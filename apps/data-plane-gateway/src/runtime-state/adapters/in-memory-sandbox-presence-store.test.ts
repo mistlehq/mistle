@@ -11,7 +11,6 @@ describe("InMemorySandboxPresenceStore", () => {
     await store.touchLease({
       sandboxInstanceId: "sbi_abc",
       leaseId: "spl_first",
-      kind: "pty",
       source: "dashboard",
       sessionId: "session_first",
       ttlMs: 30_000,
@@ -20,7 +19,6 @@ describe("InMemorySandboxPresenceStore", () => {
     await store.touchLease({
       sandboxInstanceId: "sbi_abc",
       leaseId: "spl_second",
-      kind: "agent",
       source: "cli",
       sessionId: "session_second",
       ttlMs: 30_000,
@@ -54,7 +52,6 @@ describe("InMemorySandboxPresenceStore", () => {
     await store.touchLease({
       sandboxInstanceId: "sbi_abc",
       leaseId: "spl_only",
-      kind: "pty",
       source: "dashboard",
       sessionId: "session_only",
       ttlMs: 30_000,
@@ -82,7 +79,6 @@ describe("InMemorySandboxPresenceStore", () => {
     await store.touchLease({
       sandboxInstanceId: "sbi_abc",
       leaseId: "spl_expiring",
-      kind: "pty",
       source: "dashboard",
       sessionId: "session_expiring",
       ttlMs: 5_000,

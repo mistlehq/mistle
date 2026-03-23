@@ -206,7 +206,6 @@ describe("runtime-state store integrations", () => {
       await store.touchLease({
         sandboxInstanceId,
         leaseId: "spl_first",
-        kind: "pty",
         source: "dashboard",
         sessionId: "session_first",
         ttlMs: 30_000,
@@ -215,7 +214,6 @@ describe("runtime-state store integrations", () => {
       await store.touchLease({
         sandboxInstanceId,
         leaseId: "spl_second",
-        kind: "agent",
         source: "cli",
         sessionId: "session_second",
         ttlMs: 50,

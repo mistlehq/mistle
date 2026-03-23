@@ -1,12 +1,4 @@
 /**
- * The keepalive capability represented by a presence lease.
- *
- * `pty` is a terminal-style interactive session. `agent` is an interactive
- * agent session that should keep the sandbox alive while connected.
- */
-export type SandboxPresenceLeaseKind = "pty" | "agent";
-
-/**
  * The product surface that originated a presence lease.
  *
  * The stop policy should generally not branch on this field. It exists so the
@@ -18,9 +10,11 @@ export type SandboxPresenceLeaseSource = "dashboard" | "cli";
  * Stores interactive client presence leases for sandbox instances.
  *
  * Presence is non-exclusive: many interactive sessions may keep the same
- * sandbox alive concurrently. Implementations should treat `touchLease(...)` as
- * an upsert-like operation that creates a missing lease or extends an existing
- * one.
+ * sandbox alive concurrently. Leases are intentionally session-scoped rather
+ * than stream-scoped, so a connected interactive websocket may keep a sandbox
+ * alive even when it currently has no open streams. Implementations should
+ * treat `touchLease(...)` as an upsert-like operation that creates a missing
+ * lease or extends an existing one.
  */
 export interface SandboxPresenceStore {
   /**
@@ -29,7 +23,6 @@ export interface SandboxPresenceStore {
   touchLease(input: {
     sandboxInstanceId: string;
     leaseId: string;
-    kind: SandboxPresenceLeaseKind;
     source: SandboxPresenceLeaseSource;
     sessionId: string;
     ttlMs: number;
