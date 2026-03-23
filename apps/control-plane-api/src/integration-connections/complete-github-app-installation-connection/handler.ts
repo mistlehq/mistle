@@ -1,7 +1,7 @@
 import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
-import { buildDashboardUrl } from "../../dashboard-url.js";
+import { buildDashboardUrl } from "../../lib/dashboard-url.js";
 import type { AppContextBindings } from "../../types.js";
 import { completeGitHubAppInstallationConnection } from "../services/complete-github-app-installation-connection.js";
 import { route } from "./route.js";

@@ -7,7 +7,6 @@ import {
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
-import { buildDashboardUrl } from "../src/dashboard-url.js";
 import {
   CompleteGitHubAppInstallationConnectionBadRequestResponseSchema,
   CompleteGitHubAppInstallationConnectionQuerySchema,
@@ -16,6 +15,7 @@ import {
   StartGitHubAppInstallationConnectionBadRequestResponseSchema,
   StartGitHubAppInstallationConnectionResponseSchema,
 } from "../src/integration-connections/start-github-app-installation-connection/schema.js";
+import { buildDashboardUrl } from "../src/lib/dashboard-url.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
 
