@@ -1,14 +1,66 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema-jsonc.json",
   "include": ["dependencies", "devDependencies", "unlisted", "binaries", "unresolved"],
+  "ignoreBinaries": ["nix"],
   "workspaces": {
-    ".": {},
-    "apps/*": {},
+    ".": {
+      "entry": [
+        "package.json",
+        "scripts/**/*.{js,mjs,ts}",
+        "lefthook.yml",
+        ".github/workflows/**/*.{yml,yaml}",
+      ],
+    },
+    "apps/*": {
+      "entry": [
+        "src/index.{js,ts,tsx}",
+        "src/main.{js,ts,tsx}",
+        "src/bootstrap/main.{js,ts,tsx}",
+        "scripts/**/*.{js,mjs,ts}",
+        "*.config.{js,mjs,ts}",
+        "vite.config.ts",
+        "vitest*.config.ts",
+        "openworkflow.config.ts",
+      ],
+    },
+    "apps/control-plane-api": {
+      "ignoreDependencies": ["typeid-js"],
+    },
+    "apps/control-plane-worker": {
+      "ignoreDependencies": ["@mistle/logging"],
+    },
+    "apps/dashboard": {
+      "ignoreDependencies": ["openapi-typescript"],
+    },
+    "apps/data-plane-worker": {
+      "ignoreDependencies": ["@mistle/logging", "typeid-js"],
+    },
+    "apps/sandbox-runtime": {
+      "ignoreDependencies": ["postject"],
+    },
+    "packages/control-plane-internal-client": {
+      "ignoreDependencies": ["openapi-typescript"],
+    },
+    "packages/data-plane-internal-client": {
+      "ignoreDependencies": ["openapi-typescript"],
+    },
+    "packages/*": {
+      "entry": [
+        "src/index.{js,ts,tsx}",
+        "scripts/**/*.{js,mjs,ts}",
+        "*.config.{js,mjs,ts}",
+        ".storybook/**/*.{js,mjs,ts,css}",
+      ],
+    },
+    "packages/storybook": {
+      "ignoreDependencies": ["@mistle/ui", "streamdown"],
+    },
     "tests": {},
   },
   "ignoreFiles": [
     ".git/**",
-    ".github/**",
+    ".direnv/**",
+    ".pkgrep/**",
     "**/dist/**",
     "**/coverage/**",
     "**/test-results/**",

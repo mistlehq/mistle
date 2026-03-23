@@ -116,6 +116,9 @@ jobs:
       - name: Run static checks in Nix shell
         run: nix develop --command bash -lc "pnpm format:check && pnpm lint && pnpm typecheck"
 
+      - name: Run knip in Nix shell
+        run: nix develop --command pnpm lint:knip
+
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-turbo-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5
