@@ -17,7 +17,6 @@ async function resolveAutomationConversation(
 ): Promise<SandboxInstanceAutomationConversation | null> {
   const routes = await db.query.automationConversationRoutes.findMany({
     columns: {
-      createdAt: true,
       updatedAt: true,
       id: true,
       conversationId: true,
@@ -32,7 +31,6 @@ async function resolveAutomationConversation(
 
   const matchingRoutes: Array<
     SandboxInstanceAutomationConversation & {
-      createdAt: string;
       updatedAt: string;
     }
   > = [];
@@ -57,7 +55,6 @@ async function resolveAutomationConversation(
     }
 
     matchingRoutes.push({
-      createdAt: route.createdAt,
       updatedAt: route.updatedAt,
       conversationId: conversation.id,
       routeId: route.id,
