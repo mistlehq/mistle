@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { shouldAutoOpenTerminal } from "./session-terminal-panel.js";
+import { shouldAutoCloseTerminalOnExit, shouldAutoOpenTerminal } from "./session-terminal-panel.js";
 
 describe("shouldAutoOpenTerminal", () => {
   it("allows auto-open for running sandboxes", () => {
@@ -43,6 +43,39 @@ describe("shouldAutoOpenTerminal", () => {
         isConnectionReady: true,
         lifecycleState: "opening",
         hasAttemptedAutoOpen: true,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("shouldAutoCloseTerminalOnExit", () => {
+  it("auto-closes when the PTY exits and the exit has not been handled yet", () => {
+    expect(
+      shouldAutoCloseTerminalOnExit({
+        exitInfo: {
+          exitCode: 0,
+        },
+        hasHandledExit: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not auto-close before the PTY exits", () => {
+    expect(
+      shouldAutoCloseTerminalOnExit({
+        exitInfo: null,
+        hasHandledExit: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not auto-close the same exit twice", () => {
+    expect(
+      shouldAutoCloseTerminalOnExit({
+        exitInfo: {
+          exitCode: 0,
+        },
+        hasHandledExit: true,
       }),
     ).toBe(false);
   });

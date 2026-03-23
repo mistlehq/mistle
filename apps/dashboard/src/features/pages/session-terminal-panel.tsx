@@ -1,4 +1,4 @@
-import type { SandboxPtyState } from "@mistle/sandbox-session-client";
+import type { SandboxPtyExitInfo, SandboxPtyState } from "@mistle/sandbox-session-client";
 import { Button, cn } from "@mistle/ui";
 import { MinusIcon, SpinnerGapIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useRef } from "react";
@@ -35,6 +35,13 @@ function shouldAutoOpenTerminal(input: {
   }
 
   return !input.hasAttemptedAutoOpen;
+}
+
+function shouldAutoCloseTerminalOnExit(input: {
+  exitInfo: SandboxPtyExitInfo | null;
+  hasHandledExit: boolean;
+}): boolean {
+  return input.exitInfo !== null && !input.hasHandledExit;
 }
 
 function SessionTerminalToolbarStatus(input: {
@@ -95,10 +102,30 @@ export function SessionTerminalPanel({
   const { lifecycle, output, actions } = ptyState;
   const { openPty, resizePty, writeInput } = actions;
   const hasAttemptedAutoOpenRef = useRef(false);
+  const hasHandledExitRef = useRef(false);
 
   useEffect(() => {
     hasAttemptedAutoOpenRef.current = false;
   }, [isConnectionReady, isVisible, sandboxInstanceId, sandboxStatus]);
+
+  useEffect(() => {
+    if (lifecycle.exitInfo === null) {
+      hasHandledExitRef.current = false;
+      return;
+    }
+
+    if (
+      !shouldAutoCloseTerminalOnExit({
+        exitInfo: lifecycle.exitInfo,
+        hasHandledExit: hasHandledExitRef.current,
+      })
+    ) {
+      return;
+    }
+
+    hasHandledExitRef.current = true;
+    void handleCloseTerminal();
+  }, [lifecycle.exitInfo]);
 
   useEffect(() => {
     if (
@@ -182,4 +209,4 @@ export function SessionTerminalPanel({
   );
 }
 
-export { shouldAutoOpenTerminal };
+export { shouldAutoCloseTerminalOnExit, shouldAutoOpenTerminal };
