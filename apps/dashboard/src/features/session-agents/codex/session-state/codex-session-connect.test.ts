@@ -124,7 +124,22 @@ describe("codex session connect", () => {
         preferredThreadId: "thread_persisted",
         selectedThreadId: "thread_persisted",
       }),
-    ).toBe("error_missing_persisted");
+    ).toBe("error_broken_persisted");
+  });
+
+  it("keeps the explicit error when the persisted linked thread has no rollout", () => {
+    expect(
+      resolveReconnectResumeFailureAction({
+        error: new CodexJsonRpcRequestError({
+          method: "thread/resume",
+          id: 8,
+          code: -32600,
+          message: "no rollout found for thread id thread_persisted",
+        }),
+        preferredThreadId: "thread_persisted",
+        selectedThreadId: "thread_persisted",
+      }),
+    ).toBe("error_broken_persisted");
   });
 
   it("builds the connected session snapshot from the minted connection", () => {

@@ -35,7 +35,7 @@ function isNoRolloutPersistedThreadError(error: unknown): boolean {
   );
 }
 
-export type ReconnectResumeFailureAction = "error_missing_persisted" | "start_new" | "rethrow";
+export type ReconnectResumeFailureAction = "error_broken_persisted" | "start_new" | "rethrow";
 
 export function resolveReconnectResumeFailureAction(input: {
   error: unknown;
@@ -45,9 +45,9 @@ export function resolveReconnectResumeFailureAction(input: {
   if (
     input.preferredThreadId !== null &&
     input.selectedThreadId === input.preferredThreadId &&
-    isMissingPersistedThreadError(input.error)
+    (isMissingPersistedThreadError(input.error) || isNoRolloutPersistedThreadError(input.error))
   ) {
-    return "error_missing_persisted";
+    return "error_broken_persisted";
   }
 
   if (isMissingPersistedThreadError(input.error) || isNoRolloutPersistedThreadError(input.error)) {
@@ -106,11 +106,11 @@ export async function establishInitialCodexThread(input: {
         selectedThreadId: action.threadId,
       });
 
-      if (failureAction === "error_missing_persisted") {
+      if (failureAction === "error_broken_persisted") {
         throw describeCodexSessionStepError(
           "Resuming persisted chat session",
           new Error(
-            `This chat session could not be resumed because the linked persisted session '${input.preferredThreadId}' is no longer available.`,
+            `This chat session could not be resumed because the linked persisted session '${input.preferredThreadId}' is no longer resumable.`,
           ),
         );
       }
