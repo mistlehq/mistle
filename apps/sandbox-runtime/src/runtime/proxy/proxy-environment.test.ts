@@ -9,10 +9,16 @@ describe("resolveBaselineProxyEnvironment", () => {
       tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy.internal:8081/egress",
     });
 
+    expect(environment.ALL_PROXY).toBe("http://127.0.0.1:8090");
     expect(environment.HTTP_PROXY).toBe("http://127.0.0.1:8090");
     expect(environment.HTTPS_PROXY).toBe("http://127.0.0.1:8090");
+    expect(environment.WS_PROXY).toBe("http://127.0.0.1:8090");
+    expect(environment.WSS_PROXY).toBe("http://127.0.0.1:8090");
+    expect(environment.all_proxy).toBe("http://127.0.0.1:8090");
     expect(environment.http_proxy).toBe("http://127.0.0.1:8090");
     expect(environment.https_proxy).toBe("http://127.0.0.1:8090");
+    expect(environment.ws_proxy).toBe("http://127.0.0.1:8090");
+    expect(environment.wss_proxy).toBe("http://127.0.0.1:8090");
     const noProxy = environment.NO_PROXY;
     expect(noProxy).toBeDefined();
     if (noProxy === undefined) {

@@ -42,9 +42,21 @@ switch (mode) {
         response.setHeader("content-type", "application/json");
         response.end(
           JSON.stringify({
+            allProxy: process.env.ALL_PROXY,
+            allProxyLower: process.env.all_proxy,
+            httpsProxy: process.env.HTTPS_PROXY,
+            httpsProxyLower: process.env.https_proxy,
+            httpProxy: process.env.HTTP_PROXY,
+            httpProxyLower: process.env.http_proxy,
+            noProxy: process.env.NO_PROXY,
+            noProxyLower: process.env.no_proxy,
             setupValue: process.env.SETUP_VALUE,
             overriddenValue: process.env.OVERRIDDEN_VALUE,
             processOnlyValue: process.env.PROCESS_ONLY_VALUE,
+            wsProxy: process.env.WS_PROXY,
+            wsProxyLower: process.env.ws_proxy,
+            wssProxy: process.env.WSS_PROXY,
+            wssProxyLower: process.env.wss_proxy,
           }),
         );
         return;

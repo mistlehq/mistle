@@ -31,12 +31,18 @@ export function resolveBaselineProxyEnvironment(
   const noProxyValue = resolveNoProxyEntries(input.tokenizerProxyEgressBaseUrl).join(",");
 
   return {
+    ALL_PROXY: proxyUrl,
     HTTP_PROXY: proxyUrl,
     HTTPS_PROXY: proxyUrl,
     NO_PROXY: noProxyValue,
+    WS_PROXY: proxyUrl,
+    WSS_PROXY: proxyUrl,
+    all_proxy: proxyUrl,
     http_proxy: proxyUrl,
     https_proxy: proxyUrl,
     no_proxy: noProxyValue,
+    ws_proxy: proxyUrl,
+    wss_proxy: proxyUrl,
   };
 }
 

@@ -11,6 +11,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { startRuntimeClientProcessManager } from "../src/runtime/processes/runtime-client-process-manager.js";
 import { flattenRuntimeClientProcesses } from "../src/runtime/processes/runtime-client-processes.js";
+import {
+  applyEnvironmentEntries,
+  resolveBaselineProxyEnvironment,
+} from "../src/runtime/proxy/proxy-environment.js";
 
 const RuntimeClientProcessHelperPath = fileURLToPath(
   new URL("./helpers/runtime-client-process-helper.mjs", import.meta.url),
@@ -349,9 +353,77 @@ describe("startRuntimeClientProcessManager", () => {
     const response = await fetch(`http://127.0.0.1:${freePort}/env`);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
+      allProxy: undefined,
+      allProxyLower: undefined,
+      httpsProxy: undefined,
+      httpsProxyLower: undefined,
+      httpProxy: undefined,
+      httpProxyLower: undefined,
+      noProxy: undefined,
+      noProxyLower: undefined,
       setupValue: "setup-value",
       overriddenValue: "process",
       processOnlyValue: "process-only",
+      wsProxy: undefined,
+      wsProxyLower: undefined,
+      wssProxy: undefined,
+      wssProxyLower: undefined,
     });
+  });
+
+  it("propagates baseline proxy env to spawned runtime clients", async () => {
+    const restoreEnvironment = applyEnvironmentEntries(
+      resolveBaselineProxyEnvironment({
+        listenAddr: ":8090",
+        tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy.internal:8081/tokenizer-proxy/egress",
+      }),
+    );
+
+    const freePort = await reserveTCPPort();
+
+    try {
+      const manager = await startRuntimeClientProcessManager([
+        {
+          ...helperProcessSpec("process_proxy_env", "http-listen", {
+            SANDBOX_RUNTIME_PROCESS_HELPER_PORT: String(freePort),
+          }),
+          readiness: {
+            type: "http",
+            url: `http://127.0.0.1:${freePort}`,
+            expectedStatus: 200,
+            timeoutMs: 2000,
+          },
+          stop: {
+            signal: "sigterm",
+            timeoutMs: 2000,
+            gracePeriodMs: 100,
+          },
+        },
+      ]);
+      StartedManagers.add(manager);
+
+      const response = await fetch(`http://127.0.0.1:${freePort}/env`);
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        allProxy: "http://127.0.0.1:8090",
+        allProxyLower: "http://127.0.0.1:8090",
+        httpsProxy: "http://127.0.0.1:8090",
+        httpsProxyLower: "http://127.0.0.1:8090",
+        httpProxy: "http://127.0.0.1:8090",
+        httpProxyLower: "http://127.0.0.1:8090",
+        noProxy: "127.0.0.1,::1,localhost,tokenizer-proxy.internal,tokenizer-proxy.internal:8081",
+        noProxyLower:
+          "127.0.0.1,::1,localhost,tokenizer-proxy.internal,tokenizer-proxy.internal:8081",
+        setupValue: undefined,
+        overriddenValue: undefined,
+        processOnlyValue: undefined,
+        wsProxy: "http://127.0.0.1:8090",
+        wsProxyLower: "http://127.0.0.1:8090",
+        wssProxy: "http://127.0.0.1:8090",
+        wssProxyLower: "http://127.0.0.1:8090",
+      });
+    } finally {
+      restoreEnvironment();
+    }
   });
 });
