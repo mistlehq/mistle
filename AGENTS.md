@@ -47,6 +47,7 @@
 - Located in `apps/*/integration/` folders
 - Use real infrastructure (Postgres, etc.) but test the app as a unit
 - **Infrastructure:** Prefer Testcontainers for databases and other dependencies. Compose custom stacks using service primitives from `@mistle/test-harness` (for example `startPostgresWithPgBouncer()`) or use `PostgreSqlContainer` from `@testcontainers/postgresql` directly. Start containers in test setup/`beforeAll` and stop them in teardown/`afterAll`. Only spin up what your test needs (e.g., just Postgres for database tests, Postgres + Restate for tests that need both).
+- When an integration test starts a local TCP service/runtime, do not hard-code shared ports like `3000` or `4000`. Reserve an ephemeral port instead (for example with `reserveAvailablePort({ host: "127.0.0.1" })` from `@mistle/test-harness/network`) so suites can run in parallel without `EADDRINUSE`.
 - Example: Testing auth routes by importing `createApp()` and making requests to it, verifying database state
 
 **System tests** (`*.system.test.ts`):

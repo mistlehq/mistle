@@ -16,6 +16,7 @@ import {
   MigrationTracking,
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
+import { reserveAvailablePort } from "@mistle/test-harness";
 import { Client, Pool } from "pg";
 import { afterEach, describe, expect } from "vitest";
 
@@ -118,7 +119,7 @@ async function createStartedDataPlaneFixture(input: {
     const config: DataPlaneApiConfig = {
       server: {
         host: "127.0.0.1",
-        port: 4000,
+        port: await reserveAvailablePort({ host: "127.0.0.1" }),
       },
       database: {
         url: databaseUrl,
