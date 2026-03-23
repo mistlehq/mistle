@@ -1,6 +1,7 @@
 import type { CompiledAgentRuntime, CompiledRuntimeClient } from "@mistle/integrations-core";
 import type WebSocket from "ws";
 
+import { logSandboxRuntimeEvent } from "../runtime/logger.js";
 import { ignorePromiseRejectionAfterAbort } from "./abortable-race.js";
 import {
   finishActiveTunnelStreamRelay,
@@ -299,7 +300,15 @@ async function runTunnelClientLoop(input: {
     if (dialAttempt > 1) {
       try {
         await exchangeTunnelTokensNow(input.gatewayWsUrl, input.tokens);
-      } catch {
+      } catch (error) {
+        logSandboxRuntimeEvent({
+          level: "warn",
+          event: "sandbox_tunnel_token_exchange_before_redial_failed",
+          fields: {
+            dialAttempt,
+            message: error instanceof Error ? error.message : describeUnknownError(error),
+          },
+        });
         await waitForReconnect(input.signal, nextTunnelReconnectDelay());
         continue;
       }
@@ -307,10 +316,33 @@ async function runTunnelClientLoop(input: {
 
     let tunnelSocket: WebSocket;
     try {
+      logSandboxRuntimeEvent({
+        level: "info",
+        event: "sandbox_tunnel_connect_attempt_started",
+        fields: {
+          dialAttempt,
+        },
+      });
       const parsedUrl = parseGatewayUrl(input.gatewayWsUrl);
       parsedUrl.searchParams.set("bootstrap_token", input.tokens.currentBootstrapToken());
       tunnelSocket = await connectWebSocket(parsedUrl.toString(), input.signal);
-    } catch {
+      logSandboxRuntimeEvent({
+        level: "info",
+        event: "sandbox_tunnel_connect_attempt_succeeded",
+        fields: {
+          dialAttempt,
+        },
+      });
+    } catch (error) {
+      logSandboxRuntimeEvent({
+        level: "warn",
+        event: "sandbox_tunnel_connect_attempt_failed",
+        fields: {
+          dialAttempt,
+          retryDelayMs: nextTunnelReconnectDelay(),
+          message: error instanceof Error ? error.message : describeUnknownError(error),
+        },
+      });
       await waitForReconnect(input.signal, nextTunnelReconnectDelay());
       continue;
     }
@@ -337,12 +369,28 @@ async function runTunnelClientLoop(input: {
       return;
     }
     if (connectionError === undefined) {
+      logSandboxRuntimeEvent({
+        level: "info",
+        event: "sandbox_tunnel_connection_closed_cleanly",
+        fields: {
+          dialAttempt,
+        },
+      });
       return;
     }
     if (!(connectionError instanceof Error)) {
       throw new Error(describeUnknownError(connectionError));
     }
 
+    logSandboxRuntimeEvent({
+      level: "warn",
+      event: "sandbox_tunnel_connection_lost",
+      fields: {
+        dialAttempt,
+        retryDelayMs: nextTunnelReconnectDelay(),
+        message: connectionError.message,
+      },
+    });
     await waitForReconnect(input.signal, nextTunnelReconnectDelay());
     continue;
   }

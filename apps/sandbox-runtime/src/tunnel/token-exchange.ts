@@ -1,3 +1,5 @@
+import { logSandboxRuntimeEvent } from "../runtime/logger.js";
+
 const TUNNEL_TOKEN_EXCHANGE_ROUTE_SUFFIX = "/token-exchange";
 const TUNNEL_RECONNECT_DELAY_MS = 1_000;
 
@@ -258,7 +260,20 @@ export async function runTunnelTokenExchangeLoop(input: {
 
     try {
       await exchangeTunnelTokensNow(input.gatewayWsUrl, input.tokens);
-    } catch {
+    } catch (error) {
+      logSandboxRuntimeEvent({
+        level: "warn",
+        event: "sandbox_tunnel_token_exchange_failed",
+        fields: {
+          retryDelayMs: nextTunnelReconnectDelay(),
+          message:
+            error instanceof Error
+              ? error.message
+              : typeof error === "string"
+                ? error
+                : "unknown token exchange error",
+        },
+      });
       await sleep(nextTunnelReconnectDelay(), input.signal);
     }
   }
