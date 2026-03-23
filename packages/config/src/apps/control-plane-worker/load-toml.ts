@@ -9,17 +9,12 @@ export function loadControlPlaneWorkerFromToml(
 ): PartialControlPlaneWorkerConfigInput {
   const apps = asObjectRecord(tomlRoot.apps);
   const controlPlaneWorker = asObjectRecord(apps.control_plane_worker);
-  const server = asObjectRecord(controlPlaneWorker.server);
   const workflow = asObjectRecord(controlPlaneWorker.workflow);
   const email = asObjectRecord(controlPlaneWorker.email);
   const dataPlaneApi = asObjectRecord(controlPlaneWorker.data_plane_api);
   const controlPlaneApi = asObjectRecord(controlPlaneWorker.control_plane_api);
 
   return PartialControlPlaneWorkerConfigSchema.parse({
-    server: {
-      host: server.host,
-      port: server.port,
-    },
     workflow: {
       databaseUrl: workflow.database_url,
       namespaceId: workflow.namespace_id,

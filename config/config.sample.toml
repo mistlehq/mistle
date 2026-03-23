@@ -68,10 +68,6 @@ active_master_encryption_key_version = 1
 [apps.control_plane_api.integrations.master_encryption_keys]
 "1" = "replace-with-master-encryption-key"
 
-[apps.control_plane_worker.server]
-host = "0.0.0.0"
-port = 8081
-
 [apps.control_plane_worker.workflow]
 database_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 namespace_id = "production"
@@ -123,10 +119,6 @@ key_prefix = "mistle:runtime-state"
 
 [apps.data_plane_gateway.data_plane_api]
 base_url = "http://data-plane-api:8082"
-
-[apps.data_plane_worker.server]
-host = "0.0.0.0"
-port = 8083
 
 [apps.data_plane_worker.database]
 url = "postgresql://mistle:replace-with-password@db:5432/mistle"

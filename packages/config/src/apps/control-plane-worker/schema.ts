@@ -1,12 +1,5 @@
 import { z } from "zod";
 
-export const ControlPlaneWorkerServerConfigSchema = z
-  .object({
-    host: z.string().min(1),
-    port: z.number().int().min(1).max(65535),
-  })
-  .strict();
-
 export const ControlPlaneWorkerWorkflowConfigSchema = z
   .object({
     databaseUrl: z.string().min(1),
@@ -42,7 +35,6 @@ export const ControlPlaneWorkerControlPlaneApiConfigSchema = z
 
 export const ControlPlaneWorkerConfigSchema = z
   .object({
-    server: ControlPlaneWorkerServerConfigSchema,
     workflow: ControlPlaneWorkerWorkflowConfigSchema,
     email: ControlPlaneWorkerEmailConfigSchema,
     dataPlaneApi: ControlPlaneWorkerDataPlaneApiConfigSchema,
@@ -52,7 +44,6 @@ export const ControlPlaneWorkerConfigSchema = z
 
 export const PartialControlPlaneWorkerConfigSchema = z
   .object({
-    server: ControlPlaneWorkerServerConfigSchema.partial().optional(),
     workflow: ControlPlaneWorkerWorkflowConfigSchema.partial().optional(),
     email: ControlPlaneWorkerEmailConfigSchema.partial().optional(),
     dataPlaneApi: ControlPlaneWorkerDataPlaneApiConfigSchema.partial().optional(),

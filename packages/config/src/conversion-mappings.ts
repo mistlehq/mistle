@@ -176,16 +176,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envValueFormat: "json",
   },
   {
-    configPath: ["apps", "control_plane_worker", "server", "host"],
-    tomlPath: ["apps", "control_plane_worker", "server", "host"],
-    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_HOST",
-  },
-  {
-    configPath: ["apps", "control_plane_worker", "server", "port"],
-    tomlPath: ["apps", "control_plane_worker", "server", "port"],
-    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_PORT",
-  },
-  {
     configPath: ["apps", "control_plane_worker", "workflow", "databaseUrl"],
     tomlPath: ["apps", "control_plane_worker", "workflow", "database_url"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL",
@@ -314,16 +304,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     configPath: ["apps", "data_plane_gateway", "dataPlaneApi", "baseUrl"],
     tomlPath: ["apps", "data_plane_gateway", "data_plane_api", "base_url"],
     envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL",
-  },
-  {
-    configPath: ["apps", "data_plane_worker", "server", "host"],
-    tomlPath: ["apps", "data_plane_worker", "server", "host"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_HOST",
-  },
-  {
-    configPath: ["apps", "data_plane_worker", "server", "port"],
-    tomlPath: ["apps", "data_plane_worker", "server", "port"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_PORT",
   },
   {
     configPath: ["apps", "data_plane_worker", "database", "url"],
