@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import type { StartSandboxInstanceInput } from "@mistle/data-plane-internal-client";
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 
 import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
@@ -27,6 +28,14 @@ type StartProfileInstanceOutput = {
   workflowRunId: string;
   sandboxInstanceId: string;
 };
+
+function cloneStartSandboxRuntimePlan(input: unknown): StartSandboxInstanceInput["runtimePlan"] {
+  const clonedRuntimePlan: StartSandboxInstanceInput["runtimePlan"] = JSON.parse(
+    JSON.stringify(input),
+  );
+
+  return clonedRuntimePlan;
+}
 
 export async function startProfileInstance(
   {
@@ -64,7 +73,7 @@ export async function startProfileInstance(
     sandboxProfileId: serviceInput.profileId,
     sandboxProfileVersion: serviceInput.profileVersion,
     idempotencyKey,
-    runtimePlan,
+    runtimePlan: cloneStartSandboxRuntimePlan(runtimePlan),
     startedBy: serviceInput.startedBy,
     source: serviceInput.source,
     image: serviceInput.image,

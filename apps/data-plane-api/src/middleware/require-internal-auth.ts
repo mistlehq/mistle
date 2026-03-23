@@ -1,9 +1,9 @@
 import type { MiddlewareHandler } from "hono";
 
+import { DATA_PLANE_INTERNAL_AUTH_HEADER } from "../internal/constants.js";
 import type { AppContextBindings } from "../types.js";
 
 type CreateRequireInternalAuthMiddlewareInput = {
-  headerName: string;
   errorCode: string;
   errorMessage: string;
 };
@@ -12,7 +12,7 @@ export function createRequireInternalAuthMiddleware(
   input: CreateRequireInternalAuthMiddlewareInput,
 ): MiddlewareHandler<AppContextBindings> {
   return async (ctx, next) => {
-    const providedServiceToken = ctx.req.header(input.headerName);
+    const providedServiceToken = ctx.req.header(DATA_PLANE_INTERNAL_AUTH_HEADER);
 
     if (
       providedServiceToken === undefined ||

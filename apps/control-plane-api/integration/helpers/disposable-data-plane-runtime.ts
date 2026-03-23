@@ -9,8 +9,8 @@ import {
 import { reserveAvailablePort } from "@mistle/test-harness";
 import { Client, Pool } from "pg";
 
+import { createDataPlaneApiRuntime } from "../../../data-plane-api/src/main.js";
 import { createDataPlaneBackend } from "../../../data-plane-api/src/openworkflow/index.js";
-import { createDataPlaneApiRuntime } from "../../../data-plane-api/src/runtime/index.js";
 import type { DataPlaneApiConfig } from "../../../data-plane-api/src/types.js";
 
 export type DisposableDataPlaneRuntime = {

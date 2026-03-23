@@ -1,8 +1,8 @@
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 
-import type { SandboxRuntimeStateSnapshot } from "../runtime-state/sandbox-runtime-state-reader.js";
-import { isSandboxRuntimeReady } from "../runtime-state/sandbox-runtime-state-readiness.js";
-import { DataPlaneSandboxInstanceStatuses } from "./contracts.js";
+import type { SandboxRuntimeStateSnapshot } from "../../runtime-state/sandbox-runtime-state-reader.js";
+import { isSandboxRuntimeReady } from "../../runtime-state/sandbox-runtime-state-readiness.js";
+import { DataPlaneSandboxInstanceStatuses, type GetSandboxInstanceResponse } from "./schemas.js";
 
 /**
  * Composes the effective user-facing sandbox status from durable lifecycle
@@ -15,7 +15,7 @@ import { DataPlaneSandboxInstanceStatuses } from "./contracts.js";
 export function resolveEffectiveSandboxInstanceStatus(input: {
   persistedStatus: string;
   runtimeStateSnapshot: SandboxRuntimeStateSnapshot | null;
-}): (typeof DataPlaneSandboxInstanceStatuses)[keyof typeof DataPlaneSandboxInstanceStatuses] {
+}): NonNullable<GetSandboxInstanceResponse>["status"] {
   if (input.persistedStatus === SandboxInstanceStatuses.FAILED) {
     return DataPlaneSandboxInstanceStatuses.FAILED;
   }

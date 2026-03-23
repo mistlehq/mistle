@@ -5,7 +5,7 @@ import {
 import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { describe, expect } from "vitest";
 
-import { INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "../src/internal-sandbox-instances/index.js";
+import { INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "../src/internal/sandbox-instances/index.js";
 import { it } from "./test-context.js";
 
 describe("internal sandbox instances list integration", () => {
