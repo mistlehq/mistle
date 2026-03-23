@@ -17,6 +17,7 @@ async function resolveAutomationConversation(
 ): Promise<SandboxInstanceAutomationConversation | null> {
   const routes = await db.query.automationConversationRoutes.findMany({
     columns: {
+      createdAt: true,
       id: true,
       conversationId: true,
       providerConversationId: true,
@@ -28,7 +29,11 @@ async function resolveAutomationConversation(
       ),
   });
 
-  const matchingRoutes: SandboxInstanceAutomationConversation[] = [];
+  const matchingRoutes: Array<
+    SandboxInstanceAutomationConversation & {
+      createdAt: string;
+    }
+  > = [];
 
   for (const route of routes) {
     const conversation = await db.query.automationConversations.findFirst({
@@ -47,6 +52,7 @@ async function resolveAutomationConversation(
     }
 
     matchingRoutes.push({
+      createdAt: route.createdAt,
       conversationId: conversation.id,
       routeId: route.id,
       providerConversationId: route.providerConversationId,
@@ -58,10 +64,26 @@ async function resolveAutomationConversation(
   }
 
   if (matchingRoutes.length > 1) {
+    matchingRoutes.sort((left, right) => {
+      const createdAtComparison = right.createdAt.localeCompare(left.createdAt);
+      if (createdAtComparison !== 0) {
+        return createdAtComparison;
+      }
+
+      return (right.routeId ?? "").localeCompare(left.routeId ?? "");
+    });
+  }
+
+  const mostRecentRoute = matchingRoutes[0];
+  if (mostRecentRoute === undefined) {
     return null;
   }
 
-  return matchingRoutes[0] ?? null;
+  return {
+    conversationId: mostRecentRoute.conversationId,
+    routeId: mostRecentRoute.routeId,
+    providerConversationId: mostRecentRoute.providerConversationId,
+  };
 }
 
 export async function getInstance(

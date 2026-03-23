@@ -289,7 +289,7 @@ describe("sandbox instances get integration", () => {
     expect(body.automationConversation).toBeNull();
   });
 
-  it("returns null automation conversation metadata when multiple active automation conversations match the sandbox", async ({
+  it("returns the most recently created automation conversation metadata when multiple active automation conversations match the sandbox", async ({
     fixture,
   }) => {
     const dataPlaneFixture = await createStartedDataPlaneFixture({
@@ -365,6 +365,7 @@ describe("sandbox instances get integration", () => {
         providerExecutionId: null,
         providerState: null,
         status: "active",
+        createdAt: "2026-03-21T00:00:00.000Z",
       },
       {
         id: "cvr_cp_get_003_b",
@@ -374,6 +375,7 @@ describe("sandbox instances get integration", () => {
         providerExecutionId: null,
         providerState: null,
         status: "active",
+        createdAt: "2026-03-21T00:00:01.000Z",
       },
     ]);
 
@@ -391,7 +393,123 @@ describe("sandbox instances get integration", () => {
       status: "running",
       failureCode: null,
       failureMessage: null,
-      automationConversation: null,
+      automationConversation: {
+        conversationId: "cnv_cp_get_003_b",
+        routeId: "cvr_cp_get_003_b",
+        providerConversationId: "thread_cp_get_003_b",
+      },
+    });
+  });
+
+  it("returns the newest route even when its provider conversation id is still pending", async ({
+    fixture,
+  }) => {
+    const dataPlaneFixture = await createStartedDataPlaneFixture({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
+    const session = await fixture.authSession({
+      email: "integration-sandbox-instances-get-pending-newest@example.com",
+    });
+
+    await dataPlaneFixture.db.insert(sandboxInstances).values({
+      id: "sbi_cp_get_004",
+      organizationId: session.organizationId,
+      sandboxProfileId: "sbp_dp_get_004",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerRuntimeId: "provider-cp-get-004",
+      status: SandboxInstanceStatuses.RUNNING,
+      startedByKind: "user",
+      startedById: session.userId,
+      source: "webhook",
+      createdAt: "2026-03-21T00:00:00.000Z",
+      updatedAt: "2026-03-21T00:00:00.000Z",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_cp_get_004",
+      organizationId: session.organizationId,
+      displayName: "Webhook sandbox profile pending newest",
+      status: SandboxProfileStatuses.ACTIVE,
+    });
+
+    await fixture.db.insert(automationConversations).values([
+      {
+        id: "cnv_cp_get_004_a",
+        organizationId: session.organizationId,
+        ownerKind: AutomationConversationOwnerKinds.AUTOMATION_TARGET,
+        ownerId: "aut_cp_get_004_a",
+        createdByKind: AutomationConversationCreatedByKinds.WEBHOOK,
+        createdById: "iwe_cp_get_004_a",
+        sandboxProfileId: "sbp_cp_get_004",
+        integrationFamilyId: "openai",
+        conversationKey: "webhook-conversation-key-004-a",
+        title: null,
+        preview: null,
+        status: AutomationConversationStatuses.ACTIVE,
+      },
+      {
+        id: "cnv_cp_get_004_b",
+        organizationId: session.organizationId,
+        ownerKind: AutomationConversationOwnerKinds.AUTOMATION_TARGET,
+        ownerId: "aut_cp_get_004_b",
+        createdByKind: AutomationConversationCreatedByKinds.WEBHOOK,
+        createdById: "iwe_cp_get_004_b",
+        sandboxProfileId: "sbp_cp_get_004",
+        integrationFamilyId: "openai",
+        conversationKey: "webhook-conversation-key-004-b",
+        title: null,
+        preview: null,
+        status: AutomationConversationStatuses.ACTIVE,
+      },
+    ]);
+
+    await fixture.db.insert(automationConversationRoutes).values([
+      {
+        id: "cvr_cp_get_004_a",
+        conversationId: "cnv_cp_get_004_a",
+        sandboxInstanceId: "sbi_cp_get_004",
+        providerConversationId: "thread_cp_get_004_a",
+        providerExecutionId: null,
+        providerState: null,
+        status: "active",
+        createdAt: "2026-03-21T00:00:00.000Z",
+      },
+      {
+        id: "cvr_cp_get_004_b",
+        conversationId: "cnv_cp_get_004_b",
+        sandboxInstanceId: "sbi_cp_get_004",
+        providerConversationId: null,
+        providerExecutionId: null,
+        providerState: null,
+        status: "active",
+        createdAt: "2026-03-21T00:00:01.000Z",
+      },
+    ]);
+
+    const response = await fixture.request("/v1/sandbox/instances/sbi_cp_get_004", {
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
+
+    expect(body).toEqual({
+      id: "sbi_cp_get_004",
+      status: "running",
+      failureCode: null,
+      failureMessage: null,
+      automationConversation: {
+        conversationId: "cnv_cp_get_004_b",
+        routeId: "cvr_cp_get_004_b",
+        providerConversationId: null,
+      },
     });
   });
 });
