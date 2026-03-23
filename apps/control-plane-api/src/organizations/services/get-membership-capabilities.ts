@@ -1,37 +1,24 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { ForbiddenError, NotFoundError } from "@mistle/http/errors.js";
 
 import {
   buildMembershipCapabilities,
   parseOrganizationRole,
 } from "../../auth/services/organization-policy.js";
 
-export type GetOrganizationMembershipCapabilitiesCtx = {
+export type GetMembershipCapabilitiesCtx = {
   db: ControlPlaneDatabase;
 };
 
-export type GetOrganizationMembershipCapabilitiesInput = {
+export type GetMembershipCapabilitiesInput = {
   actorUserId: string;
   organizationId: string;
 };
 
-export type OrganizationMembershipCapabilitiesSuccess = {
-  kind: "success";
-  data: ReturnType<typeof buildMembershipCapabilities>;
-};
-
-export type OrganizationMembershipCapabilitiesResult =
-  | OrganizationMembershipCapabilitiesSuccess
-  | {
-      kind: "forbidden";
-    }
-  | {
-      kind: "not_found";
-    };
-
-export async function getOrganizationMembershipCapabilities(
-  ctx: GetOrganizationMembershipCapabilitiesCtx,
-  input: GetOrganizationMembershipCapabilitiesInput,
-): Promise<OrganizationMembershipCapabilitiesResult> {
+export async function getMembershipCapabilities(
+  ctx: GetMembershipCapabilitiesCtx,
+  input: GetMembershipCapabilitiesInput,
+): Promise<ReturnType<typeof buildMembershipCapabilities>> {
   const membership = await ctx.db.query.members.findFirst({
     columns: {
       role: true,
@@ -49,14 +36,10 @@ export async function getOrganizationMembershipCapabilities(
     });
 
     if (organization === undefined) {
-      return {
-        kind: "not_found",
-      };
+      throw new NotFoundError("NOT_FOUND", "Organization was not found.");
     }
 
-    return {
-      kind: "forbidden",
-    };
+    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
   }
 
   const actorRole = parseOrganizationRole(membership.role);
@@ -64,11 +47,8 @@ export async function getOrganizationMembershipCapabilities(
     throw new Error("Unexpected organization role was found.");
   }
 
-  return {
-    kind: "success",
-    data: buildMembershipCapabilities({
-      actorRole,
-      organizationId: input.organizationId,
-    }),
-  };
+  return buildMembershipCapabilities({
+    actorRole,
+    organizationId: input.organizationId,
+  });
 }
