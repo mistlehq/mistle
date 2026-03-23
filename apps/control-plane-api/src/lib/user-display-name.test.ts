@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveUserDisplayName } from "./display-name.js";
+import { resolveUserDisplayName } from "./user-display-name.js";
 
 describe("resolveUserDisplayName", () => {
   it("falls back to email when the name is missing", () => {
