@@ -46,8 +46,13 @@ async function resolveStartedByNames(
 }
 
 export async function listInstances(
-  db: ControlPlaneDatabase,
-  dataPlaneClient: DataPlaneSandboxInstancesClient,
+  {
+    db,
+    dataPlaneClient,
+  }: {
+    db: ControlPlaneDatabase;
+    dataPlaneClient: DataPlaneSandboxInstancesClient;
+  },
   input: {
     organizationId: string;
     limit?: number;

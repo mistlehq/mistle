@@ -1,7 +1,7 @@
 import { SandboxProfileStatuses, sandboxProfiles } from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
 
-import { NotFoundResponseSchema, SandboxProfileSchema } from "../src/sandbox-profiles/contracts.js";
+import { NotFoundResponseSchema, SandboxProfileSchema } from "../src/sandbox-profiles/index.js";
 import { it } from "./test-context.js";
 
 describe("sandbox profiles get integration", () => {

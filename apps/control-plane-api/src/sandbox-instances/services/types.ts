@@ -1,20 +1,8 @@
 import type {
-  DataPlaneSandboxInstancesClient,
   GetSandboxInstanceResponse,
   ListSandboxInstancesResponse,
 } from "@mistle/data-plane-internal-client";
-import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
-
-export type CreateSandboxInstancesServiceInput = {
-  db: ControlPlaneDatabase;
-  dataPlaneClient: DataPlaneSandboxInstancesClient;
-  defaultConnectionToken: {
-    gatewayWebsocketUrl: string;
-    tokenTtlSeconds: number;
-    tokenConfig: ConnectionTokenConfig;
-  };
-};
 
 export type MintSandboxInstanceConnectionTokenInput = {
   organizationId: string;
@@ -53,24 +41,4 @@ export type ListSandboxInstancesResult = Omit<ListSandboxInstancesResponse, "ite
       };
     }
   >;
-};
-
-export type SandboxInstancesService = {
-  listInstances: (input: {
-    organizationId: string;
-    limit?: number;
-    after?: string;
-    before?: string;
-  }) => Promise<ListSandboxInstancesResult>;
-  getInstance: (input: {
-    organizationId: string;
-    instanceId: string;
-  }) => Promise<SandboxInstanceStatus>;
-  mintConnectionToken: (
-    input: MintSandboxInstanceConnectionTokenInput,
-  ) => Promise<SandboxInstanceConnectionToken>;
-  mintConnectionTokenForInstance: (input: {
-    organizationId: string;
-    instanceId: string;
-  }) => Promise<SandboxInstanceConnectionToken>;
 };

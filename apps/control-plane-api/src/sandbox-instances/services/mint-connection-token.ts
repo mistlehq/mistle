@@ -1,9 +1,7 @@
 import { randomUUID } from "node:crypto";
 
-import type {
-  DataPlaneSandboxInstancesClient,
-  GetSandboxInstanceResponse,
-} from "@mistle/data-plane-internal-client";
+import type { GetSandboxInstanceResponse } from "@mistle/data-plane-internal-client";
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { mintConnectionToken as mintGatewayConnectionToken } from "@mistle/gateway-connection-auth";
 import { systemClock, systemSleeper } from "@mistle/time";
 
@@ -83,7 +81,7 @@ function createInstanceNotResumableError(
 }
 
 async function getExistingSandboxInstance(
-  dataPlaneClient: DataPlaneSandboxInstancesClient,
+  dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">,
   input: {
     organizationId: string;
     instanceId: string;
@@ -102,7 +100,7 @@ async function getExistingSandboxInstance(
 }
 
 async function waitForRunningSandboxInstance(
-  dataPlaneClient: DataPlaneSandboxInstancesClient,
+  dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">,
   input: {
     organizationId: string;
     instanceId: string;
@@ -131,7 +129,14 @@ async function waitForRunningSandboxInstance(
 }
 
 export async function mintConnectionToken(
-  dataPlaneClient: DataPlaneSandboxInstancesClient,
+  {
+    dataPlaneClient,
+  }: {
+    dataPlaneClient: Pick<
+      DataPlaneSandboxInstancesClient,
+      "getSandboxInstance" | "resumeSandboxInstance"
+    >;
+  },
   input: MintSandboxInstanceConnectionTokenInput,
 ): Promise<SandboxInstanceConnectionToken> {
   let sandboxInstance = await getExistingSandboxInstance(dataPlaneClient, {

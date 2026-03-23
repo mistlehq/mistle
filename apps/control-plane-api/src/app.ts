@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import type { OpenWorkflow } from "openworkflow";
@@ -38,6 +39,8 @@ export type CreateAppInput = {
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   integrationRegistry: IntegrationRegistry;
+  dataPlaneClient: DataPlaneSandboxInstancesClient;
+  connectionTokenConfig: AppContextBindings["Variables"]["connectionTokenConfig"];
   openWorkflow: OpenWorkflow;
   services: AppServices;
 };
@@ -52,6 +55,8 @@ export function createApp(input: CreateAppInput): ControlPlaneApp {
     internalAuthServiceToken: input.internalAuthServiceToken,
     db: input.db,
     integrationRegistry: input.integrationRegistry,
+    dataPlaneClient: input.dataPlaneClient,
+    connectionTokenConfig: input.connectionTokenConfig,
     openWorkflow: input.openWorkflow,
     services: input.services,
   });
@@ -71,6 +76,8 @@ export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): 
       internalAuthServiceToken: input.internalAuthServiceToken,
       db,
       integrationRegistry: input.integrationRegistry,
+      dataPlaneClient: input.dataPlaneClient,
+      connectionTokenConfig: input.connectionTokenConfig,
       openWorkflow: input.openWorkflow,
       services,
     }),

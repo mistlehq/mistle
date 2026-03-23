@@ -3735,19 +3735,38 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["INVALID_WEBHOOK_REQUEST"]
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_WEBHOOK_REQUEST"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
                     },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
                     }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }
@@ -4215,7 +4234,7 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["INVALID_INSTANCE_ID", "INVALID_LIST_INSTANCES_INPUT"]
+                          "enum": ["INVALID_LIST_INSTANCES_INPUT"]
                         },
                         "message": {
                           "type": "string",
@@ -4228,27 +4247,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -4389,49 +4397,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": ["INVALID_INSTANCE_ID", "INVALID_LIST_INSTANCES_INPUT"]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
                     },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
-                        },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
-                        }
-                      },
-                      "required": ["success", "error"],
-                      "additionalProperties": false
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
-                  ]
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -4489,7 +4467,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["INSTANCE_NOT_FOUND"]
+                      "enum": ["NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -4579,49 +4557,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": ["INVALID_INSTANCE_ID", "INVALID_LIST_INSTANCES_INPUT"]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
                     },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
-                        },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
-                        }
-                      },
-                      "required": ["success", "error"],
-                      "additionalProperties": false
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
-                  ]
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -4679,7 +4627,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["INSTANCE_NOT_FOUND"]
+                      "enum": ["NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -4701,7 +4649,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["INSTANCE_NOT_RESUMABLE", "INSTANCE_FAILED"]
+                      "enum": ["INSTANCE_FAILED", "INSTANCE_NOT_RESUMABLE"]
                     },
                     "message": {
                       "type": "string",
@@ -4875,27 +4823,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -5030,27 +4967,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "enum": [false]
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
                     },
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["name", "message"],
-                      "additionalProperties": {}
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
-                  "required": ["success", "error"],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -5179,27 +5105,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "enum": [false]
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
                     },
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["name", "message"],
-                      "additionalProperties": {}
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
-                  "required": ["success", "error"],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -5365,27 +5280,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "enum": [false]
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
                     },
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["name", "message"],
-                      "additionalProperties": {}
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
-                  "required": ["success", "error"],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -5514,27 +5418,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "enum": [false]
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
                     },
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["name", "message"],
-                      "additionalProperties": {}
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
-                  "required": ["success", "error"],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -5674,27 +5567,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "enum": [false]
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
                     },
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["name", "message"],
-                      "additionalProperties": {}
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
-                  "required": ["success", "error"],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -5875,27 +5757,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "enum": [false]
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
                     },
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["name", "message"],
-                      "additionalProperties": {}
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
-                  "required": ["success", "error"],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -6201,27 +6072,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -6417,27 +6277,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]

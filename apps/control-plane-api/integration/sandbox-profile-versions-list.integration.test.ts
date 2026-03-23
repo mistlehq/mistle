@@ -8,7 +8,7 @@ import { describe, expect } from "vitest";
 import {
   ListSandboxProfileVersionsResponseSchema,
   NotFoundResponseSchema,
-} from "../src/sandbox-profiles/contracts.js";
+} from "../src/sandbox-profiles/index.js";
 import { it } from "./test-context.js";
 
 describe("sandbox profile versions list integration", () => {

@@ -1,51 +1,49 @@
-export const SandboxInstancesNotFoundCodes = {
-  INSTANCE_NOT_FOUND: "INSTANCE_NOT_FOUND",
-} as const;
+import { BadRequestError, ConflictError, NotFoundError } from "@mistle/http/errors.js";
+
+import {
+  SandboxInstancesBadRequestCodes,
+  SandboxInstancesConflictCodes,
+  SandboxInstancesNotFoundCodes,
+} from "../constants.js";
+
+export {
+  SandboxInstancesBadRequestCodes,
+  SandboxInstancesConflictCodes,
+  SandboxInstancesNotFoundCodes,
+};
 
 export type SandboxInstancesNotFoundCode =
   (typeof SandboxInstancesNotFoundCodes)[keyof typeof SandboxInstancesNotFoundCodes];
 
-export class SandboxInstancesNotFoundError extends Error {
+export class SandboxInstancesNotFoundError extends NotFoundError {
   code: SandboxInstancesNotFoundCode;
 
   constructor(code: SandboxInstancesNotFoundCode, message: string) {
-    super(message);
-    this.name = "SandboxInstancesNotFoundError";
+    super(code, message);
     this.code = code;
   }
 }
-
-export const SandboxInstancesBadRequestCodes = {
-  INVALID_LIST_INSTANCES_INPUT: "INVALID_LIST_INSTANCES_INPUT",
-} as const;
 
 export type SandboxInstancesBadRequestCode =
   (typeof SandboxInstancesBadRequestCodes)[keyof typeof SandboxInstancesBadRequestCodes];
 
-export class SandboxInstancesBadRequestError extends Error {
+export class SandboxInstancesBadRequestError extends BadRequestError {
   code: SandboxInstancesBadRequestCode;
 
   constructor(code: SandboxInstancesBadRequestCode, message: string) {
-    super(message);
-    this.name = "SandboxInstancesBadRequestError";
+    super(code, message);
     this.code = code;
   }
 }
 
-export const SandboxInstancesConflictCodes = {
-  INSTANCE_NOT_RESUMABLE: "INSTANCE_NOT_RESUMABLE",
-  INSTANCE_FAILED: "INSTANCE_FAILED",
-} as const;
-
 export type SandboxInstancesConflictCode =
   (typeof SandboxInstancesConflictCodes)[keyof typeof SandboxInstancesConflictCodes];
 
-export class SandboxInstancesConflictError extends Error {
+export class SandboxInstancesConflictError extends ConflictError {
   code: SandboxInstancesConflictCode;
 
   constructor(code: SandboxInstancesConflictCode, message: string) {
-    super(message);
-    this.name = "SandboxInstancesConflictError";
+    super(code, message);
     this.code = code;
   }
 }

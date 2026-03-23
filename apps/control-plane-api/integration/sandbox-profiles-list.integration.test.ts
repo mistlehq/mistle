@@ -4,7 +4,7 @@ import { describe, expect } from "vitest";
 import {
   ListSandboxProfilesResponseSchema,
   ValidationErrorResponseSchema,
-} from "../src/sandbox-profiles/contracts.js";
+} from "../src/sandbox-profiles/index.js";
 import { it } from "./test-context.js";
 
 describe("sandbox profiles list integration", () => {
@@ -123,8 +123,8 @@ describe("sandbox profiles list integration", () => {
     expect(response.status).toBe(400);
 
     const body = ValidationErrorResponseSchema.parse(await response.json());
-    expect(body.success).toBe(false);
-    expect(body.error.name).toBe("ZodError");
+    expect(body.code).toBe("VALIDATION_ERROR");
+    expect(body.message).toBe("Invalid request.");
   });
 
   it("does not return profiles from another organization", async ({ fixture }) => {

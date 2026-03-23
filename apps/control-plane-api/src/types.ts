@@ -1,15 +1,13 @@
 import type { ServerType } from "@hono/node-server";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import { AppIds, type loadConfig } from "@mistle/config";
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
-import type { HandleIntegrationWebhookEventWorkflowInput } from "@mistle/workflow-registry/control-plane";
 import type { Context, Hono } from "hono";
 import type { OpenWorkflow } from "openworkflow";
 
 import type { ControlPlaneAuth } from "./auth/index.js";
-import type { SandboxInstancesService } from "./sandbox-instances/services/factory.js";
-import type { SandboxProfilesService } from "./sandbox-profiles/services/factory.js";
 
 type LoadControlPlaneApiConfigResult = ReturnType<
   typeof loadConfig<typeof AppIds.CONTROL_PLANE_API>
@@ -44,11 +42,6 @@ export type AppRoutes<BasePath> = {
 
 export type AppServices = {
   auth: ControlPlaneAuth;
-  integrationWebhooks: {
-    receiveWebhookEvent: (input: HandleIntegrationWebhookEventWorkflowInput) => Promise<void>;
-  };
-  sandboxInstances: SandboxInstancesService;
-  sandboxProfiles: SandboxProfilesService;
 };
 
 export type AppSession = {
@@ -68,6 +61,8 @@ export type AppContextVariables = {
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   integrationRegistry: IntegrationRegistry;
+  dataPlaneClient: DataPlaneSandboxInstancesClient;
+  connectionTokenConfig: ControlPlaneApiConnectionTokenConfig;
   openWorkflow: OpenWorkflow;
   services: AppServices;
   session: AppSession | null;

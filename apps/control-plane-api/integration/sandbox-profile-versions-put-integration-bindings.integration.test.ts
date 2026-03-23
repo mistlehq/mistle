@@ -14,7 +14,7 @@ import {
   PutSandboxProfileVersionIntegrationBindingsResponseSchema,
   SandboxProfileVersionNotFoundResponseSchema,
   ValidationErrorResponseSchema,
-} from "../src/sandbox-profiles/contracts.js";
+} from "../src/sandbox-profiles/index.js";
 import { it } from "./test-context.js";
 
 describe("sandbox profile version put integration bindings integration", () => {
@@ -486,8 +486,8 @@ describe("sandbox profile version put integration bindings integration", () => {
 
     expect(response.status).toBe(400);
     const responseBody = ValidationErrorResponseSchema.parse(await response.json());
-    expect(responseBody.success).toBe(false);
-    expect(responseBody.error.name).toBe("ZodError");
+    expect(responseBody.code).toBe("VALIDATION_ERROR");
+    expect(responseBody.message).toBe("Invalid request.");
   });
 
   it("returns INVALID_BINDING_CONFIG_REFERENCE for unsupported reasoning per model", async ({
