@@ -64,7 +64,7 @@ describe("SessionWorkbenchPage", () => {
     expect(pageRoot?.firstElementChild?.getAttribute("role")).toBe("region");
   });
 
-  it("shows the stopped sandbox alert when resume is not implemented", () => {
+  it("shows the stopped sandbox alert", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -97,9 +97,7 @@ describe("SessionWorkbenchPage", () => {
 
     expect(screen.getByText("Stopped sandbox")).toBeDefined();
     expect(
-      screen.getByText(
-        "This sandbox is stopped. Dashboard resume handling is not implemented yet, so chat and terminal stay disconnected until the sandbox is running.",
-      ),
+      screen.getByText("This sandbox is stopped. Resume it to reconnect chat and terminal."),
     ).toBeDefined();
   });
 });

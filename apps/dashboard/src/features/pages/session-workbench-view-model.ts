@@ -110,7 +110,14 @@ export function resolveStoppedSessionMessage(input: {
     return null;
   }
 
-  return "This sandbox is stopped. Dashboard resume handling is not implemented yet, so chat and terminal stay disconnected until the sandbox is running.";
+  return "This sandbox is stopped. Resume it to reconnect chat and terminal.";
+}
+
+export function shouldShowResumeAction(input: {
+  requiresManualResume: boolean;
+  isResumingStoppedSandbox: boolean;
+}): boolean {
+  return input.requiresManualResume || input.isResumingStoppedSandbox;
 }
 
 export type ChatComposerAction =

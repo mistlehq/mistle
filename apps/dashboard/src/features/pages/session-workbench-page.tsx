@@ -14,6 +14,7 @@ import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
 } from "./session-workbench-page-view.js";
+import { shouldShowResumeAction } from "./session-workbench-view-model.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
 export function SessionWorkbenchPage(): React.JSX.Element {
@@ -29,6 +30,10 @@ export function SessionWorkbenchPage(): React.JSX.Element {
     ? (workbench.stoppedSessionState.message ??
       "Terminal is available only when the sandbox is running.")
     : terminalButtonLabel;
+  const showResumeButton = shouldShowResumeAction({
+    requiresManualResume: workbench.stoppedSessionState.requiresManualResume,
+    isResumingStoppedSandbox: workbench.isResumingStoppedSandbox,
+  });
   const headerActions = useMemo(
     () => (
       <div className="flex items-center gap-2">
@@ -39,6 +44,19 @@ export function SessionWorkbenchPage(): React.JSX.Element {
           {workbench.sessionHeaderStatusUi.label}
         </Badge>
         <span aria-hidden className="h-5 w-px bg-stone-200" />
+        {showResumeButton ? (
+          <Button
+            disabled={workbench.isResumingStoppedSandbox}
+            onClick={() => {
+              void workbench.requestStoppedSandboxResume();
+            }}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {workbench.isResumingStoppedSandbox ? "Resuming..." : "Resume"}
+          </Button>
+        ) : null}
         <Button
           aria-label={terminalButtonLabel}
           aria-pressed={workbench.terminalPanelState.isVisible}
@@ -68,8 +86,11 @@ export function SessionWorkbenchPage(): React.JSX.Element {
     ),
     [
       isTerminalOpenDisabled,
+      showResumeButton,
       terminalButtonTitle,
+      workbench.isResumingStoppedSandbox,
       workbench.ptyState.actions.disconnectPty,
+      workbench.requestStoppedSandboxResume,
       workbench.sessionHeaderStatusUi.className,
       workbench.sessionHeaderStatusUi.label,
       workbench.sessionHeaderStatusUi.variant,

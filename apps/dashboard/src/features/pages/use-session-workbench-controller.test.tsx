@@ -6,7 +6,11 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
+  clearStoredResumeIdempotencyKey,
+  createResumeIdempotencyStorageKey,
   hasAutomationSessionPreparationTimedOut,
+  persistResumeIdempotencyKey,
+  readStoredResumeIdempotencyKey,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
@@ -210,5 +214,38 @@ describe("useSessionWorkbenchController", () => {
         nowMs: 30_000,
       }),
     ).toBe(0);
+  });
+
+  it("namespaces resume idempotency storage keys per sandbox instance", () => {
+    const sandboxInstanceId = `sbi-resume-${Date.now()}`;
+    const otherSandboxInstanceId = `sbi-other-${Date.now()}`;
+
+    expect(createResumeIdempotencyStorageKey(sandboxInstanceId)).not.toBe(
+      createResumeIdempotencyStorageKey(otherSandboxInstanceId),
+    );
+  });
+
+  it("treats missing browser storage as empty and no-ops writes", () => {
+    const sandboxInstanceId = `sbi-resume-${Date.now()}`;
+
+    expect(
+      readStoredResumeIdempotencyKey({
+        sandboxInstanceId,
+        storage: null,
+      }),
+    ).toBeNull();
+
+    expect(() => {
+      persistResumeIdempotencyKey({
+        sandboxInstanceId,
+        idempotencyKey: "resume-key-001",
+        storage: null,
+      });
+
+      clearStoredResumeIdempotencyKey({
+        sandboxInstanceId,
+        storage: null,
+      });
+    }).not.toThrow();
   });
 });

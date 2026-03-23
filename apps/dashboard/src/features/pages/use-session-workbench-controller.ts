@@ -6,7 +6,7 @@ import {
   resolveSessionConnectionReadiness,
   shouldAutoConnectSession,
 } from "../sessions/session-connect-policy.js";
-import { getSandboxInstanceStatus } from "../sessions/sessions-service.js";
+import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   hasSessionTopAlert,
@@ -29,6 +29,7 @@ const AutomationSessionStatusRefetchIntervalMs = 2_000;
 const AutomationSessionPreparationTimeoutMs = 30_000;
 const AutomationSessionPreparationTimeoutMessage =
   "This chat session is taking longer than expected to become ready. Please try again shortly.";
+const ResumeIdempotencyKeyStorageKeyPrefix = "dashboard:session-workbench:resume-idempotency:";
 
 type SandboxAutomationConversation = {
   conversationId: string;
@@ -118,7 +119,9 @@ type SessionWorkbenchState = {
     requiresManualResume: boolean;
   };
   hasTopAlert: boolean;
+  isResumingStoppedSandbox: boolean;
   ptyState: ReturnType<typeof useSandboxPtyState>;
+  requestStoppedSandboxResume: () => Promise<void>;
   sandboxFailureMessage: string | null;
   sandboxStatusQuery: ReturnType<
     typeof useQuery<Awaited<ReturnType<typeof getSandboxInstanceStatus>>, Error>
@@ -178,6 +181,46 @@ export type {
   UseSessionWorkbenchControllerResult,
 };
 
+export function createResumeIdempotencyStorageKey(sandboxInstanceId: string): string {
+  return `${ResumeIdempotencyKeyStorageKeyPrefix}${sandboxInstanceId}`;
+}
+
+function getBrowserStorage(): Storage | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.localStorage;
+}
+
+export function readStoredResumeIdempotencyKey(input: {
+  sandboxInstanceId: string;
+  storage: Pick<Storage, "getItem"> | null;
+}): string | null {
+  const storedKey = input.storage?.getItem(
+    createResumeIdempotencyStorageKey(input.sandboxInstanceId),
+  );
+  return storedKey === null || storedKey === undefined || storedKey.length === 0 ? null : storedKey;
+}
+
+export function persistResumeIdempotencyKey(input: {
+  sandboxInstanceId: string;
+  idempotencyKey: string;
+  storage: Pick<Storage, "setItem"> | null;
+}): void {
+  input.storage?.setItem(
+    createResumeIdempotencyStorageKey(input.sandboxInstanceId),
+    input.idempotencyKey,
+  );
+}
+
+export function clearStoredResumeIdempotencyKey(input: {
+  sandboxInstanceId: string;
+  storage: Pick<Storage, "removeItem"> | null;
+}): void {
+  input.storage?.removeItem(createResumeIdempotencyStorageKey(input.sandboxInstanceId));
+}
+
 export function useSessionWorkbenchController(input: {
   sandboxInstanceId: string | null;
 }): UseSessionWorkbenchControllerResult {
@@ -187,6 +230,8 @@ export function useSessionWorkbenchController(input: {
   const [automationPendingErrorMessage, setAutomationPendingErrorMessage] = useState<string | null>(
     null,
   );
+  const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(false);
+  const [resumeErrorMessage, setResumeErrorMessage] = useState<string | null>(null);
   const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
   const sessionState = useCodexSessionState();
   const ptyState = useSandboxPtyState();
@@ -253,18 +298,24 @@ export function useSessionWorkbenchController(input: {
         return AutomationSessionStatusRefetchIntervalMs;
       }
 
+      if (status === "stopped" && isResumingStoppedSandbox) {
+        return 1_000;
+      }
+
       return status === "running" || status === "failed" || status === "stopped" ? false : 1_000;
     },
   });
   const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
+  const effectiveSandboxStatus =
+    sandboxStatus === "stopped" && isResumingStoppedSandbox ? "starting" : sandboxStatus;
   const automationConversation = sandboxStatusQuery.data?.automationConversation ?? null;
   const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
-    sandboxStatus,
+    sandboxStatus: effectiveSandboxStatus,
     automationConversation,
   });
   const connectionReadiness = resolveSessionConnectionReadiness({
     sandboxInstanceId: input.sandboxInstanceId,
-    sandboxStatus,
+    sandboxStatus: effectiveSandboxStatus,
     isStatusPending: sandboxStatusQuery.isPending,
   });
   const stoppedSessionMessage = resolveStoppedSessionMessage({
@@ -283,10 +334,36 @@ export function useSessionWorkbenchController(input: {
     setHasAttemptedAutoConnect(false);
     setAutomationPendingSinceMs(null);
     setAutomationPendingErrorMessage(null);
+    setIsResumingStoppedSandbox(false);
+    setResumeErrorMessage(null);
     clearStartErrorMessage();
     disconnectSession();
     void disconnectPty();
   }, [clearStartErrorMessage, disconnectPty, disconnectSession, input.sandboxInstanceId]);
+
+  useEffect(() => {
+    if (input.sandboxInstanceId === null || sandboxStatus === null || sandboxStatus === "stopped") {
+      return;
+    }
+
+    clearStoredResumeIdempotencyKey({
+      sandboxInstanceId: input.sandboxInstanceId,
+      storage: getBrowserStorage(),
+    });
+  }, [input.sandboxInstanceId, sandboxStatus]);
+
+  useEffect(() => {
+    if (
+      !isResumingStoppedSandbox ||
+      sandboxStatus === null ||
+      sandboxStatus === "stopped" ||
+      sandboxStatus === "starting"
+    ) {
+      return;
+    }
+
+    setIsResumingStoppedSandbox(false);
+  }, [isResumingStoppedSandbox, sandboxStatus]);
 
   useEffect(() => {
     if (!isWaitingForAutomationThread) {
@@ -390,19 +467,19 @@ export function useSessionWorkbenchController(input: {
   ]);
 
   const sandboxStatusLabel =
-    sandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
+    effectiveSandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
   const sessionHeaderStatusUi = resolveSessionHeaderStatusUi({
     sandboxStatus: sandboxStatusLabel.toLowerCase(),
     agentConnectionState,
     step,
-    hasConnectionError: resolvedStartErrorMessage !== null,
+    hasConnectionError: resolvedStartErrorMessage !== null || resumeErrorMessage !== null,
   });
 
   const hasActiveTurn = canInterruptTurn || canSteerTurn;
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: sandboxStatusQuery.isError,
-    startErrorMessage: resolvedStartErrorMessage,
+    startErrorMessage: resolvedStartErrorMessage ?? resumeErrorMessage,
     sandboxFailureMessage,
     stoppedSessionMessage: stoppedSessionState.message,
   });
@@ -484,16 +561,62 @@ export function useSessionWorkbenchController(input: {
     }
   }, [composerText, hasActiveTurn, interruptTurn, startTurn, steerTurn]);
 
+  const requestStoppedSandboxResume = useCallback(async (): Promise<void> => {
+    if (
+      input.sandboxInstanceId === null ||
+      sandboxStatus !== "stopped" ||
+      isResumingStoppedSandbox
+    ) {
+      return;
+    }
+
+    const storage = getBrowserStorage();
+    const idempotencyKey =
+      readStoredResumeIdempotencyKey({
+        sandboxInstanceId: input.sandboxInstanceId,
+        storage,
+      }) ?? crypto.randomUUID();
+
+    persistResumeIdempotencyKey({
+      sandboxInstanceId: input.sandboxInstanceId,
+      idempotencyKey,
+      storage,
+    });
+
+    setResumeErrorMessage(null);
+    setIsResumingStoppedSandbox(true);
+    try {
+      await resumeSandboxInstance({
+        instanceId: input.sandboxInstanceId,
+        idempotencyKey,
+      });
+      setHasAttemptedAutoConnect(false);
+      await sandboxStatusQuery.refetch();
+    } catch (error) {
+      setIsResumingStoppedSandbox(false);
+      setResumeErrorMessage(
+        error instanceof Error ? error.message : "Could not resume sandbox session.",
+      );
+    }
+  }, [
+    input.sandboxInstanceId,
+    isResumingStoppedSandbox,
+    sandboxStatus,
+    sandboxStatusQuery.refetch,
+  ]);
+
   return {
     workbench: {
       connectionReadiness,
       stoppedSessionState,
       hasTopAlert,
+      isResumingStoppedSandbox,
       ptyState,
+      requestStoppedSandboxResume,
       sandboxFailureMessage,
       sandboxStatusQuery,
       sessionHeaderStatusUi,
-      startErrorMessage: resolvedStartErrorMessage,
+      startErrorMessage: resolvedStartErrorMessage ?? resumeErrorMessage,
       terminalPanelState,
     },
     conversationPane: {

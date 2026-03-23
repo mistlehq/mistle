@@ -5,6 +5,7 @@ import {
   resolveChatComposerAction,
   resolveSessionHeaderStatusUi,
   resolveStoppedSessionMessage,
+  shouldShowResumeAction,
 } from "./session-workbench-view-model.js";
 
 describe("resolveSessionHeaderStatusUi", () => {
@@ -120,15 +121,38 @@ describe("resolveStoppedSessionMessage", () => {
       resolveStoppedSessionMessage({
         connectionReadinessReason: "stopped",
       }),
-    ).toBe(
-      "This sandbox is stopped. Dashboard resume handling is not implemented yet, so chat and terminal stay disconnected until the sandbox is running.",
-    );
+    ).toBe("This sandbox is stopped. Resume it to reconnect chat and terminal.");
 
     expect(
       resolveStoppedSessionMessage({
         connectionReadinessReason: "ready",
       }),
     ).toBeNull();
+  });
+});
+
+describe("shouldShowResumeAction", () => {
+  it("keeps the resume action visible while a stopped sandbox resume is in flight", () => {
+    expect(
+      shouldShowResumeAction({
+        requiresManualResume: true,
+        isResumingStoppedSandbox: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowResumeAction({
+        requiresManualResume: false,
+        isResumingStoppedSandbox: true,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowResumeAction({
+        requiresManualResume: false,
+        isResumingStoppedSandbox: false,
+      }),
+    ).toBe(false);
   });
 });
 
