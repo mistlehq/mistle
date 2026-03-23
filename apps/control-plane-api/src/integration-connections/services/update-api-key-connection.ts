@@ -15,7 +15,7 @@ import {
   encryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
-} from "../../integration-credentials/crypto.js";
+} from "../../lib/crypto.js";
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,

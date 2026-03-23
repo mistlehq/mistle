@@ -5,7 +5,7 @@ import { ControlPlaneDbSchema, type ControlPlaneDatabase } from "@mistle/db/cont
 import {
   resolveMasterEncryptionKeyMaterial,
   wrapOrganizationCredentialKey,
-} from "../../integration-credentials/crypto.js";
+} from "../../lib/crypto.js";
 
 const ORGANIZATION_CREDENTIAL_KEY_VERSION = 1;
 const ORGANIZATION_CREDENTIAL_KEY_BYTE_LENGTH = 32;

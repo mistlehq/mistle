@@ -4,7 +4,7 @@ import {
   decryptIntegrationTargetSecrets,
   resolveMasterEncryptionKeyMaterial,
   type IntegrationTargetSecrets,
-} from "../../integration-credentials/crypto.js";
+} from "../../lib/crypto.js";
 import type { AppContext } from "../../types.js";
 
 type IntegrationsConfig = AppContext["var"]["config"]["integrations"];

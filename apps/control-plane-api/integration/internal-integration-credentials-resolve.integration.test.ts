@@ -16,15 +16,15 @@ import {
 import { describe, expect } from "vitest";
 
 import {
+  CONTROL_PLANE_INTERNAL_AUTH_HEADER,
+  INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH,
+} from "../src/internal-integration-credentials/index.js";
+import {
   encryptCredentialUtf8,
   encryptIntegrationTargetSecrets,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
-} from "../src/integration-credentials/crypto.js";
-import {
-  CONTROL_PLANE_INTERNAL_AUTH_HEADER,
-  INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH,
-} from "../src/internal-integration-credentials/index.js";
+} from "../src/lib/crypto.js";
 import { it } from "./test-context.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 

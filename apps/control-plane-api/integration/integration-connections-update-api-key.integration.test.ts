@@ -19,7 +19,7 @@ import {
   decryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
-} from "../src/integration-credentials/crypto.js";
+} from "../src/lib/crypto.js";
 import { it } from "./test-context.js";
 
 describe("integration connections update api key integration", () => {

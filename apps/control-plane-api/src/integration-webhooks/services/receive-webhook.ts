@@ -14,12 +14,12 @@ import type {
   IntegrationWebhookImmediateResponse,
 } from "@mistle/integrations-core";
 
+import { resolveIntegrationTargetSecrets } from "../../integration-targets/services/resolve-target-secrets.js";
 import {
   decryptIntegrationConnectionSecrets,
   resolveMasterEncryptionKeyMaterial,
   type IntegrationConnectionSecrets,
-} from "../../integration-credentials/crypto.js";
-import { resolveIntegrationTargetSecrets } from "../../integration-targets/services/resolve-target-secrets.js";
+} from "../../lib/crypto.js";
 import type { AppContext } from "../../types.js";
 import {
   IntegrationWebhooksBadRequestCodes,
