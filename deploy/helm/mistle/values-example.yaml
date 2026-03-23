@@ -1,6 +1,6 @@
 global:
   namespaceOverride: mistle
-  imageRegistry: us-central1-docker.pkg.dev/example-project/mistle
+  imageRegistry: ghcr.io/mistlehq
 
 controlPlaneApi:
   image:
