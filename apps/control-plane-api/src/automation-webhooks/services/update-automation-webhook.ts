@@ -8,11 +8,9 @@ import {
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
 
-import {
-  assertSandboxProfileReferenceOrThrow,
-  assertWebhookConnectionReferenceOrThrow,
-  loadWebhookAutomationAggregateOrThrow,
-} from "../services.js";
+import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-reference-or-throw.js";
+import { assertWebhookConnectionReferenceOrThrow } from "./assert-webhook-connection-reference-or-throw.js";
+import { loadWebhookAutomationAggregateOrThrow } from "./load-webhook-automation-aggregate-or-throw.js";
 
 export type UpdateWebhookAutomationInput = {
   organizationId: string;
@@ -34,50 +32,50 @@ export type UpdateWebhookAutomationInput = {
 };
 
 export async function updateAutomationWebhook(
-  input: {
+  ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
   },
-  serviceInput: UpdateWebhookAutomationInput,
+  input: UpdateWebhookAutomationInput,
 ) {
   const existingAutomation = await loadWebhookAutomationAggregateOrThrow(
-    { db: input.db },
+    { db: ctx.db },
     {
-      organizationId: serviceInput.organizationId,
-      automationId: serviceInput.automationId,
+      organizationId: input.organizationId,
+      automationId: input.automationId,
     },
   );
 
   const integrationConnectionId =
-    serviceInput.integrationConnectionId ?? existingAutomation.integrationConnectionId;
+    input.integrationConnectionId ?? existingAutomation.integrationConnectionId;
   const sandboxProfileId =
-    serviceInput.target?.sandboxProfileId ?? existingAutomation.target.sandboxProfileId;
+    input.target?.sandboxProfileId ?? existingAutomation.target.sandboxProfileId;
 
   await assertWebhookConnectionReferenceOrThrow(
-    { db: input.db, integrationRegistry: input.integrationRegistry },
+    { db: ctx.db, integrationRegistry: ctx.integrationRegistry },
     {
-      organizationId: serviceInput.organizationId,
+      organizationId: input.organizationId,
       integrationConnectionId,
     },
   );
   await assertSandboxProfileReferenceOrThrow(
-    { db: input.db },
+    { db: ctx.db },
     {
-      organizationId: serviceInput.organizationId,
+      organizationId: input.organizationId,
       sandboxProfileId,
     },
   );
 
-  return input.db.transaction(async (tx) => {
-    await updateAutomationBaseRow(tx, serviceInput);
-    await updateWebhookConfigRow(tx, serviceInput);
-    await updateAutomationTargetRow(tx, existingAutomation.target, serviceInput);
+  return ctx.db.transaction(async (tx) => {
+    await updateAutomationBaseRow(tx, input);
+    await updateWebhookConfigRow(tx, input);
+    await updateAutomationTargetRow(tx, existingAutomation.target, input);
 
     return loadWebhookAutomationAggregateOrThrow(
       { db: tx },
       {
-        organizationId: serviceInput.organizationId,
-        automationId: serviceInput.automationId,
+        organizationId: input.organizationId,
+        automationId: input.automationId,
       },
     );
   });
@@ -85,16 +83,16 @@ export async function updateAutomationWebhook(
 
 async function updateAutomationBaseRow(
   tx: ControlPlaneTransaction,
-  serviceInput: UpdateWebhookAutomationInput,
+  input: UpdateWebhookAutomationInput,
 ): Promise<void> {
   const nextValues: Partial<typeof automations.$inferInsert> = {};
 
-  if (serviceInput.name !== undefined) {
-    nextValues.name = serviceInput.name;
+  if (input.name !== undefined) {
+    nextValues.name = input.name;
   }
 
-  if (serviceInput.enabled !== undefined) {
-    nextValues.enabled = serviceInput.enabled;
+  if (input.enabled !== undefined) {
+    nextValues.enabled = input.enabled;
   }
 
   await tx
@@ -103,37 +101,37 @@ async function updateAutomationBaseRow(
       ...nextValues,
       updatedAt: sql`now()`,
     })
-    .where(eq(automations.id, serviceInput.automationId));
+    .where(eq(automations.id, input.automationId));
 }
 
 async function updateWebhookConfigRow(
   tx: ControlPlaneTransaction,
-  serviceInput: UpdateWebhookAutomationInput,
+  input: UpdateWebhookAutomationInput,
 ): Promise<void> {
   const nextValues: Partial<typeof webhookAutomations.$inferInsert> = {};
 
-  if (serviceInput.integrationConnectionId !== undefined) {
-    nextValues.integrationConnectionId = serviceInput.integrationConnectionId;
+  if (input.integrationConnectionId !== undefined) {
+    nextValues.integrationConnectionId = input.integrationConnectionId;
   }
 
-  if (serviceInput.eventTypes !== undefined) {
-    nextValues.eventTypes = serviceInput.eventTypes;
+  if (input.eventTypes !== undefined) {
+    nextValues.eventTypes = input.eventTypes;
   }
 
-  if (serviceInput.payloadFilter !== undefined) {
-    nextValues.payloadFilter = serviceInput.payloadFilter;
+  if (input.payloadFilter !== undefined) {
+    nextValues.payloadFilter = input.payloadFilter;
   }
 
-  if (serviceInput.inputTemplate !== undefined) {
-    nextValues.inputTemplate = serviceInput.inputTemplate;
+  if (input.inputTemplate !== undefined) {
+    nextValues.inputTemplate = input.inputTemplate;
   }
 
-  if (serviceInput.conversationKeyTemplate !== undefined) {
-    nextValues.conversationKeyTemplate = serviceInput.conversationKeyTemplate;
+  if (input.conversationKeyTemplate !== undefined) {
+    nextValues.conversationKeyTemplate = input.conversationKeyTemplate;
   }
 
-  if (serviceInput.idempotencyKeyTemplate !== undefined) {
-    nextValues.idempotencyKeyTemplate = serviceInput.idempotencyKeyTemplate;
+  if (input.idempotencyKeyTemplate !== undefined) {
+    nextValues.idempotencyKeyTemplate = input.idempotencyKeyTemplate;
   }
 
   if (Object.keys(nextValues).length === 0) {
@@ -146,7 +144,7 @@ async function updateWebhookConfigRow(
       ...nextValues,
       updatedAt: sql`now()`,
     })
-    .where(eq(webhookAutomations.automationId, serviceInput.automationId));
+    .where(eq(webhookAutomations.automationId, input.automationId));
 }
 
 async function updateAutomationTargetRow(
@@ -156,20 +154,20 @@ async function updateAutomationTargetRow(
     sandboxProfileId: string;
     sandboxProfileVersion: number | null;
   },
-  serviceInput: UpdateWebhookAutomationInput,
+  input: UpdateWebhookAutomationInput,
 ): Promise<void> {
-  if (serviceInput.target === undefined) {
+  if (input.target === undefined) {
     return;
   }
 
   await tx
     .update(automationTargets)
     .set({
-      sandboxProfileId: serviceInput.target.sandboxProfileId ?? existingTarget.sandboxProfileId,
+      sandboxProfileId: input.target.sandboxProfileId ?? existingTarget.sandboxProfileId,
       sandboxProfileVersion:
-        serviceInput.target.sandboxProfileVersion === undefined
+        input.target.sandboxProfileVersion === undefined
           ? existingTarget.sandboxProfileVersion
-          : serviceInput.target.sandboxProfileVersion,
+          : input.target.sandboxProfileVersion,
       updatedAt: sql`now()`,
     })
     .where(eq(automationTargets.id, existingTarget.id));

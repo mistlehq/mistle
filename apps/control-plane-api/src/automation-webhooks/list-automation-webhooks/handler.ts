@@ -3,8 +3,8 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
+import { listAutomationWebhooks } from "../services/list-automation-webhooks.js";
 import { route } from "./route.js";
-import { listAutomationWebhooks } from "./service.js";
 
 const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
