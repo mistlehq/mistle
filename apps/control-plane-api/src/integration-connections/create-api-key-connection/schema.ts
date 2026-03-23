@@ -4,7 +4,10 @@ import {
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
+import {
+  IntegrationConnectionsBadRequestCodes,
+  IntegrationConnectionsNotFoundCodes,
+} from "../constants.js";
 
 export const CreateApiKeyConnectionParamsSchema = z
   .object({
@@ -28,3 +31,7 @@ export const CreateApiKeyConnectionBadRequestResponseSchema = z.union([
   ),
   ValidationErrorResponseSchema,
 ]);
+
+export const CreateApiKeyConnectionNotFoundResponseSchema = createCodeMessageErrorSchema(
+  z.literal(IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND),
+);

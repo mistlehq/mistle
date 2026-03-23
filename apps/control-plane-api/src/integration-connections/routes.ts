@@ -1,6 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { OpenApiValidationHook } from "@mistle/http/errors.js";
 
+import { createRequireAuthSessionMiddleware } from "../middleware/require-auth-session.js";
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import * as completeGitHubAppInstallationConnection from "./complete-github-app-installation-connection/index.js";
 import * as completeOAuth2Connection from "./complete-oauth2-connection/index.js";
@@ -20,24 +21,31 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
   const routes = new OpenAPIHono<AppContextBindings>({
     defaultHook: OpenApiValidationHook,
   });
+  const protectedRoutes = new OpenAPIHono<AppContextBindings>({
+    defaultHook: OpenApiValidationHook,
+  });
 
-  routes.openapi(listIntegrationConnections.route, listIntegrationConnections.handler);
-  routes.openapi(
+  protectedRoutes.use("*", createRequireAuthSessionMiddleware());
+
+  protectedRoutes.openapi(listIntegrationConnections.route, listIntegrationConnections.handler);
+  protectedRoutes.openapi(
     listIntegrationConnectionResources.route,
     listIntegrationConnectionResources.handler,
   );
-  routes.openapi(
+  protectedRoutes.openapi(
     refreshIntegrationConnectionResources.route,
     refreshIntegrationConnectionResources.handler,
   );
-  routes.openapi(createApiKeyConnection.route, createApiKeyConnection.handler);
-  routes.openapi(updateIntegrationConnection.route, updateIntegrationConnection.handler);
-  routes.openapi(updateApiKeyConnection.route, updateApiKeyConnection.handler);
-  routes.openapi(
+  protectedRoutes.openapi(createApiKeyConnection.route, createApiKeyConnection.handler);
+  protectedRoutes.openapi(updateIntegrationConnection.route, updateIntegrationConnection.handler);
+  protectedRoutes.openapi(updateApiKeyConnection.route, updateApiKeyConnection.handler);
+  protectedRoutes.openapi(
     startGitHubAppInstallationConnection.route,
     startGitHubAppInstallationConnection.handler,
   );
-  routes.openapi(startOAuth2Connection.route, startOAuth2Connection.handler);
+  protectedRoutes.openapi(startOAuth2Connection.route, startOAuth2Connection.handler);
+
+  routes.route("/", protectedRoutes);
   routes.openapi(
     completeGitHubAppInstallationConnection.route,
     completeGitHubAppInstallationConnection.handler,

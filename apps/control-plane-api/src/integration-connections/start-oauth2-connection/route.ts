@@ -1,11 +1,10 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { ProtectedIntegrationConnectionsRouteMiddleware } from "../middleware.js";
-import { IntegrationConnectionsNotFoundResponseSchema } from "../schemas.js";
 import {
   StartOAuth2ConnectionBadRequestResponseSchema,
   StartOAuth2ConnectionBodySchema,
+  StartOAuth2ConnectionNotFoundResponseSchema,
   StartOAuth2ConnectionParamsSchema,
   StartOAuth2ConnectionResponseSchema,
 } from "./schema.js";
@@ -14,7 +13,6 @@ export const route = createRoute({
   method: "post",
   path: "/:targetKey/oauth2/start",
   tags: ["Integrations"],
-  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
   request: {
     params: StartOAuth2ConnectionParamsSchema,
     body: {
@@ -63,7 +61,7 @@ export const route = createRoute({
       description: "Integration target was not found.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsNotFoundResponseSchema,
+          schema: StartOAuth2ConnectionNotFoundResponseSchema,
         },
       },
     },

@@ -4,7 +4,10 @@ import {
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
+import {
+  IntegrationConnectionsBadRequestCodes,
+  IntegrationConnectionsNotFoundCodes,
+} from "../constants.js";
 
 export const RefreshIntegrationConnectionResourcesParamsSchema = z
   .object({
@@ -28,3 +31,6 @@ export const RefreshIntegrationConnectionResourcesBadRequestResponseSchema = z.u
   ),
   ValidationErrorResponseSchema,
 ]);
+
+export const RefreshIntegrationConnectionResourcesNotFoundResponseSchema =
+  createCodeMessageErrorSchema(z.literal(IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND));

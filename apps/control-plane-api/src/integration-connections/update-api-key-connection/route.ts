@@ -1,14 +1,11 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { ProtectedIntegrationConnectionsRouteMiddleware } from "../middleware.js";
-import {
-  IntegrationConnectionSchema,
-  IntegrationConnectionsNotFoundResponseSchema,
-} from "../schemas.js";
+import { IntegrationConnectionSchema } from "../schemas.js";
 import {
   UpdateApiKeyConnectionBadRequestResponseSchema,
   UpdateApiKeyConnectionBodySchema,
+  UpdateApiKeyConnectionNotFoundResponseSchema,
   UpdateApiKeyConnectionParamsSchema,
 } from "./schema.js";
 
@@ -16,7 +13,6 @@ export const route = createRoute({
   method: "put",
   path: "/:connectionId/api-key",
   tags: ["Integrations"],
-  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
   request: {
     params: UpdateApiKeyConnectionParamsSchema,
     body: {
@@ -65,7 +61,7 @@ export const route = createRoute({
       description: "Integration target or connection was not found.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsNotFoundResponseSchema,
+          schema: UpdateApiKeyConnectionNotFoundResponseSchema,
         },
       },
     },

@@ -4,7 +4,10 @@ import {
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
+import {
+  IntegrationConnectionsBadRequestCodes,
+  IntegrationConnectionsNotFoundCodes,
+} from "../constants.js";
 
 export const StartGitHubAppInstallationConnectionParamsSchema = z
   .object({
@@ -34,3 +37,6 @@ export const StartGitHubAppInstallationConnectionBadRequestResponseSchema = z.un
   ),
   ValidationErrorResponseSchema,
 ]);
+
+export const StartGitHubAppInstallationConnectionNotFoundResponseSchema =
+  createCodeMessageErrorSchema(z.literal(IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND));

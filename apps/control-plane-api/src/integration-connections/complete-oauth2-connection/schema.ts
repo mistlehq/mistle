@@ -4,7 +4,10 @@ import {
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
+import {
+  IntegrationConnectionsBadRequestCodes,
+  IntegrationConnectionsNotFoundCodes,
+} from "../constants.js";
 
 export const CompleteOAuth2ConnectionParamsSchema = z
   .object({
@@ -35,3 +38,7 @@ export const CompleteOAuth2ConnectionBadRequestResponseSchema = z.union([
   ),
   ValidationErrorResponseSchema,
 ]);
+
+export const CompleteOAuth2ConnectionNotFoundResponseSchema = createCodeMessageErrorSchema(
+  z.literal(IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND),
+);

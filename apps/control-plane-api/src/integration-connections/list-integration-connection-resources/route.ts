@@ -1,11 +1,10 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { ProtectedIntegrationConnectionsRouteMiddleware } from "../middleware.js";
-import { IntegrationConnectionsNotFoundResponseSchema } from "../schemas.js";
 import {
-  IntegrationConnectionsConflictResponseSchema,
+  ListIntegrationConnectionResourcesConflictResponseSchema,
   ListIntegrationConnectionResourcesBadRequestResponseSchema,
+  ListIntegrationConnectionResourcesNotFoundResponseSchema,
   ListIntegrationConnectionResourcesParamsSchema,
   ListIntegrationConnectionResourcesQuerySchema,
   ListIntegrationConnectionResourcesResponseSchema,
@@ -15,7 +14,6 @@ export const route = createRoute({
   method: "get",
   path: "/:connectionId/resources",
   tags: ["Integrations"],
-  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
   request: {
     params: ListIntegrationConnectionResourcesParamsSchema,
     query: ListIntegrationConnectionResourcesQuerySchema,
@@ -57,7 +55,7 @@ export const route = createRoute({
       description: "Integration connection was not found.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsNotFoundResponseSchema,
+          schema: ListIntegrationConnectionResourcesNotFoundResponseSchema,
         },
       },
     },
@@ -65,7 +63,7 @@ export const route = createRoute({
       description: "Resource listing requires a usable resource snapshot.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsConflictResponseSchema,
+          schema: ListIntegrationConnectionResourcesConflictResponseSchema,
         },
       },
     },

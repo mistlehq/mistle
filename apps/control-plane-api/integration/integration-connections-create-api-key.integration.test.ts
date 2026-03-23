@@ -10,11 +10,11 @@ import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
-import { CreateApiKeyConnectionBodySchema } from "../src/integration-connections/create-api-key-connection/schema.js";
 import {
-  IntegrationConnectionSchema,
-  IntegrationConnectionsNotFoundResponseSchema,
-} from "../src/integration-connections/schemas.js";
+  CreateApiKeyConnectionBodySchema,
+  CreateApiKeyConnectionNotFoundResponseSchema,
+} from "../src/integration-connections/create-api-key-connection/schema.js";
+import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
 import {
   decryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
@@ -167,7 +167,7 @@ describe("integration connections create api key integration", () => {
     });
 
     expect(response.status).toBe(404);
-    const responseBody = IntegrationConnectionsNotFoundResponseSchema.parse(await response.json());
+    const responseBody = CreateApiKeyConnectionNotFoundResponseSchema.parse(await response.json());
     expect(responseBody).toEqual({
       code: "TARGET_NOT_FOUND",
       message: "Integration target 'missing_target' was not found.",
@@ -202,7 +202,7 @@ describe("integration connections create api key integration", () => {
     });
 
     expect(response.status).toBe(404);
-    const responseBody = IntegrationConnectionsNotFoundResponseSchema.parse(await response.json());
+    const responseBody = CreateApiKeyConnectionNotFoundResponseSchema.parse(await response.json());
     expect(responseBody.code).toBe("TARGET_NOT_FOUND");
   });
 

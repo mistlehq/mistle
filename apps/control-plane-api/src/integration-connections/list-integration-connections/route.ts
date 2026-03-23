@@ -1,7 +1,6 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { ProtectedIntegrationConnectionsRouteMiddleware } from "../middleware.js";
 import {
   ListIntegrationConnectionsBadRequestResponseSchema,
   ListIntegrationConnectionsQuerySchema,
@@ -12,7 +11,6 @@ export const route = createRoute({
   method: "get",
   path: "/",
   tags: ["Integrations"],
-  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
   request: {
     query: ListIntegrationConnectionsQuerySchema,
   },

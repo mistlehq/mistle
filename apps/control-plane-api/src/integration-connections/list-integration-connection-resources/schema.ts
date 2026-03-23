@@ -6,11 +6,12 @@ import {
 } from "@mistle/http/errors.js";
 import { createKeysetPageSizeSchema } from "@mistle/http/pagination";
 
-import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import {
-  IntegrationConnectionResourceSchema,
-  IntegrationConnectionsConflictResponseSchema,
-} from "../schemas.js";
+  IntegrationConnectionsBadRequestCodes,
+  IntegrationConnectionsConflictCodes,
+  IntegrationConnectionsNotFoundCodes,
+} from "../constants.js";
+import { IntegrationConnectionResourceSchema } from "../schemas.js";
 
 export const ListIntegrationConnectionResourcesParamsSchema = z
   .object({
@@ -84,4 +85,18 @@ export const ListIntegrationConnectionResourcesBadRequestResponseSchema = z.unio
   ValidationErrorResponseSchema,
 ]);
 
-export { IntegrationConnectionsConflictResponseSchema };
+export const ListIntegrationConnectionResourcesNotFoundResponseSchema =
+  createCodeMessageErrorSchema(z.literal(IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND));
+
+export const ListIntegrationConnectionResourcesConflictResponseSchema = z
+  .object({
+    code: z.enum([
+      IntegrationConnectionsConflictCodes.RESOURCE_SYNC_REQUIRED,
+      IntegrationConnectionsConflictCodes.RESOURCE_SYNC_IN_PROGRESS,
+      IntegrationConnectionsConflictCodes.RESOURCE_SYNC_FAILED,
+    ]),
+    message: z.string().min(1),
+    lastErrorCode: z.string().min(1).optional(),
+    lastErrorMessage: z.string().min(1).optional(),
+  })
+  .strict();

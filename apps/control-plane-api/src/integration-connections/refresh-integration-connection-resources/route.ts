@@ -1,10 +1,9 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { ProtectedIntegrationConnectionsRouteMiddleware } from "../middleware.js";
-import { IntegrationConnectionsNotFoundResponseSchema } from "../schemas.js";
 import {
   RefreshIntegrationConnectionResourcesBadRequestResponseSchema,
+  RefreshIntegrationConnectionResourcesNotFoundResponseSchema,
   RefreshIntegrationConnectionResourcesParamsSchema,
   RefreshIntegrationConnectionResourcesResponseSchema,
 } from "./schema.js";
@@ -13,7 +12,6 @@ export const route = createRoute({
   method: "post",
   path: "/:connectionId/resources/:kind/refresh",
   tags: ["Integrations"],
-  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
   request: {
     params: RefreshIntegrationConnectionResourcesParamsSchema,
   },
@@ -54,7 +52,7 @@ export const route = createRoute({
       description: "Integration connection was not found.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsNotFoundResponseSchema,
+          schema: RefreshIntegrationConnectionResourcesNotFoundResponseSchema,
         },
       },
     },

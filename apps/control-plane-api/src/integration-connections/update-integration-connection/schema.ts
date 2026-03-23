@@ -1,5 +1,10 @@
 import { z } from "@hono/zod-openapi";
-import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
+import {
+  createCodeMessageErrorSchema,
+  ValidationErrorResponseSchema,
+} from "@mistle/http/errors.js";
+
+import { IntegrationConnectionsNotFoundCodes } from "../constants.js";
 
 export const UpdateIntegrationConnectionParamsSchema = z
   .object({
@@ -14,3 +19,7 @@ export const UpdateIntegrationConnectionBodySchema = z
   .strict();
 
 export const UpdateIntegrationConnectionBadRequestResponseSchema = ValidationErrorResponseSchema;
+
+export const UpdateIntegrationConnectionNotFoundResponseSchema = createCodeMessageErrorSchema(
+  z.literal(IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND),
+);

@@ -3,5 +3,6 @@ export { route } from "./route.js";
 export {
   UpdateIntegrationConnectionBadRequestResponseSchema,
   UpdateIntegrationConnectionBodySchema,
+  UpdateIntegrationConnectionNotFoundResponseSchema,
   UpdateIntegrationConnectionParamsSchema,
 } from "./schema.js";

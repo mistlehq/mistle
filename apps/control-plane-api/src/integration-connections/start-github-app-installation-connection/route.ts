@@ -1,11 +1,10 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { ProtectedIntegrationConnectionsRouteMiddleware } from "../middleware.js";
-import { IntegrationConnectionsNotFoundResponseSchema } from "../schemas.js";
 import {
   StartGitHubAppInstallationConnectionBadRequestResponseSchema,
   StartGitHubAppInstallationConnectionBodySchema,
+  StartGitHubAppInstallationConnectionNotFoundResponseSchema,
   StartGitHubAppInstallationConnectionParamsSchema,
   StartGitHubAppInstallationConnectionResponseSchema,
 } from "./schema.js";
@@ -14,7 +13,6 @@ export const route = createRoute({
   method: "post",
   path: "/:targetKey/github-app-installation/start",
   tags: ["Integrations"],
-  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
   request: {
     params: StartGitHubAppInstallationConnectionParamsSchema,
     body: {
@@ -63,7 +61,7 @@ export const route = createRoute({
       description: "Integration target was not found.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsNotFoundResponseSchema,
+          schema: StartGitHubAppInstallationConnectionNotFoundResponseSchema,
         },
       },
     },

@@ -1,11 +1,10 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 
-import { RefreshIntegrationConnectionResourcesResponseSchema } from "../integration-connections/refresh-integration-connection-resources/schema.js";
 import {
-  IntegrationConnectionsBadRequestResponseSchema,
-  IntegrationConnectionsNotFoundResponseSchema,
-} from "../integration-connections/schemas.js";
+  RefreshIntegrationConnectionResourcesBadRequestResponseSchema,
+  RefreshIntegrationConnectionResourcesNotFoundResponseSchema,
+  RefreshIntegrationConnectionResourcesResponseSchema,
+} from "../integration-connections/refresh-integration-connection-resources/schema.js";
 
 export const InternalIntegrationConnectionsErrorResponseSchema = z
   .object({
@@ -14,10 +13,8 @@ export const InternalIntegrationConnectionsErrorResponseSchema = z
   })
   .strict();
 
-export const InternalIntegrationConnectionsBadRequestResponseSchema = z.union([
-  IntegrationConnectionsBadRequestResponseSchema,
-  ValidationErrorResponseSchema,
-]);
+export const InternalIntegrationConnectionsBadRequestResponseSchema =
+  RefreshIntegrationConnectionResourcesBadRequestResponseSchema;
 
 export const InternalRefreshIntegrationConnectionResourcesRequestSchema = z
   .object({
@@ -70,7 +67,7 @@ export const internalRefreshIntegrationConnectionResourcesRoute = createRoute({
       description: "Referenced integration connection was not found.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsNotFoundResponseSchema,
+          schema: RefreshIntegrationConnectionResourcesNotFoundResponseSchema,
         },
       },
     },

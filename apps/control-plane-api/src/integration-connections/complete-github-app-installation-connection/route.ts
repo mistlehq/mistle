@@ -1,11 +1,9 @@
 import { createRoute } from "@hono/zod-openapi";
 
-import {
-  IntegrationConnectionsNotFoundResponseSchema,
-  RedirectLocationHeaderSchema,
-} from "../schemas.js";
+import { RedirectLocationHeaderSchema } from "../schemas.js";
 import {
   CompleteGitHubAppInstallationConnectionBadRequestResponseSchema,
+  CompleteGitHubAppInstallationConnectionNotFoundResponseSchema,
   CompleteGitHubAppInstallationConnectionParamsSchema,
   CompleteGitHubAppInstallationConnectionQuerySchema,
 } from "./schema.js";
@@ -36,7 +34,7 @@ export const route = createRoute({
       description: "Integration target was not found.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsNotFoundResponseSchema,
+          schema: CompleteGitHubAppInstallationConnectionNotFoundResponseSchema,
         },
       },
     },
