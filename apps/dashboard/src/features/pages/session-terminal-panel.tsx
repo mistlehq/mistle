@@ -168,10 +168,7 @@ export function SessionTerminalPanel({
         data-terminal-state={lifecycle.state}
         style={{ borderColor: TERMINAL_BORDER_COLOR }}
       >
-        <div
-          className="flex items-center gap-2 border-b bg-white px-3 py-1"
-          style={{ borderColor: TERMINAL_BORDER_COLOR }}
-        >
+        <div className="flex items-center gap-2 bg-white px-3 py-1">
           <SessionTerminalToolbarStatus
             errorMessage={lifecycle.errorMessage}
             state={lifecycle.state}
