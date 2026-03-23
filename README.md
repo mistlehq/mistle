@@ -10,6 +10,11 @@ Kubernetes application packaging for Mistle lives under:
 
 Use this chart to deploy Mistle on Kubernetes.
 
+For repo-local Helm smoke testing against OrbStack and the compose-backed
+development dependencies, start from:
+
+- `deploy/helm/mistle/values-local.yaml`
+
 ## For Developers
 
 Local development is Nix-first.

@@ -93,6 +93,44 @@ app.kubernetes.io/component: {{ .component }}
 {{- end }}
 {{- end -}}
 
+{{- define "mistle.renderVolumes" -}}
+{{- range . }}
+- name: {{ .name }}
+  {{- if .hostPath }}
+  hostPath:
+    path: {{ .hostPath.path | quote }}
+    {{- with .hostPath.type }}
+    type: {{ . }}
+    {{- end }}
+  {{- end }}
+  {{- if .emptyDir }}
+  emptyDir:
+    {{- toYaml .emptyDir | nindent 4 }}
+  {{- end }}
+  {{- if .configMap }}
+  configMap:
+    {{- toYaml .configMap | nindent 4 }}
+  {{- end }}
+  {{- if .secret }}
+  secret:
+    {{- toYaml .secret | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end -}}
+
+{{- define "mistle.renderVolumeMounts" -}}
+{{- range . }}
+- name: {{ .name }}
+  mountPath: {{ .mountPath | quote }}
+  {{- with .readOnly }}
+  readOnly: {{ . }}
+  {{- end }}
+  {{- with .subPath }}
+  subPath: {{ . | quote }}
+  {{- end }}
+{{- end }}
+{{- end -}}
+
 {{- define "mistle.workload" -}}
 {{- $root := .root -}}
 {{- $component := .component -}}
@@ -135,6 +173,10 @@ spec:
           ports:
             - name: http
               containerPort: {{ $values.containerPort }}
+          {{- with $values.volumeMounts }}
+          volumeMounts:
+            {{- include "mistle.renderVolumeMounts" . | nindent 12 }}
+          {{- end }}
           {{- if or $values.env $values.secretEnv }}
           env:
             {{- if $values.env }}
@@ -148,6 +190,22 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- with $values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $values.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with $values.volumes }}
+      volumes:
+        {{- include "mistle.renderVolumes" . | nindent 8 }}
+      {{- end }}
 {{- end -}}
 
 {{- define "mistle.service" -}}

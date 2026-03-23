@@ -13,6 +13,11 @@ Each workload uses the same main configuration surface:
 - `ingress` where relevant
 - `env`
 - `secretEnv`
+- `volumeMounts`
+- `volumes`
+- `readinessProbe`
+- `livenessProbe`
+- `startupProbe`
 - `resources`
 
 For Mistle service images, `global.imageRegistry` is prepended by default. Third-party images can opt out with `image.useGlobalRegistry: false`. The bundled `valkey` workload already does this.
@@ -70,4 +75,5 @@ http://mistle-control-plane-api:8080
 
 - `values.yaml`: baseline chart contract
 - `values-example.yaml`: example operator-facing configuration
+- `values-local.yaml`: repo-local OrbStack/compose smoke-test configuration
 - `templates/`: workload resources
