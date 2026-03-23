@@ -49,8 +49,7 @@ describe("token exchange helpers", () => {
     );
 
     expect(delay).toBe(30_000);
-    expect(nextTunnelReconnectDelay(1)).toBe(1_000);
-    expect(nextTunnelReconnectDelay(6)).toBe(30_000);
+    expect(nextTunnelReconnectDelay()).toBe(1_000);
   });
 
   it("stores and replaces tunnel tokens", () => {

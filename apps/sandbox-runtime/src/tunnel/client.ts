@@ -29,15 +29,9 @@ import {
   normalizeBootstrapToken,
   parseGatewayUrl,
   runTunnelTokenExchangeLoop,
-  shouldRetryTunnelTokenExchange,
 } from "./token-exchange.js";
 import { parseTunnelMessageRouting } from "./tunnel-message.js";
-import {
-  connectWebSocket,
-  createWebSocketMessageQueue,
-  isExpectedWebSocketClose,
-  closeWebSocket,
-} from "./websocket.js";
+import { closeWebSocket, connectWebSocket, createWebSocketMessageQueue } from "./websocket.js";
 
 export type TunnelCompletion =
   | {
@@ -66,8 +60,8 @@ export type StartTunnelClientInput = {
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
 };
 
-export function classifyTunnelConnectionError(error: unknown): "retry" | "fail" {
-  return isExpectedWebSocketClose(error) ? "retry" : "fail";
+export function classifyTunnelConnectionError(_error: unknown): "retry" {
+  return "retry";
 }
 
 function describeUnknownError(error: unknown): string {
@@ -309,13 +303,8 @@ async function runTunnelClientLoop(input: {
     if (dialAttempt > 1) {
       try {
         await exchangeTunnelTokensNow(input.gatewayWsUrl, input.tokens);
-      } catch (error) {
-        if (!shouldRetryTunnelTokenExchange(error)) {
-          throw new Error(
-            `sandbox tunnel reconnect token exchange failed: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-        await waitForReconnect(input.signal, nextTunnelReconnectDelay(dialAttempt - 1));
+      } catch {
+        await waitForReconnect(input.signal, nextTunnelReconnectDelay());
         continue;
       }
     }
@@ -326,7 +315,7 @@ async function runTunnelClientLoop(input: {
       parsedUrl.searchParams.set("bootstrap_token", input.tokens.currentBootstrapToken());
       tunnelSocket = await connectWebSocket(parsedUrl.toString(), input.signal);
     } catch {
-      await waitForReconnect(input.signal, nextTunnelReconnectDelay(dialAttempt));
+      await waitForReconnect(input.signal, nextTunnelReconnectDelay());
       continue;
     }
 
@@ -355,6 +344,7 @@ async function runTunnelClientLoop(input: {
       return;
     }
     if (classifyTunnelConnectionError(connectionError) === "retry") {
+      await waitForReconnect(input.signal, nextTunnelReconnectDelay());
       continue;
     }
 

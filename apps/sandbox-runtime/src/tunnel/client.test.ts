@@ -11,10 +11,12 @@ describe("classifyTunnelConnectionError", () => {
     );
   });
 
-  it("fails unexpected websocket and protocol errors", () => {
+  it("retries unexpected websocket and protocol errors", () => {
     expect(classifyTunnelConnectionError(new WebSocketClosedError(1011, "internal error"))).toBe(
-      "fail",
+      "retry",
     );
-    expect(classifyTunnelConnectionError(new Error("invalid tunnel control message"))).toBe("fail");
+    expect(classifyTunnelConnectionError(new Error("invalid tunnel control message"))).toBe(
+      "retry",
+    );
   });
 });
