@@ -38,6 +38,7 @@ export function SessionWorkbenchPage(): React.JSX.Element {
         >
           {workbench.sessionHeaderStatusUi.label}
         </Badge>
+        <span aria-hidden className="h-5 w-px bg-stone-200" />
         <Button
           aria-label={terminalButtonLabel}
           aria-pressed={workbench.terminalPanelState.isVisible}
