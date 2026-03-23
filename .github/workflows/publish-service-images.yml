@@ -1,0 +1,114 @@
+name: Publish Service Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Service image to publish
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - control-plane-api
+          - control-plane-worker
+          - data-plane-api
+          - data-plane-worker
+          - data-plane-gateway
+          - tokenizer-proxy
+      publish_latest:
+        description: Also publish the latest tag
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-service-images-${{ github.ref }}-${{ inputs.component }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.component }}
+    if: ${{ inputs.component == 'all' || inputs.component == matrix.component }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: control-plane-api
+            target: control-plane-api-runtime
+          - component: control-plane-worker
+            target: control-plane-worker-runtime
+          - component: data-plane-api
+            target: data-plane-api-runtime
+          - component: data-plane-worker
+            target: data-plane-worker-runtime
+          - component: data-plane-gateway
+            target: data-plane-gateway-runtime
+          - component: tokenizer-proxy
+            target: tokenizer-proxy-runtime
+    env:
+      IMAGE_REPOSITORY: ghcr.io/mistlehq/${{ matrix.component }}
+      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_LATEST_TAG: latest
+      IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+      IMAGE_TARGET: ${{ matrix.target }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build service image
+        run: |
+          tags=(--tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}")
+
+          if [ "${{ inputs.publish_latest }}" = "true" ]; then
+            tags+=(--tag "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}")
+          fi
+
+          docker build \
+            --platform linux/amd64 \
+            --target "${IMAGE_TARGET}" \
+            --file Dockerfile \
+            --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.title=${{ matrix.component }}" \
+            "${tags[@]}" \
+            .
+
+      - name: Push service image
+        run: |
+          docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+
+          if [ "${{ inputs.publish_latest }}" = "true" ]; then
+            docker push "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}"
+          fi
+
+      - name: Resolve pushed digest
+        id: publish
+        run: |
+          image_ref="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${IMAGE_TAG}")"
+          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
+
+      - name: Summarize published image
+        run: |
+          {
+            echo "## Published image"
+            echo
+            echo "- Component: \`${{ matrix.component }}\`"
+            echo "- Tag: \`${IMAGE_REPOSITORY}:${IMAGE_TAG}\`"
+            if [ "${{ inputs.publish_latest }}" = "true" ]; then
+              echo "- Alias: \`${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}\`"
+            fi
+            echo "- Digest: \`${{ steps.publish.outputs.image_ref }}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
