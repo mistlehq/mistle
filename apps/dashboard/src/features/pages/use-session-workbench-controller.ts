@@ -242,10 +242,6 @@ export function useSessionWorkbenchController(input: {
     enabled: input.sandboxInstanceId !== null,
     retry: false,
     refetchInterval: (query) => {
-      if (automationPendingErrorMessage !== null) {
-        return false;
-      }
-
       const status = query.state.data?.status;
       const automationConversation = query.state.data?.automationConversation ?? null;
       if (

@@ -1,4 +1,5 @@
 import {
+  CodexJsonRpcRequestError,
   resumeCodexThread,
   startCodexThread,
   type CodexJsonRpcClient,
@@ -11,6 +12,17 @@ import { selectCodexConnectionThreadStrategy } from "./codex-session-lifecycle-p
 import type { ConnectedCodexSession } from "./codex-session-types.js";
 
 const DefaultCodexModel = "gpt-5.3-codex";
+
+function isMissingPersistedThreadError(error: unknown): boolean {
+  if (!(error instanceof CodexJsonRpcRequestError)) {
+    return false;
+  }
+
+  return (
+    error.message.startsWith("JSON-RPC request") &&
+    (error.message.includes("invalid thread id:") || error.message.includes("thread not found:"))
+  );
+}
 
 export type CodexConnectionBootstrapResult = {
   generation: number;
@@ -55,7 +67,11 @@ export async function establishInitialCodexThread(input: {
         threadId: action.threadId,
       });
     } catch (error) {
-      if (input.preferredThreadId !== null && action.threadId === input.preferredThreadId) {
+      if (
+        input.preferredThreadId !== null &&
+        action.threadId === input.preferredThreadId &&
+        isMissingPersistedThreadError(error)
+      ) {
         throw describeCodexSessionStepError(
           "Resuming persisted Codex thread",
           new Error(
