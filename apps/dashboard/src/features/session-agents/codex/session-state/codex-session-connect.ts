@@ -6,6 +6,7 @@ import {
 } from "@mistle/integrations-definitions/openai/agent/client";
 
 import type { MintSandboxConnectionTokenResult } from "../../../sessions/sessions-service.js";
+import { describeCodexSessionStepError } from "./codex-session-errors.js";
 import { selectCodexConnectionThreadStrategy } from "./codex-session-lifecycle-policy.js";
 import type { ConnectedCodexSession } from "./codex-session-types.js";
 
@@ -46,15 +47,25 @@ export async function establishInitialCodexThread(input: {
     loadedThreadIds: input.loadedThreadIds,
   });
 
-  if (action.type === "error") {
-    throw new Error(action.errorMessage);
-  }
-
   if (action.type === "resume") {
-    const resumedThread = await resumeCodexThread({
-      rpcClient: input.rpcClient,
-      threadId: action.threadId,
-    });
+    let resumedThread;
+    try {
+      resumedThread = await resumeCodexThread({
+        rpcClient: input.rpcClient,
+        threadId: action.threadId,
+      });
+    } catch (error) {
+      if (input.preferredThreadId !== null && action.threadId === input.preferredThreadId) {
+        throw describeCodexSessionStepError(
+          "Resuming persisted Codex thread",
+          new Error(
+            `This session is linked to persisted Codex thread '${input.preferredThreadId}', but that thread is no longer available.`,
+          ),
+        );
+      }
+
+      throw error;
+    }
     input.ensureCurrentGeneration(input.generation);
 
     return {

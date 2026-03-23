@@ -109,20 +109,6 @@ describe("codex session lifecycle policy", () => {
     });
   });
 
-  it("returns an explicit error when the persisted thread binding is stale", () => {
-    expect(
-      selectCodexConnectionThreadStrategy({
-        preferredThreadId: "thread_persisted",
-        availableThreads: [],
-        loadedThreadIds: [],
-      }),
-    ).toEqual({
-      type: "error",
-      errorMessage:
-        "This session is linked to persisted Codex thread 'thread_persisted', but that thread is no longer available.",
-    });
-  });
-
   it("starts a new thread when none exist yet", () => {
     expect(
       selectCodexConnectionThreadStrategy({
