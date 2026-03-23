@@ -12,7 +12,8 @@ const INITIAL_PTY_DIMENSIONS = {
   cols: FALLBACK_PTY_COLS,
   rows: FALLBACK_PTY_ROWS,
 };
-const TERMINAL_FONT_FAMILY = "var(--font-mono)";
+const FALLBACK_TERMINAL_FONT_FAMILY =
+  '"JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
 
 const DARK_TERMINAL_THEME: ITheme = {
   background: "#132723",
@@ -68,6 +69,18 @@ function readIsDarkTheme(): boolean {
   }
 
   return document.documentElement.classList.contains("dark");
+}
+
+function resolveTerminalFontFamily(): string {
+  if (typeof document === "undefined") {
+    return FALLBACK_TERMINAL_FONT_FAMILY;
+  }
+
+  const fontFamily = getComputedStyle(document.documentElement)
+    .getPropertyValue("--font-mono")
+    .trim();
+
+  return fontFamily.length > 0 ? fontFamily : FALLBACK_TERMINAL_FONT_FAMILY;
 }
 
 type SessionTerminalSurfaceProps = {
@@ -161,7 +174,7 @@ export function SessionTerminalSurface({
       convertEol: true,
       cursorBlink: false,
       cursorInactiveStyle: "none",
-      fontFamily: TERMINAL_FONT_FAMILY,
+      fontFamily: resolveTerminalFontFamily(),
       fontSize: 12,
       lineHeight: 1.25,
       scrollback: 2_000,
