@@ -47,6 +47,10 @@ function SessionTerminalToolbarStatus(input: {
     input.errorMessage === null
       ? `Terminal status: ${presentation.label}`
       : `Terminal status: ${presentation.label}. ${input.errorMessage}`;
+  const indicatorTitle =
+    input.errorMessage === null
+      ? `Terminal ${presentation.label.toLowerCase()}`
+      : `Terminal ${presentation.label.toLowerCase()}: ${input.errorMessage}`;
 
   return (
     <div
@@ -58,16 +62,11 @@ function SessionTerminalToolbarStatus(input: {
       <span className="sr-only">{liveStatusText}</span>
       <div aria-hidden className="flex min-w-0 flex-1 items-center gap-2">
         <span className="shrink-0 text-sm font-semibold text-stone-900">Terminal</span>
-        <span className="h-4 w-px shrink-0 bg-stone-200" />
-        <span
-          className="flex min-w-0 items-center gap-2 text-sm text-stone-600"
-          title={input.errorMessage ?? undefined}
-        >
+        <span className="flex items-center gap-2" title={indicatorTitle}>
           {presentation.showSpinner ? (
             <SpinnerGapIcon className="size-4 shrink-0 animate-spin text-stone-500" />
           ) : null}
-          <span className={cn("size-2 shrink-0 rounded-full", dotClass)} />
-          <span className="truncate">{presentation.label}</span>
+          <span className={cn("size-2.5 shrink-0 rounded-full", dotClass)} />
         </span>
       </div>
     </div>
