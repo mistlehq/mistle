@@ -1,0 +1,392 @@
+# Repo-local Helm smoke-test values for OrbStack Kubernetes plus
+# infra/local/docker-compose.yml. This is intentionally not a generic
+# self-hosting example.
+global:
+  namespaceOverride: mistle
+  imageRegistry: ghcr.io/mistlehq
+
+controlPlaneApi:
+  image:
+    repository: control-plane-api
+    tag: latest
+  env:
+    - name: NODE_ENV
+      value: development
+    - name: MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN
+      value: 1vHA2LWIdFYyPnZQiPXUvDJ1wp5GRHrvw5zbl95xl3U
+    - name: MISTLE_GLOBAL_SANDBOX_PROVIDER
+      value: docker
+    - name: MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE
+      value: ghcr.io/mistlehq/sandbox-base:latest
+    - name: MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL
+      value: ws://localhost:5202/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL
+      value: ws://data-plane-gateway-relay:5202/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER
+      value: control-plane-api
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET
+      value: Lszj8kkWJ37E1SVhrHZV2y7DqoE0IfR03wM7JjspvCs
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER
+      value: data-plane-worker
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
+      value: V78IWduJXkgdvHzkXyYPJquKBiICFygwbgg1RzXtR2o
+    - name: MISTLE_GLOBAL_TELEMETRY_ENABLED
+      value: "true"
+    - name: MISTLE_GLOBAL_TELEMETRY_DEBUG
+      value: "false"
+    - name: MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT
+      value: http://host.docker.internal:4318/v1/traces
+    - name: MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT
+      value: http://host.docker.internal:4318/v1/logs
+    - name: MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT
+      value: http://host.docker.internal:4318/v1/metrics
+    - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
+      value: deployment.environment=development
+    - name: MISTLE_APPS_CONTROL_PLANE_API_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_CONTROL_PLANE_API_PORT
+      value: "8080"
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL
+      value: http://localhost:5100
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_ALLOWED_ATTEMPTS
+      value: "3"
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_EXPIRES_IN_SECONDS
+      value: "300"
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_LENGTH
+      value: "6"
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_SECRET
+      value: FeiNxT7QujMwJhFZDEULju7pH41tFQBheNp075O6PMw
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS
+      value: http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:5173,http://localhost:5173
+    - name: MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL
+      value: http://localhost:5173
+    - name: MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL
+      value: http://mistle-data-plane-api:8082
+    - name: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL
+      value: postgresql://mistle:mistle@host.docker.internal:5432/mistle_dev
+    - name: MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION
+      value: "1"
+    - name: MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON
+      value: '{"1":"_4ldubvjORJD1ykzDdXm8fgls6JwTKktcWM1MS9pTyE"}'
+    - name: MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL
+      value: postgresql://mistle:mistle@host.docker.internal:6432/mistle_dev
+    - name: MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID
+      value: development
+
+controlPlaneWorker:
+  image:
+    repository: control-plane-worker
+    tag: latest
+  env:
+    - name: NODE_ENV
+      value: development
+    - name: MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN
+      value: 1vHA2LWIdFYyPnZQiPXUvDJ1wp5GRHrvw5zbl95xl3U
+    - name: MISTLE_GLOBAL_SANDBOX_PROVIDER
+      value: docker
+    - name: MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE
+      value: ghcr.io/mistlehq/sandbox-base:latest
+    - name: MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL
+      value: ws://localhost:5202/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL
+      value: ws://data-plane-gateway-relay:5202/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER
+      value: control-plane-api
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET
+      value: Lszj8kkWJ37E1SVhrHZV2y7DqoE0IfR03wM7JjspvCs
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER
+      value: data-plane-worker
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
+      value: V78IWduJXkgdvHzkXyYPJquKBiICFygwbgg1RzXtR2o
+    - name: MISTLE_GLOBAL_TELEMETRY_ENABLED
+      value: "true"
+    - name: MISTLE_GLOBAL_TELEMETRY_DEBUG
+      value: "false"
+    - name: MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT
+      value: http://host.docker.internal:4318/v1/traces
+    - name: MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT
+      value: http://host.docker.internal:4318/v1/logs
+    - name: MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT
+      value: http://host.docker.internal:4318/v1/metrics
+    - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
+      value: deployment.environment=development
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_PORT
+      value: "8081"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL
+      value: http://mistle-control-plane-api:8080
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL
+      value: http://mistle-data-plane-api:8082
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_EMAIL_FROM_ADDRESS
+      value: no-reply@mistle.local
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_EMAIL_FROM_NAME
+      value: Mistle (Local)
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_HOST
+      value: host.docker.internal
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PASSWORD
+      value: mailpit
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT
+      value: "1025"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE
+      value: "false"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_USERNAME
+      value: mailpit
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY
+      value: "1"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL
+      value: postgresql://mistle:mistle@host.docker.internal:5432/mistle_dev
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID
+      value: development
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS
+      value: "true"
+
+dataPlaneApi:
+  image:
+    repository: data-plane-api
+    tag: latest
+  env:
+    - name: NODE_ENV
+      value: development
+    - name: MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN
+      value: 1vHA2LWIdFYyPnZQiPXUvDJ1wp5GRHrvw5zbl95xl3U
+    - name: MISTLE_GLOBAL_SANDBOX_PROVIDER
+      value: docker
+    - name: MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE
+      value: ghcr.io/mistlehq/sandbox-base:latest
+    - name: MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL
+      value: ws://localhost:5202/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL
+      value: ws://data-plane-gateway-relay:5202/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER
+      value: control-plane-api
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET
+      value: Lszj8kkWJ37E1SVhrHZV2y7DqoE0IfR03wM7JjspvCs
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER
+      value: data-plane-worker
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
+      value: V78IWduJXkgdvHzkXyYPJquKBiICFygwbgg1RzXtR2o
+    - name: MISTLE_GLOBAL_TELEMETRY_ENABLED
+      value: "true"
+    - name: MISTLE_GLOBAL_TELEMETRY_DEBUG
+      value: "false"
+    - name: MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT
+      value: http://host.docker.internal:4318/v1/traces
+    - name: MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT
+      value: http://host.docker.internal:4318/v1/logs
+    - name: MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT
+      value: http://host.docker.internal:4318/v1/metrics
+    - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
+      value: deployment.environment=development
+    - name: MISTLE_APPS_DATA_PLANE_API_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_DATA_PLANE_API_PORT
+      value: "8082"
+    - name: MISTLE_APPS_DATA_PLANE_API_DATABASE_URL
+      value: postgresql://mistle:mistle@host.docker.internal:5432/mistle_dev
+    - name: MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL
+      value: http://mistle-data-plane-gateway:8084
+    - name: MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL
+      value: postgresql://mistle:mistle@host.docker.internal:6432/mistle_dev
+    - name: MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID
+      value: development
+
+dataPlaneWorker:
+  enabled: true
+  image:
+    repository: data-plane-worker
+    tag: latest
+  env:
+    - name: NODE_ENV
+      value: development
+    - name: MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN
+      value: 1vHA2LWIdFYyPnZQiPXUvDJ1wp5GRHrvw5zbl95xl3U
+    - name: MISTLE_GLOBAL_SANDBOX_PROVIDER
+      value: docker
+    - name: MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE
+      value: ghcr.io/mistlehq/sandbox-base:latest
+    - name: MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL
+      value: ws://localhost:5202/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL
+      value: ws://data-plane-gateway-relay:5202/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER
+      value: control-plane-api
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET
+      value: Lszj8kkWJ37E1SVhrHZV2y7DqoE0IfR03wM7JjspvCs
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER
+      value: data-plane-worker
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
+      value: V78IWduJXkgdvHzkXyYPJquKBiICFygwbgg1RzXtR2o
+    - name: MISTLE_GLOBAL_TELEMETRY_ENABLED
+      value: "true"
+    - name: MISTLE_GLOBAL_TELEMETRY_DEBUG
+      value: "false"
+    - name: MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT
+      value: http://host.docker.internal:4318/v1/traces
+    - name: MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT
+      value: http://host.docker.internal:4318/v1/logs
+    - name: MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT
+      value: http://host.docker.internal:4318/v1/metrics
+    - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
+      value: deployment.environment=development
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_PORT
+      value: "8083"
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL
+      value: postgresql://mistle:mistle@host.docker.internal:5432/mistle_dev
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL
+      value: postgresql://mistle:mistle@host.docker.internal:5432/mistle_dev
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID
+      value: development
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS
+      value: "true"
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY
+      value: "1"
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS
+      value: "120"
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS
+      value: "3600"
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL
+      value: http://mistle-data-plane-gateway:8084
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL
+      value: http://tokenizer-proxy-relay:5025/tokenizer-proxy/egress
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH
+      value: /var/run/docker.sock
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME
+      value: mistle-sandbox-dev
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT
+      value: http://otel-lgtm:4318/v1/traces
+  volumeMounts:
+    - name: docker-sock
+      mountPath: /var/run/docker.sock
+  volumes:
+    - name: docker-sock
+      hostPath:
+        path: /var/run/docker.sock
+        type: Socket
+
+dataPlaneGateway:
+  enabled: true
+  image:
+    repository: data-plane-gateway
+    tag: latest
+  env:
+    - name: NODE_ENV
+      value: development
+    - name: MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN
+      value: 1vHA2LWIdFYyPnZQiPXUvDJ1wp5GRHrvw5zbl95xl3U
+    - name: MISTLE_GLOBAL_SANDBOX_PROVIDER
+      value: docker
+    - name: MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE
+      value: ghcr.io/mistlehq/sandbox-base:latest
+    - name: MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL
+      value: ws://localhost:5202/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL
+      value: ws://data-plane-gateway-relay:5202/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER
+      value: control-plane-api
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET
+      value: Lszj8kkWJ37E1SVhrHZV2y7DqoE0IfR03wM7JjspvCs
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER
+      value: data-plane-worker
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
+      value: V78IWduJXkgdvHzkXyYPJquKBiICFygwbgg1RzXtR2o
+    - name: MISTLE_GLOBAL_TELEMETRY_ENABLED
+      value: "true"
+    - name: MISTLE_GLOBAL_TELEMETRY_DEBUG
+      value: "false"
+    - name: MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT
+      value: http://host.docker.internal:4318/v1/traces
+    - name: MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT
+      value: http://host.docker.internal:4318/v1/logs
+    - name: MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT
+      value: http://host.docker.internal:4318/v1/metrics
+    - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
+      value: deployment.environment=development
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_PORT
+      value: "8084"
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL
+      value: postgresql://mistle:mistle@host.docker.internal:5432/mistle_dev
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND
+      value: valkey
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL
+      value: redis://mistle-valkey:6379
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_KEY_PREFIX
+      value: mistle:runtime-state:development
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL
+      value: http://mistle-data-plane-api:8082
+
+tokenizerProxy:
+  enabled: true
+  image:
+    repository: tokenizer-proxy
+    tag: latest
+  env:
+    - name: NODE_ENV
+      value: development
+    - name: MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN
+      value: 1vHA2LWIdFYyPnZQiPXUvDJ1wp5GRHrvw5zbl95xl3U
+    - name: MISTLE_GLOBAL_SANDBOX_PROVIDER
+      value: docker
+    - name: MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE
+      value: ghcr.io/mistlehq/sandbox-base:latest
+    - name: MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL
+      value: ws://localhost:5202/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL
+      value: ws://data-plane-gateway-relay:5202/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER
+      value: control-plane-api
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET
+      value: Lszj8kkWJ37E1SVhrHZV2y7DqoE0IfR03wM7JjspvCs
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER
+      value: data-plane-worker
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
+      value: V78IWduJXkgdvHzkXyYPJquKBiICFygwbgg1RzXtR2o
+    - name: MISTLE_GLOBAL_TELEMETRY_ENABLED
+      value: "true"
+    - name: MISTLE_GLOBAL_TELEMETRY_DEBUG
+      value: "false"
+    - name: MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT
+      value: http://host.docker.internal:4318/v1/traces
+    - name: MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT
+      value: http://host.docker.internal:4318/v1/logs
+    - name: MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT
+      value: http://host.docker.internal:4318/v1/metrics
+    - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
+      value: deployment.environment=development
+    - name: MISTLE_APPS_TOKENIZER_PROXY_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_TOKENIZER_PROXY_PORT
+      value: "8085"
+    - name: MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL
+      value: http://mistle-control-plane-api:8080
+
+valkey:
+  enabled: true
