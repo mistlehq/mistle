@@ -1,7 +1,7 @@
 import { SendVerificationOTPWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import type { EmailOTPOptions } from "better-auth/plugins";
 
-import { type createControlPlaneOpenWorkflow } from "../../openworkflow/index.js";
+import { type createControlPlaneOpenWorkflow } from "../../openworkflow.js";
 
 type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
 type SendVerificationOTPRequest = Parameters<EmailOTPOptions["sendVerificationOTP"]>[0];

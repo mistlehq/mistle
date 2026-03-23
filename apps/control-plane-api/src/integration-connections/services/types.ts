@@ -1,7 +1,7 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
-import type { createControlPlaneOpenWorkflow } from "../../openworkflow/index.js";
+import type { createControlPlaneOpenWorkflow } from "../../openworkflow.js";
 import type {
   RequestIntegrationConnectionResourceRefreshInput,
   RequestIntegrationConnectionResourceRefreshResult,

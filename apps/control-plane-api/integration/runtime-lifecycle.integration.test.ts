@@ -1,9 +1,8 @@
 import { reserveAvailablePort } from "@mistle/test-harness";
+import { sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
-import { createApp, stopApp } from "../src/app.js";
-import { createControlPlaneApiRuntime } from "../src/runtime/index.js";
-import { getAppDatabase } from "../src/runtime/resources.js";
+import { createControlPlaneApiRuntime } from "../src/main.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
 import { it } from "./test-context.js";
 
@@ -104,17 +103,17 @@ describe("runtime lifecycle integration", () => {
     await expect(fetch(healthURL)).rejects.toThrow();
   });
 
-  it("releases app resources after stopApp", async ({ fixture }) => {
-    const app = await createApp({
+  it("releases runtime resources after stop", async ({ fixture }) => {
+    const runtime = await createControlPlaneApiRuntime({
       app: fixture.config,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       connectionToken: IntegrationConnectionTokenConfig,
       sandbox: IntegrationSandboxRuntimeConfig,
     });
-    expect(getAppDatabase(app)).toBeDefined();
 
-    await stopApp(app);
+    await runtime.db.execute(sql`select 1`);
+    await runtime.stop();
 
-    expect(() => getAppDatabase(app)).toThrow("Control plane app instance is unknown.");
+    await expect(runtime.db.execute(sql`select 1`)).rejects.toThrow();
   });
 });

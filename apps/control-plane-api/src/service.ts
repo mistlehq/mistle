@@ -3,7 +3,7 @@ import { HandleIntegrationWebhookEventWorkflowSpec } from "@mistle/workflow-regi
 
 import { createControlPlaneAuth } from "./auth/index.js";
 import { createIntegrationConnectionsService } from "./integration-connections/index.js";
-import type { AppRuntimeResources } from "./runtime/resources.js";
+import type { AppRuntimeResources } from "./resources.js";
 import { SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS } from "./sandbox-instances/constants.js";
 import { createSandboxInstancesService } from "./sandbox-instances/index.js";
 import { createSandboxProfilesService } from "./sandbox-profiles/index.js";

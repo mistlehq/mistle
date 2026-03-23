@@ -17,7 +17,7 @@ function extractRequestCookie(setCookieHeader: string): string {
 }
 
 async function signInAndGetCookie(input: {
-  request: (path: string, init?: RequestInit) => Promise<Response>;
+  request: (path: string, init?: RequestInit) => Response | Promise<Response>;
   readSignInOtp: () => Promise<string>;
   email: string;
 }): Promise<string> {

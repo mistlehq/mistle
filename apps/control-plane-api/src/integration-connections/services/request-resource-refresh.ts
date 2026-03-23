@@ -8,7 +8,7 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { SyncIntegrationConnectionResourcesWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
-import type { createControlPlaneOpenWorkflow } from "../../openworkflow/index.js";
+import type { createControlPlaneOpenWorkflow } from "../../openworkflow.js";
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsBadRequestError,

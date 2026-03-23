@@ -17,7 +17,7 @@ import {
   IntegrationWebhooksBadRequestResponseSchema,
   IntegrationWebhooksNotFoundResponseSchema,
 } from "../src/integration-webhooks/contracts.js";
-import { ControlPlaneOpenWorkflowSchema } from "../src/openworkflow/index.js";
+import { ControlPlaneOpenWorkflowSchema } from "../src/openworkflow.js";
 import { it } from "./test-context.js";
 
 const GitHubEventTypeHeader = "issue_comment";

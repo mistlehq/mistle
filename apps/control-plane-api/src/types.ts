@@ -90,7 +90,7 @@ export type StartedServer = {
 export type ControlPlaneApiRuntime = {
   app: ControlPlaneApp;
   db: ControlPlaneDatabase;
-  request: (path: string, init?: RequestInit) => Promise<Response>;
+  request: (path: string, init?: RequestInit) => Response | Promise<Response>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
 };

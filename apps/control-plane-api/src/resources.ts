@@ -3,11 +3,8 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { Pool } from "pg";
 
-import {
-  createControlPlaneBackend,
-  createControlPlaneOpenWorkflow,
-} from "../openworkflow/index.js";
-import type { ControlPlaneApiConfig, ControlPlaneApp } from "../types.js";
+import { createControlPlaneBackend, createControlPlaneOpenWorkflow } from "./openworkflow.js";
+import type { ControlPlaneApiConfig } from "./types.js";
 
 export type AppRuntimeResources = {
   db: ControlPlaneDatabase;
@@ -16,18 +13,6 @@ export type AppRuntimeResources = {
   workflowBackend: Awaited<ReturnType<typeof createControlPlaneBackend>>;
   openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
 };
-
-const AppResourcesByInstance = new WeakMap<ControlPlaneApp, AppRuntimeResources>();
-
-function getAppResources(app: ControlPlaneApp): AppRuntimeResources {
-  const appResources = AppResourcesByInstance.get(app);
-
-  if (appResources === undefined) {
-    throw new Error("Control plane app instance is unknown.");
-  }
-
-  return appResources;
-}
 
 export async function createAppResources(
   config: ControlPlaneApiConfig,
@@ -59,17 +44,6 @@ export async function createAppResources(
   };
 }
 
-export function setAppResources(app: ControlPlaneApp, resources: AppRuntimeResources): void {
-  AppResourcesByInstance.set(app, resources);
-}
-
-export async function stopAppResources(app: ControlPlaneApp): Promise<void> {
-  const appResources = getAppResources(app);
-
-  AppResourcesByInstance.delete(app);
-  await Promise.all([appResources.dbPool.end(), appResources.workflowBackend.stop()]);
-}
-
-export function getAppDatabase(app: ControlPlaneApp): ControlPlaneDatabase {
-  return getAppResources(app).db;
+export async function stopAppResources(resources: AppRuntimeResources): Promise<void> {
+  await Promise.all([resources.dbPool.end(), resources.workflowBackend.stop()]);
 }

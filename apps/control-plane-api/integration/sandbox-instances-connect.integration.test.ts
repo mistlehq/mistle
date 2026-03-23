@@ -19,7 +19,7 @@ import { afterEach, describe, expect } from "vitest";
 import { createDataPlaneBackend } from "../../data-plane-api/src/openworkflow/index.js";
 import { createDataPlaneApiRuntime } from "../../data-plane-api/src/runtime/index.js";
 import type { DataPlaneApiConfig } from "../../data-plane-api/src/types.js";
-import { createControlPlaneApiRuntime } from "../src/runtime/index.js";
+import { createControlPlaneApiRuntime } from "../src/main.js";
 import {
   SandboxInstanceConnectionTokenSchema,
   SandboxInstancesConflictResponseSchema,
@@ -195,7 +195,7 @@ function createControlPlaneConfig(input: {
 
 async function createAuthenticatedControlPlaneSession(input: {
   fixture: ControlPlaneApiIntegrationFixture;
-  request: (path: string, init?: RequestInit) => Promise<Response>;
+  request: (path: string, init?: RequestInit) => Response | Promise<Response>;
   db: Awaited<ReturnType<typeof createControlPlaneApiRuntime>>["db"];
   email: string;
 }) {
