@@ -1776,14 +1776,9 @@ export interface paths {
                   message: string;
                 }
               | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
                 };
           };
         };
