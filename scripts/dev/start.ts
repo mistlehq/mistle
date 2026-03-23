@@ -384,6 +384,7 @@ function start(): void {
       "mailpit",
       "registry",
       "otel-lgtm",
+      "valkey",
       "tokenizer-proxy-relay",
       "data-plane-gateway-relay",
     ],
