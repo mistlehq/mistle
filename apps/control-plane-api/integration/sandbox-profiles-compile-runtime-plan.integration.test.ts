@@ -178,7 +178,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(configContent).toContain('base_url = "https://api.openai.com/v1"');
     expect(configContent).toContain('wire_api = "responses"');
     expect(configContent).toContain("requires_openai_auth = false");
-    expect(configContent).toContain("supports_websockets = true");
+    expect(configContent).toContain("supports_websockets = false");
     expect(configContent).toContain('[projects."/"]');
     expect(configContent).toContain('trust_level = "trusted"');
   });
