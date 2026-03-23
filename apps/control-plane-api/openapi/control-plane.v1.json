@@ -4363,9 +4363,33 @@
                     "failureMessage": {
                       "type": ["string", "null"],
                       "minLength": 1
+                    },
+                    "automationConversation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "conversationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "routeId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "providerConversationId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["conversationId", "routeId", "providerConversationId"]
                     }
                   },
-                  "required": ["id", "status", "failureCode", "failureMessage"],
+                  "required": [
+                    "id",
+                    "status",
+                    "failureCode",
+                    "failureMessage",
+                    "automationConversation"
+                  ],
                   "additionalProperties": false
                 }
               }
