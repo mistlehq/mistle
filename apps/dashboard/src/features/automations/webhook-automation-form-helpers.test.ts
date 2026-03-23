@@ -7,6 +7,7 @@ import {
   validateWebhookAutomationFormValues,
 } from "./webhook-automation-form-helpers.js";
 import type { WebhookAutomationFormValues } from "./webhook-automation-form.js";
+import { buildWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-list-helpers.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 import type { WebhookAutomation } from "./webhook-automations-types.js";
@@ -112,7 +113,9 @@ const SampleAutomation: WebhookAutomation = {
   name: "GitHub pushes to repo triage",
   enabled: true,
   integrationConnectionId: GitHubConnectionId,
-  inputTemplate: '{"ref":"{{event.ref}}"}',
+  inputTemplate: buildWebhookAutomationInputTemplate({
+    instructions: "Please write a review of the changes made.",
+  }),
   conversationKeyTemplate: "{{event.repository.id}}",
   idempotencyKeyTemplate: null,
   eventTypes: ["push", "pull_request"],
@@ -134,7 +137,7 @@ const BaseFormValues: WebhookAutomationFormValues = {
   name: "Pull request routing",
   sandboxProfileId: "sbp_repo",
   enabled: true,
-  inputTemplate: "{}",
+  instructions: "Please write a review of the changes made.",
   conversationKeyTemplate: "{{event.id}}",
   triggerIds: [PullRequestOpenedTriggerId],
   triggerParameterValues: {},
@@ -146,7 +149,7 @@ describe("toWebhookAutomationFormValues", () => {
       name: "",
       sandboxProfileId: "",
       enabled: true,
-      inputTemplate: "",
+      instructions: "",
       conversationKeyTemplate: "",
       triggerIds: [],
       triggerParameterValues: {},
@@ -158,7 +161,7 @@ describe("toWebhookAutomationFormValues", () => {
       name: "GitHub pushes to repo triage",
       sandboxProfileId: "sbp_repo",
       enabled: true,
-      inputTemplate: '{"ref":"{{event.ref}}"}',
+      instructions: "Please write a review of the changes made.",
       conversationKeyTemplate: "{{event.repository.id}}",
       triggerIds: [
         createWebhookAutomationTriggerId({
@@ -172,6 +175,17 @@ describe("toWebhookAutomationFormValues", () => {
       ],
       triggerParameterValues: {},
     });
+  });
+
+  it("rejects non-canonical stored templates", () => {
+    expect(() =>
+      toWebhookAutomationFormValues({
+        ...SampleAutomation,
+        inputTemplate: '{"instructions":"freeform","payload":{{payload}}}',
+      }),
+    ).toThrow(
+      "This automation uses a custom input template that cannot be edited in the instructions editor.",
+    );
   });
 
   it("hydrates supported trigger parameters out of payload filters", () => {
@@ -230,7 +244,7 @@ describe("validateWebhookAutomationFormValues", () => {
           name: "",
           sandboxProfileId: "",
           enabled: true,
-          inputTemplate: "",
+          instructions: "",
           conversationKeyTemplate: "",
           triggerIds: [],
           triggerParameterValues: {},
@@ -241,7 +255,7 @@ describe("validateWebhookAutomationFormValues", () => {
       name: "Automation name is required.",
       triggerIds: "Select at least one trigger.",
       sandboxProfileId: "Select a sandbox profile.",
-      inputTemplate: "Input template is required.",
+      instructions: "Instructions are required.",
       conversationKeyTemplate: "Conversation key template is required.",
     });
   });
@@ -309,7 +323,9 @@ describe("automation payload transforms", () => {
       name: "GitHub pushes to repo triage",
       enabled: true,
       integrationConnectionId: GitHubConnectionId,
-      inputTemplate: "{}",
+      inputTemplate: buildWebhookAutomationInputTemplate({
+        instructions: "Please write a review of the changes made.",
+      }),
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.pull_request.opened", "github.issue_comment.created"],
@@ -335,7 +351,9 @@ describe("automation payload transforms", () => {
       name: "Stripe payouts incident intake",
       enabled: false,
       integrationConnectionId: GitHubConnectionId,
-      inputTemplate: "{}",
+      inputTemplate: buildWebhookAutomationInputTemplate({
+        instructions: "Please write a review of the changes made.",
+      }),
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.pull_request.opened"],
@@ -364,7 +382,9 @@ describe("automation payload transforms", () => {
       name: "Pull request routing",
       enabled: true,
       integrationConnectionId: GitHubConnectionId,
-      inputTemplate: "{}",
+      inputTemplate: buildWebhookAutomationInputTemplate({
+        instructions: "Please write a review of the changes made.",
+      }),
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.pull_request.opened"],
@@ -407,7 +427,9 @@ describe("automation payload transforms", () => {
       name: "Pull request routing",
       enabled: true,
       integrationConnectionId: GitHubConnectionId,
-      inputTemplate: "{}",
+      inputTemplate: buildWebhookAutomationInputTemplate({
+        instructions: "Please write a review of the changes made.",
+      }),
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.issue_comment.created"],

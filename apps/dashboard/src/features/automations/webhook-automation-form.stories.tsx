@@ -289,7 +289,7 @@ const EmptyCreateValues: WebhookAutomationFormValues = {
   name: "",
   sandboxProfileId: "",
   enabled: true,
-  inputTemplate: "",
+  instructions: "",
   conversationKeyTemplate: "",
   triggerIds: [],
   triggerParameterValues: {},
@@ -299,7 +299,7 @@ const ExistingAutomationValues: WebhookAutomationFormValues = {
   name: "GitHub pushes to repo triage",
   sandboxProfileId: "sbp_repo_maintainer",
   enabled: true,
-  inputTemplate: '{\n  "repo": "{{payload.repository.full_name}}",\n  "ref": "{{payload.ref}}"\n}',
+  instructions: "Please review the changes made.",
   conversationKeyTemplate: "{{payload.repository.full_name}}:{{payload.ref}}",
   triggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
   triggerParameterValues: {
@@ -336,6 +336,7 @@ function StoryHarness(input: {
         connectionOptions={input.connectionOptions ?? ConnectionOptions}
         fieldErrors={input.fieldErrors ?? {}}
         formError={input.formError ?? null}
+        isTemplateEditable
         isDeleting={input.isDeleting ?? false}
         isSaving={input.isSaving ?? false}
         mode={input.mode}
@@ -409,7 +410,7 @@ export const ValidationErrors: Story = {
       name: "Automation name is required.",
       triggerIds: "Select at least one trigger.",
       sandboxProfileId: "Choose a sandbox profile for the automation target.",
-      inputTemplate: "Input template must be valid JSON template text.",
+      instructions: "Instructions are required.",
     },
     values: {
       ...EmptyCreateValues,

@@ -91,6 +91,7 @@ function CreateWebhookAutomationEditor(input: {
       automationId={undefined}
       navigate={input.navigate}
       initialValues={toWebhookAutomationFormValues(null)}
+      templateParseError={null}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
       directoryData={prerequisites.integrationDirectoryQuery.data}
@@ -141,16 +142,19 @@ function EditWebhookAutomationEditor(input: {
     return renderWebhookAutomationEditorLoading();
   }
 
+  const resolvedInitialState = resolveWebhookAutomationEditInitialValues({
+    automation: automationQuery.data,
+    directoryData: prerequisites.integrationDirectoryQuery.data,
+  });
+
   return (
     <LoadedWebhookAutomationEditor
       key={input.automationId}
       mode="edit"
       automationId={input.automationId}
       navigate={input.navigate}
-      initialValues={resolveWebhookAutomationEditInitialValues({
-        automation: automationQuery.data,
-        directoryData: prerequisites.integrationDirectoryQuery.data,
-      })}
+      initialValues={resolvedInitialState.initialValues}
+      templateParseError={resolvedInitialState.templateParseError}
       preservedConnectionId={automationQuery.data.integrationConnectionId}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
@@ -164,6 +168,7 @@ function LoadedWebhookAutomationEditor(input: {
   automationId: string | undefined;
   navigate: (to: string) => void | Promise<void>;
   initialValues: ReturnType<typeof toWebhookAutomationFormValues>;
+  templateParseError: string | null;
   connectionOptions: ReturnType<typeof useWebhookAutomationPrerequisites>["connectionOptions"];
   sandboxProfileOptions: ReturnType<
     typeof useWebhookAutomationPrerequisites
@@ -177,10 +182,18 @@ function LoadedWebhookAutomationEditor(input: {
 
   return (
     <div className="flex flex-col gap-4">
+      {state.templateParseError === null ? null : (
+        <Alert variant="destructive">
+          <AlertTitle>Unsupported input template</AlertTitle>
+          <AlertDescription>{state.templateParseError}</AlertDescription>
+        </Alert>
+      )}
+
       <WebhookAutomationForm
         connectionOptions={state.connectionOptions}
         fieldErrors={state.fieldErrors}
         formError={state.formError}
+        isTemplateEditable={state.templateParseError === null}
         isDeleting={state.isDeleting}
         isSaving={state.isSaving}
         mode={input.mode}

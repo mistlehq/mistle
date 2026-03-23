@@ -27,11 +27,12 @@ describe("useLoadedWebhookAutomationEditorState", () => {
             name: "",
             sandboxProfileId: "",
             enabled: true,
-            inputTemplate: "",
+            instructions: "",
             conversationKeyTemplate: "",
             triggerIds: [],
             triggerParameterValues: {},
           },
+          templateParseError: null,
           connectionOptions: [],
           sandboxProfileOptions: [],
           directoryData: {
@@ -50,11 +51,12 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       name: "",
       sandboxProfileId: "",
       enabled: true,
-      inputTemplate: "",
+      instructions: "",
       conversationKeyTemplate: "",
       triggerIds: [],
       triggerParameterValues: {},
     });
+    expect(result.current.templateParseError).toBeNull();
     expect(result.current.formError).toBeNull();
   });
 });

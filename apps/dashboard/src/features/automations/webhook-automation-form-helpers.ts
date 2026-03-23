@@ -3,6 +3,10 @@ import type {
   WebhookAutomationFormValueKey,
   WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
+import {
+  buildWebhookAutomationInputTemplate,
+  parseWebhookAutomationInputTemplate,
+} from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-list-helpers.js";
 import {
   extractWebhookAutomationTriggerParameterValues,
@@ -77,11 +81,18 @@ export function toWebhookAutomationFormValues(
       name: "",
       sandboxProfileId: "",
       enabled: true,
-      inputTemplate: "",
+      instructions: "",
       conversationKeyTemplate: "",
       triggerIds: [],
       triggerParameterValues: {},
     };
+  }
+
+  const parsedInputTemplate = parseWebhookAutomationInputTemplate({
+    template: automation.inputTemplate,
+  });
+  if (!parsedInputTemplate.ok) {
+    throw new Error(parsedInputTemplate.reason);
   }
 
   const selectedTriggerIds = (automation.eventTypes ?? []).map((eventType) =>
@@ -100,7 +111,7 @@ export function toWebhookAutomationFormValues(
     name: automation.name,
     sandboxProfileId: automation.target.sandboxProfileId,
     enabled: automation.enabled,
-    inputTemplate: automation.inputTemplate,
+    instructions: parsedInputTemplate.instructions,
     conversationKeyTemplate: automation.conversationKeyTemplate,
     triggerIds: selectedTriggerIds,
     triggerParameterValues: extractedTriggerParameterValues.triggerParameterValues,
@@ -137,8 +148,8 @@ export function validateWebhookAutomationFormValues(
     errors.sandboxProfileId = "Select a sandbox profile.";
   }
 
-  if (values.inputTemplate.trim().length === 0) {
-    errors.inputTemplate = "Input template is required.";
+  if (values.instructions.trim().length === 0) {
+    errors.instructions = "Instructions are required.";
   }
 
   if (values.conversationKeyTemplate.trim().length === 0) {
@@ -218,7 +229,9 @@ export function toCreateWebhookAutomationPayload(
     name: values.name.trim(),
     enabled: values.enabled,
     integrationConnectionId: resolvedSubmissionShape.integrationConnectionId,
-    inputTemplate: values.inputTemplate,
+    inputTemplate: buildWebhookAutomationInputTemplate({
+      instructions: values.instructions,
+    }),
     conversationKeyTemplate: values.conversationKeyTemplate,
     idempotencyKeyTemplate: null,
     eventTypes: resolvedSubmissionShape.eventTypes,
@@ -242,7 +255,9 @@ export function toUpdateWebhookAutomationPayload(
     name: values.name.trim(),
     enabled: values.enabled,
     integrationConnectionId: resolvedSubmissionShape.integrationConnectionId,
-    inputTemplate: values.inputTemplate,
+    inputTemplate: buildWebhookAutomationInputTemplate({
+      instructions: values.instructions,
+    }),
     conversationKeyTemplate: values.conversationKeyTemplate,
     idempotencyKeyTemplate: null,
     eventTypes: resolvedSubmissionShape.eventTypes,

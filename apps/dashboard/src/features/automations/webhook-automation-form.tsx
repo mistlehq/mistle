@@ -37,7 +37,7 @@ export type WebhookAutomationFormValues = {
   name: string;
   sandboxProfileId: string;
   enabled: boolean;
-  inputTemplate: string;
+  instructions: string;
   conversationKeyTemplate: string;
   triggerIds: string[];
   triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
@@ -53,6 +53,7 @@ type WebhookAutomationFormProps = {
   webhookEventOptions: readonly WebhookAutomationEventOption[];
   fieldErrors: Partial<Record<WebhookAutomationFormValueKey, string>>;
   formError: string | null;
+  isTemplateEditable: boolean;
   isSaving: boolean;
   isDeleting: boolean;
   onValueChange: (
@@ -285,21 +286,26 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       </FormSection>
 
       <FormSection
-        description="These values are sent directly to the backend contract. Keep them aligned with the integration payload shape you expect."
-        title="Templates"
+        description="These instructions are sent together with the webhook event type and full payload."
+        title="Instructions"
       >
         <Field>
-          <FieldLabel htmlFor="input-template">Input template</FieldLabel>
+          <FieldLabel htmlFor="automation-instructions">Instructions</FieldLabel>
           <FieldContent>
             <Textarea
-              id="input-template"
+              id="automation-instructions"
+              disabled={!input.isTemplateEditable || input.isDeleting || input.isSaving}
               onChange={(event) => {
-                input.onValueChange("inputTemplate", event.currentTarget.value);
+                input.onValueChange("instructions", event.currentTarget.value);
               }}
               rows={7}
-              value={input.values.inputTemplate}
+              value={input.values.instructions}
             />
-            <FieldError message={input.fieldErrors.inputTemplate} />
+            <p className="text-muted-foreground text-sm">
+              The automation will always receive your instructions, the webhook event type, and the
+              full webhook payload.
+            </p>
+            <FieldError message={input.fieldErrors.instructions} />
           </FieldContent>
         </Field>
       </FormSection>
@@ -380,7 +386,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
       <div className="flex justify-end">
         <Button
-          disabled={input.isDeleting || input.isSaving}
+          disabled={!input.isTemplateEditable || input.isDeleting || input.isSaving}
           onClick={input.onSubmit}
           type="button"
         >

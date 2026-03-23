@@ -97,7 +97,7 @@ const FormValues: WebhookAutomationFormValues = {
   name: "Repo triage",
   sandboxProfileId: "sbp_01kkk1mbmxfetvga8kcmw612jj",
   enabled: true,
-  inputTemplate: "{}",
+  instructions: "Please review the changes made.",
   conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
   triggerIds: [
     createWebhookAutomationTriggerId({
@@ -116,6 +116,7 @@ describe("WebhookAutomationForm", () => {
           connectionOptions={ConnectionOptions}
           fieldErrors={{}}
           formError={null}
+          isTemplateEditable
           isDeleting={false}
           isSaving={false}
           mode={mode}
@@ -164,6 +165,17 @@ describe("WebhookAutomationForm", () => {
     expect(
       screen.getAllByText(
         "Events that render to the same key are routed into the same conversation.",
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("shows the instructions editor copy", () => {
+    renderForm("create");
+
+    expect(screen.getByLabelText("Instructions")).toBeDefined();
+    expect(
+      screen.getAllByText(
+        "The automation will always receive your instructions, the webhook event type, and the full webhook payload.",
       ).length,
     ).toBeGreaterThan(0);
   });
