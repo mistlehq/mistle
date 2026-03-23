@@ -29,7 +29,6 @@ type WebhookAutomationListViewProps = {
   items: readonly WebhookAutomationListItemViewModel[];
   isLoading: boolean;
   errorMessage: string | null;
-  onCreateAutomation: () => void;
   onOpenAutomation: (automationId: string) => void;
   onRetry: () => void;
 };
@@ -40,21 +39,6 @@ function LoadingState(): React.JSX.Element {
       <Skeleton className="h-12 w-full" />
       <Skeleton className="h-12 w-full" />
       <Skeleton className="h-12 w-full" />
-    </div>
-  );
-}
-
-function EmptyState(input: { onCreateAutomation: () => void }): React.JSX.Element {
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-muted-foreground text-sm">
-        Create a webhook automation to route incoming integration events into a sandbox profile.
-      </p>
-      <div>
-        <Button onClick={input.onCreateAutomation} type="button">
-          Create automation
-        </Button>
-      </div>
     </div>
   );
 }
@@ -85,30 +69,16 @@ export function WebhookAutomationListView(
     );
   }
 
-  if (input.items.length === 0) {
-    return <EmptyState onCreateAutomation={input.onCreateAutomation} />;
-  }
-
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold">Automations</h1>
-          <p className="text-muted-foreground text-sm">
-            Manage webhook automations for your organization&apos;s connected integrations.
-          </p>
-        </div>
-        <Button onClick={input.onCreateAutomation} type="button">
-          Create automation
-        </Button>
-      </div>
-
-      <WebhookAutomationListToolbar
-        activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
-        onSearchValueChange={setSearchValue}
-        searchValue={searchValue}
-      />
+      {input.items.length > 0 ? (
+        <WebhookAutomationListToolbar
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+          onSearchValueChange={setSearchValue}
+          searchValue={searchValue}
+        />
+      ) : null}
 
       <Table className="min-w-[56rem] table-fixed">
         <colgroup>
@@ -143,7 +113,7 @@ export function WebhookAutomationListView(
               <TableCell className="text-muted-foreground" colSpan={5}>
                 {hasItems
                   ? "No automations match the current search or filter."
-                  : "No automations were found."}
+                  : "No automations have been created yet."}
               </TableCell>
             </TableRow>
           ) : null}

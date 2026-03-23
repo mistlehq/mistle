@@ -1,3 +1,4 @@
+import { Button } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -75,13 +76,22 @@ export function AutomationsPage(): React.JSX.Element {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-row items-start justify-between gap-3">
+        <h1 className="text-xl font-semibold">Automations</h1>
+        <Button
+          onClick={() => {
+            void navigate("/automations/new");
+          }}
+          type="button"
+        >
+          Create automation
+        </Button>
+      </div>
+
       <WebhookAutomationListView
         errorMessage={errorMessage}
         isLoading={automationsQuery.isPending || prerequisites.isPending}
         items={items}
-        onCreateAutomation={() => {
-          void navigate("/automations/new");
-        }}
         onOpenAutomation={(automationId) => {
           void navigate(`/automations/${automationId}`);
         }}
@@ -95,6 +105,7 @@ export function AutomationsPage(): React.JSX.Element {
         <TablePagination
           hasNextPage={automationsQuery.data.nextPage !== null}
           hasPreviousPage={automationsQuery.data.previousPage !== null}
+          nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
           onNextPage={() => {
             const nextPage = automationsQuery.data?.nextPage;
             if (nextPage === null || nextPage === undefined) {
@@ -117,6 +128,12 @@ export function AutomationsPage(): React.JSX.Element {
               nextBefore: previousPage.before,
             });
           }}
+          previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
+          summary={
+            <p className="text-muted-foreground text-sm">
+              Showing {items.length} of {automationsQuery.data.totalResults}
+            </p>
+          }
         />
       )}
     </div>

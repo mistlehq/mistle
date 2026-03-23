@@ -38,7 +38,6 @@ const meta = {
     items: SampleItems,
     isLoading: false,
     errorMessage: null,
-    onCreateAutomation: function onCreateAutomation() {},
     onOpenAutomation: function onOpenAutomation() {},
     onRetry: function onRetry() {},
   },
