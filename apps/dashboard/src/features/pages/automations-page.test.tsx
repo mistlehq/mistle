@@ -123,4 +123,94 @@ describe("AutomationsPage", () => {
     expect(markup).toContain("bg-muted/60");
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
   });
+
+  it("renders the result summary even when there is only one page", () => {
+    const queryClient = createQueryClient();
+    const listResult: WebhookAutomationsListResult = {
+      items: [
+        {
+          conversationKeyTemplate: "{{event.id}}",
+          createdAt: "2026-03-05T00:00:00.000Z",
+          enabled: true,
+          eventTypes: ["push"],
+          id: "aut_123",
+          idempotencyKeyTemplate: null,
+          inputTemplate: "{{payload}}",
+          integrationConnectionId: "icn_123",
+          kind: "webhook",
+          name: "Repo triage",
+          payloadFilter: null,
+          target: {
+            id: "target_123",
+            sandboxProfileId: "sbp_123",
+            sandboxProfileVersion: null,
+          },
+          updatedAt: "2026-03-05T00:00:00.000Z",
+        },
+      ],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 1,
+    };
+    const connections: readonly IntegrationConnection[] = [
+      {
+        id: "icn_123",
+        targetKey: "github",
+        displayName: "GitHub Engineering",
+        status: "active",
+        createdAt: "2026-03-05T00:00:00.000Z",
+        updatedAt: "2026-03-05T00:00:00.000Z",
+      },
+    ];
+    const targets: readonly IntegrationTarget[] = [
+      {
+        targetKey: "github",
+        familyId: "github",
+        variantId: "default",
+        enabled: true,
+        config: {},
+        displayName: "GitHub",
+        description: "GitHub integration",
+        targetHealth: {
+          configStatus: "valid",
+        },
+      },
+    ];
+    const sandboxProfiles: readonly SandboxProfile[] = [
+      {
+        createdAt: "2026-03-05T00:00:00.000Z",
+        displayName: "Repo Maintainer",
+        id: "sbp_123",
+        organizationId: "org_123",
+        status: "active",
+        updatedAt: "2026-03-05T00:00:00.000Z",
+      },
+    ];
+
+    queryClient.setQueryData(
+      webhookAutomationsListQueryKey({
+        limit: 25,
+        after: null,
+        before: null,
+      }),
+      listResult,
+    );
+    queryClient.setQueryData(WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY, {
+      connections,
+      targets,
+    });
+    queryClient.setQueryData(WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY, sandboxProfiles);
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AutomationsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain("Showing 1 of 1");
+    expect(markup).not.toContain(">Previous<");
+    expect(markup).not.toContain(">Next<");
+  });
 });

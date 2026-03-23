@@ -640,14 +640,20 @@ export function SessionsPage(): React.JSX.Element {
             </TableBody>
           </Table>
 
-          <TablePagination
-            hasNextPage={hasNextPage}
-            hasPreviousPage={hasPreviousPage}
-            nextPageDisabled={nextPageDisabled}
-            onNextPage={goToNextPage}
-            onPreviousPage={goToPreviousPage}
-            previousPageDisabled={previousPageDisabled}
-          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-muted-foreground text-sm">
+              Showing {sandboxInstancesQuery.data?.items.length ?? 0} of{" "}
+              {sandboxInstancesQuery.data?.totalResults ?? 0}
+            </p>
+            <TablePagination
+              hasNextPage={hasNextPage}
+              hasPreviousPage={hasPreviousPage}
+              nextPageDisabled={nextPageDisabled}
+              onNextPage={goToNextPage}
+              onPreviousPage={goToPreviousPage}
+              previousPageDisabled={previousPageDisabled}
+            />
+          </div>
         </div>
       </div>
     </div>

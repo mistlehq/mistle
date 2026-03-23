@@ -327,19 +327,19 @@ export function SandboxProfilesPage(): React.JSX.Element {
             </TableBody>
           </Table>
 
-          <TablePagination
-            hasNextPage={listQuery.data.nextPage !== null}
-            hasPreviousPage={listQuery.data.previousPage !== null}
-            nextPageDisabled={listQuery.isFetching || listQuery.isPending}
-            onNextPage={goToNextPage}
-            onPreviousPage={goToPreviousPage}
-            previousPageDisabled={listQuery.isFetching || listQuery.isPending}
-            summary={
-              <p className="text-muted-foreground text-sm">
-                Showing {items.length} of {listQuery.data.totalResults}
-              </p>
-            }
-          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-muted-foreground text-sm">
+              Showing {items.length} of {listQuery.data.totalResults}
+            </p>
+            <TablePagination
+              hasNextPage={listQuery.data.nextPage !== null}
+              hasPreviousPage={listQuery.data.previousPage !== null}
+              nextPageDisabled={listQuery.isFetching || listQuery.isPending}
+              onNextPage={goToNextPage}
+              onPreviousPage={goToPreviousPage}
+              previousPageDisabled={listQuery.isFetching || listQuery.isPending}
+            />
+          </div>
         </>
       ) : null}
     </div>

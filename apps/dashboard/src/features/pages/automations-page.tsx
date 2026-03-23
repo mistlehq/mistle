@@ -102,39 +102,39 @@ export function AutomationsPage(): React.JSX.Element {
       />
 
       {automationsQuery.data === undefined ? null : (
-        <TablePagination
-          hasNextPage={automationsQuery.data.nextPage !== null}
-          hasPreviousPage={automationsQuery.data.previousPage !== null}
-          nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
-          onNextPage={() => {
-            const nextPage = automationsQuery.data?.nextPage;
-            if (nextPage === null || nextPage === undefined) {
-              return;
-            }
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-muted-foreground text-sm">
+            Showing {items.length} of {automationsQuery.data.totalResults}
+          </p>
+          <TablePagination
+            hasNextPage={automationsQuery.data.nextPage !== null}
+            hasPreviousPage={automationsQuery.data.previousPage !== null}
+            nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
+            onNextPage={() => {
+              const nextPage = automationsQuery.data?.nextPage;
+              if (nextPage === null || nextPage === undefined) {
+                return;
+              }
 
-            updatePagination({
-              nextAfter: nextPage.after,
-              nextBefore: null,
-            });
-          }}
-          onPreviousPage={() => {
-            const previousPage = automationsQuery.data?.previousPage;
-            if (previousPage === null || previousPage === undefined) {
-              return;
-            }
+              updatePagination({
+                nextAfter: nextPage.after,
+                nextBefore: null,
+              });
+            }}
+            onPreviousPage={() => {
+              const previousPage = automationsQuery.data?.previousPage;
+              if (previousPage === null || previousPage === undefined) {
+                return;
+              }
 
-            updatePagination({
-              nextAfter: null,
-              nextBefore: previousPage.before,
-            });
-          }}
-          previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
-          summary={
-            <p className="text-muted-foreground text-sm">
-              Showing {items.length} of {automationsQuery.data.totalResults}
-            </p>
-          }
-        />
+              updatePagination({
+                nextAfter: null,
+                nextBefore: previousPage.before,
+              });
+            }}
+            previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
+          />
+        </div>
       )}
     </div>
   );
