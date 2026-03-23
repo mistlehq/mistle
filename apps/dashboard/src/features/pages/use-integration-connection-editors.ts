@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
+  deleteIntegrationConnection,
   updateApiKeyIntegrationConnection,
   updateIntegrationConnection,
 } from "../integrations/integrations-service.js";
@@ -18,6 +19,8 @@ export function useIntegrationConnectionEditors(input: {
   const [editingApiKeyConnectionId, setEditingApiKeyConnectionId] = useState<string | null>(null);
   const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [apiKeyError, setApiKeyError] = useState<string | undefined>(undefined);
+  const [deletingConnectionId, setDeletingConnectionId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const updateConnectionNameMutation = useMutation({
     mutationFn: async (payload: { connectionId: string; displayName: string }) =>
@@ -53,8 +56,32 @@ export function useIntegrationConnectionEditors(input: {
     },
   });
 
+  const deleteConnectionMutation = useMutation({
+    mutationFn: async (payload: { connectionId: string }) => deleteIntegrationConnection(payload),
+    onMutate: () => {
+      setDeleteError(null);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: input.queryKey,
+      });
+      setDeleteError(null);
+      setDeletingConnectionId(null);
+    },
+    onError: (error) => {
+      setDeleteError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not delete connection.",
+        }),
+      );
+    },
+  });
+
   const editingApiKeyConnection =
     input.connections.find((connection) => connection.id === editingApiKeyConnectionId) ?? null;
+  const deletingConnection =
+    input.connections.find((connection) => connection.id === deletingConnectionId) ?? null;
 
   return {
     editingApiKeyConnection,
@@ -92,6 +119,35 @@ export function useIntegrationConnectionEditors(input: {
         setApiKeyError(undefined);
       },
       value: apiKeyDraft,
+    },
+    deleteDialog: {
+      connectionName: deletingConnection?.displayName ?? "",
+      errorMessage: deleteError,
+      isOpen: deletingConnection !== null,
+      isPending: deleteConnectionMutation.isPending,
+      onConfirm: () => {
+        if (deletingConnection === null) {
+          throw new Error("Deleting connection is required.");
+        }
+
+        deleteConnectionMutation.mutate({
+          connectionId: deletingConnection.id,
+        });
+      },
+      onOpenChange: (open: boolean) => {
+        if (deleteConnectionMutation.isPending) {
+          return;
+        }
+
+        if (!open) {
+          setDeletingConnectionId(null);
+          setDeleteError(null);
+        }
+      },
+    },
+    onDeleteConnection: (connectionId: string) => {
+      setDeletingConnectionId(connectionId);
+      setDeleteError(null);
     },
     onEditApiKey: (connectionId: string) => {
       setEditingApiKeyConnectionId(connectionId);

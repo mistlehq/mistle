@@ -562,6 +562,8 @@ export interface paths {
           content: {
             "application/json": {
               items: {
+                automationCount?: number;
+                bindingCount?: number;
                 config?: {
                   [key: string]: unknown;
                 };
@@ -685,6 +687,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              automationCount?: number;
+              bindingCount?: number;
               config?: {
                 [key: string]: unknown;
               };
@@ -766,7 +770,94 @@ export interface paths {
       };
     };
     post?: never;
-    delete?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          connectionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Delete an integration connection. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              connectionId: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection still has one or more dependent bindings or automations. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              code: "CONNECTION_HAS_BINDINGS" | "CONNECTION_HAS_AUTOMATIONS";
+              message: string;
+            };
+          };
+        };
+      };
+    };
     options?: never;
     head?: never;
     patch?: never;
@@ -805,6 +896,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              automationCount?: number;
+              bindingCount?: number;
               config?: {
                 [key: string]: unknown;
               };
@@ -1183,6 +1276,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              automationCount?: number;
+              bindingCount?: number;
               config?: {
                 [key: string]: unknown;
               };

@@ -1,14 +1,24 @@
 import {
+  automations,
+  AutomationKinds,
+  integrationConnectionCredentials,
   integrationConnectionResourceStates,
   integrationConnections,
   IntegrationConnectionStatuses,
   IntegrationConnectionResourceSyncStates,
+  integrationCredentials,
+  IntegrationCredentialSecretKinds,
   integrationTargets,
+  sandboxProfiles,
+  sandboxProfileVersionIntegrationBindings,
+  sandboxProfileVersions,
+  webhookAutomations,
 } from "@mistle/db/control-plane";
 import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 import { describe, expect } from "vitest";
 
 import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
+import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
 
 describe("integration connections list integration", () => {
@@ -22,29 +32,7 @@ describe("integration connections list integration", () => {
       email: "integration-connections-list-org-b@example.com",
     });
 
-    await fixture.db
-      .insert(integrationTargets)
-      .values([
-        {
-          targetKey: "github_cloud",
-          familyId: "github",
-          variantId: "github-cloud",
-          enabled: true,
-          config: {
-            base_url: "https://github.com",
-          },
-        },
-        {
-          targetKey: "openai-default",
-          familyId: "openai",
-          variantId: "openai-default",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.openai.com",
-          },
-        },
-      ])
-      .onConflictDoNothing();
+    await ensureListTargets(fixture);
 
     const firstConnectionCreatedAt = new Date("2026-01-01T00:00:00.000Z");
     const secondConnectionCreatedAt = new Date("2026-01-02T00:00:00.000Z");
@@ -109,6 +97,24 @@ describe("integration connections list integration", () => {
       lastErrorMessage: null,
     });
 
+    await insertBindingUsage(fixture, {
+      organizationId: firstOrgSession.organizationId,
+      profileId: "spf_001",
+      profileDisplayName: "Profile 1",
+      bindingId: "ibd_001",
+      connectionId: "icn_001",
+    });
+    await insertWebhookAutomationUsage(fixture, {
+      organizationId: firstOrgSession.organizationId,
+      automationId: "atm_001",
+      automationName: "GitHub webhook automation",
+      connectionId: "icn_002",
+      eventTypes: ["response.created"],
+      payloadFilter: {
+        type: "response.created",
+      },
+    });
+
     const firstPageResponse = await fixture.request("/v1/integration/connections?limit=2", {
       headers: {
         cookie: firstOrgSession.cookie,
@@ -131,6 +137,8 @@ describe("integration connections list integration", () => {
         targetKey: "github_cloud",
         displayName: "GitHub Main",
         status: IntegrationConnectionStatuses.ACTIVE,
+        bindingCount: 1,
+        automationCount: 0,
         externalSubjectId: "github-user-1",
         config: {
           installation_id: "12345",
@@ -167,6 +175,8 @@ describe("integration connections list integration", () => {
         targetKey: "openai-default",
         displayName: "OpenAI Backup",
         status: IntegrationConnectionStatuses.ERROR,
+        bindingCount: 0,
+        automationCount: 1,
         createdAt: secondConnectionCreatedAt.toISOString(),
         updatedAt: secondConnectionCreatedAt.toISOString(),
       },
@@ -203,6 +213,8 @@ describe("integration connections list integration", () => {
         targetKey: "github_cloud",
         displayName: "GitHub Revoked",
         status: IntegrationConnectionStatuses.REVOKED,
+        bindingCount: 0,
+        automationCount: 0,
         resources: [
           {
             kind: "repository",
@@ -286,6 +298,163 @@ describe("integration connections list integration", () => {
     });
   });
 
+  it("deletes an unbound connection and blocks deleting a bound connection", async ({
+    fixture,
+  }) => {
+    const session = await fixture.authSession({
+      email: "integration-connections-delete@example.com",
+    });
+
+    await ensureGitHubCloudTarget(fixture);
+
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_delete_free",
+        organizationId: session.organizationId,
+        targetKey: "github_cloud",
+        displayName: "Free connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      },
+      {
+        id: "icn_delete_bound",
+        organizationId: session.organizationId,
+        targetKey: "github_cloud",
+        displayName: "Bound connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      },
+      {
+        id: "icn_delete_automation",
+        organizationId: session.organizationId,
+        targetKey: "github_cloud",
+        displayName: "Automation connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      },
+    ]);
+
+    await insertBindingUsage(fixture, {
+      organizationId: session.organizationId,
+      profileId: "spf_delete",
+      profileDisplayName: "Delete test profile",
+      bindingId: "ibd_delete_bound",
+      connectionId: "icn_delete_bound",
+    });
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.organizationId, session.organizationId), eq(table.version, 1)),
+    });
+
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key for delete integration test.");
+    }
+
+    await fixture.db.insert(integrationCredentials).values({
+      id: "icr_delete_free",
+      organizationId: session.organizationId,
+      secretKind: IntegrationCredentialSecretKinds.API_KEY,
+      ciphertext: "ciphertext-delete-free",
+      nonce: "nonce-delete-free",
+      organizationCredentialKeyVersion: organizationCredentialKey.version,
+      intendedFamilyId: "github",
+    });
+
+    await fixture.db.insert(integrationConnectionCredentials).values({
+      connectionId: "icn_delete_free",
+      credentialId: "icr_delete_free",
+      purpose: "api_key",
+    });
+
+    await insertWebhookAutomationUsage(fixture, {
+      organizationId: session.organizationId,
+      automationId: "atm_delete_automation",
+      automationName: "Delete guard automation",
+      connectionId: "icn_delete_automation",
+      eventTypes: ["issue_comment.created"],
+      payloadFilter: {
+        action: "created",
+      },
+    });
+
+    const deleteFreeResponse = await fixture.request(
+      "/v1/integration/connections/icn_delete_free",
+      {
+        method: "DELETE",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(deleteFreeResponse.status).toBe(200);
+    expect(await deleteFreeResponse.json()).toEqual({
+      connectionId: "icn_delete_free",
+    });
+
+    const deletedConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { eq }) => eq(table.id, "icn_delete_free"),
+    });
+    expect(deletedConnection).toBeUndefined();
+
+    const deletedCredentialLink = await fixture.db.query.integrationConnectionCredentials.findFirst(
+      {
+        where: (table, { and, eq }) =>
+          and(eq(table.connectionId, "icn_delete_free"), eq(table.credentialId, "icr_delete_free")),
+      },
+    );
+    expect(deletedCredentialLink).toBeUndefined();
+
+    const deletedCredential = await fixture.db.query.integrationCredentials.findFirst({
+      where: (table, { eq }) => eq(table.id, "icr_delete_free"),
+    });
+    expect(deletedCredential).toBeUndefined();
+
+    const deleteBoundResponse = await fixture.request(
+      "/v1/integration/connections/icn_delete_bound",
+      {
+        method: "DELETE",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(deleteBoundResponse.status).toBe(409);
+    expect(await deleteBoundResponse.json()).toEqual({
+      code: "CONNECTION_HAS_BINDINGS",
+      message:
+        "This integration connection cannot be deleted while it is still used by one or more bindings.",
+    });
+
+    const boundConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { eq }) => eq(table.id, "icn_delete_bound"),
+    });
+    expect(boundConnection).toBeDefined();
+
+    const deleteAutomationResponse = await fixture.request(
+      "/v1/integration/connections/icn_delete_automation",
+      {
+        method: "DELETE",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(deleteAutomationResponse.status).toBe(409);
+    expect(await deleteAutomationResponse.json()).toEqual({
+      code: "CONNECTION_HAS_AUTOMATIONS",
+      message:
+        "This integration connection cannot be deleted while it is still used by one or more webhook automations.",
+    });
+
+    const automationConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { eq }) => eq(table.id, "icn_delete_automation"),
+    });
+    expect(automationConnection).toBeDefined();
+
+    const persistedWebhookAutomation = await fixture.db.query.webhookAutomations.findFirst({
+      where: (table, { eq }) => eq(table.automationId, "atm_delete_automation"),
+    });
+    expect(persistedWebhookAutomation).toBeDefined();
+  });
+
   it("returns 401 when the request is unauthenticated", async ({ fixture }) => {
     const response = await fixture.request("/v1/integration/connections");
 
@@ -296,3 +465,102 @@ describe("integration connections list integration", () => {
     });
   });
 });
+
+async function ensureListTargets(fixture: ControlPlaneApiIntegrationFixture): Promise<void> {
+  await fixture.db
+    .insert(integrationTargets)
+    .values([
+      {
+        targetKey: "github_cloud",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          base_url: "https://github.com",
+        },
+      },
+      {
+        targetKey: "openai-default",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com",
+        },
+      },
+    ])
+    .onConflictDoNothing();
+}
+
+async function ensureGitHubCloudTarget(fixture: ControlPlaneApiIntegrationFixture): Promise<void> {
+  await fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: "github_cloud",
+      familyId: "github",
+      variantId: "github-cloud",
+      enabled: true,
+      config: {
+        base_url: "https://github.com",
+      },
+    })
+    .onConflictDoNothing();
+}
+
+async function insertBindingUsage(
+  fixture: ControlPlaneApiIntegrationFixture,
+  input: {
+    organizationId: string;
+    profileId: string;
+    profileDisplayName: string;
+    bindingId: string;
+    connectionId: string;
+  },
+): Promise<void> {
+  await fixture.db.insert(sandboxProfiles).values({
+    id: input.profileId,
+    organizationId: input.organizationId,
+    displayName: input.profileDisplayName,
+  });
+  await fixture.db.insert(sandboxProfileVersions).values({
+    sandboxProfileId: input.profileId,
+    version: 1,
+  });
+  await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+    id: input.bindingId,
+    sandboxProfileId: input.profileId,
+    sandboxProfileVersion: 1,
+    connectionId: input.connectionId,
+    kind: "git",
+    config: {},
+  });
+}
+
+async function insertWebhookAutomationUsage(
+  fixture: ControlPlaneApiIntegrationFixture,
+  input: {
+    organizationId: string;
+    automationId: string;
+    automationName: string;
+    connectionId: string;
+    eventTypes: string[];
+    payloadFilter: Record<string, unknown>;
+  },
+): Promise<void> {
+  await fixture.db.insert(automations).values({
+    id: input.automationId,
+    organizationId: input.organizationId,
+    kind: AutomationKinds.WEBHOOK,
+    name: input.automationName,
+    enabled: true,
+  });
+  await fixture.db.insert(webhookAutomations).values({
+    automationId: input.automationId,
+    integrationConnectionId: input.connectionId,
+    eventTypes: input.eventTypes,
+    payloadFilter: input.payloadFilter,
+    inputTemplate: "Handle payload",
+    conversationKeyTemplate: "conversation",
+    idempotencyKeyTemplate: "dedupe",
+  });
+}

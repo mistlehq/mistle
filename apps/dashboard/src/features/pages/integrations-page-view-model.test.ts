@@ -158,6 +158,27 @@ describe("integrations page view model", () => {
     expect(item?.resources[0]?.isRefreshing).toBe(true);
   });
 
+  it("disables deletion when a connection is still referenced by webhook automations", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_automation_guarded",
+          targetKey: "github",
+          displayName: "Engineering GitHub",
+          status: "active",
+          bindingCount: 0,
+          automationCount: 1,
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.bindingCount).toBe(0);
+    expect(item?.canDelete).toBe(false);
+  });
+
   it("returns an empty resource summary list when a connection has no resources payload", () => {
     expect(
       getIntegrationConnectionResourceSummaries({
@@ -397,6 +418,8 @@ function createConnection(
     targetKey: "github",
     displayName: input.displayName ?? `GitHub ${input.id}`,
     status: input.status,
+    bindingCount: input.bindingCount ?? 0,
+    automationCount: input.automationCount ?? 0,
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-11T04:30:00.000Z",
     ...(input.resources === undefined ? {} : { resources: input.resources }),

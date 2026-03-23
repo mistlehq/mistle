@@ -1220,6 +1220,14 @@
                             "type": "string",
                             "enum": ["active", "error", "revoked"]
                           },
+                          "bindingCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "automationCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "externalSubjectId": {
                             "type": "string",
                             "minLength": 1
@@ -1954,6 +1962,14 @@
                       "type": "string",
                       "enum": ["active", "error", "revoked"]
                     },
+                    "bindingCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "automationCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "externalSubjectId": {
                       "type": "string",
                       "minLength": 1
@@ -2184,6 +2200,14 @@
                       "type": "string",
                       "enum": ["active", "error", "revoked"]
                     },
+                    "bindingCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "automationCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "externalSubjectId": {
                       "type": "string",
                       "minLength": 1
@@ -2337,6 +2361,158 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": ["Integrations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "connectionId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete an integration connection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connectionId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["connectionId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Integration connection was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["CONNECTION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Integration connection still has one or more dependent bindings or automations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["CONNECTION_HAS_BINDINGS"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["CONNECTION_HAS_AUTOMATIONS"]
+                        }
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/integration/connections/:connectionId/api-key": {
@@ -2399,6 +2575,14 @@
                     "status": {
                       "type": "string",
                       "enum": ["active", "error", "revoked"]
+                    },
+                    "bindingCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "automationCount": {
+                      "type": "integer",
+                      "minimum": 0
                     },
                     "externalSubjectId": {
                       "type": "string",

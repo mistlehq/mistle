@@ -1,6 +1,7 @@
 import { useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { DeleteIntegrationConnectionDialog } from "../integrations/delete-integration-connection-dialog.js";
 import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-connection-api-key-dialog.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import { IntegrationConnectionDialog } from "../integrations/integration-connection-dialog.js";
@@ -49,6 +50,7 @@ export function IntegrationsPage() {
           connections: directoryState.selectedDetailConnections,
           refreshingResourceKeys: directoryState.refreshingResourceKeys,
         })}
+        onDeleteConnection={connectionEditors.onDeleteConnection}
         onEditApiKey={connectionEditors.onEditApiKey}
         onRefreshResource={directoryState.onRefreshResource}
         resourceItemsByKey={directoryState.resourceItemsByKey}
@@ -82,6 +84,7 @@ export function IntegrationsPage() {
             pending={connectionDialogState.pending}
           />
           <IntegrationConnectionApiKeyDialog {...connectionEditors.apiKeyDialog} />
+          <DeleteIntegrationConnectionDialog {...connectionEditors.deleteDialog} />
         </>
       }
       detailSurface={detailSurface}

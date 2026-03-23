@@ -17,6 +17,8 @@ describe("IntegrationConnectionDetailView", () => {
         connections={[
           {
             id: "icn_github_primary",
+            bindingCount: 1,
+            canDelete: false,
             displayName: "Engineering GitHub",
             status: "active",
             authMethodLabel: "GitHub App installation",
@@ -31,6 +33,8 @@ describe("IntegrationConnectionDetailView", () => {
           },
           {
             id: "icn_github_archive",
+            bindingCount: 0,
+            canDelete: true,
             displayName: "Archive Mirror",
             status: "error",
             authMethodLabel: "API key",
@@ -99,6 +103,8 @@ describe("IntegrationConnectionDetailView", () => {
         connections={[
           {
             id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
             displayName: "Engineering GitHub",
             status: "active",
             authMethodLabel: "GitHub App installation",
@@ -128,6 +134,8 @@ describe("IntegrationConnectionDetailView", () => {
         connections={[
           {
             id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
             displayName: "Engineering GitHub",
             authMethodId: "github-app-installation",
             authMethodLabel: "GitHub App installation",
@@ -136,6 +144,8 @@ describe("IntegrationConnectionDetailView", () => {
           },
           {
             id: "icn_github_archive",
+            bindingCount: 0,
+            canDelete: true,
             displayName: "Archive Mirror",
             authMethodId: "github-app-installation",
             authMethodLabel: "GitHub App installation",
@@ -173,6 +183,8 @@ describe("IntegrationConnectionDetailView", () => {
         connections={[
           {
             id: "icn_openai_primary",
+            bindingCount: 0,
+            canDelete: true,
             displayName: "OpenAI Production",
             authMethodId: "api-key",
             authMethodLabel: "API key",
@@ -192,5 +204,43 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("**********")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Edit API key" }));
     expect(editedConnectionId).toBe("icn_openai_primary");
+  });
+
+  it("shows delete only for unbound connections", () => {
+    let deletedConnectionId: string | null = null;
+
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_bound",
+            bindingCount: 2,
+            canDelete: false,
+            displayName: "Bound connection",
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [],
+          },
+          {
+            id: "icn_free",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Free connection",
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [],
+          },
+        ]}
+        onDeleteConnection={(connectionId) => {
+          deletedConnectionId = connectionId;
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Delete connection Bound connection" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Delete connection Free connection" }));
+    expect(deletedConnectionId).toBe("icn_free");
   });
 });
