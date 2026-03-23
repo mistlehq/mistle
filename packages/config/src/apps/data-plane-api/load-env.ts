@@ -2,6 +2,7 @@ import { createEnvLoader, hasEntries } from "../../core/load-env.js";
 import {
   type PartialDataPlaneApiConfigInput,
   DataPlaneApiDatabaseConfigSchema,
+  DataPlaneApiRuntimeStateConfigSchema,
   DataPlaneApiServerConfigSchema,
   DataPlaneApiWorkflowConfigSchema,
   PartialDataPlaneApiConfigSchema,
@@ -37,6 +38,13 @@ const loadWorkflowEnv = createEnvLoader<typeof DataPlaneApiWorkflowConfigSchema>
   },
 ]);
 
+const loadRuntimeStateEnv = createEnvLoader<typeof DataPlaneApiRuntimeStateConfigSchema>([
+  {
+    key: "gatewayBaseUrl",
+    envVar: "MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL",
+  },
+]);
+
 export function loadDataPlaneApiFromEnv(env: NodeJS.ProcessEnv): PartialDataPlaneApiConfigInput {
   const partialConfig: PartialDataPlaneApiConfigInput = {};
 
@@ -53,6 +61,11 @@ export function loadDataPlaneApiFromEnv(env: NodeJS.ProcessEnv): PartialDataPlan
   const workflow = loadWorkflowEnv(env);
   if (hasEntries(workflow)) {
     partialConfig.workflow = workflow;
+  }
+
+  const runtimeState = loadRuntimeStateEnv(env);
+  if (hasEntries(runtimeState)) {
+    partialConfig.runtimeState = runtimeState;
   }
 
   return PartialDataPlaneApiConfigSchema.parse(partialConfig);

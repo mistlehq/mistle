@@ -115,6 +115,9 @@ describe("parseConfigRecord", () => {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
           },
+          runtimeState: {
+            gatewayBaseUrl: "http://127.0.0.1:5202",
+          },
         },
         data_plane_worker: {
           server: {
@@ -293,6 +296,9 @@ describe("parseConfigRecord", () => {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
           },
+          runtimeState: {
+            gatewayBaseUrl: "http://127.0.0.1:5202",
+          },
         },
         data_plane_worker: {
           server: {
@@ -469,6 +475,9 @@ describe("parseConfigRecord", () => {
           workflow: {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
+          },
+          runtimeState: {
+            gatewayBaseUrl: "http://127.0.0.1:5202",
           },
         },
         data_plane_worker: {

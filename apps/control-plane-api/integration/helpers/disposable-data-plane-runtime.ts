@@ -103,6 +103,7 @@ export async function createDisposableDataPlaneRuntime(input: {
       Number.isInteger(configuredPort) && configuredPort > 0
         ? configuredPort
         : await reserveAvailablePort({ host });
+    const gatewayPort = await reserveAvailablePort({ host });
     const config: DataPlaneApiConfig = {
       server: {
         host,
@@ -114,6 +115,9 @@ export async function createDisposableDataPlaneRuntime(input: {
       workflow: {
         databaseUrl,
         namespaceId: input.workflowNamespaceId,
+      },
+      runtimeState: {
+        gatewayBaseUrl: `http://${host}:${String(gatewayPort)}`,
       },
     };
 

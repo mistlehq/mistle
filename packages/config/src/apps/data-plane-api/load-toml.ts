@@ -9,6 +9,7 @@ export function loadDataPlaneApiFromToml(
   const server = asObjectRecord(dataPlaneApi.server);
   const database = asObjectRecord(dataPlaneApi.database);
   const workflow = asObjectRecord(dataPlaneApi.workflow);
+  const runtimeState = asObjectRecord(dataPlaneApi.runtime_state);
 
   return PartialDataPlaneApiConfigSchema.parse({
     server: {
@@ -21,6 +22,9 @@ export function loadDataPlaneApiFromToml(
     workflow: {
       databaseUrl: workflow.database_url,
       namespaceId: workflow.namespace_id,
+    },
+    runtimeState: {
+      gatewayBaseUrl: runtimeState.gateway_base_url,
     },
   });
 }

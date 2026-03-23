@@ -276,6 +276,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID",
   },
   {
+    configPath: ["apps", "data_plane_api", "runtimeState", "gatewayBaseUrl"],
+    tomlPath: ["apps", "data_plane_api", "runtime_state", "gateway_base_url"],
+    envVar: "MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL",
+  },
+  {
     configPath: ["apps", "data_plane_gateway", "server", "host"],
     tomlPath: ["apps", "data_plane_gateway", "server", "host"],
     envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_HOST",

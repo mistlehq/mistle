@@ -202,6 +202,11 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
             databaseUrl: runtimeDatabaseUrl,
             namespaceId: sharedInfraConfig.workflowNamespaceId,
           },
+          runtimeState: {
+            gatewayBaseUrl: `http://127.0.0.1:${String(
+              await reserveAvailablePort({ host: "127.0.0.1" }),
+            )}`,
+          },
         };
 
         const runtime = await createDataPlaneApiRuntime({

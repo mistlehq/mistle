@@ -6,7 +6,7 @@ import type { AppContextBindings, DataPlaneApiRuntimeConfig, DataPlaneApp } from
 
 export async function createApp(runtimeConfig: DataPlaneApiRuntimeConfig): Promise<DataPlaneApp> {
   const app = new OpenAPIHono<AppContextBindings>();
-  const resources = await createAppResources(runtimeConfig.app);
+  const resources = await createAppResources(runtimeConfig);
 
   registerAppRoutes({
     app,
