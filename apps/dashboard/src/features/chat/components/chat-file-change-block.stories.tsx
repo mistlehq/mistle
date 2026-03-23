@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
-  CodexStoryFileChangeApprovalRequest,
-  CodexStoryFileChangeBlock,
-} from "../../session-agents/codex/fixtures/approval-story-fixtures.js";
+  CodexFixtureFileChangeApprovalRequest,
+  CodexFixtureFileChangeBlock,
+} from "../../session-agents/codex/fixtures/approval-fixtures.js";
 import { ChatFileChangeBlock } from "./chat-file-change-block.js";
 
 const meta = {
@@ -15,7 +15,7 @@ const meta = {
   },
   args: {
     approvalRequest: null,
-    block: CodexStoryFileChangeBlock,
+    block: CodexFixtureFileChangeBlock,
     isRespondingToServerRequest: false,
     onRespondToServerRequest: function onRespondToServerRequest() {},
   },
@@ -30,7 +30,7 @@ export const Completed: Story = {};
 export const Streaming: Story = {
   args: {
     block: {
-      ...CodexStoryFileChangeBlock,
+      ...CodexFixtureFileChangeBlock,
       output: "Applying the next patch to the dashboard chat view stories...",
       status: "streaming",
     },
@@ -39,9 +39,9 @@ export const Streaming: Story = {
 
 export const AwaitingApproval: Story = {
   args: {
-    approvalRequest: CodexStoryFileChangeApprovalRequest,
+    approvalRequest: CodexFixtureFileChangeApprovalRequest,
     block: {
-      ...CodexStoryFileChangeBlock,
+      ...CodexFixtureFileChangeBlock,
       output: null,
       status: "streaming",
     },
@@ -51,7 +51,7 @@ export const AwaitingApproval: Story = {
 export const ApprovalError: Story = {
   args: {
     approvalRequest: {
-      ...CodexStoryFileChangeApprovalRequest,
+      ...CodexFixtureFileChangeApprovalRequest,
       responseErrorMessage: "The file change approval was declined for this session.",
     },
   },

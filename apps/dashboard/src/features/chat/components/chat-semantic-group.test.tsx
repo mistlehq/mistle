@@ -4,12 +4,12 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
-  CodexStoryExploringGroupEntry,
-  CodexStoryMakingEditsGroupEntry,
-  CodexStoryRunningCommandsGroupEntry,
-  CodexStorySearchingWebGroupEntry,
-  CodexStoryThinkingGroupEntry,
-} from "../../session-agents/codex/fixtures/chat-story-fixtures.js";
+  CodexFixtureExploringGroupEntry,
+  CodexFixtureMakingEditsGroupEntry,
+  CodexFixtureRunningCommandsGroupEntry,
+  CodexFixtureSearchingWebGroupEntry,
+  CodexFixtureThinkingGroupEntry,
+} from "../../session-agents/codex/fixtures/chat-fixtures.js";
 import type { ChatSemanticGroupEntry } from "../chat-types.js";
 import { ChatSemanticGroup } from "./chat-semantic-group.js";
 
@@ -19,7 +19,7 @@ describe("ChatSemanticGroup", () => {
   it("renders exploring groups as compact semantic steps with collapsible results", () => {
     const { container } = render(
       <ChatSemanticGroup
-        block={CodexStoryExploringGroupEntry}
+        block={CodexFixtureExploringGroupEntry}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={() => {}}
         pendingServerRequests={[]}
@@ -38,7 +38,7 @@ describe("ChatSemanticGroup", () => {
   it("renders non-exploring groups with semantic titles and no disclosure for empty output", () => {
     render(
       <ChatSemanticGroup
-        block={CodexStoryThinkingGroupEntry}
+        block={CodexFixtureThinkingGroupEntry}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={() => {}}
         pendingServerRequests={[]}
@@ -55,7 +55,7 @@ describe("ChatSemanticGroup", () => {
   it("toggles output below the row when a disclosure is opened", () => {
     const { container } = render(
       <ChatSemanticGroup
-        block={CodexStoryExploringGroupEntry}
+        block={CodexFixtureExploringGroupEntry}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={() => {}}
         pendingServerRequests={[]}
@@ -84,7 +84,7 @@ describe("ChatSemanticGroup", () => {
   it("toggles the whole semantic group from the header", () => {
     const { container } = render(
       <ChatSemanticGroup
-        block={CodexStoryThinkingGroupEntry}
+        block={CodexFixtureThinkingGroupEntry}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={() => {}}
         pendingServerRequests={[]}
@@ -108,7 +108,7 @@ describe("ChatSemanticGroup", () => {
   it("renders making-edits output with the diff viewer", () => {
     const { container } = render(
       <ChatSemanticGroup
-        block={CodexStoryMakingEditsGroupEntry}
+        block={CodexFixtureMakingEditsGroupEntry}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={() => {}}
         pendingServerRequests={[]}
@@ -177,7 +177,7 @@ describe("ChatSemanticGroup", () => {
   it("renders searching-web output as a result list instead of raw json", () => {
     render(
       <ChatSemanticGroup
-        block={CodexStorySearchingWebGroupEntry}
+        block={CodexFixtureSearchingWebGroupEntry}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={() => {}}
         pendingServerRequests={[]}
@@ -208,7 +208,7 @@ describe("ChatSemanticGroup", () => {
   it("renders running-commands output with the subdued command log treatment", () => {
     const { container } = render(
       <ChatSemanticGroup
-        block={CodexStoryRunningCommandsGroupEntry}
+        block={CodexFixtureRunningCommandsGroupEntry}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={() => {}}
         pendingServerRequests={[]}
@@ -238,7 +238,7 @@ describe("ChatSemanticGroup", () => {
 
     render(
       <ChatSemanticGroup
-        block={CodexStoryRunningCommandsGroupEntry}
+        block={CodexFixtureRunningCommandsGroupEntry}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={(_requestId, result) => {
           submittedResults.push(result);

@@ -1,9 +1,9 @@
 import type { ChatEntry } from "../../../chat/chat-types.js";
 import type { SessionConversationComposerProps } from "../../../pages/session-conversation-pane.js";
 import type { CodexApprovalRequestEntry } from "../approvals/codex-approval-requests-state.js";
-import { CodexStoryExploringGroupEntry } from "./chat-story-fixtures.js";
+import { CodexFixtureExploringGroupEntry } from "./chat-fixtures.js";
 
-export const CodexStorySessionEntries: readonly ChatEntry[] = [
+export const CodexFixtureSessionEntries: readonly ChatEntry[] = [
   {
     id: "user-1",
     turnId: "turn-1",
@@ -27,7 +27,7 @@ export const CodexStorySessionEntries: readonly ChatEntry[] = [
   },
 ];
 
-export const CodexStorySessionEntriesWithExploringGroup: readonly ChatEntry[] = [
+export const CodexFixtureSessionEntriesWithExploringGroup: readonly ChatEntry[] = [
   {
     id: "user-session-exploring-1",
     turnId: "turn-session-exploring",
@@ -35,7 +35,7 @@ export const CodexStorySessionEntriesWithExploringGroup: readonly ChatEntry[] = 
     status: "completed",
     text: "Trace how the chat thread renders the new exploring group.",
   },
-  CodexStoryExploringGroupEntry,
+  CodexFixtureExploringGroupEntry,
   {
     id: "assistant-session-exploring-1",
     turnId: "turn-session-exploring",
@@ -46,9 +46,9 @@ export const CodexStorySessionEntriesWithExploringGroup: readonly ChatEntry[] = 
   },
 ];
 
-export const CodexStorySessionServerRequests: readonly CodexApprovalRequestEntry[] = [];
+export const CodexFixtureSessionServerRequests: readonly CodexApprovalRequestEntry[] = [];
 
-export const CodexStorySessionComposerProps: SessionConversationComposerProps = {
+export const CodexFixtureSessionComposerProps: SessionConversationComposerProps = {
   composerText: "Focus on dashboard asset ownership next.",
   modelOptions: [
     { value: "gpt-5", label: "GPT-5" },

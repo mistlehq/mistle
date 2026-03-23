@@ -1,6 +1,6 @@
 import type { ChatEntry, ChatSemanticGroupEntry } from "../../../chat/chat-types.js";
 
-export const CodexStoryChatThreadEntries: readonly ChatEntry[] = [
+export const CodexFixtureChatThreadEntries: readonly ChatEntry[] = [
   {
     id: "user-1",
     turnId: "turn-1",
@@ -88,7 +88,7 @@ const StorySemanticDisplayKeys = {
   },
 } as const;
 
-export const CodexStoryExploringGroupEntry: ChatSemanticGroupEntry = {
+export const CodexFixtureExploringGroupEntry: ChatSemanticGroupEntry = {
   id: "exploring-group-1",
   turnId: "turn-exploring",
   kind: "semantic-group",
@@ -163,7 +163,7 @@ export const CodexStoryExploringGroupEntry: ChatSemanticGroupEntry = {
   ],
 };
 
-export const CodexStoryChatThreadEntriesWithExploringGroup: readonly ChatEntry[] = [
+export const CodexFixtureChatThreadEntriesWithExploringGroup: readonly ChatEntry[] = [
   {
     id: "user-exploring-1",
     turnId: "turn-exploring",
@@ -179,7 +179,7 @@ export const CodexStoryChatThreadEntriesWithExploringGroup: readonly ChatEntry[]
     status: "completed",
     summary: "Reading the shared semantic helpers and the dashboard chat-thread renderer first.",
   },
-  CodexStoryExploringGroupEntry,
+  CodexFixtureExploringGroupEntry,
   {
     id: "assistant-exploring-1",
     turnId: "turn-exploring",
@@ -196,7 +196,7 @@ export const CodexStoryChatThreadEntriesWithExploringGroup: readonly ChatEntry[]
   },
 ];
 
-export const CodexStoryThinkingGroupEntry: ChatSemanticGroupEntry = {
+export const CodexFixtureThinkingGroupEntry: ChatSemanticGroupEntry = {
   id: "thinking-group-1",
   turnId: "turn-thinking",
   kind: "semantic-group",
@@ -229,7 +229,7 @@ export const CodexStoryThinkingGroupEntry: ChatSemanticGroupEntry = {
   ],
 };
 
-export const CodexStoryChatThreadEntriesWithThinkingGroup: readonly ChatEntry[] = [
+export const CodexFixtureChatThreadEntriesWithThinkingGroup: readonly ChatEntry[] = [
   {
     id: "user-thinking-1",
     turnId: "turn-thinking",
@@ -237,7 +237,7 @@ export const CodexStoryChatThreadEntriesWithThinkingGroup: readonly ChatEntry[] 
     status: "completed",
     text: "Explain how the semantic grouping changed.",
   },
-  CodexStoryThinkingGroupEntry,
+  CodexFixtureThinkingGroupEntry,
   {
     id: "assistant-thinking-1",
     turnId: "turn-thinking",
@@ -248,7 +248,7 @@ export const CodexStoryChatThreadEntriesWithThinkingGroup: readonly ChatEntry[] 
   },
 ];
 
-export const CodexStoryChatThreadEntriesWithStructuredPlan: readonly ChatEntry[] = [
+export const CodexFixtureChatThreadEntriesWithStructuredPlan: readonly ChatEntry[] = [
   {
     id: "user-plan-1",
     turnId: "turn-plan",
@@ -292,7 +292,7 @@ export const CodexStoryChatThreadEntriesWithStructuredPlan: readonly ChatEntry[]
   },
 ];
 
-export const CodexStoryChatThreadEntriesWithGenericItem: readonly ChatEntry[] = [
+export const CodexFixtureChatThreadEntriesWithGenericItem: readonly ChatEntry[] = [
   {
     id: "user-generic-1",
     turnId: "turn-generic",
@@ -328,7 +328,7 @@ export const CodexStoryChatThreadEntriesWithGenericItem: readonly ChatEntry[] = 
   },
 ];
 
-export const CodexStoryMakingEditsGroupEntry: ChatSemanticGroupEntry = {
+export const CodexFixtureMakingEditsGroupEntry: ChatSemanticGroupEntry = {
   id: "making-edits-group-1",
   turnId: "turn-making-edits",
   kind: "semantic-group",
@@ -369,7 +369,7 @@ export const CodexStoryMakingEditsGroupEntry: ChatSemanticGroupEntry = {
   ],
 };
 
-export const CodexStorySearchingWebGroupEntry: ChatSemanticGroupEntry = {
+export const CodexFixtureSearchingWebGroupEntry: ChatSemanticGroupEntry = {
   id: "searching-web-group-1",
   turnId: "turn-searching-web",
   kind: "semantic-group",
@@ -427,7 +427,7 @@ export const CodexStorySearchingWebGroupEntry: ChatSemanticGroupEntry = {
   ],
 };
 
-export const CodexStoryToolCallGroupEntry: ChatSemanticGroupEntry = {
+export const CodexFixtureToolCallGroupEntry: ChatSemanticGroupEntry = {
   id: "tool-call-group-1",
   turnId: "turn-tool-call",
   kind: "semantic-group",
@@ -481,7 +481,7 @@ export const CodexStoryToolCallGroupEntry: ChatSemanticGroupEntry = {
   ],
 };
 
-export const CodexStoryRunningCommandsGroupEntry: ChatSemanticGroupEntry = {
+export const CodexFixtureRunningCommandsGroupEntry: ChatSemanticGroupEntry = {
   id: "running-commands-group-1",
   turnId: "turn-running-commands",
   kind: "semantic-group",
@@ -517,7 +517,7 @@ export const CodexStoryRunningCommandsGroupEntry: ChatSemanticGroupEntry = {
   ],
 };
 
-export const CodexStoryRunningCommandsLongOutputGroupEntry: ChatSemanticGroupEntry = {
+export const CodexFixtureRunningCommandsLongOutputGroupEntry: ChatSemanticGroupEntry = {
   id: "running-commands-group-long-1",
   turnId: "turn-running-commands-long",
   kind: "semantic-group",

@@ -37,3 +37,12 @@ Minimal dashboard scaffold using Vite + React.
 
 - Shared package:
   - `../packages/sandbox-session-protocol`
+
+## Storybook Boundary
+
+- Keep dashboard stories colocated in `src/**` as `*.stories.tsx`.
+- The dashboard app tsconfig excludes `*.stories.tsx`, `*.story-fixtures.ts`, `*.story-fixtures.tsx`, and `src/storybook/**`.
+- Storybook-specific validation belongs to `@mistle/storybook`, not the dashboard runtime typecheck.
+- Prefer neutral fixtures for sample data shared by stories and tests.
+- Keep Storybook-only composition in `*.story-fixtures.ts` or `*.story-fixtures.tsx`.
+- Do not import story-only fixtures from dashboard tests.

@@ -1,15 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
-  CodexStoryChatThreadEntriesWithStructuredPlan,
-  CodexStoryChatThreadEntriesWithThinkingGroup,
-} from "../session-agents/codex/fixtures/chat-story-fixtures.js";
+  CodexFixtureChatThreadEntriesWithStructuredPlan,
+  CodexFixtureChatThreadEntriesWithThinkingGroup,
+} from "../session-agents/codex/fixtures/chat-fixtures.js";
 import {
-  CodexStorySessionComposerProps,
-  CodexStorySessionEntries,
-  CodexStorySessionEntriesWithExploringGroup,
-  CodexStorySessionServerRequests,
-} from "../session-agents/codex/fixtures/session-story-fixtures.js";
+  CodexFixtureSessionComposerProps,
+  CodexFixtureSessionEntries,
+  CodexFixtureSessionEntriesWithExploringGroup,
+  CodexFixtureSessionServerRequests,
+} from "../session-agents/codex/fixtures/session-fixtures.js";
 import {
   SessionConversationBottomPanel,
   SessionConversationMainContent,
@@ -17,11 +17,11 @@ import {
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 const baseArgs = {
-  chatEntries: CodexStorySessionEntries,
-  serverRequestPanelEntries: CodexStorySessionServerRequests,
+  chatEntries: CodexFixtureSessionEntries,
+  serverRequestPanelEntries: CodexFixtureSessionServerRequests,
   isRespondingToServerRequest: false,
   onRespondToServerRequest: function onRespondToServerRequest() {},
-  composerProps: CodexStorySessionComposerProps,
+  composerProps: CodexFixtureSessionComposerProps,
 };
 
 const meta = {
@@ -58,18 +58,18 @@ export const Default: Story = {};
 
 export const WithExploringGroup: Story = {
   args: {
-    chatEntries: CodexStorySessionEntriesWithExploringGroup,
+    chatEntries: CodexFixtureSessionEntriesWithExploringGroup,
   },
 };
 
 export const WithThinkingGroup: Story = {
   args: {
-    chatEntries: CodexStoryChatThreadEntriesWithThinkingGroup,
+    chatEntries: CodexFixtureChatThreadEntriesWithThinkingGroup,
   },
 };
 
 export const WithStructuredPlan: Story = {
   args: {
-    chatEntries: CodexStoryChatThreadEntriesWithStructuredPlan,
+    chatEntries: CodexFixtureChatThreadEntriesWithStructuredPlan,
   },
 };
