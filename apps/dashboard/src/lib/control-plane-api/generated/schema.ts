@@ -2678,10 +2678,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code:
-                | "INSTANCE_NOT_RESUMABLE"
-                | "INSTANCE_FAILED"
-                | "MULTIPLE_ACTIVE_AUTOMATION_CONVERSATIONS";
+              code: "INSTANCE_NOT_RESUMABLE" | "INSTANCE_FAILED";
               message: string;
             };
           };

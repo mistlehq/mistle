@@ -96,11 +96,7 @@ const SandboxInstancesBadRequestCodeSchema = z.enum([
   "INVALID_LIST_INSTANCES_INPUT",
 ]);
 const SandboxInstancesNotFoundCodeSchema = z.enum(["INSTANCE_NOT_FOUND"]);
-const SandboxInstancesConflictCodeSchema = z.enum([
-  "INSTANCE_NOT_RESUMABLE",
-  "INSTANCE_FAILED",
-  "MULTIPLE_ACTIVE_AUTOMATION_CONVERSATIONS",
-]);
+const SandboxInstancesConflictCodeSchema = z.enum(["INSTANCE_NOT_RESUMABLE", "INSTANCE_FAILED"]);
 
 export const SandboxInstancesBadRequestResponseSchema = z.union([
   z

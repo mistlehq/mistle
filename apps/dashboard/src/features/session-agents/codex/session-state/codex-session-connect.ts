@@ -73,9 +73,9 @@ export async function establishInitialCodexThread(input: {
         isMissingPersistedThreadError(error)
       ) {
         throw describeCodexSessionStepError(
-          "Resuming persisted Codex thread",
+          "Resuming persisted chat session",
           new Error(
-            `This session is linked to persisted Codex thread '${input.preferredThreadId}', but that thread is no longer available.`,
+            `This chat session could not be resumed because the linked persisted session '${input.preferredThreadId}' is no longer available.`,
           ),
         );
       }
