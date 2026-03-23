@@ -143,7 +143,7 @@ function buildProxyMediationRuntimePlan(): CompiledRuntimePlan {
         match: {
           hosts: ["api.openai.com"],
           pathPrefixes: ["/v1"],
-          methods: ["POST"],
+          methods: ["GET", "POST"],
         },
         upstream: {
           baseUrl: "https://api.openai.com/v1",
@@ -510,6 +510,70 @@ describe("proxy mediation", () => {
 
     expect(response.statusCode).toBe(202);
     expect(response.body).toBe(`{"intercepted":true}`);
+    expect(capturedPath).toBe("/tokenizer-proxy/egress/v1/responses");
+    expect(capturedUpstreamBaseUrl).toBe("https://api.openai.com/v1");
+  });
+
+  it("mediates matching intercepted https upgrades through tokenizer proxy", async () => {
+    let capturedPath = "";
+    let capturedUpstreamBaseUrl = "";
+
+    const upgradeCapableServer = createHttpServer((_request, response) => {
+      response.writeHead(426);
+      response.end();
+    });
+    upgradeCapableServer.on("upgrade", (request, socket) => {
+      const tokenizerProxyUrl = new URL(`http://tokenizer-proxy.internal${request.url ?? "/"}`);
+      capturedPath = tokenizerProxyUrl.pathname;
+      const upstreamBaseUrlHeader = request.headers["x-mistle-egress-upstream-base-url"];
+      capturedUpstreamBaseUrl =
+        typeof upstreamBaseUrlHeader === "string"
+          ? upstreamBaseUrlHeader
+          : (upstreamBaseUrlHeader?.[0] ?? "");
+
+      socket.write(
+        "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
+      );
+      socket.once("data", (payloadChunk: Buffer) => {
+        expect(payloadChunk.toString("utf8")).toBe("ping\n");
+        socket.write("pong\n");
+        socket.end();
+      });
+    });
+    upgradeCapableServer.listen(0, "127.0.0.1");
+    await once(upgradeCapableServer, "listening");
+
+    const address = upgradeCapableServer.address();
+    if (address === null || typeof address === "string") {
+      throw new Error("expected listening TCP address");
+    }
+
+    StartedServers.push({
+      baseUrl: `http://127.0.0.1:${address.port}`,
+      close: async () => {
+        upgradeCapableServer.close();
+        await once(upgradeCapableServer, "close");
+      },
+    });
+
+    const proxyCa = generateProxyCa();
+    const proxyServer = await startProxyServer({
+      runtimePlan: buildProxyMediationRuntimePlan(),
+      tokenizerProxyEgressBaseUrl: `http://127.0.0.1:${address.port}/tokenizer-proxy/egress`,
+      certificateAuthority: createCertificateAuthority(
+        proxyCa.certificatePem,
+        proxyCa.privateKeyPem,
+      ),
+    });
+
+    await expect(
+      performHttpsUpgradeProxyRequest({
+        proxyBaseUrl: proxyServer.baseUrl,
+        targetUrl: "https://api.openai.com/v1/responses?stream=true",
+        caCertificatePem: proxyCa.certificatePem,
+      }),
+    ).resolves.toBe("pong\n");
+
     expect(capturedPath).toBe("/tokenizer-proxy/egress/v1/responses");
     expect(capturedUpstreamBaseUrl).toBe("https://api.openai.com/v1");
   });

@@ -1,4 +1,4 @@
-import { serve, type ServerType } from "@hono/node-server";
+import { createAdaptorServer, type ServerType } from "@hono/node-server";
 
 import type { StartServerInput, StartedServer } from "./types.js";
 
@@ -16,11 +16,13 @@ function closeServer(server: ServerType): Promise<void> {
 }
 
 export function startServer(input: StartServerInput): StartedServer {
-  const server = serve({
+  const server = createAdaptorServer({
     fetch: input.app.fetch,
-    hostname: input.host,
-    port: input.port,
   });
+  if (input.onUpgrade !== undefined) {
+    server.on("upgrade", input.onUpgrade);
+  }
+  server.listen(input.port, input.host);
 
   return {
     server,
