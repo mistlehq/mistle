@@ -9,15 +9,12 @@ import {
   sandboxProfiles,
   webhookAutomations,
 } from "@mistle/db/control-plane";
+import { NotFoundResponseSchema, ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 import { describe, expect } from "vitest";
 
-import {
-  AutomationWebhookSchema,
-  AutomationWebhooksBadRequestResponseSchema,
-  AutomationWebhooksNotFoundResponseSchema,
-  ListAutomationWebhooksResponseSchema,
-  ValidationErrorResponseSchema,
-} from "../src/automation-webhooks/contracts.js";
+import { CreateAutomationWebhookBadRequestResponseSchema } from "../src/automation-webhooks/create-automation-webhook/index.js";
+import { ListAutomationWebhooksResponseSchema } from "../src/automation-webhooks/list-automation-webhooks/index.js";
+import { AutomationWebhookSchema } from "../src/automation-webhooks/schemas.js";
 import { it } from "./test-context.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
@@ -426,7 +423,6 @@ describe("automation webhooks CRUD integration", () => {
     });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      status: "deleted",
       automationId: "atm_webhook_delete_001",
     });
 
@@ -479,7 +475,7 @@ describe("automation webhooks CRUD integration", () => {
       }),
     });
     expect(response.status).toBe(400);
-    const body = AutomationWebhooksBadRequestResponseSchema.parse(await response.json());
+    const body = CreateAutomationWebhookBadRequestResponseSchema.parse(await response.json());
     expect(body.code).toBe("CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE");
   });
 
@@ -538,10 +534,8 @@ describe("automation webhooks CRUD integration", () => {
       },
     );
     expect(notFoundResponse.status).toBe(404);
-    const notFoundBody = AutomationWebhooksNotFoundResponseSchema.parse(
-      await notFoundResponse.json(),
-    );
-    expect(notFoundBody.code).toBe("AUTOMATION_NOT_FOUND");
+    const notFoundBody = NotFoundResponseSchema.parse(await notFoundResponse.json());
+    expect(notFoundBody.code).toBe("NOT_FOUND");
 
     const invalidPatchResponse = await fixture.request("/v1/automations/webhooks/atm_invalid", {
       method: "PATCH",
@@ -553,8 +547,8 @@ describe("automation webhooks CRUD integration", () => {
     });
     expect(invalidPatchResponse.status).toBe(400);
     const validationBody = ValidationErrorResponseSchema.parse(await invalidPatchResponse.json());
-    expect(validationBody.success).toBe(false);
-    expect(validationBody.error.name).toBe("ZodError");
+    expect(validationBody.code).toBe("VALIDATION_ERROR");
+    expect(validationBody.message).toBe("Invalid request.");
   });
 });
 

@@ -5,7 +5,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP, organization } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 
-import type { createControlPlaneOpenWorkflow } from "../../openworkflow/index.js";
+import type { createControlPlaneOpenWorkflow } from "../../openworkflow.js";
 import { AUTH_ROUTE_BASE_PATH } from "../constants.js";
 import { applyActiveOrganizationToSession } from "./apply-active-organization-to-session.js";
 import { createInitialOrganizationCredentialKey } from "./create-initial-organization-credential-key.js";

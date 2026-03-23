@@ -5,7 +5,7 @@ import type { AppContextBindings, AppSession } from "../types.js";
 
 const AuthErrorCodes = {
   UNAUTHORIZED: "UNAUTHORIZED",
-  ACTIVE_ORGANIZATION_REQUIRED: "ACTIVE_ORGANIZATION_REQUIRED",
+  FORBIDDEN: "FORBIDDEN",
 } as const;
 
 const SessionShapeSchema = z.looseObject({
@@ -81,7 +81,7 @@ export function createRequireAuthSessionMiddleware(): MiddlewareHandler<AppConte
     if (parsedSession.kind === "forbidden") {
       return ctx.json(
         {
-          code: AuthErrorCodes.ACTIVE_ORGANIZATION_REQUIRED,
+          code: AuthErrorCodes.FORBIDDEN,
           message: "Active organization is required for this request.",
         },
         403,

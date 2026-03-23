@@ -25,7 +25,7 @@ import {
   resolveRepositoryRootFromDirectory,
 } from "../scripts/integration-targets/provision-integration-targets.js";
 import { syncIntegrationTargets } from "../scripts/integration-targets/sync-integration-targets.js";
-import { createControlPlaneBackend } from "../src/openworkflow/index.js";
+import { createControlPlaneBackend } from "../src/openworkflow.js";
 
 const SHARED_INFRA_KEY = DEFAULT_SHARED_INTEGRATION_INFRA_KEY;
 const TEMPLATE_DATABASE_NAME_PREFIX = "mistle_control_plane_api_it_template";

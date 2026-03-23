@@ -4,6 +4,7 @@ import {
   IntegrationConnectionResourceSyncStates,
   IntegrationConnectionStatuses,
 } from "@mistle/db/control-plane";
+import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 import {
   createKeysetPageSizeSchema,
   createKeysetPaginationEnvelopeSchema,
@@ -231,20 +232,6 @@ export const ListIntegrationConnectionsResponseSchema = createKeysetPaginationEn
   },
 );
 
-export const IntegrationConnectionsUnauthorizedResponseSchema = z
-  .object({
-    code: z.literal("UNAUTHORIZED"),
-    message: z.string().min(1),
-  })
-  .strict();
-
-export const IntegrationConnectionsForbiddenResponseSchema = z
-  .object({
-    code: z.literal("ACTIVE_ORGANIZATION_REQUIRED"),
-    message: z.string().min(1),
-  })
-  .strict();
-
 const RedirectLocationHeaderSchema = z
   .object({
     Location: z.string().min(1),
@@ -389,7 +376,7 @@ export const listIntegrationConnectionsRoute = createRoute({
       description: "Authentication is required.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },
@@ -397,7 +384,7 @@ export const listIntegrationConnectionsRoute = createRoute({
       description: "Active organization is required.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsForbiddenResponseSchema,
+          schema: ForbiddenResponseSchema,
         },
       },
     },
@@ -494,7 +481,7 @@ export const refreshIntegrationConnectionResourcesRoute = createRoute({
       description: "Authentication is required.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },
@@ -502,7 +489,7 @@ export const refreshIntegrationConnectionResourcesRoute = createRoute({
       description: "Active organization is required.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsForbiddenResponseSchema,
+          schema: ForbiddenResponseSchema,
         },
       },
     },
@@ -614,7 +601,7 @@ export const updateIntegrationConnectionRoute = createRoute({
       description: "Authentication is required.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },
@@ -622,7 +609,7 @@ export const updateIntegrationConnectionRoute = createRoute({
       description: "Active organization is required.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsForbiddenResponseSchema,
+          schema: ForbiddenResponseSchema,
         },
       },
     },
@@ -682,7 +669,7 @@ export const updateApiKeyConnectionRoute = createRoute({
       description: "Authentication is required.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },
@@ -690,7 +677,7 @@ export const updateApiKeyConnectionRoute = createRoute({
       description: "Active organization is required.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsForbiddenResponseSchema,
+          schema: ForbiddenResponseSchema,
         },
       },
     },
@@ -750,7 +737,7 @@ export const startGitHubAppInstallationConnectionRoute = createRoute({
       description: "Authentication is required.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },
@@ -758,7 +745,7 @@ export const startGitHubAppInstallationConnectionRoute = createRoute({
       description: "Active organization is required.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsForbiddenResponseSchema,
+          schema: ForbiddenResponseSchema,
         },
       },
     },
@@ -818,7 +805,7 @@ export const startOAuth2ConnectionRoute = createRoute({
       description: "Authentication is required.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },
@@ -826,7 +813,7 @@ export const startOAuth2ConnectionRoute = createRoute({
       description: "Active organization is required.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionsForbiddenResponseSchema,
+          schema: ForbiddenResponseSchema,
         },
       },
     },

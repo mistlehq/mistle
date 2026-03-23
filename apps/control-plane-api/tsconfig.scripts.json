@@ -5,6 +5,7 @@
     "paths": {
       "@mistle/config": ["../../packages/config/src/index.ts"],
       "@mistle/db/control-plane": ["../../packages/db/src/control-plane/index.ts"],
+      "@mistle/http/*.js": ["../../packages/http/src/*.ts"],
       "@mistle/http/pagination": ["../../packages/http/src/pagination/index.ts"],
       "@mistle/logging": ["../../packages/logging/src/index.ts"],
       "@mistle/time": ["../../packages/time/src/index.ts"],

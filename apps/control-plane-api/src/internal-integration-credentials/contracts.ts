@@ -1,6 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-
-import { InternalIntegrationCredentialsErrorCodes } from "./services/errors.js";
+import { UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
 export const ResolveIntegrationCredentialRequestSchema = z
   .object({
@@ -62,13 +61,6 @@ export const InternalIntegrationCredentialErrorResponseSchema = z
   })
   .strict();
 
-export const InternalIntegrationCredentialUnauthorizedResponseSchema = z
-  .object({
-    code: z.literal(InternalIntegrationCredentialsErrorCodes.UNAUTHORIZED),
-    message: z.string().min(1),
-  })
-  .strict();
-
 export const resolveIntegrationCredentialRoute = createRoute({
   method: "post",
   path: "/resolve",
@@ -104,7 +96,7 @@ export const resolveIntegrationCredentialRoute = createRoute({
       description: "Internal service authentication failed.",
       content: {
         "application/json": {
-          schema: InternalIntegrationCredentialUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },
@@ -162,7 +154,7 @@ export const resolveIntegrationTargetSecretsRoute = createRoute({
       description: "Internal service authentication failed.",
       content: {
         "application/json": {
-          schema: InternalIntegrationCredentialUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },

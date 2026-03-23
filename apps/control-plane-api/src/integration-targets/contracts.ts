@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 import {
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
@@ -144,20 +145,6 @@ export const ListIntegrationTargetsResponseSchema = createKeysetPaginationEnvelo
   },
 );
 
-export const IntegrationTargetsUnauthorizedResponseSchema = z
-  .object({
-    code: z.literal("UNAUTHORIZED"),
-    message: z.string().min(1),
-  })
-  .strict();
-
-export const IntegrationTargetsForbiddenResponseSchema = z
-  .object({
-    code: z.literal("ACTIVE_ORGANIZATION_REQUIRED"),
-    message: z.string().min(1),
-  })
-  .strict();
-
 export const listIntegrationTargetsRoute = createRoute({
   method: "get",
   path: "/",
@@ -186,7 +173,7 @@ export const listIntegrationTargetsRoute = createRoute({
       description: "Authentication is required.",
       content: {
         "application/json": {
-          schema: IntegrationTargetsUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },
@@ -194,7 +181,7 @@ export const listIntegrationTargetsRoute = createRoute({
       description: "Active organization is required.",
       content: {
         "application/json": {
-          schema: IntegrationTargetsForbiddenResponseSchema,
+          schema: ForbiddenResponseSchema,
         },
       },
     },

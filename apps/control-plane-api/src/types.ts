@@ -7,7 +7,6 @@ import type { HandleIntegrationWebhookEventWorkflowInput } from "@mistle/workflo
 import type { Context, Hono } from "hono";
 
 import type { ControlPlaneAuth } from "./auth/index.js";
-import type { AutomationWebhooksService } from "./automation-webhooks/services/factory.js";
 import type { IntegrationConnectionsService } from "./integration-connections/services/factory.js";
 import type { SandboxInstancesService } from "./sandbox-instances/services/factory.js";
 import type { SandboxProfilesService } from "./sandbox-profiles/services/factory.js";
@@ -45,7 +44,6 @@ export type AppRoutes<BasePath> = {
 
 export type AppServices = {
   auth: ControlPlaneAuth;
-  automationWebhooks: AutomationWebhooksService;
   integrationConnections: IntegrationConnectionsService;
   integrationWebhooks: {
     receiveWebhookEvent: (input: HandleIntegrationWebhookEventWorkflowInput) => Promise<void>;
@@ -92,7 +90,7 @@ export type StartedServer = {
 export type ControlPlaneApiRuntime = {
   app: ControlPlaneApp;
   db: ControlPlaneDatabase;
-  request: (path: string, init?: RequestInit) => Promise<Response>;
+  request: (path: string, init?: RequestInit) => Response | Promise<Response>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
 };

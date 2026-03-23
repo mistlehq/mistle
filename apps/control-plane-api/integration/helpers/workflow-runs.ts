@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 
-import { ControlPlaneOpenWorkflowSchema } from "../../src/openworkflow/index.js";
+import { ControlPlaneOpenWorkflowSchema } from "../../src/openworkflow.js";
 
 type CountControlPlaneWorkflowRunsInput = {
   databaseUrl: string;

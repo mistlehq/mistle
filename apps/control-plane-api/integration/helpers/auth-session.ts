@@ -12,7 +12,7 @@ export type AuthenticatedSession = {
 };
 
 export type CreateAuthenticatedSessionInput = {
-  request: (path: string, init?: RequestInit) => Promise<Response>;
+  request: (path: string, init?: RequestInit) => Response | Promise<Response>;
   db: ControlPlaneDatabase;
   otpLength: number;
   email?: string;

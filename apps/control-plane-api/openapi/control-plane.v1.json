@@ -200,10 +200,7 @@
                           "type": "string",
                           "enum": [
                             "INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
-                            "INVALID_CONNECTION_REFERENCE",
-                            "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
-                            "INVALID_SANDBOX_PROFILE_REFERENCE"
+                            "INVALID_PAGINATION_CURSOR"
                           ]
                         },
                         "message": {
@@ -217,27 +214,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -276,7 +262,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -473,8 +459,6 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
                             "INVALID_CONNECTION_REFERENCE",
                             "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
                             "INVALID_SANDBOX_PROFILE_REFERENCE"
@@ -491,27 +475,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -550,7 +523,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -679,6 +652,28 @@
               }
             }
           },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication is required.",
             "content": {
@@ -710,7 +705,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -732,7 +727,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["AUTOMATION_NOT_FOUND"]
+                      "enum": ["NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -933,8 +928,6 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
                             "INVALID_CONNECTION_REFERENCE",
                             "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
                             "INVALID_SANDBOX_PROFILE_REFERENCE"
@@ -951,27 +944,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -1010,7 +992,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -1032,7 +1014,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["AUTOMATION_NOT_FOUND"]
+                      "enum": ["NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -1069,16 +1051,34 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": ["deleted"]
-                    },
                     "automationId": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["status", "automationId"],
+                  "required": ["automationId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1115,7 +1115,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -1137,7 +1137,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["AUTOMATION_NOT_FOUND"]
+                      "enum": ["NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -1425,7 +1425,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -1926,7 +1926,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -2432,7 +2432,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -2710,7 +2710,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -2913,7 +2913,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -3116,7 +3116,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -4009,7 +4009,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -4285,7 +4285,7 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                          "enum": ["FORBIDDEN"]
                         },
                         "message": {
                           "type": "string",
@@ -4629,7 +4629,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -4785,7 +4785,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -4975,7 +4975,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -5252,7 +5252,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -5405,7 +5405,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -5554,7 +5554,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -5740,7 +5740,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -5889,7 +5889,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -6049,7 +6049,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -6250,7 +6250,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -6578,7 +6578,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -6794,7 +6794,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",

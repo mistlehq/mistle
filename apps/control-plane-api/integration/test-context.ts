@@ -10,7 +10,7 @@ import { Client } from "pg";
 import { it as vitestIt } from "vitest";
 import { z } from "zod";
 
-import { createControlPlaneApiRuntime } from "../src/runtime/index.js";
+import { createControlPlaneApiRuntime } from "../src/main.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
 import type { AuthenticatedSession } from "./helpers/auth-session.js";
 import { createAuthenticatedSession } from "./helpers/auth-session.js";
@@ -43,7 +43,7 @@ export type ControlPlaneApiIntegrationFixture = {
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   databaseStack: ControlPlaneApiIntegrationDatabaseStack;
-  request: (path: string, init?: RequestInit) => Promise<Response>;
+  request: (path: string, init?: RequestInit) => Response | Promise<Response>;
   authSession: (input?: { email?: string }) => Promise<AuthenticatedSession>;
 };
 
@@ -154,7 +154,9 @@ async function dropDatabaseIfExists(input: {
   }
 }
 
-export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }>({
+export const it = vitestIt.extend<{
+  fixture: ControlPlaneApiIntegrationFixture;
+}>({
   fixture: [
     async ({}, use) => {
       const cleanupTasks: Array<() => Promise<void>> = [];

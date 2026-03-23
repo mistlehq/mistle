@@ -54,7 +54,6 @@ export const WebhookAutomationsListResultSchema = z
 export const DeleteWebhookAutomationResultSchema = z
   .object({
     automationId: z.string().min(1),
-    status: z.literal("deleted"),
   })
   .strict();
 

@@ -1,9 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 
-import {
-  registerInternalApiRouteModules,
-  registerPublicApiRouteModules,
-} from "../runtime/routes.js";
+import { registerInternalApiRouteModules, registerPublicApiRouteModules } from "../app.js";
 import type { AppContextBindings } from "../types.js";
 import { CONTROL_PLANE_INTERNAL_OPENAPI_INFO, CONTROL_PLANE_OPENAPI_INFO } from "./constants.js";
 

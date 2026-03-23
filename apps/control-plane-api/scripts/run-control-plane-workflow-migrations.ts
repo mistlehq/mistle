@@ -1,7 +1,7 @@
 import { AppIds, loadConfig } from "@mistle/config";
 
 import { logger } from "../src/logger.js";
-import { createControlPlaneBackend } from "../src/openworkflow/index.js";
+import { createControlPlaneBackend } from "../src/openworkflow.js";
 
 async function main(): Promise<void> {
   const loadedConfig = loadConfig({

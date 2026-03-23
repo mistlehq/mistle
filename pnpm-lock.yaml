@@ -719,6 +719,9 @@ importers:
 
   packages/http:
     dependencies:
+      hono:
+        specifier: ^4.12.8
+        version: 4.12.8
       zod:
         specifier: ^4.3.6
         version: 4.3.6
