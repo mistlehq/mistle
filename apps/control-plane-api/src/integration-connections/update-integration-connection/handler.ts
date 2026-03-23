@@ -10,17 +10,18 @@ const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
   { session }: AppSession,
 ) => {
-  const params = ctx.req.valid("param");
-  const body = ctx.req.valid("json");
+  const db = ctx.get("db");
+  const { connectionId } = ctx.req.valid("param");
+  const { displayName } = ctx.req.valid("json");
 
   const updatedConnection = await updateIntegrationConnection(
     {
-      db: ctx.get("db"),
+      db,
     },
     {
       organizationId: session.activeOrganizationId,
-      connectionId: params.connectionId,
-      displayName: body.displayName,
+      connectionId,
+      displayName,
     },
   );
 

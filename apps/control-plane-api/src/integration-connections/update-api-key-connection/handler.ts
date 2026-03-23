@@ -10,20 +10,23 @@ const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
   { session }: AppSession,
 ) => {
-  const params = ctx.req.valid("param");
-  const body = ctx.req.valid("json");
+  const db = ctx.get("db");
+  const integrationRegistry = ctx.get("integrationRegistry");
+  const integrationsConfig = ctx.get("config").integrations;
+  const { connectionId } = ctx.req.valid("param");
+  const { apiKey, displayName } = ctx.req.valid("json");
 
   const updatedConnection = await updateApiKeyConnection(
     {
-      db: ctx.get("db"),
-      integrationRegistry: ctx.get("integrationRegistry"),
-      integrationsConfig: ctx.get("config").integrations,
+      db,
+      integrationRegistry,
+      integrationsConfig,
     },
     {
       organizationId: session.activeOrganizationId,
-      connectionId: params.connectionId,
-      displayName: body.displayName,
-      apiKey: body.apiKey,
+      connectionId,
+      displayName,
+      apiKey,
     },
   );
 

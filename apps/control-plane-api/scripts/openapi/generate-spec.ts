@@ -1,4 +1,4 @@
-import { logger } from "../logger.js";
+import { logger } from "../../src/logger.js";
 import {
   getInternalOpenApiSpecFilePath,
   getOpenApiSpecFilePath,

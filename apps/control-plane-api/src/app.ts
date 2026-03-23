@@ -14,7 +14,6 @@ import { createInternalSandboxRuntimeRoutes } from "./internal-sandbox-runtime/i
 import { createAppContextMiddleware } from "./middleware/app-context.js";
 import { createCorsMiddleware } from "./middleware/cors.js";
 import { withAuthSession } from "./middleware/with-auth-session.js";
-import { CONTROL_PLANE_OPENAPI_INFO, CONTROL_PLANE_OPENAPI_PATH } from "./openapi/constants.js";
 import { createOrganizationMembershipCapabilitiesRoutes } from "./organization-membership-capabilities/index.js";
 import { createSandboxInstancesRoutes } from "./sandbox-instances/index.js";
 import { createSandboxProfilesRoutes } from "./sandbox-profiles/index.js";
@@ -25,6 +24,13 @@ import type {
   ControlPlaneApiSandboxRuntimeConfig,
   ControlPlaneApp,
 } from "./types.js";
+
+const ControlPlaneOpenApiPath = "/openapi.json";
+
+const ControlPlaneOpenApiInfo = {
+  title: "Mistle Control Plane API",
+  version: "0.0.0",
+};
 
 export type CreateAppInput = {
   config: ControlPlaneApiConfig;
@@ -69,9 +75,9 @@ export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): 
       services,
     }),
   );
-  app.doc(CONTROL_PLANE_OPENAPI_PATH, {
+  app.doc(ControlPlaneOpenApiPath, {
     openapi: "3.1.0",
-    info: CONTROL_PLANE_OPENAPI_INFO,
+    info: ControlPlaneOpenApiInfo,
   });
   registerApiRouteModules(app);
   app.get("/__healthz", (ctx) => {
