@@ -12,8 +12,7 @@ const INITIAL_PTY_DIMENSIONS = {
   cols: FALLBACK_PTY_COLS,
   rows: FALLBACK_PTY_ROWS,
 };
-const TERMINAL_FONT_FAMILY =
-  '"JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+const TERMINAL_FONT_FAMILY = "var(--font-mono)";
 
 const DARK_TERMINAL_THEME: ITheme = {
   background: "#132723",
@@ -45,7 +44,7 @@ const LIGHT_TERMINAL_THEME: ITheme = {
   cursor: "#444444",
   cursorAccent: "#ffffff",
   selectionBackground: "#cfe0ff",
-  black: "#d9d9d9",
+  black: "#111111",
   red: "#c65a4b",
   green: "#3f9a52",
   yellow: "#8c6d1f",
