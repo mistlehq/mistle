@@ -229,7 +229,7 @@ export function resolveSessionResultsSummary(input: {
 } {
   return {
     visibleCount: input.listedSessionCount + input.optimisticSessionCount,
-    totalCount: input.totalResults + input.optimisticSessionCount,
+    totalCount: input.totalResults,
   };
 }
 

@@ -164,7 +164,7 @@ describe("SessionsPage", () => {
     expect(markup).not.toContain(">Next<");
   });
 
-  it("counts optimistic sessions in the result summary totals", () => {
+  it("counts optimistic sessions only in the visible results", () => {
     expect(
       resolveSessionResultsSummary({
         listedSessionCount: 1,
@@ -173,7 +173,7 @@ describe("SessionsPage", () => {
       }),
     ).toStrictEqual({
       visibleCount: 2,
-      totalCount: 2,
+      totalCount: 1,
     });
   });
 
