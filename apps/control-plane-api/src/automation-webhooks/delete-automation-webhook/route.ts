@@ -3,9 +3,11 @@ import {
   ForbiddenResponseSchema,
   NotFoundResponseSchema,
   UnauthorizedResponseSchema,
+  ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { AutomationWebhookParamsSchema, DeleteAutomationWebhookResponseSchema } from "./schema.js";
+import { AutomationWebhookParamsSchema } from "../schemas.js";
+import { DeleteAutomationWebhookResponseSchema } from "./schema.js";
 
 export const route = createRoute({
   method: "delete",
@@ -20,6 +22,14 @@ export const route = createRoute({
       content: {
         "application/json": {
           schema: DeleteAutomationWebhookResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ValidationErrorResponseSchema,
         },
       },
     },

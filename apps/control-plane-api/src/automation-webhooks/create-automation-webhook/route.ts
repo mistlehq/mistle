@@ -1,8 +1,8 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
+import { AutomationWebhookSchema } from "../schemas.js";
 import {
-  AutomationWebhookSchema,
   CreateAutomationWebhookBadRequestResponseSchema,
   CreateAutomationWebhookBodySchema,
 } from "./schema.js";

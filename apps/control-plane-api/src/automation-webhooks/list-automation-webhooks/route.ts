@@ -4,8 +4,8 @@ import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/htt
 import {
   ListAutomationWebhooksBadRequestResponseSchema,
   ListAutomationWebhooksResponseSchema,
-  ListWebhookAutomationsQuerySchema,
 } from "./schema.js";
+import { ListWebhookAutomationsQuerySchema } from "./service.js";
 
 export const route = createRoute({
   method: "get",

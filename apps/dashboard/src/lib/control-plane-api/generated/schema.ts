@@ -74,23 +74,13 @@ export interface paths {
             "application/json":
               | {
                   /** @enum {string} */
-                  code:
-                    | "INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT"
-                    | "INVALID_PAGINATION_CURSOR"
-                    | "INVALID_CONNECTION_REFERENCE"
-                    | "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE"
-                    | "INVALID_SANDBOX_PROFILE_REFERENCE";
+                  code: "INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT" | "INVALID_PAGINATION_CURSOR";
                   message: string;
                 }
               | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
                 };
           };
         };
@@ -191,22 +181,15 @@ export interface paths {
               | {
                   /** @enum {string} */
                   code:
-                    | "INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT"
-                    | "INVALID_PAGINATION_CURSOR"
                     | "INVALID_CONNECTION_REFERENCE"
                     | "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE"
                     | "INVALID_SANDBOX_PROFILE_REFERENCE";
                   message: string;
                 }
               | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
                 };
           };
         };
@@ -292,6 +275,19 @@ export interface paths {
             };
           };
         };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
         /** @description Authentication is required. */
         401: {
           headers: {
@@ -354,6 +350,19 @@ export interface paths {
           content: {
             "application/json": {
               automationId: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
             };
           };
         };
@@ -470,22 +479,15 @@ export interface paths {
               | {
                   /** @enum {string} */
                   code:
-                    | "INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT"
-                    | "INVALID_PAGINATION_CURSOR"
                     | "INVALID_CONNECTION_REFERENCE"
                     | "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE"
                     | "INVALID_SANDBOX_PROFILE_REFERENCE";
                   message: string;
                 }
               | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
                 };
           };
         };

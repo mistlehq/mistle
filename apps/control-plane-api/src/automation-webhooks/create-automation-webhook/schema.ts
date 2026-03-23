@@ -1,12 +1,10 @@
 import { z } from "@hono/zod-openapi";
-
 import {
-  AutomationWebhookSchema,
-  AutomationWebhooksBadRequestResponseSchema,
+  createCodeMessageErrorSchema,
   ValidationErrorResponseSchema,
-} from "../schemas.js";
+} from "@mistle/http/errors.js";
 
-export { AutomationWebhookSchema };
+import { AutomationWebhooksBadRequestCodes } from "../constants.js";
 
 export const CreateAutomationWebhookBodySchema = z
   .object({
@@ -27,7 +25,13 @@ export const CreateAutomationWebhookBodySchema = z
   })
   .strict();
 
+const CreateAutomationWebhookBadRequestCodeSchema = z.enum([
+  AutomationWebhooksBadRequestCodes.INVALID_CONNECTION_REFERENCE,
+  AutomationWebhooksBadRequestCodes.CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE,
+  AutomationWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_REFERENCE,
+]);
+
 export const CreateAutomationWebhookBadRequestResponseSchema = z.union([
-  AutomationWebhooksBadRequestResponseSchema,
+  createCodeMessageErrorSchema(CreateAutomationWebhookBadRequestCodeSchema),
   ValidationErrorResponseSchema,
 ]);

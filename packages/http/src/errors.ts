@@ -7,6 +7,18 @@ type NonVoidHandlerResponse<Body = unknown> =
   | TypedResponse<Body>
   | Promise<Response | TypedResponse<Body>>;
 
+type OpenApiValidationResult =
+  | {
+      success: true;
+      target: string;
+      data: unknown;
+    }
+  | {
+      success: false;
+      target: string;
+      error: unknown;
+    };
+
 export abstract class HttpError extends Error {
   abstract readonly status: ContentfulStatusCode;
   readonly code: string;
@@ -52,6 +64,27 @@ export const UnauthorizedResponseSchema = createCodeMessageErrorSchema(z.literal
 export const ForbiddenResponseSchema = createCodeMessageErrorSchema(z.literal("FORBIDDEN"));
 
 export const NotFoundResponseSchema = createCodeMessageErrorSchema(z.literal("NOT_FOUND"));
+
+export const ValidationErrorResponseSchema = createCodeMessageErrorSchema(
+  z.literal("VALIDATION_ERROR"),
+);
+
+export function OpenApiValidationHook<E extends Env, P extends string>(
+  result: OpenApiValidationResult,
+  ctx: Context<E, P>,
+) {
+  if (result.success) {
+    return;
+  }
+
+  return ctx.json(
+    {
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
+    },
+    400,
+  );
+}
 
 export function handleHttpError(ctx: Context, error: unknown) {
   if (error instanceof HttpError) {

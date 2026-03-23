@@ -3,9 +3,10 @@ import {
   ForbiddenResponseSchema,
   NotFoundResponseSchema,
   UnauthorizedResponseSchema,
+  ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { AutomationWebhookParamsSchema, AutomationWebhookSchema } from "./schema.js";
+import { AutomationWebhookParamsSchema, AutomationWebhookSchema } from "../schemas.js";
 
 export const route = createRoute({
   method: "get",
@@ -20,6 +21,14 @@ export const route = createRoute({
       content: {
         "application/json": {
           schema: AutomationWebhookSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ValidationErrorResponseSchema,
         },
       },
     },

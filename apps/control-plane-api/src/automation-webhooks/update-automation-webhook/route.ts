@@ -5,9 +5,8 @@ import {
   UnauthorizedResponseSchema,
 } from "@mistle/http/errors.js";
 
+import { AutomationWebhookParamsSchema, AutomationWebhookSchema } from "../schemas.js";
 import {
-  AutomationWebhookParamsSchema,
-  AutomationWebhookSchema,
   UpdateAutomationWebhookBadRequestResponseSchema,
   UpdateAutomationWebhookBodySchema,
 } from "./schema.js";

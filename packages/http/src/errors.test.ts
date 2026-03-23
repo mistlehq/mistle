@@ -5,6 +5,7 @@ import {
   handleHttpError,
   NotFoundResponseSchema,
   NotFoundError,
+  ValidationErrorResponseSchema,
   withHttpErrorHandler,
 } from "./errors.js";
 
@@ -26,6 +27,18 @@ describe("errors", () => {
         extra: "nope",
       }),
     ).toThrow();
+  });
+
+  it("defines a flat validation error schema", () => {
+    const parsed = ValidationErrorResponseSchema.parse({
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
+    });
+
+    expect(parsed).toEqual({
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
+    });
   });
 
   it("translates HttpError instances into JSON responses", async () => {

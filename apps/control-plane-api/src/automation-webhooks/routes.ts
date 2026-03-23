@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { OpenApiValidationHook } from "@mistle/http/errors.js";
 
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import { AUTOMATION_WEBHOOKS_ROUTE_BASE_PATH } from "./constants.js";
@@ -11,7 +12,9 @@ import * as updateAutomationWebhook from "./update-automation-webhook/index.js";
 export function createAutomationWebhooksRoutes(): AppRoutes<
   typeof AUTOMATION_WEBHOOKS_ROUTE_BASE_PATH
 > {
-  const routes = new OpenAPIHono<AppContextBindings>();
+  const routes = new OpenAPIHono<AppContextBindings>({
+    defaultHook: OpenApiValidationHook,
+  });
 
   routes.openapi(listAutomationWebhooks.route, listAutomationWebhooks.handler);
   routes.openapi(createAutomationWebhook.route, createAutomationWebhook.handler);
