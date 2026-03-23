@@ -3,7 +3,6 @@ import { TerminalIcon } from "@phosphor-icons/react";
 import { useMemo } from "react";
 import { useParams } from "react-router";
 
-import { SessionMoreActions } from "../sessions/session-more-actions.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import {
   SessionConversationBottomPanel,
@@ -39,16 +38,6 @@ export function SessionWorkbenchPage(): React.JSX.Element {
         >
           {workbench.sessionHeaderStatusUi.label}
         </Badge>
-        <SessionMoreActions
-          agentConnectionState={workbench.moreActionsState.agentConnectionState}
-          configJson={workbench.moreActionsState.configJson}
-          configRequirementsJson={workbench.moreActionsState.configRequirementsJson}
-          connectedSession={workbench.moreActionsState.connectedSession}
-          isReadingConfig={workbench.moreActionsState.isReadingConfig}
-          isReadingConfigRequirements={workbench.moreActionsState.isReadingConfigRequirements}
-          onLoadConfigSetup={workbench.moreActionsState.loadConfigSetup}
-          sandboxInstanceId={sandboxInstanceId}
-        />
         <Button
           aria-label={terminalButtonLabel}
           aria-pressed={workbench.terminalPanelState.isVisible}
@@ -78,15 +67,7 @@ export function SessionWorkbenchPage(): React.JSX.Element {
     ),
     [
       isTerminalOpenDisabled,
-      sandboxInstanceId,
       terminalButtonTitle,
-      workbench.moreActionsState.agentConnectionState,
-      workbench.moreActionsState.configJson,
-      workbench.moreActionsState.configRequirementsJson,
-      workbench.moreActionsState.connectedSession,
-      workbench.moreActionsState.isReadingConfig,
-      workbench.moreActionsState.isReadingConfigRequirements,
-      workbench.moreActionsState.loadConfigSetup,
       workbench.ptyState.actions.disconnectPty,
       workbench.sessionHeaderStatusUi.className,
       workbench.sessionHeaderStatusUi.label,
