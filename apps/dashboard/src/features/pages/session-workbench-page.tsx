@@ -50,6 +50,13 @@ export function SessionWorkbenchPage(): React.JSX.Element {
           sandboxInstanceId={sandboxInstanceId}
         />
         <Button
+          aria-label={terminalButtonLabel}
+          aria-pressed={workbench.terminalPanelState.isVisible}
+          className={
+            workbench.terminalPanelState.isVisible
+              ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
+              : "bg-transparent text-foreground shadow-none hover:bg-stone-100"
+          }
           disabled={isTerminalOpenDisabled}
           onClick={() => {
             if (workbench.terminalPanelState.isVisible) {
@@ -60,13 +67,12 @@ export function SessionWorkbenchPage(): React.JSX.Element {
 
             workbench.terminalPanelState.openPanel();
           }}
-          size="sm"
+          size="icon-sm"
           title={terminalButtonTitle}
           type="button"
-          variant={workbench.terminalPanelState.isVisible ? "secondary" : "outline"}
+          variant="ghost"
         >
           <TerminalIcon className="size-4" />
-          Terminal
         </Button>
       </div>
     ),
