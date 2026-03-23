@@ -11,6 +11,7 @@ import {
 import { aggregateArtifactEnvironment } from "./artifact-environment.js";
 import { loadRuntimeConfig, type RuntimeConfig } from "./config.js";
 import { createRuntimeHttpServer } from "./http-server.js";
+import { logSandboxRuntimeEvent } from "./logger.js";
 import { parseListenAddress } from "./parse-listen-address.js";
 import {
   startRuntimeClientProcessManager,
@@ -92,6 +93,17 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     reader: input.stdin,
     maxBytes: DefaultStartupInputMaxBytes,
   });
+  const startupStartedAtMs = Date.now();
+  logSandboxRuntimeEvent({
+    level: "info",
+    event: "sandbox_runtime_startup_started",
+    fields: {
+      artifactCount: startupInput.runtimePlan.artifacts.length,
+      workspaceSourceCount: startupInput.runtimePlan.workspaceSources.length,
+      runtimeClientCount: startupInput.runtimePlan.runtimeClients.length,
+      agentRuntimeCount: startupInput.runtimePlan.agentRuntimes.length,
+    },
+  });
   const state = {
     startupReady: false,
   };
@@ -130,19 +142,66 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
 
   let processManager: RuntimeClientProcessManager | undefined;
   let tunnelClient: StartedTunnelClient | undefined;
+  let startupStage:
+    | "apply_runtime_plan"
+    | "start_runtime_clients"
+    | "start_tunnel"
+    | "startup_ready" = "apply_runtime_plan";
   try {
+    logSandboxRuntimeEvent({
+      level: "info",
+      event: "sandbox_runtime_plan_apply_started",
+      fields: {
+        artifactCount: startupInput.runtimePlan.artifacts.length,
+        workspaceSourceCount: startupInput.runtimePlan.workspaceSources.length,
+      },
+    });
+    const applyRuntimePlanStartedAtMs = Date.now();
     await applyRuntimePlan({
       instanceVolume: startupInput.instanceVolume,
       runtimePlan: startupInput.runtimePlan,
+    });
+    logSandboxRuntimeEvent({
+      level: "info",
+      event: "sandbox_runtime_plan_apply_completed",
+      fields: {
+        elapsedMs: Date.now() - applyRuntimePlanStartedAtMs,
+      },
     });
     const artifactEnvironment = aggregateArtifactEnvironment(startupInput.runtimePlan.artifacts);
     if (artifactEnvironment !== undefined) {
       restoreArtifactEnvironment = applyEnvironmentEntries(artifactEnvironment);
     }
+    startupStage = "start_runtime_clients";
+    logSandboxRuntimeEvent({
+      level: "info",
+      event: "sandbox_runtime_clients_start_started",
+      fields: {
+        runtimeClientCount: startupInput.runtimePlan.runtimeClients.length,
+      },
+    });
+    const startRuntimeClientsStartedAtMs = Date.now();
     processManager = await startRuntimeClientProcessManager(
       flattenRuntimeClientProcesses(startupInput.runtimePlan.runtimeClients),
     );
+    logSandboxRuntimeEvent({
+      level: "info",
+      event: "sandbox_runtime_clients_start_completed",
+      fields: {
+        elapsedMs: Date.now() - startRuntimeClientsStartedAtMs,
+        runtimeClientCount: startupInput.runtimePlan.runtimeClients.length,
+      },
+    });
     try {
+      startupStage = "start_tunnel";
+      logSandboxRuntimeEvent({
+        level: "info",
+        event: "sandbox_tunnel_client_starting",
+        fields: {
+          runtimeClientCount: startupInput.runtimePlan.runtimeClients.length,
+          agentRuntimeCount: startupInput.runtimePlan.agentRuntimes.length,
+        },
+      });
       tunnelClient = startTunnelClient({
         signal: new AbortController().signal,
         gatewayWsUrl: startupInput.tunnelGatewayWsUrl,
@@ -157,6 +216,14 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
       );
     }
     state.startupReady = true;
+    startupStage = "startup_ready";
+    logSandboxRuntimeEvent({
+      level: "info",
+      event: "sandbox_runtime_startup_ready",
+      fields: {
+        elapsedMs: Date.now() - startupStartedAtMs,
+      },
+    });
   } catch (error) {
     if (tunnelClient !== undefined) {
       await tunnelClient.close().catch(() => undefined);
@@ -167,6 +234,15 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     restoreArtifactEnvironment?.();
     restoreProxyEnvironment();
     await closeServer(server);
+
+    logSandboxRuntimeEvent({
+      level: "error",
+      event: "sandbox_runtime_startup_failed",
+      fields: {
+        stage: startupStage,
+        message: error instanceof Error ? error.message : String(error),
+      },
+    });
 
     throw new Error(
       error instanceof Error && error.message.startsWith("runtime client process[")
