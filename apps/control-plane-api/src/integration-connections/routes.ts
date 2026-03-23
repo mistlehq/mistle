@@ -42,10 +42,18 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
   routes.use(createApiKeyConnection.route.path, requireAuthSession);
   routes.openapi(createApiKeyConnection.route, createApiKeyConnection.handler);
 
-  routes.use(updateIntegrationConnection.route.path, requireAuthSession);
+  routes.on(
+    updateIntegrationConnection.route.method,
+    updateIntegrationConnection.route.path,
+    requireAuthSession,
+  );
   routes.openapi(updateIntegrationConnection.route, updateIntegrationConnection.handler);
 
-  routes.use(deleteIntegrationConnection.route.path, requireAuthSession);
+  routes.on(
+    deleteIntegrationConnection.route.method,
+    deleteIntegrationConnection.route.path,
+    requireAuthSession,
+  );
   routes.openapi(deleteIntegrationConnection.route, deleteIntegrationConnection.handler);
 
   routes.use(updateApiKeyConnection.route.path, requireAuthSession);
