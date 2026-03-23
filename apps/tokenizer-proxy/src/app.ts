@@ -11,12 +11,23 @@ import {
 } from "./egress/constants.js";
 import { CredentialCache } from "./egress/credential-cache.js";
 import { createEgressProxyHandler } from "./egress/proxy-handler.js";
-import type { AppContextBindings, TokenizerProxyApp, TokenizerProxyConfig } from "./types.js";
+import { createEgressProxyUpgradeHandler } from "./egress/upgrade-handler.js";
+import type {
+  AppContextBindings,
+  TokenizerProxyApp,
+  TokenizerProxyConfig,
+  TokenizerProxyUpgradeHandler,
+} from "./types.js";
 
-export function createApp(
+type TokenizerProxyAppComponents = {
+  app: TokenizerProxyApp;
+  onUpgrade: TokenizerProxyUpgradeHandler;
+};
+
+export function createAppComponents(
   config: TokenizerProxyConfig,
   internalAuthServiceToken: string,
-): TokenizerProxyApp {
+): TokenizerProxyAppComponents {
   const app = new Hono<AppContextBindings>();
   const controlPlaneInternalClient = new ControlPlaneInternalClient({
     baseUrl: config.controlPlaneApi.baseUrl,
@@ -30,6 +41,10 @@ export function createApp(
     now: () => Date.now(),
   });
   const egressProxyHandler = createEgressProxyHandler({
+    controlPlaneInternalClient,
+    credentialCache,
+  });
+  const egressProxyUpgradeHandler = createEgressProxyUpgradeHandler({
     controlPlaneInternalClient,
     credentialCache,
   });
@@ -47,5 +62,15 @@ export function createApp(
   app.all(EGRESS_BASE_PATH, egressProxyHandler);
   app.all(EGRESS_WILDCARD_BASE_PATH, egressProxyHandler);
 
-  return app;
+  return {
+    app,
+    onUpgrade: egressProxyUpgradeHandler,
+  };
+}
+
+export function createApp(
+  config: TokenizerProxyConfig,
+  internalAuthServiceToken: string,
+): TokenizerProxyApp {
+  return createAppComponents(config, internalAuthServiceToken).app;
 }

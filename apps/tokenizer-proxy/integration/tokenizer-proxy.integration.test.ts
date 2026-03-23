@@ -2,7 +2,12 @@
  * This suite uses an extended integration `it` fixture imported from test context.
  */
 
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import {
+  createServer,
+  request as httpRequest,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 import { gzipSync } from "node:zlib";
 
 import { reserveAvailablePort, startHttpEcho } from "@mistle/test-harness";
@@ -162,6 +167,126 @@ async function startGzipUpstream(input: {
       });
     },
   };
+}
+
+async function startWebSocketUpstream(input: { host: string; path: string }): Promise<{
+  baseUrl: string;
+  capturedAuthorizationHeader: () => string | undefined;
+  stop: () => Promise<void>;
+}> {
+  const port = await reserveAvailablePort({ host: input.host });
+  let authorizationHeader: string | undefined;
+
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    if (request.url === input.path) {
+      response.statusCode = 426;
+      response.end("upgrade required");
+      return;
+    }
+
+    response.statusCode = 404;
+    response.end("not found");
+  });
+
+  server.on("upgrade", (request, socket, head) => {
+    if (request.url !== input.path) {
+      socket.destroy();
+      return;
+    }
+
+    authorizationHeader =
+      typeof request.headers.authorization === "string"
+        ? request.headers.authorization
+        : request.headers.authorization?.[0];
+
+    socket.write(
+      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
+    );
+    if (head.length > 0) {
+      socket.unshift(head);
+    }
+    socket.once("data", (payload) => {
+      expect(payload.toString("utf8")).toBe("ping\n");
+      socket.write("pong\n");
+      socket.end();
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, input.host, () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  return {
+    baseUrl: `http://${input.host}:${String(port)}`,
+    capturedAuthorizationHeader: () => authorizationHeader,
+    stop: async () => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error !== undefined) {
+            reject(error);
+            return;
+          }
+
+          resolve();
+        });
+      });
+    },
+  };
+}
+
+async function performUpgradeRequest(input: {
+  baseUrl: string;
+  path: string;
+  headers: Record<string, string>;
+}): Promise<string> {
+  const targetUrl = new URL(input.baseUrl);
+
+  return await new Promise<string>((resolve, reject) => {
+    const request = httpRequest({
+      host: targetUrl.hostname,
+      port: targetUrl.port,
+      method: "GET",
+      path: input.path,
+      headers: {
+        Connection: "Upgrade",
+        Upgrade: "websocket",
+        ...input.headers,
+      },
+    });
+
+    request.once("upgrade", (_response, socket, head) => {
+      if (head.length > 0) {
+        socket.unshift(head);
+      }
+
+      const onData = (payload: Buffer): void => {
+        const message = payload.toString("utf8");
+        if (message.endsWith("pong\n")) {
+          socket.off("data", onData);
+          socket.end();
+          resolve("pong\n");
+        }
+      };
+
+      socket.on("data", onData);
+      socket.once("error", reject);
+      socket.write("ping\n");
+    });
+    request.once("response", (response) => {
+      response.resume();
+      reject(
+        new Error(
+          `Expected upgrade response, received status ${String(response.statusCode ?? 0)}.`,
+        ),
+      );
+    });
+    request.once("error", reject);
+    request.end();
+  });
 }
 
 describe("tokenizer proxy integration", () => {
@@ -428,6 +553,56 @@ describe("tokenizer proxy integration", () => {
           },
         },
       });
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamService.stop()]);
+    }
+  });
+
+  it("forwards websocket upgrades to the upstream with injected auth", async () => {
+    const upstreamService = await startWebSocketUpstream({
+      host: "127.0.0.1",
+      path: "/v1/responses?stream=true",
+    });
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "sk-live-proxy",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+    });
+    await runtime.start();
+
+    try {
+      const message = await performUpgradeRequest({
+        baseUrl: `http://${host}:${String(port)}`,
+        path: "/tokenizer-proxy/egress/v1/responses?stream=true",
+        headers: {
+          [EgressRequestHeaders.EGRESS_RULE_ID]: "egress_rule_openai",
+          [EgressRequestHeaders.UPSTREAM_BASE_URL]: upstreamService.baseUrl,
+          [EgressRequestHeaders.BINDING_ID]: "ibd_openai",
+          [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "bearer",
+          [EgressRequestHeaders.AUTH_INJECTION_TARGET]: "authorization",
+          [EgressRequestHeaders.CONNECTION_ID]: "icn_openai",
+          [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "api_key",
+          [EgressRequestHeaders.CREDENTIAL_RESOLVER_KEY]: "default",
+        },
+      });
+
+      expect(message).toBe("pong\n");
+      expect(upstreamService.capturedAuthorizationHeader()).toBe("Bearer sk-live-proxy");
     } finally {
       await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamService.stop()]);
     }

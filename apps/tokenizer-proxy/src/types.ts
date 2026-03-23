@@ -1,3 +1,6 @@
+import type { IncomingMessage } from "node:http";
+import type { Socket } from "node:net";
+
 import type { ServerType } from "@hono/node-server";
 import { AppIds, type loadConfig } from "@mistle/config";
 import type { Context, Hono } from "hono";
@@ -23,11 +26,17 @@ export type AppContextVariables = {
 
 export type AppContext = Context<AppContextBindings>;
 export type TokenizerProxyApp = Hono<AppContextBindings>;
+export type TokenizerProxyUpgradeHandler = (
+  request: IncomingMessage,
+  socket: Socket,
+  head: Buffer,
+) => void;
 
 export type StartServerInput = {
   app: TokenizerProxyApp;
   host: string;
   port: number;
+  onUpgrade?: TokenizerProxyUpgradeHandler;
 };
 
 export type StartedServer = {

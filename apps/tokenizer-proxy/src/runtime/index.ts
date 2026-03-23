@@ -1,4 +1,4 @@
-import { createApp } from "../app.js";
+import { createAppComponents } from "../app.js";
 import { startServer } from "../server.js";
 import type {
   StartedServer,
@@ -9,7 +9,7 @@ import type {
 export function createTokenizerProxyRuntime(
   config: TokenizerProxyRuntimeConfig,
 ): TokenizerProxyRuntime {
-  const app = createApp(config.app, config.internalAuthServiceToken);
+  const { app, onUpgrade } = createAppComponents(config.app, config.internalAuthServiceToken);
 
   let startedServer: StartedServer | undefined;
   let stopPromise: Promise<void> | undefined;
@@ -39,6 +39,7 @@ export function createTokenizerProxyRuntime(
         app,
         host: config.app.server.host,
         port: config.app.server.port,
+        onUpgrade,
       });
     },
     stop: async () => {
