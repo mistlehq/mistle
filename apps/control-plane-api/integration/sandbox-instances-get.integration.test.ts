@@ -248,6 +248,89 @@ describe("sandbox instances get integration", () => {
     });
   });
 
+  it("includes pending automation conversation metadata while the route is preparing", async ({
+    fixture,
+  }) => {
+    const dataPlaneFixture = await createStartedDataPlaneFixture({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
+    const session = await fixture.authSession({
+      email: "integration-sandbox-instances-get-pending@example.com",
+    });
+
+    await dataPlaneFixture.db.insert(sandboxInstances).values({
+      id: "sbi_cp_get_pending_001",
+      organizationId: session.organizationId,
+      sandboxProfileId: "sbp_dp_get_pending_001",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerRuntimeId: "provider-cp-get-pending-001",
+      status: SandboxInstanceStatuses.RUNNING,
+      startedByKind: "user",
+      startedById: session.userId,
+      source: "webhook",
+      createdAt: "2026-03-21T00:00:00.000Z",
+      updatedAt: "2026-03-21T00:00:00.000Z",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_cp_get_pending_001",
+      organizationId: session.organizationId,
+      displayName: "Webhook sandbox profile pending",
+      status: SandboxProfileStatuses.ACTIVE,
+    });
+
+    await fixture.db.insert(automationConversations).values({
+      id: "cnv_cp_get_pending_001",
+      organizationId: session.organizationId,
+      ownerKind: AutomationConversationOwnerKinds.AUTOMATION_TARGET,
+      ownerId: "aut_cp_get_pending_001",
+      createdByKind: AutomationConversationCreatedByKinds.WEBHOOK,
+      createdById: "iwe_cp_get_pending_001",
+      sandboxProfileId: "sbp_cp_get_pending_001",
+      integrationFamilyId: "openai",
+      conversationKey: "webhook-conversation-key-pending",
+      title: null,
+      preview: null,
+      status: AutomationConversationStatuses.PENDING,
+    });
+
+    await fixture.db.insert(automationConversationRoutes).values({
+      id: "cvr_cp_get_pending_001",
+      conversationId: "cnv_cp_get_pending_001",
+      sandboxInstanceId: "sbi_cp_get_pending_001",
+      providerConversationId: null,
+      providerExecutionId: null,
+      providerState: null,
+      status: "active",
+    });
+
+    const response = await fixture.request("/v1/sandbox/instances/sbi_cp_get_pending_001", {
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
+
+    expect(body).toEqual({
+      id: "sbi_cp_get_pending_001",
+      status: "running",
+      failureCode: null,
+      failureMessage: null,
+      automationConversation: {
+        conversationId: "cnv_cp_get_pending_001",
+        routeId: "cvr_cp_get_pending_001",
+        providerConversationId: null,
+      },
+    });
+  });
+
   it("returns null automation conversation metadata when the sandbox is unbound", async ({
     fixture,
   }) => {

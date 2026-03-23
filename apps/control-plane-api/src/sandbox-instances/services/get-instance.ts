@@ -40,11 +40,14 @@ async function resolveAutomationConversation(
       columns: {
         id: true,
       },
-      where: (table, { and, eq }) =>
+      where: (table, { and, eq, or }) =>
         and(
           eq(table.id, route.conversationId),
           eq(table.organizationId, input.organizationId),
-          eq(table.status, AutomationConversationStatuses.ACTIVE),
+          or(
+            eq(table.status, AutomationConversationStatuses.PENDING),
+            eq(table.status, AutomationConversationStatuses.ACTIVE),
+          ),
         ),
     });
     if (conversation === undefined) {
