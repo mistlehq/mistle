@@ -365,6 +365,9 @@ export function useSessionWorkbenchController(input: {
     }
 
     setHasAttemptedAutoConnect(true);
+    // This reconnect path only supports initial bootstrap for the latest
+    // persisted automation binding. Live migration of an already-open session
+    // across route rebinding is currently unsupported.
     connectSession({
       sandboxInstanceId: input.sandboxInstanceId,
       preferredThreadId: automationConversation?.providerConversationId ?? null,

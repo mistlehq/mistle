@@ -56,6 +56,9 @@ export async function rebindAutomationConversationSandbox(
       });
     }
 
+    // Rebinding updates the sandbox attachment before a later replace-binding
+    // step refreshes the provider conversation metadata. Dashboard sessions
+    // that are already open are not currently migrated across this transition.
     const updatedRows = await transaction
       .update(automationConversationRoutes)
       .set({
