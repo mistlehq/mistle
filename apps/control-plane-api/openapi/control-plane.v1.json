@@ -3619,27 +3619,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]

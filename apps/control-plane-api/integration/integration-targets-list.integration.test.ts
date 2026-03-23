@@ -1,11 +1,9 @@
 import { integrationTargets } from "@mistle/db/control-plane";
+import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
-import {
-  ListIntegrationTargetsResponseSchema,
-  ValidationErrorResponseSchema,
-} from "../src/integration-targets/contracts.js";
+import { ListIntegrationTargetsResponseSchema } from "../src/integration-targets/index.js";
 import { it } from "./test-context.js";
 
 describe("integration targets discovery integration", () => {
@@ -250,8 +248,10 @@ describe("integration targets discovery integration", () => {
     expect(response.status).toBe(400);
 
     const body = ValidationErrorResponseSchema.parse(await response.json());
-    expect(body.success).toBe(false);
-    expect(body.error.name).toBe("ZodError");
+    expect(body).toEqual({
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
+    });
   });
 
   it("returns 401 when the request is unauthenticated", async ({ fixture }) => {

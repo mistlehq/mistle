@@ -1,4 +1,6 @@
 import { integrationTargets, type IntegrationTarget } from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { BadRequestError } from "@mistle/http/errors.js";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import {
   decodeKeysetCursorOrThrow,
@@ -18,9 +20,8 @@ import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppContext } from "../../types.js";
-import { IntegrationTargetSchema } from "../contracts.js";
-import { IntegrationTargetsBadRequestCodes, IntegrationTargetsBadRequestError } from "./errors.js";
+import { IntegrationTargetsBadRequestCodes } from "../constants.js";
+import { IntegrationTargetSchema } from "../schemas.js";
 import { projectTargetUi } from "./project-target-ui.js";
 
 const PAGE_SIZE_OPTIONS = {
@@ -215,7 +216,7 @@ function resolveTargetMetadata(input: {
 }
 
 export async function listIntegrationTargets(
-  db: AppContext["var"]["db"],
+  ctx: { db: ControlPlaneDatabase },
   input: ListIntegrationTargetsInput,
 ): Promise<KeysetPaginatedResult<IntegrationTargetListItem>> {
   let pageSize: number;
@@ -224,7 +225,7 @@ export async function listIntegrationTargets(
     pageSize = parseKeysetPageSize(input.limit, PAGE_SIZE_OPTIONS);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      throw new IntegrationTargetsBadRequestError(
+      throw new BadRequestError(
         IntegrationTargetsBadRequestCodes.INVALID_LIST_TARGETS_INPUT,
         "`limit` must be an integer between 1 and 100.",
       );
@@ -252,7 +253,7 @@ export async function listIntegrationTargets(
               [KeysetCursorDecodeErrorReasons.INVALID_SHAPE]: `\`${decodeCursorName}\` cursor has an invalid shape.`,
             } as const;
 
-            return new IntegrationTargetsBadRequestError(
+            return new BadRequestError(
               IntegrationTargetsBadRequestCodes.INVALID_PAGINATION_CURSOR,
               reasonToMessage[reason],
             );
@@ -263,7 +264,7 @@ export async function listIntegrationTargets(
         targetKey: target.targetKey,
       }),
       fetchPage: async ({ direction, cursor, limitPlusOne }) =>
-        db.query.integrationTargets.findMany({
+        ctx.db.query.integrationTargets.findMany({
           where: (table, { and, eq, gt, lt }) => {
             const enabledScope = eq(table.enabled, true);
 
@@ -284,7 +285,7 @@ export async function listIntegrationTargets(
           limit: limitPlusOne,
         }),
       countTotalResults: async () => {
-        const [result] = await db
+        const [result] = await ctx.db
           .select({
             totalResults: sql<number>`count(*)::int`,
           })
@@ -340,7 +341,7 @@ export async function listIntegrationTargets(
       error instanceof KeysetPaginationInputError &&
       error.reason === KeysetPaginationInputErrorReasons.BOTH_CURSORS_PROVIDED
     ) {
-      throw new IntegrationTargetsBadRequestError(
+      throw new BadRequestError(
         IntegrationTargetsBadRequestCodes.INVALID_LIST_TARGETS_INPUT,
         "Only one of `after` or `before` can be provided.",
       );
