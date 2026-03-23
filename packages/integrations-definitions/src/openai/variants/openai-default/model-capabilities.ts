@@ -21,6 +21,7 @@ export const OpenAiDefaultModelId = "gpt-5.4";
 
 export const OpenAiModelIds = [
   OpenAiDefaultModelId,
+  "gpt-5.4-mini",
   "gpt-5.3-codex",
   "gpt-5.3-codex-spark",
   "gpt-5.2-codex",
@@ -48,6 +49,7 @@ const OpenAiDefaultCapabilitySet: OpenAiCapabilitySet = {
   models: OpenAiModelIds,
   allowedReasoningByModel: {
     "gpt-5.4": ["low", "medium", "high", "xhigh"],
+    "gpt-5.4-mini": ["low", "medium", "high", "xhigh"],
     "gpt-5.3-codex": ["low", "medium", "high", "xhigh"],
     "gpt-5.3-codex-spark": ["low", "medium", "high", "xhigh"],
     "gpt-5.2-codex": ["low", "medium", "high", "xhigh"],
@@ -57,6 +59,7 @@ const OpenAiDefaultCapabilitySet: OpenAiCapabilitySet = {
   },
   defaultReasoningByModel: {
     "gpt-5.4": "medium",
+    "gpt-5.4-mini": "medium",
     "gpt-5.3-codex": "medium",
     "gpt-5.3-codex-spark": "high",
     "gpt-5.2-codex": "medium",

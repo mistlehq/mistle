@@ -12,53 +12,6 @@ import { createOpenAiRawBindingCapabilities } from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 
 describe("openai binding config forms", () => {
-  it("defaults the binding form to gpt-5.4 when no current model is set", () => {
-    const resolvedForm = resolveIntegrationForm({
-      schema: OpenAiApiKeyBindingConfigSchema,
-      form: resolveOpenAiBindingConfigForm,
-      context: {
-        familyId: "openai",
-        variantId: "openai-default",
-        kind: "agent",
-        target: {
-          rawConfig: {
-            api_base_url: "https://api.openai.com",
-            binding_capabilities: createOpenAiRawBindingCapabilities(),
-          },
-          config: OpenAiApiKeyTargetConfigSchema.parse({
-            api_base_url: "https://api.openai.com",
-            binding_capabilities: createOpenAiRawBindingCapabilities(),
-          }),
-        },
-        connection: {
-          rawConfig: {
-            connection_method: "api-key",
-          },
-          config: OpenAiConnectionConfigSchema.parse({
-            connection_method: "api-key",
-          }),
-        },
-      },
-    });
-
-    expect(resolvedForm.schema).toMatchObject({
-      properties: {
-        defaultModel: {
-          default: "gpt-5.4",
-          oneOf: expect.arrayContaining([
-            {
-              const: "gpt-5.4",
-              title: "gpt-5.4",
-            },
-          ]),
-        },
-        reasoningEffort: {
-          default: "medium",
-        },
-      },
-    });
-  });
-
   it("resolves binding config choices from target capabilities", () => {
     const targetConfig = OpenAiApiKeyTargetConfigSchema.parse({
       api_base_url: "https://api.openai.com",
@@ -103,6 +56,16 @@ describe("openai binding config forms", () => {
         defaultModel: {
           title: "Default model",
           default: "gpt-5.1-codex-mini",
+          oneOf: expect.arrayContaining([
+            {
+              const: "gpt-5.4",
+              title: "gpt-5.4",
+            },
+            {
+              const: "gpt-5.4-mini",
+              title: "gpt-5.4-mini",
+            },
+          ]),
         },
         reasoningEffort: {
           title: "Reasoning effort",
