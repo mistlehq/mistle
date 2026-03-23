@@ -43,6 +43,13 @@ export const SandboxInstanceStatusResponseSchema = z
     status: SandboxInstanceStatusSchema,
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    automationConversation: z
+      .object({
+        conversationId: z.string().min(1),
+        routeId: z.string().min(1).nullable(),
+        providerConversationId: z.string().min(1).nullable(),
+      })
+      .nullable(),
   })
   .strict();
 

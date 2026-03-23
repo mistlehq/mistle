@@ -4,6 +4,7 @@ import {
   createIntegrationRuntimeDatabaseName,
   getCurrentVitestFilePath,
   readTestContext,
+  reserveAvailablePort,
   runCleanupTasks,
 } from "@mistle/test-harness";
 import { Client } from "pg";
@@ -184,6 +185,8 @@ export const it = vitestIt.extend<{
           port: sharedInfraConfig.databaseDirectPort,
           databaseName: runtimeDatabaseName,
         });
+        const dataPlaneHost = "127.0.0.1";
+        const dataPlanePort = await reserveAvailablePort({ host: dataPlaneHost });
 
         const config: ControlPlaneApiConfig = {
           server: {
@@ -198,7 +201,7 @@ export const it = vitestIt.extend<{
             namespaceId: sharedInfraConfig.workflowNamespaceId,
           },
           dataPlaneApi: {
-            baseUrl: "http://127.0.0.1:4000",
+            baseUrl: `http://${dataPlaneHost}:${String(dataPlanePort)}`,
           },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,

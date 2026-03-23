@@ -43,6 +43,7 @@ describe("codex session lifecycle policy", () => {
   it("resumes the oldest created available thread", () => {
     expect(
       selectCodexConnectionThreadStrategy({
+        preferredThreadId: null,
         availableThreads: [
           {
             id: "thread_old",
@@ -70,6 +71,7 @@ describe("codex session lifecycle policy", () => {
   it("resumes the loaded thread even when it is missing from the available page", () => {
     expect(
       selectCodexConnectionThreadStrategy({
+        preferredThreadId: null,
         availableThreads: [],
         loadedThreadIds: ["thread_loaded_only"],
       }),
@@ -79,9 +81,38 @@ describe("codex session lifecycle policy", () => {
     });
   });
 
+  it("prefers the explicit persisted thread binding when available", () => {
+    expect(
+      selectCodexConnectionThreadStrategy({
+        preferredThreadId: "thread_persisted",
+        availableThreads: [
+          {
+            id: "thread_persisted",
+            name: null,
+            preview: null,
+            createdAt: 5,
+            updatedAt: 5,
+          },
+          {
+            id: "thread_old",
+            name: null,
+            preview: null,
+            createdAt: 10,
+            updatedAt: 10,
+          },
+        ],
+        loadedThreadIds: ["thread_loaded_only"],
+      }),
+    ).toEqual({
+      type: "resume",
+      threadId: "thread_persisted",
+    });
+  });
+
   it("starts a new thread when none exist yet", () => {
     expect(
       selectCodexConnectionThreadStrategy({
+        preferredThreadId: null,
         availableThreads: [],
         loadedThreadIds: [],
       }),

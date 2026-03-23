@@ -9,6 +9,7 @@ describe("codex session connect", () => {
   it("resumes the oldest created existing thread on reconnect", () => {
     expect(
       resolveInitialCodexThreadAction({
+        preferredThreadId: null,
         availableThreads: [
           {
             id: "thread_old",
@@ -36,6 +37,7 @@ describe("codex session connect", () => {
   it("resumes a loaded thread that is missing from the available page", () => {
     expect(
       resolveInitialCodexThreadAction({
+        preferredThreadId: null,
         availableThreads: [],
         loadedThreadIds: ["thread_loaded_only"],
       }),
@@ -45,9 +47,31 @@ describe("codex session connect", () => {
     });
   });
 
+  it("prefers the persisted provider conversation id on reconnect", () => {
+    expect(
+      resolveInitialCodexThreadAction({
+        preferredThreadId: "thread_persisted",
+        availableThreads: [
+          {
+            id: "thread_persisted",
+            name: null,
+            preview: null,
+            createdAt: 5,
+            updatedAt: 5,
+          },
+        ],
+        loadedThreadIds: ["thread_loaded_only"],
+      }),
+    ).toEqual({
+      type: "resume",
+      threadId: "thread_persisted",
+    });
+  });
+
   it("starts a new thread when no existing thread is available", () => {
     expect(
       resolveInitialCodexThreadAction({
+        preferredThreadId: null,
         availableThreads: [],
         loadedThreadIds: [],
       }),

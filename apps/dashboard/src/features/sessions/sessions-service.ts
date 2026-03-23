@@ -20,6 +20,13 @@ const SandboxInstanceStatusResponseSchema = z
     status: z.enum(["starting", "running", "stopped", "failed"]),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    automationConversation: z
+      .object({
+        conversationId: z.string().min(1),
+        routeId: z.string().min(1).nullable(),
+        providerConversationId: z.string().min(1).nullable(),
+      })
+      .nullable(),
   })
   .strict();
 
@@ -42,6 +49,11 @@ export type SandboxInstanceStatusResult = {
   status: "starting" | "running" | "stopped" | "failed";
   failureCode: string | null;
   failureMessage: string | null;
+  automationConversation: {
+    conversationId: string;
+    routeId: string | null;
+    providerConversationId: string | null;
+  } | null;
 };
 
 export type MintSandboxConnectionTokenResult = {

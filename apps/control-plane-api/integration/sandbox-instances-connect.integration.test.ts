@@ -1,24 +1,8 @@
-import { randomUUID } from "node:crypto";
-
-import {
-  createDataPlaneDatabase,
-  sandboxInstances,
-  SandboxInstanceVolumeModes,
-} from "@mistle/db/data-plane";
-import {
-  DATA_PLANE_MIGRATIONS_FOLDER_PATH,
-  MigrationTracking,
-  runDataPlaneMigrations,
-} from "@mistle/db/migrator";
-import { reserveAvailablePort } from "@mistle/test-harness";
+import { sandboxInstances, SandboxInstanceVolumeModes } from "@mistle/db/data-plane";
 import { systemSleeper } from "@mistle/time";
 import { eq } from "drizzle-orm";
-import { Client, Pool } from "pg";
 import { afterEach, describe, expect } from "vitest";
 
-import { createDataPlaneBackend } from "../../data-plane-api/src/openworkflow/index.js";
-import { createDataPlaneApiRuntime } from "../../data-plane-api/src/runtime/index.js";
-import type { DataPlaneApiConfig } from "../../data-plane-api/src/types.js";
 import { createControlPlaneApiRuntime } from "../src/main.js";
 import {
   SandboxInstanceConnectionTokenSchema,
@@ -26,14 +10,11 @@ import {
 } from "../src/sandbox-instances/contracts.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
 import { createAuthenticatedSession } from "./helpers/auth-session.js";
+import {
+  createDisposableDataPlaneRuntime,
+  type DisposableDataPlaneRuntime,
+} from "./helpers/disposable-data-plane-runtime.js";
 import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
-
-type StartedDataPlaneFixture = {
-  baseUrl: string;
-  db: ReturnType<typeof createDataPlaneDatabase>;
-  dbPool: Pool;
-  stop: () => Promise<void>;
-};
 
 type WorkflowRunRow = {
   id: string;
@@ -43,7 +24,7 @@ const ResumeWorkflowName = "data-plane.sandbox-instances.resume";
 const WorkflowQueuePollIntervalMs = 100;
 const WorkflowQueueWaitTimeoutMs = 10_000;
 
-const startedDataPlaneFixtures: StartedDataPlaneFixture[] = [];
+const startedDataPlaneFixtures: DisposableDataPlaneRuntime[] = [];
 
 afterEach(async () => {
   while (startedDataPlaneFixtures.length > 0) {
@@ -53,133 +34,6 @@ afterEach(async () => {
     }
   }
 });
-
-function parseDatabaseConnectionString(connectionString: string): {
-  username: string;
-  password: string;
-  host: string;
-  port: number;
-} {
-  const url = new URL(connectionString);
-  const port = Number(url.port);
-  if (!Number.isInteger(port) || port < 1) {
-    throw new Error("Expected database connection string to include a valid port.");
-  }
-
-  return {
-    username: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    host: url.hostname,
-    port,
-  };
-}
-
-function createDatabaseUrl(input: {
-  username: string;
-  password: string;
-  host: string;
-  port: number;
-  databaseName: string;
-}): string {
-  return `postgresql://${encodeURIComponent(input.username)}:${encodeURIComponent(input.password)}@${input.host}:${String(input.port)}/${input.databaseName}`;
-}
-
-async function createStartedDataPlaneFixture(input: {
-  controlPlaneDatabaseUrl: string;
-  internalAuthServiceToken: string;
-  workflowNamespaceId: string;
-}): Promise<StartedDataPlaneFixture> {
-  const adminConnection = parseDatabaseConnectionString(input.controlPlaneDatabaseUrl);
-  const databaseName = `mistle_cp_connect_${randomUUID().replaceAll("-", "_")}`;
-  const databaseUrl = createDatabaseUrl({
-    ...adminConnection,
-    databaseName,
-  });
-  const adminClient = new Client({
-    connectionString: createDatabaseUrl({
-      ...adminConnection,
-      databaseName: "postgres",
-    }),
-  });
-
-  let runtime: Awaited<ReturnType<typeof createDataPlaneApiRuntime>> | undefined;
-  let dbPool: Pool | undefined;
-
-  await adminClient.connect();
-
-  try {
-    await adminClient.query(`CREATE DATABASE "${databaseName}"`);
-    await runDataPlaneMigrations({
-      connectionString: databaseUrl,
-      schemaName: MigrationTracking.DATA_PLANE.SCHEMA_NAME,
-      migrationsFolder: DATA_PLANE_MIGRATIONS_FOLDER_PATH,
-      migrationsSchema: MigrationTracking.DATA_PLANE.SCHEMA_NAME,
-      migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
-    });
-
-    const workflowBackend = await createDataPlaneBackend({
-      url: databaseUrl,
-      namespaceId: input.workflowNamespaceId,
-      runMigrations: true,
-    });
-    await workflowBackend.stop();
-
-    dbPool = new Pool({
-      connectionString: databaseUrl,
-    });
-
-    const host = "127.0.0.1";
-    const port = await reserveAvailablePort({ host });
-    const config: DataPlaneApiConfig = {
-      server: {
-        host,
-        port,
-      },
-      database: {
-        url: databaseUrl,
-      },
-      workflow: {
-        databaseUrl,
-        namespaceId: input.workflowNamespaceId,
-      },
-    };
-
-    runtime = await createDataPlaneApiRuntime({
-      app: config,
-      internalAuthServiceToken: input.internalAuthServiceToken,
-      sandboxProvider: "docker",
-    });
-    await runtime.start();
-
-    return {
-      baseUrl: `http://${host}:${String(port)}`,
-      db: createDataPlaneDatabase(dbPool),
-      dbPool,
-      stop: async () => {
-        if (runtime !== undefined) {
-          await runtime.stop();
-        }
-        if (dbPool !== undefined) {
-          await dbPool.end();
-        }
-
-        await adminClient.query(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
-        await adminClient.end();
-      },
-    };
-  } catch (error) {
-    if (runtime !== undefined) {
-      await runtime.stop();
-    }
-    if (dbPool !== undefined) {
-      await dbPool.end();
-    }
-
-    await adminClient.query(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
-    await adminClient.end();
-    throw error;
-  }
-}
 
 function createControlPlaneConfig(input: {
   baseConfig: ControlPlaneApiConfig;
@@ -208,7 +62,7 @@ async function createAuthenticatedControlPlaneSession(input: {
 }
 
 async function insertSandboxInstance(input: {
-  dataPlaneFixture: StartedDataPlaneFixture;
+  dataPlaneFixture: DisposableDataPlaneRuntime;
   organizationId: string;
   sandboxInstanceId: string;
   status: "starting" | "running" | "stopped" | "failed";
@@ -236,7 +90,7 @@ async function insertSandboxInstance(input: {
 }
 
 async function updateSandboxInstanceStatus(input: {
-  dataPlaneFixture: StartedDataPlaneFixture;
+  dataPlaneFixture: DisposableDataPlaneRuntime;
   sandboxInstanceId: string;
   status: "running" | "failed";
   failureCode?: string | null;
@@ -253,7 +107,7 @@ async function updateSandboxInstanceStatus(input: {
 }
 
 async function waitForResumeWorkflowRun(input: {
-  dataPlaneFixture: StartedDataPlaneFixture;
+  dataPlaneFixture: DisposableDataPlaneRuntime;
   workflowNamespaceId: string;
   sandboxInstanceId: string;
 }): Promise<WorkflowRunRow> {
@@ -289,10 +143,12 @@ async function waitForResumeWorkflowRun(input: {
 
 describe("sandbox instance connect integration", () => {
   it("mints a connection token immediately for running instances", async ({ fixture }) => {
-    const dataPlaneFixture = await createStartedDataPlaneFixture({
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_connect",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
     });
     startedDataPlaneFixtures.push(dataPlaneFixture);
 
@@ -351,10 +207,12 @@ describe("sandbox instance connect integration", () => {
   it("waits for starting instances to become running before minting a connection token", async ({
     fixture,
   }) => {
-    const dataPlaneFixture = await createStartedDataPlaneFixture({
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_connect",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
     });
     startedDataPlaneFixtures.push(dataPlaneFixture);
 
@@ -419,10 +277,12 @@ describe("sandbox instance connect integration", () => {
   it("resumes stopped instances through data-plane before minting a connection token", async ({
     fixture,
   }) => {
-    const dataPlaneFixture = await createStartedDataPlaneFixture({
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_connect",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
     });
     startedDataPlaneFixtures.push(dataPlaneFixture);
 
@@ -490,10 +350,12 @@ describe("sandbox instance connect integration", () => {
   }, 60_000);
 
   it("returns INSTANCE_FAILED for failed instances", async ({ fixture }) => {
-    const dataPlaneFixture = await createStartedDataPlaneFixture({
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_connect",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
     });
     startedDataPlaneFixtures.push(dataPlaneFixture);
 

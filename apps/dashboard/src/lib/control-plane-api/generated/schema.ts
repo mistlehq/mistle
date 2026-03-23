@@ -2473,6 +2473,11 @@ export interface paths {
           };
           content: {
             "application/json": {
+              automationConversation: {
+                conversationId: string;
+                providerConversationId: string | null;
+                routeId: string | null;
+              } | null;
               failureCode: string | null;
               failureMessage: string | null;
               id: string;

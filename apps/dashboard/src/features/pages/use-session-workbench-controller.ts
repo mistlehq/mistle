@@ -25,6 +25,17 @@ type ComposerConfigDraft = ComposerConfigSnapshot & {
   baseConfigJson: string | null;
 };
 
+const AutomationSessionStatusRefetchIntervalMs = 2_000;
+const AutomationSessionPreparationTimeoutMs = 30_000;
+const AutomationSessionPreparationTimeoutMessage =
+  "This chat session is taking longer than expected to become ready. Please try again shortly.";
+
+type SandboxAutomationConversation = {
+  conversationId: string;
+  routeId: string | null;
+  providerConversationId: string | null;
+} | null;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -61,6 +72,40 @@ function readComposerConfigSnapshot(configJson: string | null): ComposerConfigSn
     model: typeof model === "string" ? model : null,
     modelReasoningEffort: typeof modelReasoningEffort === "string" ? modelReasoningEffort : null,
   };
+}
+
+export function shouldWaitForAutomationSessionThread(input: {
+  sandboxStatus: string | null;
+  automationConversation: SandboxAutomationConversation;
+}): boolean {
+  return (
+    input.sandboxStatus === "running" &&
+    input.automationConversation !== null &&
+    input.automationConversation.providerConversationId === null
+  );
+}
+
+export function hasAutomationSessionPreparationTimedOut(input: {
+  pendingSinceMs: number | null;
+  nowMs: number;
+}): boolean {
+  if (input.pendingSinceMs === null) {
+    return false;
+  }
+
+  return input.nowMs - input.pendingSinceMs >= AutomationSessionPreparationTimeoutMs;
+}
+
+export function resolveAutomationSessionPreparationTimeoutDelayMs(input: {
+  pendingSinceMs: number | null;
+  nowMs: number;
+}): number | null {
+  if (input.pendingSinceMs === null) {
+    return null;
+  }
+
+  const remainingMs = AutomationSessionPreparationTimeoutMs - (input.nowMs - input.pendingSinceMs);
+  return remainingMs > 0 ? remainingMs : 0;
 }
 
 type SessionWorkbenchState = {
@@ -149,6 +194,10 @@ export function useSessionWorkbenchController(input: {
 }): UseSessionWorkbenchControllerResult {
   const [composerText, setComposerText] = useState("");
   const [hasAttemptedAutoConnect, setHasAttemptedAutoConnect] = useState(false);
+  const [automationPendingSinceMs, setAutomationPendingSinceMs] = useState<number | null>(null);
+  const [automationPendingErrorMessage, setAutomationPendingErrorMessage] = useState<string | null>(
+    null,
+  );
   const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
   const sessionState = useCodexSessionState();
   const ptyState = useSandboxPtyState();
@@ -206,10 +255,25 @@ export function useSessionWorkbenchController(input: {
     retry: false,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
+      const automationConversation = query.state.data?.automationConversation ?? null;
+      if (
+        shouldWaitForAutomationSessionThread({
+          sandboxStatus: status ?? null,
+          automationConversation,
+        })
+      ) {
+        return AutomationSessionStatusRefetchIntervalMs;
+      }
+
       return status === "running" || status === "failed" || status === "stopped" ? false : 1_000;
     },
   });
   const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
+  const automationConversation = sandboxStatusQuery.data?.automationConversation ?? null;
+  const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
+    sandboxStatus,
+    automationConversation,
+  });
   const connectionReadiness = resolveSessionConnectionReadiness({
     sandboxInstanceId: input.sandboxInstanceId,
     sandboxStatus,
@@ -229,10 +293,54 @@ export function useSessionWorkbenchController(input: {
 
   useEffect(() => {
     setHasAttemptedAutoConnect(false);
+    setAutomationPendingSinceMs(null);
+    setAutomationPendingErrorMessage(null);
     clearStartErrorMessage();
     disconnectSession();
     void disconnectPty();
   }, [clearStartErrorMessage, disconnectPty, disconnectSession, input.sandboxInstanceId]);
+
+  useEffect(() => {
+    if (!isWaitingForAutomationThread) {
+      setAutomationPendingSinceMs(null);
+      setAutomationPendingErrorMessage(null);
+      return;
+    }
+
+    if (automationPendingSinceMs === null) {
+      setAutomationPendingSinceMs(Date.now());
+      return;
+    }
+
+    if (
+      hasAutomationSessionPreparationTimedOut({
+        pendingSinceMs: automationPendingSinceMs,
+        nowMs: Date.now(),
+      })
+    ) {
+      setAutomationPendingErrorMessage(AutomationSessionPreparationTimeoutMessage);
+      return;
+    }
+
+    const timeoutDelayMs = resolveAutomationSessionPreparationTimeoutDelayMs({
+      pendingSinceMs: automationPendingSinceMs,
+      nowMs: Date.now(),
+    });
+
+    if (timeoutDelayMs === null) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setAutomationPendingErrorMessage(AutomationSessionPreparationTimeoutMessage);
+    }, timeoutDelayMs);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [automationPendingSinceMs, isWaitingForAutomationThread]);
+
+  const resolvedStartErrorMessage = startErrorMessage ?? automationPendingErrorMessage;
 
   useEffect(() => {
     if (input.sandboxInstanceId === null) {
@@ -246,22 +354,34 @@ export function useSessionWorkbenchController(input: {
         connected: connectedSession !== null,
         isStartingSession,
         hasAttemptedAutoConnect,
-        hasStartError: startErrorMessage !== null,
+        hasStartError: resolvedStartErrorMessage !== null,
       })
     ) {
       return;
     }
 
+    if (isWaitingForAutomationThread) {
+      return;
+    }
+
     setHasAttemptedAutoConnect(true);
-    connectSession({ sandboxInstanceId: input.sandboxInstanceId });
+    // This reconnect path only supports initial bootstrap for the latest
+    // persisted automation binding. Live migration of an already-open session
+    // across route rebinding is currently unsupported.
+    connectSession({
+      sandboxInstanceId: input.sandboxInstanceId,
+      preferredThreadId: automationConversation?.providerConversationId ?? null,
+    });
   }, [
+    automationConversation,
     connectSession,
     connectedSession,
     hasAttemptedAutoConnect,
     input.sandboxInstanceId,
     isStartingSession,
+    isWaitingForAutomationThread,
     connectionReadiness.canConnect,
-    startErrorMessage,
+    resolvedStartErrorMessage,
   ]);
 
   useEffect(() => {
@@ -287,14 +407,14 @@ export function useSessionWorkbenchController(input: {
     sandboxStatus: sandboxStatusLabel.toLowerCase(),
     agentConnectionState,
     step,
-    hasConnectionError: startErrorMessage !== null,
+    hasConnectionError: resolvedStartErrorMessage !== null,
   });
 
   const hasActiveTurn = canInterruptTurn || canSteerTurn;
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: sandboxStatusQuery.isError,
-    startErrorMessage,
+    startErrorMessage: resolvedStartErrorMessage,
     sandboxFailureMessage,
     stoppedSessionMessage: stoppedSessionState.message,
   });
@@ -390,7 +510,7 @@ export function useSessionWorkbenchController(input: {
       sandboxFailureMessage,
       sandboxStatusQuery,
       sessionHeaderStatusUi,
-      startErrorMessage,
+      startErrorMessage: resolvedStartErrorMessage,
       terminalPanelState,
       moreActionsState: {
         agentConnectionState: lifecycle.agentConnectionState,

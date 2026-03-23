@@ -5,7 +5,12 @@ import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
-import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
+import {
+  hasAutomationSessionPreparationTimedOut,
+  resolveAutomationSessionPreparationTimeoutDelayMs,
+  shouldWaitForAutomationSessionThread,
+  useSessionWorkbenchController,
+} from "./use-session-workbench-controller.js";
 
 describe("useSessionWorkbenchController", () => {
   it("returns separate workbench and conversation pane state for a missing session id", () => {
@@ -122,5 +127,89 @@ describe("useSessionWorkbenchController", () => {
 
     expect(result.current.workbench.terminalPanelState.isVisible).toBe(expectedVisibility);
     expect(result.current.workbench.terminalPanelState.panelSize).toBe(expectedPanelSize);
+  });
+
+  it("waits for automation-backed sessions whose persisted thread id is still pending", () => {
+    expect(
+      shouldWaitForAutomationSessionThread({
+        sandboxStatus: "running",
+        automationConversation: {
+          conversationId: "cnv_pending",
+          routeId: "cvr_pending",
+          providerConversationId: null,
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldWaitForAutomationSessionThread({
+        sandboxStatus: "running",
+        automationConversation: {
+          conversationId: "cnv_ready",
+          routeId: "cvr_ready",
+          providerConversationId: "thread_ready",
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldWaitForAutomationSessionThread({
+        sandboxStatus: "running",
+        automationConversation: null,
+      }),
+    ).toBe(false);
+  });
+
+  it("times out automation pending state after the configured wait window", () => {
+    expect(
+      hasAutomationSessionPreparationTimedOut({
+        pendingSinceMs: null,
+        nowMs: 30_000,
+      }),
+    ).toBe(false);
+
+    expect(
+      hasAutomationSessionPreparationTimedOut({
+        pendingSinceMs: 0,
+        nowMs: 29_999,
+      }),
+    ).toBe(false);
+
+    expect(
+      hasAutomationSessionPreparationTimedOut({
+        pendingSinceMs: 0,
+        nowMs: 30_000,
+      }),
+    ).toBe(true);
+  });
+
+  it("computes the remaining automation preparation timeout delay", () => {
+    expect(
+      resolveAutomationSessionPreparationTimeoutDelayMs({
+        pendingSinceMs: null,
+        nowMs: 30_000,
+      }),
+    ).toBeNull();
+
+    expect(
+      resolveAutomationSessionPreparationTimeoutDelayMs({
+        pendingSinceMs: 0,
+        nowMs: 0,
+      }),
+    ).toBe(30_000);
+
+    expect(
+      resolveAutomationSessionPreparationTimeoutDelayMs({
+        pendingSinceMs: 0,
+        nowMs: 29_999,
+      }),
+    ).toBe(1);
+
+    expect(
+      resolveAutomationSessionPreparationTimeoutDelayMs({
+        pendingSinceMs: 0,
+        nowMs: 30_000,
+      }),
+    ).toBe(0);
   });
 });
