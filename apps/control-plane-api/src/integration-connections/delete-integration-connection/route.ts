@@ -58,7 +58,8 @@ export const route = createRoute({
       },
     },
     409: {
-      description: "Integration connection still has one or more bindings.",
+      description:
+        "Integration connection still has one or more dependent bindings or automations.",
       content: {
         "application/json": {
           schema: DeleteIntegrationConnectionConflictResponseSchema,

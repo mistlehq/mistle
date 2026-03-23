@@ -2471,15 +2471,23 @@
             }
           },
           "409": {
-            "description": "Integration connection still has one or more bindings.",
+            "description": "Integration connection still has one or more dependent bindings or automations.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "code": {
-                      "type": "string",
-                      "enum": ["CONNECTION_HAS_BINDINGS"]
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["CONNECTION_HAS_BINDINGS"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["CONNECTION_HAS_AUTOMATIONS"]
+                        }
+                      ]
                     },
                     "message": {
                       "type": "string",

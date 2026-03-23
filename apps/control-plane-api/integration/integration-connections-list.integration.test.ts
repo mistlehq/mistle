@@ -1,12 +1,18 @@
 import {
+  automations,
+  AutomationKinds,
+  integrationConnectionCredentials,
   integrationConnectionResourceStates,
   integrationConnections,
   IntegrationConnectionStatuses,
   IntegrationConnectionResourceSyncStates,
+  integrationCredentials,
+  IntegrationCredentialSecretKinds,
   integrationTargets,
   sandboxProfiles,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
+  webhookAutomations,
 } from "@mistle/db/control-plane";
 import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 import { describe, expect } from "vitest";
@@ -345,6 +351,13 @@ describe("integration connections list integration", () => {
         displayName: "Bound connection",
         status: IntegrationConnectionStatuses.ACTIVE,
       },
+      {
+        id: "icn_delete_automation",
+        organizationId: session.organizationId,
+        targetKey: "github_cloud",
+        displayName: "Automation connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      },
     ]);
 
     await fixture.db.insert(sandboxProfiles).values({
@@ -363,6 +376,51 @@ describe("integration connections list integration", () => {
       connectionId: "icn_delete_bound",
       kind: "git",
       config: {},
+    });
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.organizationId, session.organizationId), eq(table.version, 1)),
+    });
+
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key for delete integration test.");
+    }
+
+    await fixture.db.insert(integrationCredentials).values({
+      id: "icr_delete_free",
+      organizationId: session.organizationId,
+      secretKind: IntegrationCredentialSecretKinds.API_KEY,
+      ciphertext: "ciphertext-delete-free",
+      nonce: "nonce-delete-free",
+      organizationCredentialKeyVersion: organizationCredentialKey.version,
+      intendedFamilyId: "github",
+    });
+
+    await fixture.db.insert(integrationConnectionCredentials).values({
+      connectionId: "icn_delete_free",
+      credentialId: "icr_delete_free",
+      purpose: "api_key",
+    });
+
+    await fixture.db.insert(automations).values({
+      id: "atm_delete_automation",
+      organizationId: session.organizationId,
+      kind: AutomationKinds.WEBHOOK,
+      name: "Delete guard automation",
+      enabled: true,
+    });
+
+    await fixture.db.insert(webhookAutomations).values({
+      automationId: "atm_delete_automation",
+      integrationConnectionId: "icn_delete_automation",
+      eventTypes: ["issue_comment.created"],
+      payloadFilter: {
+        action: "created",
+      },
+      inputTemplate: "Handle payload",
+      conversationKeyTemplate: "conversation",
+      idempotencyKeyTemplate: "dedupe",
     });
 
     const deleteFreeResponse = await fixture.request(
@@ -384,6 +442,19 @@ describe("integration connections list integration", () => {
     });
     expect(deletedConnection).toBeUndefined();
 
+    const deletedCredentialLink = await fixture.db.query.integrationConnectionCredentials.findFirst(
+      {
+        where: (table, { and, eq }) =>
+          and(eq(table.connectionId, "icn_delete_free"), eq(table.credentialId, "icr_delete_free")),
+      },
+    );
+    expect(deletedCredentialLink).toBeUndefined();
+
+    const deletedCredential = await fixture.db.query.integrationCredentials.findFirst({
+      where: (table, { eq }) => eq(table.id, "icr_delete_free"),
+    });
+    expect(deletedCredential).toBeUndefined();
+
     const deleteBoundResponse = await fixture.request(
       "/v1/integration/connections/icn_delete_bound",
       {
@@ -404,6 +475,32 @@ describe("integration connections list integration", () => {
       where: (table, { eq }) => eq(table.id, "icn_delete_bound"),
     });
     expect(boundConnection).toBeDefined();
+
+    const deleteAutomationResponse = await fixture.request(
+      "/v1/integration/connections/icn_delete_automation",
+      {
+        method: "DELETE",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(deleteAutomationResponse.status).toBe(409);
+    expect(await deleteAutomationResponse.json()).toEqual({
+      code: "CONNECTION_HAS_AUTOMATIONS",
+      message:
+        "This integration connection cannot be deleted while it is still used by one or more webhook automations.",
+    });
+
+    const automationConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { eq }) => eq(table.id, "icn_delete_automation"),
+    });
+    expect(automationConnection).toBeDefined();
+
+    const persistedWebhookAutomation = await fixture.db.query.webhookAutomations.findFirst({
+      where: (table, { eq }) => eq(table.automationId, "atm_delete_automation"),
+    });
+    expect(persistedWebhookAutomation).toBeDefined();
   });
 
   it("returns 401 when the request is unauthenticated", async ({ fixture }) => {

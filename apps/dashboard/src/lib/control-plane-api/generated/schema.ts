@@ -842,15 +842,14 @@ export interface paths {
             };
           };
         };
-        /** @description Integration connection still has one or more bindings. */
+        /** @description Integration connection still has one or more dependent bindings or automations. */
         409: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             "application/json": {
-              /** @enum {string} */
-              code: "CONNECTION_HAS_BINDINGS";
+              code: "CONNECTION_HAS_BINDINGS" | "CONNECTION_HAS_AUTOMATIONS";
               message: string;
             };
           };
