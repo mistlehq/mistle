@@ -15,12 +15,12 @@ import type {
   IntegrationWebhookImmediateResponse,
 } from "@mistle/integrations-core";
 
-import { resolveIntegrationTargetSecrets } from "../../integration-targets/services/resolve-target-secrets.js";
 import {
   decryptIntegrationConnectionSecrets,
   resolveMasterEncryptionKeyMaterial,
   type IntegrationConnectionSecrets,
 } from "../../lib/crypto.js";
+import { resolveIntegrationTargetSecrets } from "../../lib/integration-target-secrets.js";
 import type { AppContext } from "../../types.js";
 import {
   IntegrationWebhooksBadRequestCodes,

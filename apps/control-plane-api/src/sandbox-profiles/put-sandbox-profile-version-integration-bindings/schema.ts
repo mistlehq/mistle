@@ -7,7 +7,7 @@ import {
 import {
   SandboxProfilesIntegrationBindingsBadRequestCodes,
   SandboxProfilesNotFoundCodes,
-} from "../services/errors.js";
+} from "../errors.js";
 
 export const badRequestResponseSchema = z.union([
   createCodeMessageErrorSchema(

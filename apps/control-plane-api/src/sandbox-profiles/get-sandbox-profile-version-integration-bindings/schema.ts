@@ -1,7 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { createCodeMessageErrorSchema } from "@mistle/http/errors.js";
 
-import { SandboxProfilesNotFoundCodes } from "../services/errors.js";
+import { SandboxProfilesNotFoundCodes } from "../errors.js";
 
 export const notFoundResponseSchema = createCodeMessageErrorSchema(
   z.enum([

@@ -9,8 +9,8 @@ import { SyncIntegrationConnectionResourcesWorkflowSpec } from "@mistle/workflow
 import { describe, expect } from "vitest";
 
 import { RefreshIntegrationConnectionResourcesResponseSchema } from "../src/integration-connections/refresh-integration-connection-resources/schema.js";
-import { INTERNAL_INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH } from "../src/internal-integration-connections/index.js";
-import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "../src/internal-integration-credentials/index.js";
+import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "../src/internal/index.js";
+import { INTERNAL_INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH } from "../src/internal/integration-connections/index.js";
 import { countControlPlaneWorkflowRuns } from "./helpers/workflow-runs.js";
 import { it } from "./test-context.js";
 
@@ -182,11 +182,9 @@ describe("internal integration connections", () => {
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({
-      success: false,
-      error: {
-        name: "ZodError",
-      },
+    await expect(response.json()).resolves.toEqual({
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
     });
   });
 });

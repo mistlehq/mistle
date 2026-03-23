@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 
-import { compileProfileVersionRuntimePlan } from "./compile-profile-version-runtime-plan.js";
-import { SandboxProfilesCompileError, SandboxProfilesCompileErrorCodes } from "./errors.js";
+import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
+import { SandboxProfilesCompileError, SandboxProfilesCompileErrorCodes } from "../errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type StartProfileInstanceInput = {

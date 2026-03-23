@@ -1,7 +1,7 @@
 import { describe, expect } from "vitest";
 
-import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "../src/internal-integration-credentials/index.js";
-import { INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH } from "../src/internal-sandbox-runtime/index.js";
+import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "../src/internal/index.js";
+import { INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH } from "../src/internal/sandbox-runtime/index.js";
 import { it } from "./test-context.js";
 
 describe("internal sandbox runtime", () => {
@@ -58,11 +58,9 @@ describe("internal sandbox runtime", () => {
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({
-      success: false,
-      error: {
-        name: "ZodError",
-      },
+    await expect(response.json()).resolves.toEqual({
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
     });
   });
 
@@ -107,11 +105,9 @@ describe("internal sandbox runtime", () => {
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({
-      success: false,
-      error: {
-        name: "ZodError",
-      },
+    await expect(response.json()).resolves.toEqual({
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
     });
   });
 });

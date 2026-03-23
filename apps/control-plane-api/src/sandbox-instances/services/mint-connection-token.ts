@@ -10,7 +10,7 @@ import {
   SandboxInstancesConflictError,
   SandboxInstancesNotFoundCodes,
   SandboxInstancesNotFoundError,
-} from "./errors.js";
+} from "../errors.js";
 import type {
   MintSandboxInstanceConnectionTokenInput,
   SandboxInstanceConnectionToken,

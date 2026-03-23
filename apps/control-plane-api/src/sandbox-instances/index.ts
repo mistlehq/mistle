@@ -13,4 +13,4 @@ export { route as getSandboxInstanceRoute } from "./get-sandbox-instance/route.j
 export { badRequestResponseSchema as SandboxInstancesBadRequestResponseSchema } from "./list-sandbox-instances/schema.js";
 export { NotFoundResponseSchema as SandboxInstancesNotFoundResponseSchema } from "@mistle/http/errors.js";
 export { conflictResponseSchema as SandboxInstancesConflictResponseSchema } from "./create-sandbox-instance-connection-token/schema.js";
-export { SandboxInstancesConflictError, SandboxInstancesNotFoundError } from "./services/errors.js";
+export { SandboxInstancesConflictError, SandboxInstancesNotFoundError } from "./errors.js";

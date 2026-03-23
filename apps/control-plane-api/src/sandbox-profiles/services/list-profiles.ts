@@ -14,7 +14,7 @@ import {
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { SandboxProfilesBadRequestCodes, SandboxProfilesBadRequestError } from "./errors.js";
+import { SandboxProfilesBadRequestCodes, SandboxProfilesBadRequestError } from "../errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 const DEFAULT_PAGE_SIZE = 20;
