@@ -52,7 +52,7 @@ function renderCodexConfig(input: {
         base_url: input.apiBaseUrl,
         wire_api: "responses",
         requires_openai_auth: false,
-        supports_websockets: true,
+        supports_websockets: false,
       },
     },
     ...(input.additionalInstructions === undefined

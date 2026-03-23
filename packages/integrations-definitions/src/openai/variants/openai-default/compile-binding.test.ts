@@ -187,7 +187,7 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(configContent).toContain('base_url = "https://api.openai.com/v1"');
     expect(configContent).toContain('wire_api = "responses"');
     expect(configContent).toContain("requires_openai_auth = false");
-    expect(configContent).toContain("supports_websockets = true");
+    expect(configContent).toContain("supports_websockets = false");
     expect(configContent).toContain('trust_level = "trusted"');
     expect(configContent).not.toContain("developer_instructions");
     expect(configContent).not.toContain("openai_base_url");
