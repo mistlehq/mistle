@@ -206,7 +206,7 @@ export function SessionWorkbenchPage(): React.JSX.Element {
           isConnectionReady={workbench.connectionReadiness.canConnect}
           isVisible={workbench.terminalPanelState.isVisible}
           onHide={workbench.terminalPanelState.closePanel}
-          onClose={async (): Promise<void> => {
+          onDisconnectTerminal={async (): Promise<void> => {
             workbench.terminalPanelState.closePanel();
             await workbench.ptyState.actions.disconnectPty();
           }}

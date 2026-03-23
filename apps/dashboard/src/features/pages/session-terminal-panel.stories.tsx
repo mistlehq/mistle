@@ -139,7 +139,7 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
               onHide={() => {
                 setIsTerminalVisible(false);
               }}
-              onClose={() => {
+              onDisconnectTerminal={() => {
                 setIsTerminalVisible(false);
               }}
               ptyState={ptyState}

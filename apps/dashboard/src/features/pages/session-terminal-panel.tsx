@@ -37,7 +37,7 @@ function shouldAutoOpenTerminal(input: {
   return !input.hasAttemptedAutoOpen;
 }
 
-function shouldAutoCloseTerminalOnExit(input: {
+function shouldHandleTerminalExit(input: {
   exitInfo: SandboxPtyExitInfo | null;
   hasHandledExit: boolean;
 }): boolean {
@@ -84,7 +84,7 @@ type SessionTerminalPanelProps = {
   onHide: () => void;
   isVisible: boolean;
   isConnectionReady: boolean;
-  onClose: () => Promise<void> | void;
+  onDisconnectTerminal: () => Promise<void> | void;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   sandboxInstanceId: string;
   sandboxStatus: string | null;
@@ -94,7 +94,7 @@ export function SessionTerminalPanel({
   onHide,
   isVisible,
   isConnectionReady,
-  onClose,
+  onDisconnectTerminal,
   ptyState,
   sandboxInstanceId,
   sandboxStatus,
@@ -115,7 +115,7 @@ export function SessionTerminalPanel({
     }
 
     if (
-      !shouldAutoCloseTerminalOnExit({
+      !shouldHandleTerminalExit({
         exitInfo: lifecycle.exitInfo,
         hasHandledExit: hasHandledExitRef.current,
       })
@@ -124,7 +124,7 @@ export function SessionTerminalPanel({
     }
 
     hasHandledExitRef.current = true;
-    void handleCloseTerminal();
+    void handleDisconnectTerminal();
   }, [lifecycle.exitInfo]);
 
   useEffect(() => {
@@ -152,9 +152,9 @@ export function SessionTerminalPanel({
     onHide();
   }
 
-  async function handleCloseTerminal(): Promise<void> {
+  async function handleDisconnectTerminal(): Promise<void> {
     output.clearOutput();
-    await onClose();
+    await onDisconnectTerminal();
   }
 
   if (!isVisible) {
@@ -185,7 +185,7 @@ export function SessionTerminalPanel({
             </Button>
             <Button
               aria-label="Close terminal"
-              onClick={() => void handleCloseTerminal()}
+              onClick={() => void handleDisconnectTerminal()}
               size="icon-sm"
               type="button"
               variant="ghost"
@@ -206,4 +206,4 @@ export function SessionTerminalPanel({
   );
 }
 
-export { shouldAutoCloseTerminalOnExit, shouldAutoOpenTerminal };
+export { shouldHandleTerminalExit, shouldAutoOpenTerminal };
