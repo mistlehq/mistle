@@ -3,7 +3,6 @@ import { TerminalIcon } from "@phosphor-icons/react";
 import { useMemo } from "react";
 import { useParams } from "react-router";
 
-import { SessionMoreActions } from "../sessions/session-more-actions.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import {
   SessionConversationBottomPanel,
@@ -39,17 +38,15 @@ export function SessionWorkbenchPage(): React.JSX.Element {
         >
           {workbench.sessionHeaderStatusUi.label}
         </Badge>
-        <SessionMoreActions
-          agentConnectionState={workbench.moreActionsState.agentConnectionState}
-          configJson={workbench.moreActionsState.configJson}
-          configRequirementsJson={workbench.moreActionsState.configRequirementsJson}
-          connectedSession={workbench.moreActionsState.connectedSession}
-          isReadingConfig={workbench.moreActionsState.isReadingConfig}
-          isReadingConfigRequirements={workbench.moreActionsState.isReadingConfigRequirements}
-          onLoadConfigSetup={workbench.moreActionsState.loadConfigSetup}
-          sandboxInstanceId={sandboxInstanceId}
-        />
+        <span aria-hidden className="h-5 w-px bg-stone-200" />
         <Button
+          aria-label={terminalButtonLabel}
+          aria-pressed={workbench.terminalPanelState.isVisible}
+          className={
+            workbench.terminalPanelState.isVisible
+              ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
+              : "bg-transparent text-foreground shadow-none hover:bg-stone-100"
+          }
           disabled={isTerminalOpenDisabled}
           onClick={() => {
             if (workbench.terminalPanelState.isVisible) {
@@ -60,27 +57,18 @@ export function SessionWorkbenchPage(): React.JSX.Element {
 
             workbench.terminalPanelState.openPanel();
           }}
-          size="sm"
+          size="icon-sm"
           title={terminalButtonTitle}
           type="button"
-          variant={workbench.terminalPanelState.isVisible ? "secondary" : "outline"}
+          variant="ghost"
         >
           <TerminalIcon className="size-4" />
-          Terminal
         </Button>
       </div>
     ),
     [
       isTerminalOpenDisabled,
-      sandboxInstanceId,
       terminalButtonTitle,
-      workbench.moreActionsState.agentConnectionState,
-      workbench.moreActionsState.configJson,
-      workbench.moreActionsState.configRequirementsJson,
-      workbench.moreActionsState.connectedSession,
-      workbench.moreActionsState.isReadingConfig,
-      workbench.moreActionsState.isReadingConfigRequirements,
-      workbench.moreActionsState.loadConfigSetup,
       workbench.ptyState.actions.disconnectPty,
       workbench.sessionHeaderStatusUi.className,
       workbench.sessionHeaderStatusUi.label,
@@ -114,6 +102,11 @@ export function SessionWorkbenchPage(): React.JSX.Element {
       return !chatItemIds.has(entry.itemId);
     },
   );
+  const terminalPanelKey = [
+    sandboxInstanceId,
+    workbench.sandboxStatusQuery.data?.status ?? "unknown",
+    workbench.terminalPanelState.isVisible ? "visible" : "hidden",
+  ].join(":");
 
   const alerts: SessionWorkbenchAlert[] = [];
   if (workbench.sandboxStatusQuery.isError) {
@@ -203,16 +196,16 @@ export function SessionWorkbenchPage(): React.JSX.Element {
       }
       secondaryPanel={
         <SessionTerminalPanel
+          key={terminalPanelKey}
           isConnectionReady={workbench.connectionReadiness.canConnect}
           isVisible={workbench.terminalPanelState.isVisible}
           onHide={workbench.terminalPanelState.closePanel}
-          onClose={async (): Promise<void> => {
+          onDisconnectTerminal={async (): Promise<void> => {
             workbench.terminalPanelState.closePanel();
             await workbench.ptyState.actions.disconnectPty();
           }}
           ptyState={workbench.ptyState}
           sandboxInstanceId={sandboxInstanceId}
-          sandboxStatus={workbench.sandboxStatusQuery.data?.status ?? null}
         />
       }
       secondaryPanelSize={workbench.terminalPanelState.panelSize}

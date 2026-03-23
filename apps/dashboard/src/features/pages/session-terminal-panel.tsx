@@ -1,4 +1,4 @@
-import type { SandboxPtyState } from "@mistle/sandbox-session-client";
+import type { SandboxPtyExitInfo, SandboxPtyState } from "@mistle/sandbox-session-client";
 import { Button, cn } from "@mistle/ui";
 import { MinusIcon, SpinnerGapIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useRef } from "react";
@@ -37,6 +37,13 @@ function shouldAutoOpenTerminal(input: {
   return !input.hasAttemptedAutoOpen;
 }
 
+function shouldHandleTerminalExit(input: {
+  exitInfo: SandboxPtyExitInfo | null;
+  hasHandledExit: boolean;
+}): boolean {
+  return input.exitInfo !== null && !input.hasHandledExit;
+}
+
 function SessionTerminalToolbarStatus(input: {
   errorMessage: string | null;
   state: SandboxPtyState;
@@ -47,6 +54,10 @@ function SessionTerminalToolbarStatus(input: {
     input.errorMessage === null
       ? `Terminal status: ${presentation.label}`
       : `Terminal status: ${presentation.label}. ${input.errorMessage}`;
+  const indicatorTitle =
+    input.errorMessage === null
+      ? `Terminal ${presentation.label.toLowerCase()}`
+      : `Terminal ${presentation.label.toLowerCase()}: ${input.errorMessage}`;
 
   return (
     <div
@@ -58,16 +69,11 @@ function SessionTerminalToolbarStatus(input: {
       <span className="sr-only">{liveStatusText}</span>
       <div aria-hidden className="flex min-w-0 flex-1 items-center gap-2">
         <span className="shrink-0 text-sm font-semibold text-stone-900">Terminal</span>
-        <span className="h-4 w-px shrink-0 bg-stone-200" />
-        <span
-          className="flex min-w-0 items-center gap-2 text-sm text-stone-600"
-          title={input.errorMessage ?? undefined}
-        >
+        <span className="flex items-center gap-2" title={indicatorTitle}>
           {presentation.showSpinner ? (
             <SpinnerGapIcon className="size-4 shrink-0 animate-spin text-stone-500" />
           ) : null}
-          <span className={cn("size-2 shrink-0 rounded-full", dotClass)} />
-          <span className="truncate">{presentation.label}</span>
+          <span className={cn("size-2.5 shrink-0 rounded-full", dotClass)} />
         </span>
       </div>
     </div>
@@ -78,28 +84,42 @@ type SessionTerminalPanelProps = {
   onHide: () => void;
   isVisible: boolean;
   isConnectionReady: boolean;
-  onClose: () => Promise<void> | void;
+  onDisconnectTerminal: () => Promise<void> | void;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   sandboxInstanceId: string;
-  sandboxStatus: string | null;
 };
 
 export function SessionTerminalPanel({
   onHide,
   isVisible,
   isConnectionReady,
-  onClose,
+  onDisconnectTerminal,
   ptyState,
   sandboxInstanceId,
-  sandboxStatus,
 }: SessionTerminalPanelProps): React.JSX.Element | null {
   const { lifecycle, output, actions } = ptyState;
   const { openPty, resizePty, writeInput } = actions;
   const hasAttemptedAutoOpenRef = useRef(false);
+  const hasHandledExitRef = useRef(false);
 
   useEffect(() => {
-    hasAttemptedAutoOpenRef.current = false;
-  }, [isConnectionReady, isVisible, sandboxInstanceId, sandboxStatus]);
+    if (lifecycle.exitInfo === null) {
+      hasHandledExitRef.current = false;
+      return;
+    }
+
+    if (
+      !shouldHandleTerminalExit({
+        exitInfo: lifecycle.exitInfo,
+        hasHandledExit: hasHandledExitRef.current,
+      })
+    ) {
+      return;
+    }
+
+    hasHandledExitRef.current = true;
+    void handleDisconnectTerminal();
+  }, [lifecycle.exitInfo]);
 
   useEffect(() => {
     if (
@@ -126,9 +146,9 @@ export function SessionTerminalPanel({
     onHide();
   }
 
-  async function handleCloseTerminal(): Promise<void> {
+  async function handleDisconnectTerminal(): Promise<void> {
     output.clearOutput();
-    await onClose();
+    await onDisconnectTerminal();
   }
 
   if (!isVisible) {
@@ -142,10 +162,7 @@ export function SessionTerminalPanel({
         data-terminal-state={lifecycle.state}
         style={{ borderColor: TERMINAL_BORDER_COLOR }}
       >
-        <div
-          className="flex items-center gap-2 border-b bg-white px-3 py-1"
-          style={{ borderColor: TERMINAL_BORDER_COLOR }}
-        >
+        <div className="flex items-center gap-2 bg-white px-3 py-1">
           <SessionTerminalToolbarStatus
             errorMessage={lifecycle.errorMessage}
             state={lifecycle.state}
@@ -162,7 +179,7 @@ export function SessionTerminalPanel({
             </Button>
             <Button
               aria-label="Close terminal"
-              onClick={() => void handleCloseTerminal()}
+              onClick={() => void handleDisconnectTerminal()}
               size="icon-sm"
               type="button"
               variant="ghost"
@@ -183,4 +200,4 @@ export function SessionTerminalPanel({
   );
 }
 
-export { shouldAutoOpenTerminal };
+export { shouldHandleTerminalExit, shouldAutoOpenTerminal };

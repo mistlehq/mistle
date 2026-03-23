@@ -1,6 +1,6 @@
 import { spawnPty } from "@mistle/sandbox-rs-napi";
 
-const DEFAULT_PTY_SHELL = "/bin/sh";
+const DEFAULT_PTY_SHELL = "/bin/bash";
 const PREFERRED_TERM = "xterm-256color";
 
 type SpawnPtyHostInput = {
@@ -45,10 +45,14 @@ function resolvePtyEnvironment(): PtyEnvironmentEntry[] {
   return environmentEntries;
 }
 
+export function resolveDefaultPtyShell(): string {
+  return DEFAULT_PTY_SHELL;
+}
+
 export function startNativePtySession(input: SpawnPtyHostInput, callbacks: SpawnPtyHostCallbacks) {
   return spawnPty(
     {
-      command: DEFAULT_PTY_SHELL,
+      command: resolveDefaultPtyShell(),
       args: ["-i"],
       env: resolvePtyEnvironment(),
       ...(input.cwd === undefined ? {} : { cwd: input.cwd }),

@@ -139,12 +139,11 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
               onHide={() => {
                 setIsTerminalVisible(false);
               }}
-              onClose={() => {
+              onDisconnectTerminal={() => {
                 setIsTerminalVisible(false);
               }}
               ptyState={ptyState}
               sandboxInstanceId="sbi_storybook"
-              sandboxStatus="running"
             />
           }
           secondaryPanelSize={panelSize}

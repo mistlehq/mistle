@@ -25,7 +25,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid "${SANDBOX_GID}" "${SANDBOX_USER}" \
-  && useradd --uid "${SANDBOX_UID}" --gid "${SANDBOX_GID}" --create-home --shell /bin/sh "${SANDBOX_USER}" \
+  && useradd --uid "${SANDBOX_UID}" --gid "${SANDBOX_GID}" --create-home --shell /bin/bash "${SANDBOX_USER}" \
   && mkdir -p \
     /etc/codex \
     /home/${SANDBOX_USER}/projects \

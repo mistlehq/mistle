@@ -27,29 +27,26 @@ describe("resolveSessionTerminalStatusPresentation", () => {
     });
   });
 
-  it("uses pending + spinner for transitional states", () => {
+  it("treats non-open states as inactive", () => {
     expect(resolveSessionTerminalStatusPresentation(SandboxPtyStates.CONNECTING)).toEqual({
-      label: "Connecting",
-      showSpinner: true,
-      tone: "pending",
+      label: "Inactive",
+      showSpinner: false,
+      tone: "offline",
     });
     expect(resolveSessionTerminalStatusPresentation(SandboxPtyStates.OPENING)).toEqual({
-      label: "Opening",
-      showSpinner: true,
-      tone: "pending",
+      label: "Inactive",
+      showSpinner: false,
+      tone: "offline",
     });
     expect(resolveSessionTerminalStatusPresentation(SandboxPtyStates.CLOSING)).toEqual({
-      label: "Closing",
-      showSpinner: true,
-      tone: "pending",
-    });
-  });
-
-  it("marks error distinctly", () => {
-    expect(resolveSessionTerminalStatusPresentation(SandboxPtyStates.ERROR)).toEqual({
-      label: "Error",
+      label: "Inactive",
       showSpinner: false,
-      tone: "error",
+      tone: "offline",
+    });
+    expect(resolveSessionTerminalStatusPresentation(SandboxPtyStates.ERROR)).toEqual({
+      label: "Inactive",
+      showSpinner: false,
+      tone: "offline",
     });
   });
 });

@@ -133,17 +133,6 @@ type SessionWorkbenchState = {
     setPanelSize: (size: number) => void;
     togglePanel: () => void;
   };
-  moreActionsState: {
-    agentConnectionState: ReturnType<
-      typeof useCodexSessionState
-    >["lifecycle"]["agentConnectionState"];
-    configJson: string | null;
-    configRequirementsJson: string | null;
-    connectedSession: ReturnType<typeof useCodexSessionState>["lifecycle"]["connectedSession"];
-    isReadingConfig: boolean;
-    isReadingConfigRequirements: boolean;
-    loadConfigSetup: () => void;
-  };
 };
 
 type SessionConversationPaneState = {
@@ -220,8 +209,7 @@ export function useSessionWorkbenchController(input: {
     step,
   } = lifecycle;
   const { canInterruptTurn, canSteerTurn, interruptTurn, startTurn, steerTurn } = chat;
-  const { batchWriteConfig, loadModels, readConfig, readConfigRequirements, writeConfigValue } =
-    admin;
+  const { batchWriteConfig, loadModels, readConfig, writeConfigValue } = admin;
   const composerConfigSnapshot =
     connectedSession === null
       ? {
@@ -418,11 +406,6 @@ export function useSessionWorkbenchController(input: {
     sandboxFailureMessage,
     stoppedSessionMessage: stoppedSessionState.message,
   });
-  const loadConfigSetup = useCallback((): void => {
-    readConfig(true);
-    readConfigRequirements();
-  }, [readConfig, readConfigRequirements]);
-
   useEffect(() => {
     if (connectedSession === null) {
       return;
@@ -512,15 +495,6 @@ export function useSessionWorkbenchController(input: {
       sessionHeaderStatusUi,
       startErrorMessage: resolvedStartErrorMessage,
       terminalPanelState,
-      moreActionsState: {
-        agentConnectionState: lifecycle.agentConnectionState,
-        configJson: admin.configJson,
-        configRequirementsJson: admin.configRequirementsJson,
-        connectedSession: lifecycle.connectedSession,
-        isReadingConfig: admin.isReadingConfig,
-        isReadingConfigRequirements: admin.isReadingConfigRequirements,
-        loadConfigSetup,
-      },
     },
     conversationPane: {
       chatState: chat.chatState,
