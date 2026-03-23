@@ -6,7 +6,7 @@ import {
   SandboxProfilesIntegrationBindingsBadRequestCodes,
   SandboxProfilesIntegrationBindingsBadRequestError,
   SandboxProfilesNotFoundError,
-} from "../services/errors.js";
+} from "../errors.js";
 import { putProfileVersionIntegrationBindings } from "../services/put-profile-version-integration-bindings.js";
 import { route } from "./route.js";
 import { badRequestResponseSchema, notFoundResponseSchema } from "./schema.js";

@@ -12,7 +12,7 @@ import {
   SandboxProfilesIntegrationBindingsBadRequestError,
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
-} from "./errors.js";
+} from "../errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 import { validateBindingResources } from "./validate-binding-resources.js";
 

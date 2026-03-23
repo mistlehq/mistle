@@ -6,7 +6,7 @@ import {
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 
 import { resolveUserDisplayName } from "../../lib/user-display-name.js";
-import { SandboxInstancesBadRequestCodes, SandboxInstancesBadRequestError } from "./errors.js";
+import { SandboxInstancesBadRequestCodes, SandboxInstancesBadRequestError } from "../errors.js";
 import type { ListSandboxInstancesResult } from "./types.js";
 
 async function resolveStartedByNames(

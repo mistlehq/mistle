@@ -11,13 +11,13 @@ import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
-import { compileProfileVersionRuntimePlan } from "../src/sandbox-profiles/services/compile-profile-version-runtime-plan.js";
+import { compileProfileVersionRuntimePlan } from "../src/sandbox-profiles/compile-profile-version-runtime-plan.js";
 import {
   SandboxProfilesCompileError,
   SandboxProfilesCompileErrorCodes,
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
-} from "../src/sandbox-profiles/services/errors.js";
+} from "../src/sandbox-profiles/errors.js";
 import { it } from "./test-context.js";
 
 describe("sandbox profile compile runtime plan integration", () => {

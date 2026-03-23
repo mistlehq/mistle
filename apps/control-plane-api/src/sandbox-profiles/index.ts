@@ -46,4 +46,4 @@ export {
   SandboxProfilesIntegrationBindingsBadRequestError,
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
-} from "./services/errors.js";
+} from "./errors.js";

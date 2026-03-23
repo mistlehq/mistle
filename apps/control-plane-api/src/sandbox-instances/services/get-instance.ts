@@ -5,7 +5,7 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 
-import { SandboxInstancesNotFoundCodes, SandboxInstancesNotFoundError } from "./errors.js";
+import { SandboxInstancesNotFoundCodes, SandboxInstancesNotFoundError } from "../errors.js";
 import type { SandboxInstanceAutomationConversation, SandboxInstanceStatus } from "./types.js";
 
 async function resolveAutomationConversation(

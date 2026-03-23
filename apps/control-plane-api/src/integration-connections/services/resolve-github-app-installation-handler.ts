@@ -8,7 +8,7 @@ import {
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
-import { resolveIntegrationTargetSecrets } from "../../integration-targets/services/resolve-target-secrets.js";
+import { resolveIntegrationTargetSecrets } from "../../lib/integration-target-secrets.js";
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,

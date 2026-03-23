@@ -16,7 +16,7 @@ import { describe, expect } from "vitest";
 import {
   SandboxProfilesIntegrationBindingsBadRequestCodes,
   SandboxProfilesNotFoundCodes,
-} from "../src/sandbox-profiles/services/errors.js";
+} from "../src/sandbox-profiles/errors.js";
 import { putProfileVersionIntegrationBindings } from "../src/sandbox-profiles/services/put-profile-version-integration-bindings.js";
 import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
 

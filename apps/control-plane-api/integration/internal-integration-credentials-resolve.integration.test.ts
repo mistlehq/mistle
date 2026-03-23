@@ -18,7 +18,7 @@ import { describe, expect } from "vitest";
 import {
   CONTROL_PLANE_INTERNAL_AUTH_HEADER,
   INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH,
-} from "../src/internal-integration-credentials/index.js";
+} from "../src/internal/integration-credentials/index.js";
 import {
   encryptCredentialUtf8,
   encryptIntegrationTargetSecrets,

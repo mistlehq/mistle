@@ -4,7 +4,7 @@ import {
   createCodeMessageErrorSchema,
 } from "@mistle/http/errors.js";
 
-import { SandboxProfilesBadRequestCodes } from "../services/errors.js";
+import { SandboxProfilesBadRequestCodes } from "../errors.js";
 
 export const badRequestResponseSchema = z.union([
   createCodeMessageErrorSchema(

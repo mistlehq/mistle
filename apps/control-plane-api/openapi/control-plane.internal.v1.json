@@ -119,7 +119,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "minLength": 1
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
@@ -494,7 +494,8 @@
                         "minLength": 1
                       }
                     },
-                    "required": ["kind", "id"]
+                    "required": ["kind", "id"],
+                    "additionalProperties": false
                   },
                   "source": {
                     "anyOf": [
@@ -509,7 +510,14 @@
                     ]
                   }
                 },
-                "required": ["organizationId", "profileId", "profileVersion", "startedBy", "source"]
+                "required": [
+                  "organizationId",
+                  "profileId",
+                  "profileVersion",
+                  "startedBy",
+                  "source"
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -535,7 +543,8 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["status", "workflowRunId", "sandboxInstanceId"]
+                  "required": ["status", "workflowRunId", "sandboxInstanceId"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -558,7 +567,8 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"]
+                      "required": ["code", "message"],
+                      "additionalProperties": false
                     },
                     {
                       "type": "object",
@@ -589,14 +599,15 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "minLength": 1
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -617,7 +628,8 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -655,7 +667,8 @@
                     "minLength": 1
                   }
                 },
-                "required": ["organizationId", "instanceId"]
+                "required": ["organizationId", "instanceId"],
+                "additionalProperties": false
               }
             }
           }
@@ -685,7 +698,8 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["id", "status", "failureCode", "failureMessage"]
+                  "required": ["id", "status", "failureCode", "failureMessage"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -708,7 +722,8 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"]
+                      "required": ["code", "message"],
+                      "additionalProperties": false
                     },
                     {
                       "type": "object",
@@ -739,14 +754,15 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "minLength": 1
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -767,7 +783,8 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -805,7 +822,8 @@
                     "minLength": 1
                   }
                 },
-                "required": ["organizationId", "instanceId"]
+                "required": ["organizationId", "instanceId"],
+                "additionalProperties": false
               }
             }
           }
@@ -835,7 +853,8 @@
                       "format": "date-time"
                     }
                   },
-                  "required": ["instanceId", "url", "token", "expiresAt"]
+                  "required": ["instanceId", "url", "token", "expiresAt"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -858,7 +877,8 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"]
+                      "required": ["code", "message"],
+                      "additionalProperties": false
                     },
                     {
                       "type": "object",
@@ -889,14 +909,15 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "minLength": 1
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -917,7 +938,8 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -938,7 +960,8 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }

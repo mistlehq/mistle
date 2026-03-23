@@ -563,11 +563,8 @@ describe("sandbox profile version put integration bindings integration", () => {
     const responseBody = PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema.parse(
       await response.json(),
     );
-    if (!("code" in responseBody)) {
-      throw new Error("Expected integration bindings bad-request error response.");
-    }
     expect(responseBody.code).toBe("INVALID_BINDING_CONFIG_REFERENCE");
-    if (responseBody.code !== "INVALID_BINDING_CONFIG_REFERENCE") {
+    if (responseBody.code !== "INVALID_BINDING_CONFIG_REFERENCE" || !("details" in responseBody)) {
       throw new Error("Expected invalid binding config reference response.");
     }
     expect(responseBody.details.issues[0]?.validatorCode).toBe(

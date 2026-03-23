@@ -1,6 +1,6 @@
 import type { SandboxProfile } from "@mistle/db/control-plane";
 
-import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "./errors.js";
+import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "../errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type GetProfileInput = {

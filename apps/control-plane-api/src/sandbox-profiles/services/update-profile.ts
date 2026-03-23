@@ -2,7 +2,7 @@ import type { SandboxProfile } from "@mistle/db/control-plane";
 import { sandboxProfiles } from "@mistle/db/control-plane";
 import { and, eq, sql, type SQL } from "drizzle-orm";
 
-import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "./errors.js";
+import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "../errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type UpdateProfileInput = {
