@@ -96,6 +96,18 @@ export function hasAutomationSessionPreparationTimedOut(input: {
   return input.nowMs - input.pendingSinceMs >= AutomationSessionPreparationTimeoutMs;
 }
 
+export function resolveAutomationSessionPreparationTimeoutDelayMs(input: {
+  pendingSinceMs: number | null;
+  nowMs: number;
+}): number | null {
+  if (input.pendingSinceMs === null) {
+    return null;
+  }
+
+  const remainingMs = AutomationSessionPreparationTimeoutMs - (input.nowMs - input.pendingSinceMs);
+  return remainingMs > 0 ? remainingMs : 0;
+}
+
 type SessionWorkbenchState = {
   connectionReadiness: {
     canConnect: boolean;
@@ -301,15 +313,32 @@ export function useSessionWorkbenchController(input: {
     }
 
     if (
-      automationPendingErrorMessage === null &&
       hasAutomationSessionPreparationTimedOut({
         pendingSinceMs: automationPendingSinceMs,
         nowMs: Date.now(),
       })
     ) {
       setAutomationPendingErrorMessage(AutomationSessionPreparationTimeoutMessage);
+      return;
     }
-  }, [automationPendingErrorMessage, automationPendingSinceMs, isWaitingForAutomationThread]);
+
+    const timeoutDelayMs = resolveAutomationSessionPreparationTimeoutDelayMs({
+      pendingSinceMs: automationPendingSinceMs,
+      nowMs: Date.now(),
+    });
+
+    if (timeoutDelayMs === null) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setAutomationPendingErrorMessage(AutomationSessionPreparationTimeoutMessage);
+    }, timeoutDelayMs);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [automationPendingSinceMs, isWaitingForAutomationThread]);
 
   const resolvedStartErrorMessage = startErrorMessage ?? automationPendingErrorMessage;
 

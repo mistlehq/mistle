@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
   hasAutomationSessionPreparationTimedOut,
+  resolveAutomationSessionPreparationTimeoutDelayMs,
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
@@ -180,5 +181,35 @@ describe("useSessionWorkbenchController", () => {
         nowMs: 30_000,
       }),
     ).toBe(true);
+  });
+
+  it("computes the remaining automation preparation timeout delay", () => {
+    expect(
+      resolveAutomationSessionPreparationTimeoutDelayMs({
+        pendingSinceMs: null,
+        nowMs: 30_000,
+      }),
+    ).toBeNull();
+
+    expect(
+      resolveAutomationSessionPreparationTimeoutDelayMs({
+        pendingSinceMs: 0,
+        nowMs: 0,
+      }),
+    ).toBe(30_000);
+
+    expect(
+      resolveAutomationSessionPreparationTimeoutDelayMs({
+        pendingSinceMs: 0,
+        nowMs: 29_999,
+      }),
+    ).toBe(1);
+
+    expect(
+      resolveAutomationSessionPreparationTimeoutDelayMs({
+        pendingSinceMs: 0,
+        nowMs: 30_000,
+      }),
+    ).toBe(0);
   });
 });
