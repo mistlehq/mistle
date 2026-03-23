@@ -1885,11 +1885,17 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "INVALID_WEBHOOK_REQUEST";
-              message: string;
-            };
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_WEBHOOK_REQUEST";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
           };
         };
         /** @description Integration target or connection was not found. */
@@ -2113,18 +2119,13 @@ export interface paths {
             "application/json":
               | {
                   /** @enum {string} */
-                  code: "INVALID_INSTANCE_ID" | "INVALID_LIST_INSTANCES_INPUT";
+                  code: "INVALID_LIST_INSTANCES_INPUT";
                   message: string;
                 }
               | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
                 };
           };
         };
@@ -2217,22 +2218,11 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code: "INVALID_INSTANCE_ID" | "INVALID_LIST_INSTANCES_INPUT";
-                  message: string;
-                }
-              | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
-                };
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
           };
         };
         /** @description Authentication is required. */
@@ -2269,7 +2259,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "INSTANCE_NOT_FOUND";
+              code: "NOT_FOUND";
               message: string;
             };
           };
@@ -2338,22 +2328,11 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code: "INVALID_INSTANCE_ID" | "INVALID_LIST_INSTANCES_INPUT";
-                  message: string;
-                }
-              | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
-                };
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
           };
         };
         /** @description Authentication is required. */
@@ -2390,7 +2369,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "INSTANCE_NOT_FOUND";
+              code: "NOT_FOUND";
               message: string;
             };
           };
@@ -2403,7 +2382,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "INSTANCE_NOT_RESUMABLE" | "INSTANCE_FAILED";
+              code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE";
               message: string;
             };
           };
@@ -2486,14 +2465,9 @@ export interface paths {
                   message: string;
                 }
               | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
                 };
           };
         };
@@ -2574,14 +2548,9 @@ export interface paths {
           };
           content: {
             "application/json": {
-              error: {
-                message: string;
-                name: string;
-              } & {
-                [key: string]: unknown;
-              };
-              /** @enum {boolean} */
-              success: false;
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
             };
           };
         };
@@ -2670,14 +2639,9 @@ export interface paths {
           };
           content: {
             "application/json": {
-              error: {
-                message: string;
-                name: string;
-              } & {
-                [key: string]: unknown;
-              };
-              /** @enum {boolean} */
-              success: false;
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
             };
           };
         };
@@ -2764,14 +2728,9 @@ export interface paths {
           };
           content: {
             "application/json": {
-              error: {
-                message: string;
-                name: string;
-              } & {
-                [key: string]: unknown;
-              };
-              /** @enum {boolean} */
-              success: false;
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
             };
           };
         };
@@ -2868,14 +2827,9 @@ export interface paths {
           };
           content: {
             "application/json": {
-              error: {
-                message: string;
-                name: string;
-              } & {
-                [key: string]: unknown;
-              };
-              /** @enum {boolean} */
-              success: false;
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
             };
           };
         };
@@ -2970,14 +2924,9 @@ export interface paths {
           };
           content: {
             "application/json": {
-              error: {
-                message: string;
-                name: string;
-              } & {
-                [key: string]: unknown;
-              };
-              /** @enum {boolean} */
-              success: false;
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
             };
           };
         };
@@ -3107,14 +3056,9 @@ export interface paths {
                   message: string;
                 }
               | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
                 };
           };
         };
@@ -3223,14 +3167,9 @@ export interface paths {
           };
           content: {
             "application/json": {
-              error: {
-                message: string;
-                name: string;
-              } & {
-                [key: string]: unknown;
-              };
-              /** @enum {boolean} */
-              success: false;
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
             };
           };
         };
@@ -3360,14 +3299,9 @@ export interface paths {
                   message: string;
                 }
               | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
                 };
           };
         };
