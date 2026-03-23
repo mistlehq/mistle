@@ -6,18 +6,28 @@ import {
   isOpenAiReasoningEffortSupported,
   OpenAiCapabilities,
   OpenAiCapabilitiesSchema,
+  OpenAiDefaultModelId,
   resolveOpenAiDefaultReasoningEffort,
 } from "./model-capabilities.js";
 
 describe("OpenAI model capabilities", () => {
   it("parses the canonical capability payload", () => {
     const parsed = OpenAiCapabilitiesSchema.parse(OpenAiCapabilities);
+    expect(parsed.models[0]).toBe(OpenAiDefaultModelId);
+    expect(parsed.models).toContain("gpt-5.4");
     expect(parsed.models).toContain("gpt-5.3-codex");
     expect(parsed.models).toContain("gpt-5.1-codex-mini");
   });
 
   it("supports model and reasoning checks", () => {
+    expect(isOpenAiModelSupported({ model: "gpt-5.4" })).toBe(true);
     expect(isOpenAiModelSupported({ model: "gpt-5.3-codex" })).toBe(true);
+    expect(
+      isOpenAiReasoningEffortSupported({
+        model: "gpt-5.4",
+        reasoningEffort: "xhigh",
+      }),
+    ).toBe(true);
     expect(
       isOpenAiReasoningEffortSupported({
         model: "gpt-5.3-codex",
@@ -35,13 +45,14 @@ describe("OpenAI model capabilities", () => {
   it("resolves default reasoning effort per model", () => {
     expect(
       resolveOpenAiDefaultReasoningEffort({
-        model: "gpt-5.3-codex-spark",
+        model: "gpt-5.4",
       }),
-    ).toBe("high");
+    ).toBe("medium");
   });
 
   it("builds raw target-config payload shape for seeding", () => {
     const raw = createOpenAiRawBindingCapabilities();
-    expect(raw.default_reasoning_by_model["gpt-5.3-codex"]).toBe("medium");
+    expect(raw.models[0]).toBe(OpenAiDefaultModelId);
+    expect(raw.default_reasoning_by_model["gpt-5.4"]).toBe("medium");
   });
 });

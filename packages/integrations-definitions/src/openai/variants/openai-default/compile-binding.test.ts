@@ -108,7 +108,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         kind: "agent",
         config: {
           runtime: "codex-cli",
-          defaultModel: "gpt-5.3-codex",
+          defaultModel: "gpt-5.4",
           reasoningEffort: "medium",
         },
       },
@@ -167,7 +167,7 @@ describe("compileOpenAiApiKeyBinding", () => {
 
     expect(compiled.runtimeClients).toHaveLength(1);
     expect(compiled.runtimeClients[0]?.setup.env).toEqual({
-      OPENAI_MODEL: "gpt-5.3-codex",
+      OPENAI_MODEL: "gpt-5.4",
       OPENAI_REASONING_EFFORT: "medium",
     });
     expect(compiled.runtimeClients[0]?.setup.files).toHaveLength(1);
@@ -177,7 +177,7 @@ describe("compileOpenAiApiKeyBinding", () => {
       mode: 384,
     });
     const configContent = compiled.runtimeClients[0]?.setup.files[0]?.content;
-    expect(configContent).toContain('model = "gpt-5.3-codex"');
+    expect(configContent).toContain('model = "gpt-5.4"');
     expect(configContent).toContain('model_provider = "proxy"');
     expect(configContent).toContain('model_reasoning_effort = "medium"');
     expect(configContent).toContain('approval_policy = "never"');

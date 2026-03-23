@@ -17,7 +17,10 @@ export const OpenAiReasoningEffortLabelByValue: Record<OpenAiReasoningEffort, st
   xhigh: "Extra High",
 };
 
+export const OpenAiDefaultModelId = "gpt-5.4";
+
 export const OpenAiModelIds = [
+  OpenAiDefaultModelId,
   "gpt-5.3-codex",
   "gpt-5.3-codex-spark",
   "gpt-5.2-codex",
@@ -44,6 +47,7 @@ export type OpenAiCapabilitySet = {
 const OpenAiDefaultCapabilitySet: OpenAiCapabilitySet = {
   models: OpenAiModelIds,
   allowedReasoningByModel: {
+    "gpt-5.4": ["low", "medium", "high", "xhigh"],
     "gpt-5.3-codex": ["low", "medium", "high", "xhigh"],
     "gpt-5.3-codex-spark": ["low", "medium", "high", "xhigh"],
     "gpt-5.2-codex": ["low", "medium", "high", "xhigh"],
@@ -52,6 +56,7 @@ const OpenAiDefaultCapabilitySet: OpenAiCapabilitySet = {
     "gpt-5.1-codex-mini": ["medium", "high"],
   },
   defaultReasoningByModel: {
+    "gpt-5.4": "medium",
     "gpt-5.3-codex": "medium",
     "gpt-5.3-codex-spark": "high",
     "gpt-5.2-codex": "medium",

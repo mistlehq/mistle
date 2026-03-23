@@ -6,13 +6,13 @@ describe("OpenAiApiKeyBindingConfigSchema", () => {
   it("parses a valid codex binding config", () => {
     const parsed = OpenAiApiKeyBindingConfigSchema.parse({
       runtime: OpenAiRuntimes.CODEX_CLI,
-      defaultModel: "gpt-5.3-codex",
+      defaultModel: "gpt-5.4",
       reasoningEffort: "medium",
     });
 
     expect(parsed).toEqual({
       runtime: "codex-cli",
-      defaultModel: "gpt-5.3-codex",
+      defaultModel: "gpt-5.4",
       reasoningEffort: "medium",
     });
   });
