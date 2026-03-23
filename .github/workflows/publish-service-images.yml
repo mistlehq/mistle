@@ -50,27 +50,71 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  prepare:
+    name: Prepare publish matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      publish_latest: ${{ steps.flags.outputs.publish_latest }}
+      selected_component: ${{ steps.flags.outputs.selected_component }}
+
+    steps:
+      - name: Resolve publish flags
+        id: flags
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "publish_latest=true" >> "${GITHUB_OUTPUT}"
+            echo "selected_component=all" >> "${GITHUB_OUTPUT}"
+          else
+            echo "publish_latest=${{ inputs.publish_latest }}" >> "${GITHUB_OUTPUT}"
+            echo "selected_component=${{ inputs.component }}" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Resolve matrix
+        id: matrix
+        env:
+          SELECTED_COMPONENT: ${{ steps.flags.outputs.selected_component }}
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+
+          all_components = [
+              {"component": "control-plane-api", "target": "control-plane-api-runtime"},
+              {"component": "control-plane-worker", "target": "control-plane-worker-runtime"},
+              {"component": "data-plane-api", "target": "data-plane-api-runtime"},
+              {"component": "data-plane-worker", "target": "data-plane-worker-runtime"},
+              {"component": "data-plane-gateway", "target": "data-plane-gateway-runtime"},
+              {"component": "tokenizer-proxy", "target": "tokenizer-proxy-runtime"},
+          ]
+          selected_component = os.environ["SELECTED_COMPONENT"]
+
+          if selected_component == "all":
+              selected = all_components
+          else:
+              selected = [
+                  component
+                  for component in all_components
+                  if component["component"] == selected_component
+              ]
+
+          if not selected:
+              raise RuntimeError(f"Unsupported component selection: {selected_component}")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"matrix={json.dumps(selected)}\n")
+          PY
+
   publish:
     name: Publish ${{ matrix.component }}
-    if: ${{ github.event_name == 'push' || inputs.component == 'all' || inputs.component == matrix.component }}
+    needs:
+      - prepare
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - component: control-plane-api
-            target: control-plane-api-runtime
-          - component: control-plane-worker
-            target: control-plane-worker-runtime
-          - component: data-plane-api
-            target: data-plane-api-runtime
-          - component: data-plane-worker
-            target: data-plane-worker-runtime
-          - component: data-plane-gateway
-            target: data-plane-gateway-runtime
-          - component: tokenizer-proxy
-            target: tokenizer-proxy-runtime
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
     env:
       IMAGE_REPOSITORY: ghcr.io/mistlehq/${{ matrix.component }}
       IMAGE_TAG: ${{ github.sha }}
@@ -91,7 +135,7 @@ jobs:
         run: |
           tags=(--tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}")
 
-          if [ "${{ github.event_name == 'push' || inputs.publish_latest }}" = "true" ]; then
+          if [ "${{ needs.prepare.outputs.publish_latest }}" = "true" ]; then
             tags+=(--tag "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}")
           fi
 
@@ -109,7 +153,7 @@ jobs:
         run: |
           docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
 
-          if [ "${{ github.event_name == 'push' || inputs.publish_latest }}" = "true" ]; then
+          if [ "${{ needs.prepare.outputs.publish_latest }}" = "true" ]; then
             docker push "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}"
           fi
 
@@ -126,7 +170,7 @@ jobs:
             echo
             echo "- Component: \`${{ matrix.component }}\`"
             echo "- Tag: \`${IMAGE_REPOSITORY}:${IMAGE_TAG}\`"
-            if [ "${{ github.event_name == 'push' || inputs.publish_latest }}" = "true" ]; then
+            if [ "${{ needs.prepare.outputs.publish_latest }}" = "true" ]; then
               echo "- Alias: \`${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}\`"
             fi
             echo "- Digest: \`${{ steps.publish.outputs.image_ref }}\`"
@@ -136,6 +180,7 @@ jobs:
     name: Notify Slack
     runs-on: ubuntu-latest
     needs:
+      - prepare
       - publish
     if: >-
       ${{
@@ -153,7 +198,7 @@ jobs:
       PUBLISH_RESULT: ${{ needs.publish.result }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       WORKFLOW_NAME: ${{ github.workflow }}
-      SELECTED_COMPONENT: ${{ github.event_name == 'workflow_dispatch' && inputs.component || 'all' }}
+      SELECTED_COMPONENT: ${{ needs.prepare.outputs.selected_component }}
 
     steps:
       - name: Fetch Infisical secrets
