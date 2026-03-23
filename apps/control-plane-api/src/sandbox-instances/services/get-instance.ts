@@ -18,6 +18,7 @@ async function resolveAutomationConversation(
   const routes = await db.query.automationConversationRoutes.findMany({
     columns: {
       createdAt: true,
+      updatedAt: true,
       id: true,
       conversationId: true,
       providerConversationId: true,
@@ -32,6 +33,7 @@ async function resolveAutomationConversation(
   const matchingRoutes: Array<
     SandboxInstanceAutomationConversation & {
       createdAt: string;
+      updatedAt: string;
     }
   > = [];
 
@@ -56,6 +58,7 @@ async function resolveAutomationConversation(
 
     matchingRoutes.push({
       createdAt: route.createdAt,
+      updatedAt: route.updatedAt,
       conversationId: conversation.id,
       routeId: route.id,
       providerConversationId: route.providerConversationId,
@@ -68,9 +71,9 @@ async function resolveAutomationConversation(
 
   if (matchingRoutes.length > 1) {
     matchingRoutes.sort((left, right) => {
-      const createdAtComparison = right.createdAt.localeCompare(left.createdAt);
-      if (createdAtComparison !== 0) {
-        return createdAtComparison;
+      const updatedAtComparison = right.updatedAt.localeCompare(left.updatedAt);
+      if (updatedAtComparison !== 0) {
+        return updatedAtComparison;
       }
 
       return (right.routeId ?? "").localeCompare(left.routeId ?? "");

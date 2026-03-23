@@ -373,7 +373,7 @@ describe("sandbox instances get integration", () => {
     expect(body.automationConversation).toBeNull();
   });
 
-  it("returns the most recently created automation conversation metadata when multiple active automation conversations match the sandbox", async ({
+  it("returns the most recently updated automation conversation metadata when multiple active automation conversations match the sandbox", async ({
     fixture,
   }) => {
     const dataPlaneFixture = await createStartedDataPlaneFixture({
@@ -450,6 +450,7 @@ describe("sandbox instances get integration", () => {
         providerState: null,
         status: "active",
         createdAt: "2026-03-21T00:00:00.000Z",
+        updatedAt: "2026-03-21T00:00:02.000Z",
       },
       {
         id: "cvr_cp_get_003_b",
@@ -460,6 +461,7 @@ describe("sandbox instances get integration", () => {
         providerState: null,
         status: "active",
         createdAt: "2026-03-21T00:00:01.000Z",
+        updatedAt: "2026-03-21T00:00:01.000Z",
       },
     ]);
 
@@ -478,9 +480,9 @@ describe("sandbox instances get integration", () => {
       failureCode: null,
       failureMessage: null,
       automationConversation: {
-        conversationId: "cnv_cp_get_003_b",
-        routeId: "cvr_cp_get_003_b",
-        providerConversationId: "thread_cp_get_003_b",
+        conversationId: "cnv_cp_get_003_a",
+        routeId: "cvr_cp_get_003_a",
+        providerConversationId: "thread_cp_get_003_a",
       },
     });
   });
