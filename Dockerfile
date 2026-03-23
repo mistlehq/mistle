@@ -1,7 +1,5 @@
 # syntax=docker/dockerfile:1.7
 
-ARG MISTLE_CONFIG_FILE=config.production.toml
-
 FROM node:22-alpine AS base
 
 ENV PNPM_HOME=/pnpm
@@ -40,8 +38,6 @@ COPY docker/apps/control-plane-worker/entrypoint.sh /usr/local/bin/mistle-contro
 
 RUN chmod +x /usr/local/bin/mistle-control-plane-worker-entrypoint
 
-ARG MISTLE_CONFIG_FILE
-ENV MISTLE_CONFIG_PATH=/app/config/${MISTLE_CONFIG_FILE}
 EXPOSE 5101
 
 ENTRYPOINT ["/usr/local/bin/mistle-control-plane-worker-entrypoint"]
@@ -53,8 +49,6 @@ COPY docker/apps/data-plane-api/entrypoint.sh /usr/local/bin/mistle-data-plane-a
 
 RUN chmod +x /usr/local/bin/mistle-data-plane-api-entrypoint
 
-ARG MISTLE_CONFIG_FILE
-ENV MISTLE_CONFIG_PATH=/app/config/${MISTLE_CONFIG_FILE}
 EXPOSE 5200
 
 ENTRYPOINT ["/usr/local/bin/mistle-data-plane-api-entrypoint"]
@@ -66,8 +60,6 @@ COPY docker/apps/data-plane-worker/entrypoint.sh /usr/local/bin/mistle-data-plan
 
 RUN chmod +x /usr/local/bin/mistle-data-plane-worker-entrypoint
 
-ARG MISTLE_CONFIG_FILE
-ENV MISTLE_CONFIG_PATH=/app/config/${MISTLE_CONFIG_FILE}
 EXPOSE 5201
 
 ENTRYPOINT ["/usr/local/bin/mistle-data-plane-worker-entrypoint"]
@@ -79,8 +71,6 @@ COPY docker/apps/data-plane-gateway/entrypoint.sh /usr/local/bin/mistle-data-pla
 
 RUN chmod +x /usr/local/bin/mistle-data-plane-gateway-entrypoint
 
-ARG MISTLE_CONFIG_FILE
-ENV MISTLE_CONFIG_PATH=/app/config/${MISTLE_CONFIG_FILE}
 EXPOSE 5202
 
 ENTRYPOINT ["/usr/local/bin/mistle-data-plane-gateway-entrypoint"]
@@ -92,8 +82,6 @@ COPY docker/apps/tokenizer-proxy/entrypoint.sh /usr/local/bin/mistle-tokenizer-p
 
 RUN chmod +x /usr/local/bin/mistle-tokenizer-proxy-entrypoint
 
-ARG MISTLE_CONFIG_FILE
-ENV MISTLE_CONFIG_PATH=/app/config/${MISTLE_CONFIG_FILE}
 EXPOSE 5205
 
 ENTRYPOINT ["/usr/local/bin/mistle-tokenizer-proxy-entrypoint"]
@@ -105,8 +93,6 @@ COPY docker/apps/control-plane-api/entrypoint.sh /usr/local/bin/mistle-control-p
 
 RUN chmod +x /usr/local/bin/mistle-control-plane-api-entrypoint
 
-ARG MISTLE_CONFIG_FILE
-ENV MISTLE_CONFIG_PATH=/app/config/${MISTLE_CONFIG_FILE}
 EXPOSE 5100
 
 ENTRYPOINT ["/usr/local/bin/mistle-control-plane-api-entrypoint"]

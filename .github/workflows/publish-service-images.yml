@@ -1,0 +1,275 @@
+name: Publish Service Images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/publish-service-images.yml"
+      - "Dockerfile"
+      - "docker/apps/**"
+      - "apps/control-plane-api/**"
+      - "apps/control-plane-worker/**"
+      - "apps/data-plane-api/**"
+      - "apps/data-plane-worker/**"
+      - "apps/data-plane-gateway/**"
+      - "apps/tokenizer-proxy/**"
+      - "packages/**"
+      - "scripts/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "tsconfig.base.json"
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Service image to publish
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - control-plane-api
+          - control-plane-worker
+          - data-plane-api
+          - data-plane-worker
+          - data-plane-gateway
+          - tokenizer-proxy
+      publish_latest:
+        description: Also publish the latest tag
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-service-images-${{ github.ref }}-${{ inputs.component }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Prepare publish matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      publish_latest: ${{ steps.flags.outputs.publish_latest }}
+      selected_component: ${{ steps.flags.outputs.selected_component }}
+
+    steps:
+      - name: Resolve publish flags
+        id: flags
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "publish_latest=true" >> "${GITHUB_OUTPUT}"
+            echo "selected_component=all" >> "${GITHUB_OUTPUT}"
+          else
+            echo "publish_latest=${{ inputs.publish_latest }}" >> "${GITHUB_OUTPUT}"
+            echo "selected_component=${{ inputs.component }}" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Resolve matrix
+        id: matrix
+        env:
+          SELECTED_COMPONENT: ${{ steps.flags.outputs.selected_component }}
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+
+          all_components = [
+              {"component": "control-plane-api", "target": "control-plane-api-runtime"},
+              {"component": "control-plane-worker", "target": "control-plane-worker-runtime"},
+              {"component": "data-plane-api", "target": "data-plane-api-runtime"},
+              {"component": "data-plane-worker", "target": "data-plane-worker-runtime"},
+              {"component": "data-plane-gateway", "target": "data-plane-gateway-runtime"},
+              {"component": "tokenizer-proxy", "target": "tokenizer-proxy-runtime"},
+          ]
+          selected_component = os.environ["SELECTED_COMPONENT"]
+
+          if selected_component == "all":
+              selected = all_components
+          else:
+              selected = [
+                  component
+                  for component in all_components
+                  if component["component"] == selected_component
+              ]
+
+          if not selected:
+              raise RuntimeError(f"Unsupported component selection: {selected_component}")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"matrix={json.dumps(selected)}\n")
+          PY
+
+  publish:
+    name: Publish ${{ matrix.component }}
+    needs:
+      - prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    env:
+      IMAGE_REPOSITORY: ghcr.io/mistlehq/${{ matrix.component }}
+      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_LATEST_TAG: latest
+      IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+      IMAGE_TARGET: ${{ matrix.target }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build service image
+        run: |
+          tags=(--tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}")
+
+          if [ "${{ needs.prepare.outputs.publish_latest }}" = "true" ]; then
+            tags+=(--tag "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}")
+          fi
+
+          docker build \
+            --platform linux/amd64 \
+            --target "${IMAGE_TARGET}" \
+            --file Dockerfile \
+            --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.title=${{ matrix.component }}" \
+            "${tags[@]}" \
+            .
+
+      - name: Push service image
+        run: |
+          docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+
+          if [ "${{ needs.prepare.outputs.publish_latest }}" = "true" ]; then
+            docker push "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}"
+          fi
+
+      - name: Resolve pushed digest
+        id: publish
+        run: |
+          image_ref="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${IMAGE_TAG}")"
+          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
+
+      - name: Summarize published image
+        run: |
+          {
+            echo "## Published image"
+            echo
+            echo "- Component: \`${{ matrix.component }}\`"
+            echo "- Tag: \`${IMAGE_REPOSITORY}:${IMAGE_TAG}\`"
+            if [ "${{ needs.prepare.outputs.publish_latest }}" = "true" ]; then
+              echo "- Alias: \`${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}\`"
+            fi
+            echo "- Digest: \`${{ steps.publish.outputs.image_ref }}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  notify:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - publish
+    if: >-
+      ${{
+        always() &&
+        (
+          needs.publish.result == 'failure' ||
+          needs.publish.result == 'cancelled' ||
+          github.event_name == 'workflow_dispatch'
+        )
+      }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PUBLISH_RESULT: ${{ needs.publish.result }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      WORKFLOW_NAME: ${{ github.workflow }}
+      SELECTED_COMPONENT: ${{ needs.prepare.outputs.selected_component }}
+
+    steps:
+      - name: Fetch Infisical secrets
+        uses: Infisical/secrets-action@v1.0.11
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
+          project-slug: mistle-oss
+          env-slug: ci
+          secret-path: /ci-shared
+
+      - name: Post Slack notification
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          publish_result = os.environ["PUBLISH_RESULT"]
+          color_by_result = {
+              "success": "#2eb886",
+              "failure": "#e01e5a",
+              "cancelled": "#ecb22e",
+          }
+          emoji_by_result = {
+              "success": ":white_check_mark:",
+              "failure": ":x:",
+              "cancelled": ":warning:",
+          }
+          color = color_by_result.get(publish_result, "#808080")
+          emoji = emoji_by_result.get(publish_result, ":grey_question:")
+          component = os.environ["SELECTED_COMPONENT"]
+          payload = {
+              "attachments": [
+                  {
+                      "color": color,
+                      "title": os.environ["WORKFLOW_NAME"],
+                      "title_link": os.environ["RUN_URL"],
+                      "text": f"{emoji} Service image publish finished with result: {publish_result}.",
+                      "fields": [
+                          {
+                              "title": "Repository",
+                              "value": os.environ["GITHUB_REPOSITORY"],
+                              "short": True,
+                          },
+                          {
+                              "title": "Branch",
+                              "value": os.environ["GITHUB_REF_NAME"],
+                              "short": True,
+                          },
+                          {
+                              "title": "Component",
+                              "value": component,
+                              "short": True,
+                          },
+                          {
+                              "title": "Trigger",
+                              "value": os.environ["GITHUB_EVENT_NAME"],
+                              "short": True,
+                          },
+                      ],
+                  }
+              ]
+          }
+          request = urllib.request.Request(
+              os.environ["SLACK_WEBHOOK_URL"],
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(request) as response:
+              if response.status != 200:
+                  raise RuntimeError(f"Slack webhook returned unexpected status {response.status}.")
+          PY

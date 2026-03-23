@@ -17,7 +17,7 @@ Each workload uses the same main configuration surface:
 
 For Mistle service images, `global.imageRegistry` is prepended by default. Third-party images can opt out with `image.useGlobalRegistry: false`. The bundled `valkey` workload already does this.
 
-The official published Mistle images can live under a shared registry prefix such as:
+The official published Mistle images live under the shared public GHCR prefix:
 
 ```text
 ghcr.io/mistlehq
