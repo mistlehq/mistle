@@ -8,6 +8,8 @@
         "api_base_url": "https://api.openai.com/v1",
         "binding_capabilities": {
           "models": [
+            "gpt-5.4",
+            "gpt-5.4-mini",
             "gpt-5.3-codex",
             "gpt-5.3-codex-spark",
             "gpt-5.2-codex",
@@ -16,6 +18,8 @@
             "gpt-5.1-codex-mini"
           ],
           "allowed_reasoning_by_model": {
+            "gpt-5.4": ["low", "medium", "high", "xhigh"],
+            "gpt-5.4-mini": ["low", "medium", "high", "xhigh"],
             "gpt-5.3-codex": ["low", "medium", "high", "xhigh"],
             "gpt-5.3-codex-spark": ["low", "medium", "high", "xhigh"],
             "gpt-5.2-codex": ["low", "medium", "high", "xhigh"],
@@ -24,6 +28,8 @@
             "gpt-5.1-codex-mini": ["medium", "high"]
           },
           "default_reasoning_by_model": {
+            "gpt-5.4": "medium",
+            "gpt-5.4-mini": "medium",
             "gpt-5.3-codex": "medium",
             "gpt-5.3-codex-spark": "high",
             "gpt-5.2-codex": "medium",

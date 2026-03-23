@@ -56,6 +56,16 @@ describe("openai binding config forms", () => {
         defaultModel: {
           title: "Default model",
           default: "gpt-5.1-codex-mini",
+          oneOf: expect.arrayContaining([
+            {
+              const: "gpt-5.4",
+              title: "gpt-5.4",
+            },
+            {
+              const: "gpt-5.4-mini",
+              title: "gpt-5.4-mini",
+            },
+          ]),
         },
         reasoningEffort: {
           title: "Reasoning effort",

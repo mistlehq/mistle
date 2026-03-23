@@ -18,6 +18,7 @@ export {
   OpenAiCapabilities,
   OpenAiCapabilitiesSchema,
   OpenAiConnectionMethodIds,
+  OpenAiDefaultModelId,
   OpenAiModelIds,
   OpenAiReasoningEffortLabelByValue,
   isOpenAiModelSupported,
