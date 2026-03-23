@@ -95,7 +95,7 @@ export async function getInstance(
     dataPlaneClient,
   }: {
     db: ControlPlaneDatabase;
-    dataPlaneClient: DataPlaneSandboxInstancesClient;
+    dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">;
   },
   input: { organizationId: string; instanceId: string },
 ): Promise<SandboxInstanceStatus> {

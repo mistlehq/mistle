@@ -3,7 +3,7 @@ import {
   sandboxInstances,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 
 export async function markSandboxInstanceStarting(ctx: {
   db: DataPlaneDatabase;
@@ -24,7 +24,10 @@ export async function markSandboxInstanceStarting(ctx: {
     .where(
       and(
         eq(sandboxInstances.id, ctx.sandboxInstanceId),
-        eq(sandboxInstances.status, SandboxInstanceStatuses.STOPPED),
+        or(
+          eq(sandboxInstances.status, SandboxInstanceStatuses.STOPPED),
+          eq(sandboxInstances.status, SandboxInstanceStatuses.FAILED),
+        ),
       ),
     )
     .returning({
@@ -46,5 +49,7 @@ export async function markSandboxInstanceStarting(ctx: {
     return;
   }
 
-  throw new Error("Failed to transition sandbox instance status from stopped to starting.");
+  throw new Error(
+    "Failed to transition sandbox instance status from stopped or failed to starting.",
+  );
 }

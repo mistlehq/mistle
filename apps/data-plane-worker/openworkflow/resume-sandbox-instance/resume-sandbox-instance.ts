@@ -73,9 +73,12 @@ async function resolveResumableSandboxInstanceState(input: {
     return null;
   }
 
-  if (sandboxInstance.status !== SandboxInstanceStatuses.STOPPED) {
+  if (
+    sandboxInstance.status !== SandboxInstanceStatuses.STOPPED &&
+    sandboxInstance.status !== SandboxInstanceStatuses.FAILED
+  ) {
     throw new Error(
-      `Expected sandbox instance '${input.sandboxInstanceId}' to be stopped, starting, or running before resume execution.`,
+      `Expected sandbox instance '${input.sandboxInstanceId}' to be stopped, failed, starting, or running before resume execution.`,
     );
   }
 
@@ -85,7 +88,7 @@ async function resolveResumableSandboxInstanceState(input: {
     sandboxInstance.instanceVolumeMode === null
   ) {
     throw new Error(
-      `Expected stopped sandbox instance '${input.sandboxInstanceId}' to have instance volume metadata.`,
+      `Expected resumable sandbox instance '${input.sandboxInstanceId}' to have instance volume metadata.`,
     );
   }
 
@@ -100,7 +103,7 @@ async function resolveResumableSandboxInstanceState(input: {
 
   if (persistedRuntimePlan === undefined) {
     throw new Error(
-      `Expected stopped sandbox instance '${input.sandboxInstanceId}' to have an active runtime plan.`,
+      `Expected resumable sandbox instance '${input.sandboxInstanceId}' to have an active runtime plan.`,
     );
   }
 
