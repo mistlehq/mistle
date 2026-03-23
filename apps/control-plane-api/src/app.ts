@@ -1,11 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 
-import {
-  createAppResources,
-  getAppDatabase,
-  setAppResources,
-  stopAppResources,
-} from "./runtime/resources.js";
+import { createAppResources, setAppResources, stopAppResources } from "./runtime/resources.js";
 import { registerAppRoutes } from "./runtime/routes.js";
 import { createAppServices } from "./service.js";
 import type { AppContextBindings, ControlPlaneApiRuntimeConfig, ControlPlaneApp } from "./types.js";
@@ -37,5 +32,3 @@ export async function createApp(
 export async function stopApp(app: ControlPlaneApp): Promise<void> {
   await stopAppResources(app);
 }
-
-export { getAppDatabase };
