@@ -5,24 +5,11 @@ import {
   PartialDataPlaneWorkerRuntimeStateConfigSchema,
   DataPlaneWorkerSandboxDockerConfigSchema,
   DataPlaneWorkerSandboxModalConfigSchema,
-  DataPlaneWorkerServerConfigSchema,
   DataPlaneWorkerTunnelConfigSchema,
   DataPlaneWorkerWorkflowConfigSchema,
   PartialDataPlaneWorkerConfigSchema,
   PartialDataPlaneWorkerSandboxConfigSchema,
 } from "./schema.js";
-
-const loadServerEnv = createEnvLoader<typeof DataPlaneWorkerServerConfigSchema>([
-  {
-    key: "host",
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_HOST",
-  },
-  {
-    key: "port",
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_PORT",
-    parse: Number,
-  },
-]);
 
 const loadDatabaseEnv = createEnvLoader<typeof DataPlaneWorkerDatabaseConfigSchema>([
   {
@@ -118,11 +105,6 @@ export function loadDataPlaneWorkerFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialDataPlaneWorkerConfigInput {
   const partialConfig: PartialDataPlaneWorkerConfigInput = {};
-
-  const server = loadServerEnv(env);
-  if (hasEntries(server)) {
-    partialConfig.server = server;
-  }
 
   const database = loadDatabaseEnv(env);
   if (hasEntries(database)) {

@@ -105,10 +105,6 @@ controlPlaneWorker:
       value: http://otel-collector:4318/v1/metrics
     - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
       value: deployment.environment=production
-    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_HOST
-      value: 0.0.0.0
-    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_PORT
-      value: "8081"
     - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID
       value: production
     - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS
@@ -204,10 +200,6 @@ dataPlaneWorker:
       value: data-plane-worker
     - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE
       value: data-plane-gateway
-    - name: MISTLE_APPS_DATA_PLANE_WORKER_HOST
-      value: 0.0.0.0
-    - name: MISTLE_APPS_DATA_PLANE_WORKER_PORT
-      value: "8083"
     - name: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID
       value: production
     - name: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS

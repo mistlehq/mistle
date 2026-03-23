@@ -118,10 +118,6 @@ controlPlaneWorker:
       value: http://host.docker.internal:4318/v1/metrics
     - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
       value: deployment.environment=development
-    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_HOST
-      value: 0.0.0.0
-    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_PORT
-      value: "8081"
     - name: MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL
       value: http://mistle-control-plane-api:8080
     - name: MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL
@@ -245,10 +241,6 @@ dataPlaneWorker:
       value: http://host.docker.internal:4318/v1/metrics
     - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
       value: deployment.environment=development
-    - name: MISTLE_APPS_DATA_PLANE_WORKER_HOST
-      value: 0.0.0.0
-    - name: MISTLE_APPS_DATA_PLANE_WORKER_PORT
-      value: "8083"
     - name: MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL
       value: postgresql://mistle:mistle@host.docker.internal:5432/mistle_dev
     - name: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL

@@ -4,22 +4,9 @@ import {
   ControlPlaneWorkerDataPlaneApiConfigSchema,
   type PartialControlPlaneWorkerConfigInput,
   ControlPlaneWorkerEmailConfigSchema,
-  ControlPlaneWorkerServerConfigSchema,
   ControlPlaneWorkerWorkflowConfigSchema,
   PartialControlPlaneWorkerConfigSchema,
 } from "./schema.js";
-
-const loadServerEnv = createEnvLoader<typeof ControlPlaneWorkerServerConfigSchema>([
-  {
-    key: "host",
-    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_HOST",
-  },
-  {
-    key: "port",
-    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_PORT",
-    parse: Number,
-  },
-]);
 
 const loadWorkflowEnv = createEnvLoader<typeof ControlPlaneWorkerWorkflowConfigSchema>([
   {
@@ -96,11 +83,6 @@ export function loadControlPlaneWorkerFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialControlPlaneWorkerConfigInput {
   const partialConfig: PartialControlPlaneWorkerConfigInput = {};
-
-  const server = loadServerEnv(env);
-  if (hasEntries(server)) {
-    partialConfig.server = server;
-  }
 
   const workflow = loadWorkflowEnv(env);
   if (hasEntries(workflow)) {
