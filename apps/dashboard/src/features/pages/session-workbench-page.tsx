@@ -114,6 +114,11 @@ export function SessionWorkbenchPage(): React.JSX.Element {
       return !chatItemIds.has(entry.itemId);
     },
   );
+  const terminalPanelKey = [
+    sandboxInstanceId,
+    workbench.sandboxStatusQuery.data?.status ?? "unknown",
+    workbench.terminalPanelState.isVisible ? "visible" : "hidden",
+  ].join(":");
 
   const alerts: SessionWorkbenchAlert[] = [];
   if (workbench.sandboxStatusQuery.isError) {
@@ -203,6 +208,7 @@ export function SessionWorkbenchPage(): React.JSX.Element {
       }
       secondaryPanel={
         <SessionTerminalPanel
+          key={terminalPanelKey}
           isConnectionReady={workbench.connectionReadiness.canConnect}
           isVisible={workbench.terminalPanelState.isVisible}
           onHide={workbench.terminalPanelState.closePanel}
@@ -212,7 +218,6 @@ export function SessionWorkbenchPage(): React.JSX.Element {
           }}
           ptyState={workbench.ptyState}
           sandboxInstanceId={sandboxInstanceId}
-          sandboxStatus={workbench.sandboxStatusQuery.data?.status ?? null}
         />
       }
       secondaryPanelSize={workbench.terminalPanelState.panelSize}

@@ -144,7 +144,6 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
               }}
               ptyState={ptyState}
               sandboxInstanceId="sbi_storybook"
-              sandboxStatus="running"
             />
           }
           secondaryPanelSize={panelSize}

@@ -87,7 +87,6 @@ type SessionTerminalPanelProps = {
   onDisconnectTerminal: () => Promise<void> | void;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   sandboxInstanceId: string;
-  sandboxStatus: string | null;
 };
 
 export function SessionTerminalPanel({
@@ -97,16 +96,11 @@ export function SessionTerminalPanel({
   onDisconnectTerminal,
   ptyState,
   sandboxInstanceId,
-  sandboxStatus,
 }: SessionTerminalPanelProps): React.JSX.Element | null {
   const { lifecycle, output, actions } = ptyState;
   const { openPty, resizePty, writeInput } = actions;
   const hasAttemptedAutoOpenRef = useRef(false);
   const hasHandledExitRef = useRef(false);
-
-  useEffect(() => {
-    hasAttemptedAutoOpenRef.current = false;
-  }, [isConnectionReady, isVisible, sandboxInstanceId, sandboxStatus]);
 
   useEffect(() => {
     if (lifecycle.exitInfo === null) {

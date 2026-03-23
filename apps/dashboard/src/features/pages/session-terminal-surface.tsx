@@ -211,7 +211,16 @@ export function SessionTerminalSurface({
       lastRenderedChunkCountRef.current = 0;
       outputDecoderRef.current = new TextDecoder();
     };
-  }, [fitTerminal, isVisible, onWriteInput, resizePtyToTerminal, terminalTheme]);
+  }, [fitTerminal, isVisible, onWriteInput, resizePtyToTerminal]);
+
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (terminal === null) {
+      return;
+    }
+
+    terminal.options.theme = terminalTheme;
+  }, [terminalTheme]);
 
   useEffect(() => {
     if (!isVisible) {
