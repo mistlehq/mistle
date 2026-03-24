@@ -3,7 +3,6 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
-  Checkbox,
   Field,
   FieldContent,
   FieldDescription,
@@ -14,6 +13,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Switch,
   Textarea,
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
@@ -64,6 +64,18 @@ type WebhookAutomationFormProps = {
   onSubmit: () => void;
   onDelete: (() => void) | null;
 };
+
+function FormSection(input: {
+  children: React.ReactNode;
+  header?: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <section className="flex flex-col gap-2">
+      {input.header === undefined ? null : input.header}
+      <div className="divide-y rounded border bg-white">{input.children}</div>
+    </section>
+  );
+}
 
 function FieldError(input: { message: string | undefined }): React.JSX.Element | null {
   if (input.message === undefined) {
@@ -143,6 +155,36 @@ export function resolveConversationKeyFieldOptions(input: {
   };
 }
 
+function resolveConversationGroupingOptionCopy(input: {
+  option: WebhookAutomationConversationKeyOption;
+}): {
+  label: string;
+  description: string;
+} {
+  switch (input.option.id) {
+    case "repository":
+      return {
+        label: "Repository",
+        description: "Events from the same repository go to the same conversation.",
+      };
+    case "issue":
+      return {
+        label: "Issue",
+        description: "Events from the same issue go to the same conversation.",
+      };
+    case "pull-request":
+      return {
+        label: "Pull request",
+        description: "Events from the same pull request go to the same conversation.",
+      };
+    default:
+      return {
+        label: input.option.label.replace(/^Per\s+/u, ""),
+        description: "Keep related events in the same conversation.",
+      };
+  }
+}
+
 export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.JSX.Element {
   const submitLabel = input.mode === "create" ? "Create automation" : "Save changes";
   const selectedTriggerOptions = resolveSelectedWebhookAutomationEventOptions({
@@ -160,6 +202,15 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
     selectedEventOptions: selectedTriggerOptions,
     currentTemplate: input.values.conversationKeyTemplate,
   });
+  const selectedConversationGroupingOption = conversationKeySelectionState.options.find(
+    (option) => option.template === conversationKeySelectionState.selectedTemplate,
+  );
+  const selectedConversationGroupingLabel =
+    selectedConversationGroupingOption === undefined
+      ? undefined
+      : resolveConversationGroupingOptionCopy({
+          option: selectedConversationGroupingOption,
+        }).label;
 
   return (
     <div className="flex flex-col gap-6">
@@ -196,8 +247,26 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         </Alert>
       )}
 
-      <div className="space-y-5">
-        <div className="grid gap-5">
+      {input.mode === "edit" ? (
+        <FormSection>
+          <div className="flex min-h-10 items-center justify-between gap-3 p-4">
+            <div className="space-y-1">
+              <FieldLabel htmlFor="automation-enabled">Automation enabled</FieldLabel>
+            </div>
+            <Switch
+              aria-label="Automation enabled"
+              checked={input.values.enabled}
+              id="automation-enabled"
+              onCheckedChange={(checked) => {
+                input.onValueChange("enabled", checked);
+              }}
+            />
+          </div>
+        </FormSection>
+      ) : null}
+
+      <FormSection>
+        <div className="p-4">
           <SelectField
             error={input.fieldErrors.sandboxProfileId}
             label="Sandbox profile"
@@ -210,120 +279,111 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             value={input.values.sandboxProfileId}
           />
         </div>
+      </FormSection>
 
-        {input.mode === "edit" ? (
-          <div className="bg-muted/40 flex items-start gap-3 rounded-lg border p-4">
-            <Checkbox
-              checked={input.values.enabled}
-              id="automation-enabled"
-              onCheckedChange={(checked) => {
-                input.onValueChange("enabled", checked === true);
-              }}
-            />
-            <div className="space-y-1">
-              <FieldLabel htmlFor="automation-enabled">Automation enabled</FieldLabel>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="space-y-5">
-        <h2 className="text-base font-semibold">Triggers</h2>
-
-        <WebhookAutomationTriggerPicker
-          error={input.fieldErrors.triggerIds}
-          eventOptions={input.webhookEventOptions}
-          hasConnectedIntegrations={input.connectionOptions.length > 0}
-          onTriggerParameterValueChange={({ triggerId, parameterId, value }) => {
-            input.onValueChange("triggerParameterValues", {
-              ...input.values.triggerParameterValues,
-              [triggerId]: {
-                ...(input.values.triggerParameterValues[triggerId] ?? {}),
-                [parameterId]: value,
-              },
-            });
-          }}
-          onValueChange={(value) => {
-            input.onValueChange("triggerIds", value);
-          }}
-          selectedConnectionId={selectedConnectionId}
-          selectedTriggerIds={input.values.triggerIds}
-          triggerParameterValues={input.values.triggerParameterValues}
-        />
-        <FieldError message={input.fieldErrors.triggerIds} />
-
-        <Field>
-          <FieldHeader>
-            <FieldLabel>Conversation grouping</FieldLabel>
-            <FieldDescription>
-              Events that render to the same key are routed into the same conversation.
-            </FieldDescription>
-          </FieldHeader>
-          <FieldContent>
-            <Select
-              disabled={conversationKeySelectionState.options.length === 0}
-              onValueChange={(value) => {
-                if (value === null) {
-                  return;
-                }
-
-                input.onValueChange("conversationKeyTemplate", value);
-              }}
-              value={conversationKeySelectionState.selectedTemplate}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue
-                  placeholder={
-                    input.values.triggerIds.length === 0
-                      ? "Select triggers first"
-                      : "Select conversation grouping"
-                  }
-                >
-                  {
-                    conversationKeySelectionState.options.find(
-                      (option) =>
-                        option.template === conversationKeySelectionState.selectedTemplate,
-                    )?.label
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {conversationKeySelectionState.options.map((option) => (
-                  <SelectItem key={option.id} value={option.template}>
-                    <div className="flex flex-col gap-0.5">
-                      <span>{option.label}</span>
-                      <span className="text-muted-foreground text-xs">{option.description}</span>
-                      <code className="text-muted-foreground text-[11px]">{option.template}</code>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FieldError message={input.fieldErrors.conversationKeyTemplate} />
-          </FieldContent>
-        </Field>
-      </div>
-
-      <Field>
-        <FieldHeader>
-          <FieldLabel htmlFor="automation-instructions">Instructions</FieldLabel>
-          <FieldDescription>
-            These instructions are sent together with the webhook event type and full payload.
-          </FieldDescription>
-        </FieldHeader>
-        <FieldContent>
-          <Textarea
-            id="automation-instructions"
-            disabled={input.isDeleting || input.isSaving}
-            onChange={(event) => {
-              input.onValueChange("instructions", event.currentTarget.value);
+      <FormSection header={<h2 className="text-base font-semibold">Triggers</h2>}>
+        <div className="p-4">
+          <WebhookAutomationTriggerPicker
+            error={input.fieldErrors.triggerIds}
+            eventOptions={input.webhookEventOptions}
+            hasConnectedIntegrations={input.connectionOptions.length > 0}
+            onTriggerParameterValueChange={({ triggerId, parameterId, value }) => {
+              input.onValueChange("triggerParameterValues", {
+                ...input.values.triggerParameterValues,
+                [triggerId]: {
+                  ...(input.values.triggerParameterValues[triggerId] ?? {}),
+                  [parameterId]: value,
+                },
+              });
             }}
-            rows={7}
-            value={input.values.instructions}
+            onValueChange={(value) => {
+              input.onValueChange("triggerIds", value);
+            }}
+            selectedConnectionId={selectedConnectionId}
+            selectedTriggerIds={input.values.triggerIds}
+            triggerParameterValues={input.values.triggerParameterValues}
           />
-          <FieldError message={input.fieldErrors.instructions} />
-        </FieldContent>
-      </Field>
+          <FieldError message={input.fieldErrors.triggerIds} />
+        </div>
+
+        <div className="p-4">
+          <Field orientation="horizontal">
+            <FieldHeader>
+              <FieldLabel>Group events by</FieldLabel>
+            </FieldHeader>
+            <FieldContent>
+              <Select
+                disabled={conversationKeySelectionState.options.length === 0}
+                onValueChange={(value) => {
+                  if (value === null) {
+                    return;
+                  }
+
+                  input.onValueChange("conversationKeyTemplate", value);
+                }}
+                value={conversationKeySelectionState.selectedTemplate}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue
+                    placeholder={
+                      input.values.triggerIds.length === 0
+                        ? "Select triggers first"
+                        : "Select conversation grouping"
+                    }
+                  >
+                    {selectedConversationGroupingLabel}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {conversationKeySelectionState.options.map((option) => {
+                    const optionCopy = resolveConversationGroupingOptionCopy({
+                      option,
+                    });
+
+                    return (
+                      <SelectItem key={option.id} value={option.template}>
+                        <div className="flex flex-col gap-0.5">
+                          <span>{optionCopy.label}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {optionCopy.description}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <FieldError message={input.fieldErrors.conversationKeyTemplate} />
+            </FieldContent>
+          </Field>
+        </div>
+      </FormSection>
+
+      <FormSection>
+        <div className="p-4">
+          <Field>
+            <FieldHeader>
+              <FieldLabel htmlFor="automation-instructions">Agent Instructions</FieldLabel>
+              <FieldDescription>
+                These instructions are sent together with the webhook event type and full payload.
+              </FieldDescription>
+            </FieldHeader>
+            <FieldContent>
+              <Textarea
+                className="min-h-36"
+                id="automation-instructions"
+                disabled={input.isDeleting || input.isSaving}
+                onChange={(event) => {
+                  input.onValueChange("instructions", event.currentTarget.value);
+                }}
+                rows={5}
+                value={input.values.instructions}
+              />
+              <FieldError message={input.fieldErrors.instructions} />
+            </FieldContent>
+          </Field>
+        </div>
+      </FormSection>
 
       <div className="flex justify-end">
         <Button

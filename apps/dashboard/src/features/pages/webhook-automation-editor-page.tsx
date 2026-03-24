@@ -192,32 +192,34 @@ function LoadedWebhookAutomationEditor(input: {
   const state = useLoadedWebhookAutomationEditorState(input);
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
-      <WebhookAutomationForm
-        connectionOptions={state.connectionOptions}
-        fieldErrors={state.fieldErrors}
-        formError={state.formError}
-        isDeleting={state.isDeleting}
-        isSaving={state.isSaving}
-        mode={input.mode}
-        onDelete={state.onRequestDelete}
-        onSubmit={state.onSubmit}
-        onValueChange={state.onValueChange}
-        sandboxProfileOptions={state.sandboxProfileOptions}
-        webhookEventOptions={state.webhookEventOptions}
-        values={state.values}
-      />
-
-      {input.mode === "edit" ? (
-        <DeleteWebhookAutomationDialog
-          automationName={state.values.name}
-          errorMessage={state.deleteError}
-          isOpen={state.isDeleteDialogOpen}
-          isPending={state.isDeleting}
-          onConfirm={state.onConfirmDelete}
-          onOpenChange={state.onDeleteDialogOpenChange}
+    <div className="-mx-4 -my-6 min-h-full bg-muted/30 px-4 py-6">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+        <WebhookAutomationForm
+          connectionOptions={state.connectionOptions}
+          fieldErrors={state.fieldErrors}
+          formError={state.formError}
+          isDeleting={state.isDeleting}
+          isSaving={state.isSaving}
+          mode={input.mode}
+          onDelete={state.onRequestDelete}
+          onSubmit={state.onSubmit}
+          onValueChange={state.onValueChange}
+          sandboxProfileOptions={state.sandboxProfileOptions}
+          webhookEventOptions={state.webhookEventOptions}
+          values={state.values}
         />
-      ) : null}
+
+        {input.mode === "edit" ? (
+          <DeleteWebhookAutomationDialog
+            automationName={state.values.name}
+            errorMessage={state.deleteError}
+            isOpen={state.isDeleteDialogOpen}
+            isPending={state.isDeleting}
+            onConfirm={state.onConfirmDelete}
+            onOpenChange={state.onDeleteDialogOpenChange}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }

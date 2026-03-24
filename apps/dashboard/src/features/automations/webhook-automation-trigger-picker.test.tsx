@@ -21,7 +21,7 @@ const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
     }),
     eventType: "github.issue_comment.created",
     connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-    connectionLabel: "GitHub Engineering",
+    connectionLabel: "GitHub - GitHub Engineering",
     label: "Issue comment created",
     category: "Issues",
     logoKey: "github",
@@ -54,7 +54,7 @@ const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
     }),
     eventType: "github.pull_request.opened",
     connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-    connectionLabel: "GitHub Engineering",
+    connectionLabel: "GitHub - GitHub Engineering",
     label: "Pull request opened",
     category: "Pull requests",
     logoKey: "github",
@@ -153,7 +153,8 @@ describe("WebhookAutomationTriggerPicker", () => {
   it("groups available triggers by integration connection label", () => {
     expect(groupWebhookAutomationEventOptions(WebhookEventOptions)).toEqual([
       {
-        connectionLabel: "GitHub Engineering",
+        connectionLabel: "GitHub - GitHub Engineering",
+        logoKey: "github",
         items: [WebhookEventOptions[0], WebhookEventOptions[1]],
       },
     ]);
@@ -326,7 +327,7 @@ describe("WebhookAutomationTriggerPicker", () => {
     }
 
     fireEvent.click(addTriggerButton);
-    expect(screen.getAllByText("GitHub Engineering").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("GitHub - GitHub Engineering").length).toBeGreaterThan(0);
     expect(addTriggerInput.getAttribute("aria-expanded")).toBe("true");
 
     fireEvent.click(screen.getByRole("option", { name: "Issue comment created" }));

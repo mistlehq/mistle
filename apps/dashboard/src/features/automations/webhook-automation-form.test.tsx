@@ -161,18 +161,13 @@ describe("WebhookAutomationForm", () => {
   it("shows the automation enabled field on edit", () => {
     renderForm("edit");
 
-    expect(screen.getByRole("checkbox", { name: "Automation enabled" })).toBeDefined();
+    expect(screen.getByRole("switch", { name: "Automation enabled" })).toBeDefined();
   });
 
   it("shows connector-defined conversation grouping choices", () => {
     renderForm("create");
 
-    expect(screen.getAllByText("Conversation grouping").length).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText(
-        "Events that render to the same key are routed into the same conversation.",
-      ).length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByText("Group events by").length).toBeGreaterThan(0);
   });
 
   it("does not inject an unsupported current conversation grouping option", () => {
@@ -191,14 +186,14 @@ describe("WebhookAutomationForm", () => {
   it("shows the instructions editor copy", () => {
     renderForm("create");
 
-    expect(screen.getByLabelText("Instructions")).toBeDefined();
+    expect(screen.getByLabelText("Agent Instructions")).toBeDefined();
     expect(
       screen.getAllByText(
         "These instructions are sent together with the webhook event type and full payload.",
       ).length,
     ).toBeGreaterThan(0);
     expect(screen.queryByText("Basics")).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Instructions" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Agent Instructions" })).toBeNull();
   });
 
   it("renders triggers before instructions", () => {
@@ -207,7 +202,7 @@ describe("WebhookAutomationForm", () => {
     });
 
     const [triggersHeading] = screen.getAllByRole("heading", { name: "Triggers" });
-    const instructionsField = screen.getByLabelText("Instructions");
+    const instructionsField = screen.getByLabelText("Agent Instructions");
 
     if (triggersHeading === undefined) {
       throw new Error("Expected triggers heading to be rendered.");
@@ -220,7 +215,7 @@ describe("WebhookAutomationForm", () => {
       ),
     ).toBe(true);
     expect(container.textContent?.indexOf("Triggers")).toBeLessThan(
-      container.textContent?.indexOf("Instructions") ?? Number.POSITIVE_INFINITY,
+      container.textContent?.indexOf("Agent Instructions") ?? Number.POSITIVE_INFINITY,
     );
   });
 

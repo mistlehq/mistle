@@ -15,6 +15,29 @@ function sortOptionsByLabel<T extends { label: string }>(items: readonly T[]): T
   return [...items].sort((left, right) => left.label.localeCompare(right.label));
 }
 
+function formatWebhookAutomationTriggerGroupLabel(input: {
+  integrationDisplayName: string;
+  connectionDisplayName: string;
+}): string {
+  const integrationDisplayName = input.integrationDisplayName.trim();
+  const connectionDisplayName = input.connectionDisplayName.trim();
+
+  if (integrationDisplayName.length === 0) {
+    return connectionDisplayName;
+  }
+
+  if (
+    connectionDisplayName.length === 0 ||
+    connectionDisplayName.localeCompare(integrationDisplayName, undefined, {
+      sensitivity: "accent",
+    }) === 0
+  ) {
+    return integrationDisplayName;
+  }
+
+  return `${integrationDisplayName} - ${connectionDisplayName}`;
+}
+
 export function formatWebhookAutomationUpdatedAt(isoDateTime: string): string {
   return formatRelativeOrDate(isoDateTime);
 }
@@ -94,7 +117,10 @@ export function buildWebhookAutomationEventOptions(input: {
         }),
         eventType: eventDefinition.eventType,
         connectionId: connection.id,
-        connectionLabel: connection.displayName,
+        connectionLabel: formatWebhookAutomationTriggerGroupLabel({
+          integrationDisplayName: target.displayName,
+          connectionDisplayName: connection.displayName,
+        }),
         label: eventDefinition.displayName,
         ...(target.logoKey === undefined ? {} : { logoKey: target.logoKey }),
         ...(eventDefinition.conversationKeyOptions === undefined
