@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
@@ -194,6 +194,12 @@ type ResumeIdempotencyStorageRecord = {
   expiresAtMs: number;
 };
 
+export function getSandboxInstanceStatusQueryKey(
+  sandboxInstanceId: string | null,
+): readonly ["sandbox-instance-status", string | null] {
+  return ["sandbox-instance-status", sandboxInstanceId];
+}
+
 export function createResumeIdempotencyStorageKey(sandboxInstanceId: string): string {
   return `${ResumeIdempotencyKeyStorageKeyPrefix}${sandboxInstanceId}`;
 }
@@ -256,6 +262,17 @@ export function clearStoredResumeIdempotencyKey(input: {
   });
 }
 
+export function seedSandboxInstanceStatusQuery(input: {
+  queryClient: QueryClient;
+  sandboxInstanceId: string;
+  sandboxStatus: Awaited<ReturnType<typeof getSandboxInstanceStatus>>;
+}): void {
+  input.queryClient.setQueryData(
+    getSandboxInstanceStatusQueryKey(input.sandboxInstanceId),
+    input.sandboxStatus,
+  );
+}
+
 export function useSessionWorkbenchController(input: {
   sandboxInstanceId: string | null;
 }): UseSessionWorkbenchControllerResult {
@@ -268,6 +285,7 @@ export function useSessionWorkbenchController(input: {
   const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(false);
   const [resumeErrorMessage, setResumeErrorMessage] = useState<string | null>(null);
   const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
+  const queryClient = useQueryClient();
   const sessionState = useCodexSessionState();
   const ptyState = useSandboxPtyState();
   const terminalPanelState = useSessionTerminalWorkbenchState({
@@ -308,7 +326,7 @@ export function useSessionWorkbenchController(input: {
       : composerConfigSnapshot;
 
   const sandboxStatusQuery = useQuery({
-    queryKey: ["sandbox-instance-status", input.sandboxInstanceId],
+    queryKey: getSandboxInstanceStatusQueryKey(input.sandboxInstanceId),
     queryFn: async ({ signal }) => {
       if (input.sandboxInstanceId === null) {
         throw new Error("Session id is required.");
@@ -624,9 +642,14 @@ export function useSessionWorkbenchController(input: {
     setResumeErrorMessage(null);
     setIsResumingStoppedSandbox(true);
     try {
-      await resumeSandboxInstance({
+      const resumedSandboxStatus = await resumeSandboxInstance({
         instanceId: input.sandboxInstanceId,
         idempotencyKey,
+      });
+      seedSandboxInstanceStatusQuery({
+        queryClient,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sandboxStatus: resumedSandboxStatus,
       });
       setHasAttemptedAutoConnect(false);
       await sandboxStatusQuery.refetch();
@@ -639,6 +662,7 @@ export function useSessionWorkbenchController(input: {
   }, [
     input.sandboxInstanceId,
     isResumingStoppedSandbox,
+    queryClient,
     sandboxStatus,
     sandboxStatusQuery.refetch,
   ]);

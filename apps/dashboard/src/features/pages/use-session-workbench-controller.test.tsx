@@ -8,10 +8,12 @@ import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-st
 import {
   clearStoredResumeIdempotencyKey,
   createResumeIdempotencyStorageKey,
+  getSandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
   persistResumeIdempotencyKey,
   readStoredResumeIdempotencyKey,
   resolveAutomationSessionPreparationTimeoutDelayMs,
+  seedSandboxInstanceStatusQuery,
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
@@ -289,5 +291,35 @@ describe("useSessionWorkbenchController", () => {
         nowMs: 1_000 + 5 * 60 * 1_000,
       }),
     ).toBeNull();
+  });
+
+  it("seeds the sandbox status query from a successful resume response", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    seedSandboxInstanceStatusQuery({
+      queryClient,
+      sandboxInstanceId: "sbi_resume_001",
+      sandboxStatus: {
+        id: "sbi_resume_001",
+        status: "starting",
+        failureCode: null,
+        failureMessage: null,
+        automationConversation: null,
+      },
+    });
+
+    expect(queryClient.getQueryData(getSandboxInstanceStatusQueryKey("sbi_resume_001"))).toEqual({
+      id: "sbi_resume_001",
+      status: "starting",
+      failureCode: null,
+      failureMessage: null,
+      automationConversation: null,
+    });
   });
 });
