@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
   clearStoredResumeIdempotencyKey,
@@ -11,11 +12,12 @@ import {
   getSandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
   persistResumeIdempotencyKey,
+  readStoredResumeIdempotencyRecord,
   readStoredResumeIdempotencyKey,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   seedSandboxInstanceStatusQuery,
   shouldClearStoredResumeIdempotencyKey,
-  shouldClearInFlightResumeState,
+  shouldRetainResumeRetryWindowAfterError,
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
@@ -287,6 +289,17 @@ describe("useSessionWorkbenchController", () => {
     ).toBe("resume-key-001");
 
     expect(
+      readStoredResumeIdempotencyRecord({
+        sandboxInstanceId: "sbi_resume_001",
+        storage,
+        nowMs: 1_000 + 60_000,
+      }),
+    ).toEqual({
+      value: "resume-key-001",
+      expiresAtMs: 1_000 + 5 * 60 * 1_000,
+    });
+
+    expect(
       readStoredResumeIdempotencyKey({
         sandboxInstanceId: "sbi_resume_001",
         storage,
@@ -334,38 +347,29 @@ describe("useSessionWorkbenchController", () => {
     expect(shouldClearStoredResumeIdempotencyKey("failed")).toBe(true);
   });
 
-  it("ends the in-flight resume state once polling reaches a terminal status", () => {
+  it("retains the retry window only for ambiguous or server-side resume failures", () => {
+    expect(shouldRetainResumeRetryWindowAfterError(new Error("network failure"))).toBe(true);
     expect(
-      shouldClearInFlightResumeState({
-        sandboxStatus: null,
-        hasStoredResumeIdempotencyKey: false,
-      }),
-    ).toBe(false);
-    expect(
-      shouldClearInFlightResumeState({
-        sandboxStatus: "starting",
-        hasStoredResumeIdempotencyKey: true,
-      }),
-    ).toBe(false);
+      shouldRetainResumeRetryWindowAfterError(
+        new SandboxProfilesApiError({
+          operation: "resumeSandboxInstance",
+          status: 500,
+          body: null,
+          message: "Server error",
+        }),
+      ),
+    ).toBe(true);
 
     expect(
-      shouldClearInFlightResumeState({
-        sandboxStatus: "stopped",
-        hasStoredResumeIdempotencyKey: true,
-      }),
-    ).toBe(true);
-    expect(
-      shouldClearInFlightResumeState({
-        sandboxStatus: "running",
-        hasStoredResumeIdempotencyKey: true,
-      }),
-    ).toBe(true);
-    expect(
-      shouldClearInFlightResumeState({
-        sandboxStatus: "failed",
-        hasStoredResumeIdempotencyKey: true,
-      }),
-    ).toBe(true);
+      shouldRetainResumeRetryWindowAfterError(
+        new SandboxProfilesApiError({
+          operation: "resumeSandboxInstance",
+          status: 409,
+          body: null,
+          message: "Conflict",
+        }),
+      ),
+    ).toBe(false);
   });
 
   it("keeps a reloaded stopped sandbox resumable even when a stored resume key exists", () => {
