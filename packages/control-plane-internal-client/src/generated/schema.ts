@@ -54,38 +54,13 @@ export interface paths {
             "application/json":
               | {
                   /** @enum {string} */
-                  code:
-                    | "INVALID_LIST_CONNECTIONS_INPUT"
-                    | "INVALID_PAGINATION_CURSOR"
-                    | "INVALID_LIST_CONNECTION_RESOURCES_INPUT"
-                    | "INVALID_RESOURCE_PAGINATION_CURSOR"
-                    | "RESOURCE_KIND_NOT_SUPPORTED"
-                    | "INVALID_CREATE_CONNECTION_INPUT"
-                    | "INVALID_UPDATE_CONNECTION_INPUT"
-                    | "API_KEY_NOT_SUPPORTED"
-                    | "API_KEY_CONNECTION_REQUIRED"
-                    | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
-                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
-                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
-                    | "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED"
-                    | "INVALID_OAUTH2_START_INPUT"
-                    | "INVALID_OAUTH2_COMPLETE_INPUT"
-                    | "OAUTH2_NOT_SUPPORTED"
-                    | "OAUTH2_CAPABILITY_NOT_CONFIGURED"
-                    | "REDIRECT_STATE_INVALID"
-                    | "REDIRECT_STATE_EXPIRED"
-                    | "REDIRECT_STATE_ALREADY_USED";
+                  code: "RESOURCE_KIND_NOT_SUPPORTED";
                   message: string;
                 }
               | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
                 };
           };
         };
@@ -96,7 +71,8 @@ export interface paths {
           };
           content: {
             "application/json": {
-              code: string;
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
               message: string;
             };
           };
@@ -109,7 +85,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND";
+              code: "CONNECTION_NOT_FOUND";
               message: string;
             };
           };
@@ -367,14 +343,9 @@ export interface paths {
                   message: string;
                 }
               | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
                 };
           };
         };
@@ -385,7 +356,8 @@ export interface paths {
           };
           content: {
             "application/json": {
-              code: string;
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
               message: string;
             };
           };
@@ -472,14 +444,9 @@ export interface paths {
                   message: string;
                 }
               | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
                 };
           };
         };
@@ -490,7 +457,8 @@ export interface paths {
           };
           content: {
             "application/json": {
-              code: string;
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
               message: string;
             };
           };
@@ -593,14 +561,9 @@ export interface paths {
                   message: string;
                 }
               | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
                 };
           };
         };
@@ -611,7 +574,8 @@ export interface paths {
           };
           content: {
             "application/json": {
-              code: string;
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
               message: string;
             };
           };
