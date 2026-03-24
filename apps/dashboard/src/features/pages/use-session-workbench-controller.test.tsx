@@ -367,4 +367,57 @@ describe("useSessionWorkbenchController", () => {
       }),
     ).toBe(true);
   });
+
+  it("keeps a reloaded stopped sandbox resumable even when a stored resume key exists", () => {
+    const sandboxInstanceId = `sbi-resume-${Date.now()}`;
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+
+    persistResumeIdempotencyKey({
+      sandboxInstanceId,
+      idempotencyKey: "resume-key-001",
+      storage: window.localStorage,
+      nowMs: Date.now(),
+    });
+    seedSandboxInstanceStatusQuery({
+      queryClient,
+      sandboxInstanceId,
+      sandboxStatus: {
+        id: sandboxInstanceId,
+        status: "stopped",
+        failureCode: null,
+        failureMessage: null,
+        automationConversation: null,
+      },
+    });
+
+    const wrapper = ({ children }: React.PropsWithChildren): React.JSX.Element => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(
+      () =>
+        useSessionWorkbenchController({
+          sandboxInstanceId,
+        }),
+      {
+        wrapper,
+      },
+    );
+
+    expect(result.current.workbench.isResumingStoppedSandbox).toBe(false);
+    expect(result.current.workbench.connectionReadiness.reason).toBe("stopped");
+    expect(result.current.workbench.stoppedSessionState.requiresManualResume).toBe(true);
+
+    clearStoredResumeIdempotencyKey({
+      sandboxInstanceId,
+      storage: window.localStorage,
+    });
+  });
 });
