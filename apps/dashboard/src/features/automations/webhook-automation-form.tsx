@@ -300,10 +300,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
               rows={7}
               value={input.values.instructions}
             />
-            <p className="text-muted-foreground text-sm">
-              The automation will always receive your instructions, the webhook event type, and the
-              full webhook payload.
-            </p>
             <FieldError message={input.fieldErrors.instructions} />
           </FieldContent>
         </Field>

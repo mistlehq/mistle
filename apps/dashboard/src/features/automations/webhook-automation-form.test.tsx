@@ -178,10 +178,5 @@ describe("WebhookAutomationForm", () => {
     renderForm("create");
 
     expect(screen.getByLabelText("Instructions")).toBeDefined();
-    expect(
-      screen.getAllByText(
-        "The automation will always receive your instructions, the webhook event type, and the full webhook payload.",
-      ).length,
-    ).toBeGreaterThan(0);
   });
 });
