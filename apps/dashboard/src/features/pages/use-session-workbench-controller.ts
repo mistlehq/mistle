@@ -312,6 +312,17 @@ export function shouldRetainResumeRetryWindowAfterError(error: unknown): boolean
   return error.status >= 500;
 }
 
+export function shouldShowResumeInFlightState(input: {
+  isResumingStoppedSandbox: boolean;
+  resumeOnOpenRequestToken: string | null;
+  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
+}): boolean {
+  return (
+    input.isResumingStoppedSandbox ||
+    (input.resumeOnOpenRequestToken !== null && input.sandboxStatus === "stopped")
+  );
+}
+
 export function isActiveResumeRequest(input: {
   activeRequest: ResumeRequestGuard | null;
   requestId: number;
@@ -428,7 +439,12 @@ export function useSessionWorkbenchController(input: {
         return AutomationSessionStatusRefetchIntervalMs;
       }
 
-      if (status === "stopped" && (isResumingStoppedSandbox || hasStoredResumeIdempotencyKey)) {
+      if (
+        status === "stopped" &&
+        ((input.resumeOnOpenRequestToken !== null && status === "stopped") ||
+          isResumingStoppedSandbox ||
+          hasStoredResumeIdempotencyKey)
+      ) {
         return 1_000;
       }
 
@@ -436,8 +452,13 @@ export function useSessionWorkbenchController(input: {
     },
   });
   const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
+  const isShowingResumeInFlightState = shouldShowResumeInFlightState({
+    isResumingStoppedSandbox,
+    resumeOnOpenRequestToken: input.resumeOnOpenRequestToken,
+    sandboxStatus,
+  });
   const effectiveSandboxStatus =
-    sandboxStatus === "stopped" && isResumingStoppedSandbox ? "starting" : sandboxStatus;
+    sandboxStatus === "stopped" && isShowingResumeInFlightState ? "starting" : sandboxStatus;
   const automationConversation = sandboxStatusQuery.data?.automationConversation ?? null;
   const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
     sandboxStatus,
@@ -865,7 +886,7 @@ export function useSessionWorkbenchController(input: {
       connectionReadiness,
       stoppedSessionState,
       hasTopAlert,
-      isResumingStoppedSandbox,
+      isResumingStoppedSandbox: isShowingResumeInFlightState,
       ptyState,
       requestStoppedSandboxResume,
       sandboxFailureMessage,

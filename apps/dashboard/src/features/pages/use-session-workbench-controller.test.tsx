@@ -18,6 +18,7 @@ import {
   resolveAutomationSessionPreparationTimeoutDelayMs,
   seedSandboxInstanceStatusQuery,
   shouldClearResumeErrorMessage,
+  shouldShowResumeInFlightState,
   shouldClearStoredResumeIdempotencyKey,
   shouldRetainResumeRetryWindowAfterError,
   shouldWaitForAutomationSessionThread,
@@ -483,5 +484,31 @@ describe("useSessionWorkbenchController", () => {
       sandboxInstanceId,
       storage: window.localStorage,
     });
+  });
+
+  it("treats resume-on-open intent as in-flight only while the sandbox is still stopped", () => {
+    expect(
+      shouldShowResumeInFlightState({
+        isResumingStoppedSandbox: false,
+        resumeOnOpenRequestToken: "resume-on-open",
+        sandboxStatus: "stopped",
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowResumeInFlightState({
+        isResumingStoppedSandbox: false,
+        resumeOnOpenRequestToken: "resume-on-open",
+        sandboxStatus: "starting",
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldShowResumeInFlightState({
+        isResumingStoppedSandbox: true,
+        resumeOnOpenRequestToken: null,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe(true);
   });
 });
