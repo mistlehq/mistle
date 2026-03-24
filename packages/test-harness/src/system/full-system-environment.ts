@@ -332,6 +332,7 @@ export async function startFullSystemEnvironment(
       environment: {
         ...input.dataPlaneApiEnvironment,
         MISTLE_APPS_DATA_PLANE_API_DATABASE_URL: containerDatabaseUrl,
+        MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
         MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
         MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
       },
@@ -371,6 +372,7 @@ export async function startFullSystemEnvironment(
       environment: {
         ...input.controlPlaneApiEnvironment,
         MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL: containerDatabaseUrl,
+        MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
         MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
         MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: input.controlPlaneWorkflowNamespaceId,
         MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL: input.authBaseUrl,

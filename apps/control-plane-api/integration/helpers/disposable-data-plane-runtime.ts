@@ -111,6 +111,7 @@ export async function createDisposableDataPlaneRuntime(input: {
       },
       database: {
         url: databaseUrl,
+        migrationUrl: databaseUrl,
       },
       workflow: {
         databaseUrl,

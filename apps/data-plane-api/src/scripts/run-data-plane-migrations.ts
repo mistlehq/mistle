@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   });
 
   await runDataPlaneMigrations({
-    connectionString: loadedConfig.app.database.url,
+    connectionString: loadedConfig.app.database.migrationUrl,
     schemaName: DATA_PLANE_SCHEMA_NAME,
     migrationsFolder: DATA_PLANE_MIGRATIONS_FOLDER_PATH,
     migrationsSchema: MigrationTracking.DATA_PLANE.SCHEMA_NAME,

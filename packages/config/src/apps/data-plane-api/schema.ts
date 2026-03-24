@@ -15,6 +15,7 @@ export const DataPlaneApiServerConfigSchema = z
 export const DataPlaneApiDatabaseConfigSchema = z
   .object({
     url: z.string().min(1),
+    migrationUrl: z.string().min(1),
   })
   .strict();
 

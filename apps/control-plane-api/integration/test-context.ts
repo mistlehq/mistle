@@ -195,6 +195,7 @@ export const it = vitestIt.extend<{
           },
           database: {
             url: runtimeDatabaseUrl,
+            migrationUrl: runtimeDatabaseUrl,
           },
           workflow: {
             databaseUrl: runtimeDatabaseUrl,

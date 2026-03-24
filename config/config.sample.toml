@@ -43,6 +43,7 @@ port = 8080
 
 [apps.control_plane_api.database]
 url = "postgresql://mistle:replace-with-password@db:5432/mistle"
+migration_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 
 [apps.control_plane_api.auth]
 base_url = "https://api.mistle.example"
@@ -95,6 +96,7 @@ port = 8082
 
 [apps.data_plane_api.database]
 url = "postgresql://mistle:replace-with-password@db:5432/mistle"
+migration_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 
 [apps.data_plane_api.workflow]
 database_url = "postgresql://mistle:replace-with-password@db:6432/mistle"

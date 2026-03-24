@@ -116,6 +116,7 @@ const controlPlaneApiEnvConfig = {
   },
   database: {
     url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+    migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
   },
   auth: {
     baseUrl: "http://127.0.0.1:5000",
@@ -210,6 +211,7 @@ const dataPlaneApiEnvConfig = {
   },
   database: {
     url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+    migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
   },
   workflow: {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",

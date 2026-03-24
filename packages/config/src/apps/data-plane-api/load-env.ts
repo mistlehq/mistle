@@ -25,6 +25,10 @@ const loadDatabaseEnv = createEnvLoader<typeof DataPlaneApiDatabaseConfigSchema>
     key: "url",
     envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_URL",
   },
+  {
+    key: "migrationUrl",
+    envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL",
+  },
 ]);
 
 const loadWorkflowEnv = createEnvLoader<typeof DataPlaneApiWorkflowConfigSchema>([
