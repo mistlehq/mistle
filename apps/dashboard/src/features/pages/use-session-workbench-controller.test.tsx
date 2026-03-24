@@ -16,6 +16,7 @@ import {
   readStoredResumeIdempotencyKey,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   seedSandboxInstanceStatusQuery,
+  shouldClearResumeErrorMessage,
   shouldClearStoredResumeIdempotencyKey,
   shouldRetainResumeRetryWindowAfterError,
   shouldWaitForAutomationSessionThread,
@@ -345,6 +346,15 @@ describe("useSessionWorkbenchController", () => {
 
     expect(shouldClearStoredResumeIdempotencyKey("running")).toBe(true);
     expect(shouldClearStoredResumeIdempotencyKey("failed")).toBe(true);
+  });
+
+  it("clears stale resume errors only after the sandbox starts progressing again", () => {
+    expect(shouldClearResumeErrorMessage(null)).toBe(false);
+    expect(shouldClearResumeErrorMessage("stopped")).toBe(false);
+    expect(shouldClearResumeErrorMessage("failed")).toBe(false);
+
+    expect(shouldClearResumeErrorMessage("starting")).toBe(true);
+    expect(shouldClearResumeErrorMessage("running")).toBe(true);
   });
 
   it("retains the retry window only for ambiguous or server-side resume failures", () => {

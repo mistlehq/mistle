@@ -293,6 +293,12 @@ export function shouldClearStoredResumeIdempotencyKey(
   return sandboxStatus === "running" || sandboxStatus === "failed";
 }
 
+export function shouldClearResumeErrorMessage(
+  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null,
+): boolean {
+  return sandboxStatus === "starting" || sandboxStatus === "running";
+}
+
 export function shouldRetainResumeRetryWindowAfterError(error: unknown): boolean {
   if (!(error instanceof SandboxProfilesApiError)) {
     return true;
@@ -497,6 +503,14 @@ export function useSessionWorkbenchController(input: {
     });
     setStoredResumeIdempotencyRecord(null);
   }, [input.sandboxInstanceId, sandboxStatus]);
+
+  useEffect(() => {
+    if (!shouldClearResumeErrorMessage(sandboxStatus)) {
+      return;
+    }
+
+    setResumeErrorMessage(null);
+  }, [sandboxStatus]);
 
   useEffect(() => {
     if (!isWaitingForAutomationThread) {
