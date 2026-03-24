@@ -6,6 +6,7 @@ import {
   Checkbox,
   Field,
   FieldContent,
+  FieldDescription,
   FieldLabel,
   Select,
   SelectContent,
@@ -240,7 +241,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         </Alert>
       )}
 
-      <FormSection description="" title="Basics">
+      <FormSection description="" title="">
         <div className="space-y-5">
           <div className="grid gap-5 md:grid-cols-2">
             {input.mode === "create" ? (
@@ -284,14 +285,11 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         </div>
       </FormSection>
 
-      <FormSection
-        description="These instructions are sent together with the webhook event type and full payload."
-        title="Instructions"
-      >
+      <FormSection description="" title="Instructions">
         <Field>
-          <FieldLabel htmlFor="automation-instructions">Instructions</FieldLabel>
           <FieldContent>
             <Textarea
+              aria-label="Instructions"
               id="automation-instructions"
               disabled={input.isDeleting || input.isSaving}
               onChange={(event) => {
@@ -329,9 +327,12 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           />
           <FieldError message={input.fieldErrors.triggerIds} />
 
-          <Field>
+          <Field className="gap-2">
             <FieldLabel>Conversation grouping</FieldLabel>
-            <FieldContent>
+            <FieldContent className="gap-2">
+              <FieldDescription className="nth-last-2:mt-0">
+                Events that render to the same key are routed into the same conversation.
+              </FieldDescription>
               <Select
                 disabled={conversationKeyFieldOptions.displayOptions.length === 0}
                 onValueChange={(value) => {
@@ -370,9 +371,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-muted-foreground text-sm">
-                Events that render to the same key are routed into the same conversation.
-              </p>
               <FieldError message={input.fieldErrors.conversationKeyTemplate} />
             </FieldContent>
           </Field>
