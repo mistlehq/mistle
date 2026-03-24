@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import { createDataPlaneInternalOpenApiDocument } from "./document.js";
 
-const INTERNAL_OPENAPI_SPEC_FILE_URL = new URL(
+const InternalOpenApiSpecFileUrl = new URL(
   "../../openapi/data-plane.internal.v1.json",
   import.meta.url,
 );
@@ -13,7 +13,7 @@ function serializeDocument(document: unknown): string {
 }
 
 export function getInternalOpenApiSpecFilePath(): string {
-  return fileURLToPath(INTERNAL_OPENAPI_SPEC_FILE_URL);
+  return fileURLToPath(InternalOpenApiSpecFileUrl);
 }
 
 async function writeSpecFile(input: { fileUrl: URL; document: unknown }): Promise<void> {
@@ -25,7 +25,7 @@ async function writeSpecFile(input: { fileUrl: URL; document: unknown }): Promis
 
 export async function writeOpenApiSpecFile(): Promise<void> {
   await writeSpecFile({
-    fileUrl: INTERNAL_OPENAPI_SPEC_FILE_URL,
+    fileUrl: InternalOpenApiSpecFileUrl,
     document: createDataPlaneInternalOpenApiDocument(),
   });
 }
@@ -53,7 +53,7 @@ async function assertSpecFileIsCurrent(input: {
 
 export async function assertOpenApiSpecFileIsCurrent(): Promise<void> {
   await assertSpecFileIsCurrent({
-    fileUrl: INTERNAL_OPENAPI_SPEC_FILE_URL,
+    fileUrl: InternalOpenApiSpecFileUrl,
     document: createDataPlaneInternalOpenApiDocument(),
     missingErrorMessage: [
       `Internal OpenAPI spec file is missing at ${getInternalOpenApiSpecFilePath()}.`,

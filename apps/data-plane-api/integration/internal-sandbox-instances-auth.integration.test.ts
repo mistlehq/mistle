@@ -7,7 +7,7 @@ import {
 import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { describe, expect } from "vitest";
 
-import { INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "../src/internal-sandbox-instances/index.js";
+import { INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "../src/internal/sandbox-instances/index.js";
 import { it } from "./test-context.js";
 
 function createRuntimePlan(input: {
@@ -184,11 +184,9 @@ describe("internal sandbox instances auth integration", () => {
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({
-      success: false,
-      error: {
-        name: "ZodError",
-      },
+    await expect(response.json()).resolves.toEqual({
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
     });
   }, 60_000);
 

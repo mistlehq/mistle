@@ -11,7 +11,7 @@ import { Pool, Client } from "pg";
 import { it as vitestIt } from "vitest";
 import { z } from "zod";
 
-import { createDataPlaneApiRuntime } from "../src/runtime/index.js";
+import { createDataPlaneApiRuntime } from "../src/main.js";
 import type { DataPlaneApiConfig } from "../src/types.js";
 
 const RUNTIME_DATABASE_NAME_PREFIX = "mistle_data_plane_api_it_runtime";

@@ -1,11 +1,9 @@
 import { CompiledRuntimePlanSchema, assembleCompiledRuntimePlan } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import {
-  ResumeSandboxInstanceInputValidationSchema,
-  StopSandboxInstanceInputValidationSchema,
-  StartSandboxInstanceInputValidationSchema,
-} from "./contracts.js";
+import { ResumeSandboxInstanceInputSchema } from "./resume-sandbox-instance/schema.js";
+import { StartSandboxInstanceInputSchema } from "./start-sandbox-instance/schema.js";
+import { StopSandboxInstanceInputSchema } from "./stop-sandbox-instance/schema.js";
 
 function createRuntimePlan() {
   return assembleCompiledRuntimePlan({
@@ -69,11 +67,9 @@ function createRuntimePlan() {
   });
 }
 
-describe("StartSandboxInstanceInputValidationSchema", () => {
+describe("StartSandboxInstanceInputSchema", () => {
   it("reuses the shared compiled runtime plan schema", () => {
-    expect(StartSandboxInstanceInputValidationSchema.shape.runtimePlan).toBe(
-      CompiledRuntimePlanSchema,
-    );
+    expect(StartSandboxInstanceInputSchema.shape.runtimePlan).toBe(CompiledRuntimePlanSchema);
   });
 
   it("accepts runtime plans assembled by integrations-core", () => {
@@ -95,7 +91,7 @@ describe("StartSandboxInstanceInputValidationSchema", () => {
       },
     };
 
-    expect(StartSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
+    expect(StartSandboxInstanceInputSchema.parse(input)).toEqual(input);
   });
 
   it("accepts omitted start request ids for server-generated defaults", () => {
@@ -115,11 +111,11 @@ describe("StartSandboxInstanceInputValidationSchema", () => {
       },
     };
 
-    expect(StartSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
+    expect(StartSandboxInstanceInputSchema.parse(input)).toEqual(input);
   });
 
   it("reports nested runtime plan validation issues", () => {
-    const result = StartSandboxInstanceInputValidationSchema.safeParse({
+    const result = StartSandboxInstanceInputSchema.safeParse({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       sandboxProfileVersion: 1,
@@ -153,7 +149,7 @@ describe("StartSandboxInstanceInputValidationSchema", () => {
   });
 });
 
-describe("ResumeSandboxInstanceInputValidationSchema", () => {
+describe("ResumeSandboxInstanceInputSchema", () => {
   it("accepts a valid resume request", () => {
     const input = {
       organizationId: "org_123",
@@ -161,7 +157,7 @@ describe("ResumeSandboxInstanceInputValidationSchema", () => {
       idempotencyKey: "req_456",
     };
 
-    expect(ResumeSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
+    expect(ResumeSandboxInstanceInputSchema.parse(input)).toEqual(input);
   });
 
   it("accepts omitted idempotency keys for server-generated defaults", () => {
@@ -170,11 +166,11 @@ describe("ResumeSandboxInstanceInputValidationSchema", () => {
       instanceId: "sbi_123",
     };
 
-    expect(ResumeSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
+    expect(ResumeSandboxInstanceInputSchema.parse(input)).toEqual(input);
   });
 });
 
-describe("StopSandboxInstanceInputValidationSchema", () => {
+describe("StopSandboxInstanceInputSchema", () => {
   it("accepts a valid stop request", () => {
     const input = {
       sandboxInstanceId: "sbi_123",
@@ -183,11 +179,11 @@ describe("StopSandboxInstanceInputValidationSchema", () => {
       idempotencyKey: "stop-idempotency-123",
     };
 
-    expect(StopSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
+    expect(StopSandboxInstanceInputSchema.parse(input)).toEqual(input);
   });
 
   it("requires an explicit idempotency key", () => {
-    const result = StopSandboxInstanceInputValidationSchema.safeParse({
+    const result = StopSandboxInstanceInputSchema.safeParse({
       sandboxInstanceId: "sbi_123",
       stopReason: "disconnected",
       expectedOwnerLeaseId: "sol_123",

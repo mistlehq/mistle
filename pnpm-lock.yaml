@@ -614,6 +614,9 @@ importers:
 
   packages/data-plane-internal-client:
     dependencies:
+      '@mistle/workflow-registry':
+        specifier: workspace:*
+        version: link:../workflow-registry
       openapi-fetch:
         specifier: ^0.17.0
         version: 0.17.0

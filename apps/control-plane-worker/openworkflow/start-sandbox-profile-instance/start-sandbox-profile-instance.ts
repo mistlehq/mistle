@@ -21,5 +21,8 @@ export async function startSandboxProfileInstance(
     sandboxProfileVersion: input.sandboxProfileVersion,
   });
 
-  return ctx.dataPlaneClient.startSandboxInstance(input);
+  return ctx.dataPlaneClient.startSandboxInstance({
+    ...input,
+    runtimePlan: input.runtimePlan,
+  });
 }

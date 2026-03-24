@@ -3,7 +3,7 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
 import { AppIds, type loadConfig } from "@mistle/config";
 import type { Context, Hono } from "hono";
 
-import type { AppRuntimeResources } from "./runtime/resources.js";
+import type { AppRuntimeResources } from "./resources.js";
 
 type LoadDataPlaneApiConfigResult = ReturnType<typeof loadConfig<typeof AppIds.DATA_PLANE_API>>;
 

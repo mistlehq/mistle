@@ -1,10 +1,10 @@
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
 import { Pool } from "pg";
 
-import { createDataPlaneBackend, createDataPlaneOpenWorkflow } from "../openworkflow/index.js";
-import { GatewayHttpSandboxRuntimeStateReader } from "../runtime-state/gateway-http-sandbox-runtime-state-reader.js";
-import type { SandboxRuntimeStateReader } from "../runtime-state/sandbox-runtime-state-reader.js";
-import type { DataPlaneApiRuntimeConfig, DataPlaneApp } from "../types.js";
+import { createDataPlaneBackend, createDataPlaneOpenWorkflow } from "./openworkflow/index.js";
+import { GatewayHttpSandboxRuntimeStateReader } from "./runtime-state/gateway-http-sandbox-runtime-state-reader.js";
+import type { SandboxRuntimeStateReader } from "./runtime-state/sandbox-runtime-state-reader.js";
+import type { DataPlaneApiRuntimeConfig } from "./types.js";
 
 export type AppRuntimeResources = {
   db: DataPlaneDatabase;
@@ -14,18 +14,6 @@ export type AppRuntimeResources = {
   openWorkflow: ReturnType<typeof createDataPlaneOpenWorkflow>;
   runtimeStateReader: SandboxRuntimeStateReader;
 };
-
-const AppResourcesByInstance = new WeakMap<DataPlaneApp, AppRuntimeResources>();
-
-function getAppResources(app: DataPlaneApp): AppRuntimeResources {
-  const appResources = AppResourcesByInstance.get(app);
-
-  if (appResources === undefined) {
-    throw new Error("Data plane app instance is unknown.");
-  }
-
-  return appResources;
-}
 
 export async function createAppResources(
   runtimeConfig: DataPlaneApiRuntimeConfig,
@@ -66,17 +54,10 @@ export async function createAppResources(
   };
 }
 
-export function setAppResources(app: DataPlaneApp, resources: AppRuntimeResources): void {
-  AppResourcesByInstance.set(app, resources);
-}
-
-export async function stopAppResources(app: DataPlaneApp): Promise<void> {
-  const appResources = getAppResources(app);
-
-  AppResourcesByInstance.delete(app);
+export async function stopAppResources(resources: AppRuntimeResources): Promise<void> {
   await Promise.all([
-    appResources.dbPool.end(),
-    appResources.workflowDbPool.end(),
-    appResources.workflowBackend.stop(),
+    resources.dbPool.end(),
+    resources.workflowDbPool.end(),
+    resources.workflowBackend.stop(),
   ]);
 }
