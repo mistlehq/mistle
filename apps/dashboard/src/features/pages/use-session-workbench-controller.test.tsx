@@ -15,6 +15,7 @@ import {
   resolveAutomationSessionPreparationTimeoutDelayMs,
   seedSandboxInstanceStatusQuery,
   shouldClearStoredResumeIdempotencyKey,
+  shouldClearInFlightResumeState,
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
@@ -331,5 +332,14 @@ describe("useSessionWorkbenchController", () => {
 
     expect(shouldClearStoredResumeIdempotencyKey("running")).toBe(true);
     expect(shouldClearStoredResumeIdempotencyKey("failed")).toBe(true);
+  });
+
+  it("ends the in-flight resume state once polling reaches a terminal status", () => {
+    expect(shouldClearInFlightResumeState(null)).toBe(false);
+    expect(shouldClearInFlightResumeState("starting")).toBe(false);
+
+    expect(shouldClearInFlightResumeState("stopped")).toBe(true);
+    expect(shouldClearInFlightResumeState("running")).toBe(true);
+    expect(shouldClearInFlightResumeState("failed")).toBe(true);
   });
 });

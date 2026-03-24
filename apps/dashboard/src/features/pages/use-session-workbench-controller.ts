@@ -268,6 +268,12 @@ export function shouldClearStoredResumeIdempotencyKey(
   return sandboxStatus === "running" || sandboxStatus === "failed";
 }
 
+export function shouldClearInFlightResumeState(
+  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null,
+): boolean {
+  return sandboxStatus === "stopped" || sandboxStatus === "running" || sandboxStatus === "failed";
+}
+
 export function seedSandboxInstanceStatusQuery(input: {
   queryClient: QueryClient;
   sandboxInstanceId: string;
@@ -412,12 +418,7 @@ export function useSessionWorkbenchController(input: {
   }, [input.sandboxInstanceId, sandboxStatus]);
 
   useEffect(() => {
-    if (
-      !isResumingStoppedSandbox ||
-      sandboxStatus === null ||
-      sandboxStatus === "stopped" ||
-      sandboxStatus === "starting"
-    ) {
+    if (!isResumingStoppedSandbox || !shouldClearInFlightResumeState(sandboxStatus)) {
       return;
     }
 
