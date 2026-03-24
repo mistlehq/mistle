@@ -42,21 +42,28 @@ export function FormPageSection(input: FormPageSectionProps): React.JSX.Element 
 export type FormPageHeaderProps = {
   actions?: ReactNode;
   description?: ReactNode;
+  icon?: ReactNode;
   title: ReactNode;
 };
 
 export function FormPageHeader(input: FormPageHeaderProps): React.JSX.Element {
   const hasDescription = input.description !== undefined && input.description !== null;
   const hasActions = input.actions !== undefined && input.actions !== null;
+  const hasIcon = input.icon !== undefined && input.icon !== null;
 
   return (
     <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold">{input.title}</h1>
-          {hasDescription ? (
-            <p className="text-muted-foreground text-sm">{input.description}</p>
-          ) : null}
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        {hasIcon ? <div className="shrink-0">{input.icon}</div> : null}
+        <div className="min-w-0 flex-1">
+          <div className={cn("flex flex-col", hasIcon ? "gap-0" : "gap-1")}>
+            <h1 className="text-xl font-semibold">{input.title}</h1>
+            {hasDescription ? (
+              <p className={cn("text-muted-foreground text-sm", hasIcon ? "leading-tight" : null)}>
+                {input.description}
+              </p>
+            ) : null}
+          </div>
         </div>
       </div>
       {hasActions ? <div className="shrink-0">{input.actions}</div> : null}
