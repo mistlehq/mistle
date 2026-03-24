@@ -227,27 +227,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         ) : null}
       </div>
 
-      <Field>
-        <FieldHeader>
-          <FieldLabel htmlFor="automation-instructions">Instructions</FieldLabel>
-          <FieldDescription>
-            These instructions are sent together with the webhook event type and full payload.
-          </FieldDescription>
-        </FieldHeader>
-        <FieldContent>
-          <Textarea
-            id="automation-instructions"
-            disabled={input.isDeleting || input.isSaving}
-            onChange={(event) => {
-              input.onValueChange("instructions", event.currentTarget.value);
-            }}
-            rows={7}
-            value={input.values.instructions}
-          />
-          <FieldError message={input.fieldErrors.instructions} />
-        </FieldContent>
-      </Field>
-
       <div className="space-y-5">
         <h2 className="text-base font-semibold">Triggers</h2>
 
@@ -324,6 +303,27 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           </FieldContent>
         </Field>
       </div>
+
+      <Field>
+        <FieldHeader>
+          <FieldLabel htmlFor="automation-instructions">Instructions</FieldLabel>
+          <FieldDescription>
+            These instructions are sent together with the webhook event type and full payload.
+          </FieldDescription>
+        </FieldHeader>
+        <FieldContent>
+          <Textarea
+            id="automation-instructions"
+            disabled={input.isDeleting || input.isSaving}
+            onChange={(event) => {
+              input.onValueChange("instructions", event.currentTarget.value);
+            }}
+            rows={7}
+            value={input.values.instructions}
+          />
+          <FieldError message={input.fieldErrors.instructions} />
+        </FieldContent>
+      </Field>
 
       <div className="flex justify-end">
         <Button

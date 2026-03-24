@@ -201,6 +201,29 @@ describe("WebhookAutomationForm", () => {
     expect(screen.queryByRole("heading", { name: "Instructions" })).toBeNull();
   });
 
+  it("renders triggers before instructions", () => {
+    const { container } = renderFormWithOptions({
+      mode: "create",
+    });
+
+    const [triggersHeading] = screen.getAllByRole("heading", { name: "Triggers" });
+    const instructionsField = screen.getByLabelText("Instructions");
+
+    if (triggersHeading === undefined) {
+      throw new Error("Expected triggers heading to be rendered.");
+    }
+
+    expect(
+      Boolean(
+        triggersHeading.compareDocumentPosition(instructionsField) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
+    expect(container.textContent?.indexOf("Triggers")).toBeLessThan(
+      container.textContent?.indexOf("Instructions") ?? Number.POSITIVE_INFINITY,
+    );
+  });
+
   it("renders the create automation name in the header with the inline edit affordance", () => {
     renderForm("create");
 
