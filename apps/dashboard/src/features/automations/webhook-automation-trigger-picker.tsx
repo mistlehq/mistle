@@ -130,83 +130,38 @@ export function WebhookAutomationTriggerPicker(input: {
     parameterId: string;
     value: string;
   }) => void;
+  showAddTriggerControl?: boolean;
 }): React.JSX.Element {
-  const selectedEventOptions = resolveSelectedWebhookAutomationEventOptions({
-    eventOptions: input.eventOptions,
-    selectedTriggerIds: input.selectedTriggerIds,
-  });
   const pickerState = resolveWebhookAutomationTriggerPickerState({
     hasConnectedIntegrations: input.hasConnectedIntegrations,
     selectedTriggerIds: input.selectedTriggerIds,
     eventOptions: input.eventOptions,
   });
-  const [isOpen, setIsOpen] = useState(false);
-  const anchorRef = useComboboxAnchor();
-  const triggerPickerId = useId();
+  const selectedEventOptions = resolveSelectedWebhookAutomationEventOptions({
+    eventOptions: input.eventOptions,
+    selectedTriggerIds: input.selectedTriggerIds,
+  });
 
   return (
     <div className="space-y-3">
-      <Combobox<string, true>
-        autoHighlight
-        disabled={pickerState.disabled}
-        multiple
-        onOpenChange={setIsOpen}
-        onValueChange={(value) => {
-          input.onValueChange(value);
-          setIsOpen(false);
-        }}
-        open={isOpen}
-        value={[...input.selectedTriggerIds]}
-      >
-        <div ref={anchorRef}>
-          <div className="relative">
-            <PlusIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-4 z-10 size-4 -translate-y-1/2" />
-            <ComboboxInput
-              aria-invalid={input.error === undefined ? undefined : true}
-              className="w-full [&_[data-slot=input-group-control]]:pl-10"
-              disabled={pickerState.disabled}
-              id={triggerPickerId}
-              placeholder={pickerState.inputPlaceholder}
-              showClear={false}
-            />
-          </div>
-        </div>
-
-        <ComboboxContent
-          align="start"
-          anchor={anchorRef}
-          className="w-[min(34rem,calc(100vw-2rem))] p-0"
-        >
-          <ComboboxList className="max-h-80">
-            {pickerState.groupedAvailableEventOptions.map((group) => (
-              <ComboboxGroup key={group.connectionLabel}>
-                <ComboboxLabel className="flex items-center gap-2">
-                  {group.logoKey === undefined ? null : (
-                    <img
-                      alt=""
-                      aria-hidden
-                      className="size-3.5 shrink-0"
-                      src={resolveIntegrationLogoPath({ logoKey: group.logoKey })}
-                    />
-                  )}
-                  <span>{group.connectionLabel}</span>
-                </ComboboxLabel>
-                {group.items.map((option) => (
-                  <ComboboxItem key={option.id} value={option.id}>
-                    <span className="truncate">{option.label}</span>
-                  </ComboboxItem>
-                ))}
-              </ComboboxGroup>
-            ))}
-          </ComboboxList>
-        </ComboboxContent>
-      </Combobox>
+      {input.showAddTriggerControl === false ? null : (
+        <WebhookAutomationTriggerPickerAddButton
+          error={input.error}
+          eventOptions={input.eventOptions}
+          hasConnectedIntegrations={input.hasConnectedIntegrations}
+          onValueChange={input.onValueChange}
+          selectedTriggerIds={input.selectedTriggerIds}
+          variant="inline"
+        />
+      )}
 
       {pickerState.helperMessage === null ? null : (
         <p className="text-muted-foreground text-sm">{pickerState.helperMessage}</p>
       )}
 
-      {selectedEventOptions.length === 0 ? null : (
+      {selectedEventOptions.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No triggers added yet.</p>
+      ) : (
         <div className="space-y-1.5">
           {selectedEventOptions.map((option) => (
             <div
@@ -269,6 +224,110 @@ export function WebhookAutomationTriggerPicker(input: {
         </div>
       )}
     </div>
+  );
+}
+
+export function WebhookAutomationTriggerPickerAddButton(input: {
+  hasConnectedIntegrations: boolean;
+  selectedTriggerIds: readonly string[];
+  eventOptions: readonly WebhookAutomationEventOption[];
+  error?: string | undefined;
+  onValueChange: (value: string[]) => void;
+  variant?: "inline" | "header";
+}): React.JSX.Element {
+  const pickerState = resolveWebhookAutomationTriggerPickerState({
+    hasConnectedIntegrations: input.hasConnectedIntegrations,
+    selectedTriggerIds: input.selectedTriggerIds,
+    eventOptions: input.eventOptions,
+  });
+  const [isOpen, setIsOpen] = useState(false);
+  const anchorRef = useComboboxAnchor();
+  const triggerPickerId = useId();
+
+  return (
+    <Combobox<string, true>
+      autoHighlight
+      disabled={pickerState.disabled}
+      multiple
+      onOpenChange={setIsOpen}
+      onValueChange={(value) => {
+        input.onValueChange(value);
+        setIsOpen(false);
+      }}
+      open={isOpen}
+      value={[...input.selectedTriggerIds]}
+    >
+      <div ref={anchorRef}>
+        {input.variant === "header" ? (
+          <Button
+            aria-expanded={isOpen}
+            aria-haspopup="listbox"
+            disabled={pickerState.disabled}
+            onClick={() => {
+              setIsOpen((open) => !open);
+            }}
+            type="button"
+            variant="outline"
+          >
+            <PlusIcon aria-hidden className="size-4" />
+            Add trigger
+          </Button>
+        ) : (
+          <div className="relative">
+            <PlusIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-4 z-10 size-4 -translate-y-1/2" />
+            <ComboboxInput
+              aria-invalid={input.error === undefined ? undefined : true}
+              className="w-full [&_[data-slot=input-group-control]]:pl-10"
+              disabled={pickerState.disabled}
+              id={triggerPickerId}
+              placeholder={pickerState.inputPlaceholder}
+              showClear={false}
+            />
+          </div>
+        )}
+      </div>
+
+      <ComboboxContent
+        align={input.variant === "header" ? "end" : "start"}
+        anchor={anchorRef}
+        className="w-[min(34rem,calc(100vw-2rem))] p-0"
+      >
+        {input.variant === "header" ? (
+          <div className="border-b p-1">
+            <ComboboxInput
+              aria-invalid={input.error === undefined ? undefined : true}
+              className="w-full"
+              disabled={pickerState.disabled}
+              id={triggerPickerId}
+              placeholder="Search triggers"
+              showClear={false}
+            />
+          </div>
+        ) : null}
+        <ComboboxList className="max-h-80">
+          {pickerState.groupedAvailableEventOptions.map((group) => (
+            <ComboboxGroup key={group.connectionLabel}>
+              <ComboboxLabel className="flex items-center gap-2">
+                {group.logoKey === undefined ? null : (
+                  <img
+                    alt=""
+                    aria-hidden
+                    className="size-3.5 shrink-0"
+                    src={resolveIntegrationLogoPath({ logoKey: group.logoKey })}
+                  />
+                )}
+                <span>{group.connectionLabel}</span>
+              </ComboboxLabel>
+              {group.items.map((option) => (
+                <ComboboxItem key={option.id} value={option.id}>
+                  <span className="truncate">{option.label}</span>
+                </ComboboxItem>
+              ))}
+            </ComboboxGroup>
+          ))}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   );
 }
 

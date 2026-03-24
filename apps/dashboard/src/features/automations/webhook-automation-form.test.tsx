@@ -44,14 +44,14 @@ const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
     conversationKeyOptions: [
       {
         id: "issue",
-        label: "Per issue thread",
-        description: "All matching events for the same issue go to one conversation.",
+        label: "Issue",
+        description: "Events from the same issue go to the same conversation.",
         template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
       },
       {
         id: "repository",
-        label: "Per repository",
-        description: "All matching events in the same repository go to one conversation.",
+        label: "Repository",
+        description: "Events from the same repository go to the same conversation.",
         template: "{{payload.repository.full_name}}",
       },
     ],
@@ -80,14 +80,14 @@ const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
     conversationKeyOptions: [
       {
         id: "pull-request",
-        label: "Per pull request",
-        description: "All matching events for the same pull request go to one conversation.",
+        label: "Pull request",
+        description: "Events from the same pull request go to the same conversation.",
         template: "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
       },
       {
         id: "repository",
-        label: "Per repository",
-        description: "All matching events in the same repository go to one conversation.",
+        label: "Repository",
+        description: "Events from the same repository go to the same conversation.",
         template: "{{payload.repository.full_name}}",
       },
     ],
@@ -116,7 +116,10 @@ describe("WebhookAutomationForm", () => {
     });
   }
 
-  function renderFormWithOptions(input: { mode?: "create" | "edit" }): ReturnType<typeof render> {
+  function renderFormWithOptions(input: {
+    mode?: "create" | "edit";
+    values?: WebhookAutomationFormValues;
+  }): ReturnType<typeof render> {
     return render(
       <QueryClientProvider client={new QueryClient()}>
         <WebhookAutomationForm
@@ -131,7 +134,7 @@ describe("WebhookAutomationForm", () => {
           onValueChange={() => {}}
           sandboxProfileOptions={SandboxProfileOptions}
           webhookEventOptions={WebhookEventOptions}
-          values={FormValues}
+          values={input.values ?? FormValues}
         />
       </QueryClientProvider>,
     );
@@ -168,6 +171,19 @@ describe("WebhookAutomationForm", () => {
     renderForm("create");
 
     expect(screen.getAllByText("Group events by").length).toBeGreaterThan(0);
+  });
+
+  it("hides conversation grouping when no triggers are selected", () => {
+    const { container } = renderFormWithOptions({
+      mode: "create",
+      values: {
+        ...FormValues,
+        triggerIds: [],
+        conversationKeyTemplate: "",
+      },
+    });
+
+    expect(container.textContent?.includes("Group events by")).toBe(false);
   });
 
   it("does not inject an unsupported current conversation grouping option", () => {

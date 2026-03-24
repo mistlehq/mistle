@@ -236,6 +236,17 @@ describe("WebhookAutomationTriggerPicker", () => {
     expect(input.getAttribute("disabled")).toBe("");
   });
 
+  it("shows an empty state when no triggers are selected", () => {
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+      selectedTriggerIds: [],
+      triggerParameterValues: {},
+    });
+
+    expect(screen.getAllByText("No triggers added yet.").length).toBeGreaterThan(0);
+  });
+
   it("renders selector-backed trigger parameters", () => {
     renderTriggerPicker({
       hasConnectedIntegrations: true,

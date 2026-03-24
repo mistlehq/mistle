@@ -20,6 +20,7 @@ import { TrashIcon } from "@phosphor-icons/react";
 
 import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
+import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
 import type {
@@ -155,36 +156,6 @@ export function resolveConversationKeyFieldOptions(input: {
   };
 }
 
-function resolveConversationGroupingOptionCopy(input: {
-  option: WebhookAutomationConversationKeyOption;
-}): {
-  label: string;
-  description: string;
-} {
-  switch (input.option.id) {
-    case "repository":
-      return {
-        label: "Repository",
-        description: "Events from the same repository go to the same conversation.",
-      };
-    case "issue":
-      return {
-        label: "Issue",
-        description: "Events from the same issue go to the same conversation.",
-      };
-    case "pull-request":
-      return {
-        label: "Pull request",
-        description: "Events from the same pull request go to the same conversation.",
-      };
-    default:
-      return {
-        label: input.option.label.replace(/^Per\s+/u, ""),
-        description: "Keep related events in the same conversation.",
-      };
-  }
-}
-
 export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.JSX.Element {
   const submitLabel = input.mode === "create" ? "Create automation" : "Save changes";
   const selectedTriggerOptions = resolveSelectedWebhookAutomationEventOptions({
@@ -208,9 +179,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
   const selectedConversationGroupingLabel =
     selectedConversationGroupingOption === undefined
       ? undefined
-      : resolveConversationGroupingOptionCopy({
-          option: selectedConversationGroupingOption,
-        }).label;
+      : selectedConversationGroupingOption.label;
 
   return (
     <div className="flex flex-col gap-6">
@@ -281,7 +250,23 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         </div>
       </FormSection>
 
-      <FormSection header={<h2 className="text-base font-semibold">Triggers</h2>}>
+      <FormSection
+        header={
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold">Triggers</h2>
+            <WebhookAutomationTriggerPickerAddButton
+              error={input.fieldErrors.triggerIds}
+              eventOptions={input.webhookEventOptions}
+              hasConnectedIntegrations={input.connectionOptions.length > 0}
+              onValueChange={(value) => {
+                input.onValueChange("triggerIds", value);
+              }}
+              selectedTriggerIds={input.values.triggerIds}
+              variant="header"
+            />
+          </div>
+        }
+      >
         <div className="p-4">
           <WebhookAutomationTriggerPicker
             error={input.fieldErrors.triggerIds}
@@ -301,62 +286,53 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             }}
             selectedConnectionId={selectedConnectionId}
             selectedTriggerIds={input.values.triggerIds}
+            showAddTriggerControl={false}
             triggerParameterValues={input.values.triggerParameterValues}
           />
           <FieldError message={input.fieldErrors.triggerIds} />
         </div>
 
-        <div className="p-4">
-          <Field orientation="horizontal">
-            <FieldHeader>
-              <FieldLabel>Group events by</FieldLabel>
-            </FieldHeader>
-            <FieldContent>
-              <Select
-                disabled={conversationKeySelectionState.options.length === 0}
-                onValueChange={(value) => {
-                  if (value === null) {
-                    return;
-                  }
-
-                  input.onValueChange("conversationKeyTemplate", value);
-                }}
-                value={conversationKeySelectionState.selectedTemplate}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue
-                    placeholder={
-                      input.values.triggerIds.length === 0
-                        ? "Select triggers first"
-                        : "Select conversation grouping"
+        {input.values.triggerIds.length === 0 ? null : (
+          <div className="p-4">
+            <Field orientation="horizontal">
+              <FieldHeader>
+                <FieldLabel>Group events by</FieldLabel>
+              </FieldHeader>
+              <FieldContent>
+                <Select
+                  disabled={conversationKeySelectionState.options.length === 0}
+                  onValueChange={(value) => {
+                    if (value === null) {
+                      return;
                     }
-                  >
-                    {selectedConversationGroupingLabel}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {conversationKeySelectionState.options.map((option) => {
-                    const optionCopy = resolveConversationGroupingOptionCopy({
-                      option,
-                    });
 
-                    return (
+                    input.onValueChange("conversationKeyTemplate", value);
+                  }}
+                  value={conversationKeySelectionState.selectedTemplate}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select conversation grouping">
+                      {selectedConversationGroupingLabel}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {conversationKeySelectionState.options.map((option) => (
                       <SelectItem key={option.id} value={option.template}>
                         <div className="flex flex-col gap-0.5">
-                          <span>{optionCopy.label}</span>
+                          <span>{option.label}</span>
                           <span className="text-muted-foreground text-xs">
-                            {optionCopy.description}
+                            {option.description}
                           </span>
                         </div>
                       </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-              <FieldError message={input.fieldErrors.conversationKeyTemplate} />
-            </FieldContent>
-          </Field>
-        </div>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError message={input.fieldErrors.conversationKeyTemplate} />
+              </FieldContent>
+            </Field>
+          </div>
+        )}
       </FormSection>
 
       <FormSection>
