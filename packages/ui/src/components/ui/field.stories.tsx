@@ -69,7 +69,7 @@ export const Horizontal = {
   render: function Render() {
     return (
       <div className="w-[40rem]">
-        <Field orientation="horizontal">
+        <Field contentWidth="fill" orientation="horizontal">
           <FieldLabel htmlFor="profile-name">Profile name</FieldLabel>
           <FieldContent>
             <Input defaultValue="Coder" id="profile-name" />
@@ -84,7 +84,7 @@ export const HorizontalWithDescription = {
   render: function Render() {
     return (
       <div className="w-[40rem]">
-        <Field orientation="horizontal">
+        <Field contentWidth="fill" orientation="horizontal">
           <FieldHeader>
             <FieldLabel htmlFor="profile-notes">Profile notes</FieldLabel>
             <FieldDescription>

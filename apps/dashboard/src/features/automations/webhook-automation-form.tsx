@@ -80,13 +80,12 @@ function SelectField(input: {
   options: readonly WebhookAutomationFormOption[];
   error: string | undefined;
   orientation?: "vertical" | "horizontal";
-  fieldClassName?: string;
   onValueChange: (value: string) => void;
 }): React.JSX.Element {
   const selectedOption = input.options.find((option) => option.value === input.value);
 
   return (
-    <Field className={input.fieldClassName} orientation={input.orientation ?? "vertical"}>
+    <Field orientation={input.orientation ?? "vertical"}>
       <FieldLabel>{input.label}</FieldLabel>
       <FieldContent>
         <Select
@@ -99,7 +98,7 @@ function SelectField(input: {
           }}
           value={input.value}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className={input.orientation === "horizontal" ? undefined : "w-full"}>
             <SelectValue placeholder={input.placeholder}>{selectedOption?.label}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -198,10 +197,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       )}
 
       <div className="space-y-5">
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid gap-5">
           <SelectField
             error={input.fieldErrors.sandboxProfileId}
-            fieldClassName="items-center has-[>[data-slot=field-content]]:items-center"
             label="Sandbox profile"
             orientation="horizontal"
             onValueChange={(value) => {
