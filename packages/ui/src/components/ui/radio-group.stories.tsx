@@ -1,4 +1,11 @@
-import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from "./field.js";
+import {
+  Field,
+  FieldDescription,
+  FieldHeader,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "./field.js";
 import { RadioGroup, RadioGroupItem } from "./radio-group.js";
 
 export default {
@@ -18,19 +25,39 @@ export const Default = {
         <RadioGroup {...args}>
           <Field orientation="horizontal">
             <RadioGroupItem id="deploy-automatic" value="automatic" />
-            <FieldLabel htmlFor="deploy-automatic">
-              Automatic rollout
-              <FieldDescription>Ship changes immediately after all checks pass.</FieldDescription>
-            </FieldLabel>
+            <FieldLabel htmlFor="deploy-automatic">Automatic rollout</FieldLabel>
           </Field>
           <Field orientation="horizontal">
             <RadioGroupItem id="deploy-manual" value="manual" />
-            <FieldLabel htmlFor="deploy-manual">
-              Manual approval
+            <FieldLabel htmlFor="deploy-manual">Manual approval</FieldLabel>
+          </Field>
+        </RadioGroup>
+      </FieldSet>
+    );
+  },
+};
+
+export const WithDescriptions = {
+  render: function Render(args: { defaultValue: string }) {
+    return (
+      <FieldSet className="max-w-md">
+        <FieldLegend>Deployment strategy</FieldLegend>
+        <RadioGroup {...args}>
+          <Field orientation="horizontal">
+            <RadioGroupItem id="deploy-automatic" value="automatic" />
+            <FieldHeader>
+              <FieldLabel htmlFor="deploy-automatic">Automatic rollout</FieldLabel>
+              <FieldDescription>Ship changes immediately after all checks pass.</FieldDescription>
+            </FieldHeader>
+          </Field>
+          <Field orientation="horizontal">
+            <RadioGroupItem id="deploy-manual" value="manual" />
+            <FieldHeader>
+              <FieldLabel htmlFor="deploy-manual">Manual approval</FieldLabel>
               <FieldDescription>
                 Require a release manager to confirm each deployment.
               </FieldDescription>
-            </FieldLabel>
+            </FieldHeader>
           </Field>
         </RadioGroup>
       </FieldSet>
@@ -50,12 +77,12 @@ export const DisabledOption = {
           </Field>
           <Field orientation="horizontal">
             <RadioGroupItem disabled id="access-30-days" value="30-days" />
-            <FieldLabel htmlFor="access-30-days">
-              30 days
+            <FieldHeader>
+              <FieldLabel htmlFor="access-30-days">30 days</FieldLabel>
               <FieldDescription>
                 This plan is unavailable on the current workspace tier.
               </FieldDescription>
-            </FieldLabel>
+            </FieldHeader>
           </Field>
         </RadioGroup>
       </FieldSet>

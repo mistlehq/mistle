@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   WebhookAutomationForm,
+  resolveConversationKeyFieldOptions,
   type WebhookAutomationEventOption,
   type WebhookAutomationFormOption,
   type WebhookAutomationFormValues,
@@ -43,14 +44,14 @@ const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
     conversationKeyOptions: [
       {
         id: "issue",
-        label: "Per issue thread",
-        description: "All matching events for the same issue go to one conversation.",
+        label: "Issue",
+        description: "Events from the same issue go to the same conversation.",
         template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
       },
       {
         id: "repository",
-        label: "Per repository",
-        description: "All matching events in the same repository go to one conversation.",
+        label: "Repository",
+        description: "Events from the same repository go to the same conversation.",
         template: "{{payload.repository.full_name}}",
       },
     ],
@@ -79,14 +80,14 @@ const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
     conversationKeyOptions: [
       {
         id: "pull-request",
-        label: "Per pull request",
-        description: "All matching events for the same pull request go to one conversation.",
+        label: "Pull request",
+        description: "Events from the same pull request go to the same conversation.",
         template: "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
       },
       {
         id: "repository",
-        label: "Per repository",
-        description: "All matching events in the same repository go to one conversation.",
+        label: "Repository",
+        description: "Events from the same repository go to the same conversation.",
         template: "{{payload.repository.full_name}}",
       },
     ],
@@ -97,7 +98,7 @@ const FormValues: WebhookAutomationFormValues = {
   name: "Repo triage",
   sandboxProfileId: "sbp_01kkk1mbmxfetvga8kcmw612jj",
   enabled: true,
-  inputTemplate: "{}",
+  instructions: "Please review the changes made.",
   conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
   triggerIds: [
     createWebhookAutomationTriggerId({
@@ -110,7 +111,16 @@ const FormValues: WebhookAutomationFormValues = {
 
 describe("WebhookAutomationForm", () => {
   function renderForm(mode: "create" | "edit" = "create"): void {
-    render(
+    renderFormWithOptions({
+      mode,
+    });
+  }
+
+  function renderFormWithOptions(input: {
+    mode?: "create" | "edit";
+    values?: WebhookAutomationFormValues;
+  }): ReturnType<typeof render> {
+    return render(
       <QueryClientProvider client={new QueryClient()}>
         <WebhookAutomationForm
           connectionOptions={ConnectionOptions}
@@ -118,13 +128,14 @@ describe("WebhookAutomationForm", () => {
           formError={null}
           isDeleting={false}
           isSaving={false}
-          mode={mode}
-          onDelete={mode === "edit" ? () => {} : null}
+          mode={input.mode ?? "create"}
+          onDelete={(input.mode ?? "create") === "edit" ? () => {} : null}
           onSubmit={() => {}}
           onValueChange={() => {}}
           sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledReason={null}
           webhookEventOptions={WebhookEventOptions}
-          values={FormValues}
+          values={input.values ?? FormValues}
         />
       </QueryClientProvider>,
     );
@@ -154,17 +165,117 @@ describe("WebhookAutomationForm", () => {
   it("shows the automation enabled field on edit", () => {
     renderForm("edit");
 
-    expect(screen.getByRole("checkbox", { name: "Automation enabled" })).toBeDefined();
+    expect(screen.getByRole("switch", { name: "Automation enabled" })).toBeDefined();
   });
 
   it("shows connector-defined conversation grouping choices", () => {
     renderForm("create");
 
-    expect(screen.getAllByText("Conversation grouping").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Group events by").length).toBeGreaterThan(0);
+  });
+
+  it("hides conversation grouping when no triggers are selected", () => {
+    const { container } = renderFormWithOptions({
+      mode: "create",
+      values: {
+        ...FormValues,
+        triggerIds: [],
+        conversationKeyTemplate: "",
+      },
+    });
+
+    expect(container.textContent?.includes("Group events by")).toBe(false);
+  });
+
+  it("does not inject an unsupported current conversation grouping option", () => {
+    const fieldOptions = resolveConversationKeyFieldOptions({
+      selectedEventOptions: [WebhookEventOptions[0]!],
+      currentTemplate: "{{payload.unsupported}}",
+    });
+
+    expect(fieldOptions.hasUnsupportedCurrentTemplate).toBe(true);
+    expect(fieldOptions.selectedTemplate).toBe("");
+    expect(
+      fieldOptions.options.some((option) => option.label === "Current setting (unsupported)"),
+    ).toBe(false);
+  });
+
+  it("shows the instructions editor copy", () => {
+    renderForm("create");
+
+    expect(screen.getByLabelText("Agent Instructions")).toBeDefined();
     expect(
       screen.getAllByText(
-        "Events that render to the same key are routed into the same conversation.",
+        "These instructions are sent together with the webhook payload and event type.",
       ).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("Basics")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Agent Instructions" })).toBeNull();
+  });
+
+  it("renders triggers before instructions", () => {
+    const { container } = renderFormWithOptions({
+      mode: "create",
+    });
+
+    const [triggersHeading] = screen.getAllByRole("heading", { name: "Triggers" });
+    const instructionsField = screen.getByLabelText("Agent Instructions");
+
+    if (triggersHeading === undefined) {
+      throw new Error("Expected triggers heading to be rendered.");
+    }
+
+    expect(
+      Boolean(
+        triggersHeading.compareDocumentPosition(instructionsField) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
+    expect(container.textContent?.indexOf("Triggers")).toBeLessThan(
+      container.textContent?.indexOf("Agent Instructions") ?? Number.POSITIVE_INFINITY,
+    );
+  });
+
+  it("renders the create automation name in the header with the inline edit affordance", () => {
+    renderForm("create");
+
+    expect(screen.getAllByRole("heading", { name: "Repo triage" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Edit automation name" }).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.queryByText("Create Automation")).toBeNull();
+    expect(screen.queryByText("Automation name")).toBeNull();
+  });
+
+  it("shows the selected-profile trigger binding message when triggers are unavailable", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WebhookAutomationForm
+          connectionOptions={ConnectionOptions}
+          fieldErrors={{}}
+          formError={null}
+          isDeleting={false}
+          isSaving={false}
+          mode="create"
+          onDelete={null}
+          onSubmit={() => {}}
+          onValueChange={() => {}}
+          sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledReason={
+            "The selected profile has no bindings with automation triggers."
+          }
+          webhookEventOptions={[]}
+          values={{
+            ...FormValues,
+            triggerIds: [],
+            conversationKeyTemplate: "",
+          }}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(
+      screen.getAllByText("The selected profile has no bindings with automation triggers.").length,
     ).toBeGreaterThan(0);
   });
 });

@@ -21,7 +21,7 @@ const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
     }),
     eventType: "github.issue_comment.created",
     connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-    connectionLabel: "GitHub Engineering",
+    connectionLabel: "GitHub - GitHub Engineering",
     label: "Issue comment created",
     category: "Issues",
     logoKey: "github",
@@ -54,7 +54,7 @@ const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
     }),
     eventType: "github.pull_request.opened",
     connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-    connectionLabel: "GitHub Engineering",
+    connectionLabel: "GitHub - GitHub Engineering",
     label: "Pull request opened",
     category: "Pull requests",
     logoKey: "github",
@@ -77,6 +77,7 @@ function renderTriggerPicker(input: {
   selectedConnectionId: string;
   selectedTriggerIds: readonly string[];
   triggerParameterValues: Record<string, Record<string, string>>;
+  disabledReason?: string | null;
   eventOptions?: readonly WebhookAutomationEventOption[];
   useStatefulSelection?: boolean;
 }): ReturnType<typeof render> {
@@ -120,6 +121,7 @@ function renderTriggerPicker(input: {
         error={undefined}
         eventOptions={input.eventOptions ?? WebhookEventOptions}
         hasConnectedIntegrations={input.hasConnectedIntegrations}
+        {...(input.disabledReason === undefined ? {} : { disabledReason: input.disabledReason })}
         onTriggerParameterValueChange={() => {}}
         onValueChange={setSelectedTriggerIds}
         selectedConnectionId={input.selectedConnectionId}
@@ -138,6 +140,7 @@ function renderTriggerPicker(input: {
           error={undefined}
           eventOptions={input.eventOptions ?? WebhookEventOptions}
           hasConnectedIntegrations={input.hasConnectedIntegrations}
+          {...(input.disabledReason === undefined ? {} : { disabledReason: input.disabledReason })}
           onTriggerParameterValueChange={() => {}}
           onValueChange={() => {}}
           selectedConnectionId={input.selectedConnectionId}
@@ -153,7 +156,8 @@ describe("WebhookAutomationTriggerPicker", () => {
   it("groups available triggers by integration connection label", () => {
     expect(groupWebhookAutomationEventOptions(WebhookEventOptions)).toEqual([
       {
-        connectionLabel: "GitHub Engineering",
+        connectionLabel: "GitHub - GitHub Engineering",
+        logoKey: "github",
         items: [WebhookEventOptions[0], WebhookEventOptions[1]],
       },
     ]);
@@ -235,6 +239,39 @@ describe("WebhookAutomationTriggerPicker", () => {
     expect(input.getAttribute("disabled")).toBe("");
   });
 
+  it("shows a profile binding message when trigger selection is disabled by the selected profile", () => {
+    const { container } = renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: "",
+      selectedTriggerIds: [],
+      triggerParameterValues: {},
+      eventOptions: [],
+      disabledReason: "The selected profile has no bindings with automation triggers.",
+    });
+
+    const input = container.querySelector('input[placeholder="No triggers available"]');
+    if (input === null) {
+      throw new Error("Expected trigger input.");
+    }
+
+    expect(input.getAttribute("disabled")).toBe("");
+    expect(
+      screen.getAllByText("The selected profile has no bindings with automation triggers.").length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("No triggers added yet.")).toBeNull();
+  });
+
+  it("shows an empty state when no triggers are selected", () => {
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+      selectedTriggerIds: [],
+      triggerParameterValues: {},
+    });
+
+    expect(screen.getAllByText("No triggers added yet.").length).toBeGreaterThan(0);
+  });
+
   it("renders selector-backed trigger parameters", () => {
     renderTriggerPicker({
       hasConnectedIntegrations: true,
@@ -282,6 +319,27 @@ describe("WebhookAutomationTriggerPicker", () => {
     expect(screen.getAllByText("pull request").length).toBeGreaterThan(0);
   });
 
+  it("renders unset enum-backed trigger parameters as placeholders", () => {
+    const { container } = renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+      selectedTriggerIds: [
+        createWebhookAutomationTriggerId({
+          connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+          eventType: "github.issue_comment.created",
+        }),
+      ],
+      triggerParameterValues: {},
+    });
+
+    const selectValue = container.querySelector('[data-slot="select-value"]');
+    if (selectValue === null) {
+      throw new Error("Expected enum select value.");
+    }
+
+    expect(selectValue.textContent).toBe("Any comment target");
+  });
+
   it("hides already selected triggers from the add-trigger list", () => {
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
@@ -326,7 +384,7 @@ describe("WebhookAutomationTriggerPicker", () => {
     }
 
     fireEvent.click(addTriggerButton);
-    expect(screen.getAllByText("GitHub Engineering").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("GitHub - GitHub Engineering").length).toBeGreaterThan(0);
     expect(addTriggerInput.getAttribute("aria-expanded")).toBe("true");
 
     fireEvent.click(screen.getByRole("option", { name: "Issue comment created" }));

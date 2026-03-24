@@ -1,5 +1,5 @@
 import { Checkbox } from "./checkbox.js";
-import { Field, FieldDescription } from "./field.js";
+import { Field, FieldDescription, FieldHeader } from "./field.js";
 import { Label } from "./label.js";
 
 export default {
@@ -18,12 +18,23 @@ export const WithFieldControl = {
     return (
       <Field orientation="horizontal">
         <Checkbox defaultChecked id="incident-alerts" />
-        <Label htmlFor="incident-alerts">
-          Incident alerts
+        <Label htmlFor="incident-alerts">Incident alerts</Label>
+      </Field>
+    );
+  },
+};
+
+export const WithFieldControlDescription = {
+  render: function Render() {
+    return (
+      <Field orientation="horizontal">
+        <Checkbox defaultChecked id="incident-alerts" />
+        <FieldHeader>
+          <Label htmlFor="incident-alerts">Incident alerts</Label>
           <FieldDescription>
             Notify the on-call rotation when a production incident is detected.
           </FieldDescription>
-        </Label>
+        </FieldHeader>
       </Field>
     );
   },

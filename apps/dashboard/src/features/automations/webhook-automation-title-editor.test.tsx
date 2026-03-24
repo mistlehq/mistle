@@ -10,7 +10,6 @@ describe("WebhookAutomationTitleEditor", () => {
     const { rerender } = render(
       <WebhookAutomationTitleEditor
         errorMessage={undefined}
-        mode="edit"
         onCommit={() => {}}
         saveDisabled={false}
         title="Old automation name"
@@ -25,7 +24,6 @@ describe("WebhookAutomationTitleEditor", () => {
     rerender(
       <WebhookAutomationTitleEditor
         errorMessage={undefined}
-        mode="edit"
         onCommit={() => {}}
         saveDisabled={false}
         title="New automation name"

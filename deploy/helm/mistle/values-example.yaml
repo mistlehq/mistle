@@ -76,6 +76,9 @@ controlPlaneApi:
     - name: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL
       secretName: mistle-runtime
       secretKey: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL
+    - name: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL
     - name: MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL
       secretName: mistle-runtime
       secretKey: MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL
@@ -165,6 +168,9 @@ dataPlaneApi:
     - name: MISTLE_APPS_DATA_PLANE_API_DATABASE_URL
       secretName: mistle-runtime
       secretKey: MISTLE_APPS_DATA_PLANE_API_DATABASE_URL
+    - name: MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL
     - name: MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL
       secretName: mistle-runtime
       secretKey: MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL

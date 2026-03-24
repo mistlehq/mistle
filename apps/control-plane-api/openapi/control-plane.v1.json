@@ -461,7 +461,8 @@
                           "enum": [
                             "INVALID_CONNECTION_REFERENCE",
                             "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
-                            "INVALID_SANDBOX_PROFILE_REFERENCE"
+                            "INVALID_SANDBOX_PROFILE_REFERENCE",
+                            "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
                           ]
                         },
                         "message": {
@@ -930,7 +931,8 @@
                           "enum": [
                             "INVALID_CONNECTION_REFERENCE",
                             "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
-                            "INVALID_SANDBOX_PROFILE_REFERENCE"
+                            "INVALID_SANDBOX_PROFILE_REFERENCE",
+                            "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
                           ]
                         },
                         "message": {

@@ -289,7 +289,7 @@ const EmptyCreateValues: WebhookAutomationFormValues = {
   name: "",
   sandboxProfileId: "",
   enabled: true,
-  inputTemplate: "",
+  instructions: "",
   conversationKeyTemplate: "",
   triggerIds: [],
   triggerParameterValues: {},
@@ -299,7 +299,7 @@ const ExistingAutomationValues: WebhookAutomationFormValues = {
   name: "GitHub pushes to repo triage",
   sandboxProfileId: "sbp_repo_maintainer",
   enabled: true,
-  inputTemplate: '{\n  "repo": "{{payload.repository.full_name}}",\n  "ref": "{{payload.ref}}"\n}',
+  instructions: "Please review the changes made.",
   conversationKeyTemplate: "{{payload.repository.full_name}}:{{payload.ref}}",
   triggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
   triggerParameterValues: {
@@ -323,6 +323,7 @@ function StoryHarness(input: {
   isSaving?: boolean;
   isDeleting?: boolean;
   onDelete?: (() => void) | null;
+  triggerPickerDisabledReason?: string | null;
   connectionOptions?: readonly WebhookAutomationFormOption[];
   sandboxProfileOptions?: readonly WebhookAutomationFormOption[];
   webhookEventOptions?: readonly WebhookAutomationEventOption[];
@@ -348,6 +349,7 @@ function StoryHarness(input: {
           }));
         }}
         sandboxProfileOptions={input.sandboxProfileOptions ?? SandboxProfileOptions}
+        triggerPickerDisabledReason={input.triggerPickerDisabledReason ?? null}
         webhookEventOptions={input.webhookEventOptions ?? GitHubWebhookEventOptions}
         values={values}
       />
@@ -371,6 +373,7 @@ type Story = StoryObj<typeof meta>;
 export const Create: Story = {
   args: {
     mode: "create",
+    triggerPickerDisabledReason: "Select a sandbox profile to choose triggers.",
     values: EmptyCreateValues,
   },
 };
@@ -409,7 +412,7 @@ export const ValidationErrors: Story = {
       name: "Automation name is required.",
       triggerIds: "Select at least one trigger.",
       sandboxProfileId: "Choose a sandbox profile for the automation target.",
-      inputTemplate: "Input template must be valid JSON template text.",
+      instructions: "Instructions are required.",
     },
     values: {
       ...EmptyCreateValues,
@@ -440,8 +443,33 @@ export const Saving: Story = {
 export const NoTriggersAvailable: Story = {
   args: {
     mode: "create",
-    values: EmptyCreateValues,
+    triggerPickerDisabledReason: "The selected profile has no bindings with automation triggers.",
+    values: {
+      ...EmptyCreateValues,
+      sandboxProfileId: "sbp_repo_maintainer",
+    },
     webhookEventOptions: [],
+  },
+};
+
+export const LoadingProfileBindings: Story = {
+  args: {
+    mode: "create",
+    triggerPickerDisabledReason: "Loading profile bindings...",
+    values: {
+      ...EmptyCreateValues,
+      sandboxProfileId: "sbp_repo_maintainer",
+    },
+    webhookEventOptions: [],
+  },
+};
+
+export const ProfileBindingsLoadFailure: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    triggerPickerDisabledReason: "Could not load profile bindings.",
+    values: ExistingAutomationValues,
   },
 };
 

@@ -54,6 +54,7 @@ export const UpdateAutomationWebhookBadRequestResponseSchema = z.union([
       AutomationWebhooksBadRequestCodes.INVALID_CONNECTION_REFERENCE,
       AutomationWebhooksBadRequestCodes.CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE,
       AutomationWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_REFERENCE,
+      AutomationWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
     ]),
   ),
   ValidationErrorResponseSchema,

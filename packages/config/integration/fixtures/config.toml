@@ -40,6 +40,7 @@ port = 5100
 
 [apps.control_plane_api.database]
 url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
+migration_url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 
 [apps.control_plane_api.auth]
 base_url = "http://127.0.0.1:5000"
@@ -92,6 +93,7 @@ port = 5300
 
 [apps.data_plane_api.database]
 url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
+migration_url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 
 [apps.data_plane_api.workflow]
 database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle"

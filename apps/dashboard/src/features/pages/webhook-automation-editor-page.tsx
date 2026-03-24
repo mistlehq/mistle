@@ -141,16 +141,32 @@ function EditWebhookAutomationEditor(input: {
     return renderWebhookAutomationEditorLoading();
   }
 
+  let initialValues: ReturnType<typeof toWebhookAutomationFormValues>;
+  try {
+    initialValues = resolveWebhookAutomationEditInitialValues({
+      automation: automationQuery.data,
+      directoryData: prerequisites.integrationDirectoryQuery.data,
+    });
+  } catch (error) {
+    return renderWebhookAutomationEditorError({
+      title: "Could not load automation",
+      description: resolveApiErrorMessage({
+        error,
+        fallbackMessage: "Could not load automation.",
+      }),
+      onBack: () => {
+        void input.navigate("/automations");
+      },
+    });
+  }
+
   return (
     <LoadedWebhookAutomationEditor
       key={input.automationId}
       mode="edit"
       automationId={input.automationId}
       navigate={input.navigate}
-      initialValues={resolveWebhookAutomationEditInitialValues({
-        automation: automationQuery.data,
-        directoryData: prerequisites.integrationDirectoryQuery.data,
-      })}
+      initialValues={initialValues}
       preservedConnectionId={automationQuery.data.integrationConnectionId}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
@@ -176,32 +192,35 @@ function LoadedWebhookAutomationEditor(input: {
   const state = useLoadedWebhookAutomationEditorState(input);
 
   return (
-    <div className="flex flex-col gap-4">
-      <WebhookAutomationForm
-        connectionOptions={state.connectionOptions}
-        fieldErrors={state.fieldErrors}
-        formError={state.formError}
-        isDeleting={state.isDeleting}
-        isSaving={state.isSaving}
-        mode={input.mode}
-        onDelete={state.onRequestDelete}
-        onSubmit={state.onSubmit}
-        onValueChange={state.onValueChange}
-        sandboxProfileOptions={state.sandboxProfileOptions}
-        webhookEventOptions={state.webhookEventOptions}
-        values={state.values}
-      />
-
-      {input.mode === "edit" ? (
-        <DeleteWebhookAutomationDialog
-          automationName={state.values.name}
-          errorMessage={state.deleteError}
-          isOpen={state.isDeleteDialogOpen}
-          isPending={state.isDeleting}
-          onConfirm={state.onConfirmDelete}
-          onOpenChange={state.onDeleteDialogOpenChange}
+    <div className="-mx-4 -my-6 min-h-full bg-muted/30 px-4 py-6">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+        <WebhookAutomationForm
+          connectionOptions={state.connectionOptions}
+          fieldErrors={state.fieldErrors}
+          formError={state.formError}
+          isDeleting={state.isDeleting}
+          isSaving={state.isSaving}
+          mode={input.mode}
+          onDelete={state.onRequestDelete}
+          onSubmit={state.onSubmit}
+          onValueChange={state.onValueChange}
+          sandboxProfileOptions={state.sandboxProfileOptions}
+          triggerPickerDisabledReason={state.triggerPickerDisabledReason}
+          webhookEventOptions={state.webhookEventOptions}
+          values={state.values}
         />
-      ) : null}
+
+        {input.mode === "edit" ? (
+          <DeleteWebhookAutomationDialog
+            automationName={state.values.name}
+            errorMessage={state.deleteError}
+            isOpen={state.isDeleteDialogOpen}
+            isPending={state.isDeleting}
+            onConfirm={state.onConfirmDelete}
+            onOpenChange={state.onDeleteDialogOpenChange}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }

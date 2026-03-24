@@ -68,6 +68,8 @@ controlPlaneApi:
       value: http://mistle-data-plane-api:8082
     - name: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL
       value: postgresql://mistle:mistle@host.docker.internal:5432/mistle_dev
+    - name: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL
+      value: postgresql://mistle:mistle@host.docker.internal:5432/mistle_dev
     - name: MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION
       value: "1"
     - name: MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON
@@ -191,6 +193,8 @@ dataPlaneApi:
     - name: MISTLE_APPS_DATA_PLANE_API_PORT
       value: "8082"
     - name: MISTLE_APPS_DATA_PLANE_API_DATABASE_URL
+      value: postgresql://mistle:mistle@host.docker.internal:5432/mistle_dev
+    - name: MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL
       value: postgresql://mistle:mistle@host.docker.internal:5432/mistle_dev
     - name: MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL
       value: http://mistle-data-plane-gateway:8084

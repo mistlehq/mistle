@@ -114,6 +114,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL",
   },
   {
+    configPath: ["apps", "control_plane_api", "database", "migrationUrl"],
+    tomlPath: ["apps", "control_plane_api", "database", "migration_url"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL",
+  },
+  {
     configPath: ["apps", "control_plane_api", "auth", "baseUrl"],
     tomlPath: ["apps", "control_plane_api", "auth", "base_url"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL",
@@ -254,6 +259,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     configPath: ["apps", "data_plane_api", "database", "url"],
     tomlPath: ["apps", "data_plane_api", "database", "url"],
     envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_URL",
+  },
+  {
+    configPath: ["apps", "data_plane_api", "database", "migrationUrl"],
+    tomlPath: ["apps", "data_plane_api", "database", "migration_url"],
+    envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL",
   },
   {
     configPath: ["apps", "data_plane_api", "workflow", "databaseUrl"],

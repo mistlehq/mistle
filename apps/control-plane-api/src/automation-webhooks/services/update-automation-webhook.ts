@@ -9,6 +9,7 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
 
 import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-reference-or-throw.js";
+import { assertSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
 import { assertWebhookConnectionReferenceOrThrow } from "./assert-webhook-connection-reference-or-throw.js";
 import { loadWebhookAutomationAggregateOrThrow } from "./load-webhook-automation-aggregate-or-throw.js";
 
@@ -50,6 +51,10 @@ export async function updateAutomationWebhook(
     input.integrationConnectionId ?? existingAutomation.integrationConnectionId;
   const sandboxProfileId =
     input.target?.sandboxProfileId ?? existingAutomation.target.sandboxProfileId;
+  const sandboxProfileVersion =
+    input.target?.sandboxProfileVersion === undefined
+      ? existingAutomation.target.sandboxProfileVersion
+      : input.target.sandboxProfileVersion;
 
   await assertWebhookConnectionReferenceOrThrow(
     { db: ctx.db, integrationRegistry: ctx.integrationRegistry },
@@ -63,6 +68,14 @@ export async function updateAutomationWebhook(
     {
       organizationId: input.organizationId,
       sandboxProfileId,
+    },
+  );
+  await assertSandboxProfileTriggerReferenceOrThrow(
+    { db: ctx.db },
+    {
+      sandboxProfileId,
+      sandboxProfileVersion,
+      integrationConnectionId,
     },
   );
 

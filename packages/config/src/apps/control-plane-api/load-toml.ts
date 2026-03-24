@@ -25,6 +25,7 @@ export function loadControlPlaneApiFromToml(
     },
     database: {
       url: database.url,
+      migrationUrl: database.migration_url,
     },
     auth: {
       baseUrl: auth.base_url,
