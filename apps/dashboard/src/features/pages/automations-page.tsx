@@ -73,7 +73,7 @@ export function AutomationsPage(): React.JSX.Element {
     setSearchParams(nextSearchParams);
   }
 
-  const canShowListingFooter =
+  const canShowSummary =
     automationsQuery.data !== undefined &&
     !prerequisites.isPending &&
     prerequisites.errorMessage === null;
@@ -129,7 +129,7 @@ export function AutomationsPage(): React.JSX.Element {
           prerequisites.refetchAll();
         }}
         previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
-        totalResults={canShowListingFooter ? automationsQuery.data.totalResults : null}
+        summaryTotalResults={canShowSummary ? automationsQuery.data.totalResults : null}
       />
     </div>
   );

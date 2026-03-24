@@ -204,7 +204,10 @@ describe("AutomationsPage", () => {
           updatedAt: "2026-03-05T00:00:00.000Z",
         },
       ],
-      nextPage: null,
+      nextPage: {
+        after: "cursor_next",
+        limit: 25,
+      },
       previousPage: null,
       totalResults: 1,
     };
@@ -227,8 +230,8 @@ describe("AutomationsPage", () => {
     );
 
     expect(markup).not.toContain("Showing 0 of 1");
-    expect(markup).not.toContain(">Previous<");
-    expect(markup).not.toContain(">Next<");
+    expect(markup).toContain(">Previous<");
+    expect(markup).toContain(">Next<");
   });
 
   it("does not render the result summary when prerequisites fail", () => {
@@ -255,7 +258,10 @@ describe("AutomationsPage", () => {
           updatedAt: "2026-03-05T00:00:00.000Z",
         },
       ],
-      nextPage: null,
+      nextPage: {
+        after: "cursor_next",
+        limit: 25,
+      },
       previousPage: null,
       totalResults: 1,
     };
@@ -293,8 +299,8 @@ describe("AutomationsPage", () => {
 
     expect(markup).not.toContain("Showing 0 of 1");
     expect(markup).not.toContain("Showing 1 of 1");
-    expect(markup).not.toContain(">Previous<");
-    expect(markup).not.toContain(">Next<");
+    expect(markup).toContain(">Previous<");
+    expect(markup).toContain(">Next<");
   });
 
   it("updates the result summary when the list is filtered client-side", () => {
