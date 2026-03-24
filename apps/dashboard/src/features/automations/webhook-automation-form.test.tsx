@@ -182,11 +182,9 @@ describe("WebhookAutomationForm", () => {
     });
 
     expect(fieldOptions.hasUnsupportedCurrentTemplate).toBe(true);
-    expect(fieldOptions.displayOptions).toEqual(fieldOptions.supportedOptions);
+    expect(fieldOptions.selectedTemplate).toBe("");
     expect(
-      fieldOptions.displayOptions.some(
-        (option) => option.label === "Current setting (unsupported)",
-      ),
+      fieldOptions.options.some((option) => option.label === "Current setting (unsupported)"),
     ).toBe(false);
   });
 

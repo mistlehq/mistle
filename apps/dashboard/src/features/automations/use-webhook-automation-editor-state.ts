@@ -67,7 +67,7 @@ function resolveNormalizedConversationKeyTemplate(input: {
     currentTemplate: input.values.conversationKeyTemplate,
   });
 
-  if (conversationKeyFieldOptions.supportedOptions.length === 0) {
+  if (conversationKeyFieldOptions.options.length === 0) {
     return input.values.conversationKeyTemplate;
   }
 
@@ -77,11 +77,9 @@ function resolveNormalizedConversationKeyTemplate(input: {
 
   if (
     input.values.conversationKeyTemplate.trim().length === 0 ||
-    !conversationKeyFieldOptions.supportedOptions.some(
-      (option) => option.template === input.values.conversationKeyTemplate,
-    )
+    conversationKeyFieldOptions.selectedTemplate.length === 0
   ) {
-    return conversationKeyFieldOptions.supportedOptions[0]?.template ?? "";
+    return conversationKeyFieldOptions.options[0]?.template ?? "";
   }
 
   return input.values.conversationKeyTemplate;

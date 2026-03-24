@@ -3,7 +3,6 @@ import { useState } from "react";
 import { EditableHeading } from "../shared/editable-heading.js";
 
 export function WebhookAutomationTitleEditor(input: {
-  mode: "create" | "edit";
   title: string;
   saveDisabled: boolean;
   onCommit: (nextValue: string) => void;

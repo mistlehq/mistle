@@ -125,29 +125,22 @@ export function resolveConversationKeyFieldOptions(input: {
   selectedEventOptions: readonly WebhookAutomationEventOption[];
   currentTemplate: string;
 }): {
-  supportedOptions: readonly WebhookAutomationConversationKeyOption[];
-  displayOptions: readonly WebhookAutomationConversationKeyOption[];
+  options: readonly WebhookAutomationConversationKeyOption[];
+  selectedTemplate: string;
   hasUnsupportedCurrentTemplate: boolean;
 } {
-  const supportedOptions = resolveCommonWebhookAutomationConversationKeyOptions({
+  const options = resolveCommonWebhookAutomationConversationKeyOptions({
     selectedEventOptions: input.selectedEventOptions,
   });
-
-  if (
-    input.currentTemplate.trim().length === 0 ||
-    supportedOptions.some((option) => option.template === input.currentTemplate)
-  ) {
-    return {
-      supportedOptions,
-      displayOptions: supportedOptions,
-      hasUnsupportedCurrentTemplate: false,
-    };
-  }
+  const isCurrentTemplateSupported =
+    input.currentTemplate.trim().length > 0 &&
+    options.some((option) => option.template === input.currentTemplate);
 
   return {
-    supportedOptions,
-    displayOptions: supportedOptions,
-    hasUnsupportedCurrentTemplate: true,
+    options,
+    selectedTemplate: isCurrentTemplateSupported ? input.currentTemplate : "",
+    hasUnsupportedCurrentTemplate:
+      input.currentTemplate.trim().length > 0 && !isCurrentTemplateSupported,
   };
 }
 
@@ -164,13 +157,10 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
   );
   const selectedConnectionId =
     selectedConnectionIds.size === 1 ? ([...selectedConnectionIds][0] ?? "") : "";
-  const conversationKeyFieldOptions = resolveConversationKeyFieldOptions({
+  const conversationKeySelectionState = resolveConversationKeyFieldOptions({
     selectedEventOptions: selectedTriggerOptions,
     currentTemplate: input.values.conversationKeyTemplate,
   });
-  const selectedConversationKeyTemplate = conversationKeyFieldOptions.hasUnsupportedCurrentTemplate
-    ? ""
-    : input.values.conversationKeyTemplate;
 
   return (
     <div className="flex flex-col gap-6">
@@ -178,7 +168,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         <div className="min-w-0 flex-1">
           <WebhookAutomationTitleEditor
             errorMessage={input.fieldErrors.name}
-            mode={input.mode}
             onCommit={(nextValue) => {
               input.onValueChange("name", nextValue);
             }}
@@ -295,7 +284,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           </FieldHeader>
           <FieldContent>
             <Select
-              disabled={conversationKeyFieldOptions.displayOptions.length === 0}
+              disabled={conversationKeySelectionState.options.length === 0}
               onValueChange={(value) => {
                 if (value === null) {
                   return;
@@ -303,7 +292,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
                 input.onValueChange("conversationKeyTemplate", value);
               }}
-              value={selectedConversationKeyTemplate}
+              value={conversationKeySelectionState.selectedTemplate}
             >
               <SelectTrigger className="w-full">
                 <SelectValue
@@ -314,14 +303,15 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                   }
                 >
                   {
-                    conversationKeyFieldOptions.displayOptions.find(
-                      (option) => option.template === selectedConversationKeyTemplate,
+                    conversationKeySelectionState.options.find(
+                      (option) =>
+                        option.template === conversationKeySelectionState.selectedTemplate,
                     )?.label
                   }
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {conversationKeyFieldOptions.displayOptions.map((option) => (
+                {conversationKeySelectionState.options.map((option) => (
                   <SelectItem key={option.id} value={option.template}>
                     <div className="flex flex-col gap-0.5">
                       <span>{option.label}</span>
