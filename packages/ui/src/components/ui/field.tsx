@@ -74,7 +74,7 @@ function Field({
       role="group"
       data-slot="field"
       data-orientation={orientation}
-      className={cn("gap-1", fieldVariants({ orientation }), className)}
+      className={cn("gap-1.5", fieldVariants({ orientation }), className)}
       {...props}
     />
   );
