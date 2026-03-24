@@ -262,6 +262,12 @@ export function clearStoredResumeIdempotencyKey(input: {
   });
 }
 
+export function shouldClearStoredResumeIdempotencyKey(
+  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null,
+): boolean {
+  return sandboxStatus === "running" || sandboxStatus === "failed";
+}
+
 export function seedSandboxInstanceStatusQuery(input: {
   queryClient: QueryClient;
   sandboxInstanceId: string;
@@ -395,7 +401,7 @@ export function useSessionWorkbenchController(input: {
   }, [clearStartErrorMessage, disconnectPty, disconnectSession, input.sandboxInstanceId]);
 
   useEffect(() => {
-    if (input.sandboxInstanceId === null || sandboxStatus === null || sandboxStatus === "stopped") {
+    if (input.sandboxInstanceId === null || !shouldClearStoredResumeIdempotencyKey(sandboxStatus)) {
       return;
     }
 

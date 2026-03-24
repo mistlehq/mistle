@@ -14,6 +14,7 @@ import {
   readStoredResumeIdempotencyKey,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   seedSandboxInstanceStatusQuery,
+  shouldClearStoredResumeIdempotencyKey,
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
@@ -321,5 +322,14 @@ describe("useSessionWorkbenchController", () => {
       failureMessage: null,
       automationConversation: null,
     });
+  });
+
+  it("preserves the stored resume key while the sandbox is still starting", () => {
+    expect(shouldClearStoredResumeIdempotencyKey("stopped")).toBe(false);
+    expect(shouldClearStoredResumeIdempotencyKey("starting")).toBe(false);
+    expect(shouldClearStoredResumeIdempotencyKey(null)).toBe(false);
+
+    expect(shouldClearStoredResumeIdempotencyKey("running")).toBe(true);
+    expect(shouldClearStoredResumeIdempotencyKey("failed")).toBe(true);
   });
 });
