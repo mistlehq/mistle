@@ -33,6 +33,7 @@ import {
   createSandboxProfile,
   listSandboxProfiles,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
+import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 
 const DEFAULT_LIST_LIMIT = 20;
@@ -327,17 +328,23 @@ export function SandboxProfilesPage(): React.JSX.Element {
             </TableBody>
           </Table>
 
-          <TablePagination
-            hasNextPage={listQuery.data.nextPage !== null}
-            hasPreviousPage={listQuery.data.previousPage !== null}
-            nextPageDisabled={listQuery.isFetching || listQuery.isPending}
-            onNextPage={goToNextPage}
-            onPreviousPage={goToPreviousPage}
-            previousPageDisabled={listQuery.isFetching || listQuery.isPending}
-            summary={
+          <TableListingFooter
+            resultsCount={
               <p className="text-muted-foreground text-sm">
                 Showing {items.length} of {listQuery.data.totalResults}
               </p>
+            }
+            pagination={
+              listQuery.data.nextPage === null && listQuery.data.previousPage === null ? null : (
+                <TablePagination
+                  hasNextPage={listQuery.data.nextPage !== null}
+                  hasPreviousPage={listQuery.data.previousPage !== null}
+                  nextPageDisabled={listQuery.isFetching || listQuery.isPending}
+                  onNextPage={goToNextPage}
+                  onPreviousPage={goToPreviousPage}
+                  previousPageDisabled={listQuery.isFetching || listQuery.isPending}
+                />
+              )
             }
           />
         </>

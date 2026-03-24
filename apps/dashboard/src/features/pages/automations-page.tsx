@@ -1,3 +1,4 @@
+import { Button } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -7,7 +8,6 @@ import { buildWebhookAutomationListItems } from "../automations/webhook-automati
 import { WebhookAutomationListView } from "../automations/webhook-automation-list-view.js";
 import { webhookAutomationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { listWebhookAutomations } from "../automations/webhook-automations-service.js";
-import { TablePagination } from "../shared/table-pagination.js";
 
 const AUTOMATIONS_LIST_LIMIT = 25;
 
@@ -73,52 +73,65 @@ export function AutomationsPage(): React.JSX.Element {
     setSearchParams(nextSearchParams);
   }
 
+  const canShowSummary =
+    automationsQuery.data !== undefined &&
+    !automationsQuery.isError &&
+    !prerequisites.isPending &&
+    prerequisites.errorMessage === null;
+
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-row items-start justify-between gap-3">
+        <h1 className="text-xl font-semibold">Automations</h1>
+        <Button
+          onClick={() => {
+            void navigate("/automations/new");
+          }}
+          type="button"
+        >
+          Create automation
+        </Button>
+      </div>
+
       <WebhookAutomationListView
         errorMessage={errorMessage}
+        hasNextPage={automationsQuery.data?.nextPage != null}
+        hasPreviousPage={automationsQuery.data?.previousPage != null}
         isLoading={automationsQuery.isPending || prerequisites.isPending}
         items={items}
-        onCreateAutomation={() => {
-          void navigate("/automations/new");
+        nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
+        onNextPage={() => {
+          const nextPage = automationsQuery.data?.nextPage;
+          if (nextPage === null || nextPage === undefined) {
+            return;
+          }
+
+          updatePagination({
+            nextAfter: nextPage.after,
+            nextBefore: null,
+          });
         }}
         onOpenAutomation={(automationId) => {
           void navigate(`/automations/${automationId}`);
+        }}
+        onPreviousPage={() => {
+          const previousPage = automationsQuery.data?.previousPage;
+          if (previousPage === null || previousPage === undefined) {
+            return;
+          }
+
+          updatePagination({
+            nextAfter: null,
+            nextBefore: previousPage.before,
+          });
         }}
         onRetry={() => {
           void automationsQuery.refetch();
           prerequisites.refetchAll();
         }}
+        previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
+        totalResults={canShowSummary ? automationsQuery.data.totalResults : null}
       />
-
-      {automationsQuery.data === undefined ? null : (
-        <TablePagination
-          hasNextPage={automationsQuery.data.nextPage !== null}
-          hasPreviousPage={automationsQuery.data.previousPage !== null}
-          onNextPage={() => {
-            const nextPage = automationsQuery.data?.nextPage;
-            if (nextPage === null || nextPage === undefined) {
-              return;
-            }
-
-            updatePagination({
-              nextAfter: nextPage.after,
-              nextBefore: null,
-            });
-          }}
-          onPreviousPage={() => {
-            const previousPage = automationsQuery.data?.previousPage;
-            if (previousPage === null || previousPage === undefined) {
-              return;
-            }
-
-            updatePagination({
-              nextAfter: null,
-              nextBefore: previousPage.before,
-            });
-          }}
-        />
-      )}
     </div>
   );
 }
