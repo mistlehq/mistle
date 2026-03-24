@@ -92,6 +92,7 @@ function CreateWebhookAutomationEditor(input: {
       navigate={input.navigate}
       initialValues={toWebhookAutomationFormValues(null)}
       templateParseError={null}
+      preservedInputTemplate={null}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
       directoryData={prerequisites.integrationDirectoryQuery.data}
@@ -155,6 +156,7 @@ function EditWebhookAutomationEditor(input: {
       navigate={input.navigate}
       initialValues={resolvedInitialState.initialValues}
       templateParseError={resolvedInitialState.templateParseError}
+      preservedInputTemplate={resolvedInitialState.preservedInputTemplate}
       preservedConnectionId={automationQuery.data.integrationConnectionId}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
@@ -169,6 +171,7 @@ function LoadedWebhookAutomationEditor(input: {
   navigate: (to: string) => void | Promise<void>;
   initialValues: ReturnType<typeof toWebhookAutomationFormValues>;
   templateParseError: string | null;
+  preservedInputTemplate: string | null;
   connectionOptions: ReturnType<typeof useWebhookAutomationPrerequisites>["connectionOptions"];
   sandboxProfileOptions: ReturnType<
     typeof useWebhookAutomationPrerequisites

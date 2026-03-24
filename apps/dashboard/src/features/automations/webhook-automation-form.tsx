@@ -386,7 +386,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
       <div className="flex justify-end">
         <Button
-          disabled={!input.isTemplateEditable || input.isDeleting || input.isSaving}
+          disabled={input.isDeleting || input.isSaving}
           onClick={input.onSubmit}
           type="button"
         >

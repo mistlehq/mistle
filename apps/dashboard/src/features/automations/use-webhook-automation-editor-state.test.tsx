@@ -33,6 +33,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
             triggerParameterValues: {},
           },
           templateParseError: null,
+          preservedInputTemplate: null,
           connectionOptions: [],
           sandboxProfileOptions: [],
           directoryData: {

@@ -27,6 +27,36 @@ describe("webhook automation input template", () => {
     });
   });
 
+  it("accepts equivalent pretty-printed canonical json", () => {
+    expect(
+      parseWebhookAutomationInputTemplate({
+        template: `{
+  "payload": {{payload}},
+  "instructions": "Review this",
+  "eventType": "{{webhookEvent.eventType}}"
+}`,
+      }),
+    ).toEqual({
+      ok: true,
+      instructions: "Review this",
+    });
+  });
+
+  it("does not rewrite payload placeholders inside instructions", () => {
+    expect(
+      parseWebhookAutomationInputTemplate({
+        template: `{
+  "instructions": "Mention {{payload}} literally",
+  "eventType": "{{webhookEvent.eventType}}",
+  "payload": {{payload}}
+}`,
+      }),
+    ).toEqual({
+      ok: true,
+      instructions: "Mention {{payload}} literally",
+    });
+  });
+
   it("rejects custom templates", () => {
     expect(
       parseWebhookAutomationInputTemplate({
