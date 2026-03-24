@@ -28,6 +28,17 @@ describe("webhook automation input template", () => {
     });
   });
 
+  it("preserves literal payload placeholders inside instructions", () => {
+    const template = buildWebhookAutomationInputTemplate({
+      instructions: "Explain what {{payload}} contains before reviewing it.",
+    });
+
+    expect(parseWebhookAutomationInputTemplate({ template })).toEqual({
+      ok: true,
+      instructions: "Explain what {{payload}} contains before reviewing it.",
+    });
+  });
+
   it("renders plain-text instructions as valid json", () => {
     const renderedTemplate = renderTemplateString({
       template: buildWebhookAutomationInputTemplate({

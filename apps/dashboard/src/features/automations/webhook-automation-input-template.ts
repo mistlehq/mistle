@@ -11,9 +11,9 @@ export function parseWebhookAutomationInputTemplate(input: {
   template: string;
 }): { ok: true; instructions: string } | { ok: false; reason: string } {
   const payloadPlaceholderJsonString = JSON.stringify(PayloadPlaceholder);
-  const normalizedTemplate = input.template.replaceAll(
-    PayloadPlaceholder,
-    payloadPlaceholderJsonString,
+  const normalizedTemplate = input.template.replace(
+    /"payload"\s*:\s*\{\{payload\}\}/u,
+    `"payload":${payloadPlaceholderJsonString}`,
   );
 
   let parsedTemplate: unknown;
