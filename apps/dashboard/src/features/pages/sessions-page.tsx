@@ -666,7 +666,7 @@ export function SessionsPage(): React.JSX.Element {
           </Table>
 
           <TableListingFooter
-            summary={
+            resultsCount={
               sessionResultsSummary === null ? null : (
                 <p className="text-muted-foreground text-sm">
                   Showing {sessionResultsSummary.visibleCount} of {sessionResultsSummary.totalCount}
@@ -674,14 +674,16 @@ export function SessionsPage(): React.JSX.Element {
               )
             }
             pagination={
-              <TablePagination
-                hasNextPage={hasNextPage}
-                hasPreviousPage={hasPreviousPage}
-                nextPageDisabled={nextPageDisabled}
-                onNextPage={goToNextPage}
-                onPreviousPage={goToPreviousPage}
-                previousPageDisabled={previousPageDisabled}
-              />
+              !hasNextPage && !hasPreviousPage ? null : (
+                <TablePagination
+                  hasNextPage={hasNextPage}
+                  hasPreviousPage={hasPreviousPage}
+                  nextPageDisabled={nextPageDisabled}
+                  onNextPage={goToNextPage}
+                  onPreviousPage={goToPreviousPage}
+                  previousPageDisabled={previousPageDisabled}
+                />
+              )
             }
           />
         </div>

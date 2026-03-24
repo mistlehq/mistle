@@ -329,20 +329,22 @@ export function SandboxProfilesPage(): React.JSX.Element {
           </Table>
 
           <TableListingFooter
-            summary={
+            resultsCount={
               <p className="text-muted-foreground text-sm">
                 Showing {items.length} of {listQuery.data.totalResults}
               </p>
             }
             pagination={
-              <TablePagination
-                hasNextPage={listQuery.data.nextPage !== null}
-                hasPreviousPage={listQuery.data.previousPage !== null}
-                nextPageDisabled={listQuery.isFetching || listQuery.isPending}
-                onNextPage={goToNextPage}
-                onPreviousPage={goToPreviousPage}
-                previousPageDisabled={listQuery.isFetching || listQuery.isPending}
-              />
+              listQuery.data.nextPage === null && listQuery.data.previousPage === null ? null : (
+                <TablePagination
+                  hasNextPage={listQuery.data.nextPage !== null}
+                  hasPreviousPage={listQuery.data.previousPage !== null}
+                  nextPageDisabled={listQuery.isFetching || listQuery.isPending}
+                  onNextPage={goToNextPage}
+                  onPreviousPage={goToPreviousPage}
+                  previousPageDisabled={listQuery.isFetching || listQuery.isPending}
+                />
+              )
             }
           />
         </>

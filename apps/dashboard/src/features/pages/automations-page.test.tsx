@@ -318,6 +318,77 @@ describe("AutomationsPage", () => {
     expect(markup).toContain(">Next<");
   });
 
+  it("does not render the result summary when the automation query is in error", () => {
+    const queryClient = createQueryClient();
+    const listResult: WebhookAutomationsListResult = {
+      items: [
+        {
+          conversationKeyTemplate: "{{event.id}}",
+          createdAt: "2026-03-05T00:00:00.000Z",
+          enabled: true,
+          eventTypes: ["push"],
+          id: "aut_123",
+          idempotencyKeyTemplate: null,
+          inputTemplate: "{{payload}}",
+          integrationConnectionId: "icn_123",
+          kind: "webhook",
+          name: "Repo triage",
+          payloadFilter: null,
+          target: {
+            id: "target_123",
+            sandboxProfileId: "sbp_123",
+            sandboxProfileVersion: null,
+          },
+          updatedAt: "2026-03-05T00:00:00.000Z",
+        },
+      ],
+      nextPage: {
+        after: "cursor_next",
+        limit: 25,
+      },
+      previousPage: null,
+      totalResults: 1,
+    };
+
+    queryClient.setQueryData(
+      webhookAutomationsListQueryKey({
+        limit: 25,
+        after: null,
+        before: null,
+      }),
+      listResult,
+    );
+    seedAutomationPrerequisites(queryClient);
+    const automationsListQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: webhookAutomationsListQueryKey({
+        limit: 25,
+        after: null,
+        before: null,
+      }),
+      queryFn: async () => listResult,
+    });
+    automationsListQuery.setState({
+      ...automationsListQuery.state,
+      data: listResult,
+      error: new Error("Could not load automations."),
+      errorUpdateCount: 1,
+      errorUpdatedAt: Date.now(),
+      fetchStatus: "idle",
+      status: "error",
+    });
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AutomationsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).not.toContain("Showing 1 of 1");
+    expect(markup).toContain(">Next<");
+  });
+
   it("updates the result summary when the list is filtered client-side", () => {
     const queryClient = createQueryClient();
     const listResult: WebhookAutomationsListResult = {

@@ -27,6 +27,34 @@ export type WebhookAutomationListItemViewModel = {
   enabled: boolean;
 };
 
+function renderAutomationPagination(input: {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  nextPageDisabled?: boolean;
+  previousPageDisabled?: boolean;
+  onNextPage: () => void;
+  onPreviousPage: () => void;
+}): React.JSX.Element | null {
+  if (!input.hasNextPage && !input.hasPreviousPage) {
+    return null;
+  }
+
+  return (
+    <TablePagination
+      hasNextPage={input.hasNextPage}
+      hasPreviousPage={input.hasPreviousPage}
+      onNextPage={input.onNextPage}
+      onPreviousPage={input.onPreviousPage}
+      {...(input.nextPageDisabled === undefined
+        ? {}
+        : { nextPageDisabled: input.nextPageDisabled })}
+      {...(input.previousPageDisabled === undefined
+        ? {}
+        : { previousPageDisabled: input.previousPageDisabled })}
+    />
+  );
+}
+
 type WebhookAutomationListViewProps = {
   items: readonly WebhookAutomationListItemViewModel[];
   isLoading: boolean;
@@ -160,27 +188,14 @@ export function WebhookAutomationListView(
       )}
 
       <TableListingFooter
-        summary={
+        resultsCount={
           input.summaryTotalResults === null ? null : (
             <p className="text-muted-foreground text-sm">
               Showing {visibleItems.length} of {input.summaryTotalResults}
             </p>
           )
         }
-        pagination={
-          <TablePagination
-            hasNextPage={input.hasNextPage}
-            hasPreviousPage={input.hasPreviousPage}
-            onNextPage={input.onNextPage}
-            onPreviousPage={input.onPreviousPage}
-            {...(input.nextPageDisabled === undefined
-              ? {}
-              : { nextPageDisabled: input.nextPageDisabled })}
-            {...(input.previousPageDisabled === undefined
-              ? {}
-              : { previousPageDisabled: input.previousPageDisabled })}
-          />
-        }
+        pagination={renderAutomationPagination(input)}
       />
     </div>
   );

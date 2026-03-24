@@ -75,6 +75,7 @@ export function AutomationsPage(): React.JSX.Element {
 
   const canShowSummary =
     automationsQuery.data !== undefined &&
+    !automationsQuery.isError &&
     !prerequisites.isPending &&
     prerequisites.errorMessage === null;
 
