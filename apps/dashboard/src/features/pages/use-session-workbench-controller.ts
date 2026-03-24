@@ -714,6 +714,11 @@ export function useSessionWorkbenchController(input: {
       setHasAttemptedAutoConnect(false);
       await sandboxStatusQuery.refetch();
     } catch (error) {
+      clearStoredResumeIdempotencyKey({
+        sandboxInstanceId: input.sandboxInstanceId,
+        storage,
+      });
+      setHasStoredResumeIdempotencyKey(false);
       setIsResumingStoppedSandbox(false);
       setResumeErrorMessage(
         error instanceof Error ? error.message : "Could not resume sandbox session.",
