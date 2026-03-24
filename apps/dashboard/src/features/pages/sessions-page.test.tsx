@@ -7,8 +7,10 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
+import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import {
   buildOptimisticSessions,
+  resolveSessionResultsSummary,
   SandboxSessionStatusBadge,
   SessionsPage,
 } from "./sessions-page.js";
@@ -105,6 +107,87 @@ describe("SessionsPage", () => {
     expect(markup).toContain("bg-muted/60");
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
     expect(markup).toContain('<span class="sr-only">Actions</span>');
+  });
+
+  it("renders the result summary even when there is only one page", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          refetchOnMount: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+    seedAuthenticatedSession(queryClient);
+    queryClient.setQueryData(
+      sandboxInstancesListQueryKey({
+        limit: 20,
+        after: null,
+        before: null,
+      }),
+      {
+        items: [
+          {
+            id: "sbi_123",
+            sandboxProfileId: "sbp_123",
+            sandboxProfileVersion: 2,
+            status: "running",
+            startedBy: {
+              kind: "user",
+              id: "user-id",
+              name: "Mistle User",
+            },
+            source: "dashboard",
+            createdAt: "2026-03-10T00:00:00.000Z",
+            updatedAt: "2026-03-10T00:00:00.000Z",
+            failureCode: null,
+            failureMessage: null,
+          },
+        ],
+        nextPage: null,
+        previousPage: null,
+        totalResults: 1,
+      },
+    );
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <SessionsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain("Showing 1 of 1");
+    expect(markup).not.toContain(">Previous<");
+    expect(markup).not.toContain(">Next<");
+  });
+
+  it("counts optimistic sessions only in the visible results", () => {
+    expect(
+      resolveSessionResultsSummary({
+        listedSessionCount: 1,
+        totalResults: 1,
+        optimisticSessionCount: 1,
+      }),
+    ).toStrictEqual({
+      visibleCount: 2,
+      totalCount: 2,
+    });
+  });
+
+  it("counts optimistic sessions in the total on short pages", () => {
+    expect(
+      resolveSessionResultsSummary({
+        listedSessionCount: 1,
+        totalResults: 21,
+        optimisticSessionCount: 1,
+      }),
+    ).toStrictEqual({
+      visibleCount: 2,
+      totalCount: 22,
+    });
   });
 
   it("renders a compact failure indicator with tooltip details", () => {

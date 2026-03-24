@@ -109,4 +109,44 @@ describe("SandboxProfilesPage", () => {
     expect(markup).toContain("bg-muted/60");
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
   });
+
+  it("renders the result summary even when there is only one page", () => {
+    const queryClient = createQueryClient();
+    const listResult: SandboxProfilesListResult = {
+      items: [
+        {
+          createdAt: "2026-03-05T00:00:00.000Z",
+          displayName: "Default Profile",
+          id: "sbp_123",
+          organizationId: "org_123",
+          status: "active",
+          updatedAt: "2026-03-05T00:00:00.000Z",
+        },
+      ],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 1,
+    };
+
+    queryClient.setQueryData(
+      sandboxProfilesListQueryKey({
+        limit: 20,
+        after: null,
+        before: null,
+      }),
+      listResult,
+    );
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <SandboxProfilesPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain("Showing 1 of 1");
+    expect(markup).not.toContain(">Previous<");
+    expect(markup).not.toContain(">Next<");
+  });
 });
