@@ -13,7 +13,7 @@ describe("webhook automation input template", () => {
         instructions: "Please write a review of the changes made.",
       }),
     ).toBe(
-      '{% capture __mistleWebhookAutomationInstructions %}Please write a review of the changes made.{% endcapture %}{"instructions":{{ __mistleWebhookAutomationInstructions | json }},"eventType":"{{webhookEvent.eventType}}","payload":{{payload}}}',
+      '{"instructions":"Please write a review of the changes made.","eventType":"{{webhookEvent.eventType}}","payload":{{payload}}}',
     );
   });
 
@@ -28,10 +28,10 @@ describe("webhook automation input template", () => {
     });
   });
 
-  it("renders templated instructions as valid json", () => {
+  it("renders plain-text instructions as valid json", () => {
     const renderedTemplate = renderTemplateString({
       template: buildWebhookAutomationInputTemplate({
-        instructions: "Review {{payload.comment.body}}",
+        instructions: 'Review the comment body for quotes like "this".',
       }),
       context: {
         webhookEvent: {
@@ -46,7 +46,7 @@ describe("webhook automation input template", () => {
     });
 
     expect(JSON.parse(renderedTemplate)).toEqual({
-      instructions: 'Review A "quoted"\ncomment body',
+      instructions: 'Review the comment body for quotes like "this".',
       eventType: "github.issue_comment.created",
       payload: {
         comment: {
@@ -59,8 +59,7 @@ describe("webhook automation input template", () => {
   it("rejects custom templates", () => {
     expect(
       parseWebhookAutomationInputTemplate({
-        template:
-          '{"instructions":"Review it","eventType":"{{webhookEvent.eventType}}","payload":{{payload}}}',
+        template: "Handle {{payload.comment.body}}",
       }),
     ).toEqual({
       ok: false,

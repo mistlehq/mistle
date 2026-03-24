@@ -72,13 +72,19 @@ function parseOptionalEventTypes(value: readonly string[]): string[] | null {
   return items.length === 0 ? null : items;
 }
 
+function containsLiquidSyntax(value: string): boolean {
+  return (
+    value.includes("{{") || value.includes("}}") || value.includes("{%") || value.includes("%}")
+  );
+}
+
 export function toWebhookAutomationFormValues(
   automation: WebhookAutomation | null,
   eventOptions: readonly WebhookAutomationEventOption[] = [],
 ): WebhookAutomationFormValues {
   if (automation === null) {
     return {
-      name: "",
+      name: "Your automation",
       sandboxProfileId: "",
       enabled: true,
       instructions: "",
@@ -150,6 +156,8 @@ export function validateWebhookAutomationFormValues(
 
   if (values.instructions.trim().length === 0) {
     errors.instructions = "Instructions are required.";
+  } else if (containsLiquidSyntax(values.instructions)) {
+    errors.instructions = "Instructions must be plain text and cannot include Liquid syntax.";
   }
 
   if (values.conversationKeyTemplate.trim().length === 0) {

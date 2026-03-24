@@ -63,7 +63,6 @@ export function buildWebhookAutomationSandboxProfileOptions(input: {
     input.sandboxProfiles.map((profile) => ({
       value: profile.id,
       label: profile.displayName,
-      description: profile.status,
     })),
   );
 }

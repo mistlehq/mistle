@@ -186,4 +186,15 @@ describe("WebhookAutomationForm", () => {
     expect(screen.queryByText("Basics")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Instructions" })).toBeNull();
   });
+
+  it("renders the create automation name in the header with the inline edit affordance", () => {
+    renderForm("create");
+
+    expect(screen.getAllByRole("heading", { name: "Repo triage" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Edit automation name" }).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.queryByText("Create Automation")).toBeNull();
+    expect(screen.queryByText("Automation name")).toBeNull();
+  });
 });

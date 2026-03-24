@@ -144,9 +144,9 @@ const BaseFormValues: WebhookAutomationFormValues = {
 };
 
 describe("toWebhookAutomationFormValues", () => {
-  it("creates empty defaults for create mode", () => {
+  it("creates defaults for create mode", () => {
     expect(toWebhookAutomationFormValues(null)).toEqual({
-      name: "",
+      name: "Your automation",
       sandboxProfileId: "",
       enabled: true,
       instructions: "",
@@ -181,8 +181,7 @@ describe("toWebhookAutomationFormValues", () => {
     expect(() =>
       toWebhookAutomationFormValues({
         ...SampleAutomation,
-        inputTemplate:
-          '{"instructions":"Please write a review of the changes made.","eventType":"{{webhookEvent.eventType}}","payload":{{payload}}}',
+        inputTemplate: "Handle {{payload.comment.body}}",
       }),
     ).toThrow(
       "This automation uses a custom input template that cannot be edited in the instructions editor.",
@@ -258,6 +257,20 @@ describe("validateWebhookAutomationFormValues", () => {
       sandboxProfileId: "Select a sandbox profile.",
       instructions: "Instructions are required.",
       conversationKeyTemplate: "Conversation key template is required.",
+    });
+  });
+
+  it("rejects liquid syntax in instructions", () => {
+    expect(
+      validateWebhookAutomationFormValues(
+        {
+          ...BaseFormValues,
+          instructions: "Review {{payload.comment.body}}",
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      instructions: "Instructions must be plain text and cannot include Liquid syntax.",
     });
   });
 

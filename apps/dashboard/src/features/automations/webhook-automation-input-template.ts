@@ -1,21 +1,42 @@
 const WebhookEventTypePlaceholder = "{{webhookEvent.eventType}}";
 const PayloadPlaceholder = "{{payload}}";
-const InstructionsCaptureVariableName = "__mistleWebhookAutomationInstructions";
-const InstructionsCapturePrefix = `{% capture ${InstructionsCaptureVariableName} %}`;
-const InstructionsCaptureSuffix = `{% endcapture %}{"instructions":{{ ${InstructionsCaptureVariableName} | json }},"eventType":"${WebhookEventTypePlaceholder}","payload":${PayloadPlaceholder}}`;
 const UnsupportedTemplateReason =
   "This automation uses a custom input template that cannot be edited in the instructions editor.";
 
 export function buildWebhookAutomationInputTemplate(input: { instructions: string }): string {
-  return `${InstructionsCapturePrefix}${input.instructions}${InstructionsCaptureSuffix}`;
+  return `{"instructions":${JSON.stringify(input.instructions)},"eventType":"${WebhookEventTypePlaceholder}","payload":${PayloadPlaceholder}}`;
 }
 
 export function parseWebhookAutomationInputTemplate(input: {
   template: string;
 }): { ok: true; instructions: string } | { ok: false; reason: string } {
+  const payloadPlaceholderJsonString = JSON.stringify(PayloadPlaceholder);
+  const normalizedTemplate = input.template.replaceAll(
+    PayloadPlaceholder,
+    payloadPlaceholderJsonString,
+  );
+
+  let parsedTemplate: unknown;
+
+  try {
+    parsedTemplate = JSON.parse(normalizedTemplate);
+  } catch {
+    return {
+      ok: false,
+      reason: UnsupportedTemplateReason,
+    };
+  }
+
   if (
-    !input.template.startsWith(InstructionsCapturePrefix) ||
-    !input.template.endsWith(InstructionsCaptureSuffix)
+    typeof parsedTemplate !== "object" ||
+    parsedTemplate === null ||
+    !("instructions" in parsedTemplate) ||
+    !("eventType" in parsedTemplate) ||
+    !("payload" in parsedTemplate) ||
+    typeof parsedTemplate.instructions !== "string" ||
+    parsedTemplate.eventType !== WebhookEventTypePlaceholder ||
+    parsedTemplate.payload !== PayloadPlaceholder ||
+    Object.keys(parsedTemplate).length !== 3
   ) {
     return {
       ok: false,
@@ -25,9 +46,6 @@ export function parseWebhookAutomationInputTemplate(input: {
 
   return {
     ok: true,
-    instructions: input.template.slice(
-      InstructionsCapturePrefix.length,
-      input.template.length - InstructionsCaptureSuffix.length,
-    ),
+    instructions: parsedTemplate.instructions,
   };
 }

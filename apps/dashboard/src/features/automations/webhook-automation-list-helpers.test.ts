@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildWebhookAutomationEventOptions,
+  buildWebhookAutomationSandboxProfileOptions,
   createWebhookAutomationTriggerId,
 } from "./webhook-automation-list-helpers.js";
 
@@ -204,6 +205,30 @@ describe("buildWebhookAutomationEventOptions", () => {
         description: "No longer available from your connected integrations.",
         category: "Unavailable",
         unavailable: true,
+      },
+    ]);
+  });
+});
+
+describe("buildWebhookAutomationSandboxProfileOptions", () => {
+  it("does not expose sandbox profile status as option copy", () => {
+    expect(
+      buildWebhookAutomationSandboxProfileOptions({
+        sandboxProfiles: [
+          {
+            id: "sbp_1",
+            organizationId: "org_1",
+            displayName: "Repo Maintainer",
+            status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        value: "sbp_1",
+        label: "Repo Maintainer",
       },
     ]);
   });

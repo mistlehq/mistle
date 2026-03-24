@@ -1,7 +1,6 @@
 import { useState } from "react";
 
 import { EditableHeading } from "../shared/editable-heading.js";
-import { PageTitleField } from "../shared/page-title-field.js";
 
 export function WebhookAutomationTitleEditor(input: {
   mode: "create" | "edit";
@@ -10,24 +9,6 @@ export function WebhookAutomationTitleEditor(input: {
   onCommit: (nextValue: string) => void;
   errorMessage: string | undefined;
 }): React.JSX.Element {
-  if (input.mode === "create") {
-    return (
-      <PageTitleField
-        ariaLabel="Automation name"
-        autoFocus={true}
-        className="text-base font-medium"
-        fieldId="automation-name"
-        label="Automation name"
-        maxWidthClassName="max-w-4xl"
-        onChange={input.onCommit}
-        placeholder="Automation name"
-        showLabel={true}
-        value={input.title}
-        {...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage })}
-      />
-    );
-  }
-
   return (
     <WebhookAutomationEditableTitle
       key={input.title}

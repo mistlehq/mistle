@@ -24,7 +24,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           automationId: undefined,
           navigate: async () => {},
           initialValues: {
-            name: "",
+            name: "Your automation",
             sandboxProfileId: "",
             enabled: true,
             instructions: "",
@@ -47,7 +47,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     );
 
     expect(result.current.values).toEqual({
-      name: "",
+      name: "Your automation",
       sandboxProfileId: "",
       enabled: true,
       instructions: "",
