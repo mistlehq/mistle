@@ -6,7 +6,7 @@ import { AUTH_ROUTE_BASE_PATH } from "./constants.js";
 export function createAuthRoutes(): AppRoutes<typeof AUTH_ROUTE_BASE_PATH> {
   const routes = new Hono<AppContextBindings>();
   routes.all("*", (ctx) => {
-    return ctx.get("services").auth.handler(ctx.req.raw);
+    return ctx.get("auth").handler(ctx.req.raw);
   });
 
   return {

@@ -1,21 +1,26 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
+import {
+  ForbiddenResponseSchema,
+  NotFoundResponseSchema,
+  UnauthorizedResponseSchema,
+} from "@mistle/http/errors.js";
 
-import { errorResponseSchema, paramsSchema, successResponseSchema } from "./schema.js";
+import { MembershipCapabilitiesSchema } from "../schemas.js";
+import { GetMembershipCapabilitiesParamsSchema } from "./schema.js";
 
 export const route = createRoute({
   method: "get",
   path: "/{organizationId}/membership-capabilities",
   tags: ["Organizations"],
   request: {
-    params: paramsSchema,
+    params: GetMembershipCapabilitiesParamsSchema,
   },
   responses: {
     200: {
       description: "Membership capabilities for the current actor in the organization.",
       content: {
         "application/json": {
-          schema: successResponseSchema,
+          schema: MembershipCapabilitiesSchema,
         },
       },
     },
@@ -31,7 +36,7 @@ export const route = createRoute({
       description: "Forbidden request.",
       content: {
         "application/json": {
-          schema: z.union([ForbiddenResponseSchema, errorResponseSchema]),
+          schema: ForbiddenResponseSchema,
         },
       },
     },
@@ -39,7 +44,7 @@ export const route = createRoute({
       description: "Organization was not found.",
       content: {
         "application/json": {
-          schema: errorResponseSchema,
+          schema: NotFoundResponseSchema,
         },
       },
     },

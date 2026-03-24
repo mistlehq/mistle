@@ -4031,83 +4031,69 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [true]
+                    "organizationId": {
+                      "type": "string",
+                      "minLength": 1
                     },
-                    "data": {
+                    "actorRole": {
+                      "type": "string",
+                      "enum": ["owner", "admin", "member"]
+                    },
+                    "invite": {
                       "type": "object",
                       "properties": {
-                        "organizationId": {
-                          "type": "string",
-                          "minLength": 1
+                        "canExecute": {
+                          "type": "boolean"
                         },
-                        "actorRole": {
-                          "type": "string",
-                          "enum": ["owner", "admin", "member"]
+                        "assignableRoles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": ["owner", "admin", "member"]
+                          }
+                        }
+                      },
+                      "required": ["canExecute", "assignableRoles"],
+                      "additionalProperties": false
+                    },
+                    "memberRoleUpdate": {
+                      "type": "object",
+                      "properties": {
+                        "canExecute": {
+                          "type": "boolean"
                         },
-                        "invite": {
+                        "roleTransitionMatrix": {
                           "type": "object",
                           "properties": {
-                            "canExecute": {
-                              "type": "boolean"
+                            "owner": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": ["owner", "admin", "member"]
+                              }
                             },
-                            "assignableRoles": {
+                            "admin": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": ["owner", "admin", "member"]
+                              }
+                            },
+                            "member": {
                               "type": "array",
                               "items": {
                                 "type": "string",
                                 "enum": ["owner", "admin", "member"]
                               }
                             }
-                          },
-                          "required": ["canExecute", "assignableRoles"],
-                          "additionalProperties": false
-                        },
-                        "memberRoleUpdate": {
-                          "type": "object",
-                          "properties": {
-                            "canExecute": {
-                              "type": "boolean"
-                            },
-                            "roleTransitionMatrix": {
-                              "type": "object",
-                              "properties": {
-                                "owner": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string",
-                                    "enum": ["owner", "admin", "member"]
-                                  }
-                                },
-                                "admin": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string",
-                                    "enum": ["owner", "admin", "member"]
-                                  }
-                                },
-                                "member": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string",
-                                    "enum": ["owner", "admin", "member"]
-                                  }
-                                }
-                              }
-                            }
-                          },
-                          "required": ["canExecute", "roleTransitionMatrix"],
-                          "additionalProperties": false
+                          }
                         }
                       },
-                      "required": ["organizationId", "actorRole", "invite", "memberRoleUpdate"],
+                      "required": ["canExecute", "roleTransitionMatrix"],
                       "additionalProperties": false
-                    },
-                    "error": {
-                      "type": "null"
                     }
                   },
-                  "required": ["ok", "data", "error"],
+                  "required": ["organizationId", "actorRole", "invite", "memberRoleUpdate"],
                   "additionalProperties": false
                 }
               }
@@ -4140,55 +4126,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": ["FORBIDDEN"]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
                     },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "ok": {
-                          "type": "boolean",
-                          "enum": [false]
-                        },
-                        "data": {
-                          "type": "null"
-                        },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "code": {
-                              "type": "string",
-                              "enum": ["FORBIDDEN", "NOT_FOUND"]
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "retryable": {
-                              "type": "boolean"
-                            }
-                          },
-                          "required": ["code", "message", "retryable"],
-                          "additionalProperties": false
-                        }
-                      },
-                      "required": ["ok", "data", "error"],
-                      "additionalProperties": false
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
-                  ]
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -4200,33 +4150,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [false]
+                    "code": {
+                      "type": "string",
+                      "enum": ["NOT_FOUND"]
                     },
-                    "data": {
-                      "type": "null"
-                    },
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": ["FORBIDDEN", "NOT_FOUND"]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "retryable": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": ["code", "message", "retryable"],
-                      "additionalProperties": false
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
-                  "required": ["ok", "data", "error"],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
