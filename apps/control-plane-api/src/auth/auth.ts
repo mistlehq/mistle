@@ -4,13 +4,13 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP, organization } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
+import type { OpenWorkflow } from "openworkflow";
 
-import type { createControlPlaneOpenWorkflow } from "../../openworkflow.js";
-import { AUTH_ROUTE_BASE_PATH } from "../constants.js";
-import { applyActiveOrganizationToSession } from "./apply-active-organization-to-session.js";
-import { createInitialOrganizationCredentialKey } from "./create-initial-organization-credential-key.js";
-import { createSendOrganizationInvitationService } from "./create-send-organization-invitation.js";
-import { createSendVerificationOTPService } from "./create-send-verification-otp.js";
+import { AUTH_ROUTE_BASE_PATH } from "./constants.js";
+import { applyActiveOrganizationToSession } from "./services/apply-active-organization-to-session.js";
+import { createInitialOrganizationCredentialKey } from "./services/create-initial-organization-credential-key.js";
+import { createSendOrganizationInvitationService } from "./services/create-send-organization-invitation.js";
+import { createSendVerificationOTPService } from "./services/create-send-verification-otp.js";
 
 export type ControlPlaneAuthConfig = {
   authBaseUrl: string;
@@ -24,12 +24,10 @@ export type ControlPlaneAuthConfig = {
   masterEncryptionKeys: Record<string, string>;
 };
 
-type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
-
 type CreateControlPlaneAuthOptions = {
   config: ControlPlaneAuthConfig;
   db: ControlPlaneDatabase;
-  openWorkflow: ControlPlaneOpenWorkflow;
+  openWorkflow: OpenWorkflow;
 };
 
 export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {

@@ -77,10 +77,6 @@ describe("parseConfigRecord", () => {
           },
         },
         control_plane_worker: {
-          server: {
-            host: "127.0.0.1",
-            port: 5100,
-          },
           workflow: {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
             namespaceId: "development",
@@ -120,10 +116,6 @@ describe("parseConfigRecord", () => {
           },
         },
         data_plane_worker: {
-          server: {
-            host: "127.0.0.1",
-            port: 5201,
-          },
           database: {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
           },
@@ -258,10 +250,6 @@ describe("parseConfigRecord", () => {
           },
         },
         control_plane_worker: {
-          server: {
-            host: "127.0.0.1",
-            port: 5100,
-          },
           workflow: {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
             namespaceId: "development",
@@ -301,10 +289,6 @@ describe("parseConfigRecord", () => {
           },
         },
         data_plane_worker: {
-          server: {
-            host: "127.0.0.1",
-            port: 5201,
-          },
           database: {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
           },
@@ -438,10 +422,6 @@ describe("parseConfigRecord", () => {
           },
         },
         control_plane_worker: {
-          server: {
-            host: "127.0.0.1",
-            port: 5100,
-          },
           workflow: {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
             namespaceId: "development",
@@ -481,10 +461,6 @@ describe("parseConfigRecord", () => {
           },
         },
         data_plane_worker: {
-          server: {
-            host: "127.0.0.1",
-            port: 5201,
-          },
           database: {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
           },

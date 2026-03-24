@@ -165,10 +165,6 @@ const controlPlaneApiFixtureConfig = {
 } as const;
 
 const controlPlaneWorkerEnvConfig = {
-  server: {
-    host: "127.0.0.1",
-    port: 5001,
-  },
   workflow: {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     namespaceId: "development",
@@ -194,10 +190,6 @@ const controlPlaneWorkerEnvConfig = {
 
 const controlPlaneWorkerFixtureConfig = {
   ...controlPlaneWorkerEnvConfig,
-  server: {
-    host: "0.0.0.0",
-    port: 5200,
-  },
   workflow: {
     ...controlPlaneWorkerEnvConfig.workflow,
     namespaceId: "fixture",
@@ -282,10 +274,6 @@ const dataPlaneGatewayFixtureConfig = {
 } as const;
 
 const dataPlaneWorkerEnvConfig = {
-  server: {
-    host: "127.0.0.1",
-    port: 5004,
-  },
   database: {
     url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
   },
@@ -315,10 +303,6 @@ const dataPlaneWorkerEnvConfig = {
 
 const dataPlaneWorkerFixtureConfig = {
   ...dataPlaneWorkerEnvConfig,
-  server: {
-    host: "0.0.0.0",
-    port: 5303,
-  },
   workflow: {
     ...dataPlaneWorkerEnvConfig.workflow,
     namespaceId: "fixture",
@@ -330,10 +314,6 @@ const dataPlaneWorkerFixtureConfig = {
 } as const;
 
 const dataPlaneWorkerDockerFixtureConfig = {
-  server: {
-    host: "0.0.0.0",
-    port: 5305,
-  },
   database: {
     url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
   },
@@ -466,20 +446,12 @@ describe("loadConfig integrations", () => {
       app: AppIds.CONTROL_PLANE_WORKER,
       env: createIntegrationEnv({
         NODE_ENV: "production",
-        MISTLE_APPS_CONTROL_PLANE_WORKER_HOST: "localhost",
-        MISTLE_APPS_CONTROL_PLANE_WORKER_PORT: "5301",
       }),
     });
 
     expect(config).toEqual({
       global: globalProductionConfig,
-      app: {
-        ...controlPlaneWorkerEnvConfig,
-        server: {
-          host: "localhost",
-          port: 5301,
-        },
-      },
+      app: controlPlaneWorkerEnvConfig,
     });
   });
 
@@ -667,20 +639,12 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_WORKER,
       env: createIntegrationEnv({
         NODE_ENV: "production",
-        MISTLE_APPS_DATA_PLANE_WORKER_HOST: "localhost",
-        MISTLE_APPS_DATA_PLANE_WORKER_PORT: "5304",
       }),
     });
 
     expect(config).toEqual({
       global: globalProductionConfig,
-      app: {
-        ...dataPlaneWorkerEnvConfig,
-        server: {
-          host: "localhost",
-          port: 5304,
-        },
-      },
+      app: dataPlaneWorkerEnvConfig,
     });
   });
 

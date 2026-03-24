@@ -2048,26 +2048,21 @@ export interface paths {
           };
           content: {
             "application/json": {
-              data: {
-                /** @enum {string} */
-                actorRole: "owner" | "admin" | "member";
-                invite: {
-                  assignableRoles: ("owner" | "admin" | "member")[];
-                  canExecute: boolean;
-                };
-                memberRoleUpdate: {
-                  canExecute: boolean;
-                  roleTransitionMatrix: {
-                    admin?: ("owner" | "admin" | "member")[];
-                    member?: ("owner" | "admin" | "member")[];
-                    owner?: ("owner" | "admin" | "member")[];
-                  };
-                };
-                organizationId: string;
+              /** @enum {string} */
+              actorRole: "owner" | "admin" | "member";
+              invite: {
+                assignableRoles: ("owner" | "admin" | "member")[];
+                canExecute: boolean;
               };
-              error: null;
-              /** @enum {boolean} */
-              ok: true;
+              memberRoleUpdate: {
+                canExecute: boolean;
+                roleTransitionMatrix: {
+                  admin?: ("owner" | "admin" | "member")[];
+                  member?: ("owner" | "admin" | "member")[];
+                  owner?: ("owner" | "admin" | "member")[];
+                };
+              };
+              organizationId: string;
             };
           };
         };
@@ -2090,23 +2085,11 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code: "FORBIDDEN";
-                  message: string;
-                }
-              | {
-                  data: null;
-                  error: {
-                    /** @enum {string} */
-                    code: "FORBIDDEN" | "NOT_FOUND";
-                    message: string;
-                    retryable: boolean;
-                  };
-                  /** @enum {boolean} */
-                  ok: false;
-                };
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
           };
         };
         /** @description Organization was not found. */
@@ -2116,15 +2099,9 @@ export interface paths {
           };
           content: {
             "application/json": {
-              data: null;
-              error: {
-                /** @enum {string} */
-                code: "FORBIDDEN" | "NOT_FOUND";
-                message: string;
-                retryable: boolean;
-              };
-              /** @enum {boolean} */
-              ok: false;
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
             };
           };
         };

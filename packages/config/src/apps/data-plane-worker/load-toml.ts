@@ -10,7 +10,6 @@ export function loadDataPlaneWorkerFromToml(
 ): PartialDataPlaneWorkerConfigInput {
   const apps = asObjectRecord(tomlRoot.apps);
   const dataPlaneWorker = asObjectRecord(apps.data_plane_worker);
-  const server = asObjectRecord(dataPlaneWorker.server);
   const database = asObjectRecord(dataPlaneWorker.database);
   const workflow = asObjectRecord(dataPlaneWorker.workflow);
   const tunnel = asObjectRecord(dataPlaneWorker.tunnel);
@@ -40,10 +39,6 @@ export function loadDataPlaneWorkerFromToml(
   }
 
   return PartialDataPlaneWorkerConfigSchema.parse({
-    server: {
-      host: server.host,
-      port: server.port,
-    },
     database: {
       url: database.url,
     },

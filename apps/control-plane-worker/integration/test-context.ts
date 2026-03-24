@@ -174,10 +174,6 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkerIntegrationFixtur
       });
 
       const config: ControlPlaneWorkerConfig = {
-        server: {
-          host: "127.0.0.1",
-          port: 3001,
-        },
         workflow: {
           databaseUrl: runtimeDatabaseUrl,
           namespaceId: sharedInfraConfig.workflowNamespaceId,

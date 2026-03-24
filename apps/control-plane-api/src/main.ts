@@ -1,9 +1,9 @@
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 
 import { createApp } from "./app.js";
+import { createControlPlaneAuth } from "./auth/index.js";
 import { createAppResources, stopAppResources } from "./resources.js";
 import { startServer } from "./server.js";
-import { createAppServices } from "./service.js";
 import type {
   ControlPlaneApiRuntime,
   ControlPlaneApiRuntimeConfig,
@@ -19,16 +19,28 @@ export async function createControlPlaneApiRuntime(
     baseUrl: runtimeConfig.app.dataPlaneApi.baseUrl,
     serviceToken: runtimeConfig.internalAuthServiceToken,
   });
+  const { app: config } = runtimeConfig;
   let app: ControlPlaneApp;
 
   try {
-    const services = createAppServices({
-      runtimeConfig,
-      resources,
+    const auth = createControlPlaneAuth({
+      config: {
+        authBaseUrl: config.auth.baseUrl,
+        dashboardBaseUrl: config.dashboard.baseUrl,
+        authSecret: config.auth.secret,
+        authTrustedOrigins: config.auth.trustedOrigins,
+        authOTPLength: config.auth.otpLength,
+        authOTPExpiresInSeconds: config.auth.otpExpiresInSeconds,
+        authOTPAllowedAttempts: config.auth.otpAllowedAttempts,
+        activeMasterEncryptionKeyVersion: config.integrations.activeMasterEncryptionKeyVersion,
+        masterEncryptionKeys: config.integrations.masterEncryptionKeys,
+      },
+      db: resources.db,
+      openWorkflow: resources.openWorkflow,
     });
 
     app = createApp({
-      config: runtimeConfig.app,
+      config,
       sandboxConfig: runtimeConfig.sandbox,
       internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
       db: resources.db,
@@ -36,7 +48,7 @@ export async function createControlPlaneApiRuntime(
       dataPlaneClient,
       connectionTokenConfig: runtimeConfig.connectionToken,
       openWorkflow: resources.openWorkflow,
-      services,
+      auth,
     });
   } catch (error) {
     await stopAppResources(resources);

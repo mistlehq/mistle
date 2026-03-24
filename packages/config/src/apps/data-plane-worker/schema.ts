@@ -7,13 +7,6 @@ const HttpBaseUrlSchema = z.url().refine((value) => {
   return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
 }, "Expected an http or https URL.");
 
-export const DataPlaneWorkerServerConfigSchema = z
-  .object({
-    host: z.string().min(1),
-    port: z.number().int().min(1).max(65535),
-  })
-  .strict();
-
 export const DataPlaneWorkerDatabaseConfigSchema = z
   .object({
     url: z.string().min(1),
@@ -88,7 +81,6 @@ export const PartialDataPlaneWorkerSandboxConfigSchema = z
 
 export const DataPlaneWorkerConfigSchema = z
   .object({
-    server: DataPlaneWorkerServerConfigSchema,
     database: DataPlaneWorkerDatabaseConfigSchema,
     workflow: DataPlaneWorkerWorkflowConfigSchema,
     tunnel: DataPlaneWorkerTunnelConfigSchema,
@@ -99,7 +91,6 @@ export const DataPlaneWorkerConfigSchema = z
 
 export const PartialDataPlaneWorkerConfigSchema = z
   .object({
-    server: DataPlaneWorkerServerConfigSchema.partial().optional(),
     database: DataPlaneWorkerDatabaseConfigSchema.partial().optional(),
     workflow: DataPlaneWorkerWorkflowConfigSchema.partial().optional(),
     tunnel: DataPlaneWorkerTunnelConfigSchema.partial().optional(),

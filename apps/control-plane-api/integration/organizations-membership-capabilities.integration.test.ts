@@ -1,9 +1,7 @@
+import { ForbiddenResponseSchema, NotFoundResponseSchema } from "@mistle/http/errors.js";
 import { describe, expect } from "vitest";
 
-import {
-  MembershipCapabilitiesErrorResponseSchema,
-  MembershipCapabilitiesSuccessResponseSchema,
-} from "../src/organization-membership-capabilities/index.js";
+import { MembershipCapabilitiesSchema } from "../src/organizations/index.js";
 import { it } from "./test-context.js";
 
 describe("organization membership capabilities integration", () => {
@@ -22,27 +20,23 @@ describe("organization membership capabilities integration", () => {
     );
 
     expect(response.status).toBe(200);
-    const body = MembershipCapabilitiesSuccessResponseSchema.parse(await response.json());
+    const body = MembershipCapabilitiesSchema.parse(await response.json());
 
     expect(body).toEqual({
-      ok: true,
-      data: {
-        organizationId: authenticatedSession.organizationId,
-        actorRole: "owner",
-        invite: {
-          canExecute: true,
-          assignableRoles: ["owner", "admin", "member"],
-        },
-        memberRoleUpdate: {
-          canExecute: true,
-          roleTransitionMatrix: {
-            owner: ["owner", "admin", "member"],
-            admin: ["owner", "admin", "member"],
-            member: ["owner", "admin", "member"],
-          },
+      organizationId: authenticatedSession.organizationId,
+      actorRole: "owner",
+      invite: {
+        canExecute: true,
+        assignableRoles: ["owner", "admin", "member"],
+      },
+      memberRoleUpdate: {
+        canExecute: true,
+        roleTransitionMatrix: {
+          owner: ["owner", "admin", "member"],
+          admin: ["owner", "admin", "member"],
+          member: ["owner", "admin", "member"],
         },
       },
-      error: null,
     });
   });
 
@@ -66,16 +60,11 @@ describe("organization membership capabilities integration", () => {
     );
 
     expect(response.status).toBe(403);
-    const body = MembershipCapabilitiesErrorResponseSchema.parse(await response.json());
+    const body = ForbiddenResponseSchema.parse(await response.json());
 
     expect(body).toEqual({
-      ok: false,
-      data: null,
-      error: {
-        code: "FORBIDDEN",
-        message: "Forbidden API request.",
-        retryable: false,
-      },
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
     });
   });
 
@@ -94,16 +83,11 @@ describe("organization membership capabilities integration", () => {
     );
 
     expect(response.status).toBe(404);
-    const body = MembershipCapabilitiesErrorResponseSchema.parse(await response.json());
+    const body = NotFoundResponseSchema.parse(await response.json());
 
     expect(body).toEqual({
-      ok: false,
-      data: null,
-      error: {
-        code: "NOT_FOUND",
-        message: "Organization was not found.",
-        retryable: false,
-      },
+      code: "NOT_FOUND",
+      message: "Organization was not found.",
     });
   });
 
