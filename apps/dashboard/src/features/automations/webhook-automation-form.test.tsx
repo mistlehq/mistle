@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   WebhookAutomationForm,
+  resolveConversationKeyFieldOptions,
   type WebhookAutomationEventOption,
   type WebhookAutomationFormOption,
   type WebhookAutomationFormValues,
@@ -172,6 +173,21 @@ describe("WebhookAutomationForm", () => {
         "Events that render to the same key are routed into the same conversation.",
       ).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("does not inject an unsupported current conversation grouping option", () => {
+    const fieldOptions = resolveConversationKeyFieldOptions({
+      selectedEventOptions: [WebhookEventOptions[0]!],
+      currentTemplate: "{{payload.unsupported}}",
+    });
+
+    expect(fieldOptions.hasUnsupportedCurrentTemplate).toBe(true);
+    expect(fieldOptions.displayOptions).toEqual(fieldOptions.supportedOptions);
+    expect(
+      fieldOptions.displayOptions.some(
+        (option) => option.label === "Current setting (unsupported)",
+      ),
+    ).toBe(false);
   });
 
   it("shows the instructions editor copy", () => {

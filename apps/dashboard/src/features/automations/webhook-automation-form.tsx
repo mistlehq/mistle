@@ -146,16 +146,7 @@ export function resolveConversationKeyFieldOptions(input: {
 
   return {
     supportedOptions,
-    displayOptions: [
-      {
-        id: "__current_unsupported__",
-        label: "Current setting (unsupported)",
-        description:
-          "This saved grouping is no longer supported for the selected triggers. Choose a supported option before saving.",
-        template: input.currentTemplate,
-      },
-      ...supportedOptions,
-    ],
+    displayOptions: supportedOptions,
     hasUnsupportedCurrentTemplate: true,
   };
 }
@@ -177,6 +168,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
     selectedEventOptions: selectedTriggerOptions,
     currentTemplate: input.values.conversationKeyTemplate,
   });
+  const selectedConversationKeyTemplate = conversationKeyFieldOptions.hasUnsupportedCurrentTemplate
+    ? ""
+    : input.values.conversationKeyTemplate;
 
   return (
     <div className="flex flex-col gap-6">
@@ -309,7 +303,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
                 input.onValueChange("conversationKeyTemplate", value);
               }}
-              value={input.values.conversationKeyTemplate}
+              value={selectedConversationKeyTemplate}
             >
               <SelectTrigger className="w-full">
                 <SelectValue
@@ -321,7 +315,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                 >
                   {
                     conversationKeyFieldOptions.displayOptions.find(
-                      (option) => option.template === input.values.conversationKeyTemplate,
+                      (option) => option.template === selectedConversationKeyTemplate,
                     )?.label
                   }
                 </SelectValue>

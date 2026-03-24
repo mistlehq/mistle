@@ -72,7 +72,7 @@ function resolveNormalizedConversationKeyTemplate(input: {
   }
 
   if (conversationKeyFieldOptions.hasUnsupportedCurrentTemplate) {
-    return input.values.conversationKeyTemplate;
+    return "";
   }
 
   if (
