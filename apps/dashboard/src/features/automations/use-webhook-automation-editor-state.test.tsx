@@ -4,7 +4,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { useLoadedWebhookAutomationEditorState } from "./use-webhook-automation-editor-state.js";
+import {
+  resolveSelectedProfileTriggerState,
+  useLoadedWebhookAutomationEditorState,
+} from "./use-webhook-automation-editor-state.js";
 
 describe("useLoadedWebhookAutomationEditorState", () => {
   it("renders in create mode with loaded prerequisites", () => {
@@ -56,5 +59,57 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       triggerParameterValues: {},
     });
     expect(result.current.formError).toBeNull();
+    expect(result.current.triggerPickerDisabledReason).toBe(
+      "Select a sandbox profile to choose triggers.",
+    );
+  });
+
+  it("marks profiles without trigger-capable bindings as unavailable for automations", () => {
+    expect(
+      resolveSelectedProfileTriggerState({
+        selectedProfileId: "sbp_123",
+        hasBindingData: true,
+        isBindingDataPending: false,
+        bindings: [
+          {
+            id: "bnd_linear",
+            sandboxProfileId: "sbp_123",
+            sandboxProfileVersion: 1,
+            connectionId: "conn_linear",
+            kind: "connector",
+            config: {},
+            createdAt: "2026-03-24T00:00:00.000Z",
+            updatedAt: "2026-03-24T00:00:00.000Z",
+          },
+        ],
+        directoryData: {
+          connections: [
+            {
+              id: "conn_linear",
+              targetKey: "linear-cloud",
+              displayName: "Linear Workspace",
+              status: "active",
+              createdAt: "2026-03-24T00:00:00.000Z",
+              updatedAt: "2026-03-24T00:00:00.000Z",
+            },
+          ],
+          targets: [
+            {
+              targetKey: "linear-cloud",
+              familyId: "linear",
+              variantId: "linear-default",
+              enabled: true,
+              config: {},
+              displayName: "Linear",
+              description: "Linear Cloud",
+              supportedWebhookEvents: [],
+              targetHealth: {
+                configStatus: "valid",
+              },
+            },
+          ],
+        },
+      }).disabledReason,
+    ).toBe("The selected profile has no bindings with automation triggers.");
   });
 });

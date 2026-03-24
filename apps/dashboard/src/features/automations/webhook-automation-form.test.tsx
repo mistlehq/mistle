@@ -133,6 +133,7 @@ describe("WebhookAutomationForm", () => {
           onSubmit={() => {}}
           onValueChange={() => {}}
           sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledReason={null}
           webhookEventOptions={WebhookEventOptions}
           values={input.values ?? FormValues}
         />
@@ -205,7 +206,7 @@ describe("WebhookAutomationForm", () => {
     expect(screen.getByLabelText("Agent Instructions")).toBeDefined();
     expect(
       screen.getAllByText(
-        "These instructions are sent together with the webhook event type and full payload.",
+        "These instructions are sent together with the webhook payload and event type.",
       ).length,
     ).toBeGreaterThan(0);
     expect(screen.queryByText("Basics")).toBeNull();
@@ -244,5 +245,37 @@ describe("WebhookAutomationForm", () => {
     );
     expect(screen.queryByText("Create Automation")).toBeNull();
     expect(screen.queryByText("Automation name")).toBeNull();
+  });
+
+  it("shows the selected-profile trigger binding message when triggers are unavailable", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WebhookAutomationForm
+          connectionOptions={ConnectionOptions}
+          fieldErrors={{}}
+          formError={null}
+          isDeleting={false}
+          isSaving={false}
+          mode="create"
+          onDelete={null}
+          onSubmit={() => {}}
+          onValueChange={() => {}}
+          sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledReason={
+            "The selected profile has no bindings with automation triggers."
+          }
+          webhookEventOptions={[]}
+          values={{
+            ...FormValues,
+            triggerIds: [],
+            conversationKeyTemplate: "",
+          }}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(
+      screen.getAllByText("The selected profile has no bindings with automation triggers.").length,
+    ).toBeGreaterThan(0);
   });
 });

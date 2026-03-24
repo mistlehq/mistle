@@ -77,6 +77,7 @@ function renderTriggerPicker(input: {
   selectedConnectionId: string;
   selectedTriggerIds: readonly string[];
   triggerParameterValues: Record<string, Record<string, string>>;
+  disabledReason?: string | null;
   eventOptions?: readonly WebhookAutomationEventOption[];
   useStatefulSelection?: boolean;
 }): ReturnType<typeof render> {
@@ -120,6 +121,7 @@ function renderTriggerPicker(input: {
         error={undefined}
         eventOptions={input.eventOptions ?? WebhookEventOptions}
         hasConnectedIntegrations={input.hasConnectedIntegrations}
+        {...(input.disabledReason === undefined ? {} : { disabledReason: input.disabledReason })}
         onTriggerParameterValueChange={() => {}}
         onValueChange={setSelectedTriggerIds}
         selectedConnectionId={input.selectedConnectionId}
@@ -138,6 +140,7 @@ function renderTriggerPicker(input: {
           error={undefined}
           eventOptions={input.eventOptions ?? WebhookEventOptions}
           hasConnectedIntegrations={input.hasConnectedIntegrations}
+          {...(input.disabledReason === undefined ? {} : { disabledReason: input.disabledReason })}
           onTriggerParameterValueChange={() => {}}
           onValueChange={() => {}}
           selectedConnectionId={input.selectedConnectionId}
@@ -234,6 +237,28 @@ describe("WebhookAutomationTriggerPicker", () => {
     }
 
     expect(input.getAttribute("disabled")).toBe("");
+  });
+
+  it("shows a profile binding message when trigger selection is disabled by the selected profile", () => {
+    const { container } = renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: "",
+      selectedTriggerIds: [],
+      triggerParameterValues: {},
+      eventOptions: [],
+      disabledReason: "The selected profile has no bindings with automation triggers.",
+    });
+
+    const input = container.querySelector('input[placeholder="No triggers available"]');
+    if (input === null) {
+      throw new Error("Expected trigger input.");
+    }
+
+    expect(input.getAttribute("disabled")).toBe("");
+    expect(
+      screen.getAllByText("The selected profile has no bindings with automation triggers.").length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("No triggers added yet.")).toBeNull();
   });
 
   it("shows an empty state when no triggers are selected", () => {

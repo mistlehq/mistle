@@ -348,6 +348,7 @@ function StoryHarness(input: {
           }));
         }}
         sandboxProfileOptions={input.sandboxProfileOptions ?? SandboxProfileOptions}
+        triggerPickerDisabledReason={null}
         webhookEventOptions={input.webhookEventOptions ?? GitHubWebhookEventOptions}
         values={values}
       />

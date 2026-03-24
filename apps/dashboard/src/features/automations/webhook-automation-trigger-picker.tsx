@@ -99,7 +99,18 @@ function resolveWebhookAutomationTriggerPickerState(input: {
   hasConnectedIntegrations: boolean;
   selectedTriggerIds: readonly string[];
   eventOptions: readonly WebhookAutomationEventOption[];
+  disabledReason?: string | null;
 }): WebhookAutomationTriggerPickerState {
+  if (input.disabledReason !== undefined && input.disabledReason !== null) {
+    return {
+      availableEventOptions: [],
+      groupedAvailableEventOptions: [],
+      disabled: true,
+      helperMessage: input.disabledReason,
+      inputPlaceholder: "No triggers available",
+    };
+  }
+
   const selectedTriggerIdSet = new Set(input.selectedTriggerIds);
   const availableEventOptions = input.eventOptions.filter(
     (option) => option.unavailable !== true && !selectedTriggerIdSet.has(option.id),
@@ -122,6 +133,7 @@ export function WebhookAutomationTriggerPicker(input: {
   selectedConnectionId: string;
   selectedTriggerIds: readonly string[];
   eventOptions: readonly WebhookAutomationEventOption[];
+  disabledReason?: string | null;
   triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
   error: string | undefined;
   onValueChange: (value: string[]) => void;
@@ -136,6 +148,7 @@ export function WebhookAutomationTriggerPicker(input: {
     hasConnectedIntegrations: input.hasConnectedIntegrations,
     selectedTriggerIds: input.selectedTriggerIds,
     eventOptions: input.eventOptions,
+    ...(input.disabledReason === undefined ? {} : { disabledReason: input.disabledReason }),
   });
   const selectedEventOptions = resolveSelectedWebhookAutomationEventOptions({
     eventOptions: input.eventOptions,
@@ -160,7 +173,9 @@ export function WebhookAutomationTriggerPicker(input: {
       )}
 
       {selectedEventOptions.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No triggers added yet.</p>
+        pickerState.disabled ? null : (
+          <p className="text-muted-foreground text-sm">No triggers added yet.</p>
+        )
       ) : (
         <div className="space-y-1.5">
           {selectedEventOptions.map((option) => (
@@ -231,6 +246,7 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
   hasConnectedIntegrations: boolean;
   selectedTriggerIds: readonly string[];
   eventOptions: readonly WebhookAutomationEventOption[];
+  disabledReason?: string | null;
   error?: string | undefined;
   onValueChange: (value: string[]) => void;
   variant?: "inline" | "header";
@@ -239,6 +255,7 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
     hasConnectedIntegrations: input.hasConnectedIntegrations,
     selectedTriggerIds: input.selectedTriggerIds,
     eventOptions: input.eventOptions,
+    ...(input.disabledReason === undefined ? {} : { disabledReason: input.disabledReason }),
   });
   const [isOpen, setIsOpen] = useState(false);
   const anchorRef = useComboboxAnchor();

@@ -3,6 +3,7 @@ import type {
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { formatRelativeOrDate } from "../shared/date-formatters.js";
 import type {
   WebhookAutomationEventOption,
@@ -88,6 +89,30 @@ export function buildWebhookAutomationSandboxProfileOptions(input: {
       label: profile.displayName,
     })),
   );
+}
+
+export function resolveEligibleProfileAutomationConnectionIds(input: {
+  bindings: readonly SandboxProfileVersionIntegrationBinding[];
+  connections: readonly IntegrationConnection[];
+  targets: readonly IntegrationTarget[];
+}): readonly string[] {
+  const eligibleConnectionIds = new Set<string>();
+
+  for (const binding of input.bindings) {
+    const connection = input.connections.find((candidate) => candidate.id === binding.connectionId);
+    if (connection === undefined) {
+      continue;
+    }
+
+    const target = input.targets.find((candidate) => candidate.targetKey === connection.targetKey);
+    if ((target?.supportedWebhookEvents?.length ?? 0) === 0) {
+      continue;
+    }
+
+    eligibleConnectionIds.add(connection.id);
+  }
+
+  return [...eligibleConnectionIds];
 }
 
 export function buildWebhookAutomationEventOptions(input: {

@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -6,6 +6,16 @@ import type {
   IntegrationConnection,
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
+import { resolveLatestVersion } from "../pages/sandbox-profile-integrations-state.js";
+import {
+  sandboxProfileVersionIntegrationBindingsQueryKey,
+  sandboxProfileVersionsQueryKey,
+} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import {
+  getSandboxProfileVersionIntegrationBindings,
+  listSandboxProfileVersions,
+} from "../sandbox-profiles/sandbox-profiles-service.js";
+import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
   toCreateWebhookAutomationPayload,
   toUpdateWebhookAutomationPayload,
@@ -20,6 +30,7 @@ import { resolveConversationKeyFieldOptions } from "./webhook-automation-form.js
 import {
   buildWebhookAutomationEventOptions,
   createWebhookAutomationTriggerId,
+  resolveEligibleProfileAutomationConnectionIds,
 } from "./webhook-automation-list-helpers.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
 import { AUTOMATIONS_QUERY_KEY_PREFIX } from "./webhook-automations-query-keys.js";
@@ -42,6 +53,48 @@ type WebhookAutomationOption = {
   label: string;
   description?: string;
 };
+
+type SelectedProfileTriggerState = {
+  eligibleConnectionIds: readonly string[];
+  disabledReason: string | null;
+};
+
+const NoProfileSelectedMessage = "Select a sandbox profile to choose triggers.";
+const InvalidProfileBindingMessage =
+  "The selected profile has no bindings with automation triggers.";
+
+export function resolveSelectedProfileTriggerState(input: {
+  selectedProfileId: string;
+  hasBindingData: boolean;
+  isBindingDataPending: boolean;
+  bindings: readonly SandboxProfileVersionIntegrationBinding[];
+  directoryData: DirectoryData;
+}): SelectedProfileTriggerState {
+  if (input.selectedProfileId.trim().length === 0) {
+    return {
+      eligibleConnectionIds: [],
+      disabledReason: NoProfileSelectedMessage,
+    };
+  }
+
+  if (input.isBindingDataPending || !input.hasBindingData) {
+    return {
+      eligibleConnectionIds: [],
+      disabledReason: "Loading profile bindings...",
+    };
+  }
+
+  const eligibleConnectionIds = resolveEligibleProfileAutomationConnectionIds({
+    bindings: input.bindings,
+    connections: input.directoryData.connections,
+    targets: input.directoryData.targets,
+  });
+
+  return {
+    eligibleConnectionIds,
+    disabledReason: eligibleConnectionIds.length === 0 ? InvalidProfileBindingMessage : null,
+  };
+}
 
 type LoadedWebhookAutomationEditorStateInput = {
   mode: "create" | "edit";
@@ -111,6 +164,7 @@ export function useLoadedWebhookAutomationEditorState(
   connectionOptions: readonly WebhookAutomationOption[];
   sandboxProfileOptions: readonly WebhookAutomationOption[];
   webhookEventOptions: readonly WebhookAutomationEventOption[];
+  triggerPickerDisabledReason: string | null;
   values: WebhookAutomationFormValues;
   fieldErrors: Partial<Record<keyof WebhookAutomationFormValues, string>>;
   formError: string | null;
@@ -135,18 +189,92 @@ export function useLoadedWebhookAutomationEditorState(
   const [formError, setFormError] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const selectedProfileId = formValues.sandboxProfileId.trim();
+
+  const selectedProfileVersionsQuery = useQuery({
+    queryKey: sandboxProfileVersionsQueryKey(
+      selectedProfileId.length === 0 ? "__unselected__" : selectedProfileId,
+    ),
+    queryFn: async ({ signal }) =>
+      listSandboxProfileVersions({
+        profileId: selectedProfileId,
+        signal,
+      }),
+    enabled: selectedProfileId.length > 0,
+    retry: false,
+  });
+
+  const selectedProfileVersion = useMemo(
+    () => resolveLatestVersion(selectedProfileVersionsQuery.data?.versions ?? []),
+    [selectedProfileVersionsQuery.data],
+  );
+
+  const selectedProfileBindingsQuery = useQuery({
+    queryKey:
+      selectedProfileVersion === null
+        ? sandboxProfileVersionIntegrationBindingsQueryKey({
+            profileId: selectedProfileId.length === 0 ? "__unselected__" : selectedProfileId,
+            version: 0,
+          })
+        : sandboxProfileVersionIntegrationBindingsQueryKey({
+            profileId: selectedProfileId,
+            version: selectedProfileVersion,
+          }),
+    queryFn: async ({ signal }) => {
+      if (selectedProfileVersion === null) {
+        throw new Error("No sandbox profile version is available for this profile.");
+      }
+
+      return getSandboxProfileVersionIntegrationBindings({
+        profileId: selectedProfileId,
+        version: selectedProfileVersion,
+        signal,
+      });
+    },
+    enabled: selectedProfileId.length > 0 && selectedProfileVersion !== null,
+    retry: false,
+  });
+
+  const selectedProfileTriggerState = useMemo(
+    () =>
+      resolveSelectedProfileTriggerState({
+        selectedProfileId,
+        hasBindingData:
+          selectedProfileVersion === null || selectedProfileBindingsQuery.data !== undefined,
+        isBindingDataPending:
+          selectedProfileId.length > 0 &&
+          (selectedProfileVersionsQuery.isPending || selectedProfileBindingsQuery.isPending),
+        bindings: selectedProfileBindingsQuery.data?.bindings ?? [],
+        directoryData: input.directoryData,
+      }),
+    [
+      input.directoryData,
+      selectedProfileBindingsQuery.data,
+      selectedProfileBindingsQuery.isPending,
+      selectedProfileId,
+      selectedProfileVersion,
+      selectedProfileVersionsQuery.isPending,
+    ],
+  );
 
   const webhookEventOptions = useMemo(
     () =>
       buildWebhookAutomationEventOptions({
-        connections: input.directoryData.connections,
+        connections: input.directoryData.connections.filter((connection) =>
+          selectedProfileTriggerState.eligibleConnectionIds.includes(connection.id),
+        ),
         targets: input.directoryData.targets,
         ...(input.preservedConnectionId === undefined
           ? {}
           : { preservedConnectionId: input.preservedConnectionId }),
         selectedTriggerIds: formValues.triggerIds,
       }),
-    [formValues.triggerIds, input.directoryData, input.preservedConnectionId],
+    [
+      formValues.triggerIds,
+      input.directoryData,
+      input.preservedConnectionId,
+      selectedProfileTriggerState.eligibleConnectionIds,
+    ],
   );
 
   const createMutation = useMutation({
@@ -244,6 +372,12 @@ export function useLoadedWebhookAutomationEditorState(
       });
     }
 
+    if (key === "sandboxProfileId") {
+      nextValues.triggerIds = [];
+      nextValues.triggerParameterValues = {};
+      nextValues.conversationKeyTemplate = "";
+    }
+
     setFormValues(nextValues);
     setFieldErrors((currentErrors) => ({
       ...currentErrors,
@@ -282,6 +416,7 @@ export function useLoadedWebhookAutomationEditorState(
     connectionOptions: input.connectionOptions,
     sandboxProfileOptions: input.sandboxProfileOptions,
     webhookEventOptions,
+    triggerPickerDisabledReason: selectedProfileTriggerState.disabledReason,
     values: formValues,
     fieldErrors,
     formError,

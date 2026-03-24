@@ -54,6 +54,7 @@ type WebhookAutomationFormProps = {
   connectionOptions: readonly WebhookAutomationFormOption[];
   sandboxProfileOptions: readonly WebhookAutomationFormOption[];
   webhookEventOptions: readonly WebhookAutomationEventOption[];
+  triggerPickerDisabledReason: string | null;
   fieldErrors: Partial<Record<WebhookAutomationFormValueKey, string>>;
   formError: string | null;
   isSaving: boolean;
@@ -256,6 +257,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             <h2 className="text-base font-semibold">Triggers</h2>
             <WebhookAutomationTriggerPickerAddButton
               error={input.fieldErrors.triggerIds}
+              disabledReason={input.triggerPickerDisabledReason}
               eventOptions={input.webhookEventOptions}
               hasConnectedIntegrations={input.connectionOptions.length > 0}
               onValueChange={(value) => {
@@ -272,6 +274,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             error={input.fieldErrors.triggerIds}
             eventOptions={input.webhookEventOptions}
             hasConnectedIntegrations={input.connectionOptions.length > 0}
+            disabledReason={input.triggerPickerDisabledReason}
             onTriggerParameterValueChange={({ triggerId, parameterId, value }) => {
               input.onValueChange("triggerParameterValues", {
                 ...input.values.triggerParameterValues,
@@ -341,7 +344,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             <FieldHeader>
               <FieldLabel htmlFor="automation-instructions">Agent Instructions</FieldLabel>
               <FieldDescription>
-                These instructions are sent together with the webhook event type and full payload.
+                These instructions are sent together with the webhook payload and event type.
               </FieldDescription>
             </FieldHeader>
             <FieldContent>

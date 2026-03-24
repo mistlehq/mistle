@@ -4,6 +4,7 @@ import {
   buildWebhookAutomationEventOptions,
   buildWebhookAutomationSandboxProfileOptions,
   createWebhookAutomationTriggerId,
+  resolveEligibleProfileAutomationConnectionIds,
 } from "./webhook-automation-list-helpers.js";
 
 describe("buildWebhookAutomationEventOptions", () => {
@@ -231,5 +232,88 @@ describe("buildWebhookAutomationSandboxProfileOptions", () => {
         label: "Repo Maintainer",
       },
     ]);
+  });
+});
+
+describe("resolveEligibleProfileAutomationConnectionIds", () => {
+  it("returns bound connection ids whose targets expose automation triggers", () => {
+    expect(
+      resolveEligibleProfileAutomationConnectionIds({
+        bindings: [
+          {
+            id: "bnd_github",
+            sandboxProfileId: "sbp_1",
+            sandboxProfileVersion: 1,
+            connectionId: "conn_github",
+            kind: "connector",
+            config: {},
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+          {
+            id: "bnd_linear",
+            sandboxProfileId: "sbp_1",
+            sandboxProfileVersion: 1,
+            connectionId: "conn_linear",
+            kind: "connector",
+            config: {},
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        connections: [
+          {
+            id: "conn_github",
+            targetKey: "github-cloud",
+            displayName: "GitHub Engineering",
+            status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+          {
+            id: "conn_linear",
+            targetKey: "linear-cloud",
+            displayName: "Linear Workspace",
+            status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        targets: [
+          {
+            targetKey: "github-cloud",
+            familyId: "github",
+            variantId: "github-cloud",
+            enabled: true,
+            config: {},
+            displayName: "GitHub",
+            description: "GitHub Cloud",
+            supportedWebhookEvents: [
+              {
+                eventType: "github.issue_comment.created",
+                providerEventType: "issue_comment",
+                displayName: "Issue comment created",
+              },
+            ],
+            targetHealth: {
+              configStatus: "valid",
+            },
+          },
+          {
+            targetKey: "linear-cloud",
+            familyId: "linear",
+            variantId: "linear-cloud",
+            enabled: true,
+            config: {},
+            displayName: "Linear",
+            description: "Linear Cloud",
+            supportedWebhookEvents: [],
+            targetHealth: {
+              configStatus: "valid",
+            },
+          },
+        ],
+      }),
+    ).toEqual(["conn_github"]);
   });
 });
