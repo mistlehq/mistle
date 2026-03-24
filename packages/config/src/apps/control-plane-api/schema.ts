@@ -10,6 +10,7 @@ export const ControlPlaneApiServerConfigSchema = z
 export const ControlPlaneApiDatabaseConfigSchema = z
   .object({
     url: z.string().min(1),
+    migrationUrl: z.string().min(1),
   })
   .strict();
 

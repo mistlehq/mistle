@@ -28,7 +28,7 @@ async function main(): Promise<void> {
   });
 
   await runControlPlaneMigrations({
-    connectionString: loadedConfig.app.database.url,
+    connectionString: loadedConfig.app.database.migrationUrl,
     schemaName: CONTROL_PLANE_SCHEMA_NAME,
     migrationsFolder: CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
     migrationsSchema: MigrationTracking.CONTROL_PLANE.SCHEMA_NAME,

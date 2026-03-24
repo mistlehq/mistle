@@ -45,6 +45,11 @@ secretEnv:
     secretKey: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL
 ```
 
+The API workloads run their app-data migrations on boot, so they need both:
+
+- a runtime app DB URL (`MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL`, `MISTLE_APPS_DATA_PLANE_API_DATABASE_URL`)
+- a direct migration DB URL (`MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL`, `MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL`)
+
 ## Workloads
 
 - `control-plane-api`

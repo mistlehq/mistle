@@ -29,6 +29,10 @@ const loadDatabaseEnv = createEnvLoader<typeof ControlPlaneApiDatabaseConfigSche
     key: "url",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL",
   },
+  {
+    key: "migrationUrl",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL",
+  },
 ]);
 
 const loadAuthEnv = createEnvLoader<typeof ControlPlaneApiAuthConfigSchema>([

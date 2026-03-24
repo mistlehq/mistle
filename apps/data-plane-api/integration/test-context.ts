@@ -197,6 +197,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
           },
           database: {
             url: runtimeDatabaseUrl,
+            migrationUrl: runtimeDatabaseUrl,
           },
           workflow: {
             databaseUrl: runtimeDatabaseUrl,

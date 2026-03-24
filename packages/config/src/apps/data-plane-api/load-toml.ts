@@ -18,6 +18,7 @@ export function loadDataPlaneApiFromToml(
     },
     database: {
       url: database.url,
+      migrationUrl: database.migration_url,
     },
     workflow: {
       databaseUrl: workflow.database_url,

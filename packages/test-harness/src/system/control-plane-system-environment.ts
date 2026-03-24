@@ -110,6 +110,7 @@ export async function startControlPlaneSystemEnvironment(
       environment: {
         ...input.controlPlaneApiEnvironment,
         MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL: containerDatabaseUrl,
+        MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
         MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
         MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: input.workflowNamespaceId,
         MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL: input.authBaseUrl,
