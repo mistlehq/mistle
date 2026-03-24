@@ -2,6 +2,7 @@ import { cn } from "@mistle/ui";
 import type { ReactNode } from "react";
 
 export type FormPageShellProps = {
+  bleedY?: boolean;
   children: ReactNode;
   className?: string;
   contentClassName?: string;
@@ -10,7 +11,13 @@ export type FormPageShellProps = {
 
 export function FormPageShell(input: FormPageShellProps): React.JSX.Element {
   return (
-    <div className={cn("-mx-4 -my-6 min-h-full bg-muted/30 px-4 py-6", input.className)}>
+    <div
+      className={cn(
+        "-mx-4 min-h-full bg-muted/30 px-4 py-6",
+        input.bleedY === false ? null : "-my-6",
+        input.className,
+      )}
+    >
       <div
         className={cn(
           "mx-auto flex w-full flex-col gap-4",

@@ -19,7 +19,7 @@ export type ProfileSettingsPageViewProps = {
 
 export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): React.JSX.Element {
   return (
-    <FormPageShell>
+    <FormPageShell bleedY={false}>
       <FormPageSection>
         <div className="p-4">
           <UserIdentitySummary email={props.email} name={props.displayName} />
