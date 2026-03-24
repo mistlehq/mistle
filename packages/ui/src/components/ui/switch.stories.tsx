@@ -1,6 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { Field, FieldDescription, FieldHeader, FieldLabel, FieldSet } from "./field.js";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldHeader,
+  FieldLabel,
+  FieldSet,
+} from "./field.js";
 import { Switch } from "./switch.js";
 
 const meta = {
