@@ -1,6 +1,6 @@
 import { Button } from "@mistle/ui";
 
-import { FormPageActionBar } from "../shared/form-page.js";
+import { FormPageFooter } from "../shared/form-page.js";
 
 export type SaveActionsProps = {
   cancelDisabled: boolean;
@@ -13,7 +13,15 @@ export type SaveActionsProps = {
 
 export function SaveActions(props: SaveActionsProps): React.JSX.Element {
   return (
-    <FormPageActionBar align="start">
+    <FormPageFooter>
+      <Button
+        disabled={props.cancelDisabled}
+        onClick={props.onCancel}
+        type="button"
+        variant="outline"
+      >
+        Cancel
+      </Button>
       <Button
         className={
           props.saveSuccess ? "bg-emerald-600 text-white hover:bg-emerald-600/90" : undefined
@@ -24,14 +32,6 @@ export function SaveActions(props: SaveActionsProps): React.JSX.Element {
       >
         {props.saving ? "Saving..." : props.saveSuccess ? "Saved" : "Save"}
       </Button>
-      <Button
-        disabled={props.cancelDisabled}
-        onClick={props.onCancel}
-        type="button"
-        variant="outline"
-      >
-        Cancel
-      </Button>
-    </FormPageActionBar>
+    </FormPageFooter>
   );
 }

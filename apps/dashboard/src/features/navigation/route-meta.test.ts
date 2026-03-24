@@ -146,6 +146,7 @@ describe("route breadcrumb metadata", () => {
     ).toEqual({
       title: "Integrations",
       headerIcon: null,
+      settingsLayoutVariant: "default",
       supportingText: "",
     });
   });
@@ -166,6 +167,7 @@ describe("route breadcrumb metadata", () => {
     ).toEqual({
       title: "Integration connection",
       headerIcon: "Custom icon",
+      settingsLayoutVariant: "default",
       supportingText: "github-cloud",
     });
   });

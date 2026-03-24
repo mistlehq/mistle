@@ -18,7 +18,7 @@ import {
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
 
-import { FormPageActionBar, FormPageSection } from "../shared/form-page.js";
+import { FormPageFooter, FormPageSection } from "../shared/form-page.js";
 import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
@@ -353,7 +353,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         </div>
       </FormPageSection>
 
-      <FormPageActionBar>
+      <FormPageFooter>
         <Button
           disabled={input.isDeleting || input.isSaving}
           onClick={input.onSubmit}
@@ -361,7 +361,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         >
           {input.isSaving ? "Saving..." : submitLabel}
         </Button>
-      </FormPageActionBar>
+      </FormPageFooter>
     </div>
   );
 }

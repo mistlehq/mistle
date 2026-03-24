@@ -16,6 +16,7 @@ export type AppRouteHandle = {
   description?: RouteTextValue;
   headerIcon?: (input: RouteTextResolverInput) => React.ReactNode;
   hideBreadcrumb?: boolean;
+  settingsLayoutVariant?: "default" | "form";
 };
 
 export type AppBreadcrumb = {
@@ -28,6 +29,7 @@ export type AppPageMeta = {
   title: string | null;
   headerIcon: React.ReactNode | null;
   supportingText: string | null;
+  settingsLayoutVariant: "default" | "form";
 };
 
 type MatchLike = {
@@ -96,6 +98,7 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   const description = handle["description"];
   const headerIcon = handle["headerIcon"];
   const hideBreadcrumb = handle["hideBreadcrumb"];
+  const settingsLayoutVariant = handle["settingsLayoutVariant"];
 
   if (isRouteTextValue(breadcrumb)) {
     parsedHandle.breadcrumb = breadcrumb;
@@ -125,6 +128,10 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
     parsedHandle.hideBreadcrumb = hideBreadcrumb;
   }
 
+  if (settingsLayoutVariant === "default" || settingsLayoutVariant === "form") {
+    parsedHandle.settingsLayoutVariant = settingsLayoutVariant;
+  }
+
   if (
     parsedHandle.breadcrumb === undefined &&
     parsedHandle.breadcrumbTo === undefined &&
@@ -132,7 +139,8 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
     parsedHandle.title === undefined &&
     parsedHandle.description === undefined &&
     parsedHandle.headerIcon === undefined &&
-    parsedHandle.hideBreadcrumb === undefined
+    parsedHandle.hideBreadcrumb === undefined &&
+    parsedHandle.settingsLayoutVariant === undefined
   ) {
     return null;
   }
@@ -239,6 +247,7 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
       title: null,
       headerIcon: null,
       supportingText: null,
+      settingsLayoutVariant: "default",
     };
   }
 
@@ -263,6 +272,7 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
         title,
         headerIcon,
         supportingText,
+        settingsLayoutVariant: handle.settingsLayoutVariant ?? "default",
       };
     }
   }
@@ -271,5 +281,6 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
     title: null,
     headerIcon: null,
     supportingText: null,
+    settingsLayoutVariant: "default",
   };
 }

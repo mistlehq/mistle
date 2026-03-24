@@ -18,6 +18,7 @@ export function SettingsLayout(): React.JSX.Element {
         supportingText={shouldShowSupportingText ? supportingText : ""}
         headerActions={headerActions}
         headerIcon={pageMeta.headerIcon}
+        layoutVariant={pageMeta.settingsLayoutVariant}
         title={title}
       >
         <Outlet />

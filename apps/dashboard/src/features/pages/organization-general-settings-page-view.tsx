@@ -6,6 +6,7 @@ import {
   Field,
   FieldContent,
   FieldError,
+  FieldHeader,
   FieldLabel,
   Input,
   Skeleton,
@@ -34,7 +35,7 @@ export function OrganizationGeneralSettingsPageView(
 ): React.JSX.Element {
   if (props.isLoading) {
     return (
-      <FormPageShell>
+      <FormPageShell className="pt-0">
         <FormPageSection>
           <div className="flex flex-col gap-4 p-4">
             <div className="flex flex-col gap-2">
@@ -58,7 +59,7 @@ export function OrganizationGeneralSettingsPageView(
 
   if (props.loadErrorMessage) {
     return (
-      <FormPageShell>
+      <FormPageShell className="pt-0">
         <FormPageSection>
           <div className="flex flex-col gap-3 p-4">
             <Alert variant="destructive">
@@ -77,7 +78,7 @@ export function OrganizationGeneralSettingsPageView(
   }
 
   return (
-    <FormPageShell>
+    <FormPageShell className="pt-0">
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
           <p aria-live="polite" className="sr-only" role="status">
@@ -91,8 +92,10 @@ export function OrganizationGeneralSettingsPageView(
             </Alert>
           ) : null}
 
-          <Field>
-            <FieldLabel htmlFor="organization-name">Organization name</FieldLabel>
+          <Field contentWidth="fill" orientation="horizontal">
+            <FieldHeader>
+              <FieldLabel htmlFor="organization-name">Organization name</FieldLabel>
+            </FieldHeader>
             <FieldContent>
               <Input
                 id="organization-name"
@@ -104,19 +107,17 @@ export function OrganizationGeneralSettingsPageView(
               <FieldError errors={[{ message: props.nameErrorMessage }]} />
             ) : null}
           </Field>
-
-          <SaveActions
-            cancelDisabled={!props.hasDirtyChanges || props.isSaving}
-            onCancel={props.onCancelChanges}
-            onSave={props.onSaveChanges}
-            saveDisabled={
-              !props.hasDirtyChanges || props.nameErrorMessage !== null || props.isSaving
-            }
-            saveSuccess={props.saveSuccess}
-            saving={props.isSaving}
-          />
         </div>
       </FormPageSection>
+
+      <SaveActions
+        cancelDisabled={!props.hasDirtyChanges || props.isSaving}
+        onCancel={props.onCancelChanges}
+        onSave={props.onSaveChanges}
+        saveDisabled={!props.hasDirtyChanges || props.nameErrorMessage !== null || props.isSaving}
+        saveSuccess={props.saveSuccess}
+        saving={props.isSaving}
+      />
     </FormPageShell>
   );
 }

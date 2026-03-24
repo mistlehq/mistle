@@ -90,3 +90,18 @@ export function FormPageActionBar(input: FormPageActionBarProps): React.JSX.Elem
     </div>
   );
 }
+
+export type FormPageFooterProps = {
+  children: ReactNode;
+  className?: string;
+};
+
+export function FormPageFooter(input: FormPageFooterProps): React.JSX.Element {
+  return (
+    <footer className={cn("flex", input.className)}>
+      <FormPageActionBar className="w-full" align="end">
+        {input.children}
+      </FormPageActionBar>
+    </footer>
+  );
+}
