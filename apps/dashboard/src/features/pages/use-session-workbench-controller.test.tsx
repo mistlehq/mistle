@@ -335,11 +335,42 @@ describe("useSessionWorkbenchController", () => {
   });
 
   it("ends the in-flight resume state once polling reaches a terminal status", () => {
-    expect(shouldClearInFlightResumeState(null)).toBe(false);
-    expect(shouldClearInFlightResumeState("starting")).toBe(false);
+    expect(
+      shouldClearInFlightResumeState({
+        sandboxStatus: null,
+        hasStoredResumeIdempotencyKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldClearInFlightResumeState({
+        sandboxStatus: "starting",
+        hasStoredResumeIdempotencyKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldClearInFlightResumeState({
+        sandboxStatus: "stopped",
+        hasStoredResumeIdempotencyKey: true,
+      }),
+    ).toBe(false);
 
-    expect(shouldClearInFlightResumeState("stopped")).toBe(true);
-    expect(shouldClearInFlightResumeState("running")).toBe(true);
-    expect(shouldClearInFlightResumeState("failed")).toBe(true);
+    expect(
+      shouldClearInFlightResumeState({
+        sandboxStatus: "stopped",
+        hasStoredResumeIdempotencyKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldClearInFlightResumeState({
+        sandboxStatus: "running",
+        hasStoredResumeIdempotencyKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldClearInFlightResumeState({
+        sandboxStatus: "failed",
+        hasStoredResumeIdempotencyKey: true,
+      }),
+    ).toBe(true);
   });
 });
