@@ -62,11 +62,13 @@ type SelectedProfileTriggerState = {
 const NoProfileSelectedMessage = "Select a sandbox profile to choose triggers.";
 const InvalidProfileBindingMessage =
   "The selected profile has no bindings with automation triggers.";
+const LoadProfileBindingsErrorMessage = "Could not load profile bindings.";
 
 export function resolveSelectedProfileTriggerState(input: {
   selectedProfileId: string;
   hasBindingData: boolean;
   isBindingDataPending: boolean;
+  bindingErrorMessage: string | null;
   bindings: readonly SandboxProfileVersionIntegrationBinding[];
   directoryData: DirectoryData;
 }): SelectedProfileTriggerState {
@@ -74,6 +76,13 @@ export function resolveSelectedProfileTriggerState(input: {
     return {
       eligibleConnectionIds: [],
       disabledReason: NoProfileSelectedMessage,
+    };
+  }
+
+  if (input.bindingErrorMessage !== null) {
+    return {
+      eligibleConnectionIds: [],
+      disabledReason: input.bindingErrorMessage,
     };
   }
 
@@ -235,27 +244,37 @@ export function useLoadedWebhookAutomationEditorState(
     retry: false,
   });
 
-  const selectedProfileTriggerState = useMemo(
-    () =>
-      resolveSelectedProfileTriggerState({
-        selectedProfileId,
-        hasBindingData:
-          selectedProfileVersion === null || selectedProfileBindingsQuery.data !== undefined,
-        isBindingDataPending:
-          selectedProfileId.length > 0 &&
-          (selectedProfileVersionsQuery.isPending || selectedProfileBindingsQuery.isPending),
-        bindings: selectedProfileBindingsQuery.data?.bindings ?? [],
-        directoryData: input.directoryData,
-      }),
-    [
-      input.directoryData,
-      selectedProfileBindingsQuery.data,
-      selectedProfileBindingsQuery.isPending,
+  const selectedProfileTriggerState = useMemo(() => {
+    const selectedProfileBindingsError =
+      selectedProfileVersionsQuery.error ?? selectedProfileBindingsQuery.error;
+
+    return resolveSelectedProfileTriggerState({
       selectedProfileId,
-      selectedProfileVersion,
-      selectedProfileVersionsQuery.isPending,
-    ],
-  );
+      hasBindingData:
+        selectedProfileVersion === null || selectedProfileBindingsQuery.data !== undefined,
+      isBindingDataPending:
+        selectedProfileId.length > 0 &&
+        (selectedProfileVersionsQuery.isPending || selectedProfileBindingsQuery.isPending),
+      bindingErrorMessage:
+        selectedProfileBindingsError === null
+          ? null
+          : resolveApiErrorMessage({
+              error: selectedProfileBindingsError,
+              fallbackMessage: LoadProfileBindingsErrorMessage,
+            }),
+      bindings: selectedProfileBindingsQuery.data?.bindings ?? [],
+      directoryData: input.directoryData,
+    });
+  }, [
+    input.directoryData,
+    selectedProfileBindingsQuery.error,
+    selectedProfileBindingsQuery.data,
+    selectedProfileBindingsQuery.isPending,
+    selectedProfileId,
+    selectedProfileVersion,
+    selectedProfileVersionsQuery.error,
+    selectedProfileVersionsQuery.isPending,
+  ]);
 
   const webhookEventOptions = useMemo(
     () =>

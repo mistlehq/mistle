@@ -70,6 +70,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         selectedProfileId: "sbp_123",
         hasBindingData: true,
         isBindingDataPending: false,
+        bindingErrorMessage: null,
         bindings: [
           {
             id: "bnd_linear",
@@ -111,5 +112,21 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         },
       }).disabledReason,
     ).toBe("The selected profile has no bindings with automation triggers.");
+  });
+
+  it("surfaces binding query failures instead of showing a loading state", () => {
+    expect(
+      resolveSelectedProfileTriggerState({
+        selectedProfileId: "sbp_123",
+        hasBindingData: false,
+        isBindingDataPending: false,
+        bindingErrorMessage: "Could not load profile bindings.",
+        bindings: [],
+        directoryData: {
+          connections: [],
+          targets: [],
+        },
+      }).disabledReason,
+    ).toBe("Could not load profile bindings.");
   });
 });
