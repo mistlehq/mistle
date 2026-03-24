@@ -1,5 +1,7 @@
 import { Button } from "@mistle/ui";
 
+import { FormPageActionBar } from "../shared/form-page.js";
+
 export type SaveActionsProps = {
   cancelDisabled: boolean;
   onCancel: () => void;
@@ -11,7 +13,7 @@ export type SaveActionsProps = {
 
 export function SaveActions(props: SaveActionsProps): React.JSX.Element {
   return (
-    <div className="flex gap-2">
+    <FormPageActionBar align="start">
       <Button
         className={
           props.saveSuccess ? "bg-emerald-600 text-white hover:bg-emerald-600/90" : undefined
@@ -30,6 +32,6 @@ export function SaveActions(props: SaveActionsProps): React.JSX.Element {
       >
         Cancel
       </Button>
-    </div>
+    </FormPageActionBar>
   );
 }

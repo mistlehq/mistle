@@ -1,16 +1,8 @@
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  Field,
-  FieldContent,
-  FieldError,
-  FieldLabel,
-  Input,
-} from "@mistle/ui";
+import { Field, FieldContent, FieldError, FieldLabel, Input } from "@mistle/ui";
 
 import { UserIdentitySummary } from "../account/user-identity-summary.js";
 import { SaveActions } from "../settings/save-actions.js";
+import { FormPageSection, FormPageShell } from "../shared/form-page.js";
 
 export type ProfileSettingsPageViewProps = {
   displayName: string;
@@ -27,14 +19,15 @@ export type ProfileSettingsPageViewProps = {
 
 export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader>
+    <FormPageShell>
+      <FormPageSection>
+        <div className="p-4">
           <UserIdentitySummary email={props.email} name={props.displayName} />
-        </CardHeader>
-      </Card>
-      <Card>
-        <CardContent className="flex flex-col gap-4">
+        </div>
+      </FormPageSection>
+
+      <FormPageSection>
+        <div className="flex flex-col gap-4 p-4">
           <p aria-live="polite" className="sr-only" role="status">
             {props.saveSuccess ? "Personal settings updated." : ""}
           </p>
@@ -65,8 +58,8 @@ export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): Re
             saveSuccess={props.saveSuccess}
             saving={props.saving}
           />
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </FormPageSection>
+    </FormPageShell>
   );
 }
