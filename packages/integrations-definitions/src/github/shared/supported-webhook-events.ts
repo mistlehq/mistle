@@ -5,29 +5,29 @@ import type {
 
 const GitHubRepositoryConversationKeyOption = {
   id: "repository",
-  label: "Per repository",
-  description: "All matching events in the same repository go to one conversation.",
+  label: "Repository",
+  description: "Events from the same repository go to the same conversation.",
   template: "{{payload.repository.full_name}}",
 } as const;
 
 const GitHubIssueConversationKeyOption = {
   id: "issue",
-  label: "Per issue thread",
-  description: "All matching events for the same issue go to one conversation.",
+  label: "Issue",
+  description: "Events from the same issue go to the same conversation.",
   template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
 } as const;
 
 const GitHubPullRequestConversationKeyOption = {
   id: "pull-request",
-  label: "Per pull request",
-  description: "All matching events for the same pull request go to one conversation.",
+  label: "Pull request",
+  description: "Events from the same pull request go to the same conversation.",
   template: "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
 } as const;
 
 const GitHubPushBranchConversationKeyOption = {
   id: "branch",
-  label: "Per branch",
-  description: "All matching pushes on the same branch go to one conversation.",
+  label: "Branch",
+  description: "Events from the same branch go to the same conversation.",
   template: "{{payload.repository.full_name}}:branch:{{payload.ref}}",
 } as const;
 

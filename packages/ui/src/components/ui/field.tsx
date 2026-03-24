@@ -49,32 +49,52 @@ function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-const fieldVariants = cva("data-[invalid=true]:text-destructive gap-3 group/field flex w-full", {
+const fieldVariants = cva("data-[invalid=true]:text-destructive group/field flex w-full", {
   variants: {
     orientation: {
-      vertical: "flex-col [&>*]:w-full [&>.sr-only]:w-auto",
+      vertical: "gap-2.5 flex-col [&>*]:w-full [&>.sr-only]:w-auto",
       horizontal:
-        "flex-row items-center [&>[data-slot=field-label]]:flex-auto has-[>[data-slot=field-content]]:items-start has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+        "flex-row items-start gap-4 [&>[data-slot=field-label],[data-slot=field-header]]:w-40 [&>[data-slot=field-label],[data-slot=field-header]]:shrink-0 [&>[data-slot=field-label],[data-slot=field-header]]:pt-2 [&>[data-slot=field-content]]:min-w-0 has-[>[role=checkbox]+[data-slot=field-content]]:items-center has-[>[role=radio]+[data-slot=field-content]]:items-center has-[>[role=switch]+[data-slot=field-content]]:items-center has-[>[role=checkbox]+[data-slot=field-content]]:[&>[role=checkbox]]:mt-px has-[>[role=radio]+[data-slot=field-content]]:[&>[role=radio]]:mt-px has-[>[role=switch]+[data-slot=field-content]]:[&>[role=switch]]:mt-px",
       responsive:
-        "flex-col [&>*]:w-full [&>.sr-only]:w-auto @md/field-group:flex-row @md/field-group:items-center @md/field-group:[&>*]:w-auto @md/field-group:[&>[data-slot=field-label]]:flex-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+        "gap-2.5 flex-col [&>*]:w-full [&>.sr-only]:w-auto @md/field-group:flex-row @md/field-group:items-center @md/field-group:[&>*]:w-auto @md/field-group:[&>[data-slot=field-label],[data-slot=field-header]]:flex-auto @md/field-group:has-[>[data-slot=field-header]>[data-slot=field-description]]:items-start @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+    },
+    contentWidth: {
+      fit: "",
+      fill: "",
     },
   },
+  compoundVariants: [
+    {
+      orientation: "horizontal",
+      contentWidth: "fit",
+      className:
+        "[&>[data-slot=field-content]]:flex-1 [&>[data-slot=field-content]]:items-end [&>[data-slot=field-content]>*]:max-w-full [&>[data-slot=field-content]>[data-slot=field-error]]:self-stretch [&>[data-slot=field-content]_[data-slot=select-trigger]:not([class*='w-'])]:w-auto [&>[data-slot=field-content]_[data-slot=select-trigger]:not([class*='min-w-'])]:min-w-40 [&>[data-slot=field-content]_[data-slot=select-trigger]]:max-w-full",
+    },
+    {
+      orientation: "horizontal",
+      contentWidth: "fill",
+      className: "[&>[data-slot=field-content]]:flex-1",
+    },
+  ],
   defaultVariants: {
+    contentWidth: "fit",
     orientation: "vertical",
   },
 });
 
 function Field({
   className,
+  contentWidth,
   orientation = "vertical",
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof fieldVariants>) {
   return (
     <div
       role="group"
+      data-content-width={contentWidth}
       data-slot="field"
       data-orientation={orientation}
-      className={cn(fieldVariants({ orientation }), className)}
+      className={cn(fieldVariants({ contentWidth, orientation }), className)}
       {...props}
     />
   );
@@ -84,7 +104,17 @@ function FieldContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="field-content"
-      className={cn("gap-1 group/field-content flex flex-1 flex-col leading-snug", className)}
+      className={cn("group/field-content flex flex-1 flex-col gap-1 leading-snug", className)}
+      {...props}
+    />
+  );
+}
+
+function FieldHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="field-header"
+      className={cn("flex flex-col leading-snug", className)}
       {...props}
     />
   );
@@ -123,7 +153,6 @@ function FieldDescription({ className, ...props }: React.ComponentProps<"p">) {
       data-slot="field-description"
       className={cn(
         "text-muted-foreground text-left text-sm [[data-variant=legend]+&]:-mt-1.5 leading-normal font-normal group-has-[[data-orientation=horizontal]]/field:text-balance",
-        "last:mt-0 nth-last-2:-mt-1",
         "[&>a:hover]:text-primary [&>a]:underline [&>a]:underline-offset-4",
         className,
       )}
@@ -210,6 +239,7 @@ function FieldError({
 
 export {
   Field,
+  FieldHeader,
   FieldLabel,
   FieldDescription,
   FieldError,

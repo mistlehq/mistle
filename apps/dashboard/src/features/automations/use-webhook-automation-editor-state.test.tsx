@@ -4,7 +4,59 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { useLoadedWebhookAutomationEditorState } from "./use-webhook-automation-editor-state.js";
+import {
+  resolveSelectedProfileTriggerState,
+  useLoadedWebhookAutomationEditorState,
+} from "./use-webhook-automation-editor-state.js";
+
+function createDirectoryData(input?: {
+  supportedWebhookEvents?: {
+    eventType: string;
+    providerEventType: string;
+    displayName: string;
+  }[];
+}) {
+  return {
+    connections: [
+      {
+        id: "conn_linear",
+        targetKey: "linear-cloud",
+        displayName: "Linear Workspace",
+        status: "active" as const,
+        createdAt: "2026-03-24T00:00:00.000Z",
+        updatedAt: "2026-03-24T00:00:00.000Z",
+      },
+    ],
+    targets: [
+      {
+        targetKey: "linear-cloud",
+        familyId: "linear",
+        variantId: "linear-default",
+        enabled: true,
+        config: {},
+        displayName: "Linear",
+        description: "Linear Cloud",
+        supportedWebhookEvents: input?.supportedWebhookEvents ?? [],
+        targetHealth: {
+          configStatus: "valid" as const,
+        },
+      },
+    ],
+  };
+}
+
+function createBinding() {
+  return {
+    id: "bnd_linear",
+    sandboxProfileId: "sbp_123",
+    sandboxProfileVersion: 1,
+    connectionId: "conn_linear",
+    kind: "connector" as const,
+    config: {},
+    createdAt: "2026-03-24T00:00:00.000Z",
+    updatedAt: "2026-03-24T00:00:00.000Z",
+  };
+}
 
 describe("useLoadedWebhookAutomationEditorState", () => {
   it("renders in create mode with loaded prerequisites", () => {
@@ -24,10 +76,10 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           automationId: undefined,
           navigate: async () => {},
           initialValues: {
-            name: "",
+            name: "Your automation",
             sandboxProfileId: "",
             enabled: true,
-            inputTemplate: "",
+            instructions: "",
             conversationKeyTemplate: "",
             triggerIds: [],
             triggerParameterValues: {},
@@ -47,14 +99,43 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     );
 
     expect(result.current.values).toEqual({
-      name: "",
+      name: "Your automation",
       sandboxProfileId: "",
       enabled: true,
-      inputTemplate: "",
+      instructions: "",
       conversationKeyTemplate: "",
       triggerIds: [],
       triggerParameterValues: {},
     });
     expect(result.current.formError).toBeNull();
+    expect(result.current.triggerPickerDisabledReason).toBe(
+      "Select a sandbox profile to choose triggers.",
+    );
+  });
+
+  it("marks profiles without trigger-capable bindings as unavailable for automations", () => {
+    expect(
+      resolveSelectedProfileTriggerState({
+        selectedProfileId: "sbp_123",
+        hasBindingData: true,
+        isBindingDataPending: false,
+        bindingErrorMessage: null,
+        bindings: [createBinding()],
+        directoryData: createDirectoryData(),
+      }).disabledReason,
+    ).toBe("The selected profile has no bindings with automation triggers.");
+  });
+
+  it("surfaces binding query failures instead of showing a loading state", () => {
+    expect(
+      resolveSelectedProfileTriggerState({
+        selectedProfileId: "sbp_123",
+        hasBindingData: false,
+        isBindingDataPending: false,
+        bindingErrorMessage: "Could not load profile bindings.",
+        bindings: [],
+        directoryData: createDirectoryData(),
+      }).disabledReason,
+    ).toBe("Could not load profile bindings.");
   });
 });

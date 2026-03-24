@@ -9,6 +9,7 @@ import {
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
 import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-reference-or-throw.js";
+import { assertSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
 import { assertWebhookConnectionReferenceOrThrow } from "./assert-webhook-connection-reference-or-throw.js";
 import { loadWebhookAutomationAggregateOrThrow } from "./load-webhook-automation-aggregate-or-throw.js";
 
@@ -47,6 +48,14 @@ export async function createAutomationWebhook(
     {
       organizationId: input.organizationId,
       sandboxProfileId: input.target.sandboxProfileId,
+    },
+  );
+  await assertSandboxProfileTriggerReferenceOrThrow(
+    { db: ctx.db },
+    {
+      sandboxProfileId: input.target.sandboxProfileId,
+      sandboxProfileVersion: input.target.sandboxProfileVersion,
+      integrationConnectionId: input.integrationConnectionId,
     },
   );
 

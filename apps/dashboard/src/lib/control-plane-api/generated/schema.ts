@@ -183,7 +183,8 @@ export interface paths {
                   code:
                     | "INVALID_CONNECTION_REFERENCE"
                     | "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE"
-                    | "INVALID_SANDBOX_PROFILE_REFERENCE";
+                    | "INVALID_SANDBOX_PROFILE_REFERENCE"
+                    | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE";
                   message: string;
                 }
               | {
@@ -481,7 +482,8 @@ export interface paths {
                   code:
                     | "INVALID_CONNECTION_REFERENCE"
                     | "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE"
-                    | "INVALID_SANDBOX_PROFILE_REFERENCE";
+                    | "INVALID_SANDBOX_PROFILE_REFERENCE"
+                    | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE";
                   message: string;
                 }
               | {

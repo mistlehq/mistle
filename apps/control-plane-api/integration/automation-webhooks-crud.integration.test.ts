@@ -4,9 +4,12 @@ import {
   AutomationKinds,
   integrationConnections,
   IntegrationConnectionStatuses,
+  IntegrationBindingKinds,
   integrationTargets,
   SandboxProfileStatuses,
   sandboxProfiles,
+  sandboxProfileVersions,
+  sandboxProfileVersionIntegrationBindings,
   webhookAutomations,
 } from "@mistle/db/control-plane";
 import { NotFoundResponseSchema, ValidationErrorResponseSchema } from "@mistle/http/errors.js";
@@ -55,6 +58,15 @@ describe("automation webhooks CRUD integration", () => {
     await insertSandboxProfile(fixture, {
       id: "sbp_webhook_create_001",
       organizationId: authenticatedSession.organizationId,
+    });
+    await insertSandboxProfileVersion(fixture, {
+      profileId: "sbp_webhook_create_001",
+      version: 3,
+    });
+    await insertSandboxProfileBinding(fixture, {
+      profileId: "sbp_webhook_create_001",
+      version: 3,
+      connectionId: "icn_webhook_create_001",
     });
 
     const requestBody = {
@@ -295,6 +307,20 @@ describe("automation webhooks CRUD integration", () => {
       id: "sbp_webhook_update_001",
       organizationId: authenticatedSession.organizationId,
     });
+    await insertSandboxProfileVersion(fixture, {
+      profileId: "sbp_webhook_update_001",
+      version: 7,
+    });
+    await insertSandboxProfileBinding(fixture, {
+      profileId: "sbp_webhook_update_001",
+      version: 7,
+      connectionId: "icn_webhook_update_001",
+    });
+    await insertSandboxProfileBinding(fixture, {
+      profileId: "sbp_webhook_update_001",
+      version: 7,
+      connectionId: "icn_webhook_update_002",
+    });
 
     await fixture.db.insert(automations).values({
       id: "atm_webhook_update_001",
@@ -479,6 +505,52 @@ describe("automation webhooks CRUD integration", () => {
     expect(body.code).toBe("CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE");
   });
 
+  it("returns 400 when creating a webhook automation for a profile without a binding for the selected trigger connection", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-invalid-profile-trigger@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await insertIntegrationConnection(fixture, {
+      id: "icn_webhook_invalid_profile_trigger_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertSandboxProfile(fixture, {
+      id: "sbp_webhook_invalid_profile_trigger_001",
+      organizationId: authenticatedSession.organizationId,
+    });
+    await insertSandboxProfileVersion(fixture, {
+      profileId: "sbp_webhook_invalid_profile_trigger_001",
+      version: 1,
+    });
+
+    const response = await fixture.request("/v1/automations/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        name: "GitHub issue triage",
+        integrationConnectionId: "icn_webhook_invalid_profile_trigger_001",
+        eventTypes: ["issue_comment.created"],
+        inputTemplate: "Handle payload",
+        conversationKeyTemplate: "{{payload.issue.node_id}}",
+        target: {
+          sandboxProfileId: "sbp_webhook_invalid_profile_trigger_001",
+          sandboxProfileVersion: 1,
+        },
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const body = CreateAutomationWebhookBadRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE");
+  });
+
   it("returns 404 for webhook automations outside the active organization and 400 for invalid payloads", async ({
     fixture,
   }) => {
@@ -590,6 +662,38 @@ async function insertSandboxProfile(
     organizationId: input.organizationId,
     displayName: `${input.id} display`,
     status: SandboxProfileStatuses.ACTIVE,
+    createdAt: "2026-02-01T00:00:00.000Z",
+    updatedAt: "2026-02-01T00:00:00.000Z",
+  });
+}
+
+async function insertSandboxProfileVersion(
+  fixture: ControlPlaneApiIntegrationFixture,
+  input: {
+    profileId: string;
+    version: number;
+  },
+) {
+  await fixture.db.insert(sandboxProfileVersions).values({
+    sandboxProfileId: input.profileId,
+    version: input.version,
+  });
+}
+
+async function insertSandboxProfileBinding(
+  fixture: ControlPlaneApiIntegrationFixture,
+  input: {
+    profileId: string;
+    version: number;
+    connectionId: string;
+  },
+) {
+  await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+    sandboxProfileId: input.profileId,
+    sandboxProfileVersion: input.version,
+    connectionId: input.connectionId,
+    kind: IntegrationBindingKinds.CONNECTOR,
+    config: {},
     createdAt: "2026-02-01T00:00:00.000Z",
     updatedAt: "2026-02-01T00:00:00.000Z",
   });

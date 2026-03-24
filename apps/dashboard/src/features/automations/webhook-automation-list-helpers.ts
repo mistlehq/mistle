@@ -3,6 +3,7 @@ import type {
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { formatRelativeOrDate } from "../shared/date-formatters.js";
 import type {
   WebhookAutomationEventOption,
@@ -13,6 +14,29 @@ import type { WebhookAutomation } from "./webhook-automations-types.js";
 
 function sortOptionsByLabel<T extends { label: string }>(items: readonly T[]): T[] {
   return [...items].sort((left, right) => left.label.localeCompare(right.label));
+}
+
+function formatWebhookAutomationTriggerGroupLabel(input: {
+  integrationDisplayName: string;
+  connectionDisplayName: string;
+}): string {
+  const integrationDisplayName = input.integrationDisplayName.trim();
+  const connectionDisplayName = input.connectionDisplayName.trim();
+
+  if (integrationDisplayName.length === 0) {
+    return connectionDisplayName;
+  }
+
+  if (
+    connectionDisplayName.length === 0 ||
+    connectionDisplayName.localeCompare(integrationDisplayName, undefined, {
+      sensitivity: "accent",
+    }) === 0
+  ) {
+    return integrationDisplayName;
+  }
+
+  return `${integrationDisplayName} - ${connectionDisplayName}`;
 }
 
 export function formatWebhookAutomationUpdatedAt(isoDateTime: string): string {
@@ -63,9 +87,32 @@ export function buildWebhookAutomationSandboxProfileOptions(input: {
     input.sandboxProfiles.map((profile) => ({
       value: profile.id,
       label: profile.displayName,
-      description: profile.status,
     })),
   );
+}
+
+export function resolveEligibleProfileAutomationConnectionIds(input: {
+  bindings: readonly SandboxProfileVersionIntegrationBinding[];
+  connections: readonly IntegrationConnection[];
+  targets: readonly IntegrationTarget[];
+}): readonly string[] {
+  const eligibleConnectionIds = new Set<string>();
+
+  for (const binding of input.bindings) {
+    const connection = input.connections.find((candidate) => candidate.id === binding.connectionId);
+    if (connection === undefined) {
+      continue;
+    }
+
+    const target = input.targets.find((candidate) => candidate.targetKey === connection.targetKey);
+    if ((target?.supportedWebhookEvents?.length ?? 0) === 0) {
+      continue;
+    }
+
+    eligibleConnectionIds.add(connection.id);
+  }
+
+  return [...eligibleConnectionIds];
 }
 
 export function buildWebhookAutomationEventOptions(input: {
@@ -95,7 +142,10 @@ export function buildWebhookAutomationEventOptions(input: {
         }),
         eventType: eventDefinition.eventType,
         connectionId: connection.id,
-        connectionLabel: connection.displayName,
+        connectionLabel: formatWebhookAutomationTriggerGroupLabel({
+          integrationDisplayName: target.displayName,
+          connectionDisplayName: connection.displayName,
+        }),
         label: eventDefinition.displayName,
         ...(target.logoKey === undefined ? {} : { logoKey: target.logoKey }),
         ...(eventDefinition.conversationKeyOptions === undefined

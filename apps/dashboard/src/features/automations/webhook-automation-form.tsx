@@ -3,21 +3,24 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
-  Checkbox,
   Field,
   FieldContent,
+  FieldDescription,
+  FieldHeader,
   FieldLabel,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Switch,
   Textarea,
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
 
 import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
+import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
 import type {
@@ -37,7 +40,7 @@ export type WebhookAutomationFormValues = {
   name: string;
   sandboxProfileId: string;
   enabled: boolean;
-  inputTemplate: string;
+  instructions: string;
   conversationKeyTemplate: string;
   triggerIds: string[];
   triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
@@ -51,6 +54,7 @@ type WebhookAutomationFormProps = {
   connectionOptions: readonly WebhookAutomationFormOption[];
   sandboxProfileOptions: readonly WebhookAutomationFormOption[];
   webhookEventOptions: readonly WebhookAutomationEventOption[];
+  triggerPickerDisabledReason: string | null;
   fieldErrors: Partial<Record<WebhookAutomationFormValueKey, string>>;
   formError: string | null;
   isSaving: boolean;
@@ -62,6 +66,18 @@ type WebhookAutomationFormProps = {
   onSubmit: () => void;
   onDelete: (() => void) | null;
 };
+
+function FormSection(input: {
+  children: React.ReactNode;
+  header?: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <section className="flex flex-col gap-2">
+      {input.header === undefined ? null : input.header}
+      <div className="divide-y rounded border bg-white">{input.children}</div>
+    </section>
+  );
+}
 
 function FieldError(input: { message: string | undefined }): React.JSX.Element | null {
   if (input.message === undefined) {
@@ -77,12 +93,13 @@ function SelectField(input: {
   placeholder: string;
   options: readonly WebhookAutomationFormOption[];
   error: string | undefined;
+  orientation?: "vertical" | "horizontal";
   onValueChange: (value: string) => void;
 }): React.JSX.Element {
   const selectedOption = input.options.find((option) => option.value === input.value);
 
   return (
-    <Field>
+    <Field orientation={input.orientation ?? "vertical"}>
       <FieldLabel>{input.label}</FieldLabel>
       <FieldContent>
         <Select
@@ -95,7 +112,7 @@ function SelectField(input: {
           }}
           value={input.value}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className={input.orientation === "horizontal" ? undefined : "w-full"}>
             <SelectValue placeholder={input.placeholder}>{selectedOption?.label}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -117,66 +134,26 @@ function SelectField(input: {
   );
 }
 
-function FormSection(input: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}): React.JSX.Element {
-  const hasHeading = input.title.trim().length > 0 || input.description.trim().length > 0;
-
-  return (
-    <section className="space-y-5 border-t pt-6 first:border-t-0 first:pt-0">
-      {hasHeading ? (
-        <div className="space-y-1">
-          {input.title.trim().length > 0 ? (
-            <h2 className="text-base font-semibold">{input.title}</h2>
-          ) : null}
-          {input.description.trim().length > 0 ? (
-            <p className="text-muted-foreground text-sm">{input.description}</p>
-          ) : null}
-        </div>
-      ) : null}
-      {input.children}
-    </section>
-  );
-}
-
 export function resolveConversationKeyFieldOptions(input: {
   selectedEventOptions: readonly WebhookAutomationEventOption[];
   currentTemplate: string;
 }): {
-  supportedOptions: readonly WebhookAutomationConversationKeyOption[];
-  displayOptions: readonly WebhookAutomationConversationKeyOption[];
+  options: readonly WebhookAutomationConversationKeyOption[];
+  selectedTemplate: string;
   hasUnsupportedCurrentTemplate: boolean;
 } {
-  const supportedOptions = resolveCommonWebhookAutomationConversationKeyOptions({
+  const options = resolveCommonWebhookAutomationConversationKeyOptions({
     selectedEventOptions: input.selectedEventOptions,
   });
-
-  if (
-    input.currentTemplate.trim().length === 0 ||
-    supportedOptions.some((option) => option.template === input.currentTemplate)
-  ) {
-    return {
-      supportedOptions,
-      displayOptions: supportedOptions,
-      hasUnsupportedCurrentTemplate: false,
-    };
-  }
+  const isCurrentTemplateSupported =
+    input.currentTemplate.trim().length > 0 &&
+    options.some((option) => option.template === input.currentTemplate);
 
   return {
-    supportedOptions,
-    displayOptions: [
-      {
-        id: "__current_unsupported__",
-        label: "Current setting (unsupported)",
-        description:
-          "This saved grouping is no longer supported for the selected triggers. Choose a supported option before saving.",
-        template: input.currentTemplate,
-      },
-      ...supportedOptions,
-    ],
-    hasUnsupportedCurrentTemplate: true,
+    options,
+    selectedTemplate: isCurrentTemplateSupported ? input.currentTemplate : "",
+    hasUnsupportedCurrentTemplate:
+      input.currentTemplate.trim().length > 0 && !isCurrentTemplateSupported,
   };
 }
 
@@ -193,31 +170,31 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
   );
   const selectedConnectionId =
     selectedConnectionIds.size === 1 ? ([...selectedConnectionIds][0] ?? "") : "";
-  const conversationKeyFieldOptions = resolveConversationKeyFieldOptions({
+  const conversationKeySelectionState = resolveConversationKeyFieldOptions({
     selectedEventOptions: selectedTriggerOptions,
     currentTemplate: input.values.conversationKeyTemplate,
   });
+  const selectedConversationGroupingOption = conversationKeySelectionState.options.find(
+    (option) => option.template === conversationKeySelectionState.selectedTemplate,
+  );
+  const selectedConversationGroupingLabel =
+    selectedConversationGroupingOption === undefined
+      ? undefined
+      : selectedConversationGroupingOption.label;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-3">
-        {input.mode === "edit" ? (
-          <div className="min-w-0 flex-1">
-            <WebhookAutomationTitleEditor
-              errorMessage={input.fieldErrors.name}
-              mode={input.mode}
-              onCommit={(nextValue) => {
-                input.onValueChange("name", nextValue);
-              }}
-              saveDisabled={input.isDeleting || input.isSaving}
-              title={input.values.name}
-            />
-          </div>
-        ) : (
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold">Create Automation</h1>
-          </div>
-        )}
+        <div className="min-w-0 flex-1">
+          <WebhookAutomationTitleEditor
+            errorMessage={input.fieldErrors.name}
+            onCommit={(nextValue) => {
+              input.onValueChange("name", nextValue);
+            }}
+            saveDisabled={input.isDeleting || input.isSaving}
+            title={input.values.name}
+          />
+        </div>
 
         {input.onDelete === null ? null : (
           <Button
@@ -240,76 +217,64 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         </Alert>
       )}
 
-      <FormSection description="" title="Basics">
-        <div className="space-y-5">
-          <div className="grid gap-5 md:grid-cols-2">
-            {input.mode === "create" ? (
-              <WebhookAutomationTitleEditor
-                errorMessage={input.fieldErrors.name}
-                mode={input.mode}
-                onCommit={(nextValue) => {
-                  input.onValueChange("name", nextValue);
-                }}
-                saveDisabled={input.isDeleting || input.isSaving}
-                title={input.values.name}
-              />
-            ) : null}
-
-            <SelectField
-              error={input.fieldErrors.sandboxProfileId}
-              label="Sandbox profile"
-              onValueChange={(value) => {
-                input.onValueChange("sandboxProfileId", value);
+      {input.mode === "edit" ? (
+        <FormSection>
+          <div className="flex min-h-10 items-center justify-between gap-3 p-4">
+            <div className="space-y-1">
+              <FieldLabel htmlFor="automation-enabled">Automation enabled</FieldLabel>
+            </div>
+            <Switch
+              aria-label="Automation enabled"
+              checked={input.values.enabled}
+              id="automation-enabled"
+              onCheckedChange={(checked) => {
+                input.onValueChange("enabled", checked);
               }}
-              options={input.sandboxProfileOptions}
-              placeholder="Select profile"
-              value={input.values.sandboxProfileId}
             />
           </div>
+        </FormSection>
+      ) : null}
 
-          {input.mode === "edit" ? (
-            <div className="bg-muted/40 flex items-start gap-3 rounded-lg border p-4">
-              <Checkbox
-                checked={input.values.enabled}
-                id="automation-enabled"
-                onCheckedChange={(checked) => {
-                  input.onValueChange("enabled", checked === true);
-                }}
-              />
-              <div className="space-y-1">
-                <FieldLabel htmlFor="automation-enabled">Automation enabled</FieldLabel>
-              </div>
-            </div>
-          ) : null}
+      <FormSection>
+        <div className="p-4">
+          <SelectField
+            error={input.fieldErrors.sandboxProfileId}
+            label="Sandbox profile"
+            orientation="horizontal"
+            onValueChange={(value) => {
+              input.onValueChange("sandboxProfileId", value);
+            }}
+            options={input.sandboxProfileOptions}
+            placeholder="Select profile"
+            value={input.values.sandboxProfileId}
+          />
         </div>
       </FormSection>
 
       <FormSection
-        description="These values are sent directly to the backend contract. Keep them aligned with the integration payload shape you expect."
-        title="Templates"
-      >
-        <Field>
-          <FieldLabel htmlFor="input-template">Input template</FieldLabel>
-          <FieldContent>
-            <Textarea
-              id="input-template"
-              onChange={(event) => {
-                input.onValueChange("inputTemplate", event.currentTarget.value);
+        header={
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold">Triggers</h2>
+            <WebhookAutomationTriggerPickerAddButton
+              error={input.fieldErrors.triggerIds}
+              disabledReason={input.triggerPickerDisabledReason}
+              eventOptions={input.webhookEventOptions}
+              hasConnectedIntegrations={input.connectionOptions.length > 0}
+              onValueChange={(value) => {
+                input.onValueChange("triggerIds", value);
               }}
-              rows={7}
-              value={input.values.inputTemplate}
+              selectedTriggerIds={input.values.triggerIds}
+              variant="header"
             />
-            <FieldError message={input.fieldErrors.inputTemplate} />
-          </FieldContent>
-        </Field>
-      </FormSection>
-
-      <FormSection description="" title="Triggers">
-        <div className="space-y-5">
+          </div>
+        }
+      >
+        <div className="p-4">
           <WebhookAutomationTriggerPicker
             error={input.fieldErrors.triggerIds}
             eventOptions={input.webhookEventOptions}
             hasConnectedIntegrations={input.connectionOptions.length > 0}
+            disabledReason={input.triggerPickerDisabledReason}
             onTriggerParameterValueChange={({ triggerId, parameterId, value }) => {
               input.onValueChange("triggerParameterValues", {
                 ...input.values.triggerParameterValues,
@@ -324,55 +289,76 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             }}
             selectedConnectionId={selectedConnectionId}
             selectedTriggerIds={input.values.triggerIds}
+            showAddTriggerControl={false}
             triggerParameterValues={input.values.triggerParameterValues}
           />
           <FieldError message={input.fieldErrors.triggerIds} />
+        </div>
 
+        {input.values.triggerIds.length === 0 ? null : (
+          <div className="p-4">
+            <Field orientation="horizontal">
+              <FieldHeader>
+                <FieldLabel>Group events by</FieldLabel>
+              </FieldHeader>
+              <FieldContent>
+                <Select
+                  disabled={conversationKeySelectionState.options.length === 0}
+                  onValueChange={(value) => {
+                    if (value === null) {
+                      return;
+                    }
+
+                    input.onValueChange("conversationKeyTemplate", value);
+                  }}
+                  value={conversationKeySelectionState.selectedTemplate}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select conversation grouping">
+                      {selectedConversationGroupingLabel}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {conversationKeySelectionState.options.map((option) => (
+                      <SelectItem key={option.id} value={option.template}>
+                        <div className="flex flex-col gap-0.5">
+                          <span>{option.label}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {option.description}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError message={input.fieldErrors.conversationKeyTemplate} />
+              </FieldContent>
+            </Field>
+          </div>
+        )}
+      </FormSection>
+
+      <FormSection>
+        <div className="p-4">
           <Field>
-            <FieldLabel>Conversation grouping</FieldLabel>
+            <FieldHeader>
+              <FieldLabel htmlFor="automation-instructions">Agent Instructions</FieldLabel>
+              <FieldDescription>
+                These instructions are sent together with the webhook payload and event type.
+              </FieldDescription>
+            </FieldHeader>
             <FieldContent>
-              <Select
-                disabled={conversationKeyFieldOptions.displayOptions.length === 0}
-                onValueChange={(value) => {
-                  if (value === null) {
-                    return;
-                  }
-
-                  input.onValueChange("conversationKeyTemplate", value);
+              <Textarea
+                className="min-h-36"
+                id="automation-instructions"
+                disabled={input.isDeleting || input.isSaving}
+                onChange={(event) => {
+                  input.onValueChange("instructions", event.currentTarget.value);
                 }}
-                value={input.values.conversationKeyTemplate}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue
-                    placeholder={
-                      input.values.triggerIds.length === 0
-                        ? "Select triggers first"
-                        : "Select conversation grouping"
-                    }
-                  >
-                    {
-                      conversationKeyFieldOptions.displayOptions.find(
-                        (option) => option.template === input.values.conversationKeyTemplate,
-                      )?.label
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {conversationKeyFieldOptions.displayOptions.map((option) => (
-                    <SelectItem key={option.id} value={option.template}>
-                      <div className="flex flex-col gap-0.5">
-                        <span>{option.label}</span>
-                        <span className="text-muted-foreground text-xs">{option.description}</span>
-                        <code className="text-muted-foreground text-[11px]">{option.template}</code>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-muted-foreground text-sm">
-                Events that render to the same key are routed into the same conversation.
-              </p>
-              <FieldError message={input.fieldErrors.conversationKeyTemplate} />
+                rows={5}
+                value={input.values.instructions}
+              />
+              <FieldError message={input.fieldErrors.instructions} />
             </FieldContent>
           </Field>
         </div>
