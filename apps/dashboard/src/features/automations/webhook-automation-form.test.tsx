@@ -177,7 +177,13 @@ describe("WebhookAutomationForm", () => {
   it("shows the instructions editor copy", () => {
     renderForm("create");
 
-    expect(screen.getAllByLabelText("Instructions").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Instructions")).toBeDefined();
+    expect(
+      screen.getAllByText(
+        "These instructions are sent together with the webhook event type and full payload.",
+      ).length,
+    ).toBeGreaterThan(0);
     expect(screen.queryByText("Basics")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Instructions" })).toBeNull();
   });
 });

@@ -78,12 +78,14 @@ function SelectField(input: {
   placeholder: string;
   options: readonly WebhookAutomationFormOption[];
   error: string | undefined;
+  orientation?: "vertical" | "horizontal";
+  fieldClassName?: string;
   onValueChange: (value: string) => void;
 }): React.JSX.Element {
   const selectedOption = input.options.find((option) => option.value === input.value);
 
   return (
-    <Field>
+    <Field className={input.fieldClassName} orientation={input.orientation ?? "vertical"}>
       <FieldLabel>{input.label}</FieldLabel>
       <FieldContent>
         <Select
@@ -258,7 +260,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
             <SelectField
               error={input.fieldErrors.sandboxProfileId}
+              fieldClassName="items-center has-[>[data-slot=field-content]]:items-center"
               label="Sandbox profile"
+              orientation="horizontal"
               onValueChange={(value) => {
                 input.onValueChange("sandboxProfileId", value);
               }}
@@ -285,11 +289,14 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         </div>
       </FormSection>
 
-      <FormSection description="" title="Instructions">
-        <Field>
-          <FieldContent>
+      <FormSection description="" title="">
+        <Field className="gap-1">
+          <FieldLabel htmlFor="automation-instructions">Instructions</FieldLabel>
+          <FieldContent className="gap-3 -mt-1">
+            <FieldDescription className="nth-last-2:mt-0">
+              These instructions are sent together with the webhook event type and full payload.
+            </FieldDescription>
             <Textarea
-              aria-label="Instructions"
               id="automation-instructions"
               disabled={input.isDeleting || input.isSaving}
               onChange={(event) => {
