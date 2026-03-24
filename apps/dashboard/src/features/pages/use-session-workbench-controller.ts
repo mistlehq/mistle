@@ -336,6 +336,8 @@ export function seedSandboxInstanceStatusQuery(input: {
 }
 
 export function useSessionWorkbenchController(input: {
+  onResumeOnOpenHandled: () => void;
+  resumeOnOpenRequestToken: string | null;
   sandboxInstanceId: string | null;
 }): UseSessionWorkbenchControllerResult {
   const initialStoredResumeIdempotencyRecord =
@@ -832,6 +834,30 @@ export function useSessionWorkbenchController(input: {
     queryClient,
     sandboxStatus,
     sandboxStatusQuery.refetch,
+  ]);
+
+  useEffect(() => {
+    if (input.resumeOnOpenRequestToken === null) {
+      return;
+    }
+
+    if (input.sandboxInstanceId === null || sandboxStatus === null) {
+      return;
+    }
+
+    input.onResumeOnOpenHandled();
+
+    if (sandboxStatus !== "stopped") {
+      return;
+    }
+
+    void requestStoppedSandboxResume();
+  }, [
+    input.onResumeOnOpenHandled,
+    input.resumeOnOpenRequestToken,
+    input.sandboxInstanceId,
+    requestStoppedSandboxResume,
+    sandboxStatus,
   ]);
 
   return {

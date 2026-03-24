@@ -41,6 +41,8 @@ describe("useSessionWorkbenchController", () => {
     const { result } = renderHook(
       () =>
         useSessionWorkbenchController({
+          onResumeOnOpenHandled: () => {},
+          resumeOnOpenRequestToken: null,
           sandboxInstanceId: null,
         }),
       {
@@ -104,6 +106,8 @@ describe("useSessionWorkbenchController", () => {
     const { result, rerender } = renderHook(
       ({ sandboxInstanceId }: { sandboxInstanceId: string | null }) =>
         useSessionWorkbenchController({
+          onResumeOnOpenHandled: () => {},
+          resumeOnOpenRequestToken: null,
           sandboxInstanceId,
         }),
       {
@@ -462,6 +466,8 @@ describe("useSessionWorkbenchController", () => {
     const { result } = renderHook(
       () =>
         useSessionWorkbenchController({
+          onResumeOnOpenHandled: () => {},
+          resumeOnOpenRequestToken: null,
           sandboxInstanceId,
         }),
       {

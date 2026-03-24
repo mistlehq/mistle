@@ -1,18 +1,20 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
+import { hasResumeOnOpenNavigationIntent } from "./session-workbench-page.js";
 import {
   buildOptimisticSessions,
   resolveSessionResultsSummary,
   SandboxSessionStatusBadge,
   SessionsPage,
+  shouldNavigateWithResumeIntent,
 } from "./sessions-page.js";
 
 describe("SessionsPage", () => {
@@ -204,5 +206,83 @@ describe("SessionsPage", () => {
     expect(markup).toContain("INSTANCE_VOLUME_PROVISION_FAILED");
     expect(markup).toContain("Failed to provision instance volume before runtime startup.");
     expect(markup).not.toContain("text-destructive whitespace-pre-wrap text-xs");
+  });
+
+  it("routes stopped sessions into the workbench with resume intent", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          refetchOnMount: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+    seedAuthenticatedSession(queryClient);
+    queryClient.setQueryData(
+      sandboxInstancesListQueryKey({
+        limit: 20,
+        after: null,
+        before: null,
+      }),
+      {
+        items: [
+          {
+            id: "sbi_stopped",
+            sandboxProfileId: "sbp_123",
+            sandboxProfileVersion: 2,
+            status: "stopped",
+            startedBy: {
+              kind: "user",
+              id: "user-id",
+              name: "Mistle User",
+            },
+            source: "dashboard",
+            createdAt: "2026-03-10T00:00:00.000Z",
+            updatedAt: "2026-03-10T00:00:00.000Z",
+            failureCode: null,
+            failureMessage: null,
+          },
+        ],
+        nextPage: null,
+        previousPage: null,
+        totalResults: 1,
+      },
+    );
+
+    function SessionRouteProbe(): React.JSX.Element {
+      const location = useLocation();
+      return (
+        <div>
+          <span>{location.pathname}</span>
+          <span>
+            {hasResumeOnOpenNavigationIntent(location.state) ? "resume-intent" : "no-intent"}
+          </span>
+        </div>
+      );
+    }
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/sessions"]}>
+          <Routes>
+            <Route element={<SessionsPage />} path="/sessions" />
+            <Route element={<SessionRouteProbe />} path="/sessions/:sandboxInstanceId" />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+
+    expect(screen.getByText("/sessions/sbi_stopped")).toBeDefined();
+    expect(screen.getByText("resume-intent")).toBeDefined();
+  });
+
+  it("marks only stopped sessions for resume-on-open navigation", () => {
+    expect(shouldNavigateWithResumeIntent("stopped")).toBe(true);
+    expect(shouldNavigateWithResumeIntent("starting")).toBe(false);
+    expect(shouldNavigateWithResumeIntent("running")).toBe(false);
+    expect(shouldNavigateWithResumeIntent("failed")).toBe(false);
   });
 });

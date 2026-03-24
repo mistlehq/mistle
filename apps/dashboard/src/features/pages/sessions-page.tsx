@@ -176,6 +176,10 @@ export function SandboxSessionStatusBadge(input: {
   );
 }
 
+export function shouldNavigateWithResumeIntent(status: SandboxSessionStatus): boolean {
+  return status === "stopped";
+}
+
 export function buildOptimisticSessions(input: {
   launchedSessions: readonly {
     profileId: string;
@@ -648,14 +652,28 @@ export function SessionsPage(): React.JSX.Element {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
+                        {/** Stopped sessions resume through the workbench so the
+                         existing reconnect and error flow stays centralized. */}
                         <Button
                           disabled={!isSessionPageNavigableSandboxStatus(session.status)}
                           onClick={() => {
-                            navigate(`/sessions/${encodeURIComponent(session.id)}`);
+                            const pathname = `/sessions/${encodeURIComponent(session.id)}`;
+                            if (shouldNavigateWithResumeIntent(session.status)) {
+                              navigate(pathname, {
+                                state: {
+                                  resumeOnOpen: true,
+                                },
+                              });
+                              return;
+                            }
+
+                            navigate(pathname);
                           }}
                           type="button"
                         >
-                          Open session
+                          {shouldNavigateWithResumeIntent(session.status)
+                            ? "Resume"
+                            : "Open session"}
                         </Button>
                       </TableCell>
                     </TableRow>
