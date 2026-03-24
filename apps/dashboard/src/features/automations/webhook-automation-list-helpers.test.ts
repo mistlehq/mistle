@@ -110,7 +110,7 @@ describe("buildWebhookAutomationEventOptions", () => {
         }),
         eventType: "github.pull_request.opened",
         connectionId: "conn_github",
-        connectionLabel: "GitHub Engineering",
+        connectionLabel: "GitHub - GitHub Engineering",
         label: "Pull request opened",
         conversationKeyOptions: [
           {
@@ -130,7 +130,7 @@ describe("buildWebhookAutomationEventOptions", () => {
         }),
         eventType: "github.issue_comment.created",
         connectionId: "conn_github",
-        connectionLabel: "GitHub Engineering",
+        connectionLabel: "GitHub - GitHub Engineering",
         label: "Issue comment created",
         conversationKeyOptions: [
           {
@@ -149,7 +149,7 @@ describe("buildWebhookAutomationEventOptions", () => {
         }),
         eventType: "linear.issue.created",
         connectionId: "conn_linear",
-        connectionLabel: "Linear Workspace",
+        connectionLabel: "Linear - Linear Workspace",
         label: "Issue created",
         category: "Linear Workspace / Issues",
         logoKey: "linear",
