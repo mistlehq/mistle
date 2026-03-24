@@ -232,6 +232,7 @@ describe("useSessionWorkbenchController", () => {
       readStoredResumeIdempotencyKey({
         sandboxInstanceId,
         storage: null,
+        nowMs: Date.now(),
       }),
     ).toBeNull();
 
@@ -240,6 +241,7 @@ describe("useSessionWorkbenchController", () => {
         sandboxInstanceId,
         idempotencyKey: "resume-key-001",
         storage: null,
+        nowMs: Date.now(),
       });
 
       clearStoredResumeIdempotencyKey({
@@ -247,5 +249,45 @@ describe("useSessionWorkbenchController", () => {
         storage: null,
       });
     }).not.toThrow();
+  });
+
+  it("expires stored resume idempotency keys after the retry window", () => {
+    let storedValue: string | null = null;
+    const storage = {
+      getItem(): string | null {
+        return storedValue;
+      },
+      removeItem(): void {
+        storedValue = null;
+      },
+      setItem(_key: string, value: string): void {
+        storedValue = value;
+      },
+    };
+
+    expect(
+      persistResumeIdempotencyKey({
+        sandboxInstanceId: "sbi_resume_001",
+        idempotencyKey: "resume-key-001",
+        storage,
+        nowMs: 1_000,
+      }),
+    ).toBe(true);
+
+    expect(
+      readStoredResumeIdempotencyKey({
+        sandboxInstanceId: "sbi_resume_001",
+        storage,
+        nowMs: 1_000 + 60_000,
+      }),
+    ).toBe("resume-key-001");
+
+    expect(
+      readStoredResumeIdempotencyKey({
+        sandboxInstanceId: "sbi_resume_001",
+        storage,
+        nowMs: 1_000 + 5 * 60 * 1_000,
+      }),
+    ).toBeNull();
   });
 });

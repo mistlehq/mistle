@@ -9,6 +9,13 @@ import {
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
+  getBestEffortBrowserStorage,
+  isExpiringBrowserStorageRecord,
+  readBrowserStorageJson,
+  removeBrowserStorageItem,
+  writeBrowserStorageJson,
+} from "../shared/browser-storage.js";
+import {
   hasSessionTopAlert,
   resolveChatComposerAction,
   resolveSessionHeaderStatusUi,
@@ -30,6 +37,7 @@ const AutomationSessionPreparationTimeoutMs = 30_000;
 const AutomationSessionPreparationTimeoutMessage =
   "This chat session is taking longer than expected to become ready. Please try again shortly.";
 const ResumeIdempotencyKeyStorageKeyPrefix = "dashboard:session-workbench:resume-idempotency:";
+const ResumeIdempotencyKeyTtlMs = 5 * 60 * 1_000;
 
 type SandboxAutomationConversation = {
   conversationId: string;
@@ -181,44 +189,71 @@ export type {
   UseSessionWorkbenchControllerResult,
 };
 
+type ResumeIdempotencyStorageRecord = {
+  value: string;
+  expiresAtMs: number;
+};
+
 export function createResumeIdempotencyStorageKey(sandboxInstanceId: string): string {
   return `${ResumeIdempotencyKeyStorageKeyPrefix}${sandboxInstanceId}`;
 }
 
-function getBrowserStorage(): Storage | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  return window.localStorage;
+function isResumeIdempotencyStorageRecord(value: unknown): value is ResumeIdempotencyStorageRecord {
+  return isExpiringBrowserStorageRecord(value, (storedValue): storedValue is string => {
+    return typeof storedValue === "string" && storedValue.length > 0;
+  });
 }
 
 export function readStoredResumeIdempotencyKey(input: {
   sandboxInstanceId: string;
-  storage: Pick<Storage, "getItem"> | null;
+  storage: Pick<Storage, "getItem" | "removeItem"> | null;
+  nowMs: number;
 }): string | null {
-  const storedKey = input.storage?.getItem(
-    createResumeIdempotencyStorageKey(input.sandboxInstanceId),
-  );
-  return storedKey === null || storedKey === undefined || storedKey.length === 0 ? null : storedKey;
+  const storageKey = createResumeIdempotencyStorageKey(input.sandboxInstanceId);
+  const storedRecord = readBrowserStorageJson({
+    key: storageKey,
+    storage: input.storage,
+    isValue: isResumeIdempotencyStorageRecord,
+  });
+  if (storedRecord === null) {
+    return null;
+  }
+
+  if (storedRecord.expiresAtMs <= input.nowMs) {
+    removeBrowserStorageItem({
+      key: storageKey,
+      storage: input.storage,
+    });
+    return null;
+  }
+
+  return storedRecord.value;
 }
 
 export function persistResumeIdempotencyKey(input: {
   sandboxInstanceId: string;
   idempotencyKey: string;
   storage: Pick<Storage, "setItem"> | null;
-}): void {
-  input.storage?.setItem(
-    createResumeIdempotencyStorageKey(input.sandboxInstanceId),
-    input.idempotencyKey,
-  );
+  nowMs: number;
+}): boolean {
+  return writeBrowserStorageJson({
+    key: createResumeIdempotencyStorageKey(input.sandboxInstanceId),
+    value: {
+      value: input.idempotencyKey,
+      expiresAtMs: input.nowMs + ResumeIdempotencyKeyTtlMs,
+    } satisfies ResumeIdempotencyStorageRecord,
+    storage: input.storage,
+  });
 }
 
 export function clearStoredResumeIdempotencyKey(input: {
   sandboxInstanceId: string;
   storage: Pick<Storage, "removeItem"> | null;
-}): void {
-  input.storage?.removeItem(createResumeIdempotencyStorageKey(input.sandboxInstanceId));
+}): boolean {
+  return removeBrowserStorageItem({
+    key: createResumeIdempotencyStorageKey(input.sandboxInstanceId),
+    storage: input.storage,
+  });
 }
 
 export function useSessionWorkbenchController(input: {
@@ -348,7 +383,7 @@ export function useSessionWorkbenchController(input: {
 
     clearStoredResumeIdempotencyKey({
       sandboxInstanceId: input.sandboxInstanceId,
-      storage: getBrowserStorage(),
+      storage: getBestEffortBrowserStorage("local"),
     });
   }, [input.sandboxInstanceId, sandboxStatus]);
 
@@ -570,17 +605,20 @@ export function useSessionWorkbenchController(input: {
       return;
     }
 
-    const storage = getBrowserStorage();
+    const nowMs = Date.now();
+    const storage = getBestEffortBrowserStorage("local");
     const idempotencyKey =
       readStoredResumeIdempotencyKey({
         sandboxInstanceId: input.sandboxInstanceId,
         storage,
+        nowMs,
       }) ?? crypto.randomUUID();
 
     persistResumeIdempotencyKey({
       sandboxInstanceId: input.sandboxInstanceId,
       idempotencyKey,
       storage,
+      nowMs,
     });
 
     setResumeErrorMessage(null);
