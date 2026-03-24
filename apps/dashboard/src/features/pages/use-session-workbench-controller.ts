@@ -415,22 +415,24 @@ export function useSessionWorkbenchController(input: {
   };
 
   useEffect(() => {
+    const hasStoredResumeKey =
+      input.sandboxInstanceId !== null &&
+      readStoredResumeIdempotencyKey({
+        sandboxInstanceId: input.sandboxInstanceId,
+        storage: getBestEffortBrowserStorage("local"),
+        nowMs: Date.now(),
+      }) !== null;
+
     setHasAttemptedAutoConnect(false);
     setAutomationPendingSinceMs(null);
     setAutomationPendingErrorMessage(null);
-    setHasStoredResumeIdempotencyKey(initialHasStoredResumeIdempotencyKey);
-    setIsResumingStoppedSandbox(initialHasStoredResumeIdempotencyKey);
+    setHasStoredResumeIdempotencyKey(hasStoredResumeKey);
+    setIsResumingStoppedSandbox(hasStoredResumeKey);
     setResumeErrorMessage(null);
     clearStartErrorMessage();
     disconnectSession();
     void disconnectPty();
-  }, [
-    clearStartErrorMessage,
-    disconnectPty,
-    disconnectSession,
-    initialHasStoredResumeIdempotencyKey,
-    input.sandboxInstanceId,
-  ]);
+  }, [clearStartErrorMessage, disconnectPty, disconnectSession, input.sandboxInstanceId]);
 
   useEffect(() => {
     if (input.sandboxInstanceId === null) {
