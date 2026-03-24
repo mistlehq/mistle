@@ -94,8 +94,8 @@ export function AutomationsPage(): React.JSX.Element {
 
       <WebhookAutomationListView
         errorMessage={errorMessage}
-        hasNextPage={automationsQuery.data?.nextPage !== null}
-        hasPreviousPage={automationsQuery.data?.previousPage !== null}
+        hasNextPage={automationsQuery.data?.nextPage != null}
+        hasPreviousPage={automationsQuery.data?.previousPage != null}
         isLoading={automationsQuery.isPending || prerequisites.isPending}
         items={items}
         nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}

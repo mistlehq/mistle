@@ -75,6 +75,21 @@ function seedAutomationPrerequisites(queryClient: QueryClient): void {
 }
 
 describe("AutomationsPage", () => {
+  it("does not render pagination while the initial automation query has no data", () => {
+    const queryClient = createQueryClient();
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AutomationsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).not.toContain(">Previous<");
+    expect(markup).not.toContain(">Next<");
+  });
+
   it("uses the sandbox profiles page header layout and shared table styling", () => {
     const queryClient = createQueryClient();
     const listResult: WebhookAutomationsListResult = {
