@@ -1,4 +1,3 @@
-import type { StartSandboxInstanceInput } from "@mistle/data-plane-internal-client";
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 
 import { compileProfileVersionRuntimePlan } from "../../../sandbox-profiles/compile-profile-version-runtime-plan.js";
@@ -18,14 +17,6 @@ type StartProfileInstanceInput = {
   };
   source: SandboxInstanceSource;
 };
-
-function cloneStartSandboxRuntimePlan(input: unknown): StartSandboxInstanceInput["runtimePlan"] {
-  const clonedRuntimePlan: StartSandboxInstanceInput["runtimePlan"] = JSON.parse(
-    JSON.stringify(input),
-  );
-
-  return clonedRuntimePlan;
-}
 
 export async function startProfileInstance(
   {
@@ -71,7 +62,7 @@ export async function startProfileInstance(
     organizationId: input.organizationId,
     sandboxProfileId: input.profileId,
     sandboxProfileVersion: input.profileVersion,
-    runtimePlan: cloneStartSandboxRuntimePlan(runtimePlan),
+    runtimePlan,
     startedBy: input.startedBy,
     source: input.source,
     image: {

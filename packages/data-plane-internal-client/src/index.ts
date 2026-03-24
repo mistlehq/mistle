@@ -1,3 +1,4 @@
+import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 import type { Client } from "openapi-fetch";
 import createClient from "openapi-fetch";
 import { z } from "zod";
@@ -21,8 +22,12 @@ export type CreateDataPlaneSandboxInstancesClientInput = {
   requestTimeoutMs?: number;
 };
 
-export type StartSandboxInstanceInput =
-  paths["/internal/sandbox-instances/start"]["post"]["requestBody"]["content"]["application/json"];
+export type StartSandboxInstanceInput = Omit<
+  StartSandboxInstanceWorkflowInput,
+  "sandboxInstanceId"
+> & {
+  idempotencyKey?: string;
+};
 export type StartSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox-instances/start"]["post"]["responses"]["200"]["content"]["application/json"];
 export type ResumeSandboxInstanceInput =
@@ -114,18 +119,37 @@ function createClientError(input: {
 }
 
 function createInternalClient(input: CreateDataPlaneSandboxInstancesClientInput): {
+  baseUrl: string;
   client: Client<paths>;
+  serviceToken: string;
   requestTimeoutMs: number;
 } {
   return {
+    baseUrl: input.baseUrl,
     client: createClient<paths>({
       baseUrl: input.baseUrl,
       headers: {
         [DATA_PLANE_INTERNAL_AUTH_HEADER]: input.serviceToken,
       },
     }),
+    serviceToken: input.serviceToken,
     requestTimeoutMs: input.requestTimeoutMs ?? DefaultRequestTimeoutMs,
   };
+}
+
+async function readResponseBody(response: Response): Promise<unknown> {
+  const responseText = await response.text();
+
+  if (responseText.length === 0) {
+    return undefined;
+  }
+
+  const contentType = response.headers.get("content-type");
+  if (contentType !== null && contentType.includes("application/json")) {
+    return JSON.parse(responseText);
+  }
+
+  return responseText;
 }
 
 export function createDataPlaneSandboxInstancesClient(
@@ -135,18 +159,30 @@ export function createDataPlaneSandboxInstancesClient(
 
   return {
     async startSandboxInstance(startInput) {
-      const result = await internalClient.client.POST("/internal/sandbox-instances/start", {
-        body: startInput,
-        signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
-      });
+      const response = await fetch(
+        new URL("/internal/sandbox-instances/start", internalClient.baseUrl),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            [DATA_PLANE_INTERNAL_AUTH_HEADER]: internalClient.serviceToken,
+          },
+          body: JSON.stringify(startInput),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
 
-      if (result.response.status === 200 && result.data !== undefined) {
-        return result.data;
+      if (response.status === 200) {
+        const responseBody: StartSandboxInstanceAcceptedResponse = await response.json();
+
+        return responseBody;
       }
 
+      const errorBody = await readResponseBody(response);
+
       throw createClientError({
-        status: result.response.status,
-        error: result.error,
+        status: response.status,
+        error: errorBody,
         operation: "start",
       });
     },
@@ -202,14 +238,16 @@ export function createDataPlaneSandboxInstancesClient(
       });
     },
 
-    async listSandboxInstances(listInput) {
+    async listSandboxInstances(listInput): Promise<ListSandboxInstancesResponse> {
       const result = await internalClient.client.POST("/internal/sandbox-instances/list", {
         body: listInput,
         signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
       });
 
       if (result.response.status === 200 && result.data !== undefined) {
-        return result.data;
+        const response: ListSandboxInstancesResponse = result.data;
+
+        return response;
       }
 
       throw createClientError({
