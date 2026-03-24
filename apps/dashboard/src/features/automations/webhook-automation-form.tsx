@@ -7,6 +7,7 @@ import {
   Field,
   FieldContent,
   FieldDescription,
+  FieldHeader,
   FieldLabel,
   Select,
   SelectContent,
@@ -290,12 +291,14 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       </FormSection>
 
       <FormSection description="" title="">
-        <Field className="gap-1">
-          <FieldLabel htmlFor="automation-instructions">Instructions</FieldLabel>
-          <FieldContent className="gap-3 -mt-1">
-            <FieldDescription className="nth-last-2:mt-0">
+        <Field>
+          <FieldHeader>
+            <FieldLabel htmlFor="automation-instructions">Instructions</FieldLabel>
+            <FieldDescription>
               These instructions are sent together with the webhook event type and full payload.
             </FieldDescription>
+          </FieldHeader>
+          <FieldContent>
             <Textarea
               id="automation-instructions"
               disabled={input.isDeleting || input.isSaving}
@@ -334,12 +337,14 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           />
           <FieldError message={input.fieldErrors.triggerIds} />
 
-          <Field className="gap-2">
-            <FieldLabel>Conversation grouping</FieldLabel>
-            <FieldContent className="gap-2">
-              <FieldDescription className="nth-last-2:mt-0">
+          <Field>
+            <FieldHeader>
+              <FieldLabel>Conversation grouping</FieldLabel>
+              <FieldDescription>
                 Events that render to the same key are routed into the same conversation.
               </FieldDescription>
+            </FieldHeader>
+            <FieldContent>
               <Select
                 disabled={conversationKeyFieldOptions.displayOptions.length === 0}
                 onValueChange={(value) => {

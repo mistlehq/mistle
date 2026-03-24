@@ -3,6 +3,7 @@ import {
   FieldContent,
   FieldDescription,
   FieldError,
+  FieldHeader,
   FieldLabel,
   FieldTitle,
   Input,
@@ -48,8 +49,7 @@ function resolveSelectWidgetOptions(input: {
 export const IntegrationHorizontalFieldGroupClassName = "gap-6 flex flex-col";
 export const IntegrationHorizontalFieldLayoutClassName =
   "w-full gap-2 md:flex-row md:items-start md:gap-4 md:[&>*]:w-auto md:[&>[data-slot=field-label]]:w-40 md:[&>[data-slot=field-label]]:shrink-0 md:[&>[data-slot=field-label]]:pt-2 md:[&>[data-slot=field-content]]:min-w-0 md:[&>[data-slot=field-content]]:w-auto md:[&>[data-slot=field-content]]:flex-1";
-export const IntegrationStackedFieldLayoutClassName =
-  "w-full gap-1 [&>[data-slot=field-content]]:gap-2";
+export const IntegrationStackedFieldLayoutClassName = "w-full";
 export const IntegrationSelectContentClassName =
   "w-max min-w-(--anchor-width) max-w-[min(32rem,calc(100vw-2rem))]";
 
@@ -242,15 +242,17 @@ function IntegrationFieldTemplate(
       style={props.style}
     >
       {props.displayLabel && props.label.length > 0 ? (
-        <FieldLabel htmlFor={props.id}>
-          {props.label}
-          {props.required ? <span className="text-destructive">*</span> : null}
-        </FieldLabel>
+        <FieldHeader>
+          <FieldLabel htmlFor={props.id}>
+            {props.label}
+            {props.required ? <span className="text-destructive">*</span> : null}
+          </FieldLabel>
+          {typeof props.rawDescription === "string" && props.rawDescription.length > 0 ? (
+            <FieldDescription>{props.rawDescription}</FieldDescription>
+          ) : null}
+        </FieldHeader>
       ) : null}
       <FieldContent>
-        {typeof props.rawDescription === "string" && props.rawDescription.length > 0 ? (
-          <FieldDescription>{props.rawDescription}</FieldDescription>
-        ) : null}
         {props.children}
         <FieldError errors={errorItems} />
         {typeof props.rawHelp === "string" && props.rawHelp.length > 0 ? (
@@ -276,9 +278,13 @@ function IntegrationObjectFieldTemplate(
           layout === "horizontal" ? IntegrationHorizontalFieldGroupClassName : undefined,
         )}
       >
-        {props.title.length > 0 ? <FieldTitle>{props.title}</FieldTitle> : null}
-        {typeof props.description === "string" ? (
-          <FieldDescription>{props.description}</FieldDescription>
+        {props.title.length > 0 || typeof props.description === "string" ? (
+          <FieldHeader>
+            {props.title.length > 0 ? <FieldTitle>{props.title}</FieldTitle> : null}
+            {typeof props.description === "string" ? (
+              <FieldDescription>{props.description}</FieldDescription>
+            ) : null}
+          </FieldHeader>
         ) : props.description ? (
           props.description
         ) : null}
