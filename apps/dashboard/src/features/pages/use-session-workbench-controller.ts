@@ -1,5 +1,5 @@
 import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
@@ -195,6 +195,11 @@ type ResumeIdempotencyStorageRecord = {
   expiresAtMs: number;
 };
 
+type ResumeRequestGuard = {
+  requestId: number;
+  sandboxInstanceId: string;
+};
+
 export function getSandboxInstanceStatusQueryKey(
   sandboxInstanceId: string | null,
 ): readonly ["sandbox-instance-status", string | null] {
@@ -307,6 +312,18 @@ export function shouldRetainResumeRetryWindowAfterError(error: unknown): boolean
   return error.status >= 500;
 }
 
+export function isActiveResumeRequest(input: {
+  activeRequest: ResumeRequestGuard | null;
+  requestId: number;
+  sandboxInstanceId: string;
+}): boolean {
+  return (
+    input.activeRequest !== null &&
+    input.activeRequest.requestId === input.requestId &&
+    input.activeRequest.sandboxInstanceId === input.sandboxInstanceId
+  );
+}
+
 export function seedSandboxInstanceStatusQuery(input: {
   queryClient: QueryClient;
   sandboxInstanceId: string;
@@ -341,6 +358,8 @@ export function useSessionWorkbenchController(input: {
   const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(false);
   const [resumeErrorMessage, setResumeErrorMessage] = useState<string | null>(null);
   const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
+  const activeResumeRequestRef = useRef<ResumeRequestGuard | null>(null);
+  const nextResumeRequestIdRef = useRef(0);
   const queryClient = useQueryClient();
   const sessionState = useCodexSessionState();
   const ptyState = useSandboxPtyState();
@@ -455,6 +474,7 @@ export function useSessionWorkbenchController(input: {
     setStoredResumeIdempotencyRecord(storedResumeRecord);
     setIsResumingStoppedSandbox(false);
     setResumeErrorMessage(null);
+    activeResumeRequestRef.current = null;
     clearStartErrorMessage();
     disconnectSession();
     void disconnectPty();
@@ -734,6 +754,12 @@ export function useSessionWorkbenchController(input: {
       idempotencyKey,
       nowMs,
     });
+    const requestId = nextResumeRequestIdRef.current + 1;
+    nextResumeRequestIdRef.current = requestId;
+    activeResumeRequestRef.current = {
+      requestId,
+      sandboxInstanceId: input.sandboxInstanceId,
+    };
 
     persistResumeIdempotencyKey({
       sandboxInstanceId: input.sandboxInstanceId,
@@ -750,6 +776,15 @@ export function useSessionWorkbenchController(input: {
         instanceId: input.sandboxInstanceId,
         idempotencyKey,
       });
+      if (
+        !isActiveResumeRequest({
+          activeRequest: activeResumeRequestRef.current,
+          requestId,
+          sandboxInstanceId: input.sandboxInstanceId,
+        })
+      ) {
+        return;
+      }
       seedSandboxInstanceStatusQuery({
         queryClient,
         sandboxInstanceId: input.sandboxInstanceId,
@@ -759,6 +794,15 @@ export function useSessionWorkbenchController(input: {
 
       void sandboxStatusQuery.refetch().catch(() => {});
     } catch (error) {
+      if (
+        !isActiveResumeRequest({
+          activeRequest: activeResumeRequestRef.current,
+          requestId,
+          sandboxInstanceId: input.sandboxInstanceId,
+        })
+      ) {
+        return;
+      }
       if (!shouldRetainResumeRetryWindowAfterError(error)) {
         clearStoredResumeIdempotencyKey({
           sandboxInstanceId: input.sandboxInstanceId,
@@ -771,7 +815,16 @@ export function useSessionWorkbenchController(input: {
         error instanceof Error ? error.message : "Could not resume sandbox session.",
       );
     } finally {
-      setIsResumingStoppedSandbox(false);
+      if (
+        isActiveResumeRequest({
+          activeRequest: activeResumeRequestRef.current,
+          requestId,
+          sandboxInstanceId: input.sandboxInstanceId,
+        })
+      ) {
+        activeResumeRequestRef.current = null;
+        setIsResumingStoppedSandbox(false);
+      }
     }
   }, [
     input.sandboxInstanceId,

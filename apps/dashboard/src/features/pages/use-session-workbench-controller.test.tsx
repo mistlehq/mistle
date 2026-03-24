@@ -11,6 +11,7 @@ import {
   createResumeIdempotencyStorageKey,
   getSandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
+  isActiveResumeRequest,
   persistResumeIdempotencyKey,
   readStoredResumeIdempotencyRecord,
   readStoredResumeIdempotencyKey,
@@ -380,6 +381,49 @@ describe("useSessionWorkbenchController", () => {
         }),
       ),
     ).toBe(false);
+  });
+
+  it("accepts resume completions only for the active request on the same sandbox", () => {
+    expect(
+      isActiveResumeRequest({
+        activeRequest: null,
+        requestId: 1,
+        sandboxInstanceId: "sbi_resume_001",
+      }),
+    ).toBe(false);
+
+    expect(
+      isActiveResumeRequest({
+        activeRequest: {
+          requestId: 2,
+          sandboxInstanceId: "sbi_resume_001",
+        },
+        requestId: 1,
+        sandboxInstanceId: "sbi_resume_001",
+      }),
+    ).toBe(false);
+
+    expect(
+      isActiveResumeRequest({
+        activeRequest: {
+          requestId: 1,
+          sandboxInstanceId: "sbi_resume_002",
+        },
+        requestId: 1,
+        sandboxInstanceId: "sbi_resume_001",
+      }),
+    ).toBe(false);
+
+    expect(
+      isActiveResumeRequest({
+        activeRequest: {
+          requestId: 1,
+          sandboxInstanceId: "sbi_resume_001",
+        },
+        requestId: 1,
+        sandboxInstanceId: "sbi_resume_001",
+      }),
+    ).toBe(true);
   });
 
   it("keeps a reloaded stopped sandbox resumable even when a stored resume key exists", () => {
