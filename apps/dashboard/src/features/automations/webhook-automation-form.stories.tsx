@@ -323,6 +323,7 @@ function StoryHarness(input: {
   isSaving?: boolean;
   isDeleting?: boolean;
   onDelete?: (() => void) | null;
+  triggerPickerDisabledReason?: string | null;
   connectionOptions?: readonly WebhookAutomationFormOption[];
   sandboxProfileOptions?: readonly WebhookAutomationFormOption[];
   webhookEventOptions?: readonly WebhookAutomationEventOption[];
@@ -348,7 +349,7 @@ function StoryHarness(input: {
           }));
         }}
         sandboxProfileOptions={input.sandboxProfileOptions ?? SandboxProfileOptions}
-        triggerPickerDisabledReason={null}
+        triggerPickerDisabledReason={input.triggerPickerDisabledReason ?? null}
         webhookEventOptions={input.webhookEventOptions ?? GitHubWebhookEventOptions}
         values={values}
       />
@@ -372,6 +373,7 @@ type Story = StoryObj<typeof meta>;
 export const Create: Story = {
   args: {
     mode: "create",
+    triggerPickerDisabledReason: "Select a sandbox profile to choose triggers.",
     values: EmptyCreateValues,
   },
 };
@@ -441,8 +443,33 @@ export const Saving: Story = {
 export const NoTriggersAvailable: Story = {
   args: {
     mode: "create",
-    values: EmptyCreateValues,
+    triggerPickerDisabledReason: "The selected profile has no bindings with automation triggers.",
+    values: {
+      ...EmptyCreateValues,
+      sandboxProfileId: "sbp_repo_maintainer",
+    },
     webhookEventOptions: [],
+  },
+};
+
+export const LoadingProfileBindings: Story = {
+  args: {
+    mode: "create",
+    triggerPickerDisabledReason: "Loading profile bindings...",
+    values: {
+      ...EmptyCreateValues,
+      sandboxProfileId: "sbp_repo_maintainer",
+    },
+    webhookEventOptions: [],
+  },
+};
+
+export const ProfileBindingsLoadFailure: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    triggerPickerDisabledReason: "Could not load profile bindings.",
+    values: ExistingAutomationValues,
   },
 };
 
