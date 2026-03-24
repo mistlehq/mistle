@@ -551,6 +551,58 @@ describe("automation webhooks CRUD integration", () => {
     expect(body.code).toBe("INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE");
   });
 
+  it("returns 400 when creating a webhook automation for a profile with only a non-connector binding for the selected trigger connection", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-invalid-binding-kind@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await insertIntegrationConnection(fixture, {
+      id: "icn_webhook_invalid_binding_kind_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertSandboxProfile(fixture, {
+      id: "sbp_webhook_invalid_binding_kind_001",
+      organizationId: authenticatedSession.organizationId,
+    });
+    await insertSandboxProfileVersion(fixture, {
+      profileId: "sbp_webhook_invalid_binding_kind_001",
+      version: 1,
+    });
+    await insertSandboxProfileBinding(fixture, {
+      profileId: "sbp_webhook_invalid_binding_kind_001",
+      version: 1,
+      connectionId: "icn_webhook_invalid_binding_kind_001",
+      kind: IntegrationBindingKinds.GIT,
+    });
+
+    const response = await fixture.request("/v1/automations/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        name: "GitHub issue triage",
+        integrationConnectionId: "icn_webhook_invalid_binding_kind_001",
+        eventTypes: ["issue_comment.created"],
+        inputTemplate: "Handle payload",
+        conversationKeyTemplate: "{{payload.issue.node_id}}",
+        target: {
+          sandboxProfileId: "sbp_webhook_invalid_binding_kind_001",
+          sandboxProfileVersion: 1,
+        },
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const body = CreateAutomationWebhookBadRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE");
+  });
+
   it("returns 404 for webhook automations outside the active organization and 400 for invalid payloads", async ({
     fixture,
   }) => {
@@ -686,13 +738,14 @@ async function insertSandboxProfileBinding(
     profileId: string;
     version: number;
     connectionId: string;
+    kind?: (typeof IntegrationBindingKinds)[keyof typeof IntegrationBindingKinds];
   },
 ) {
   await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
     sandboxProfileId: input.profileId,
     sandboxProfileVersion: input.version,
     connectionId: input.connectionId,
-    kind: IntegrationBindingKinds.CONNECTOR,
+    kind: input.kind ?? IntegrationBindingKinds.CONNECTOR,
     config: {},
     createdAt: "2026-02-01T00:00:00.000Z",
     updatedAt: "2026-02-01T00:00:00.000Z",

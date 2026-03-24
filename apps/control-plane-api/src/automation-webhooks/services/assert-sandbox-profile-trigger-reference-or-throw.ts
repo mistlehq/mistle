@@ -1,4 +1,8 @@
-import { type ControlPlaneDatabase, type ControlPlaneTransaction } from "@mistle/db/control-plane";
+import {
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
+  IntegrationBindingKinds,
+} from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 
 import { AutomationWebhooksBadRequestCodes } from "../constants.js";
@@ -41,6 +45,7 @@ export async function assertSandboxProfileTriggerReferenceOrThrow(
         eq(table.sandboxProfileId, input.sandboxProfileId),
         eq(table.sandboxProfileVersion, sandboxProfileVersion),
         eq(table.connectionId, input.integrationConnectionId),
+        eq(table.kind, IntegrationBindingKinds.CONNECTOR),
       ),
   });
 
