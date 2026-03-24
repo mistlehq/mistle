@@ -112,21 +112,16 @@ describe("WebhookAutomationForm", () => {
   function renderForm(mode: "create" | "edit" = "create"): void {
     renderFormWithOptions({
       mode,
-      isTemplateEditable: true,
     });
   }
 
-  function renderFormWithOptions(input: {
-    mode?: "create" | "edit";
-    isTemplateEditable: boolean;
-  }): ReturnType<typeof render> {
+  function renderFormWithOptions(input: { mode?: "create" | "edit" }): ReturnType<typeof render> {
     return render(
       <QueryClientProvider client={new QueryClient()}>
         <WebhookAutomationForm
           connectionOptions={ConnectionOptions}
           fieldErrors={{}}
           formError={null}
-          isTemplateEditable={input.isTemplateEditable}
           isDeleting={false}
           isSaving={false}
           mode={input.mode ?? "create"}
@@ -188,22 +183,5 @@ describe("WebhookAutomationForm", () => {
         "The automation will always receive your instructions, the webhook event type, and the full webhook payload.",
       ).length,
     ).toBeGreaterThan(0);
-  });
-
-  it("keeps save enabled when instructions are not editable", () => {
-    const rendered = renderFormWithOptions({
-      mode: "edit",
-      isTemplateEditable: false,
-    });
-
-    const saveButtons = screen.getAllByRole("button", {
-      name: "Save changes",
-    }) as HTMLButtonElement[];
-    const instructionFields = Array.from(
-      rendered.container.querySelectorAll<HTMLTextAreaElement>("#automation-instructions"),
-    );
-
-    expect(saveButtons.every((button) => !button.disabled)).toBe(true);
-    expect(instructionFields.every((field) => field.disabled)).toBe(true);
   });
 });

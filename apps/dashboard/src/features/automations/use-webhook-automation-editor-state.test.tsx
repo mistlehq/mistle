@@ -32,8 +32,6 @@ describe("useLoadedWebhookAutomationEditorState", () => {
             triggerIds: [],
             triggerParameterValues: {},
           },
-          templateParseError: null,
-          preservedInputTemplate: null,
           connectionOptions: [],
           sandboxProfileOptions: [],
           directoryData: {
@@ -57,7 +55,6 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       triggerIds: [],
       triggerParameterValues: {},
     });
-    expect(result.current.templateParseError).toBeNull();
     expect(result.current.formError).toBeNull();
   });
 });

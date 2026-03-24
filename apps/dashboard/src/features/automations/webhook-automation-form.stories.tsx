@@ -336,7 +336,6 @@ function StoryHarness(input: {
         connectionOptions={input.connectionOptions ?? ConnectionOptions}
         fieldErrors={input.fieldErrors ?? {}}
         formError={input.formError ?? null}
-        isTemplateEditable
         isDeleting={input.isDeleting ?? false}
         isSaving={input.isSaving ?? false}
         mode={input.mode}

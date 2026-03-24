@@ -91,8 +91,6 @@ function CreateWebhookAutomationEditor(input: {
       automationId={undefined}
       navigate={input.navigate}
       initialValues={toWebhookAutomationFormValues(null)}
-      templateParseError={null}
-      preservedInputTemplate={null}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
       directoryData={prerequisites.integrationDirectoryQuery.data}
@@ -143,10 +141,24 @@ function EditWebhookAutomationEditor(input: {
     return renderWebhookAutomationEditorLoading();
   }
 
-  const resolvedInitialState = resolveWebhookAutomationEditInitialValues({
-    automation: automationQuery.data,
-    directoryData: prerequisites.integrationDirectoryQuery.data,
-  });
+  let initialValues: ReturnType<typeof toWebhookAutomationFormValues>;
+  try {
+    initialValues = resolveWebhookAutomationEditInitialValues({
+      automation: automationQuery.data,
+      directoryData: prerequisites.integrationDirectoryQuery.data,
+    });
+  } catch (error) {
+    return renderWebhookAutomationEditorError({
+      title: "Could not load automation",
+      description: resolveApiErrorMessage({
+        error,
+        fallbackMessage: "Could not load automation.",
+      }),
+      onBack: () => {
+        void input.navigate("/automations");
+      },
+    });
+  }
 
   return (
     <LoadedWebhookAutomationEditor
@@ -154,9 +166,7 @@ function EditWebhookAutomationEditor(input: {
       mode="edit"
       automationId={input.automationId}
       navigate={input.navigate}
-      initialValues={resolvedInitialState.initialValues}
-      templateParseError={resolvedInitialState.templateParseError}
-      preservedInputTemplate={resolvedInitialState.preservedInputTemplate}
+      initialValues={initialValues}
       preservedConnectionId={automationQuery.data.integrationConnectionId}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
@@ -170,8 +180,6 @@ function LoadedWebhookAutomationEditor(input: {
   automationId: string | undefined;
   navigate: (to: string) => void | Promise<void>;
   initialValues: ReturnType<typeof toWebhookAutomationFormValues>;
-  templateParseError: string | null;
-  preservedInputTemplate: string | null;
   connectionOptions: ReturnType<typeof useWebhookAutomationPrerequisites>["connectionOptions"];
   sandboxProfileOptions: ReturnType<
     typeof useWebhookAutomationPrerequisites
@@ -185,18 +193,10 @@ function LoadedWebhookAutomationEditor(input: {
 
   return (
     <div className="flex flex-col gap-4">
-      {state.templateParseError === null ? null : (
-        <Alert variant="destructive">
-          <AlertTitle>Unsupported input template</AlertTitle>
-          <AlertDescription>{state.templateParseError}</AlertDescription>
-        </Alert>
-      )}
-
       <WebhookAutomationForm
         connectionOptions={state.connectionOptions}
         fieldErrors={state.fieldErrors}
         formError={state.formError}
-        isTemplateEditable={state.templateParseError === null}
         isDeleting={state.isDeleting}
         isSaving={state.isSaving}
         mode={input.mode}

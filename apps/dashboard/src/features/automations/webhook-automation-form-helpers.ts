@@ -121,9 +121,6 @@ export function toWebhookAutomationFormValues(
 export function validateWebhookAutomationFormValues(
   values: WebhookAutomationFormValues,
   eventOptions: readonly WebhookAutomationEventOption[] = [],
-  input?: {
-    requireInstructions?: boolean;
-  },
 ): Partial<Record<WebhookAutomationFormValueKey, string>> {
   const errors: Partial<Record<WebhookAutomationFormValueKey, string>> = {};
 
@@ -151,7 +148,7 @@ export function validateWebhookAutomationFormValues(
     errors.sandboxProfileId = "Select a sandbox profile.";
   }
 
-  if ((input?.requireInstructions ?? true) && values.instructions.trim().length === 0) {
+  if (values.instructions.trim().length === 0) {
     errors.instructions = "Instructions are required.";
   }
 
@@ -222,9 +219,6 @@ function resolveAutomationSubmissionShape(input: {
 export function toCreateWebhookAutomationPayload(
   values: WebhookAutomationFormValues,
   eventOptions: readonly WebhookAutomationEventOption[] = [],
-  input?: {
-    inputTemplateOverride?: string;
-  },
 ): CreateWebhookAutomationInput {
   const resolvedSubmissionShape = resolveAutomationSubmissionShape({
     values,
@@ -235,11 +229,9 @@ export function toCreateWebhookAutomationPayload(
     name: values.name.trim(),
     enabled: values.enabled,
     integrationConnectionId: resolvedSubmissionShape.integrationConnectionId,
-    inputTemplate:
-      input?.inputTemplateOverride ??
-      buildWebhookAutomationInputTemplate({
-        instructions: values.instructions,
-      }),
+    inputTemplate: buildWebhookAutomationInputTemplate({
+      instructions: values.instructions,
+    }),
     conversationKeyTemplate: values.conversationKeyTemplate,
     idempotencyKeyTemplate: null,
     eventTypes: resolvedSubmissionShape.eventTypes,
@@ -253,9 +245,6 @@ export function toCreateWebhookAutomationPayload(
 export function toUpdateWebhookAutomationPayload(
   values: WebhookAutomationFormValues,
   eventOptions: readonly WebhookAutomationEventOption[] = [],
-  input?: {
-    inputTemplateOverride?: string;
-  },
 ): UpdateWebhookAutomationPatch {
   const resolvedSubmissionShape = resolveAutomationSubmissionShape({
     values,
@@ -266,11 +255,9 @@ export function toUpdateWebhookAutomationPayload(
     name: values.name.trim(),
     enabled: values.enabled,
     integrationConnectionId: resolvedSubmissionShape.integrationConnectionId,
-    inputTemplate:
-      input?.inputTemplateOverride ??
-      buildWebhookAutomationInputTemplate({
-        instructions: values.instructions,
-      }),
+    inputTemplate: buildWebhookAutomationInputTemplate({
+      instructions: values.instructions,
+    }),
     conversationKeyTemplate: values.conversationKeyTemplate,
     idempotencyKeyTemplate: null,
     eventTypes: resolvedSubmissionShape.eventTypes,

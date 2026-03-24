@@ -53,7 +53,6 @@ type WebhookAutomationFormProps = {
   webhookEventOptions: readonly WebhookAutomationEventOption[];
   fieldErrors: Partial<Record<WebhookAutomationFormValueKey, string>>;
   formError: string | null;
-  isTemplateEditable: boolean;
   isSaving: boolean;
   isDeleting: boolean;
   onValueChange: (
@@ -294,7 +293,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           <FieldContent>
             <Textarea
               id="automation-instructions"
-              disabled={!input.isTemplateEditable || input.isDeleting || input.isSaving}
+              disabled={input.isDeleting || input.isSaving}
               onChange={(event) => {
                 input.onValueChange("instructions", event.currentTarget.value);
               }}

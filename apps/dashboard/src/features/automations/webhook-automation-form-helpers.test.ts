@@ -177,26 +177,12 @@ describe("toWebhookAutomationFormValues", () => {
     });
   });
 
-  it("accepts equivalent canonical templates with different json layout", () => {
-    expect(
-      toWebhookAutomationFormValues({
-        ...SampleAutomation,
-        inputTemplate: `{
-  "payload": {{payload}},
-  "eventType": "{{webhookEvent.eventType}}",
-  "instructions": "Please write a review of the changes made."
-}`,
-      }),
-    ).toMatchObject({
-      instructions: "Please write a review of the changes made.",
-    });
-  });
-
   it("rejects non-canonical stored templates", () => {
     expect(() =>
       toWebhookAutomationFormValues({
         ...SampleAutomation,
-        inputTemplate: '{"instructions":"freeform","payload":{{payload}}}',
+        inputTemplate:
+          '{"instructions":"Please write a review of the changes made.","eventType":"{{webhookEvent.eventType}}","payload":{{payload}}}',
       }),
     ).toThrow(
       "This automation uses a custom input template that cannot be edited in the instructions editor.",
@@ -321,21 +307,6 @@ describe("validateWebhookAutomationFormValues", () => {
       conversationKeyTemplate: "Select a supported conversation grouping.",
     });
   });
-
-  it("does not require instructions when a custom template is being preserved", () => {
-    const errors = validateWebhookAutomationFormValues(
-      {
-        ...BaseFormValues,
-        instructions: "",
-      },
-      GitHubEventOptions,
-      {
-        requireInstructions: false,
-      },
-    );
-
-    expect(errors.instructions).toBeUndefined();
-  });
 });
 
 describe("automation payload transforms", () => {
@@ -391,23 +362,6 @@ describe("automation payload transforms", () => {
       target: {
         sandboxProfileId: "sbp_repo",
       },
-    });
-  });
-
-  it("preserves an existing custom input template when requested", () => {
-    expect(
-      toUpdateWebhookAutomationPayload(
-        {
-          ...BaseFormValues,
-          instructions: "",
-        },
-        GitHubEventOptions,
-        {
-          inputTemplateOverride: '{"custom":"template"}',
-        },
-      ),
-    ).toMatchObject({
-      inputTemplate: '{"custom":"template"}',
     });
   });
 

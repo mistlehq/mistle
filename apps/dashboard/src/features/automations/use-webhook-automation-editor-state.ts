@@ -21,7 +21,6 @@ import {
   buildWebhookAutomationEventOptions,
   createWebhookAutomationTriggerId,
 } from "./webhook-automation-list-helpers.js";
-import { extractWebhookAutomationTriggerParameterValues } from "./webhook-automation-trigger-parameters.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
 import { AUTOMATIONS_QUERY_KEY_PREFIX } from "./webhook-automations-query-keys.js";
 import {
@@ -49,8 +48,6 @@ type LoadedWebhookAutomationEditorStateInput = {
   automationId: string | undefined;
   navigate: NavigateFunction;
   initialValues: WebhookAutomationFormValues;
-  templateParseError: string | null;
-  preservedInputTemplate: string | null;
   connectionOptions: readonly WebhookAutomationOption[];
   sandboxProfileOptions: readonly WebhookAutomationOption[];
   directoryData: DirectoryData;
@@ -93,11 +90,7 @@ function resolveNormalizedConversationKeyTemplate(input: {
 export function resolveWebhookAutomationEditInitialValues(input: {
   automation: WebhookAutomation;
   directoryData: DirectoryData;
-}): {
-  initialValues: WebhookAutomationFormValues;
-  templateParseError: string | null;
-  preservedInputTemplate: string | null;
-} {
+}): WebhookAutomationFormValues {
   const automationTriggerIds = (input.automation.eventTypes ?? []).map((eventType) =>
     createWebhookAutomationTriggerId({
       connectionId: input.automation.integrationConnectionId,
@@ -110,37 +103,8 @@ export function resolveWebhookAutomationEditInitialValues(input: {
     preservedConnectionId: input.automation.integrationConnectionId,
     selectedTriggerIds: automationTriggerIds,
   });
-  const extractedTriggerParameterValues = extractWebhookAutomationTriggerParameterValues({
-    eventOptions: hydrationEventOptions,
-    selectedTriggerIds: automationTriggerIds,
-    payloadFilter: input.automation.payloadFilter,
-  });
 
-  try {
-    return {
-      initialValues: toWebhookAutomationFormValues(input.automation, hydrationEventOptions),
-      templateParseError: null,
-      preservedInputTemplate: null,
-    };
-  } catch (error) {
-    if (error instanceof Error) {
-      return {
-        initialValues: {
-          name: input.automation.name,
-          sandboxProfileId: input.automation.target.sandboxProfileId,
-          enabled: input.automation.enabled,
-          instructions: "",
-          conversationKeyTemplate: input.automation.conversationKeyTemplate,
-          triggerIds: automationTriggerIds,
-          triggerParameterValues: extractedTriggerParameterValues.triggerParameterValues,
-        },
-        templateParseError: error.message,
-        preservedInputTemplate: input.automation.inputTemplate,
-      };
-    }
-
-    throw error;
-  }
+  return toWebhookAutomationFormValues(input.automation, hydrationEventOptions);
 }
 
 export function useLoadedWebhookAutomationEditorState(
@@ -151,7 +115,6 @@ export function useLoadedWebhookAutomationEditorState(
   webhookEventOptions: readonly WebhookAutomationEventOption[];
   values: WebhookAutomationFormValues;
   fieldErrors: Partial<Record<keyof WebhookAutomationFormValues, string>>;
-  templateParseError: string | null;
   formError: string | null;
   deleteError: string | null;
   isDeleteDialogOpen: boolean;
@@ -172,8 +135,6 @@ export function useLoadedWebhookAutomationEditorState(
     Partial<Record<keyof WebhookAutomationFormValues, string>>
   >({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [templateParseError] = useState<string | null>(input.templateParseError);
-  const [preservedInputTemplate] = useState<string | null>(input.preservedInputTemplate);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -221,24 +182,12 @@ export function useLoadedWebhookAutomationEditorState(
       return updateWebhookAutomation({
         payload: {
           automationId: input.automationId,
-          payload: toUpdateWebhookAutomationPayload(values, webhookEventOptions, {
-            ...(templateParseError === null
-              ? {}
-              : {
-                  inputTemplateOverride:
-                    preservedInputTemplate ??
-                    (() => {
-                      throw new Error("Expected original input template to be preserved.");
-                    })(),
-                }),
-          }),
+          payload: toUpdateWebhookAutomationPayload(values, webhookEventOptions),
         },
       });
     },
     onSuccess: async (automation) => {
-      if (templateParseError === null) {
-        setFormValues(toWebhookAutomationFormValues(automation, webhookEventOptions));
-      }
+      setFormValues(toWebhookAutomationFormValues(automation, webhookEventOptions));
       setFieldErrors({});
       setFormError(null);
       await queryClient.invalidateQueries({
@@ -290,10 +239,6 @@ export function useLoadedWebhookAutomationEditorState(
       [key]: value,
     };
 
-    if (key === "instructions" && templateParseError !== null) {
-      return;
-    }
-
     if (key === "triggerIds") {
       nextValues.conversationKeyTemplate = resolveNormalizedConversationKeyTemplate({
         values: nextValues,
@@ -310,9 +255,7 @@ export function useLoadedWebhookAutomationEditorState(
   }
 
   function onSubmit(): void {
-    const nextFieldErrors = validateWebhookAutomationFormValues(formValues, webhookEventOptions, {
-      requireInstructions: templateParseError === null,
-    });
+    const nextFieldErrors = validateWebhookAutomationFormValues(formValues, webhookEventOptions);
     setFieldErrors(nextFieldErrors);
     setFormError(null);
 
@@ -343,7 +286,6 @@ export function useLoadedWebhookAutomationEditorState(
     webhookEventOptions,
     values: formValues,
     fieldErrors,
-    templateParseError,
     formError,
     deleteError,
     isDeleteDialogOpen,
