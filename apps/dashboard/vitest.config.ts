@@ -6,5 +6,10 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.ts"],
+    server: {
+      deps: {
+        inline: ["@pierre/diffs", "@pierre/theme"],
+      },
+    },
   },
 });
