@@ -1,7 +1,9 @@
 import { requestControlPlane } from "../api/request-control-plane.js";
 import {
   type CreatedIntegrationConnection,
+  type DeletedIntegrationConnection,
   type StartedRedirectConnection,
+  DeletedIntegrationConnectionSchema,
   IntegrationConnectionSchema,
   StartedRedirectConnectionSchema,
   readJsonWithSchema,
@@ -95,6 +97,31 @@ export async function updateApiKeyIntegrationConnection(input: {
       operation: "updateApiKeyIntegrationConnection",
       error,
       fallbackMessage: "Could not update integration connection API key.",
+    });
+  }
+}
+
+export async function deleteIntegrationConnection(input: {
+  connectionId: string;
+}): Promise<DeletedIntegrationConnection> {
+  try {
+    const response = await requestControlPlane({
+      operation: "deleteIntegrationConnection",
+      method: "DELETE",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}`,
+      fallbackMessage: "Could not delete integration connection.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: DeletedIntegrationConnectionSchema,
+      operation: "deleteIntegrationConnection",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "deleteIntegrationConnection",
+      error,
+      fallbackMessage: "Could not delete integration connection.",
     });
   }
 }

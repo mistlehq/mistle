@@ -65,10 +65,6 @@ active_master_encryption_key_version = 2
 [apps.control_plane_api.integrations.master_encryption_keys]
 "2" = "integration-master-key-fixture"
 
-[apps.control_plane_worker.server]
-host = "0.0.0.0"
-port = 5200
-
 [apps.control_plane_worker.workflow]
 database_url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 namespace_id = "fixture"
@@ -120,10 +116,6 @@ key_prefix = "mistle:runtime-state:fixture"
 
 [apps.data_plane_gateway.data_plane_api]
 base_url = "http://127.0.0.1:5300"
-
-[apps.data_plane_worker.server]
-host = "0.0.0.0"
-port = 5303
 
 [apps.data_plane_worker.database]
 url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"

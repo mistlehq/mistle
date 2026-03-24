@@ -15,12 +15,12 @@ import { createInternalSandboxRuntimeRoutes } from "./internal/sandbox-runtime/i
 import { createAppContextMiddleware } from "./middleware/app-context.js";
 import { createCorsMiddleware } from "./middleware/cors.js";
 import { withAuthSession } from "./middleware/with-auth-session.js";
-import { createOrganizationMembershipCapabilitiesRoutes } from "./organization-membership-capabilities/index.js";
+import { createOrganizationsRoutes } from "./organizations/index.js";
 import { createSandboxInstancesRoutes } from "./sandbox-instances/index.js";
 import { createSandboxProfilesRoutes } from "./sandbox-profiles/index.js";
 import type {
   AppContextBindings,
-  AppServices,
+  AppContextVariables,
   ControlPlaneApiConfig,
   ControlPlaneApiSandboxRuntimeConfig,
   ControlPlaneApp,
@@ -42,7 +42,7 @@ export type CreateAppInput = {
   dataPlaneClient: DataPlaneSandboxInstancesClient;
   connectionTokenConfig: AppContextBindings["Variables"]["connectionTokenConfig"];
   openWorkflow: OpenWorkflow;
-  services: AppServices;
+  auth: AppContextVariables["auth"];
 };
 
 export function createApp(input: CreateAppInput): ControlPlaneApp {
@@ -58,14 +58,14 @@ export function createApp(input: CreateAppInput): ControlPlaneApp {
     dataPlaneClient: input.dataPlaneClient,
     connectionTokenConfig: input.connectionTokenConfig,
     openWorkflow: input.openWorkflow,
-    services: input.services,
+    auth: input.auth,
   });
 
   return app;
 }
 
 export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): void {
-  const { app, config, db, services } = input;
+  const { app, config, db, auth } = input;
 
   app.use("*", createCorsMiddleware({ trustedOrigins: config.auth.trustedOrigins }));
   app.use(
@@ -79,7 +79,7 @@ export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): 
       dataPlaneClient: input.dataPlaneClient,
       connectionTokenConfig: input.connectionTokenConfig,
       openWorkflow: input.openWorkflow,
-      services,
+      auth,
     }),
   );
   app.doc(ControlPlaneOpenApiPath, {
@@ -103,9 +103,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const integrationConnectionsRoutes = createIntegrationConnectionsRoutes();
   const integrationTargetsRoutes = withAuthSession(createIntegrationTargetsRoutes());
   const integrationWebhooksRoutes = createIntegrationWebhooksRoutes();
-  const organizationMembershipCapabilitiesRoutes = withAuthSession(
-    createOrganizationMembershipCapabilitiesRoutes(),
-  );
+  const organizationsRoutes = withAuthSession(createOrganizationsRoutes());
   const sandboxInstancesRoutes = withAuthSession(createSandboxInstancesRoutes());
   const sandboxProfilesRoutes = withAuthSession(createSandboxProfilesRoutes());
 
@@ -114,10 +112,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   app.route(integrationConnectionsRoutes.basePath, integrationConnectionsRoutes.routes);
   app.route(integrationTargetsRoutes.basePath, integrationTargetsRoutes.routes);
   app.route(integrationWebhooksRoutes.basePath, integrationWebhooksRoutes.routes);
-  app.route(
-    organizationMembershipCapabilitiesRoutes.basePath,
-    organizationMembershipCapabilitiesRoutes.routes,
-  );
+  app.route(organizationsRoutes.basePath, organizationsRoutes.routes);
   app.route(sandboxInstancesRoutes.basePath, sandboxInstancesRoutes.routes);
   app.route(sandboxProfilesRoutes.basePath, sandboxProfilesRoutes.routes);
 }

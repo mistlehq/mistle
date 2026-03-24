@@ -49,8 +49,6 @@ function createWorkerEnvironment(
     MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: "integration-bootstrap-secret",
     MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: "data-plane-worker",
     MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE: "data-plane-gateway",
-    MISTLE_APPS_CONTROL_PLANE_WORKER_HOST: fixture.config.server.host,
-    MISTLE_APPS_CONTROL_PLANE_WORKER_PORT: String(fixture.config.server.port),
     MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL: fixture.databaseStack.directUrl,
     MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: fixture.config.workflow.namespaceId,
     MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",

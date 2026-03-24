@@ -89,11 +89,15 @@ export function buildIntegrationConnectionDetailItems(input: {
 }): readonly IntegrationConnectionDetailItem[] {
   return input.connections.map((connection) => {
     const connectionMethodId = resolveConnectionMethodId(connection.config ?? null);
+    const bindingCount = connection.bindingCount ?? 0;
+    const automationCount = connection.automationCount ?? 0;
 
     return {
       id: connection.id,
       displayName: connection.displayName,
       status: connection.status,
+      bindingCount,
+      canDelete: bindingCount === 0 && automationCount === 0,
       ...(connectionMethodId === null
         ? { authMethodId: null }
         : { authMethodId: connectionMethodId }),

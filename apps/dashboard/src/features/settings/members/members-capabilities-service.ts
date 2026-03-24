@@ -20,7 +20,7 @@ export async function getMembershipCapabilities(input: {
       },
     );
 
-    if (data === undefined || data.ok !== true || data.data === null) {
+    if (data === undefined) {
       throw new MembersApiError({
         operation: "getMembershipCapabilities",
         status: 500,
@@ -30,7 +30,7 @@ export async function getMembershipCapabilities(input: {
       });
     }
 
-    const roleTransitionMatrix = data.data.memberRoleUpdate.roleTransitionMatrix;
+    const roleTransitionMatrix = data.memberRoleUpdate.roleTransitionMatrix;
     if (
       roleTransitionMatrix.owner === undefined ||
       roleTransitionMatrix.admin === undefined ||
@@ -46,9 +46,9 @@ export async function getMembershipCapabilities(input: {
     }
 
     return {
-      ...data.data,
+      ...data,
       memberRoleUpdate: {
-        ...data.data.memberRoleUpdate,
+        ...data.memberRoleUpdate,
         roleTransitionMatrix: {
           owner: roleTransitionMatrix.owner,
           admin: roleTransitionMatrix.admin,

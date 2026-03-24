@@ -63,7 +63,7 @@ function parseSession(value: unknown): ParseSessionResult {
 
 export function createRequireAuthSessionMiddleware(): MiddlewareHandler<AppContextBindings> {
   return async (ctx, next) => {
-    const session = await ctx.get("services").auth.api.getSession({
+    const session = await ctx.get("auth").api.getSession({
       headers: ctx.req.raw.headers,
     });
     const parsedSession = parseSession(session);

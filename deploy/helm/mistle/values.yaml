@@ -32,7 +32,22 @@ controlPlaneApi:
     tls: []
   env: []
   secretEnv: []
+  volumeMounts: []
+  volumes: []
   resources: {}
+  readinessProbe:
+    httpGet:
+      path: /__healthz
+      port: http
+    initialDelaySeconds: 3
+    periodSeconds: 10
+  livenessProbe:
+    httpGet:
+      path: /__healthz
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 20
+  startupProbe: null
 
 controlPlaneWorker:
   enabled: true
@@ -51,7 +66,12 @@ controlPlaneWorker:
     targetPort: 8081
   env: []
   secretEnv: []
+  volumeMounts: []
+  volumes: []
   resources: {}
+  readinessProbe: null
+  livenessProbe: null
+  startupProbe: null
 
 dataPlaneApi:
   enabled: true
@@ -70,7 +90,22 @@ dataPlaneApi:
     targetPort: 8082
   env: []
   secretEnv: []
+  volumeMounts: []
+  volumes: []
   resources: {}
+  readinessProbe:
+    httpGet:
+      path: /__healthz
+      port: http
+    initialDelaySeconds: 3
+    periodSeconds: 10
+  livenessProbe:
+    httpGet:
+      path: /__healthz
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 20
+  startupProbe: null
 
 dataPlaneWorker:
   enabled: true
@@ -89,7 +124,12 @@ dataPlaneWorker:
     targetPort: 8083
   env: []
   secretEnv: []
+  volumeMounts: []
+  volumes: []
   resources: {}
+  readinessProbe: null
+  livenessProbe: null
+  startupProbe: null
 
 dataPlaneGateway:
   enabled: true
@@ -116,7 +156,22 @@ dataPlaneGateway:
     tls: []
   env: []
   secretEnv: []
+  volumeMounts: []
+  volumes: []
   resources: {}
+  readinessProbe:
+    httpGet:
+      path: /__healthz
+      port: http
+    initialDelaySeconds: 3
+    periodSeconds: 10
+  livenessProbe:
+    httpGet:
+      path: /__healthz
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 20
+  startupProbe: null
 
 tokenizerProxy:
   enabled: true
@@ -135,7 +190,22 @@ tokenizerProxy:
     targetPort: 8085
   env: []
   secretEnv: []
+  volumeMounts: []
+  volumes: []
   resources: {}
+  readinessProbe:
+    httpGet:
+      path: /__healthz
+      port: http
+    initialDelaySeconds: 3
+    periodSeconds: 10
+  livenessProbe:
+    httpGet:
+      path: /__healthz
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 20
+  startupProbe: null
 
 valkey:
   enabled: true

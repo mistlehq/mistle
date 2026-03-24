@@ -29,6 +29,7 @@ describe("useIntegrationResourceState helpers", () => {
               targetKey: "github",
               displayName: "Engineering GitHub",
               status: "active",
+              bindingCount: 0,
               createdAt: "2026-03-03T00:00:00.000Z",
               updatedAt: "2026-03-11T04:30:00.000Z",
               resources: [

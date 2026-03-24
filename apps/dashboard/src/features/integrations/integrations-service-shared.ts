@@ -119,6 +119,8 @@ export const IntegrationConnectionSchema = z
     targetKey: z.string().min(1),
     displayName: z.string().min(1),
     status: z.enum(["active", "error", "revoked"]),
+    bindingCount: z.number().int().min(0).optional(),
+    automationCount: z.number().int().min(0).optional(),
     externalSubjectId: z.string().min(1).optional(),
     config: z.record(z.string(), z.unknown()).optional(),
     targetSnapshotConfig: z.record(z.string(), z.unknown()).optional(),
@@ -219,6 +221,12 @@ export const StartedRedirectConnectionSchema = z
   })
   .strict();
 
+export const DeletedIntegrationConnectionSchema = z
+  .object({
+    connectionId: z.string().min(1),
+  })
+  .strict();
+
 export type IntegrationTarget = z.infer<typeof IntegrationTargetSchema>;
 export type IntegrationConnectionMethod = NonNullable<
   IntegrationTarget["connectionMethods"]
@@ -229,6 +237,7 @@ export type IntegrationConnectionResourceSummary = NonNullable<
 >[number];
 export type IntegrationConnectionResource = z.infer<typeof IntegrationConnectionResourceSchema>;
 export type CreatedIntegrationConnection = z.infer<typeof IntegrationConnectionSchema>;
+export type DeletedIntegrationConnection = z.infer<typeof DeletedIntegrationConnectionSchema>;
 export type StartedRedirectConnection = z.infer<typeof StartedRedirectConnectionSchema>;
 export type IntegrationConnectionResources = Omit<
   z.infer<typeof IntegrationConnectionResourcesPageSchema>,

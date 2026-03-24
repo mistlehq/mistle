@@ -96,33 +96,13 @@ describe("integration connections GitHub App installation integration", () => {
   }) => {
     await ensureGithubCloudTarget(fixture);
 
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-github-app-installation-start@example.com",
-    });
-
-    const response = await fixture.request(
-      "/v1/integration/connections/github-cloud/github-app-installation/start",
-      {
-        method: "POST",
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-      },
-    );
-
-    expect(response.status).toBe(200);
-    const responseBody = StartGitHubAppInstallationConnectionResponseSchema.parse(
-      await response.json(),
-    );
-    const authorizationUrl = new URL(responseBody.authorizationUrl);
-    const state = authorizationUrl.searchParams.get("state");
+    const { authenticatedSession, state, authorizationUrl } =
+      await startGitHubAppInstallationConnection(fixture, {
+        email: "integration-connections-github-app-installation-start@example.com",
+      });
 
     expect(authorizationUrl.pathname).toBe("/apps/mistle-github-app/installations/new");
     expect(state).toBeTruthy();
-
-    if (state === null) {
-      throw new Error("Expected redirect state in authorization URL.");
-    }
 
     const redirectSession = await fixture.db.query.integrationConnectionRedirectSessions.findFirst({
       where: (table, { and, eq }) =>
@@ -149,29 +129,9 @@ describe("integration connections GitHub App installation integration", () => {
   }) => {
     await ensureGithubCloudTarget(fixture);
 
-    const authenticatedSession = await fixture.authSession({
+    const { authenticatedSession, state } = await startGitHubAppInstallationConnection(fixture, {
       email: "integration-connections-github-app-installation-complete@example.com",
     });
-
-    const startResponse = await fixture.request(
-      "/v1/integration/connections/github-cloud/github-app-installation/start",
-      {
-        method: "POST",
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-      },
-    );
-    expect(startResponse.status).toBe(200);
-    const startBody = StartGitHubAppInstallationConnectionResponseSchema.parse(
-      await startResponse.json(),
-    );
-    const startUrl = new URL(startBody.authorizationUrl);
-    const state = startUrl.searchParams.get("state");
-
-    if (state === null || state.length === 0) {
-      throw new Error("Expected redirect state in authorization URL.");
-    }
 
     const completeResponse = await fixture.request(
       createGitHubAppInstallationCompletePath({
@@ -250,33 +210,10 @@ describe("integration connections GitHub App installation integration", () => {
   }) => {
     await ensureGithubCloudTarget(fixture);
 
-    const authenticatedSession = await fixture.authSession({
+    const { authenticatedSession, state } = await startGitHubAppInstallationConnection(fixture, {
       email: "integration-connections-github-app-installation-display-name@example.com",
+      displayName: "GitHub Prod",
     });
-
-    const startResponse = await fixture.request(
-      "/v1/integration/connections/github-cloud/github-app-installation/start",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
-        },
-        body: JSON.stringify({
-          displayName: "GitHub Prod",
-        }),
-      },
-    );
-    expect(startResponse.status).toBe(200);
-    const startBody = StartGitHubAppInstallationConnectionResponseSchema.parse(
-      await startResponse.json(),
-    );
-    const startUrl = new URL(startBody.authorizationUrl);
-    const state = startUrl.searchParams.get("state");
-
-    if (state === null || state.length === 0) {
-      throw new Error("Expected redirect state in authorization URL.");
-    }
 
     const completeResponse = await fixture.request(
       createGitHubAppInstallationCompletePath({
@@ -373,11 +310,10 @@ describe("integration connections GitHub App installation integration", () => {
       email: "integration-connections-github-app-installation-complete-expired-state@example.com",
     });
 
-    await fixture.db.insert(integrationConnectionRedirectSessions).values({
+    await insertRedirectSession(fixture, {
       organizationId: authenticatedSession.organizationId,
-      targetKey: "github-cloud",
       state: "redirect_state_expired",
-      expiresAt: new Date("2020-01-01T00:00:00.000Z").toISOString(),
+      expiresAt: "2020-01-01T00:00:00.000Z",
     });
 
     const response = await fixture.request(
@@ -417,12 +353,11 @@ describe("integration connections GitHub App installation integration", () => {
       email: "integration-connections-github-app-installation-complete-used-state@example.com",
     });
 
-    await fixture.db.insert(integrationConnectionRedirectSessions).values({
+    await insertRedirectSession(fixture, {
       organizationId: authenticatedSession.organizationId,
-      targetKey: "github-cloud",
       state: "redirect_state_used",
-      expiresAt: new Date("2030-01-01T00:00:00.000Z").toISOString(),
-      usedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+      expiresAt: "2030-01-01T00:00:00.000Z",
+      usedAt: "2026-01-01T00:00:00.000Z",
     });
 
     const response = await fixture.request(
@@ -471,3 +406,72 @@ describe("integration connections GitHub App installation integration", () => {
     expect(responseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
   });
 });
+
+async function startGitHubAppInstallationConnection(
+  fixture: ControlPlaneApiIntegrationFixture,
+  input: {
+    email: string;
+    displayName?: string;
+  },
+): Promise<{
+  authenticatedSession: Awaited<ReturnType<ControlPlaneApiIntegrationFixture["authSession"]>>;
+  authorizationUrl: URL;
+  state: string;
+}> {
+  const authenticatedSession = await fixture.authSession({
+    email: input.email,
+  });
+
+  const response = await fixture.request(
+    "/v1/integration/connections/github-cloud/github-app-installation/start",
+    {
+      method: "POST",
+      headers: {
+        ...(input.displayName === undefined ? {} : { "content-type": "application/json" }),
+        cookie: authenticatedSession.cookie,
+      },
+      ...(input.displayName === undefined
+        ? {}
+        : {
+            body: JSON.stringify({
+              displayName: input.displayName,
+            }),
+          }),
+    },
+  );
+
+  expect(response.status).toBe(200);
+  const responseBody = StartGitHubAppInstallationConnectionResponseSchema.parse(
+    await response.json(),
+  );
+  const authorizationUrl = new URL(responseBody.authorizationUrl);
+  const state = authorizationUrl.searchParams.get("state");
+
+  if (state === null || state.length === 0) {
+    throw new Error("Expected redirect state in authorization URL.");
+  }
+
+  return {
+    authenticatedSession,
+    authorizationUrl,
+    state,
+  };
+}
+
+async function insertRedirectSession(
+  fixture: ControlPlaneApiIntegrationFixture,
+  input: {
+    organizationId: string;
+    state: string;
+    expiresAt: string;
+    usedAt?: string;
+  },
+): Promise<void> {
+  await fixture.db.insert(integrationConnectionRedirectSessions).values({
+    organizationId: input.organizationId,
+    targetKey: "github-cloud",
+    state: input.state,
+    expiresAt: input.expiresAt,
+    ...(input.usedAt === undefined ? {} : { usedAt: input.usedAt }),
+  });
+}

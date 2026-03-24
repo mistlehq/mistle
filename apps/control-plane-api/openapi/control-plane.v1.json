@@ -1220,6 +1220,14 @@
                             "type": "string",
                             "enum": ["active", "error", "revoked"]
                           },
+                          "bindingCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "automationCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "externalSubjectId": {
                             "type": "string",
                             "minLength": 1
@@ -1954,6 +1962,14 @@
                       "type": "string",
                       "enum": ["active", "error", "revoked"]
                     },
+                    "bindingCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "automationCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "externalSubjectId": {
                       "type": "string",
                       "minLength": 1
@@ -2184,6 +2200,14 @@
                       "type": "string",
                       "enum": ["active", "error", "revoked"]
                     },
+                    "bindingCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "automationCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "externalSubjectId": {
                       "type": "string",
                       "minLength": 1
@@ -2337,6 +2361,158 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": ["Integrations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "connectionId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete an integration connection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connectionId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["connectionId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Integration connection was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["CONNECTION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Integration connection still has one or more dependent bindings or automations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["CONNECTION_HAS_BINDINGS"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["CONNECTION_HAS_AUTOMATIONS"]
+                        }
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/integration/connections/:connectionId/api-key": {
@@ -2399,6 +2575,14 @@
                     "status": {
                       "type": "string",
                       "enum": ["active", "error", "revoked"]
+                    },
+                    "bindingCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "automationCount": {
+                      "type": "integer",
+                      "minimum": 0
                     },
                     "externalSubjectId": {
                       "type": "string",
@@ -3847,83 +4031,69 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [true]
+                    "organizationId": {
+                      "type": "string",
+                      "minLength": 1
                     },
-                    "data": {
+                    "actorRole": {
+                      "type": "string",
+                      "enum": ["owner", "admin", "member"]
+                    },
+                    "invite": {
                       "type": "object",
                       "properties": {
-                        "organizationId": {
-                          "type": "string",
-                          "minLength": 1
+                        "canExecute": {
+                          "type": "boolean"
                         },
-                        "actorRole": {
-                          "type": "string",
-                          "enum": ["owner", "admin", "member"]
+                        "assignableRoles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": ["owner", "admin", "member"]
+                          }
+                        }
+                      },
+                      "required": ["canExecute", "assignableRoles"],
+                      "additionalProperties": false
+                    },
+                    "memberRoleUpdate": {
+                      "type": "object",
+                      "properties": {
+                        "canExecute": {
+                          "type": "boolean"
                         },
-                        "invite": {
+                        "roleTransitionMatrix": {
                           "type": "object",
                           "properties": {
-                            "canExecute": {
-                              "type": "boolean"
+                            "owner": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": ["owner", "admin", "member"]
+                              }
                             },
-                            "assignableRoles": {
+                            "admin": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": ["owner", "admin", "member"]
+                              }
+                            },
+                            "member": {
                               "type": "array",
                               "items": {
                                 "type": "string",
                                 "enum": ["owner", "admin", "member"]
                               }
                             }
-                          },
-                          "required": ["canExecute", "assignableRoles"],
-                          "additionalProperties": false
-                        },
-                        "memberRoleUpdate": {
-                          "type": "object",
-                          "properties": {
-                            "canExecute": {
-                              "type": "boolean"
-                            },
-                            "roleTransitionMatrix": {
-                              "type": "object",
-                              "properties": {
-                                "owner": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string",
-                                    "enum": ["owner", "admin", "member"]
-                                  }
-                                },
-                                "admin": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string",
-                                    "enum": ["owner", "admin", "member"]
-                                  }
-                                },
-                                "member": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string",
-                                    "enum": ["owner", "admin", "member"]
-                                  }
-                                }
-                              }
-                            }
-                          },
-                          "required": ["canExecute", "roleTransitionMatrix"],
-                          "additionalProperties": false
+                          }
                         }
                       },
-                      "required": ["organizationId", "actorRole", "invite", "memberRoleUpdate"],
+                      "required": ["canExecute", "roleTransitionMatrix"],
                       "additionalProperties": false
-                    },
-                    "error": {
-                      "type": "null"
                     }
                   },
-                  "required": ["ok", "data", "error"],
+                  "required": ["organizationId", "actorRole", "invite", "memberRoleUpdate"],
                   "additionalProperties": false
                 }
               }
@@ -3956,55 +4126,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": ["FORBIDDEN"]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
                     },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "ok": {
-                          "type": "boolean",
-                          "enum": [false]
-                        },
-                        "data": {
-                          "type": "null"
-                        },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "code": {
-                              "type": "string",
-                              "enum": ["FORBIDDEN", "NOT_FOUND"]
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "retryable": {
-                              "type": "boolean"
-                            }
-                          },
-                          "required": ["code", "message", "retryable"],
-                          "additionalProperties": false
-                        }
-                      },
-                      "required": ["ok", "data", "error"],
-                      "additionalProperties": false
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
-                  ]
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -4016,33 +4150,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [false]
+                    "code": {
+                      "type": "string",
+                      "enum": ["NOT_FOUND"]
                     },
-                    "data": {
-                      "type": "null"
-                    },
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": ["FORBIDDEN", "NOT_FOUND"]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "retryable": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": ["code", "message", "retryable"],
-                      "additionalProperties": false
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
-                  "required": ["ok", "data", "error"],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -4340,6 +4457,196 @@
         "responses": {
           "200": {
             "description": "Get sandbox instance provisioning/runtime status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["starting", "running", "stopped", "failed"]
+                    },
+                    "failureCode": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "failureMessage": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "automationConversation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "conversationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "routeId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "providerConversationId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["conversationId", "routeId", "providerConversationId"]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "failureCode",
+                    "failureMessage",
+                    "automationConversation"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox instance was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sandbox/instances/{instanceId}/resume": {
+      "post": {
+        "tags": ["Sandbox Instances"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbi_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "instanceId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Start or resume an existing sandbox instance.",
             "content": {
               "application/json": {
                 "schema": {

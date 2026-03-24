@@ -562,6 +562,8 @@ export interface paths {
           content: {
             "application/json": {
               items: {
+                automationCount?: number;
+                bindingCount?: number;
                 config?: {
                   [key: string]: unknown;
                 };
@@ -685,6 +687,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              automationCount?: number;
+              bindingCount?: number;
               config?: {
                 [key: string]: unknown;
               };
@@ -766,7 +770,94 @@ export interface paths {
       };
     };
     post?: never;
-    delete?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          connectionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Delete an integration connection. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              connectionId: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection still has one or more dependent bindings or automations. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              code: "CONNECTION_HAS_BINDINGS" | "CONNECTION_HAS_AUTOMATIONS";
+              message: string;
+            };
+          };
+        };
+      };
+    };
     options?: never;
     head?: never;
     patch?: never;
@@ -805,6 +896,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              automationCount?: number;
+              bindingCount?: number;
               config?: {
                 [key: string]: unknown;
               };
@@ -1183,6 +1276,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              automationCount?: number;
+              bindingCount?: number;
               config?: {
                 [key: string]: unknown;
               };
@@ -1953,26 +2048,21 @@ export interface paths {
           };
           content: {
             "application/json": {
-              data: {
-                /** @enum {string} */
-                actorRole: "owner" | "admin" | "member";
-                invite: {
-                  assignableRoles: ("owner" | "admin" | "member")[];
-                  canExecute: boolean;
-                };
-                memberRoleUpdate: {
-                  canExecute: boolean;
-                  roleTransitionMatrix: {
-                    admin?: ("owner" | "admin" | "member")[];
-                    member?: ("owner" | "admin" | "member")[];
-                    owner?: ("owner" | "admin" | "member")[];
-                  };
-                };
-                organizationId: string;
+              /** @enum {string} */
+              actorRole: "owner" | "admin" | "member";
+              invite: {
+                assignableRoles: ("owner" | "admin" | "member")[];
+                canExecute: boolean;
               };
-              error: null;
-              /** @enum {boolean} */
-              ok: true;
+              memberRoleUpdate: {
+                canExecute: boolean;
+                roleTransitionMatrix: {
+                  admin?: ("owner" | "admin" | "member")[];
+                  member?: ("owner" | "admin" | "member")[];
+                  owner?: ("owner" | "admin" | "member")[];
+                };
+              };
+              organizationId: string;
             };
           };
         };
@@ -1995,23 +2085,11 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code: "FORBIDDEN";
-                  message: string;
-                }
-              | {
-                  data: null;
-                  error: {
-                    /** @enum {string} */
-                    code: "FORBIDDEN" | "NOT_FOUND";
-                    message: string;
-                    retryable: boolean;
-                  };
-                  /** @enum {boolean} */
-                  ok: false;
-                };
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
           };
         };
         /** @description Organization was not found. */
@@ -2021,15 +2099,9 @@ export interface paths {
           };
           content: {
             "application/json": {
-              data: null;
-              error: {
-                /** @enum {string} */
-                code: "FORBIDDEN" | "NOT_FOUND";
-                message: string;
-                retryable: boolean;
-              };
-              /** @enum {boolean} */
-              ok: false;
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
             };
           };
         };
@@ -2383,6 +2455,121 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sandbox/instances/{instanceId}/resume": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          instanceId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            idempotencyKey?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Start or resume an existing sandbox instance. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              automationConversation: {
+                conversationId: string;
+                providerConversationId: string | null;
+                routeId: string | null;
+              } | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              id: string;
+              /** @enum {string} */
+              status: "starting" | "running" | "stopped" | "failed";
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox instance was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
               message: string;
             };
           };

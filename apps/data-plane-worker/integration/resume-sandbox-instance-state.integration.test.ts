@@ -139,4 +139,57 @@ describe("resume sandbox instance state integration", () => {
     },
     IntegrationTestTimeoutMs,
   );
+
+  it("transitions a failed sandbox instance back to starting and clears stale failure state", async () => {
+    const db = createDatabase();
+    const sandboxInstanceId = "sbi_resume_failed_state_integration";
+
+    await db.insert(sandboxInstances).values({
+      id: sandboxInstanceId,
+      organizationId: "org_resume_failed_state_integration",
+      sandboxProfileId: "sbp_resume_failed_state_integration",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerRuntimeId: "provider-runtime-failed",
+      instanceVolumeProvider: "docker",
+      instanceVolumeId: "instance-volume-resume-failed-state",
+      instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,
+      status: SandboxInstanceStatuses.FAILED,
+      startedByKind: "system",
+      startedById: "worker_resume_failed_state_integration",
+      source: "dashboard",
+      stopReason: SandboxStopReasons.FAILED,
+      failedAt: "2026-03-18T00:03:00.000Z",
+      failureCode: "resume_failed_state",
+      failureMessage: "Sandbox failed before retry.",
+    });
+
+    await markSandboxInstanceStarting({
+      db,
+      sandboxInstanceId,
+    });
+
+    const startingSandboxInstance = await db.query.sandboxInstances.findFirst({
+      columns: {
+        status: true,
+        providerRuntimeId: true,
+        stoppedAt: true,
+        stopReason: true,
+        failedAt: true,
+        failureCode: true,
+        failureMessage: true,
+      },
+      where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+    });
+
+    expect(startingSandboxInstance).toEqual({
+      status: SandboxInstanceStatuses.STARTING,
+      providerRuntimeId: null,
+      stoppedAt: null,
+      stopReason: null,
+      failedAt: null,
+      failureCode: null,
+      failureMessage: null,
+    });
+  });
 });

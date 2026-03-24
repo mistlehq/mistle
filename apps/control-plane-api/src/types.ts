@@ -40,10 +40,6 @@ export type AppRoutes<BasePath> = {
   routes: Hono<AppContextBindings>;
 };
 
-export type AppServices = {
-  auth: ControlPlaneAuth;
-};
-
 export type AppSession = {
   user: {
     id: string;
@@ -64,7 +60,7 @@ export type AppContextVariables = {
   dataPlaneClient: DataPlaneSandboxInstancesClient;
   connectionTokenConfig: ControlPlaneApiConnectionTokenConfig;
   openWorkflow: OpenWorkflow;
-  services: AppServices;
+  auth: ControlPlaneAuth;
   session: AppSession | null;
 };
 
