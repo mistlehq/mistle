@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -197,6 +197,49 @@ function useSelectedProfileTriggerState(input: {
   );
 }
 
+function resolveAutomationMutationErrorMessage(input: {
+  error: unknown;
+  fallbackMessage: string;
+}): string {
+  return resolveApiErrorMessage({
+    error: input.error,
+    fallbackMessage: input.fallbackMessage,
+  });
+}
+
+async function invalidateAutomationsQuery(queryClient: QueryClient): Promise<void> {
+  await queryClient.invalidateQueries({
+    queryKey: AUTOMATIONS_QUERY_KEY_PREFIX,
+  });
+}
+
+function applyWebhookAutomationValueChange(input: {
+  values: WebhookAutomationFormValues;
+  key: keyof WebhookAutomationFormValues;
+  value: string | boolean | string[] | WebhookAutomationFormValues["triggerParameterValues"];
+  eventOptions: readonly WebhookAutomationEventOption[];
+}): WebhookAutomationFormValues {
+  const nextValues: WebhookAutomationFormValues = {
+    ...input.values,
+    [input.key]: input.value,
+  };
+
+  if (input.key === "triggerIds") {
+    nextValues.conversationKeyTemplate = resolveNormalizedConversationKeyTemplate({
+      values: nextValues,
+      eventOptions: input.eventOptions,
+    });
+  }
+
+  if (input.key === "sandboxProfileId") {
+    nextValues.triggerIds = [];
+    nextValues.triggerParameterValues = {};
+    nextValues.conversationKeyTemplate = "";
+  }
+
+  return nextValues;
+}
+
 type LoadedWebhookAutomationEditorStateInput = {
   mode: "create" | "edit";
   automationId: string | undefined;
@@ -323,14 +366,12 @@ export function useLoadedWebhookAutomationEditorState(
       }),
     onSuccess: async (automation) => {
       setFormError(null);
-      await queryClient.invalidateQueries({
-        queryKey: AUTOMATIONS_QUERY_KEY_PREFIX,
-      });
+      await invalidateAutomationsQuery(queryClient);
       await input.navigate(`/automations/${automation.id}`);
     },
     onError: (error: unknown) => {
       setFormError(
-        resolveApiErrorMessage({
+        resolveAutomationMutationErrorMessage({
           error,
           fallbackMessage: "Could not create automation.",
         }),
@@ -355,13 +396,11 @@ export function useLoadedWebhookAutomationEditorState(
       setFormValues(toWebhookAutomationFormValues(automation, webhookEventOptions));
       setFieldErrors({});
       setFormError(null);
-      await queryClient.invalidateQueries({
-        queryKey: AUTOMATIONS_QUERY_KEY_PREFIX,
-      });
+      await invalidateAutomationsQuery(queryClient);
     },
     onError: (error: unknown) => {
       setFormError(
-        resolveApiErrorMessage({
+        resolveAutomationMutationErrorMessage({
           error,
           fallbackMessage: "Could not update automation.",
         }),
@@ -380,14 +419,12 @@ export function useLoadedWebhookAutomationEditorState(
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: AUTOMATIONS_QUERY_KEY_PREFIX,
-      });
+      await invalidateAutomationsQuery(queryClient);
       await input.navigate("/automations");
     },
     onError: (error: unknown) => {
       setDeleteError(
-        resolveApiErrorMessage({
+        resolveAutomationMutationErrorMessage({
           error,
           fallbackMessage: "Could not delete automation.",
         }),
@@ -399,23 +436,12 @@ export function useLoadedWebhookAutomationEditorState(
     key: keyof WebhookAutomationFormValues,
     value: string | boolean | string[] | WebhookAutomationFormValues["triggerParameterValues"],
   ): void {
-    const nextValues: WebhookAutomationFormValues = {
-      ...formValues,
-      [key]: value,
-    };
-
-    if (key === "triggerIds") {
-      nextValues.conversationKeyTemplate = resolveNormalizedConversationKeyTemplate({
-        values: nextValues,
-        eventOptions: webhookEventOptions,
-      });
-    }
-
-    if (key === "sandboxProfileId") {
-      nextValues.triggerIds = [];
-      nextValues.triggerParameterValues = {};
-      nextValues.conversationKeyTemplate = "";
-    }
+    const nextValues = applyWebhookAutomationValueChange({
+      values: formValues,
+      key,
+      value,
+      eventOptions: webhookEventOptions,
+    });
 
     setFormValues(nextValues);
     setFieldErrors((currentErrors) => ({
