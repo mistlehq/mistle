@@ -319,6 +319,27 @@ describe("WebhookAutomationTriggerPicker", () => {
     expect(screen.getAllByText("pull request").length).toBeGreaterThan(0);
   });
 
+  it("renders unset enum-backed trigger parameters as placeholders", () => {
+    const { container } = renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+      selectedTriggerIds: [
+        createWebhookAutomationTriggerId({
+          connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+          eventType: "github.issue_comment.created",
+        }),
+      ],
+      triggerParameterValues: {},
+    });
+
+    const selectValue = container.querySelector('[data-slot="select-value"]');
+    if (selectValue === null) {
+      throw new Error("Expected enum select value.");
+    }
+
+    expect(selectValue.textContent).toBe("Any comment target");
+  });
+
   it("hides already selected triggers from the add-trigger list", () => {
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,

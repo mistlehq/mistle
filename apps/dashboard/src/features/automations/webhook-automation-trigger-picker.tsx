@@ -410,21 +410,19 @@ function TriggerParameterField(input: {
           modal={false}
           onValueChange={(value) => {
             if (value === null) {
+              input.onValueChange("");
               return;
             }
 
             input.onValueChange(value === "__any__" ? "" : value);
           }}
-          value={input.value.length === 0 ? "__any__" : input.value}
+          value={input.value.length === 0 ? null : input.value}
         >
           <SelectTrigger className="min-w-44">
             <SelectValue
               placeholder={input.parameter.placeholder ?? `Any ${input.parameter.label}`}
             >
-              {input.parameter.options.find((option) => option.value === input.value)?.label ??
-                (input.value.length === 0
-                  ? (input.parameter.placeholder ?? `Any ${input.parameter.label}`)
-                  : undefined)}
+              {input.parameter.options.find((option) => option.value === input.value)?.label}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
