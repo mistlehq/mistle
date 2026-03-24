@@ -11,12 +11,14 @@ export type SettingsLayoutViewProps = {
 export function SettingsLayoutView(input: SettingsLayoutViewProps): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
-      <SettingsPageHeader
-        headerActions={input.headerActions}
-        headerIcon={input.headerIcon}
-        supportingText={input.supportingText}
-        title={input.title}
-      />
+      <div className="mx-auto w-full max-w-2xl">
+        <SettingsPageHeader
+          headerActions={input.headerActions}
+          headerIcon={input.headerIcon}
+          supportingText={input.supportingText}
+          title={input.title}
+        />
+      </div>
       {input.children}
     </div>
   );

@@ -34,7 +34,7 @@ export function OrganizationGeneralSettingsPageView(
 ): React.JSX.Element {
   if (props.isLoading) {
     return (
-      <FormPageShell bleedY={false}>
+      <FormPageShell>
         <FormPageSection>
           <div className="flex flex-col gap-4 p-4">
             <div className="flex flex-col gap-2">
@@ -58,7 +58,7 @@ export function OrganizationGeneralSettingsPageView(
 
   if (props.loadErrorMessage) {
     return (
-      <FormPageShell bleedY={false}>
+      <FormPageShell>
         <FormPageSection>
           <div className="flex flex-col gap-3 p-4">
             <Alert variant="destructive">
@@ -77,7 +77,7 @@ export function OrganizationGeneralSettingsPageView(
   }
 
   return (
-    <FormPageShell bleedY={false}>
+    <FormPageShell>
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
           <p aria-live="polite" className="sr-only" role="status">
