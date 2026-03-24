@@ -38,7 +38,7 @@ const meta = {
     items: SampleItems,
     isLoading: false,
     errorMessage: null,
-    summaryTotalResults: SampleItems.length,
+    totalResults: SampleItems.length,
     hasNextPage: false,
     hasPreviousPage: false,
     nextPageDisabled: false,

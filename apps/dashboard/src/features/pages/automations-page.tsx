@@ -130,7 +130,7 @@ export function AutomationsPage(): React.JSX.Element {
           prerequisites.refetchAll();
         }}
         previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
-        summaryTotalResults={canShowSummary ? automationsQuery.data.totalResults : null}
+        totalResults={canShowSummary ? automationsQuery.data.totalResults : null}
       />
     </div>
   );

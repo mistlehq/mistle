@@ -59,7 +59,7 @@ type WebhookAutomationListViewProps = {
   items: readonly WebhookAutomationListItemViewModel[];
   isLoading: boolean;
   errorMessage: string | null;
-  summaryTotalResults: number | null;
+  totalResults: number | null;
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   nextPageDisabled?: boolean;
@@ -189,9 +189,9 @@ export function WebhookAutomationListView(
 
       <TableListingFooter
         resultsCount={
-          input.summaryTotalResults === null ? null : (
+          input.totalResults === null ? null : (
             <p className="text-muted-foreground text-sm">
-              Showing {visibleItems.length} of {input.summaryTotalResults}
+              Showing {visibleItems.length} of {input.totalResults}
             </p>
           )
         }
