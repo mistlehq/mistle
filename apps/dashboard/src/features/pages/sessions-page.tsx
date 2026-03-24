@@ -231,7 +231,7 @@ export function resolveSessionResultsSummary(input: {
 
   return {
     visibleCount,
-    totalCount: Math.max(input.totalResults, visibleCount),
+    totalCount: input.totalResults + input.optimisticSessionCount,
   };
 }
 
