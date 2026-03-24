@@ -9,6 +9,55 @@ import {
   useLoadedWebhookAutomationEditorState,
 } from "./use-webhook-automation-editor-state.js";
 
+function createDirectoryData(input?: {
+  supportedWebhookEvents?: {
+    eventType: string;
+    providerEventType: string;
+    displayName: string;
+  }[];
+}) {
+  return {
+    connections: [
+      {
+        id: "conn_linear",
+        targetKey: "linear-cloud",
+        displayName: "Linear Workspace",
+        status: "active" as const,
+        createdAt: "2026-03-24T00:00:00.000Z",
+        updatedAt: "2026-03-24T00:00:00.000Z",
+      },
+    ],
+    targets: [
+      {
+        targetKey: "linear-cloud",
+        familyId: "linear",
+        variantId: "linear-default",
+        enabled: true,
+        config: {},
+        displayName: "Linear",
+        description: "Linear Cloud",
+        supportedWebhookEvents: input?.supportedWebhookEvents ?? [],
+        targetHealth: {
+          configStatus: "valid" as const,
+        },
+      },
+    ],
+  };
+}
+
+function createBinding() {
+  return {
+    id: "bnd_linear",
+    sandboxProfileId: "sbp_123",
+    sandboxProfileVersion: 1,
+    connectionId: "conn_linear",
+    kind: "connector" as const,
+    config: {},
+    createdAt: "2026-03-24T00:00:00.000Z",
+    updatedAt: "2026-03-24T00:00:00.000Z",
+  };
+}
+
 describe("useLoadedWebhookAutomationEditorState", () => {
   it("renders in create mode with loaded prerequisites", () => {
     const queryClient = new QueryClient({
@@ -71,45 +120,8 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         hasBindingData: true,
         isBindingDataPending: false,
         bindingErrorMessage: null,
-        bindings: [
-          {
-            id: "bnd_linear",
-            sandboxProfileId: "sbp_123",
-            sandboxProfileVersion: 1,
-            connectionId: "conn_linear",
-            kind: "connector",
-            config: {},
-            createdAt: "2026-03-24T00:00:00.000Z",
-            updatedAt: "2026-03-24T00:00:00.000Z",
-          },
-        ],
-        directoryData: {
-          connections: [
-            {
-              id: "conn_linear",
-              targetKey: "linear-cloud",
-              displayName: "Linear Workspace",
-              status: "active",
-              createdAt: "2026-03-24T00:00:00.000Z",
-              updatedAt: "2026-03-24T00:00:00.000Z",
-            },
-          ],
-          targets: [
-            {
-              targetKey: "linear-cloud",
-              familyId: "linear",
-              variantId: "linear-default",
-              enabled: true,
-              config: {},
-              displayName: "Linear",
-              description: "Linear Cloud",
-              supportedWebhookEvents: [],
-              targetHealth: {
-                configStatus: "valid",
-              },
-            },
-          ],
-        },
+        bindings: [createBinding()],
+        directoryData: createDirectoryData(),
       }).disabledReason,
     ).toBe("The selected profile has no bindings with automation triggers.");
   });
@@ -122,10 +134,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         isBindingDataPending: false,
         bindingErrorMessage: "Could not load profile bindings.",
         bindings: [],
-        directoryData: {
-          connections: [],
-          targets: [],
-        },
+        directoryData: createDirectoryData(),
       }).disabledReason,
     ).toBe("Could not load profile bindings.");
   });

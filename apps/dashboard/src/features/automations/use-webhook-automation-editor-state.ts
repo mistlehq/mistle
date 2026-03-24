@@ -63,6 +63,8 @@ const NoProfileSelectedMessage = "Select a sandbox profile to choose triggers.";
 const InvalidProfileBindingMessage =
   "The selected profile has no bindings with automation triggers.";
 const LoadProfileBindingsErrorMessage = "Could not load profile bindings.";
+const UnselectedProfileQueryId = "__unselected__";
+const MissingProfileVersionQueryId = 0;
 
 export function resolveSelectedProfileTriggerState(input: {
   selectedProfileId: string;
@@ -103,6 +105,96 @@ export function resolveSelectedProfileTriggerState(input: {
     eligibleConnectionIds,
     disabledReason: eligibleConnectionIds.length === 0 ? InvalidProfileBindingMessage : null,
   };
+}
+
+function resolveSelectedProfileQueryId(selectedProfileId: string): string {
+  return selectedProfileId.length === 0 ? UnselectedProfileQueryId : selectedProfileId;
+}
+
+function resolveSelectedProfileBindingsErrorMessage(input: {
+  versionError: unknown;
+  bindingsError: unknown;
+}): string | null {
+  const selectedProfileBindingsError = input.versionError ?? input.bindingsError;
+  if (selectedProfileBindingsError === null) {
+    return null;
+  }
+
+  return resolveApiErrorMessage({
+    error: selectedProfileBindingsError,
+    fallbackMessage: LoadProfileBindingsErrorMessage,
+  });
+}
+
+function useSelectedProfileTriggerState(input: {
+  selectedProfileId: string;
+  directoryData: DirectoryData;
+}): SelectedProfileTriggerState {
+  const selectedProfileQueryId = resolveSelectedProfileQueryId(input.selectedProfileId);
+
+  const selectedProfileVersionsQuery = useQuery({
+    queryKey: sandboxProfileVersionsQueryKey(selectedProfileQueryId),
+    queryFn: async ({ signal }) =>
+      listSandboxProfileVersions({
+        profileId: input.selectedProfileId,
+        signal,
+      }),
+    enabled: input.selectedProfileId.length > 0,
+    retry: false,
+  });
+
+  const selectedProfileVersion = useMemo(
+    () => resolveLatestVersion(selectedProfileVersionsQuery.data?.versions ?? []),
+    [selectedProfileVersionsQuery.data],
+  );
+
+  const selectedProfileBindingsQuery = useQuery({
+    queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
+      profileId: selectedProfileQueryId,
+      version: selectedProfileVersion ?? MissingProfileVersionQueryId,
+    }),
+    queryFn: async ({ signal }) => {
+      if (selectedProfileVersion === null) {
+        throw new Error("No sandbox profile version is available for this profile.");
+      }
+
+      return getSandboxProfileVersionIntegrationBindings({
+        profileId: input.selectedProfileId,
+        version: selectedProfileVersion,
+        signal,
+      });
+    },
+    enabled: input.selectedProfileId.length > 0 && selectedProfileVersion !== null,
+    retry: false,
+  });
+
+  return useMemo(
+    () =>
+      resolveSelectedProfileTriggerState({
+        selectedProfileId: input.selectedProfileId,
+        hasBindingData:
+          selectedProfileVersion === null || selectedProfileBindingsQuery.data !== undefined,
+        isBindingDataPending:
+          input.selectedProfileId.length > 0 &&
+          (selectedProfileVersionsQuery.isPending || selectedProfileBindingsQuery.isPending),
+        bindingErrorMessage: resolveSelectedProfileBindingsErrorMessage({
+          versionError: selectedProfileVersionsQuery.error,
+          bindingsError: selectedProfileBindingsQuery.error,
+        }),
+        bindings: selectedProfileBindingsQuery.data?.bindings ?? [],
+        directoryData: input.directoryData,
+      }),
+    [
+      input.directoryData,
+      input.selectedProfileId,
+      selectedProfileBindingsQuery.data,
+      selectedProfileBindingsQuery.error,
+      selectedProfileBindingsQuery.isPending,
+      selectedProfileVersion,
+      selectedProfileVersionsQuery.error,
+      selectedProfileVersionsQuery.isPending,
+    ],
+  );
 }
 
 type LoadedWebhookAutomationEditorStateInput = {
@@ -199,82 +291,10 @@ export function useLoadedWebhookAutomationEditorState(
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const selectedProfileId = formValues.sandboxProfileId.trim();
-
-  const selectedProfileVersionsQuery = useQuery({
-    queryKey: sandboxProfileVersionsQueryKey(
-      selectedProfileId.length === 0 ? "__unselected__" : selectedProfileId,
-    ),
-    queryFn: async ({ signal }) =>
-      listSandboxProfileVersions({
-        profileId: selectedProfileId,
-        signal,
-      }),
-    enabled: selectedProfileId.length > 0,
-    retry: false,
-  });
-
-  const selectedProfileVersion = useMemo(
-    () => resolveLatestVersion(selectedProfileVersionsQuery.data?.versions ?? []),
-    [selectedProfileVersionsQuery.data],
-  );
-
-  const selectedProfileBindingsQuery = useQuery({
-    queryKey:
-      selectedProfileVersion === null
-        ? sandboxProfileVersionIntegrationBindingsQueryKey({
-            profileId: selectedProfileId.length === 0 ? "__unselected__" : selectedProfileId,
-            version: 0,
-          })
-        : sandboxProfileVersionIntegrationBindingsQueryKey({
-            profileId: selectedProfileId,
-            version: selectedProfileVersion,
-          }),
-    queryFn: async ({ signal }) => {
-      if (selectedProfileVersion === null) {
-        throw new Error("No sandbox profile version is available for this profile.");
-      }
-
-      return getSandboxProfileVersionIntegrationBindings({
-        profileId: selectedProfileId,
-        version: selectedProfileVersion,
-        signal,
-      });
-    },
-    enabled: selectedProfileId.length > 0 && selectedProfileVersion !== null,
-    retry: false,
-  });
-
-  const selectedProfileTriggerState = useMemo(() => {
-    const selectedProfileBindingsError =
-      selectedProfileVersionsQuery.error ?? selectedProfileBindingsQuery.error;
-
-    return resolveSelectedProfileTriggerState({
-      selectedProfileId,
-      hasBindingData:
-        selectedProfileVersion === null || selectedProfileBindingsQuery.data !== undefined,
-      isBindingDataPending:
-        selectedProfileId.length > 0 &&
-        (selectedProfileVersionsQuery.isPending || selectedProfileBindingsQuery.isPending),
-      bindingErrorMessage:
-        selectedProfileBindingsError === null
-          ? null
-          : resolveApiErrorMessage({
-              error: selectedProfileBindingsError,
-              fallbackMessage: LoadProfileBindingsErrorMessage,
-            }),
-      bindings: selectedProfileBindingsQuery.data?.bindings ?? [],
-      directoryData: input.directoryData,
-    });
-  }, [
-    input.directoryData,
-    selectedProfileBindingsQuery.error,
-    selectedProfileBindingsQuery.data,
-    selectedProfileBindingsQuery.isPending,
+  const selectedProfileTriggerState = useSelectedProfileTriggerState({
     selectedProfileId,
-    selectedProfileVersion,
-    selectedProfileVersionsQuery.error,
-    selectedProfileVersionsQuery.isPending,
-  ]);
+    directoryData: input.directoryData,
+  });
 
   const webhookEventOptions = useMemo(
     () =>
