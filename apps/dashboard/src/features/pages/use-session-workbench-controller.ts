@@ -273,9 +273,9 @@ export function shouldClearInFlightResumeState(input: {
   sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
 }): boolean {
   return (
+    input.sandboxStatus === "stopped" ||
     input.sandboxStatus === "running" ||
-    input.sandboxStatus === "failed" ||
-    (input.sandboxStatus === "stopped" && !input.hasStoredResumeIdempotencyKey)
+    input.sandboxStatus === "failed"
   );
 }
 
@@ -309,9 +309,7 @@ export function useSessionWorkbenchController(input: {
   const [hasStoredResumeIdempotencyKey, setHasStoredResumeIdempotencyKey] = useState(
     initialHasStoredResumeIdempotencyKey,
   );
-  const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(
-    initialHasStoredResumeIdempotencyKey,
-  );
+  const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(false);
   const [resumeErrorMessage, setResumeErrorMessage] = useState<string | null>(null);
   const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
   const queryClient = useQueryClient();
@@ -389,9 +387,7 @@ export function useSessionWorkbenchController(input: {
   });
   const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
   const effectiveSandboxStatus =
-    sandboxStatus === "stopped" && (isResumingStoppedSandbox || hasStoredResumeIdempotencyKey)
-      ? "starting"
-      : sandboxStatus;
+    sandboxStatus === "stopped" && isResumingStoppedSandbox ? "starting" : sandboxStatus;
   const automationConversation = sandboxStatusQuery.data?.automationConversation ?? null;
   const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
     sandboxStatus: effectiveSandboxStatus,
@@ -427,7 +423,7 @@ export function useSessionWorkbenchController(input: {
     setAutomationPendingSinceMs(null);
     setAutomationPendingErrorMessage(null);
     setHasStoredResumeIdempotencyKey(hasStoredResumeKey);
-    setIsResumingStoppedSandbox(hasStoredResumeKey);
+    setIsResumingStoppedSandbox(false);
     setResumeErrorMessage(null);
     clearStartErrorMessage();
     disconnectSession();
@@ -448,9 +444,6 @@ export function useSessionWorkbenchController(input: {
       }) !== null;
 
     setHasStoredResumeIdempotencyKey(hasStoredResumeKey);
-    if (hasStoredResumeKey) {
-      setIsResumingStoppedSandbox(true);
-    }
   }, [input.sandboxInstanceId, sandboxStatus]);
 
   useEffect(() => {

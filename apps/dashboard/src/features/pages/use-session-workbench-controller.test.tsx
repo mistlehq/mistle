@@ -347,17 +347,11 @@ describe("useSessionWorkbenchController", () => {
         hasStoredResumeIdempotencyKey: true,
       }),
     ).toBe(false);
-    expect(
-      shouldClearInFlightResumeState({
-        sandboxStatus: "stopped",
-        hasStoredResumeIdempotencyKey: true,
-      }),
-    ).toBe(false);
 
     expect(
       shouldClearInFlightResumeState({
         sandboxStatus: "stopped",
-        hasStoredResumeIdempotencyKey: false,
+        hasStoredResumeIdempotencyKey: true,
       }),
     ).toBe(true);
     expect(
