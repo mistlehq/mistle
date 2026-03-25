@@ -327,13 +327,7 @@ export async function startFullSystemEnvironment(
     });
     const sandboxSnapshotRepository = `${registryAuthority}/${SANDBOX_SNAPSHOT_REPOSITORY_PATH}`;
 
-    const hostDatabaseUrl = createDatabaseUrl({
-      username: sharedInfraLease.infra.postgres.postgres.username,
-      password: sharedInfraLease.infra.postgres.postgres.password,
-      host: sharedInfraLease.infra.postgres.postgres.host,
-      port: sharedInfraLease.infra.postgres.postgres.port,
-      databaseName: sharedInfraLease.infra.postgres.postgres.databaseName,
-    });
+    const hostDatabaseUrl = sharedInfraLease.infra.postgres.directUrl;
     const containerDatabaseUrl = createDatabaseUrl({
       username: sharedInfraLease.infra.postgres.postgres.username,
       password: sharedInfraLease.infra.postgres.postgres.password,
