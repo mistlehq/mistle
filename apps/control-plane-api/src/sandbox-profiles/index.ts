@@ -4,6 +4,7 @@ export type { SandboxProfile } from "@mistle/db/control-plane";
 export { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 export {
   sandboxProfileSchema as SandboxProfileSchema,
+  launchableSandboxProfileSchema as LaunchableSandboxProfileSchema,
   sandboxProfileVersionIntegrationBindingSchema as SandboxProfileVersionIntegrationBindingSchema,
   sandboxProfileVersionSchema as SandboxProfileVersionSchema,
   listSandboxProfileVersionsResponseSchema as ListSandboxProfileVersionsResponseSchema,
@@ -19,8 +20,10 @@ export {
   startSandboxProfileInstanceResponseSchema as StartSandboxProfileInstanceResponseSchema,
   listSandboxProfilesQuerySchema as ListSandboxProfilesQuerySchema,
   listSandboxProfilesResponseSchema as ListSandboxProfilesResponseSchema,
+  listLaunchableSandboxProfilesResponseSchema as ListLaunchableSandboxProfilesResponseSchema,
 } from "./schemas.js";
 export { route as listSandboxProfilesRoute } from "./list-sandbox-profiles/route.js";
+export { route as listLaunchableSandboxProfilesRoute } from "./list-launchable-sandbox-profiles/route.js";
 export { route as createSandboxProfileRoute } from "./create-sandbox-profile/route.js";
 export { route as getSandboxProfileRoute } from "./get-sandbox-profile/route.js";
 export { route as updateSandboxProfileRoute } from "./update-sandbox-profile/route.js";

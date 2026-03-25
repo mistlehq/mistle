@@ -21,20 +21,13 @@ import {
 } from "@mistle/ui";
 import { InfoIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import {
-  sandboxProfileVersionIntegrationBindingsQueryKey,
-  sandboxProfilesListQueryKey,
-  sandboxProfileVersionsQueryKey,
-} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import {
-  getSandboxProfileVersionIntegrationBindings,
-  listSandboxProfiles,
-  listSandboxProfileVersions,
-} from "../sandbox-profiles/sandbox-profiles-service.js";
+import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import { listLaunchableSandboxProfiles } from "../sandbox-profiles/sandbox-profiles-service.js";
+import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import { listSandboxInstances } from "../sessions/sessions-service.js";
@@ -46,7 +39,6 @@ import { TablePagination } from "../shared/table-pagination.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useCachedRequiredSession } from "../shell/session-context.js";
 
-const SANDBOX_PROFILE_LIST_LIMIT = 100;
 const SANDBOX_INSTANCE_LIST_LIMIT = 20;
 const SANDBOX_INSTANCE_LIST_MAX_LIMIT = 100;
 
@@ -82,23 +74,18 @@ function parseCursor(rawValue: string | null): string | null {
   return normalized;
 }
 
-function resolveLatestVersion(versions: readonly { version: number }[]): number | null {
-  if (versions.length === 0) {
-    return null;
+export function shouldClearSelectedProfile(input: {
+  selectedProfile: LaunchableSandboxProfile | null;
+  selectableProfiles: readonly LaunchableSandboxProfile[];
+  isSelectableProfilesPending: boolean;
+}): boolean {
+  if (input.selectedProfile === null || input.isSelectableProfilesPending) {
+    return false;
   }
 
-  let latestVersion = versions[0]?.version;
-  if (latestVersion === undefined) {
-    return null;
-  }
+  const selectedProfileId = input.selectedProfile.id;
 
-  for (const candidate of versions) {
-    if (candidate.version > latestVersion) {
-      latestVersion = candidate.version;
-    }
-  }
-
-  return latestVersion;
+  return !input.selectableProfiles.some((profile) => profile.id === selectedProfileId);
 }
 
 function getSandboxSessionStatusBadgeUi(status: SandboxSessionStatus): {
@@ -179,6 +166,7 @@ export function SandboxSessionStatusBadge(input: {
 export function buildOptimisticSessions(input: {
   launchedSessions: readonly {
     profileId: string;
+    profileDisplayName: string;
     profileVersion: number;
     sandboxInstanceId: string;
     createdAtIso: string;
@@ -201,6 +189,7 @@ export function buildOptimisticSessions(input: {
     items.push({
       id: session.sandboxInstanceId,
       sandboxProfileId: session.profileId,
+      sandboxProfileDisplayName: session.profileDisplayName,
       sandboxProfileVersion: session.profileVersion,
       status: session.status,
       startedBy: {
@@ -239,7 +228,7 @@ export function SessionsPage(): React.JSX.Element {
   const navigate = useNavigate();
   const session = useCachedRequiredSession();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<LaunchableSandboxProfile | null>(null);
   const {
     launchedSessions,
     startErrorMessage,
@@ -252,19 +241,9 @@ export function SessionsPage(): React.JSX.Element {
   const sandboxInstancesBefore =
     sandboxInstancesAfter === null ? parseCursor(searchParams.get("before")) : null;
 
-  const profilesQuery = useQuery({
-    queryKey: sandboxProfilesListQueryKey({
-      limit: SANDBOX_PROFILE_LIST_LIMIT,
-      after: null,
-      before: null,
-    }),
-    queryFn: async ({ signal }) =>
-      listSandboxProfiles({
-        limit: SANDBOX_PROFILE_LIST_LIMIT,
-        after: null,
-        before: null,
-        signal,
-      }),
+  const selectableProfilesQuery = useQuery({
+    queryKey: launchableSandboxProfilesQueryKey(),
+    queryFn: async ({ signal }) => listLaunchableSandboxProfiles({ signal }),
   });
   const sandboxInstancesQuery = useQuery({
     queryKey: sandboxInstancesListQueryKey({
@@ -280,73 +259,36 @@ export function SessionsPage(): React.JSX.Element {
         signal,
       }),
   });
-  const versionsQuery = useQuery({
-    queryKey:
-      selectedProfileId === null
-        ? sandboxProfileVersionsQueryKey("none")
-        : sandboxProfileVersionsQueryKey(selectedProfileId),
-    queryFn: async ({ signal }) => {
-      if (selectedProfileId === null) {
-        return { versions: [] };
-      }
-      return listSandboxProfileVersions({
-        profileId: selectedProfileId,
-        signal,
-      });
-    },
-    enabled: selectedProfileId !== null,
-    retry: false,
-  });
+  const selectableProfiles = selectableProfilesQuery.data?.items ?? [];
+  const selectedProfileVersion = selectedProfile?.latestVersion ?? null;
 
-  const selectedProfileVersion = resolveLatestVersion(versionsQuery.data?.versions ?? []);
-  const integrationBindingsQuery = useQuery({
-    queryKey:
-      selectedProfileId === null || selectedProfileVersion === null
-        ? sandboxProfileVersionIntegrationBindingsQueryKey({
-            profileId: "none",
-            version: 0,
-          })
-        : sandboxProfileVersionIntegrationBindingsQueryKey({
-            profileId: selectedProfileId,
-            version: selectedProfileVersion,
-          }),
-    queryFn: async ({ signal }) => {
-      if (selectedProfileId === null || selectedProfileVersion === null) {
-        return { bindings: [] };
-      }
-
-      return getSandboxProfileVersionIntegrationBindings({
-        profileId: selectedProfileId,
-        version: selectedProfileVersion,
-        signal,
-      });
-    },
-    enabled: selectedProfileId !== null && selectedProfileVersion !== null,
-    retry: false,
-  });
-  const hasAgentBinding = (integrationBindingsQuery.data?.bindings ?? []).some(
-    (binding) => binding.kind === "agent",
-  );
+  useEffect(() => {
+    if (
+      shouldClearSelectedProfile({
+        selectedProfile,
+        selectableProfiles,
+        isSelectableProfilesPending: selectableProfilesQuery.isPending,
+      })
+    ) {
+      clearStartErrorMessage();
+      setSelectedProfile(null);
+    }
+  }, [
+    clearStartErrorMessage,
+    selectableProfiles,
+    selectableProfilesQuery.isPending,
+    selectedProfile,
+  ]);
 
   const selectedProfileDisplayText =
-    selectedProfileId === null
-      ? "Select sandbox profile"
-      : (profilesQuery.data?.items.find((profile) => profile.id === selectedProfileId)
-          ?.displayName ?? "Select sandbox profile");
-  const selectedProfileSelectValue = selectedProfileId ?? "";
+    selectedProfile === null ? "Select sandbox profile" : selectedProfile.displayName;
+  const selectedProfileSelectValue = selectedProfile?.id ?? "";
 
   const canStartSession =
-    selectedProfileId !== null &&
+    selectedProfile !== null &&
     selectedProfileVersion !== null &&
-    !profilesQuery.isPending &&
-    !versionsQuery.isPending &&
-    !integrationBindingsQuery.isPending &&
-    !integrationBindingsQuery.isError &&
-    hasAgentBinding &&
+    !selectableProfilesQuery.isPending &&
     !isStartingSession;
-  const profilesById = new Map(
-    (profilesQuery.data?.items ?? []).map((profile) => [profile.id, profile.displayName]),
-  );
   const currentUserDisplayName = resolveUserDisplayName(session.user);
   const optimisticSessions = buildOptimisticSessions({
     launchedSessions,
@@ -419,10 +361,6 @@ export function SessionsPage(): React.JSX.Element {
     });
   }
 
-  function resolveProfileDisplayName(profileId: string): string {
-    return profilesById.get(profileId) ?? profileId;
-  }
-
   function formatStartedByLabel(input: SandboxInstanceListItem["startedBy"]): string {
     if (input.kind === "user" && input.name !== null) {
       return input.name;
@@ -469,14 +407,16 @@ export function SessionsPage(): React.JSX.Element {
         <h1 className="text-xl font-semibold">Start a new session</h1>
         <div className="flex flex-wrap items-center gap-2">
           <Select
-            disabled={profilesQuery.isPending || (profilesQuery.data?.items.length ?? 0) === 0}
+            disabled={selectableProfilesQuery.isPending || selectableProfiles.length === 0}
             onValueChange={(value) => {
               clearStartErrorMessage();
               if (value === null || value.length === 0) {
-                setSelectedProfileId(null);
+                setSelectedProfile(null);
                 return;
               }
-              setSelectedProfileId(value);
+              setSelectedProfile(
+                selectableProfiles.find((profile) => profile.id === value) ?? null,
+              );
             }}
             value={selectedProfileSelectValue}
           >
@@ -490,7 +430,7 @@ export function SessionsPage(): React.JSX.Element {
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {(profilesQuery.data?.items ?? []).map((profile) => (
+              {selectableProfiles.map((profile) => (
                 <SelectItem key={profile.id} value={profile.id}>
                   {profile.displayName}
                 </SelectItem>
@@ -500,12 +440,16 @@ export function SessionsPage(): React.JSX.Element {
           <Button
             disabled={!canStartSession}
             onClick={() => {
-              if (selectedProfileId === null || selectedProfileVersion === null) {
+              if (!canStartSession) {
+                return;
+              }
+
+              if (selectedProfile === null || selectedProfileVersion === null) {
                 return;
               }
 
               startSession({
-                profileId: selectedProfileId,
+                profileId: selectedProfile.id,
                 profileDisplayName: selectedProfileDisplayText,
                 profileVersion: selectedProfileVersion,
               });
@@ -516,49 +460,14 @@ export function SessionsPage(): React.JSX.Element {
           </Button>
         </div>
 
-        {profilesQuery.isError ? (
+        {selectableProfilesQuery.isError ? (
           <Alert variant="destructive">
             <AlertTitle>Could not load sandbox profiles</AlertTitle>
             <AlertDescription>
               {resolveApiErrorMessage({
-                error: profilesQuery.error,
+                error: selectableProfilesQuery.error,
                 fallbackMessage: "Could not load sandbox profiles.",
               })}
-            </AlertDescription>
-          </Alert>
-        ) : null}
-        {versionsQuery.isError ? (
-          <Alert variant="destructive">
-            <AlertTitle>Could not resolve sandbox profile version</AlertTitle>
-            <AlertDescription>
-              {resolveApiErrorMessage({
-                error: versionsQuery.error,
-                fallbackMessage: "Could not load sandbox profile versions.",
-              })}
-            </AlertDescription>
-          </Alert>
-        ) : null}
-        {integrationBindingsQuery.isError ? (
-          <Alert variant="destructive">
-            <AlertTitle>Could not load integration bindings</AlertTitle>
-            <AlertDescription>
-              {resolveApiErrorMessage({
-                error: integrationBindingsQuery.error,
-                fallbackMessage: "Could not load sandbox profile integration bindings.",
-              })}
-            </AlertDescription>
-          </Alert>
-        ) : null}
-        {selectedProfileId !== null &&
-        selectedProfileVersion !== null &&
-        !integrationBindingsQuery.isPending &&
-        !integrationBindingsQuery.isError &&
-        !hasAgentBinding ? (
-          <Alert variant="destructive">
-            <AlertTitle>Agent Binding Required</AlertTitle>
-            <AlertDescription>
-              Add an agent integration binding to this sandbox profile version before starting a
-              session.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -620,7 +529,7 @@ export function SessionsPage(): React.JSX.Element {
                       <TableCell>
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className="font-medium">
-                            {resolveProfileDisplayName(session.sandboxProfileId)}
+                            {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
                           </span>
                           {optimisticSessionIds.has(session.id) ? (
                             <span className="text-muted-foreground text-xs">Launching locally</span>

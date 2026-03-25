@@ -45,6 +45,32 @@ async function resolveStartedByNames(
   );
 }
 
+async function resolveSandboxProfileDisplayNames(
+  db: ControlPlaneDatabase,
+  input: {
+    organizationId: string;
+    items: ListSandboxInstancesResponse["items"];
+  },
+): Promise<Map<string, string>> {
+  const sandboxProfileIds = [...new Set(input.items.map((item) => item.sandboxProfileId))];
+  if (sandboxProfileIds.length === 0) {
+    return new Map();
+  }
+
+  const sandboxProfiles = await db.query.sandboxProfiles.findMany({
+    columns: {
+      id: true,
+      displayName: true,
+    },
+    where: (table, { and, eq, inArray }) =>
+      and(eq(table.organizationId, input.organizationId), inArray(table.id, sandboxProfileIds)),
+  });
+
+  return new Map(
+    sandboxProfiles.map((sandboxProfile) => [sandboxProfile.id, sandboxProfile.displayName]),
+  );
+}
+
 export async function listInstances(
   {
     db,
@@ -69,11 +95,16 @@ export async function listInstances(
     });
 
     const startedByNames = await resolveStartedByNames(db, sandboxInstances.items);
+    const sandboxProfileDisplayNames = await resolveSandboxProfileDisplayNames(db, {
+      organizationId: input.organizationId,
+      items: sandboxInstances.items,
+    });
 
     return {
       ...sandboxInstances,
       items: sandboxInstances.items.map((item) => ({
         ...item,
+        sandboxProfileDisplayName: sandboxProfileDisplayNames.get(item.sandboxProfileId) ?? null,
         startedBy: {
           ...item.startedBy,
           name:

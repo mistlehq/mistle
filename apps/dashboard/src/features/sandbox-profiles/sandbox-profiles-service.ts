@@ -6,6 +6,7 @@ import { requestControlPlane } from "../api/request-control-plane.js";
 import { SandboxProfilesApiError } from "./sandbox-profiles-api-errors.js";
 import type {
   CreateSandboxProfileInput,
+  LaunchableSandboxProfilesResult,
   SandboxIntegrationBindingKind,
   SandboxProfile,
   SandboxProfileVersion,
@@ -51,6 +52,38 @@ export async function listSandboxProfiles(input: {
         operation: "listSandboxProfiles",
         error,
         fallbackMessage: "Could not load sandbox profiles.",
+      }),
+    );
+  }
+}
+
+export async function listLaunchableSandboxProfiles(input: {
+  signal?: AbortSignal;
+}): Promise<LaunchableSandboxProfilesResult> {
+  try {
+    const client = getControlPlaneApiClient();
+    const { data } = await client.GET("/v1/sandbox/profiles/launchable", {
+      credentials: "include",
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    });
+
+    if (data === undefined) {
+      throw new SandboxProfilesApiError({
+        operation: "listLaunchableSandboxProfiles",
+        status: 500,
+        body: null,
+        message: "Launchable sandbox profiles response was empty.",
+        code: null,
+      });
+    }
+
+    return data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "listLaunchableSandboxProfiles",
+        error,
+        fallbackMessage: "Could not load launchable sandbox profiles.",
       }),
     );
   }
