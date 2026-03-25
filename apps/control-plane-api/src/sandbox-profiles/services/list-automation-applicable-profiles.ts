@@ -1,4 +1,5 @@
 import {
+  IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   integrationConnections,
   integrationTargets,
@@ -130,6 +131,10 @@ export async function listAutomationApplicableProfiles(
     .where(
       and(
         inArray(sandboxProfileVersionIntegrationBindings.sandboxProfileId, latestProfileIds),
+        inArray(sandboxProfileVersionIntegrationBindings.kind, [
+          IntegrationBindingKinds.GIT,
+          IntegrationBindingKinds.CONNECTOR,
+        ]),
         eq(integrationConnections.organizationId, input.organizationId),
         eq(integrationConnections.status, IntegrationConnectionStatuses.ACTIVE),
         eq(integrationTargets.enabled, true),

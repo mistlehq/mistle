@@ -49,6 +49,20 @@ describe("sandbox profiles automation applicable integration", () => {
           ],
         },
         {
+          id: "sbp_automation_git_binding",
+          displayName: "Git Binding",
+          createdAt: "2026-01-04T12:00:00.000Z",
+          versions: [1],
+          bindings: [
+            {
+              id: "ibd_automation_git_binding_v1",
+              sandboxProfileVersion: 1,
+              connectionId: "icn_automation_github",
+              kind: IntegrationBindingKinds.GIT,
+            },
+          ],
+        },
+        {
           id: "sbp_automation_old_only",
           displayName: "Old Version Only",
           createdAt: "2026-01-04T00:00:00.000Z",
@@ -59,6 +73,20 @@ describe("sandbox profiles automation applicable integration", () => {
               sandboxProfileVersion: 1,
               connectionId: "icn_automation_github",
               kind: IntegrationBindingKinds.CONNECTOR,
+            },
+          ],
+        },
+        {
+          id: "sbp_automation_agent_only",
+          displayName: "Agent Only",
+          createdAt: "2026-01-03T12:00:00.000Z",
+          versions: [1],
+          bindings: [
+            {
+              id: "ibd_automation_agent_only_v1",
+              sandboxProfileVersion: 1,
+              connectionId: "icn_automation_github",
+              kind: IntegrationBindingKinds.AGENT,
             },
           ],
         },
@@ -224,6 +252,16 @@ describe("sandbox profiles automation applicable integration", () => {
         eligibleIntegrationConnectionIds: ["icn_automation_github"],
         createdAt: "2026-01-05T00:00:00.000Z",
         updatedAt: "2026-01-05T00:00:00.000Z",
+      },
+      {
+        id: "sbp_automation_git_binding",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Git Binding",
+        status: "active",
+        latestVersion: 1,
+        eligibleIntegrationConnectionIds: ["icn_automation_github"],
+        createdAt: "2026-01-04T12:00:00.000Z",
+        updatedAt: "2026-01-04T12:00:00.000Z",
       },
     ]);
   });
