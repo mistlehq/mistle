@@ -285,6 +285,90 @@ describe("automation webhooks CRUD integration", () => {
     expect(secondPage.previousPage).not.toBeNull();
   });
 
+  it("lists webhook automations with a row-level issue when target metadata cannot be resolved", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-list-missing-target-metadata@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "retired_target",
+      familyId: "retired",
+      variantId: "retired-variant",
+      enabled: true,
+      config: {},
+      displayNameOverride: "Retired target",
+      descriptionOverride: null,
+    });
+    await insertIntegrationConnection(fixture, {
+      id: "icn_list_retired_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: "retired_target",
+    });
+    await insertSandboxProfile(fixture, {
+      id: "sbp_list_retired_001",
+      organizationId: authenticatedSession.organizationId,
+    });
+
+    await fixture.db.insert(automations).values({
+      id: "atm_webhook_list_retired_001",
+      organizationId: authenticatedSession.organizationId,
+      kind: AutomationKinds.WEBHOOK,
+      name: "Retired Target Automation",
+      enabled: true,
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+    });
+    await fixture.db
+      .insert(webhookAutomations)
+      .values(
+        createPersistedWebhookAutomationConfig(
+          "atm_webhook_list_retired_001",
+          "icn_list_retired_001",
+        ),
+      );
+    await fixture.db
+      .insert(automationTargets)
+      .values(
+        createPersistedAutomationTarget(
+          "atg_list_retired_001",
+          "atm_webhook_list_retired_001",
+          "sbp_list_retired_001",
+          1,
+        ),
+      );
+
+    const response = await fixture.request("/v1/automations/webhooks", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = ListAutomationWebhooksResponseSchema.parse(await response.json());
+    expect(body.items).toHaveLength(1);
+
+    const [item] = body.items;
+    if (item === undefined) {
+      throw new Error("Expected a webhook automation list item.");
+    }
+
+    expect(item.id).toBe("atm_webhook_list_retired_001");
+    expect(item.issue).toEqual({
+      code: "MISSING_TARGET_METADATA",
+      message:
+        "This automation references an integration target definition that is no longer available. Event metadata may be incomplete.",
+    });
+    expect(item.events).toEqual([
+      {
+        label: "issue_comment.created",
+        unavailable: true,
+      },
+    ]);
+  });
+
   it("gets and updates a webhook automation aggregate while preserving omitted PATCH fields", async ({
     fixture,
   }) => {

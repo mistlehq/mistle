@@ -16,12 +16,20 @@ export const AutomationWebhookListEventSchema = z
   })
   .strict();
 
+export const AutomationWebhookListIssueSchema = z
+  .object({
+    code: z.literal("MISSING_TARGET_METADATA"),
+    message: z.string().min(1),
+  })
+  .strict();
+
 export const AutomationWebhookListItemSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1),
     enabled: z.boolean(),
     targetName: z.string().min(1),
+    issue: AutomationWebhookListIssueSchema.optional(),
     events: z.array(AutomationWebhookListEventSchema),
     updatedAt: z.string().min(1),
   })

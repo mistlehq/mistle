@@ -58,6 +58,10 @@ export type AutomationWebhookListItem = {
   name: string;
   enabled: boolean;
   targetName: string;
+  issue?: {
+    code: "MISSING_TARGET_METADATA";
+    message: string;
+  };
   events: {
     label: string;
     logoKey?: string;
@@ -124,6 +128,91 @@ function resolveAutomationListEvents(input: {
   });
 }
 
+function resolveUnavailableAutomationListEvents(input: {
+  eventTypes: string[] | null;
+}): AutomationWebhookListItem["events"] {
+  if (input.eventTypes === null || input.eventTypes.length === 0) {
+    return [
+      {
+        label: "All events",
+        unavailable: true,
+      },
+    ];
+  }
+
+  return input.eventTypes.map((eventType) => ({
+    label: eventType,
+    unavailable: true,
+  }));
+}
+
+type AutomationListPageRow = {
+  automationId: string;
+  automationName: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  eventTypes: string[] | null;
+  integrationConnectionId: string;
+  sandboxProfileDisplayName: string;
+  integrationTargetFamilyId: string;
+  integrationTargetVariantId: string;
+  integrationTargetDisplayNameOverride: string | null;
+  integrationTargetDescriptionOverride: string | null;
+};
+
+function createAutomationListPageItem(row: AutomationListPageRow): AutomationWebhookListPageItem {
+  try {
+    const targetMetadata = resolveTargetMetadataFromPersistedTarget({
+      familyId: row.integrationTargetFamilyId,
+      variantId: row.integrationTargetVariantId,
+      displayNameOverride: row.integrationTargetDisplayNameOverride,
+      descriptionOverride: row.integrationTargetDescriptionOverride,
+    });
+
+    return {
+      id: row.automationId,
+      name: row.automationName,
+      enabled: row.enabled,
+      createdAt: row.createdAt,
+      targetName: row.sandboxProfileDisplayName,
+      events: resolveAutomationListEvents({
+        eventTypes: row.eventTypes,
+        integrationConnectionId: row.integrationConnectionId,
+        ...(targetMetadata.supportedWebhookEvents === undefined
+          ? {}
+          : {
+              supportedWebhookEvents: targetMetadata.supportedWebhookEvents.map(
+                (eventDefinition) => ({
+                  eventType: eventDefinition.eventType,
+                  displayName: eventDefinition.displayName,
+                }),
+              ),
+            }),
+        ...(targetMetadata.logoKey === undefined ? {} : { logoKey: targetMetadata.logoKey }),
+      }),
+      updatedAt: row.updatedAt,
+    };
+  } catch {
+    return {
+      id: row.automationId,
+      name: row.automationName,
+      enabled: row.enabled,
+      createdAt: row.createdAt,
+      targetName: row.sandboxProfileDisplayName,
+      issue: {
+        code: "MISSING_TARGET_METADATA",
+        message:
+          "This automation references an integration target definition that is no longer available. Event metadata may be incomplete.",
+      },
+      events: resolveUnavailableAutomationListEvents({
+        eventTypes: row.eventTypes,
+      }),
+      updatedAt: row.updatedAt,
+    };
+  }
+}
+
 async function loadAutomationListPageRows(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
@@ -169,43 +258,36 @@ async function loadAutomationListPageRows(input: {
       ),
     );
 
-  const rowsByAutomationId = new Map(
-    rows.map((row) => {
-      const targetMetadata = resolveTargetMetadataFromPersistedTarget({
-        familyId: row.integrationTargetFamilyId,
-        variantId: row.integrationTargetVariantId,
-        displayNameOverride: row.integrationTargetDisplayNameOverride,
-        descriptionOverride: row.integrationTargetDescriptionOverride,
-      });
+  const groupedRows = new Map<string, AutomationListPageRow[]>();
 
-      return [
-        row.automationId,
-        {
-          id: row.automationId,
-          name: row.automationName,
-          enabled: row.enabled,
-          createdAt: row.createdAt,
-          targetName: row.sandboxProfileDisplayName,
-          events: resolveAutomationListEvents({
-            eventTypes: row.eventTypes,
-            integrationConnectionId: row.integrationConnectionId,
-            ...(targetMetadata.supportedWebhookEvents === undefined
-              ? {}
-              : {
-                  supportedWebhookEvents: targetMetadata.supportedWebhookEvents.map(
-                    (eventDefinition) => ({
-                      eventType: eventDefinition.eventType,
-                      displayName: eventDefinition.displayName,
-                    }),
-                  ),
-                }),
-            ...(targetMetadata.logoKey === undefined ? {} : { logoKey: targetMetadata.logoKey }),
-          }),
-          updatedAt: row.updatedAt,
-        } satisfies AutomationWebhookListPageItem,
-      ];
-    }),
-  );
+  for (const row of rows) {
+    const automationRows = groupedRows.get(row.automationId);
+    if (automationRows === undefined) {
+      groupedRows.set(row.automationId, [row]);
+      continue;
+    }
+
+    automationRows.push(row);
+  }
+
+  const rowsByAutomationId = new Map<string, AutomationWebhookListPageItem>();
+
+  for (const [automationId, automationRows] of groupedRows.entries()) {
+    if (automationRows.length !== 1) {
+      throw new Error(
+        `Webhook automation '${automationId}' must have exactly one automation target.`,
+      );
+    }
+
+    const automationRow = automationRows[0];
+    if (automationRow === undefined) {
+      throw new Error(
+        `Webhook automation '${automationId}' could not be loaded for the list page.`,
+      );
+    }
+
+    rowsByAutomationId.set(automationId, createAutomationListPageItem(automationRow));
+  }
 
   return input.automationIds.map((automationId) => {
     const row = rowsByAutomationId.get(automationId);
