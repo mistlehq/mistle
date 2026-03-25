@@ -97,6 +97,7 @@ async function runRuntimeInternalSmoke(smokeDirectoryPath, startupInputJson) {
     },
     stdio: ["pipe", "ignore", "pipe"],
   });
+  const childExit = waitForExit(child);
 
   child.stdin.end(startupInputJson);
   child.stderr.setEncoding("utf8");
@@ -104,7 +105,7 @@ async function runRuntimeInternalSmoke(smokeDirectoryPath, startupInputJson) {
     stderrChunks.push(chunk);
   });
 
-  const exitCode = await waitForExit(child);
+  const exitCode = await childExit;
   const stderr = stderrChunks.join("");
   const expectedError =
     "sandbox runtime exited with error: failed to start runtime client processes";
@@ -130,6 +131,7 @@ async function runSupervisorApplyStartupSmoke(smokeDirectoryPath, startupInputJs
     },
     stdio: ["ignore", "ignore", "pipe"],
   });
+  const serveChildExit = waitForExit(serveChild);
 
   try {
     await waitForFile(startupTokenPath);
@@ -144,6 +146,7 @@ async function runSupervisorApplyStartupSmoke(smokeDirectoryPath, startupInputJs
       },
       stdio: ["pipe", "ignore", "pipe"],
     });
+    const applyStartupChildExit = waitForExit(applyStartupChild);
 
     applyStartupChild.stdin.end(startupInputJson);
     applyStartupChild.stderr.setEncoding("utf8");
@@ -151,7 +154,7 @@ async function runSupervisorApplyStartupSmoke(smokeDirectoryPath, startupInputJs
       applyStartupStderrChunks.push(chunk);
     });
 
-    const applyStartupExitCode = await waitForExit(applyStartupChild);
+    const applyStartupExitCode = await applyStartupChildExit;
     const applyStartupStderr = applyStartupStderrChunks.join("");
     if (applyStartupExitCode !== 0) {
       throw new Error(
@@ -172,7 +175,7 @@ async function runSupervisorApplyStartupSmoke(smokeDirectoryPath, startupInputJs
     throw new Error("SEA apply-startup smoke test expected startup token to be consumed.");
   } finally {
     serveChild.kill("SIGTERM");
-    await waitForExit(serveChild);
+    await serveChildExit;
   }
 }
 
