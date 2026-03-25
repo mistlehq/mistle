@@ -17,9 +17,11 @@ import {
   readStoredResumeIdempotencyKey,
   resolveSessionEntryPhase,
   resolveAutomationSessionPreparationTimeoutDelayMs,
+  resolveStoppedSessionMessageForEntryPhase,
   seedSandboxInstanceStatusQuery,
   shouldShowResumeInFlightState,
   shouldClearStoredResumeIdempotencyKey,
+  shouldRetryResumeAfterStatusRefresh,
   shouldRetainResumeRetryWindowAfterError,
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
@@ -359,6 +361,7 @@ describe("useSessionWorkbenchController", () => {
       resolveSessionEntryPhase({
         connectedSession: false,
         hasResumePolicy: false,
+        isWaitingForResumeRetry: false,
         isStatusPending: true,
         sandboxStatus: null,
       }),
@@ -368,6 +371,7 @@ describe("useSessionWorkbenchController", () => {
       resolveSessionEntryPhase({
         connectedSession: false,
         hasResumePolicy: true,
+        isWaitingForResumeRetry: false,
         isStatusPending: false,
         sandboxStatus: "stopped",
       }),
@@ -376,7 +380,18 @@ describe("useSessionWorkbenchController", () => {
     expect(
       resolveSessionEntryPhase({
         connectedSession: false,
+        hasResumePolicy: true,
+        isWaitingForResumeRetry: true,
+        isStatusPending: false,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe("resume_reconciliation_pending");
+
+    expect(
+      resolveSessionEntryPhase({
+        connectedSession: false,
         hasResumePolicy: false,
+        isWaitingForResumeRetry: false,
         isStatusPending: false,
         sandboxStatus: "stopped",
       }),
@@ -386,15 +401,17 @@ describe("useSessionWorkbenchController", () => {
       resolveSessionEntryPhase({
         connectedSession: false,
         hasResumePolicy: false,
+        isWaitingForResumeRetry: false,
         isStatusPending: false,
         sandboxStatus: "starting",
       }),
-    ).toBe("starting");
+    ).toBe("sandbox_starting");
 
     expect(
       resolveSessionEntryPhase({
         connectedSession: false,
         hasResumePolicy: false,
+        isWaitingForResumeRetry: false,
         isStatusPending: false,
         sandboxStatus: "running",
       }),
@@ -404,6 +421,7 @@ describe("useSessionWorkbenchController", () => {
       resolveSessionEntryPhase({
         connectedSession: true,
         hasResumePolicy: false,
+        isWaitingForResumeRetry: false,
         isStatusPending: false,
         sandboxStatus: "running",
       }),
@@ -413,10 +431,34 @@ describe("useSessionWorkbenchController", () => {
       resolveSessionEntryPhase({
         connectedSession: false,
         hasResumePolicy: false,
+        isWaitingForResumeRetry: false,
         isStatusPending: false,
         sandboxStatus: "failed",
       }),
-    ).toBe("failed");
+    ).toBe("sandbox_failed");
+  });
+
+  it("releases auto-resume retries only after a newer sandbox status refresh arrives", () => {
+    expect(
+      shouldRetryResumeAfterStatusRefresh({
+        resumeRetryAfterDataUpdatedAt: null,
+        sandboxStatusDataUpdatedAt: 2_000,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldRetryResumeAfterStatusRefresh({
+        resumeRetryAfterDataUpdatedAt: 2_000,
+        sandboxStatusDataUpdatedAt: 2_000,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldRetryResumeAfterStatusRefresh({
+        resumeRetryAfterDataUpdatedAt: 2_000,
+        sandboxStatusDataUpdatedAt: 2_001,
+      }),
+    ).toBe(true);
   });
 
   it("retains the retry window only for ambiguous or server-side resume failures", () => {
@@ -442,6 +484,29 @@ describe("useSessionWorkbenchController", () => {
         }),
       ),
     ).toBe(false);
+  });
+
+  it("shows definitive resume failures in the stopped-session message path", () => {
+    expect(
+      resolveStoppedSessionMessageForEntryPhase({
+        phase: "manual_resume_required",
+        resumeActionErrorMessage: "You no longer have access to this sandbox.",
+      }),
+    ).toBe("You no longer have access to this sandbox.");
+
+    expect(
+      resolveStoppedSessionMessageForEntryPhase({
+        phase: "manual_resume_required",
+        resumeActionErrorMessage: null,
+      }),
+    ).toBe("This sandbox is stopped. Resume it to reconnect chat and terminal.");
+
+    expect(
+      resolveStoppedSessionMessageForEntryPhase({
+        phase: "resume_reconciliation_pending",
+        resumeActionErrorMessage: "Conflict",
+      }),
+    ).toBeNull();
   });
 
   it("accepts resume completions only for the active request on the same sandbox", () => {

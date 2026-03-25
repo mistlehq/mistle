@@ -201,12 +201,13 @@ type ResumeRequestGuard = {
 
 type SessionEntryPhase =
   | "connecting"
-  | "failed"
+  | "sandbox_failed"
   | "loading"
   | "manual_resume_required"
   | "ready"
   | "resume_pending"
-  | "starting";
+  | "resume_reconciliation_pending"
+  | "sandbox_starting";
 
 export function getSandboxInstanceStatusQueryKey(
   sandboxInstanceId: string | null,
@@ -324,11 +325,12 @@ export function shouldShowResumeInFlightState(input: {
 export function resolveSessionEntryPhase(input: {
   connectedSession: boolean;
   hasResumePolicy: boolean;
+  isWaitingForResumeRetry: boolean;
   isStatusPending: boolean;
   sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
 }): SessionEntryPhase {
   if (input.sandboxStatus === "failed") {
-    return "failed";
+    return "sandbox_failed";
   }
 
   if (input.sandboxStatus === "running") {
@@ -336,11 +338,15 @@ export function resolveSessionEntryPhase(input: {
   }
 
   if (input.sandboxStatus === "starting") {
-    return "starting";
+    return "sandbox_starting";
   }
 
   if (input.sandboxStatus === "stopped") {
-    return input.hasResumePolicy ? "resume_pending" : "manual_resume_required";
+    if (!input.hasResumePolicy) {
+      return "manual_resume_required";
+    }
+
+    return input.isWaitingForResumeRetry ? "resume_reconciliation_pending" : "resume_pending";
   }
 
   return input.isStatusPending ? "loading" : "loading";
@@ -349,11 +355,15 @@ export function resolveSessionEntryPhase(input: {
 function resolveSandboxStatusForEntryPhase(
   phase: SessionEntryPhase,
 ): "starting" | "running" | "stopped" | "failed" | null {
-  if (phase === "failed") {
+  if (phase === "sandbox_failed") {
     return "failed";
   }
 
-  if (phase === "resume_pending" || phase === "starting") {
+  if (
+    phase === "resume_pending" ||
+    phase === "resume_reconciliation_pending" ||
+    phase === "sandbox_starting"
+  ) {
     return "starting";
   }
 
@@ -368,10 +378,40 @@ function resolveSandboxStatusForEntryPhase(
   return null;
 }
 
-function resolveStoppedSessionMessageForEntryPhase(phase: SessionEntryPhase): string | null {
-  return phase === "manual_resume_required"
-    ? "This sandbox is stopped. Resume it to reconnect chat and terminal."
-    : null;
+export function resolveStoppedSessionMessageForEntryPhase(input: {
+  phase: SessionEntryPhase;
+  resumeActionErrorMessage: string | null;
+}): string | null {
+  if (input.phase !== "manual_resume_required") {
+    return null;
+  }
+
+  return (
+    input.resumeActionErrorMessage ??
+    "This sandbox is stopped. Resume it to reconnect chat and terminal."
+  );
+}
+
+export function shouldRetryResumeAfterStatusRefresh(input: {
+  resumeRetryAfterDataUpdatedAt: number | null;
+  sandboxStatusDataUpdatedAt: number;
+}): boolean {
+  return (
+    input.resumeRetryAfterDataUpdatedAt !== null &&
+    input.sandboxStatusDataUpdatedAt > input.resumeRetryAfterDataUpdatedAt
+  );
+}
+
+function resolveResumeFailureMessage(error: unknown): string {
+  if (error instanceof SandboxProfilesApiError) {
+    return error.message;
+  }
+
+  if (error instanceof Error && error.message.length > 0) {
+    return error.message;
+  }
+
+  return "Could not resume sandbox session.";
 }
 
 export function isActiveResumeRequest(input: {
@@ -421,6 +461,10 @@ export function useSessionWorkbenchController(input: {
   const hasStoredResumeIdempotencyKey = storedResumeIdempotencyRecord !== null;
   const [hasResumePolicy, setHasResumePolicy] = useState(input.resumeOnOpenRequestToken !== null);
   const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(false);
+  const [resumeActionErrorMessage, setResumeActionErrorMessage] = useState<string | null>(null);
+  const [resumeRetryAfterDataUpdatedAt, setResumeRetryAfterDataUpdatedAt] = useState<number | null>(
+    null,
+  );
   const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
   const activeResumeRequestRef = useRef<ResumeRequestGuard | null>(null);
   const nextResumeRequestIdRef = useRef(0);
@@ -510,6 +554,7 @@ export function useSessionWorkbenchController(input: {
   const sessionEntryPhase = resolveSessionEntryPhase({
     connectedSession: connectedSession !== null,
     hasResumePolicy: hasActiveResumePolicy,
+    isWaitingForResumeRetry: resumeRetryAfterDataUpdatedAt !== null,
     isStatusPending: sandboxStatusQuery.isPending,
     sandboxStatus,
   });
@@ -524,7 +569,10 @@ export function useSessionWorkbenchController(input: {
     sandboxStatus: effectiveSandboxStatus,
     isStatusPending: sandboxStatusQuery.isPending,
   });
-  const stoppedSessionMessage = resolveStoppedSessionMessageForEntryPhase(sessionEntryPhase);
+  const stoppedSessionMessage = resolveStoppedSessionMessageForEntryPhase({
+    phase: sessionEntryPhase,
+    resumeActionErrorMessage,
+  });
   const stoppedSessionState = {
     // Mirror the policy contract: stopped-state messaging stays separate from
     // connection readiness until the control-plane API exposes a dedicated
@@ -550,6 +598,8 @@ export function useSessionWorkbenchController(input: {
     setStoredResumeIdempotencyRecord(storedResumeRecord);
     setHasResumePolicy(false);
     setIsResumingStoppedSandbox(false);
+    setResumeActionErrorMessage(null);
+    setResumeRetryAfterDataUpdatedAt(null);
     activeResumeRequestRef.current = null;
     clearStartErrorMessage();
     disconnectSession();
@@ -599,6 +649,8 @@ export function useSessionWorkbenchController(input: {
     });
     setStoredResumeIdempotencyRecord(null);
     setHasResumePolicy(false);
+    setResumeActionErrorMessage(null);
+    setResumeRetryAfterDataUpdatedAt(null);
   }, [input.sandboxInstanceId, sandboxStatus]);
 
   useEffect(() => {
@@ -607,7 +659,22 @@ export function useSessionWorkbenchController(input: {
     }
 
     setHasResumePolicy(false);
+    setResumeActionErrorMessage(null);
+    setResumeRetryAfterDataUpdatedAt(null);
   }, [sandboxStatus]);
+
+  useEffect(() => {
+    if (
+      !shouldRetryResumeAfterStatusRefresh({
+        resumeRetryAfterDataUpdatedAt,
+        sandboxStatusDataUpdatedAt: sandboxStatusQuery.dataUpdatedAt,
+      })
+    ) {
+      return;
+    }
+
+    setResumeRetryAfterDataUpdatedAt(null);
+  }, [resumeRetryAfterDataUpdatedAt, sandboxStatusQuery.dataUpdatedAt]);
 
   useEffect(() => {
     if (!isWaitingForAutomationThread) {
@@ -846,6 +913,8 @@ export function useSessionWorkbenchController(input: {
     });
     setStoredResumeIdempotencyRecord(nextStoredResumeRecord);
     setHasResumePolicy(true);
+    setResumeActionErrorMessage(null);
+    setResumeRetryAfterDataUpdatedAt(null);
 
     setIsResumingStoppedSandbox(true);
     try {
@@ -887,6 +956,10 @@ export function useSessionWorkbenchController(input: {
         });
         setStoredResumeIdempotencyRecord(null);
         setHasResumePolicy(false);
+        setResumeActionErrorMessage(resolveResumeFailureMessage(error));
+        setResumeRetryAfterDataUpdatedAt(null);
+      } else {
+        setResumeRetryAfterDataUpdatedAt(sandboxStatusQuery.dataUpdatedAt);
       }
     } finally {
       if (
