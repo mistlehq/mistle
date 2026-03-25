@@ -19,9 +19,9 @@ import {
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForEntryPhase,
   seedSandboxInstanceStatusQuery,
-  shouldShowResumeInFlightState,
   shouldClearStoredResumeIdempotencyKey,
-  shouldRetryResumeAfterStatusRefresh,
+  shouldPollStoppedSandboxStatus,
+  shouldShowResumeInFlightState,
   shouldRetainResumeRetryWindowAfterError,
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
@@ -361,7 +361,6 @@ describe("useSessionWorkbenchController", () => {
       resolveSessionEntryPhase({
         connectedSession: false,
         hasResumePolicy: false,
-        isWaitingForResumeRetry: false,
         isStatusPending: true,
         sandboxStatus: null,
       }),
@@ -371,7 +370,6 @@ describe("useSessionWorkbenchController", () => {
       resolveSessionEntryPhase({
         connectedSession: false,
         hasResumePolicy: true,
-        isWaitingForResumeRetry: false,
         isStatusPending: false,
         sandboxStatus: "stopped",
       }),
@@ -380,18 +378,7 @@ describe("useSessionWorkbenchController", () => {
     expect(
       resolveSessionEntryPhase({
         connectedSession: false,
-        hasResumePolicy: true,
-        isWaitingForResumeRetry: true,
-        isStatusPending: false,
-        sandboxStatus: "stopped",
-      }),
-    ).toBe("resume_reconciliation_pending");
-
-    expect(
-      resolveSessionEntryPhase({
-        connectedSession: false,
         hasResumePolicy: false,
-        isWaitingForResumeRetry: false,
         isStatusPending: false,
         sandboxStatus: "stopped",
       }),
@@ -401,7 +388,6 @@ describe("useSessionWorkbenchController", () => {
       resolveSessionEntryPhase({
         connectedSession: false,
         hasResumePolicy: false,
-        isWaitingForResumeRetry: false,
         isStatusPending: false,
         sandboxStatus: "starting",
       }),
@@ -411,7 +397,6 @@ describe("useSessionWorkbenchController", () => {
       resolveSessionEntryPhase({
         connectedSession: false,
         hasResumePolicy: false,
-        isWaitingForResumeRetry: false,
         isStatusPending: false,
         sandboxStatus: "running",
       }),
@@ -421,7 +406,6 @@ describe("useSessionWorkbenchController", () => {
       resolveSessionEntryPhase({
         connectedSession: true,
         hasResumePolicy: false,
-        isWaitingForResumeRetry: false,
         isStatusPending: false,
         sandboxStatus: "running",
       }),
@@ -431,34 +415,33 @@ describe("useSessionWorkbenchController", () => {
       resolveSessionEntryPhase({
         connectedSession: false,
         hasResumePolicy: false,
-        isWaitingForResumeRetry: false,
         isStatusPending: false,
         sandboxStatus: "failed",
       }),
     ).toBe("sandbox_failed");
   });
 
-  it("releases auto-resume retries only after a newer sandbox status refresh arrives", () => {
+  it("polls stopped sandbox status only while resume policy is active", () => {
     expect(
-      shouldRetryResumeAfterStatusRefresh({
-        resumeRetryAfterDataUpdatedAt: null,
-        sandboxStatusDataUpdatedAt: 2_000,
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldRetryResumeAfterStatusRefresh({
-        resumeRetryAfterDataUpdatedAt: 2_000,
-        sandboxStatusDataUpdatedAt: 2_000,
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldRetryResumeAfterStatusRefresh({
-        resumeRetryAfterDataUpdatedAt: 2_000,
-        sandboxStatusDataUpdatedAt: 2_001,
+      shouldPollStoppedSandboxStatus({
+        hasResumePolicy: true,
+        sandboxStatus: "stopped",
       }),
     ).toBe(true);
+
+    expect(
+      shouldPollStoppedSandboxStatus({
+        hasResumePolicy: false,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldPollStoppedSandboxStatus({
+        hasResumePolicy: true,
+        sandboxStatus: "starting",
+      }),
+    ).toBe(false);
   });
 
   it("retains the retry window only for ambiguous or server-side resume failures", () => {
@@ -503,7 +486,7 @@ describe("useSessionWorkbenchController", () => {
 
     expect(
       resolveStoppedSessionMessageForEntryPhase({
-        phase: "resume_reconciliation_pending",
+        phase: "resume_pending",
         resumeActionErrorMessage: "Conflict",
       }),
     ).toBeNull();
