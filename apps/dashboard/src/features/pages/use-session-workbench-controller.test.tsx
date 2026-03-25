@@ -417,6 +417,8 @@ describe("useSessionWorkbenchController", () => {
   it("shows resume progress while auto-resume is being kicked off or actively submitting", () => {
     expect(
       shouldShowResumeInFlightState({
+        hasAttemptedInitialStoppedResume: false,
+        resumeActionErrorMessage: null,
         shouldAttemptInitialStoppedResume: false,
         isResumingStoppedSandbox: true,
         sandboxStatus: "stopped",
@@ -425,6 +427,8 @@ describe("useSessionWorkbenchController", () => {
 
     expect(
       shouldShowResumeInFlightState({
+        hasAttemptedInitialStoppedResume: false,
+        resumeActionErrorMessage: null,
         shouldAttemptInitialStoppedResume: true,
         isResumingStoppedSandbox: false,
         sandboxStatus: "stopped",
@@ -433,6 +437,18 @@ describe("useSessionWorkbenchController", () => {
 
     expect(
       shouldShowResumeInFlightState({
+        hasAttemptedInitialStoppedResume: true,
+        resumeActionErrorMessage: null,
+        shouldAttemptInitialStoppedResume: false,
+        isResumingStoppedSandbox: false,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowResumeInFlightState({
+        hasAttemptedInitialStoppedResume: true,
+        resumeActionErrorMessage: "Resume conflict",
         shouldAttemptInitialStoppedResume: false,
         isResumingStoppedSandbox: false,
         sandboxStatus: "stopped",
@@ -441,6 +457,18 @@ describe("useSessionWorkbenchController", () => {
 
     expect(
       shouldShowResumeInFlightState({
+        hasAttemptedInitialStoppedResume: false,
+        resumeActionErrorMessage: null,
+        shouldAttemptInitialStoppedResume: false,
+        isResumingStoppedSandbox: false,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldShowResumeInFlightState({
+        hasAttemptedInitialStoppedResume: false,
+        resumeActionErrorMessage: null,
         shouldAttemptInitialStoppedResume: true,
         isResumingStoppedSandbox: false,
         sandboxStatus: "starting",

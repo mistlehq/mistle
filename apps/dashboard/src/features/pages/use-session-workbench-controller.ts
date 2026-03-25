@@ -315,13 +315,17 @@ export function shouldClearStoredResumeIdempotencyKey(
 }
 
 export function shouldShowResumeInFlightState(input: {
+  hasAttemptedInitialStoppedResume: boolean;
+  resumeActionErrorMessage: string | null;
   shouldAttemptInitialStoppedResume: boolean;
   isResumingStoppedSandbox: boolean;
   sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
 }): boolean {
   return (
     input.sandboxStatus === "stopped" &&
-    (input.isResumingStoppedSandbox || input.shouldAttemptInitialStoppedResume)
+    (input.isResumingStoppedSandbox ||
+      input.shouldAttemptInitialStoppedResume ||
+      (input.hasAttemptedInitialStoppedResume && input.resumeActionErrorMessage === null))
   );
 }
 
@@ -519,6 +523,8 @@ export function useSessionWorkbenchController(input: {
     sandboxStatus === "stopped" &&
     !hasAttemptedInitialStoppedResume;
   const isShowingResumeInFlightState = shouldShowResumeInFlightState({
+    hasAttemptedInitialStoppedResume,
+    resumeActionErrorMessage,
     shouldAttemptInitialStoppedResume,
     isResumingStoppedSandbox,
     sandboxStatus,
@@ -810,6 +816,7 @@ export function useSessionWorkbenchController(input: {
       storage,
       nowMs,
     });
+    setHasAttemptedInitialStoppedResume(true);
     setResumeActionErrorMessage(null);
 
     clearStartErrorMessage();
@@ -884,7 +891,6 @@ export function useSessionWorkbenchController(input: {
       return;
     }
 
-    setHasAttemptedInitialStoppedResume(true);
     void requestStoppedSandboxResume();
   }, [
     hasAttemptedInitialStoppedResume,
