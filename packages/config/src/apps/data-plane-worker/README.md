@@ -20,8 +20,11 @@ Namespace in final config:
 | `sandbox.docker.socketPath`           | `string`            | Docker daemon socket path used when provider is docker.            | None    | `[apps.data_plane_worker.sandbox.docker].socket_path`              | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH`                    |
 | `sandbox.docker.networkName`          | `string` (optional) | Optional Docker network name that sandbox containers join.         | None    | `[apps.data_plane_worker.sandbox.docker].network_name`             | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME`                   |
 | `sandbox.docker.tracesEndpoint`       | `string` (optional) | Optional sandbox-facing OTLP traces endpoint for Docker sandboxes. | None    | `[apps.data_plane_worker.sandbox.docker].traces_endpoint`          | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT`                |
+| `sandbox.e2b.apiKey`                  | `string`            | E2B API key used when provider is e2b.                             | None    | `[apps.data_plane_worker.sandbox.e2b].api_key`                     | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY`                           |
+| `sandbox.e2b.domain`                  | `string` (optional) | Optional E2B domain override.                                      | None    | `[apps.data_plane_worker.sandbox.e2b].domain`                      | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN`                            |
 
 Notes:
 
 - Sandbox provider selection now comes from `global.sandbox.provider`.
 - `apps.data_plane_worker.sandbox` only carries provider-specific runtime settings plus `tokenizer_proxy_egress_base_url`.
+- Docker and E2B both consume the same `global.sandbox.defaultBaseImage` OCI reference.

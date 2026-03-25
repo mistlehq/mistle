@@ -29,6 +29,7 @@ controlPlaneApi:
       value: docker
     - name: MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE
       value: ghcr.io/mistlehq/sandbox-base:0123456789abcdef
+    # Set provider to e2b and supply the E2B API key secret below for cloud sandboxes.
     - name: MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL
       value: wss://gateway.example.com/tunnel/sandbox
     - name: MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL
@@ -226,6 +227,9 @@ dataPlaneWorker:
       value: mistle
     - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT
       value: http://otel-collector:4318/v1/traces
+    # Uncomment when MISTLE_GLOBAL_SANDBOX_PROVIDER=e2b.
+    # - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN
+    #   value: e2b.app
   secretEnv:
     - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
       secretName: mistle-runtime
@@ -236,6 +240,10 @@ dataPlaneWorker:
     - name: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL
       secretName: mistle-runtime
       secretKey: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL
+    # Uncomment when MISTLE_GLOBAL_SANDBOX_PROVIDER=e2b.
+    # - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY
+    #   secretName: mistle-runtime
+    #   secretKey: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY
 
 dataPlaneGateway:
   image:
