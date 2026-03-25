@@ -18,7 +18,7 @@ Use this skill when the user asks to create or bootstrap a git worktree for this
 
 ## Create
 
-Use the helper script as the source of truth for creation, bootstrap, clipboard handling, and reporting.
+Use the helper script as the source of truth for creation, local-file sync, bootstrap, clipboard handling, and reporting.
 
 1. Resolve:
    - repo root
@@ -26,4 +26,9 @@ Use the helper script as the source of truth for creation, bootstrap, clipboard 
    - branch name
    - base ref
 2. Run `.agents/skills/worktree-manager/scripts/create-worktree.sh` with those four arguments in that order.
-3. Treat the script output as the source of truth for what happened and report the key fields back to the user.
+3. The helper script copies these required developer-local files from the source worktree into the new worktree before bootstrap:
+   - `.env.dev`
+   - `integration-targets.provision.json`
+   - `config/config.development.toml`
+4. Treat a missing required local file as a bootstrap error, not something to regenerate or silently skip.
+5. Treat the script output as the source of truth for what happened and report the key fields back to the user.
