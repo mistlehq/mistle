@@ -213,11 +213,10 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
         await applySandboxStartupConfiguration(
           {
             config: ctx.config,
-            startupConfigurator: ctx.startupConfigurator,
+            sandboxRuntimeControl: ctx.sandboxRuntimeControl,
           },
           {
             sandboxInstanceId: startedSandbox.sandboxInstanceId,
-            runtimeProvider: startedSandbox.runtimeProvider,
             providerSandboxId: startedSandbox.providerSandboxId,
             runtimePlan: workflowInput.runtimePlan,
           },

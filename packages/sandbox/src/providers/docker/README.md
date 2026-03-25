@@ -4,7 +4,8 @@ Docker implementation for `@mistle/sandbox`.
 
 ## Config
 
-`createSandboxAdapter({ provider: SandboxProvider.DOCKER, docker: ... })` expects:
+`createSandboxAdapter({ provider: SandboxProvider.DOCKER, docker: ... })` and
+`createSandboxRuntimeControl({ provider: SandboxProvider.DOCKER, docker: ... })` both expect:
 
 - `socketPath`: Docker daemon socket path (for example `/var/run/docker.sock`)
 - `networkName` (optional): Docker network name that started sandbox containers should join
@@ -14,9 +15,20 @@ All config fields are validated with Zod and fail fast when invalid.
 ## Usage
 
 ```ts
-import { createSandboxAdapter, SandboxProvider } from "@mistle/sandbox";
+import {
+  createSandboxAdapter,
+  createSandboxRuntimeControl,
+  SandboxProvider,
+} from "@mistle/sandbox";
 
 const adapter = createSandboxAdapter({
+  provider: SandboxProvider.DOCKER,
+  docker: {
+    socketPath: "/var/run/docker.sock",
+    networkName: "mistle-sandbox-dev",
+  },
+});
+const runtimeControl = createSandboxRuntimeControl({
   provider: SandboxProvider.DOCKER,
   docker: {
     socketPath: "/var/run/docker.sock",
@@ -30,10 +42,11 @@ const adapter = createSandboxAdapter({
 - `createVolume({})` creates a named Docker volume and returns an opaque handle.
 - `deleteVolume({ volumeId })` removes that Docker volume.
 - `start({ image, mounts })` pulls image reference and starts a Docker container with optional volume mounts.
-- `resume({ image, mounts, previousRuntimeId })` restarts the existing stopped Docker container identified by `previousRuntimeId`.
+- `resume({ image, mounts, id })` restarts the existing stopped Docker container identified by `id`.
+- `createSandboxRuntimeControl(...).applyStartup({ id, payload })` runs `sandboxd apply-startup` as `root` inside the target container.
 - returned `SandboxHandle` supports `writeStdin({ payload })` and `closeStdin()` for container stdin lifecycle.
-- `stop({ runtimeId })` stops the Docker container without removing it.
-- `destroy({ runtimeId })` force-removes the Docker container.
+- `stop({ id })` stops the Docker container without removing it.
+- `destroy({ id })` force-removes the Docker container.
 
 ## Error Surface
 

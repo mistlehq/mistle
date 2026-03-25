@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 
 import { mintBootstrapToken, mintTunnelExchangeToken } from "@mistle/gateway-tunnel-auth";
-import type { SandboxProvider } from "@mistle/sandbox";
+import type { SandboxRuntimeControl } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
-import type { SandboxStartupConfigurator } from "../core/sandbox-startup-configurator.js";
 import {
   createSandboxTunnelGatewayWsUrl,
+  encodeSandboxStartupInput,
   type SandboxStartupInput,
 } from "./sandbox-startup-input.js";
 
@@ -57,11 +57,10 @@ function createSandboxStartupInput(input: {
 export async function applySandboxStartupConfiguration(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
-    startupConfigurator: SandboxStartupConfigurator;
+    sandboxRuntimeControl: SandboxRuntimeControl;
   },
   input: {
     sandboxInstanceId: string;
-    runtimeProvider: SandboxProvider;
     providerSandboxId: string;
     runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   },
@@ -72,9 +71,8 @@ export async function applySandboxStartupConfiguration(
     runtimePlan: input.runtimePlan,
   });
 
-  await ctx.startupConfigurator.applyStartup({
-    provider: input.runtimeProvider,
-    sandboxId: input.providerSandboxId,
-    startupInput,
+  await ctx.sandboxRuntimeControl.applyStartup({
+    id: input.providerSandboxId,
+    payload: encodeSandboxStartupInput(startupInput),
   });
 }

@@ -65,6 +65,7 @@ export const ModalClientOperationIds = {
    * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L1398-L1404
    */
   CLOSE_STDIN: "close_stdin",
+  APPLY_STARTUP: "apply_startup",
 } as const;
 export type ModalClientOperation =
   (typeof ModalClientOperationIds)[keyof typeof ModalClientOperationIds];
