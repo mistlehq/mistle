@@ -1,4 +1,4 @@
-import { sandboxInstances, SandboxInstanceVolumeModes } from "@mistle/db/data-plane";
+import { sandboxInstances } from "@mistle/db/data-plane";
 import { systemSleeper } from "@mistle/time";
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect } from "vitest";
@@ -77,9 +77,6 @@ async function insertSandboxInstance(input: {
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
     providerSandboxId: input.providerSandboxId ?? "provider-runtime-connect-001",
-    instanceVolumeProvider: "docker",
-    instanceVolumeId: `volume-${input.sandboxInstanceId}`,
-    instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,
     status: input.status,
     startedByKind: "user",
     startedById: "usr_connect_integration",

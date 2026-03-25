@@ -6,7 +6,6 @@ import {
   sandboxInstanceRuntimePlans,
   sandboxInstances,
   SandboxInstanceStatuses,
-  SandboxInstanceVolumeModes,
 } from "@mistle/db/data-plane";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
@@ -64,7 +63,6 @@ async function insertStoppedSandboxInstance(input: {
   organizationId: string;
   sandboxInstanceId: string;
   providerSandboxId: string;
-  instanceVolumeId: string;
 }): Promise<void> {
   await input.fixture.db.insert(sandboxInstances).values({
     id: input.sandboxInstanceId,
@@ -73,9 +71,6 @@ async function insertStoppedSandboxInstance(input: {
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
     providerSandboxId: input.providerSandboxId,
-    instanceVolumeProvider: "docker",
-    instanceVolumeId: input.instanceVolumeId,
-    instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,
     status: SandboxInstanceStatuses.STOPPED,
     startedByKind: "user",
     startedById: "usr_resume_integration",
@@ -125,7 +120,6 @@ describe("sandboxInstances.resume integration", () => {
       organizationId: workflowInput.organizationId,
       sandboxInstanceId,
       providerSandboxId: "provider-runtime-resume-integration-001",
-      instanceVolumeId: "volume-resume-integration-001",
     });
 
     const resumedSandbox = await client.resumeSandboxInstance(workflowInput);
@@ -183,7 +177,6 @@ describe("sandboxInstances.resume integration", () => {
       organizationId: workflowInput.organizationId,
       sandboxInstanceId,
       providerSandboxId: "provider-runtime-resume-integration-002",
-      instanceVolumeId: "volume-resume-integration-002",
     });
 
     const firstResponse = await client.resumeSandboxInstance(workflowInput);

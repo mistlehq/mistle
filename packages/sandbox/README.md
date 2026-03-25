@@ -4,10 +4,9 @@ Provider-agnostic sandbox lifecycle package used by Mistle services.
 
 Current scope:
 
-- create and delete provider-backed durable volumes
 - start a sandbox from an image handle
 - resume a sandbox against existing provider-managed state
-- stop a running sandbox without destroying its durable volume state
+- stop a running sandbox without destroying sandbox filesystem state
 - destroy a sandbox runtime
 - apply runtime startup payloads through provider-scoped runtime control
 
@@ -47,14 +46,9 @@ The package root exports:
 
 - `SandboxProvider`
 - `SandboxRuntimeProvider`
-- `SandboxVolumeProvider`
 - `SandboxImageHandle`
-- `SandboxVolumeHandleV1`
-- `SandboxVolumeMountV1`
 - `SandboxHandle`
 - `SandboxRuntimeControl`
-- `CreateVolumeRequestV1`
-- `DeleteVolumeRequestV1`
 - `SandboxStartRequest`
 - `SandboxResumeRequestV1`
 - `SandboxStopRequest`
@@ -86,16 +80,8 @@ const baseImage: SandboxImageHandle = {
   createdAt: new Date().toISOString(),
 };
 
-const volume = await adapter.createVolume({});
-
 const sandbox = await adapter.start({
   image: baseImage,
-  mounts: [
-    {
-      volume,
-      mountPath: "/home/sandbox",
-    },
-  ],
 });
 
 await runtimeControl.applyStartup({
@@ -106,25 +92,16 @@ await runtimeControl.applyStartup({
 await adapter.stop({ id: sandbox.id });
 const resumedSandbox = await adapter.resume({
   image: baseImage,
-  mounts: [
-    {
-      volume,
-      mountPath: "/home/sandbox",
-    },
-  ],
   id: sandbox.id,
 });
 await adapter.destroy({ id: resumedSandbox.id });
-await adapter.deleteVolume({ volumeId: volume.volumeId });
 await runtimeControl.close();
 ```
 
 ## Usage Notes
 
 - Sandbox image handles describe the provider image passed to `start({ image })`.
-- Sandbox volume handles are opaque provider-managed volume references returned by `createVolume({})`.
-- `SandboxStartRequest.mounts` attaches provider-backed volumes at the requested mount paths.
-- `SandboxResumeRequestV1` resumes provider compute against existing mounts using a previous sandbox `id`.
+- `SandboxResumeRequestV1` resumes provider compute against existing sandbox state using a previous sandbox `id`.
 - `SandboxRuntimeControl.applyStartup({ id, payload })` delivers runtime startup bytes to an already-running sandbox using provider-native control paths.
 - `SandboxRuntimeControl.close()` releases provider client resources held by runtime control.
 - Operations may throw `SandboxError` subclasses. Configuration failures throw `SandboxConfigurationError`.
@@ -133,7 +110,6 @@ await runtimeControl.close();
 
 `@mistle/sandbox` is responsible only for sandbox lifecycle operations exposed by the adapter interface:
 
-- create and delete provider-backed volumes
 - start a sandbox from an image handle
 - resume a sandbox runtime
 - stop a sandbox runtime
@@ -157,7 +133,7 @@ Use the current Modal provider as the reference implementation.
 9. Wire the provider into both `createSandboxAdapter` and `createSandboxRuntimeControl` in `src/factory.ts`.
 10. Add unit tests next to each provider module, including config, errors, factory wiring, adapter behavior, and runtime-control construction.
 11. Add provider integration tests in `integration/<provider>/` (for example `integration/modal/modal-adapter.integration.test.ts`).
-12. Integration tests must cover the provider lifecycle surface: `createVolume`, `deleteVolume`, `start`, `resume`, `stop`, and `destroy`, plus runtime-control behavior for startup payload application and any provider-specific stdin/filesystem interactions the package exposes.
+12. Integration tests must cover the provider lifecycle surface: `start`, `resume`, `stop`, and `destroy`, plus runtime-control behavior for startup payload application and any provider-specific stdin/filesystem interactions the package exposes.
 
 Design expectations:
 
