@@ -74,15 +74,17 @@ function buildListedSession(
 function buildSelectableProfile(
   overrides: Partial<SelectableProfile> & Pick<SelectableProfile, "id">,
 ): SelectableProfile {
+  const { id, ...restOverrides } = overrides;
+
   return {
-    id: overrides.id,
+    id,
     displayName: "Alpha Profile",
     status: "active",
     latestVersion: 3,
     createdAt: "2026-03-10T00:00:00.000Z",
     updatedAt: "2026-03-10T00:00:00.000Z",
     organizationId: "org_123",
-    ...overrides,
+    ...restOverrides,
   };
 }
 
