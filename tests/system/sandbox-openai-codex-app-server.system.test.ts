@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import {
   decodeDataFrame,
   encodeDataFrame,
+  PayloadKindRawBytes,
   PayloadKindWebSocketText,
 } from "@mistle/sandbox-session-protocol";
 import { systemSleeper } from "@mistle/time";
@@ -40,6 +41,10 @@ const WEBSOCKET_TRACE_TAIL_COUNT = 40;
 const DOCKER_DIAGNOSTIC_TIMEOUT_MS = 10_000;
 const DOCKER_DIAGNOSTIC_MAX_BUFFER_BYTES = 1_000_000;
 const DIAGNOSTIC_OUTPUT_MAX_CHARS = 24_000;
+const TinyPngBytes = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8RcAAAAASUVORK5CYII=",
+  "base64",
+);
 
 const execFileAsync = promisify(execFile);
 
@@ -85,6 +90,20 @@ const JsonRpcRequestSchema = z.looseObject({
   id: JsonRpcIdSchema,
   params: z.unknown().optional(),
 });
+
+const FileUploadCompletedEventSchema = z
+  .object({
+    type: z.literal("stream.event"),
+    streamId: z.number().int().positive(),
+    event: z
+      .object({
+        type: z.literal("fileUpload.completed"),
+        attachmentId: z.string().min(1),
+        path: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict();
 
 const ThreadStartResultSchema = z.looseObject({
   thread: z.looseObject({
@@ -141,6 +160,13 @@ const SandboxInstanceStatusResponseSchema = z
     status: z.enum(["starting", "running", "stopped", "failed"]),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    automationConversation: z
+      .object({
+        conversationId: z.string().min(1),
+        routeId: z.string().min(1).nullable(),
+        providerConversationId: z.string().min(1).nullable(),
+      })
+      .nullable(),
   })
   .strict();
 
@@ -167,6 +193,11 @@ type CommandExecutionItem = {
 type JsonRpcNotification = {
   method: string;
   params: unknown;
+};
+
+type UploadedSandboxImage = {
+  attachmentId: string;
+  path: string;
 };
 
 type StepTraceEntry = {
@@ -1244,6 +1275,149 @@ function readCommandExecutionItemsForTurn(input: {
   return commandExecutions;
 }
 
+function readLocalImagePathsForTurn(input: {
+  threadReadResult: unknown;
+  turnId: string;
+}): string[] {
+  const parsedThreadReadResult = ThreadReadResultSchema.safeParse(input.threadReadResult);
+  if (!parsedThreadReadResult.success) {
+    throw new Error(
+      `thread/read result did not match expected schema: ${formatJsonForError(input.threadReadResult)}`,
+    );
+  }
+
+  const turn = (parsedThreadReadResult.data.thread.turns ?? []).find(
+    (candidateTurn) => candidateTurn.id === input.turnId,
+  );
+  if (turn === undefined) {
+    throw new Error(`thread/read result did not include target turn '${input.turnId}'.`);
+  }
+
+  const localImagePaths: string[] = [];
+  for (const item of turn.items ?? []) {
+    if (!isRecord(item) || readOptionalStringField(item, "type") !== "userMessage") {
+      continue;
+    }
+
+    const content = item["content"];
+    if (!Array.isArray(content)) {
+      continue;
+    }
+
+    for (const contentItem of content) {
+      if (!isRecord(contentItem) || readOptionalStringField(contentItem, "type") !== "localImage") {
+        continue;
+      }
+
+      const path = readOptionalStringField(contentItem, "path");
+      if (path !== null) {
+        localImagePaths.push(path);
+      }
+    }
+  }
+
+  return localImagePaths;
+}
+
+async function mintSandboxWebSocketUrl(input: {
+  request: (path: string, init?: RequestInit) => Promise<Response>;
+  cookie: string;
+  sandboxInstanceId: string;
+  dataPlaneGatewayBaseUrl: string;
+}): Promise<string> {
+  const mintConnectionTokenResponse = await requestWithTimeout({
+    request: input.request,
+    path: `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/connection-tokens`,
+    timeoutMs: MINT_CONNECTION_TOKEN_TIMEOUT_MS,
+    description: "sandbox connection token minting",
+    init: {
+      method: "POST",
+      headers: {
+        cookie: input.cookie,
+      },
+    },
+  });
+  const mintConnectionTokenPayload = await expectStatusJson({
+    response: mintConnectionTokenResponse,
+    status: 201,
+    description: "sandbox connection token minting",
+  });
+  if (!isRecord(mintConnectionTokenPayload)) {
+    throw new Error("Expected sandbox connection token response to be an object.");
+  }
+
+  const mintedUrl = readNonEmptyStringField(mintConnectionTokenPayload, "url");
+  return resolveGatewayWebSocketUrl({
+    mintedUrl,
+    gatewayBaseUrl: input.dataPlaneGatewayBaseUrl,
+  });
+}
+
+async function uploadImageOverTunnel(input: {
+  websocketUrl: string;
+  threadId: string;
+  imageBytes: Uint8Array;
+}): Promise<UploadedSandboxImage> {
+  const socket = await connectWebSocket(input.websocketUrl, WEBSOCKET_CONNECT_TIMEOUT_MS);
+
+  try {
+    const streamId = 1;
+    sendJson(socket, {
+      type: "stream.open",
+      streamId,
+      channel: {
+        kind: "fileUpload",
+        threadId: input.threadId,
+        mimeType: "image/png",
+        originalFilename: "system-test.png",
+        sizeBytes: input.imageBytes.byteLength,
+      },
+    });
+    await waitForTunnelHandshakeAck({
+      socket,
+      streamId,
+      timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+    });
+
+    socket.send(
+      encodeDataFrame({
+        streamId,
+        payloadKind: PayloadKindRawBytes,
+        payload: input.imageBytes,
+      }),
+    );
+    sendJson(socket, {
+      type: "stream.close",
+      streamId,
+    });
+
+    const deadline = Date.now() + WEBSOCKET_MESSAGE_TIMEOUT_MS;
+    while (true) {
+      const nextMessage = await waitForNextWebSocketJsonMessage(socket, remainingTimeMs(deadline));
+      const completion = FileUploadCompletedEventSchema.safeParse(nextMessage);
+      if (completion.success && completion.data.streamId === streamId) {
+        return {
+          attachmentId: completion.data.event.attachmentId,
+          path: completion.data.event.path,
+        };
+      }
+
+      const streamOpenError = StreamOpenErrorSchema.safeParse(nextMessage);
+      if (streamOpenError.success && streamOpenError.data.streamId === streamId) {
+        throw new Error(
+          `Tunnel stream.open failed with code '${streamOpenError.data.code}': ${streamOpenError.data.message}`,
+        );
+      }
+
+      if (remainingTimeMs(deadline) === 0) {
+        throw new Error("Timed out waiting for file upload completion event.");
+      }
+    }
+  } finally {
+    await closeWebSocket(socket);
+  }
+}
+
 async function waitForSandboxInstanceRunning(input: {
   request: (path: string, init?: RequestInit) => Promise<Response>;
   cookie: string;
@@ -1665,6 +1839,394 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
         const combinedAgentText = agentTextParts.join("");
         expect(combinedAgentText.length).toBeGreaterThan(0);
         expect(combinedAgentText).toContain(TEST_RESPONSE_MARKER);
+      } catch (error) {
+        let diagnostics = `Websocket trace (tail):\n${formatWebSocketTrace(websocketTraceEntries)}`;
+        const sandboxListDiagnostics = await collectSandboxContainerListDiagnostics();
+        diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\nproviderRuntimeId unavailable\n\nKnown sandbox containers:\n${sandboxListDiagnostics}`;
+
+        throw new Error(
+          `System test failed. Step trace: ${formatStepTrace(stepTrace)}. Cause: ${describeUnknownError(error)}\n\nDiagnostics:\n${diagnostics}`,
+        );
+      } finally {
+        detachWebSocketTrace?.();
+        if (websocketForCleanup !== null) {
+          await closeWebSocket(websocketForCleanup);
+        }
+      }
+    },
+    SYSTEM_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "uploads an image over fileUpload and sends it as localImage turn input",
+    async ({ fixture }) => {
+      const stepTrace: StepTraceEntry[] = [];
+      const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
+      const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
+      const connectionDisplayName = `System OpenAI Image Connection ${randomUUID()}`;
+      let websocketForCleanup: WebSocket | null = null;
+      let detachWebSocketTrace: (() => void) | null = null;
+      const websocketTraceEntries: WebSocketTraceEntry[] = [];
+
+      try {
+        const authenticatedSession = await runStep({
+          stepTrace,
+          stepName: "create authenticated session",
+          action: async () => {
+            return await fixture.authSession();
+          },
+        });
+
+        const createConnectionResponse = await runStep({
+          stepTrace,
+          stepName: "create OpenAI connection",
+          action: async () => {
+            return await requestWithTimeout({
+              request: fixture.request,
+              path: `/v1/integration/connections/${encodeURIComponent(OPENAI_TARGET_KEY)}/api-key`,
+              timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
+              description: "OpenAI API-key connection creation",
+              init: {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  cookie: authenticatedSession.cookie,
+                },
+                body: JSON.stringify({
+                  displayName: connectionDisplayName,
+                  apiKey: openAiApiKey,
+                }),
+              },
+            });
+          },
+        });
+        const createConnectionPayload = await expectStatusJson({
+          response: createConnectionResponse,
+          status: 201,
+          description: "OpenAI API-key connection creation",
+        });
+        if (!isRecord(createConnectionPayload)) {
+          throw new Error("Expected OpenAI API-key connection response to be an object.");
+        }
+        const connectionId = readNonEmptyStringField(createConnectionPayload, "id");
+
+        const profileDisplayName = `System OpenAI Image App-Server ${randomUUID()}`;
+        const createProfileResponse = await runStep({
+          stepTrace,
+          stepName: "create sandbox profile",
+          action: async () => {
+            return await requestWithTimeout({
+              request: fixture.request,
+              path: "/v1/sandbox/profiles",
+              timeoutMs: CREATE_PROFILE_TIMEOUT_MS,
+              description: "sandbox profile creation",
+              init: {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  cookie: authenticatedSession.cookie,
+                },
+                body: JSON.stringify({
+                  displayName: profileDisplayName,
+                }),
+              },
+            });
+          },
+        });
+        const createProfilePayload = await expectStatusJson({
+          response: createProfileResponse,
+          status: 201,
+          description: "sandbox profile creation",
+        });
+        if (!isRecord(createProfilePayload)) {
+          throw new Error("Expected sandbox profile creation response to be an object.");
+        }
+        const profileId = readNonEmptyStringField(createProfilePayload, "id");
+
+        const putBindingsResponse = await runStep({
+          stepTrace,
+          stepName: "bind OpenAI agent integration",
+          action: async () => {
+            return await requestWithTimeout({
+              request: fixture.request,
+              path: `/v1/sandbox/profiles/${encodeURIComponent(profileId)}/versions/1/integration-bindings`,
+              timeoutMs: PUT_BINDINGS_TIMEOUT_MS,
+              description: "sandbox profile integration binding update",
+              init: {
+                method: "PUT",
+                headers: {
+                  "content-type": "application/json",
+                  cookie: authenticatedSession.cookie,
+                },
+                body: JSON.stringify({
+                  bindings: [
+                    {
+                      connectionId,
+                      kind: "agent",
+                      config: {
+                        runtime: "codex-cli",
+                        defaultModel: "gpt-5.3-codex",
+                        reasoningEffort: "medium",
+                      },
+                    },
+                  ],
+                }),
+              },
+            });
+          },
+        });
+        await expectStatusJson({
+          response: putBindingsResponse,
+          status: 200,
+          description: "sandbox profile integration binding update",
+        });
+
+        const startInstanceResponse = await runStep({
+          stepTrace,
+          stepName: "start sandbox instance",
+          action: async () => {
+            return await requestWithTimeout({
+              request: fixture.request,
+              path: `/v1/sandbox/profiles/${encodeURIComponent(profileId)}/versions/1/instances`,
+              timeoutMs: START_INSTANCE_TIMEOUT_MS,
+              description: "sandbox profile start instance",
+              init: {
+                method: "POST",
+                headers: {
+                  cookie: authenticatedSession.cookie,
+                },
+              },
+            });
+          },
+        });
+        const startInstancePayload = await expectStatusJson({
+          response: startInstanceResponse,
+          status: 201,
+          description: "sandbox profile start instance",
+        });
+        const parsedStartInstancePayload =
+          StartSandboxInstanceResponseSchema.safeParse(startInstancePayload);
+        if (!parsedStartInstancePayload.success) {
+          throw new Error("Expected sandbox instance start response to match the API schema.");
+        }
+        const sandboxInstanceId = parsedStartInstancePayload.data.sandboxInstanceId;
+
+        await runStep({
+          stepTrace,
+          stepName: "wait for sandbox instance to reach running",
+          action: async () => {
+            await waitForSandboxInstanceRunning({
+              request: fixture.request,
+              cookie: authenticatedSession.cookie,
+              sandboxInstanceId,
+              timeoutMs: START_INSTANCE_TIMEOUT_MS,
+            });
+          },
+        });
+
+        const agentWebsocketUrl = await runStep({
+          stepTrace,
+          stepName: "mint websocket url for agent session",
+          action: async () => {
+            return await mintSandboxWebSocketUrl({
+              request: fixture.request,
+              cookie: authenticatedSession.cookie,
+              sandboxInstanceId,
+              dataPlaneGatewayBaseUrl,
+            });
+          },
+        });
+
+        const websocket = await runStep({
+          stepTrace,
+          stepName: "connect websocket tunnel",
+          action: async () => {
+            return await connectWebSocket(agentWebsocketUrl, WEBSOCKET_CONNECT_TIMEOUT_MS);
+          },
+        });
+        websocketForCleanup = websocket;
+        detachWebSocketTrace = attachWebSocketTrace({
+          socket: websocket,
+          sink: websocketTraceEntries,
+        });
+
+        const handshakeStreamId = 1;
+        await runStep({
+          stepTrace,
+          stepName: "connect and initialize Codex app-server",
+          action: async () => {
+            sendJson(websocket, {
+              type: "stream.open",
+              streamId: handshakeStreamId,
+              channel: {
+                kind: "agent",
+              },
+            });
+            await waitForTunnelHandshakeAck({
+              socket: websocket,
+              streamId: handshakeStreamId,
+              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+            });
+
+            sendAgentJson(websocket, handshakeStreamId, {
+              method: "initialize",
+              id: 0,
+              params: {
+                clientInfo: {
+                  name: "mistle_system_test",
+                  title: "Mistle System Test",
+                  version: "0.1.0",
+                },
+              },
+            });
+            await waitForJsonRpcResult({
+              socket: websocket,
+              requestId: 0,
+              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+            });
+
+            sendAgentJson(websocket, handshakeStreamId, {
+              method: "initialized",
+              params: {},
+            });
+          },
+        });
+
+        const threadId = await runStep({
+          stepTrace,
+          stepName: "json-rpc thread/start",
+          action: async () => {
+            sendAgentJson(websocket, handshakeStreamId, {
+              method: "thread/start",
+              id: 1,
+              params: {
+                model: "gpt-5.3-codex",
+              },
+            });
+            const threadStartResult = await waitForJsonRpcResult({
+              socket: websocket,
+              requestId: 1,
+              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+            });
+            const parsedThreadStartResult = ThreadStartResultSchema.safeParse(threadStartResult);
+            if (!parsedThreadStartResult.success) {
+              throw new Error(
+                `thread/start result did not contain thread.id: ${formatJsonForError(threadStartResult)}`,
+              );
+            }
+
+            return parsedThreadStartResult.data.thread.id;
+          },
+        });
+
+        const uploadedImage = await runStep({
+          stepTrace,
+          stepName: "upload image over fileUpload tunnel",
+          action: async () => {
+            const uploadWebsocketUrl = await mintSandboxWebSocketUrl({
+              request: fixture.request,
+              cookie: authenticatedSession.cookie,
+              sandboxInstanceId,
+              dataPlaneGatewayBaseUrl,
+            });
+
+            return await uploadImageOverTunnel({
+              websocketUrl: uploadWebsocketUrl,
+              threadId,
+              imageBytes: new Uint8Array(TinyPngBytes),
+            });
+          },
+        });
+
+        const notificationsWhileStartingTurn: JsonRpcNotification[] = [];
+        const turnId = await runStep({
+          stepTrace,
+          stepName: "json-rpc turn/start with localImage input",
+          action: async () => {
+            sendAgentJson(websocket, handshakeStreamId, {
+              method: "turn/start",
+              id: 2,
+              params: {
+                threadId,
+                input: [
+                  {
+                    type: "text",
+                    text: "Reply with exactly IMAGE_INPUT_OK and nothing else.",
+                  },
+                  {
+                    type: "localImage",
+                    path: uploadedImage.path,
+                  },
+                ],
+              },
+            });
+            const turnStartResult = await waitForJsonRpcResult({
+              socket: websocket,
+              requestId: 2,
+              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+              notificationSink: notificationsWhileStartingTurn,
+            });
+            const parsedTurnStartResult = TurnStartResultSchema.safeParse(turnStartResult);
+            if (!parsedTurnStartResult.success) {
+              throw new Error(
+                `turn/start result did not contain turn.id: ${formatJsonForError(turnStartResult)}`,
+              );
+            }
+
+            return parsedTurnStartResult.data.turn.id;
+          },
+        });
+
+        let preBufferedTurnCompletion: TurnCompletion | null = null;
+        for (const notification of notificationsWhileStartingTurn) {
+          const completion = parseTurnCompletedNotification(notification);
+          if (completion !== null && completion.turnId === turnId) {
+            preBufferedTurnCompletion = completion;
+          }
+        }
+
+        const turnCompletion = await runStep({
+          stepTrace,
+          stepName: "wait for turn/completed",
+          action: async () => {
+            return (
+              preBufferedTurnCompletion ??
+              (await waitForTurnCompletion({
+                socket: websocket,
+                turnId,
+                timeoutMs: TURN_COMPLETION_TIMEOUT_MS,
+                agentTextSink: [],
+                commandExecutionSink: [],
+              }))
+            );
+          },
+        });
+        expect(turnCompletion.status).toBe("completed");
+        expect(turnCompletion.errorMessage).toBeNull();
+
+        const threadReadResult = await runStep({
+          stepTrace,
+          stepName: "json-rpc thread/read",
+          action: async () => {
+            sendAgentJson(websocket, handshakeStreamId, {
+              method: "thread/read",
+              id: 3,
+              params: {
+                threadId,
+                includeTurns: true,
+              },
+            });
+            return await waitForJsonRpcResult({
+              socket: websocket,
+              requestId: 3,
+              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+            });
+          },
+        });
+
+        expect(readLocalImagePathsForTurn({ threadReadResult, turnId })).toContain(
+          uploadedImage.path,
+        );
       } catch (error) {
         let diagnostics = `Websocket trace (tail):\n${formatWebSocketTrace(websocketTraceEntries)}`;
         const sandboxListDiagnostics = await collectSandboxContainerListDiagnostics();

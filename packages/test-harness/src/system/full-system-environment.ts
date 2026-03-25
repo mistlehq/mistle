@@ -17,6 +17,11 @@ import { runCleanupTasks } from "../cleanup/index.js";
 import { startDockerNetwork } from "../network/start-docker-network.js";
 import { type StartPostgresWithPgBouncerInput } from "../services/postgres/index.js";
 import { acquireSharedPostgresMailpitInfra } from "../services/shared-postgres-mailpit.js";
+import { startValkey, type ValkeyService } from "../services/valkey/index.js";
+import {
+  createControlPlaneIntegrationTargetsSyncCommandInput,
+  resolveHostPathFromContainerPath,
+} from "./provision-system-integration-targets.js";
 
 const OMITTED_POSTGRES_OPTIONS = [
   "network",
@@ -104,6 +109,9 @@ export type StartedFullSystemEnvironment = {
     httpBaseUrl: string;
     smtpPort: number;
   };
+  valkey: {
+    url: string;
+  };
   containerHostGateway: string;
   sandboxNetworkName: string;
   stop: () => Promise<void>;
@@ -136,10 +144,16 @@ function readErrorString(error: unknown, key: "stdout" | "stderr"): string {
   return "";
 }
 
-async function runCommand(input: { command: string; args: string[]; cwd: string }): Promise<void> {
+async function runCommand(input: {
+  command: string;
+  args: string[];
+  cwd: string;
+  env?: Record<string, string>;
+}): Promise<void> {
   try {
     await execFileAsync(input.command, input.args, {
       cwd: input.cwd,
+      env: input.env === undefined ? process.env : { ...process.env, ...input.env },
     });
   } catch (error) {
     const stderr = readErrorString(error, "stderr");
@@ -256,6 +270,7 @@ export async function startFullSystemEnvironment(
   const cleanupTasks: Array<() => Promise<void>> = [];
   let stopped = false;
   let network: StartedNetwork | undefined;
+  let valkeyService: ValkeyService | undefined;
 
   try {
     const sharedInfraLease = await acquireSharedPostgresMailpitInfra({
@@ -279,6 +294,14 @@ export async function startFullSystemEnvironment(
           networkName: network.getName(),
         });
       }
+    });
+
+    valkeyService = await startValkey({
+      manageProcessCleanup: false,
+      network,
+    });
+    cleanupTasks.unshift(async () => {
+      await valkeyService?.stop();
     });
 
     const registryContainer = await new GenericContainer(REGISTRY_IMAGE_REFERENCE)
@@ -335,6 +358,8 @@ export async function startFullSystemEnvironment(
         MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
         MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
         MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
+        MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL:
+          DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
       },
     });
     cleanupTasks.unshift(async () => {
@@ -354,6 +379,8 @@ export async function startFullSystemEnvironment(
       environment: {
         ...input.dataPlaneGatewayEnvironment,
         MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL: containerDatabaseUrl,
+        MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "valkey",
+        MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL: "redis://valkey:6379",
       },
     });
     cleanupTasks.unshift(async () => {
@@ -386,6 +413,13 @@ export async function startFullSystemEnvironment(
     cleanupTasks.unshift(async () => {
       await controlPlaneApi.stop();
     });
+    await runCommand(
+      createControlPlaneIntegrationTargetsSyncCommandInput({
+        buildContextHostPath: input.buildContextHostPath,
+        configPathInContainer: input.configPathInContainer,
+        hostDatabaseUrl,
+      }),
+    );
 
     const controlPlaneWorker = await startControlPlaneWorker({
       buildContextHostPath: input.buildContextHostPath,
@@ -450,6 +484,8 @@ export async function startFullSystemEnvironment(
         MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
         MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
         MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
+        MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL:
+          DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY: sandboxSnapshotRepository,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: network.getName(),
@@ -486,6 +522,9 @@ export async function startFullSystemEnvironment(
         httpBaseUrl: sharedInfraLease.infra.mailpit.httpBaseUrl,
         smtpPort: sharedInfraLease.infra.mailpit.smtpPort,
       },
+      valkey: {
+        url: valkeyService.url,
+      },
       containerHostGateway: sharedInfraLease.infra.containerHostGateway,
       sandboxNetworkName: network.getName(),
       stop: async () => {
@@ -508,6 +547,8 @@ export async function startFullSystemEnvironment(
     throw error;
   }
 }
+
+export { createControlPlaneIntegrationTargetsSyncCommandInput, resolveHostPathFromContainerPath };
 
 export const FullSystemContainerBaseUrls = {
   CONTROL_PLANE_API: CONTROL_PLANE_API_CONTAINER_BASE_URL,
