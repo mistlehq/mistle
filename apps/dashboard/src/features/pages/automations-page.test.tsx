@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import {
   WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY,
   WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY,
@@ -19,19 +20,7 @@ import type {
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { AutomationsPage } from "./automations-page.js";
 
-function createQueryClient(): QueryClient {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        refetchOnMount: false,
-        staleTime: Number.POSITIVE_INFINITY,
-      },
-    },
-  });
-}
-
-function seedAutomationPrerequisites(queryClient: QueryClient): void {
+function seedAutomationPrerequisites(queryClient: ReturnType<typeof createTestQueryClient>): void {
   const connections: readonly IntegrationConnection[] = [
     {
       id: "icn_123",
@@ -76,7 +65,10 @@ function seedAutomationPrerequisites(queryClient: QueryClient): void {
 
 describe("AutomationsPage", () => {
   it("does not render pagination while the initial automation query has no data", () => {
-    const queryClient = createQueryClient();
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
 
     const markup = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
@@ -91,7 +83,10 @@ describe("AutomationsPage", () => {
   });
 
   it("uses the sandbox profiles page header layout and shared table styling", () => {
-    const queryClient = createQueryClient();
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
     const listResult: WebhookAutomationsListResult = {
       items: [
         {
@@ -145,7 +140,10 @@ describe("AutomationsPage", () => {
   });
 
   it("renders the result summary even when there is only one page", () => {
-    const queryClient = createQueryClient();
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
     const listResult: WebhookAutomationsListResult = {
       items: [
         {
@@ -196,7 +194,10 @@ describe("AutomationsPage", () => {
   });
 
   it("does not render the result summary while prerequisites are still loading", () => {
-    const queryClient = createQueryClient();
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
     const listResult: WebhookAutomationsListResult = {
       items: [
         {
@@ -250,7 +251,10 @@ describe("AutomationsPage", () => {
   });
 
   it("does not render the result summary when prerequisites fail", () => {
-    const queryClient = createQueryClient();
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
     const listResult: WebhookAutomationsListResult = {
       items: [
         {
@@ -319,7 +323,10 @@ describe("AutomationsPage", () => {
   });
 
   it("does not render the result summary when the automation query is in error", () => {
-    const queryClient = createQueryClient();
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
     const listResult: WebhookAutomationsListResult = {
       items: [
         {
@@ -390,7 +397,10 @@ describe("AutomationsPage", () => {
   });
 
   it("updates the result summary when the list is filtered client-side", () => {
-    const queryClient = createQueryClient();
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
     const listResult: WebhookAutomationsListResult = {
       items: [
         {

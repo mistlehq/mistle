@@ -2,13 +2,14 @@
 
 import { createServer } from "node:http";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { type ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { IntegrationConnectionMethodIds } from "../src/features/integrations/integration-connection-dialog.js";
 import { useIntegrationConnectionDialogState } from "../src/features/pages/use-integration-connection-dialog-state.js";
+import { createTestQueryClient } from "../src/test-support/query-client.js";
 
 type CapturedRequest = {
   method: string;
@@ -82,13 +83,7 @@ describe("useIntegrationConnectionDialogState update API key behavior", () => {
         VITE_CONTROL_PLANE_API_ORIGIN: `http://127.0.0.1:${address.port}`,
       });
 
-      const queryClient = new QueryClient({
-        defaultOptions: {
-          queries: {
-            retry: false,
-          },
-        },
-      });
+      const queryClient = createTestQueryClient();
       const wrapper = ({ children }: { children: ReactNode }) => (
         <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
       );

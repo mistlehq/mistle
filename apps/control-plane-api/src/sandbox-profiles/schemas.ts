@@ -28,6 +28,12 @@ export const sandboxProfileSchema = createSelectSchema(sandboxProfiles, {
   updatedAt: z.string().min(1),
 }).strict();
 
+export const launchableSandboxProfileSchema = sandboxProfileSchema
+  .extend({
+    latestVersion: z.number().int().min(1),
+  })
+  .strict();
+
 export const sandboxProfileVersionIntegrationBindingSchema = createSelectSchema(
   sandboxProfileVersionIntegrationBindings,
   {
@@ -143,3 +149,9 @@ export const listSandboxProfilesResponseSchema = createKeysetPaginationEnvelopeS
     maxLimit: 100,
   },
 );
+
+export const listLaunchableSandboxProfilesResponseSchema = z
+  .object({
+    items: z.array(launchableSandboxProfileSchema),
+  })
+  .strict();

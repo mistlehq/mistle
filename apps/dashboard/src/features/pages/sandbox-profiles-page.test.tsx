@@ -1,30 +1,22 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxProfilesListQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { SandboxProfilesListResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { SandboxProfilesPage } from "./sandbox-profiles-page.js";
 
-function createQueryClient(): QueryClient {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        refetchOnMount: false,
-        staleTime: Number.POSITIVE_INFINITY,
-      },
-    },
-  });
-}
-
 describe("SandboxProfilesPage", () => {
   it("opens and closes the create profile dialog", () => {
-    const queryClient = createQueryClient();
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
     const listResult: SandboxProfilesListResult = {
       items: [
         {
@@ -71,7 +63,10 @@ describe("SandboxProfilesPage", () => {
   });
 
   it("uses the shared dashboard table styling for the profiles list", () => {
-    const queryClient = createQueryClient();
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
     const listResult: SandboxProfilesListResult = {
       items: [
         {
@@ -111,7 +106,10 @@ describe("SandboxProfilesPage", () => {
   });
 
   it("renders the result summary even when there is only one page", () => {
-    const queryClient = createQueryClient();
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
     const listResult: SandboxProfilesListResult = {
       items: [
         {
