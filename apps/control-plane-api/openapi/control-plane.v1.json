@@ -80,7 +80,11 @@
                             "properties": {
                               "code": {
                                 "type": "string",
-                                "enum": ["MISSING_TARGET_METADATA"]
+                                "enum": [
+                                  "MISSING_TARGET_METADATA",
+                                  "MISSING_INTEGRATION_CONNECTION",
+                                  "MISSING_SANDBOX_PROFILE"
+                                ]
                               },
                               "message": {
                                 "type": "string",

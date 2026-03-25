@@ -59,7 +59,7 @@ export type AutomationWebhookListItem = {
   enabled: boolean;
   targetName: string;
   issue?: {
-    code: "MISSING_TARGET_METADATA";
+    code: "MISSING_TARGET_METADATA" | "MISSING_INTEGRATION_CONNECTION" | "MISSING_SANDBOX_PROFILE";
     message: string;
   };
   events: {
@@ -154,14 +154,73 @@ type AutomationListPageRow = {
   updatedAt: string;
   eventTypes: string[] | null;
   integrationConnectionId: string;
-  sandboxProfileDisplayName: string;
-  integrationTargetFamilyId: string;
-  integrationTargetVariantId: string;
+  resolvedIntegrationConnectionId: string | null;
+  sandboxProfileId: string;
+  sandboxProfileDisplayName: string | null;
+  integrationTargetFamilyId: string | null;
+  integrationTargetVariantId: string | null;
   integrationTargetDisplayNameOverride: string | null;
   integrationTargetDescriptionOverride: string | null;
 };
 
 function createAutomationListPageItem(row: AutomationListPageRow): AutomationWebhookListPageItem {
+  if (row.sandboxProfileDisplayName === null) {
+    return {
+      id: row.automationId,
+      name: row.automationName,
+      enabled: row.enabled,
+      createdAt: row.createdAt,
+      targetName: row.sandboxProfileId,
+      issue: {
+        code: "MISSING_SANDBOX_PROFILE",
+        message:
+          "This automation references a sandbox profile that is no longer available. The target name may be incomplete.",
+      },
+      events: resolveUnavailableAutomationListEvents({
+        eventTypes: row.eventTypes,
+      }),
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  if (row.resolvedIntegrationConnectionId === null) {
+    return {
+      id: row.automationId,
+      name: row.automationName,
+      enabled: row.enabled,
+      createdAt: row.createdAt,
+      targetName: row.sandboxProfileDisplayName,
+      issue: {
+        code: "MISSING_INTEGRATION_CONNECTION",
+        message:
+          "This automation references an integration connection that is no longer available. Event metadata may be incomplete.",
+      },
+      events: resolveUnavailableAutomationListEvents({
+        eventTypes: row.eventTypes,
+      }),
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  if (row.integrationTargetFamilyId === null || row.integrationTargetVariantId === null) {
+    return {
+      id: row.automationId,
+      name: row.automationName,
+      enabled: row.enabled,
+      createdAt: row.createdAt,
+      targetName: row.sandboxProfileDisplayName,
+      issue: {
+        code: "MISSING_TARGET_METADATA",
+        message:
+          "This automation references an integration target definition that is no longer available. Event metadata may be incomplete.",
+      },
+      events: resolveUnavailableAutomationListEvents({
+        eventTypes: row.eventTypes,
+      }),
+      updatedAt: row.updatedAt,
+    };
+  }
+
   try {
     const targetMetadata = resolveTargetMetadataFromPersistedTarget({
       familyId: row.integrationTargetFamilyId,
@@ -231,7 +290,8 @@ async function loadAutomationListPageRows(input: {
       updatedAt: automations.updatedAt,
       eventTypes: webhookAutomations.eventTypes,
       integrationConnectionId: webhookAutomations.integrationConnectionId,
-      integrationTargetKey: integrationConnections.targetKey,
+      resolvedIntegrationConnectionId: integrationConnections.id,
+      sandboxProfileId: automationTargets.sandboxProfileId,
       sandboxProfileDisplayName: sandboxProfiles.displayName,
       integrationTargetFamilyId: integrationTargets.familyId,
       integrationTargetVariantId: integrationTargets.variantId,
@@ -240,16 +300,16 @@ async function loadAutomationListPageRows(input: {
     })
     .from(automations)
     .innerJoin(webhookAutomations, eq(webhookAutomations.automationId, automations.id))
-    .innerJoin(
+    .leftJoin(
       integrationConnections,
       eq(integrationConnections.id, webhookAutomations.integrationConnectionId),
     )
-    .innerJoin(
+    .leftJoin(
       integrationTargets,
       eq(integrationTargets.targetKey, integrationConnections.targetKey),
     )
     .innerJoin(automationTargets, eq(automationTargets.automationId, automations.id))
-    .innerJoin(sandboxProfiles, eq(sandboxProfiles.id, automationTargets.sandboxProfileId))
+    .leftJoin(sandboxProfiles, eq(sandboxProfiles.id, automationTargets.sandboxProfileId))
     .where(
       and(
         eq(automations.organizationId, input.organizationId),

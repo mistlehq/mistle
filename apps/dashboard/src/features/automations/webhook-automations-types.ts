@@ -34,7 +34,11 @@ export const WebhookAutomationListEventSchema = z
 
 export const WebhookAutomationListIssueSchema = z
   .object({
-    code: z.literal("MISSING_TARGET_METADATA"),
+    code: z.enum([
+      "MISSING_TARGET_METADATA",
+      "MISSING_INTEGRATION_CONNECTION",
+      "MISSING_SANDBOX_PROFILE",
+    ]),
     message: z.string().min(1),
   })
   .strict();

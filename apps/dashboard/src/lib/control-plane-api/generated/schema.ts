@@ -41,7 +41,10 @@ export interface paths {
                 id: string;
                 issue?: {
                   /** @enum {string} */
-                  code: "MISSING_TARGET_METADATA";
+                  code:
+                    | "MISSING_TARGET_METADATA"
+                    | "MISSING_INTEGRATION_CONNECTION"
+                    | "MISSING_SANDBOX_PROFILE";
                   message: string;
                 };
                 name: string;
