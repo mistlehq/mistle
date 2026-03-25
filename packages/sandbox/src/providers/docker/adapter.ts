@@ -3,6 +3,7 @@ import {
   SandboxProviderNotImplementedError,
   SandboxResourceNotFoundError,
 } from "../../errors.js";
+import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
 import {
   SandboxProvider,
   type SandboxAdapter,
@@ -29,7 +30,7 @@ export class DockerSandboxAdapter implements SandboxAdapter {
 
     const response = await this.#client.startSandbox({
       imageRef: request.image.imageId,
-      ...(request.env === undefined ? {} : { env: request.env }),
+      env: withRequiredSandboxRuntimeEnv(request.env),
     });
     const id = response.runtimeId;
 

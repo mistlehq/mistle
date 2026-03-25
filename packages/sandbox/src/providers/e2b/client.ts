@@ -1,5 +1,6 @@
 import { CommandExitError, Sandbox, type ConnectionOpts } from "e2b";
 
+import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
 import {
   E2BClientError,
   E2BClientErrorCodes,
@@ -22,6 +23,11 @@ import {
 import { E2BApiTemplateRegistry, type E2BTemplateRegistry } from "./template-registry.js";
 
 const ApplyStartupCommand = "/usr/local/bin/sandboxd apply-startup";
+const StartSupervisorCommand = "/usr/bin/tini -s -- /usr/local/bin/sandboxd serve";
+const SupervisorSocketPath = "/run/mistle/startup-config.sock";
+const SupervisorTokenPath = "/run/mistle/startup-config.token";
+const SupervisorReadinessPollIntervalMs = 100;
+const SupervisorReadinessPollAttempts = 100;
 
 export type E2BStartSandboxResponse = {
   sandboxId: string;
@@ -61,18 +67,39 @@ function formatCommandOutput(input: { stdout: string; stderr: string }): string 
 function createCommandExitError(input: {
   operation: (typeof E2BClientOperationIds)[keyof typeof E2BClientOperationIds];
   error: CommandExitError;
+  commandDescription?: string;
 }): E2BClientError {
   return new E2BClientError({
     code: E2BClientErrorCodes.COMMAND_EXIT,
     operation: input.operation,
     retryable: false,
-    message: `E2B operation \`${input.operation}\` failed: E2B startup apply command exited with code ${String(input.error.exitCode)}.${formatCommandOutput(
+    message: `E2B operation \`${input.operation}\` failed: ${input.commandDescription ?? "E2B command"} exited with code ${String(input.error.exitCode)}.${formatCommandOutput(
       {
         stdout: input.error.stdout,
         stderr: input.error.stderr,
       },
     )}`,
     cause: input.error,
+  });
+}
+
+function createUnknownClientError(input: {
+  operation: (typeof E2BClientOperationIds)[keyof typeof E2BClientOperationIds];
+  message: string;
+  cause: unknown;
+}): E2BClientError {
+  return new E2BClientError({
+    code: E2BClientErrorCodes.UNKNOWN,
+    operation: input.operation,
+    retryable: false,
+    message: `E2B operation \`${input.operation}\` failed: ${input.message}`,
+    cause: input.cause,
+  });
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
   });
 }
 
@@ -96,7 +123,7 @@ export class E2BApiClient implements E2BClient {
         lifecycle: {
           onTimeout: "pause",
         },
-        ...(parsedRequest.env === undefined ? {} : { envs: { ...parsedRequest.env } }),
+        envs: withRequiredSandboxRuntimeEnv(parsedRequest.env),
       });
 
       return {
@@ -147,6 +174,7 @@ export class E2BApiClient implements E2BClient {
 
     try {
       const sandbox = await Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions);
+      await this.#ensureSupervisorReady(sandbox);
       const handle = await sandbox.commands.run(ApplyStartupCommand, {
         background: true,
         stdin: true,
@@ -161,10 +189,93 @@ export class E2BApiClient implements E2BClient {
         throw createCommandExitError({
           operation: E2BClientOperationIds.APPLY_STARTUP,
           error,
+          commandDescription: "E2B startup apply command",
         });
       }
 
       throw mapE2BClientError(E2BClientOperationIds.APPLY_STARTUP, error);
     }
+  }
+
+  async #ensureSupervisorReady(sandbox: Sandbox): Promise<void> {
+    if (await this.#isSupervisorReady(sandbox)) {
+      return;
+    }
+
+    try {
+      const handle = await sandbox.commands.run(StartSupervisorCommand, {
+        background: true,
+        user: "root",
+      });
+      const exitPromise = handle
+        .wait()
+        .then(() => {
+          throw createUnknownClientError({
+            operation: E2BClientOperationIds.ENSURE_SUPERVISOR_READY,
+            message: "sandbox supervisor exited before becoming ready",
+            cause: new Error("sandbox supervisor exited before becoming ready"),
+          });
+        })
+        .catch((error: unknown) => {
+          if (error instanceof CommandExitError) {
+            throw createCommandExitError({
+              operation: E2BClientOperationIds.ENSURE_SUPERVISOR_READY,
+              error,
+              commandDescription: "E2B sandbox supervisor command",
+            });
+          }
+
+          throw mapE2BClientError(E2BClientOperationIds.ENSURE_SUPERVISOR_READY, error);
+        });
+      void exitPromise.catch(() => undefined);
+
+      try {
+        for (let attempt = 0; attempt < SupervisorReadinessPollAttempts; attempt += 1) {
+          const readinessResult = await Promise.race([
+            this.#checkSupervisorReady(sandbox),
+            exitPromise,
+          ]);
+
+          if (readinessResult) {
+            return;
+          }
+
+          await sleep(SupervisorReadinessPollIntervalMs);
+        }
+      } finally {
+        await handle.disconnect().catch(() => undefined);
+      }
+    } catch (error) {
+      if (error instanceof E2BClientError) {
+        throw error;
+      }
+
+      throw mapE2BClientError(E2BClientOperationIds.ENSURE_SUPERVISOR_READY, error);
+    }
+
+    throw createUnknownClientError({
+      operation: E2BClientOperationIds.ENSURE_SUPERVISOR_READY,
+      message: `sandbox supervisor did not become ready within ${String(SupervisorReadinessPollIntervalMs * SupervisorReadinessPollAttempts)}ms`,
+      cause: new Error("sandbox supervisor readiness timed out"),
+    });
+  }
+
+  async #isSupervisorReady(sandbox: Sandbox): Promise<boolean> {
+    try {
+      return await this.#checkSupervisorReady(sandbox);
+    } catch (error) {
+      throw mapE2BClientError(E2BClientOperationIds.ENSURE_SUPERVISOR_READY, error);
+    }
+  }
+
+  async #checkSupervisorReady(sandbox: Sandbox): Promise<boolean> {
+    const result = await sandbox.commands.run(
+      `if test -S '${SupervisorSocketPath}' && test -f '${SupervisorTokenPath}'; then printf ready; else printf not-ready; fi`,
+      {
+        user: "root",
+      },
+    );
+
+    return result.stdout.trim() === "ready";
   }
 }

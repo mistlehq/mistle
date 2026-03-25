@@ -52,8 +52,7 @@ pnpm build:sandbox-runtime:sea:linux
 The base image:
 
 - packages the SEA binaries from `apps/sandbox-runtime/dist-sea`
-- starts `/usr/local/bin/sandboxd serve` under `tini`
-- accepts one startup payload through `/usr/local/bin/sandboxd apply-startup`
+- contains `/usr/local/bin/sandboxd serve` and `/usr/local/bin/sandboxd apply-startup`
 - launches `/usr/local/bin/sandbox-bootstrap runtime-internal` only after startup is applied
 - trusts a per-sandbox proxy CA before dropping privileges
 - execs `/usr/local/bin/sandboxd runtime-internal` as the `sandbox` user
@@ -62,13 +61,13 @@ The base image:
 
 ## Runtime Contract
 
-- Supervisor entrypoint: `/usr/local/bin/sandboxd serve`
+- Supervisor command: `/usr/local/bin/sandboxd serve`
 - Startup apply command: `/usr/local/bin/sandboxd apply-startup`
 - Internal bootstrap command: `/usr/local/bin/sandbox-bootstrap runtime-internal`
 - Runtime executable: `/usr/local/bin/sandboxd runtime-internal`
-- Default listen address: `SANDBOX_RUNTIME_LISTEN_ADDR=:8090`
+- Providers must supply `SANDBOX_RUNTIME_LISTEN_ADDR`, currently `:8090`
 - Control directory env: `SANDBOX_RUNTIME_CONTROL_DIR` defaults to `/run/mistle`
-- Sandbox user env: `SANDBOX_USER` is reserved and must remain `sandbox`
+- Providers must supply `SANDBOX_USER=sandbox`
 - Tokenizer proxy egress base URL env: `SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL`
 - Proxy CA install path: `/usr/local/share/ca-certificates/mistle-proxy-ca.crt`
 - Proxy CA signer FDs are passed through:
@@ -83,3 +82,4 @@ The base image:
 - `GET /__healthz` returns 200 only after startup is ready
 - User-owned state lives under `/home/sandbox`
 - Runtime-owned mutable state lives under `/var/lib/mistle`
+- The base image does not set the runtime env contract itself; providers inject the required runtime env at sandbox start time

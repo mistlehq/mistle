@@ -26,13 +26,13 @@ const adapter = createSandboxAdapter({
 
 ## Provider Behavior
 
-- `start({ image, env })` uses `image.imageId` as the canonical OCI image reference.
+- `start({ image, env })` uses `image.imageId` as the canonical OCI image reference and injects the shared required runtime env.
 - The provider resolves that image through `template-registry.ts`, which derives a deterministic template alias from the OCI image reference and builds it on demand when needed.
 - As long as the base image reference does not change, the provider will target the same E2B template alias.
 - `resume({ id })` reconnects to the same E2B sandbox id.
 - `stop({ id })` pauses the sandbox.
 - `destroy({ id })` kills the sandbox permanently.
-- `createSandboxRuntimeControl(...).applyStartup({ id, payload })` runs `sandboxd apply-startup` as `root` through the E2B commands API.
+- `createSandboxRuntimeControl(...).applyStartup({ id, payload })` first ensures `sandboxd serve` is running as `root`, then runs `sandboxd apply-startup` through the E2B commands API.
 
 ## Error Surface
 

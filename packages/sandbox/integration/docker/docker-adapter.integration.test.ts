@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type Docker from "dockerode";
 import { describe, expect } from "vitest";
 
-import { SandboxProvider } from "../../src/index.js";
+import { SandboxProvider, SandboxRuntimeEnv, SandboxRuntimeEnvDefaults } from "../../src/index.js";
 import { dockerAdapterIntegrationEnabled, it } from "./test-context.js";
 
 const describeDockerAdapterIntegration = dockerAdapterIntegrationEnabled ? describe : describe.skip;
@@ -14,6 +14,10 @@ type ContainerCommandResult = {
   exitCode: number;
   output: string;
 };
+
+function normalizeOutput(output: string): string {
+  return output.replaceAll("\r\n", "\n").trimEnd();
+}
 
 function chunkToUtf8String(chunk: unknown): string {
   if (typeof chunk === "string") {
@@ -158,11 +162,21 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       const result = await runContainerCommand({
         dockerClient: fixture.dockerClient,
         id: sandbox.id,
-        command: ["sh", "-lc", `printenv ${INJECTED_ENV_KEY}`],
+        command: [
+          "sh",
+          "-lc",
+          `printenv ${INJECTED_ENV_KEY} && printenv ${SandboxRuntimeEnv.LISTEN_ADDR} && printenv ${SandboxRuntimeEnv.USER}`,
+        ],
       });
 
       expect(result.exitCode).toBe(0);
-      expect(result.output.trimEnd()).toBe(injectedEnvValue);
+      expect(normalizeOutput(result.output)).toBe(
+        [
+          injectedEnvValue,
+          SandboxRuntimeEnvDefaults.LISTEN_ADDR,
+          SandboxRuntimeEnvDefaults.USER,
+        ].join("\n"),
+      );
     } finally {
       if (id !== undefined) {
         await fixture.adapter.destroy({ id });
