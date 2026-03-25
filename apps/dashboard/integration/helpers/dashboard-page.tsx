@@ -6,6 +6,7 @@ import { cleanup, render, type RenderResult } from "@testing-library/react";
 import { resetDashboardConfigForTest } from "../../src/config.js";
 import { resetControlPlaneApiClientForTest } from "../../src/lib/control-plane-api/client.js";
 import { seedAuthenticatedSession } from "../../src/test-support/auth-session.js";
+import { createTestQueryClient } from "../../src/test-support/query-client.js";
 
 export type DashboardRequestHandler = (
   request: IncomingMessage,
@@ -51,13 +52,7 @@ async function startDashboardServer(input: {
 }
 
 function createDashboardQueryClient(): QueryClient {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
+  return createTestQueryClient();
 }
 
 export async function renderDashboardPageIntegration(input: {

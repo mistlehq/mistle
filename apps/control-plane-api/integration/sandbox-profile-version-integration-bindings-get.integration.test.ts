@@ -2,7 +2,6 @@ import {
   integrationConnections,
   integrationTargets,
   IntegrationBindingKinds,
-  SandboxProfileStatuses,
   sandboxProfiles,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
@@ -13,6 +12,12 @@ import {
   PutSandboxProfileVersionIntegrationBindingsResponseSchema,
   SandboxProfileVersionNotFoundResponseSchema,
 } from "../src/sandbox-profiles/index.js";
+import {
+  createIntegrationTargetFixture,
+  createSandboxProfileFixture,
+  createSandboxProfileVersionFixture,
+  createSandboxProfileVersionIntegrationBindingFixture,
+} from "./helpers/sandbox-profiles.js";
 import { it } from "./test-context.js";
 
 describe("sandbox profile version integration bindings get integration", () => {
@@ -21,15 +26,13 @@ describe("sandbox profile version integration bindings get integration", () => {
       email: "integration-sandbox-profile-version-bindings-get@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default-bindings-get",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com",
-      },
-    });
+    await fixture.db.insert(integrationTargets).values(
+      createIntegrationTargetFixture({
+        targetKey: "openai-default-bindings-get",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
     const [connection] = await fixture.db
       .insert(integrationConnections)
       .values({
@@ -45,21 +48,27 @@ describe("sandbox profile version integration bindings get integration", () => {
     }
 
     await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_bindings_get_001",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Bindings Get Profile",
-      status: SandboxProfileStatuses.ACTIVE,
+      ...createSandboxProfileFixture({
+        id: "sbp_bindings_get_001",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Bindings Get Profile",
+        createdAt: "2026-03-01T00:00:00.000Z",
+      }),
     });
     await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_bindings_get_001",
-      version: 1,
+      ...createSandboxProfileVersionFixture({
+        sandboxProfileId: "sbp_bindings_get_001",
+        version: 1,
+      }),
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-      id: "ibd_bindings_get_001",
-      sandboxProfileId: "sbp_bindings_get_001",
-      sandboxProfileVersion: 1,
-      connectionId: connection.id,
-      kind: IntegrationBindingKinds.AGENT,
+      ...createSandboxProfileVersionIntegrationBindingFixture({
+        id: "ibd_bindings_get_001",
+        sandboxProfileId: "sbp_bindings_get_001",
+        sandboxProfileVersion: 1,
+        connectionId: connection.id,
+        kind: IntegrationBindingKinds.AGENT,
+      }),
       config: {
         runtime: "codex-cli",
         defaultModel: "gpt-5.3-codex",
@@ -99,10 +108,12 @@ describe("sandbox profile version integration bindings get integration", () => {
     });
 
     await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_bindings_get_missing_version_001",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Bindings Missing Version Profile",
-      status: SandboxProfileStatuses.ACTIVE,
+      ...createSandboxProfileFixture({
+        id: "sbp_bindings_get_missing_version_001",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Bindings Missing Version Profile",
+        createdAt: "2026-03-01T00:00:00.000Z",
+      }),
     });
 
     const response = await fixture.request(

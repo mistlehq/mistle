@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import {
   buildOptimisticSessions,
@@ -58,13 +59,7 @@ describe("SessionsPage", () => {
   });
 
   it("renders sandbox launcher controls", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient();
     seedAuthenticatedSession(queryClient);
 
     const rendered = render(
@@ -89,13 +84,7 @@ describe("SessionsPage", () => {
   });
 
   it("uses the shared dashboard table styling for the session list", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient();
     seedAuthenticatedSession(queryClient);
 
     const markup = renderToStaticMarkup(
@@ -113,14 +102,9 @@ describe("SessionsPage", () => {
   });
 
   it("renders the result summary even when there is only one page", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          refetchOnMount: false,
-          staleTime: Number.POSITIVE_INFINITY,
-        },
-      },
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
     });
     seedAuthenticatedSession(queryClient);
     queryClient.setQueryData(

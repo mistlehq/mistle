@@ -1,14 +1,14 @@
-import {
-  SandboxProfileStatuses,
-  sandboxProfiles,
-  sandboxProfileVersions,
-} from "@mistle/db/control-plane";
+import { sandboxProfiles, sandboxProfileVersions } from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
 
 import {
   ListSandboxProfileVersionsResponseSchema,
   NotFoundResponseSchema,
 } from "../src/sandbox-profiles/index.js";
+import {
+  createSandboxProfileFixture,
+  createSandboxProfileVersionFixture,
+} from "./helpers/sandbox-profiles.js";
 import { it } from "./test-context.js";
 
 describe("sandbox profile versions list integration", () => {
@@ -18,24 +18,26 @@ describe("sandbox profile versions list integration", () => {
     });
 
     await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_versions_list_001",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Versions List Profile",
-      status: SandboxProfileStatuses.ACTIVE,
+      ...createSandboxProfileFixture({
+        id: "sbp_versions_list_001",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Versions List Profile",
+        createdAt: "2026-03-01T00:00:00.000Z",
+      }),
     });
     await fixture.db.insert(sandboxProfileVersions).values([
-      {
+      createSandboxProfileVersionFixture({
         sandboxProfileId: "sbp_versions_list_001",
         version: 1,
-      },
-      {
+      }),
+      createSandboxProfileVersionFixture({
         sandboxProfileId: "sbp_versions_list_001",
         version: 2,
-      },
-      {
+      }),
+      createSandboxProfileVersionFixture({
         sandboxProfileId: "sbp_versions_list_001",
         version: 3,
-      },
+      }),
     ]);
 
     const response = await fixture.request("/v1/sandbox/profiles/sbp_versions_list_001/versions", {
@@ -58,14 +60,18 @@ describe("sandbox profile versions list integration", () => {
     });
 
     await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_versions_list_org_b_001",
-      organizationId: secondOrgSession.organizationId,
-      displayName: "Org B Profile",
-      status: SandboxProfileStatuses.ACTIVE,
+      ...createSandboxProfileFixture({
+        id: "sbp_versions_list_org_b_001",
+        organizationId: secondOrgSession.organizationId,
+        displayName: "Org B Profile",
+        createdAt: "2026-03-01T00:00:00.000Z",
+      }),
     });
     await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_versions_list_org_b_001",
-      version: 1,
+      ...createSandboxProfileVersionFixture({
+        sandboxProfileId: "sbp_versions_list_org_b_001",
+        version: 1,
+      }),
     });
 
     const response = await fixture.request(

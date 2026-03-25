@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
 import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -15,16 +16,6 @@ import {
   IntegrationsEditorSection,
   preserveDialogRowIdentity,
 } from "./sandbox-profile-editor-page.js";
-
-function createQueryClient(): QueryClient {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
-}
 
 function createTarget(
   targetKey: string,
@@ -159,7 +150,7 @@ afterEach(() => {
 
 describe("IntegrationsEditorSection", () => {
   it("adds a binding into the selected section via dialog", async () => {
-    const queryClient = createQueryClient();
+    const queryClient = createTestQueryClient();
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -181,7 +172,7 @@ describe("IntegrationsEditorSection", () => {
   }, 10000);
 
   it("lists distinct connection display names for duplicate provider connections", async () => {
-    const queryClient = createQueryClient();
+    const queryClient = createTestQueryClient();
 
     render(
       <QueryClientProvider client={queryClient}>
