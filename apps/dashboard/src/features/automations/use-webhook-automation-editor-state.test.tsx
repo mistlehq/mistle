@@ -9,50 +9,16 @@ import {
   useLoadedWebhookAutomationEditorState,
 } from "./use-webhook-automation-editor-state.js";
 
-function createDirectoryData(input?: {
-  supportedWebhookEvents?: {
-    eventType: string;
-    providerEventType: string;
-    displayName: string;
-  }[];
+function createAutomationApplicableProfile(input?: {
+  eligibleIntegrationConnectionIds?: string[];
 }) {
   return {
-    connections: [
-      {
-        id: "conn_linear",
-        targetKey: "linear-cloud",
-        displayName: "Linear Workspace",
-        status: "active" as const,
-        createdAt: "2026-03-24T00:00:00.000Z",
-        updatedAt: "2026-03-24T00:00:00.000Z",
-      },
-    ],
-    targets: [
-      {
-        targetKey: "linear-cloud",
-        familyId: "linear",
-        variantId: "linear-default",
-        enabled: true,
-        config: {},
-        displayName: "Linear",
-        description: "Linear Cloud",
-        supportedWebhookEvents: input?.supportedWebhookEvents ?? [],
-        targetHealth: {
-          configStatus: "valid" as const,
-        },
-      },
-    ],
-  };
-}
-
-function createBinding() {
-  return {
-    id: "bnd_linear",
-    sandboxProfileId: "sbp_123",
-    sandboxProfileVersion: 1,
-    connectionId: "conn_linear",
-    kind: "connector" as const,
-    config: {},
+    id: "sbp_123",
+    organizationId: "org_123",
+    displayName: "Support Agent",
+    status: "active" as const,
+    latestVersion: 3,
+    eligibleIntegrationConnectionIds: input?.eligibleIntegrationConnectionIds ?? [],
     createdAt: "2026-03-24T00:00:00.000Z",
     updatedAt: "2026-03-24T00:00:00.000Z",
   };
@@ -86,6 +52,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           },
           connectionOptions: [],
           sandboxProfileOptions: [],
+          automationApplicableSandboxProfiles: [],
           directoryData: {
             connections: [],
             targets: [],
@@ -116,26 +83,21 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   it("marks profiles without trigger-capable bindings as unavailable for automations", () => {
     expect(
       resolveSelectedProfileTriggerState({
-        selectedProfileId: "sbp_123",
-        hasBindingData: true,
-        isBindingDataPending: false,
-        bindingErrorMessage: null,
-        bindings: [createBinding()],
-        directoryData: createDirectoryData(),
+        selectedProfile: createAutomationApplicableProfile(),
       }).disabledReason,
     ).toBe("The selected profile has no bindings with automation triggers.");
   });
 
-  it("surfaces binding query failures instead of showing a loading state", () => {
+  it("enables trigger selection when the selected profile exposes eligible connections", () => {
     expect(
       resolveSelectedProfileTriggerState({
-        selectedProfileId: "sbp_123",
-        hasBindingData: false,
-        isBindingDataPending: false,
-        bindingErrorMessage: "Could not load profile bindings.",
-        bindings: [],
-        directoryData: createDirectoryData(),
-      }).disabledReason,
-    ).toBe("Could not load profile bindings.");
+        selectedProfile: createAutomationApplicableProfile({
+          eligibleIntegrationConnectionIds: ["conn_linear"],
+        }),
+      }),
+    ).toEqual({
+      disabledReason: null,
+      eligibleConnectionIds: ["conn_linear"],
+    });
   });
 });

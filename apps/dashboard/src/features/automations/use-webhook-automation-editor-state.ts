@@ -1,4 +1,4 @@
-import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -6,16 +6,7 @@ import type {
   IntegrationConnection,
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
-import { resolveLatestVersion } from "../pages/sandbox-profile-integrations-state.js";
-import {
-  sandboxProfileVersionIntegrationBindingsQueryKey,
-  sandboxProfileVersionsQueryKey,
-} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import {
-  getSandboxProfileVersionIntegrationBindings,
-  listSandboxProfileVersions,
-} from "../sandbox-profiles/sandbox-profiles-service.js";
-import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { AutomationApplicableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
   toCreateWebhookAutomationPayload,
   toUpdateWebhookAutomationPayload,
@@ -30,7 +21,6 @@ import { resolveConversationKeyFieldOptions } from "./webhook-automation-form.js
 import {
   buildWebhookAutomationEventOptions,
   createWebhookAutomationTriggerId,
-  resolveEligibleProfileAutomationConnectionIds,
 } from "./webhook-automation-list-helpers.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
 import { AUTOMATIONS_QUERY_KEY_PREFIX } from "./webhook-automations-query-keys.js";
@@ -62,139 +52,23 @@ type SelectedProfileTriggerState = {
 const NoProfileSelectedMessage = "Select a sandbox profile to choose triggers.";
 const InvalidProfileBindingMessage =
   "The selected profile has no bindings with automation triggers.";
-const LoadProfileBindingsErrorMessage = "Could not load profile bindings.";
-const UnselectedProfileQueryId = "__unselected__";
-const MissingProfileVersionQueryId = 0;
 
 export function resolveSelectedProfileTriggerState(input: {
-  selectedProfileId: string;
-  hasBindingData: boolean;
-  isBindingDataPending: boolean;
-  bindingErrorMessage: string | null;
-  bindings: readonly SandboxProfileVersionIntegrationBinding[];
-  directoryData: DirectoryData;
+  selectedProfile: AutomationApplicableSandboxProfile | null;
 }): SelectedProfileTriggerState {
-  if (input.selectedProfileId.trim().length === 0) {
+  if (input.selectedProfile === null) {
     return {
       eligibleConnectionIds: [],
       disabledReason: NoProfileSelectedMessage,
     };
   }
 
-  if (input.bindingErrorMessage !== null) {
-    return {
-      eligibleConnectionIds: [],
-      disabledReason: input.bindingErrorMessage,
-    };
-  }
-
-  if (input.isBindingDataPending || !input.hasBindingData) {
-    return {
-      eligibleConnectionIds: [],
-      disabledReason: "Loading profile bindings...",
-    };
-  }
-
-  const eligibleConnectionIds = resolveEligibleProfileAutomationConnectionIds({
-    bindings: input.bindings,
-    connections: input.directoryData.connections,
-    targets: input.directoryData.targets,
-  });
+  const eligibleConnectionIds = input.selectedProfile.eligibleIntegrationConnectionIds;
 
   return {
     eligibleConnectionIds,
     disabledReason: eligibleConnectionIds.length === 0 ? InvalidProfileBindingMessage : null,
   };
-}
-
-function resolveSelectedProfileQueryId(selectedProfileId: string): string {
-  return selectedProfileId.length === 0 ? UnselectedProfileQueryId : selectedProfileId;
-}
-
-function resolveSelectedProfileBindingsErrorMessage(input: {
-  versionError: unknown;
-  bindingsError: unknown;
-}): string | null {
-  const selectedProfileBindingsError = input.versionError ?? input.bindingsError;
-  if (selectedProfileBindingsError === null) {
-    return null;
-  }
-
-  return resolveApiErrorMessage({
-    error: selectedProfileBindingsError,
-    fallbackMessage: LoadProfileBindingsErrorMessage,
-  });
-}
-
-function useSelectedProfileTriggerState(input: {
-  selectedProfileId: string;
-  directoryData: DirectoryData;
-}): SelectedProfileTriggerState {
-  const selectedProfileQueryId = resolveSelectedProfileQueryId(input.selectedProfileId);
-
-  const selectedProfileVersionsQuery = useQuery({
-    queryKey: sandboxProfileVersionsQueryKey(selectedProfileQueryId),
-    queryFn: async ({ signal }) =>
-      listSandboxProfileVersions({
-        profileId: input.selectedProfileId,
-        signal,
-      }),
-    enabled: input.selectedProfileId.length > 0,
-    retry: false,
-  });
-
-  const selectedProfileVersion = useMemo(
-    () => resolveLatestVersion(selectedProfileVersionsQuery.data?.versions ?? []),
-    [selectedProfileVersionsQuery.data],
-  );
-
-  const selectedProfileBindingsQuery = useQuery({
-    queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
-      profileId: selectedProfileQueryId,
-      version: selectedProfileVersion ?? MissingProfileVersionQueryId,
-    }),
-    queryFn: async ({ signal }) => {
-      if (selectedProfileVersion === null) {
-        throw new Error("No sandbox profile version is available for this profile.");
-      }
-
-      return getSandboxProfileVersionIntegrationBindings({
-        profileId: input.selectedProfileId,
-        version: selectedProfileVersion,
-        signal,
-      });
-    },
-    enabled: input.selectedProfileId.length > 0 && selectedProfileVersion !== null,
-    retry: false,
-  });
-
-  return useMemo(
-    () =>
-      resolveSelectedProfileTriggerState({
-        selectedProfileId: input.selectedProfileId,
-        hasBindingData:
-          selectedProfileVersion === null || selectedProfileBindingsQuery.data !== undefined,
-        isBindingDataPending:
-          input.selectedProfileId.length > 0 &&
-          (selectedProfileVersionsQuery.isPending || selectedProfileBindingsQuery.isPending),
-        bindingErrorMessage: resolveSelectedProfileBindingsErrorMessage({
-          versionError: selectedProfileVersionsQuery.error,
-          bindingsError: selectedProfileBindingsQuery.error,
-        }),
-        bindings: selectedProfileBindingsQuery.data?.bindings ?? [],
-        directoryData: input.directoryData,
-      }),
-    [
-      input.directoryData,
-      input.selectedProfileId,
-      selectedProfileBindingsQuery.data,
-      selectedProfileBindingsQuery.error,
-      selectedProfileBindingsQuery.isPending,
-      selectedProfileVersion,
-      selectedProfileVersionsQuery.error,
-      selectedProfileVersionsQuery.isPending,
-    ],
-  );
 }
 
 function resolveAutomationMutationErrorMessage(input: {
@@ -247,6 +121,7 @@ type LoadedWebhookAutomationEditorStateInput = {
   initialValues: WebhookAutomationFormValues;
   connectionOptions: readonly WebhookAutomationOption[];
   sandboxProfileOptions: readonly WebhookAutomationOption[];
+  automationApplicableSandboxProfiles: readonly AutomationApplicableSandboxProfile[];
   directoryData: DirectoryData;
   preservedConnectionId?: string;
 };
@@ -334,9 +209,11 @@ export function useLoadedWebhookAutomationEditorState(
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const selectedProfileId = formValues.sandboxProfileId.trim();
-  const selectedProfileTriggerState = useSelectedProfileTriggerState({
-    selectedProfileId,
-    directoryData: input.directoryData,
+  const selectedProfile = input.automationApplicableSandboxProfiles.find(
+    (profile) => profile.id === selectedProfileId,
+  );
+  const selectedProfileTriggerState = resolveSelectedProfileTriggerState({
+    selectedProfile: selectedProfile ?? null,
   });
 
   const webhookEventOptions = useMemo(

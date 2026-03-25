@@ -5,6 +5,7 @@ import { normalizeHttpApiError } from "../api/http-api-error.js";
 import { requestControlPlane } from "../api/request-control-plane.js";
 import { SandboxProfilesApiError } from "./sandbox-profiles-api-errors.js";
 import type {
+  AutomationApplicableSandboxProfilesResult,
   CreateSandboxProfileInput,
   LaunchableSandboxProfilesResult,
   SandboxIntegrationBindingKind,
@@ -84,6 +85,38 @@ export async function listLaunchableSandboxProfiles(input: {
         operation: "listLaunchableSandboxProfiles",
         error,
         fallbackMessage: "Could not load launchable sandbox profiles.",
+      }),
+    );
+  }
+}
+
+export async function listAutomationApplicableSandboxProfiles(input: {
+  signal?: AbortSignal;
+}): Promise<AutomationApplicableSandboxProfilesResult> {
+  try {
+    const client = getControlPlaneApiClient();
+    const { data } = await client.GET("/v1/sandbox/profiles/automation-applicable", {
+      credentials: "include",
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    });
+
+    if (data === undefined) {
+      throw new SandboxProfilesApiError({
+        operation: "listAutomationApplicableSandboxProfiles",
+        status: 500,
+        body: null,
+        message: "Automation-applicable sandbox profiles response was empty.",
+        code: null,
+      });
+    }
+
+    return data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "listAutomationApplicableSandboxProfiles",
+        error,
+        fallbackMessage: "Could not load automation-applicable sandbox profiles.",
       }),
     );
   }

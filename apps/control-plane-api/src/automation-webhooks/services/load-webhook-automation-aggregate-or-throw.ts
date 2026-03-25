@@ -20,6 +20,7 @@ export type AutomationWebhookAggregate = {
   target: {
     id: string;
     sandboxProfileId: string;
+    sandboxProfileDisplayName?: string;
     sandboxProfileVersion: number | null;
   };
 };
@@ -66,6 +67,13 @@ export async function loadWebhookAutomationAggregateOrThrow(
   }
 
   const target = targets[0];
+  const sandboxProfile = await ctx.db.query.sandboxProfiles.findFirst({
+    columns: {
+      displayName: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.organizationId, input.organizationId), eq(table.id, target.sandboxProfileId)),
+  });
 
   return {
     id: automation.id,
@@ -82,6 +90,11 @@ export async function loadWebhookAutomationAggregateOrThrow(
     target: {
       id: target.id,
       sandboxProfileId: target.sandboxProfileId,
+      ...(sandboxProfile === undefined
+        ? {}
+        : {
+            sandboxProfileDisplayName: sandboxProfile.displayName,
+          }),
       sandboxProfileVersion: target.sandboxProfileVersion,
     },
   };

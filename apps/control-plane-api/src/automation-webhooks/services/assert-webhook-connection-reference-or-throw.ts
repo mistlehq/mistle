@@ -7,6 +7,7 @@ import { BadRequestError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
 import { AutomationWebhooksBadRequestCodes } from "../constants.js";
+import { assertWebhookCapableTargetDefinition } from "./assert-webhook-capable-target-definition.js";
 
 export async function assertWebhookConnectionReferenceOrThrow(
   ctx: {
@@ -42,18 +43,12 @@ export async function assertWebhookConnectionReferenceOrThrow(
     throw new Error(`Integration target '${connection.targetKey}' was not found.`);
   }
 
-  const definition = ctx.integrationRegistry.getDefinition({
+  const webhookTarget = assertWebhookCapableTargetDefinition(ctx.integrationRegistry, {
     familyId: target.familyId,
     variantId: target.variantId,
   });
 
-  if (definition === undefined) {
-    throw new Error(
-      `Integration definition '${target.familyId}/${target.variantId}' is not registered.`,
-    );
-  }
-
-  if (definition.webhookHandler === undefined) {
+  if (!webhookTarget.supportsWebhookHandling) {
     throw new BadRequestError(
       AutomationWebhooksBadRequestCodes.CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE,
       "Integration connection target does not define webhook handling.",

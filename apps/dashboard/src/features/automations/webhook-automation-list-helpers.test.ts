@@ -4,7 +4,6 @@ import {
   buildWebhookAutomationEventOptions,
   buildWebhookAutomationSandboxProfileOptions,
   createWebhookAutomationTriggerId,
-  resolveEligibleProfileAutomationConnectionIds,
 } from "./webhook-automation-list-helpers.js";
 
 describe("buildWebhookAutomationEventOptions", () => {
@@ -220,6 +219,8 @@ describe("buildWebhookAutomationSandboxProfileOptions", () => {
             id: "sbp_1",
             organizationId: "org_1",
             displayName: "Repo Maintainer",
+            eligibleIntegrationConnectionIds: [],
+            latestVersion: 1,
             status: "active",
             createdAt: "2026-03-16T10:00:00.000Z",
             updatedAt: "2026-03-16T10:00:00.000Z",
@@ -233,87 +234,37 @@ describe("buildWebhookAutomationSandboxProfileOptions", () => {
       },
     ]);
   });
-});
 
-describe("resolveEligibleProfileAutomationConnectionIds", () => {
-  it("returns bound connection ids whose targets expose automation triggers", () => {
+  it("preserves the current profile when it is no longer automation-applicable", () => {
     expect(
-      resolveEligibleProfileAutomationConnectionIds({
-        bindings: [
+      buildWebhookAutomationSandboxProfileOptions({
+        sandboxProfiles: [
           {
-            id: "bnd_github",
-            sandboxProfileId: "sbp_1",
-            sandboxProfileVersion: 1,
-            connectionId: "conn_github",
-            kind: "connector",
-            config: {},
-            createdAt: "2026-03-16T10:00:00.000Z",
-            updatedAt: "2026-03-16T10:00:00.000Z",
-          },
-          {
-            id: "bnd_linear",
-            sandboxProfileId: "sbp_1",
-            sandboxProfileVersion: 1,
-            connectionId: "conn_linear",
-            kind: "connector",
-            config: {},
-            createdAt: "2026-03-16T10:00:00.000Z",
-            updatedAt: "2026-03-16T10:00:00.000Z",
-          },
-        ],
-        connections: [
-          {
-            id: "conn_github",
-            targetKey: "github-cloud",
-            displayName: "GitHub Engineering",
-            status: "active",
-            createdAt: "2026-03-16T10:00:00.000Z",
-            updatedAt: "2026-03-16T10:00:00.000Z",
-          },
-          {
-            id: "conn_linear",
-            targetKey: "linear-cloud",
-            displayName: "Linear Workspace",
+            id: "sbp_1",
+            organizationId: "org_1",
+            displayName: "Repo Maintainer",
+            eligibleIntegrationConnectionIds: [],
+            latestVersion: 1,
             status: "active",
             createdAt: "2026-03-16T10:00:00.000Z",
             updatedAt: "2026-03-16T10:00:00.000Z",
           },
         ],
-        targets: [
-          {
-            targetKey: "github-cloud",
-            familyId: "github",
-            variantId: "github-cloud",
-            enabled: true,
-            config: {},
-            displayName: "GitHub",
-            description: "GitHub Cloud",
-            supportedWebhookEvents: [
-              {
-                eventType: "github.issue_comment.created",
-                providerEventType: "issue_comment",
-                displayName: "Issue comment created",
-              },
-            ],
-            targetHealth: {
-              configStatus: "valid",
-            },
-          },
-          {
-            targetKey: "linear-cloud",
-            familyId: "linear",
-            variantId: "linear-cloud",
-            enabled: true,
-            config: {},
-            displayName: "Linear",
-            description: "Linear Cloud",
-            supportedWebhookEvents: [],
-            targetHealth: {
-              configStatus: "valid",
-            },
-          },
-        ],
+        preservedProfile: {
+          id: "sbp_stale",
+          displayName: "Legacy Agent",
+        },
       }),
-    ).toEqual(["conn_github"]);
+    ).toEqual([
+      {
+        value: "sbp_stale",
+        label: "Legacy Agent",
+        description: "No longer applicable for webhook-triggered automations.",
+      },
+      {
+        value: "sbp_1",
+        label: "Repo Maintainer",
+      },
+    ]);
   });
 });

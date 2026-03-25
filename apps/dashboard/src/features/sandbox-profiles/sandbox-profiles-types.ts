@@ -4,6 +4,8 @@ type ListSandboxProfilesResponse =
   paths["/v1/sandbox/profiles"]["get"]["responses"][200]["content"]["application/json"];
 type ListLaunchableSandboxProfilesResponse =
   paths["/v1/sandbox/profiles/launchable"]["get"]["responses"][200]["content"]["application/json"];
+type ListAutomationApplicableSandboxProfilesResponse =
+  paths["/v1/sandbox/profiles/automation-applicable"]["get"]["responses"][200]["content"]["application/json"];
 type GetSandboxProfileResponse =
   paths["/v1/sandbox/profiles/{profileId}"]["get"]["responses"][200]["content"]["application/json"];
 type CreateSandboxProfileRequest =
@@ -16,6 +18,10 @@ export type SandboxProfileStatus = SandboxProfile["status"];
 export type SandboxProfilesListResult = ListSandboxProfilesResponse;
 export type LaunchableSandboxProfilesResult = ListLaunchableSandboxProfilesResponse;
 export type LaunchableSandboxProfile = LaunchableSandboxProfilesResult["items"][number];
+export type AutomationApplicableSandboxProfilesResult =
+  ListAutomationApplicableSandboxProfilesResponse;
+export type AutomationApplicableSandboxProfile =
+  AutomationApplicableSandboxProfilesResult["items"][number];
 export type KeysetPageCursor = NonNullable<SandboxProfilesListResult["nextPage"]>;
 export type KeysetPreviousPageCursor = NonNullable<SandboxProfilesListResult["previousPage"]>;
 export type CreateSandboxProfileInput = CreateSandboxProfileRequest;

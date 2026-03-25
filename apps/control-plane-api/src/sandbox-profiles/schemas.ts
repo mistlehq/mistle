@@ -34,6 +34,12 @@ export const launchableSandboxProfileSchema = sandboxProfileSchema
   })
   .strict();
 
+export const automationApplicableSandboxProfileSchema = launchableSandboxProfileSchema
+  .extend({
+    eligibleIntegrationConnectionIds: z.array(z.string().min(1)),
+  })
+  .strict();
+
 export const sandboxProfileVersionIntegrationBindingSchema = createSelectSchema(
   sandboxProfileVersionIntegrationBindings,
   {
@@ -153,5 +159,11 @@ export const listSandboxProfilesResponseSchema = createKeysetPaginationEnvelopeS
 export const listLaunchableSandboxProfilesResponseSchema = z
   .object({
     items: z.array(launchableSandboxProfileSchema),
+  })
+  .strict();
+
+export const listAutomationApplicableSandboxProfilesResponseSchema = z
+  .object({
+    items: z.array(automationApplicableSandboxProfileSchema),
   })
   .strict();

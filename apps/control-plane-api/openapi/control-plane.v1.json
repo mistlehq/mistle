@@ -113,6 +113,10 @@
                                 "type": "string",
                                 "minLength": 1
                               },
+                              "sandboxProfileDisplayName": {
+                                "type": "string",
+                                "minLength": 1
+                              },
                               "sandboxProfileVersion": {
                                 "type": ["integer", "null"],
                                 "minimum": 1
@@ -410,6 +414,10 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "sandboxProfileDisplayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
                         "sandboxProfileVersion": {
                           "type": ["integer", "null"],
                           "minimum": 1
@@ -613,6 +621,10 @@
                           "minLength": 1
                         },
                         "sandboxProfileId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileDisplayName": {
                           "type": "string",
                           "minLength": 1
                         },
@@ -877,6 +889,10 @@
                           "minLength": 1
                         },
                         "sandboxProfileId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileDisplayName": {
                           "type": "string",
                           "minLength": 1
                         },
@@ -5404,6 +5420,133 @@
                           "createdAt",
                           "updatedAt",
                           "latestVersion"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sandbox/profiles/automation-applicable": {
+      "get": {
+        "tags": ["Sandbox Profiles"],
+        "responses": {
+          "200": {
+            "description": "List sandbox profiles applicable to webhook-triggered automations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "organizationId": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["active", "inactive"]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "latestVersion": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "eligibleIntegrationConnectionIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "organizationId",
+                          "displayName",
+                          "status",
+                          "createdAt",
+                          "updatedAt",
+                          "latestVersion",
+                          "eligibleIntegrationConnectionIds"
                         ],
                         "additionalProperties": false
                       }

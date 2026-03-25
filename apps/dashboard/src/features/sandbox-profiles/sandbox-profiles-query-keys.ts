@@ -14,6 +14,13 @@ export function launchableSandboxProfilesQueryKey(): readonly ["sandbox-profiles
   return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "launchable"];
 }
 
+export function automationApplicableSandboxProfilesQueryKey(): readonly [
+  "sandbox-profiles",
+  "automation-applicable",
+] {
+  return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "automation-applicable"];
+}
+
 export function sandboxProfileDetailQueryKey(
   profileId: string,
 ): readonly ["sandbox-profiles", "detail", string] {

@@ -48,6 +48,7 @@ export interface paths {
                 } | null;
                 target: {
                   id: string;
+                  sandboxProfileDisplayName?: string;
                   sandboxProfileId: string;
                   sandboxProfileVersion: number | null;
                 };
@@ -164,6 +165,7 @@ export interface paths {
               } | null;
               target: {
                 id: string;
+                sandboxProfileDisplayName?: string;
                 sandboxProfileId: string;
                 sandboxProfileVersion: number | null;
               };
@@ -269,6 +271,7 @@ export interface paths {
               } | null;
               target: {
                 id: string;
+                sandboxProfileDisplayName?: string;
                 sandboxProfileId: string;
                 sandboxProfileVersion: number | null;
               };
@@ -463,6 +466,7 @@ export interface paths {
               } | null;
               target: {
                 id: string;
+                sandboxProfileDisplayName?: string;
                 sandboxProfileId: string;
                 sandboxProfileVersion: number | null;
               };
@@ -3545,6 +3549,88 @@ export interface paths {
         };
       };
     };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sandbox/profiles/automation-applicable": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List sandbox profiles applicable to webhook-triggered automations. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              items: {
+                createdAt: string;
+                displayName: string;
+                eligibleIntegrationConnectionIds: string[];
+                id: string;
+                latestVersion: number;
+                organizationId: string;
+                /** @enum {string} */
+                status: "active" | "inactive";
+                updatedAt: string;
+              }[];
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
     post?: never;
     delete?: never;
     options?: never;

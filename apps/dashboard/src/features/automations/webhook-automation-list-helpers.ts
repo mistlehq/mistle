@@ -2,8 +2,10 @@ import type {
   IntegrationConnection,
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
-import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
-import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type {
+  AutomationApplicableSandboxProfile,
+  SandboxProfile,
+} from "../sandbox-profiles/sandbox-profiles-types.js";
 import { formatRelativeOrDate } from "../shared/date-formatters.js";
 import type {
   WebhookAutomationEventOption,
@@ -81,38 +83,30 @@ export function buildWebhookAutomationConnectionOptions(input: {
 }
 
 export function buildWebhookAutomationSandboxProfileOptions(input: {
-  sandboxProfiles: readonly SandboxProfile[];
+  sandboxProfiles: readonly AutomationApplicableSandboxProfile[];
+  preservedProfile?: {
+    id: string;
+    displayName: string;
+  };
 }): readonly WebhookAutomationFormOption[] {
-  return sortOptionsByLabel(
-    input.sandboxProfiles.map((profile) => ({
-      value: profile.id,
-      label: profile.displayName,
-    })),
-  );
-}
+  const options: WebhookAutomationFormOption[] = input.sandboxProfiles.map((profile) => ({
+    value: profile.id,
+    label: profile.displayName,
+  }));
+  const preservedProfile = input.preservedProfile;
 
-export function resolveEligibleProfileAutomationConnectionIds(input: {
-  bindings: readonly SandboxProfileVersionIntegrationBinding[];
-  connections: readonly IntegrationConnection[];
-  targets: readonly IntegrationTarget[];
-}): readonly string[] {
-  const eligibleConnectionIds = new Set<string>();
-
-  for (const binding of input.bindings) {
-    const connection = input.connections.find((candidate) => candidate.id === binding.connectionId);
-    if (connection === undefined) {
-      continue;
-    }
-
-    const target = input.targets.find((candidate) => candidate.targetKey === connection.targetKey);
-    if ((target?.supportedWebhookEvents?.length ?? 0) === 0) {
-      continue;
-    }
-
-    eligibleConnectionIds.add(connection.id);
+  if (
+    preservedProfile !== undefined &&
+    !options.some((option) => option.value === preservedProfile.id)
+  ) {
+    options.push({
+      value: preservedProfile.id,
+      label: preservedProfile.displayName,
+      description: "No longer applicable for webhook-triggered automations.",
+    });
   }
 
-  return [...eligibleConnectionIds];
+  return sortOptionsByLabel(options);
 }
 
 export function buildWebhookAutomationEventOptions(input: {

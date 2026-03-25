@@ -46,12 +46,12 @@ export function AutomationsPage(): React.JSX.Element {
   const items =
     automationsQuery.data === undefined ||
     prerequisites.integrationDirectoryQuery.data === undefined ||
-    prerequisites.sandboxProfilesQuery.data === undefined
+    prerequisites.automationApplicableSandboxProfilesQuery.data === undefined
       ? []
       : buildWebhookAutomationListItems({
           automations: automationsQuery.data.items,
           connections: prerequisites.integrationDirectoryQuery.data.connections,
-          sandboxProfiles: prerequisites.sandboxProfilesQuery.data,
+          sandboxProfiles: prerequisites.automationApplicableSandboxProfilesQuery.data.items,
         });
 
   const errorMessage =

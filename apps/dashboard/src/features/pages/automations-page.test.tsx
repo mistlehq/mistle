@@ -7,17 +7,15 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
-import {
-  WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY,
-  WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY,
-} from "../automations/use-webhook-automation-prerequisites.js";
+import { WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY } from "../automations/use-webhook-automation-prerequisites.js";
 import { webhookAutomationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import type { WebhookAutomationsListResult } from "../automations/webhook-automations-types.js";
 import type {
   IntegrationConnection,
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
-import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { automationApplicableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import type { AutomationApplicableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { AutomationsPage } from "./automations-page.js";
 
 function seedAutomationPrerequisites(queryClient: ReturnType<typeof createTestQueryClient>): void {
@@ -45,11 +43,13 @@ function seedAutomationPrerequisites(queryClient: ReturnType<typeof createTestQu
       },
     },
   ];
-  const sandboxProfiles: readonly SandboxProfile[] = [
+  const sandboxProfiles: readonly AutomationApplicableSandboxProfile[] = [
     {
       createdAt: "2026-03-05T00:00:00.000Z",
       displayName: "Repo Maintainer",
+      eligibleIntegrationConnectionIds: ["icn_123"],
       id: "sbp_123",
+      latestVersion: 1,
       organizationId: "org_123",
       status: "active",
       updatedAt: "2026-03-05T00:00:00.000Z",
@@ -60,7 +60,9 @@ function seedAutomationPrerequisites(queryClient: ReturnType<typeof createTestQu
     connections,
     targets,
   });
-  queryClient.setQueryData(WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY, sandboxProfiles);
+  queryClient.setQueryData(automationApplicableSandboxProfilesQueryKey(), {
+    items: sandboxProfiles,
+  });
 }
 
 describe("AutomationsPage", () => {

@@ -98,6 +98,9 @@ function CreateWebhookAutomationEditor(input: {
       initialValues={toWebhookAutomationFormValues(null)}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
+      automationApplicableSandboxProfiles={
+        prerequisites.automationApplicableSandboxProfilesQuery.data?.items ?? []
+      }
       directoryData={prerequisites.integrationDirectoryQuery.data}
     />
   );
@@ -121,6 +124,12 @@ function EditWebhookAutomationEditor(input: {
       ? undefined
       : {
           preservedConnectionId: automationQuery.data.integrationConnectionId,
+          preservedProfile: {
+            id: automationQuery.data.target.sandboxProfileId,
+            displayName:
+              automationQuery.data.target.sandboxProfileDisplayName ??
+              automationQuery.data.target.sandboxProfileId,
+          },
         },
   );
 
@@ -175,6 +184,9 @@ function EditWebhookAutomationEditor(input: {
       preservedConnectionId={automationQuery.data.integrationConnectionId}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
+      automationApplicableSandboxProfiles={
+        prerequisites.automationApplicableSandboxProfilesQuery.data?.items ?? []
+      }
       directoryData={prerequisites.integrationDirectoryQuery.data}
     />
   );
@@ -189,6 +201,11 @@ function LoadedWebhookAutomationEditor(input: {
   sandboxProfileOptions: ReturnType<
     typeof useWebhookAutomationPrerequisites
   >["sandboxProfileOptions"];
+  automationApplicableSandboxProfiles: NonNullable<
+    ReturnType<
+      typeof useWebhookAutomationPrerequisites
+    >["automationApplicableSandboxProfilesQuery"]["data"]
+  >["items"];
   directoryData: NonNullable<
     ReturnType<typeof useWebhookAutomationPrerequisites>["integrationDirectoryQuery"]["data"]
   >;
