@@ -104,6 +104,20 @@ describe("sandbox profiles automation applicable integration", () => {
             },
           ],
         },
+        {
+          id: "sbp_automation_unknown_definition",
+          displayName: "Unknown Definition",
+          createdAt: "2025-12-31T00:00:00.000Z",
+          versions: [1],
+          bindings: [
+            {
+              id: "ibd_automation_unknown_definition_v1",
+              sandboxProfileVersion: 1,
+              connectionId: "icn_automation_unknown_definition",
+              kind: IntegrationBindingKinds.CONNECTOR,
+            },
+          ],
+        },
       ],
     });
 
@@ -132,6 +146,12 @@ describe("sandbox profiles automation applicable integration", () => {
         targetKey: "openai-automation-applicable",
         familyId: "openai",
         variantId: "openai-default",
+        enabled: true,
+      }),
+      createIntegrationTargetFixture({
+        targetKey: "unknown-automation-applicable",
+        familyId: "retired-family",
+        variantId: "retired-variant",
         enabled: true,
       }),
     ]);
@@ -170,6 +190,13 @@ describe("sandbox profiles automation applicable integration", () => {
         organizationId: authenticatedSession.organizationId,
         targetKey: "openai-automation-applicable",
         displayName: "OpenAI",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+      createIntegrationConnectionFixture({
+        id: "icn_automation_unknown_definition",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "unknown-automation-applicable",
+        displayName: "Unknown Definition",
         status: IntegrationConnectionStatuses.ACTIVE,
       }),
     ]);

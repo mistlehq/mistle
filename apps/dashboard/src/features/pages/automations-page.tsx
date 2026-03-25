@@ -45,20 +45,21 @@ export function AutomationsPage(): React.JSX.Element {
 
   const items =
     automationsQuery.data === undefined ||
-    prerequisites.integrationDirectoryQuery.data === undefined ||
-    prerequisites.automationApplicableSandboxProfilesQuery.data === undefined
+    prerequisites.integrationDirectoryQuery.data === undefined
       ? []
       : buildWebhookAutomationListItems({
           automations: automationsQuery.data.items,
           connections: prerequisites.integrationDirectoryQuery.data.connections,
-          sandboxProfiles: prerequisites.automationApplicableSandboxProfilesQuery.data.items,
+          sandboxProfiles: prerequisites.automationApplicableSandboxProfilesQuery.data?.items ?? [],
         });
 
   const errorMessage =
-    automationsQuery.isError || prerequisites.errorMessage !== null
+    automationsQuery.isError || prerequisites.integrationDirectoryQuery.isError
       ? resolveApiErrorMessage({
-          error: automationsQuery.error,
-          fallbackMessage: prerequisites.errorMessage ?? "Could not load automations.",
+          error: automationsQuery.error ?? prerequisites.integrationDirectoryQuery.error,
+          fallbackMessage: automationsQuery.isError
+            ? "Could not load automations."
+            : "Could not load automation prerequisites.",
         })
       : null;
 
@@ -76,8 +77,8 @@ export function AutomationsPage(): React.JSX.Element {
   const canShowSummary =
     automationsQuery.data !== undefined &&
     !automationsQuery.isError &&
-    !prerequisites.isPending &&
-    prerequisites.errorMessage === null;
+    !prerequisites.integrationDirectoryQuery.isPending &&
+    !prerequisites.integrationDirectoryQuery.isError;
 
   return (
     <div className="flex flex-col gap-4">
@@ -97,7 +98,7 @@ export function AutomationsPage(): React.JSX.Element {
         errorMessage={errorMessage}
         hasNextPage={automationsQuery.data?.nextPage != null}
         hasPreviousPage={automationsQuery.data?.previousPage != null}
-        isLoading={automationsQuery.isPending || prerequisites.isPending}
+        isLoading={automationsQuery.isPending || prerequisites.integrationDirectoryQuery.isPending}
         items={items}
         nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
         onNextPage={() => {

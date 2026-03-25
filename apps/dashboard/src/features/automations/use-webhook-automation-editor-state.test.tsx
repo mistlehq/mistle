@@ -64,6 +64,44 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     );
   });
 
+  it("keeps delete available in view mode for stale automations", () => {
+    const queryClient = createTestQueryClient({
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "view",
+          automationId: "aut_123",
+          navigate: async () => {},
+          initialValues: {
+            name: "Your automation",
+            sandboxProfileId: "sbp_stale",
+            enabled: true,
+            instructions: "",
+            conversationKeyTemplate: "",
+            triggerIds: [],
+            triggerParameterValues: {},
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          automationApplicableSandboxProfiles: [],
+          directoryData: {
+            connections: [],
+            targets: [],
+          },
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    expect(result.current.onRequestDelete).not.toBeNull();
+  });
+
   it("marks profiles without trigger-capable bindings as unavailable for automations", () => {
     expect(
       resolveSelectedProfileTriggerState({

@@ -147,12 +147,18 @@ export async function listAutomationApplicableProfiles(
       continue;
     }
 
-    if (
-      !assertWebhookCapableTargetDefinition(integrationRegistry, {
-        familyId: binding.familyId,
-        variantId: binding.variantId,
-      }).hasSupportedWebhookEvents
-    ) {
+    try {
+      if (
+        !assertWebhookCapableTargetDefinition(integrationRegistry, {
+          familyId: binding.familyId,
+          variantId: binding.variantId,
+        }).hasSupportedWebhookEvents
+      ) {
+        continue;
+      }
+    } catch {
+      // Historical bindings may reference definitions that are no longer registered.
+      // Treat those bindings as non-applicable instead of failing the whole listing.
       continue;
     }
 

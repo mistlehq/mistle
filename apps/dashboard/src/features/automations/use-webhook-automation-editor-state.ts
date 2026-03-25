@@ -413,7 +413,7 @@ export function useLoadedWebhookAutomationEditorState(
     isDeleting: deleteMutation.isPending,
     isSaving: createMutation.isPending || updateMutation.isPending,
     onDeleteDialogOpenChange: setIsDeleteDialogOpen,
-    onRequestDelete: input.mode === "edit" ? requestDelete : null,
+    onRequestDelete: input.mode === "create" ? null : requestDelete,
     onConfirmDelete: confirmDelete,
     onSubmit,
     onValueChange,

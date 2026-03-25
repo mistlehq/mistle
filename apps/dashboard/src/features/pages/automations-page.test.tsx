@@ -163,6 +163,60 @@ describe("AutomationsPage", () => {
     expect(markup).toContain(">Next<");
   });
 
+  it("still renders automation rows when the applicability query fails", () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    const listResult: WebhookAutomationsListResult = createWebhookAutomationsListResultFixture({
+      items: [
+        createWebhookAutomationFixture({
+          target: {
+            id: "target_123",
+            sandboxProfileId: "sbp_stale",
+            sandboxProfileDisplayName: "Legacy Agent",
+            sandboxProfileVersion: null,
+          },
+        }),
+      ],
+    });
+
+    queryClient.setQueryData(
+      webhookAutomationsListQueryKey({
+        limit: 25,
+        after: null,
+        before: null,
+      }),
+      listResult,
+    );
+    seedAutomationPrerequisites(queryClient);
+
+    const applicabilityQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: ["sandbox-profiles", "automation-applicable"],
+      queryFn: async () => {
+        throw new Error("Could not load automation-applicable profiles.");
+      },
+    });
+    applicabilityQuery.setState({
+      ...applicabilityQuery.state,
+      error: new Error("Could not load automation-applicable profiles."),
+      errorUpdateCount: 1,
+      errorUpdatedAt: Date.now(),
+      fetchStatus: "idle",
+      status: "error",
+    });
+
+    const markup = renderPageToStaticMarkup({
+      queryClient,
+      element: <AutomationsPage />,
+    });
+
+    expect(markup).toContain("Automation");
+    expect(markup).toContain("Legacy Agent");
+    expect(markup).toContain("Showing 1 of 1");
+    expect(markup).not.toContain("Could not load automations");
+  });
+
   it("does not render the result summary when the automation query is in error", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
