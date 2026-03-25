@@ -10,6 +10,15 @@ const SANDBOX_STATE_FILE_PATH = "/tmp/mistle-e2b-state.txt";
 const INJECTED_ENV_KEY = "MISTLE_SANDBOX_INJECTED_ENV";
 
 describeE2BAdapterIntegration("e2b adapter integration", () => {
+  it("reuses the same template alias for the same base image", async ({ fixture }) => {
+    const firstRegistry = fixture.createTemplateRegistry();
+    const secondRegistry = fixture.createTemplateRegistry();
+    const firstAlias = await firstRegistry.resolveAlias(fixture.baseImage.imageId);
+    const secondAlias = await secondRegistry.resolveAlias(fixture.baseImage.imageId);
+
+    expect(secondAlias).toBe(firstAlias);
+  }, 300_000);
+
   it("starts a sandbox from the shared base image and injects env", async ({ fixture }) => {
     const injectedEnvValue = `mistle-e2b-env-${randomUUID()}`;
     let id: string | undefined;
