@@ -12,6 +12,7 @@ export const controlPlaneApiDevelopmentPreset = {
         },
         database: {
           url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_dev",
+          migration_url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_dev",
         },
         auth: {
           base_url: "http://localhost:5100",
