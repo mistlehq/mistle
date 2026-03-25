@@ -28,6 +28,10 @@ const StripePayoutFailedTriggerId = createWebhookAutomationTriggerId({
   connectionId: StripeConnectionId,
   eventType: "stripe.payout.failed",
 });
+const PushDeletedTriggerId = createWebhookAutomationTriggerId({
+  connectionId: GitHubConnectionId,
+  eventType: "github.push.deleted",
+});
 
 const ConnectionOptions: readonly WebhookAutomationFormOption[] = [
   {
@@ -521,22 +525,13 @@ export const UnavailableSavedEvent: Story = {
     onDelete: function onDelete() {},
     values: {
       ...ExistingAutomationValues,
-      triggerIds: [
-        IssueCommentCreatedTriggerId,
-        createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
-          eventType: "github.push.deleted",
-        }),
-      ],
+      triggerIds: [IssueCommentCreatedTriggerId, PushDeletedTriggerId],
       triggerParameterValues: {},
     },
     webhookEventOptions: [
       ...GitHubWebhookEventOptions,
       {
-        id: createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
-          eventType: "github.push.deleted",
-        }),
+        id: PushDeletedTriggerId,
         eventType: "github.push.deleted",
         connectionId: GitHubConnectionId,
         connectionLabel: "GitHub Engineering",
@@ -544,8 +539,38 @@ export const UnavailableSavedEvent: Story = {
         description: "No longer available from your connected integrations.",
         category: "Unavailable",
         logoKey: "github",
-        unavailable: true,
+        availability: "missing_integration",
       },
+    ],
+  },
+};
+
+export const WrongProfileSavedEvent: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    fieldErrors: {
+      triggerIds: "This trigger is not available for the selected sandbox profile.",
+    },
+    values: {
+      ...ExistingAutomationValues,
+      sandboxProfileId: "sbp_finance_investigator",
+      triggerIds: [IssueCommentCreatedTriggerId, PullRequestOpenedTriggerId],
+      triggerParameterValues: {
+        [PullRequestOpenedTriggerId]: {
+          repository: "mistlehq/platform",
+          author: "octocat",
+          baseBranch: "main",
+        },
+      },
+    },
+    webhookEventOptions: [
+      {
+        ...GitHubWebhookEventOptions[0]!,
+        availability: "wrong_profile",
+        description: "This trigger is not available for the selected sandbox profile.",
+      },
+      GitHubWebhookEventOptions[2]!,
     ],
   },
 };

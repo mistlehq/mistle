@@ -24,6 +24,10 @@ const PullRequestReviewCommentCreatedTriggerId = createWebhookAutomationTriggerI
   connectionId: GitHubConnectionId,
   eventType: "github.pull_request_review_comment.created",
 });
+const PushDeletedTriggerId = createWebhookAutomationTriggerId({
+  connectionId: GitHubConnectionId,
+  eventType: "github.push.deleted",
+});
 
 const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
   {
@@ -354,20 +358,11 @@ export const UnavailableSavedTrigger: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: GitHubConnectionId,
-    selectedTriggerIds: [
-      PullRequestOpenedTriggerId,
-      createWebhookAutomationTriggerId({
-        connectionId: GitHubConnectionId,
-        eventType: "github.push.deleted",
-      }),
-    ],
+    selectedTriggerIds: [PullRequestOpenedTriggerId, PushDeletedTriggerId],
     eventOptions: [
       ...GitHubEventOptions,
       {
-        id: createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
-          eventType: "github.push.deleted",
-        }),
+        id: PushDeletedTriggerId,
         eventType: "github.push.deleted",
         connectionId: GitHubConnectionId,
         connectionLabel: "GitHub Engineering",
@@ -375,8 +370,24 @@ export const UnavailableSavedTrigger: Story = {
         description: "No longer available from your connected integrations.",
         category: "Unavailable",
         logoKey: "github",
-        unavailable: true,
+        availability: "missing_integration",
       },
+    ],
+  },
+};
+
+export const WrongProfileSavedTrigger: Story = {
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: GitHubConnectionId,
+    selectedTriggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+    eventOptions: [
+      {
+        ...GitHubEventOptions[0],
+        availability: "wrong_profile",
+        description: "This trigger is not available for the selected sandbox profile.",
+      },
+      GitHubEventOptions[2]!,
     ],
   },
 };
