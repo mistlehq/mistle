@@ -15,8 +15,6 @@ export interface SandboxImageHandle {
 export interface SandboxHandle {
   readonly provider: SandboxRuntimeProvider;
   readonly id: string;
-  writeStdin(input: { payload: Uint8Array<ArrayBufferLike> }): Promise<void>;
-  closeStdin(): Promise<void>;
 }
 
 export interface SandboxRuntimeControl {

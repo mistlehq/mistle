@@ -69,16 +69,6 @@ function createSandboxHandle(sandboxId: string): SandboxHandle {
   return {
     provider: SandboxProvider.E2B,
     id: sandboxId,
-    writeStdin: async () => {
-      throw new SandboxProviderNotImplementedError(
-        "E2B sandbox stdin is not exposed through @mistle/sandbox.",
-      );
-    },
-    closeStdin: async () => {
-      throw new SandboxProviderNotImplementedError(
-        "E2B sandbox stdin is not exposed through @mistle/sandbox.",
-      );
-    },
   };
 }
 

@@ -18,8 +18,6 @@ const REGISTRY_IMAGE_REFERENCE = "registry:3";
 const REGISTRY_INTERNAL_PORT = 5000;
 const BASE_IMAGE_SOURCE_REFERENCE = "registry:3";
 const BASE_IMAGE_REPOSITORY_PATH = "mistle/base";
-const STARTUP_STDIN_PROBE_IMAGE_SOURCE_REFERENCE = "alpine:3.22";
-const STARTUP_STDIN_PROBE_REPOSITORY_PATH = "mistle/startup-stdin-probe";
 
 const DockerProgressMessageSchema = z
   .object({
@@ -48,7 +46,6 @@ type DockerRegistryAuthConfig = {
 export type DockerAdapterIntegrationFixture = {
   adapter: SandboxAdapter;
   baseImage: SandboxImageHandle;
-  startupStdinProbeImage: SandboxImageHandle;
   dockerClient: Docker;
 };
 
@@ -89,15 +86,10 @@ export const it = vitestIt.extend<{ fixture: DockerAdapterIntegrationFixture }>(
           dockerClient,
           registryAuthority: registry.registryAuthority,
         });
-        const startupStdinProbeImage = await publishStartupStdinProbeImage({
-          dockerClient,
-          registryAuthority: registry.registryAuthority,
-        });
 
         await use({
           adapter,
           baseImage,
-          startupStdinProbeImage,
           dockerClient,
         });
       } finally {
@@ -141,30 +133,6 @@ async function publishBaseImage(input: {
   await consumeProgressStream(pushStream);
 
   return createBaseImageHandle(taggedBaseImageReference);
-}
-
-async function publishStartupStdinProbeImage(input: {
-  dockerClient: Docker;
-  registryAuthority: string;
-}): Promise<SandboxImageHandle> {
-  await pullImage(input.dockerClient, STARTUP_STDIN_PROBE_IMAGE_SOURCE_REFERENCE);
-
-  const repository = `${input.registryAuthority}/${STARTUP_STDIN_PROBE_REPOSITORY_PATH}`;
-  const tag = `probe-${randomUUID().replaceAll("-", "")}`;
-  const taggedImageReference = `${repository}:${tag}`;
-  const sourceImage = input.dockerClient.getImage(STARTUP_STDIN_PROBE_IMAGE_SOURCE_REFERENCE);
-  await sourceImage.tag({
-    repo: repository,
-    tag,
-  });
-
-  const taggedImage = input.dockerClient.getImage(taggedImageReference);
-  const pushStream = await taggedImage.push({
-    authconfig: createRegistryAuthConfig(input.registryAuthority),
-  });
-  await consumeProgressStream(pushStream);
-
-  return createBaseImageHandle(taggedImageReference);
 }
 
 async function startRegistry(): Promise<RegistryFixture> {
