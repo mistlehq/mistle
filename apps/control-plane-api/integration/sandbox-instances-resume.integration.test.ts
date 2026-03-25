@@ -1,8 +1,4 @@
-import {
-  sandboxInstanceRuntimePlans,
-  sandboxInstances,
-  SandboxInstanceVolumeModes,
-} from "@mistle/db/data-plane";
+import { sandboxInstanceRuntimePlans, sandboxInstances } from "@mistle/db/data-plane";
 import { systemSleeper } from "@mistle/time";
 import { afterEach, describe, expect } from "vitest";
 import { z } from "zod";
@@ -104,9 +100,6 @@ async function insertResumableSandboxInstance(input: {
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
     providerSandboxId: "provider-runtime-resume-integration",
-    instanceVolumeProvider: "docker",
-    instanceVolumeId: `volume-${input.sandboxInstanceId}`,
-    instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,
     status: input.status,
     startedByKind: "user",
     startedById: "usr_resume_integration",

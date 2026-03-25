@@ -39,10 +39,8 @@ const runtimeControl = createSandboxRuntimeControl({
 
 ## Provider Behavior
 
-- `createVolume({})` creates a named Docker volume and returns an opaque handle.
-- `deleteVolume({ volumeId })` removes that Docker volume.
-- `start({ image, mounts })` pulls image reference and starts a Docker container with optional volume mounts.
-- `resume({ image, mounts, id })` restarts the existing stopped Docker container identified by `id`.
+- `start({ image })` pulls the image reference and starts a Docker container from it.
+- `resume({ image, id })` restarts the existing stopped Docker container identified by `id`.
 - `createSandboxRuntimeControl(...).applyStartup({ id, payload })` runs `sandboxd apply-startup` as `root` inside the target container.
 - returned `SandboxHandle` supports `writeStdin({ payload })` and `closeStdin()` for container stdin lifecycle.
 - `stop({ id })` stops the Docker container without removing it.

@@ -1,6 +1,4 @@
-import { randomUUID } from "node:crypto";
-
-import type { App, ModalWriteStream, Volume } from "modal";
+import type { App, ModalWriteStream } from "modal";
 import { ModalClient as ModalSdkClient } from "modal";
 
 import {
@@ -10,18 +8,13 @@ import {
 } from "./client-errors.js";
 import {
   ModalCloseSandboxStdinRequestSchema,
-  ModalCreateVolumeRequestSchema,
-  ModalDeleteVolumeRequestSchema,
   ModalStartSandboxRequestSchema,
   ModalStopSandboxRequestSchema,
   ModalWriteSandboxStdinRequestSchema,
   type ModalCloseSandboxStdinRequest,
-  type ModalCreateVolumeRequest,
-  type ModalDeleteVolumeRequest,
   type ModalSandboxConfig,
   type ModalStartSandboxRequest,
   type ModalStopSandboxRequest,
-  type ModalVolumeMount,
   type ModalWriteSandboxStdinRequest,
 } from "./schemas.js";
 
@@ -29,21 +22,11 @@ export type ModalStartSandboxResponse = {
   runtimeId: string;
 };
 
-export type ModalCreateVolumeResponse = {
-  volumeId: string;
-};
-
 export interface ModalClient {
-  createVolume(request: ModalCreateVolumeRequest): Promise<ModalCreateVolumeResponse>;
-  deleteVolume(request: ModalDeleteVolumeRequest): Promise<void>;
   startSandbox(request: ModalStartSandboxRequest): Promise<ModalStartSandboxResponse>;
   writeSandboxStdin(request: ModalWriteSandboxStdinRequest): Promise<void>;
   closeSandboxStdin(request: ModalCloseSandboxStdinRequest): Promise<void>;
   stopSandbox(request: ModalStopSandboxRequest): Promise<void>;
-}
-
-function createModalVolumeName(): string {
-  return `mistle-volume-${randomUUID().replaceAll("-", "")}`;
 }
 
 export class ModalApiClient implements ModalClient {
@@ -61,37 +44,6 @@ export class ModalApiClient implements ModalClient {
     });
   }
 
-  async createVolume(_request: ModalCreateVolumeRequest): Promise<ModalCreateVolumeResponse> {
-    ModalCreateVolumeRequestSchema.parse(_request);
-
-    const volumeId = createModalVolumeName();
-    await this.#runModalClientOperation(ModalClientOperationIds.CREATE_VOLUME, () =>
-      this.#modalClient.volumes.fromName(volumeId, {
-        createIfMissing: true,
-        ...(this.#config.environmentName === undefined
-          ? {}
-          : { environment: this.#config.environmentName }),
-      }),
-    );
-
-    return {
-      volumeId,
-    };
-  }
-
-  async deleteVolume(request: ModalDeleteVolumeRequest): Promise<void> {
-    const parsedRequest = ModalDeleteVolumeRequestSchema.parse(request);
-
-    await this.#runModalClientOperation(ModalClientOperationIds.DELETE_VOLUME, () =>
-      this.#modalClient.volumes.delete(parsedRequest.volumeId, {
-        allowMissing: false,
-        ...(this.#config.environmentName === undefined
-          ? {}
-          : { environment: this.#config.environmentName }),
-      }),
-    );
-  }
-
   async startSandbox(request: ModalStartSandboxRequest): Promise<ModalStartSandboxResponse> {
     const parsedRequest = ModalStartSandboxRequestSchema.parse(request);
 
@@ -99,12 +51,7 @@ export class ModalApiClient implements ModalClient {
     const image = await this.#runModalClientOperation(ModalClientOperationIds.RESOLVE_IMAGE, () =>
       this.#modalClient.images.fromId(parsedRequest.imageId),
     );
-    const createParams = {
-      ...(parsedRequest.env === undefined ? {} : { env: parsedRequest.env }),
-      ...(parsedRequest.mounts === undefined || parsedRequest.mounts.length === 0
-        ? {}
-        : { volumes: await this.#resolveVolumesByMountPath(parsedRequest.mounts) }),
-    };
+    const createParams = parsedRequest.env === undefined ? {} : { env: parsedRequest.env };
     const sandbox = await this.#runModalClientOperation(ModalClientOperationIds.START_SANDBOX, () =>
       this.#modalClient.sandboxes.create(app, image, createParams),
     );
@@ -176,30 +123,6 @@ export class ModalApiClient implements ModalClient {
       throw error;
     }
   }
-
-  async #resolveVolumesByMountPath(
-    mounts: ReadonlyArray<ModalVolumeMount>,
-  ): Promise<Record<string, Volume>> {
-    const entries = await Promise.all(
-      mounts.map(async (mount) => {
-        const volume = await this.#runModalClientOperation(
-          ModalClientOperationIds.RESOLVE_VOLUME,
-          () =>
-            this.#modalClient.volumes.fromName(mount.volumeId, {
-              createIfMissing: false,
-              ...(this.#config.environmentName === undefined
-                ? {}
-                : { environment: this.#config.environmentName }),
-            }),
-        );
-
-        return [mount.mountPath, volume] as const;
-      }),
-    );
-
-    return Object.fromEntries(entries);
-  }
-
   async #runModalClientOperation<TResult>(
     operation: ModalClientOperation,
     operationFn: () => Promise<TResult>,

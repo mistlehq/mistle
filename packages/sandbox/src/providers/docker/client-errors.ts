@@ -17,12 +17,6 @@ export const DockerClientOperationIds = {
    */
   CREATE_CONTAINER: "create_container",
   /**
-   * `docker.createVolume(...)`.
-   * Source:
-   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/docker.js#L1063-L1093
-   */
-  CREATE_VOLUME: "create_volume",
-  /**
    * `container.start(...)`.
    * Source:
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L388-L420
@@ -50,23 +44,11 @@ export const DockerClientOperationIds = {
    */
   RESOLVE_CONTAINER: "resolve_container",
   /**
-   * `volume.inspect(...)`.
-   * Source:
-   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/volume.js#L33-L61
-   */
-  RESOLVE_VOLUME: "resolve_volume",
-  /**
    * `container.remove(...)`.
    * Source:
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L815-L847
    */
   REMOVE_CONTAINER: "remove_container",
-  /**
-   * `volume.remove(...)`.
-   * Source:
-   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/volume.js#L83-L114
-   */
-  REMOVE_VOLUME: "remove_volume",
 } as const;
 export type DockerClientOperation =
   (typeof DockerClientOperationIds)[keyof typeof DockerClientOperationIds];

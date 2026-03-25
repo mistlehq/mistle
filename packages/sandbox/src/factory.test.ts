@@ -15,8 +15,6 @@ describe("createSandboxAdapter", () => {
       },
     });
 
-    expect(typeof adapter.createVolume).toBe("function");
-    expect(typeof adapter.deleteVolume).toBe("function");
     expect(typeof adapter.start).toBe("function");
     expect(typeof adapter.resume).toBe("function");
     expect(typeof adapter.stop).toBe("function");
@@ -39,8 +37,6 @@ describe("createSandboxAdapter", () => {
       },
     });
 
-    expect(typeof adapter.createVolume).toBe("function");
-    expect(typeof adapter.deleteVolume).toBe("function");
     expect(typeof adapter.start).toBe("function");
     expect(typeof adapter.resume).toBe("function");
     expect(typeof adapter.stop).toBe("function");

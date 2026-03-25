@@ -264,15 +264,15 @@ describe("SessionsPage", () => {
     const markup = renderToStaticMarkup(
       <SandboxSessionStatusBadge
         status="failed"
-        failureCode="INSTANCE_VOLUME_PROVISION_FAILED"
-        failureMessage="Failed to provision instance volume before runtime startup."
+        failureCode="sandbox_start_failed"
+        failureMessage="Failed to start sandbox runtime."
       />,
     );
 
     expect(markup).toContain("View failure details");
     expect(markup).toContain("Failed");
-    expect(markup).toContain("INSTANCE_VOLUME_PROVISION_FAILED");
-    expect(markup).toContain("Failed to provision instance volume before runtime startup.");
+    expect(markup).toContain("sandbox_start_failed");
+    expect(markup).toContain("Failed to start sandbox runtime.");
     expect(markup).not.toContain("text-destructive whitespace-pre-wrap text-xs");
   });
 
