@@ -9,8 +9,6 @@ import type {
   WebhookAutomationEventOption,
   WebhookAutomationFormOption,
 } from "./webhook-automation-form.js";
-import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-view.js";
-import type { WebhookAutomation } from "./webhook-automations-types.js";
 
 function sortOptionsByLabel<T extends { label: string }>(items: readonly T[]): T[] {
   return [...items].sort((left, right) => left.label.localeCompare(right.label));
@@ -239,66 +237,5 @@ export function buildWebhookAutomationEventOptions(input: {
     }
 
     return left.label.localeCompare(right.label);
-  });
-}
-
-export function buildWebhookAutomationListItems(input: {
-  automations: readonly WebhookAutomation[];
-  connections: readonly IntegrationConnection[];
-  targets: readonly IntegrationTarget[];
-  sandboxProfiles: readonly SandboxProfile[];
-}): readonly WebhookAutomationListItemViewModel[] {
-  return input.automations.map((automation) => {
-    const connection = input.connections.find(
-      (candidate) => candidate.id === automation.integrationConnectionId,
-    );
-    const selectedTriggerIds =
-      automation.eventTypes?.map((eventType) =>
-        createWebhookAutomationTriggerId({
-          connectionId: automation.integrationConnectionId,
-          eventType,
-        }),
-      ) ?? [];
-    const selectedEventOptions =
-      automation.eventTypes === null || automation.eventTypes.length === 0
-        ? []
-        : buildWebhookAutomationEventOptions({
-            connections: input.connections,
-            targets: input.targets,
-            preservedConnectionId: automation.integrationConnectionId,
-            selectedTriggerIds,
-          }).filter((eventOption) => selectedTriggerIds.includes(eventOption.id));
-    const target = input.targets.find((candidate) => candidate.targetKey === connection?.targetKey);
-    const sandboxProfile = input.sandboxProfiles.find(
-      (candidate) => candidate.id === automation.target.sandboxProfileId,
-    );
-    const events =
-      automation.eventTypes === null || automation.eventTypes.length === 0
-        ? [
-            {
-              label: "All events",
-              ...(target?.logoKey === undefined ? {} : { logoKey: target.logoKey }),
-            },
-          ]
-        : automation.eventTypes.map((eventType) => {
-            const eventOption = selectedEventOptions.find(
-              (option) => option.eventType === eventType,
-            );
-
-            return {
-              label: eventOption?.label ?? eventType,
-              ...(eventOption?.logoKey === undefined ? {} : { logoKey: eventOption.logoKey }),
-              ...(eventOption?.unavailable === true ? { unavailable: true } : {}),
-            };
-          });
-
-    return {
-      id: automation.id,
-      name: automation.name,
-      sandboxProfileName: sandboxProfile?.displayName ?? automation.target.sandboxProfileId,
-      events,
-      updatedAtLabel: formatWebhookAutomationUpdatedAt(automation.updatedAt),
-      enabled: automation.enabled,
-    };
   });
 }

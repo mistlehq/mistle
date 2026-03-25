@@ -32,25 +32,15 @@ export interface paths {
           content: {
             "application/json": {
               items: {
-                conversationKeyTemplate: string;
-                createdAt: string;
                 enabled: boolean;
-                eventTypes: string[] | null;
+                events: {
+                  label: string;
+                  logoKey?: string;
+                  unavailable?: boolean;
+                }[];
                 id: string;
-                idempotencyKeyTemplate: string | null;
-                inputTemplate: string;
-                integrationConnectionId: string;
-                /** @enum {string} */
-                kind: "webhook";
                 name: string;
-                payloadFilter: {
-                  [key: string]: unknown;
-                } | null;
-                target: {
-                  id: string;
-                  sandboxProfileId: string;
-                  sandboxProfileVersion: number | null;
-                };
+                targetName: string;
                 updatedAt: string;
               }[];
               nextPage: {

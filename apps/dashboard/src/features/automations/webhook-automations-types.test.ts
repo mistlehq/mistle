@@ -62,22 +62,16 @@ describe("webhook automations types", () => {
     const parsed = WebhookAutomationsListResultSchema.parse({
       items: [
         {
-          conversationKeyTemplate: "{{event.id}}",
-          createdAt: "2026-03-11T10:00:00.000Z",
           enabled: true,
-          eventTypes: null,
+          events: [
+            {
+              label: "CI Completed",
+              logoKey: "github",
+            },
+          ],
           id: "aut_123",
-          idempotencyKeyTemplate: null,
-          inputTemplate: "{}",
-          integrationConnectionId: "conn_123",
-          kind: "webhook",
           name: "Automation",
-          payloadFilter: null,
-          target: {
-            id: "target_123",
-            sandboxProfileId: "sbp_123",
-            sandboxProfileVersion: null,
-          },
+          targetName: "Production",
           updatedAt: "2026-03-11T10:05:00.000Z",
         },
       ],
@@ -90,6 +84,7 @@ describe("webhook automations types", () => {
     });
 
     expect(parsed.nextPage?.after).toBe("cursor_2");
+    expect(parsed.items[0]?.events[0]?.label).toBe("CI Completed");
     expect(parsed.totalResults).toBe(1);
   });
 

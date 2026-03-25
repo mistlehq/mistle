@@ -10,7 +10,7 @@ const SampleItems: readonly WebhookAutomationListItemViewModel[] = [
   {
     id: "aut_01jps7k2z2v3qj4k9m0n1p2q3r",
     name: "GitHub pushes to repo triage",
-    sandboxProfileName: "Repo Maintainer",
+    targetName: "Repo Maintainer",
     events: [
       {
         label: "CI completed",
@@ -27,7 +27,7 @@ const SampleItems: readonly WebhookAutomationListItemViewModel[] = [
   {
     id: "aut_01jps7mhvgc0p7e01b4z4r7c0m",
     name: "Stripe payouts incident intake",
-    sandboxProfileName: "Finance Investigator",
+    targetName: "Finance Investigator",
     events: [
       {
         label: "Payout failed",

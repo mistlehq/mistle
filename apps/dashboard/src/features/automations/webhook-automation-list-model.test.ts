@@ -11,7 +11,7 @@ const SampleItems: readonly WebhookAutomationListItemViewModel[] = [
   {
     id: "aut_01",
     name: "GitHub pushes to repo triage",
-    sandboxProfileName: "Repo Maintainer",
+    targetName: "Repo Maintainer",
     events: [
       {
         label: "Pull request opened",
@@ -28,7 +28,7 @@ const SampleItems: readonly WebhookAutomationListItemViewModel[] = [
   {
     id: "aut_02",
     name: "Stripe payouts incident intake",
-    sandboxProfileName: "Finance Investigator",
+    targetName: "Finance Investigator",
     events: [
       {
         label: "Payout failed",

@@ -21,16 +21,7 @@ const routeHandler = async (
     },
   );
 
-  return ctx.json(
-    {
-      ...result,
-      items: result.items.map((automationWebhook) => ({
-        ...automationWebhook,
-        kind: "webhook" as const,
-      })),
-    },
-    200,
-  );
+  return ctx.json(result, 200);
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(

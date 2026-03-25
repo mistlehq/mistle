@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -236,15 +236,16 @@ describe("WebhookAutomationForm", () => {
     );
   });
 
-  it("renders the create automation name in the header with the inline edit affordance", () => {
-    renderForm("create");
+  it("renders a fixed create title and a separate automation name field", () => {
+    const { container } = renderFormWithOptions({
+      mode: "create",
+    });
+    const form = within(container);
 
-    expect(screen.getAllByRole("heading", { name: "Repo triage" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: "Edit automation name" }).length).toBeGreaterThan(
-      0,
-    );
-    expect(screen.queryByText("Create Automation")).toBeNull();
-    expect(screen.queryByText("Automation name")).toBeNull();
+    expect(form.getAllByRole("heading", { name: "Create Automation" }).length).toBeGreaterThan(0);
+    expect(form.getByText("Automation name")).toBeDefined();
+    expect(form.getByDisplayValue("Repo triage")).toBeDefined();
+    expect(form.queryByRole("button", { name: "Edit automation name" })).toBeNull();
   });
 
   it("shows the selected-profile trigger binding message when triggers are unavailable", () => {

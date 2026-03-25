@@ -79,7 +79,7 @@ export function filterWebhookAutomationListItems(input: {
 
     return (
       includesSearchValue(item.name, searchValue) ||
-      includesSearchValue(item.sandboxProfileName, searchValue) ||
+      includesSearchValue(item.targetName, searchValue) ||
       item.events.some((event) => includesSearchValue(event.label, searchValue)) ||
       includesSearchValue(item.enabled ? "enabled" : "disabled", searchValue)
     );

@@ -1,4 +1,12 @@
-import { automations, AutomationKinds } from "@mistle/db/control-plane";
+import {
+  automations,
+  automationTargets,
+  AutomationKinds,
+  integrationConnections,
+  integrationTargets,
+  sandboxProfiles,
+  webhookAutomations,
+} from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
@@ -13,14 +21,11 @@ import {
   paginateKeyset,
   parseKeysetPageSize,
 } from "@mistle/http/pagination";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { resolveTargetMetadataFromPersistedTarget } from "../../integration-targets/services/resolve-target-metadata.js";
 import { AutomationWebhooksBadRequestCodes } from "../constants.js";
-import {
-  loadWebhookAutomationAggregateOrThrow,
-  type AutomationWebhookAggregate,
-} from "./load-webhook-automation-aggregate-or-throw.js";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -48,10 +53,176 @@ export type ListWebhookAutomationsInput = {
   before?: string | undefined;
 };
 
+export type AutomationWebhookListItem = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  targetName: string;
+  events: {
+    label: string;
+    logoKey?: string;
+    unavailable?: boolean;
+  }[];
+  updatedAt: string;
+};
+
+type AutomationWebhookListPageItem = AutomationWebhookListItem & {
+  createdAt: string;
+};
+
+function createTriggerId(input: { connectionId: string; eventType: string }): string {
+  return `${input.connectionId}::${input.eventType}`;
+}
+
+function resolveAutomationListEvents(input: {
+  eventTypes: string[] | null;
+  integrationConnectionId: string;
+  supportedWebhookEvents?: {
+    eventType: string;
+    displayName: string;
+  }[];
+  logoKey?: string;
+}): AutomationWebhookListItem["events"] {
+  const supportedEventMap = new Map(
+    (input.supportedWebhookEvents ?? []).map((eventDefinition) => [
+      createTriggerId({
+        connectionId: input.integrationConnectionId,
+        eventType: eventDefinition.eventType,
+      }),
+      eventDefinition,
+    ]),
+  );
+
+  if (input.eventTypes === null || input.eventTypes.length === 0) {
+    return [
+      {
+        label: "All events",
+        ...(input.logoKey === undefined ? {} : { logoKey: input.logoKey }),
+      },
+    ];
+  }
+
+  return input.eventTypes.map((eventType) => {
+    const eventDefinition = supportedEventMap.get(
+      createTriggerId({
+        connectionId: input.integrationConnectionId,
+        eventType,
+      }),
+    );
+
+    if (eventDefinition === undefined) {
+      return {
+        label: eventType,
+        unavailable: true,
+      };
+    }
+
+    return {
+      label: eventDefinition.displayName,
+      ...(input.logoKey === undefined ? {} : { logoKey: input.logoKey }),
+    };
+  });
+}
+
+async function loadAutomationListPageRows(input: {
+  db: ControlPlaneDatabase;
+  organizationId: string;
+  automationIds: readonly string[];
+}): Promise<AutomationWebhookListPageItem[]> {
+  if (input.automationIds.length === 0) {
+    return [];
+  }
+
+  const rows = await input.db
+    .select({
+      automationId: automations.id,
+      automationName: automations.name,
+      enabled: automations.enabled,
+      createdAt: automations.createdAt,
+      updatedAt: automations.updatedAt,
+      eventTypes: webhookAutomations.eventTypes,
+      integrationConnectionId: webhookAutomations.integrationConnectionId,
+      integrationTargetKey: integrationConnections.targetKey,
+      sandboxProfileDisplayName: sandboxProfiles.displayName,
+      integrationTargetFamilyId: integrationTargets.familyId,
+      integrationTargetVariantId: integrationTargets.variantId,
+      integrationTargetDisplayNameOverride: integrationTargets.displayNameOverride,
+      integrationTargetDescriptionOverride: integrationTargets.descriptionOverride,
+    })
+    .from(automations)
+    .innerJoin(webhookAutomations, eq(webhookAutomations.automationId, automations.id))
+    .innerJoin(
+      integrationConnections,
+      eq(integrationConnections.id, webhookAutomations.integrationConnectionId),
+    )
+    .innerJoin(
+      integrationTargets,
+      eq(integrationTargets.targetKey, integrationConnections.targetKey),
+    )
+    .innerJoin(automationTargets, eq(automationTargets.automationId, automations.id))
+    .innerJoin(sandboxProfiles, eq(sandboxProfiles.id, automationTargets.sandboxProfileId))
+    .where(
+      and(
+        eq(automations.organizationId, input.organizationId),
+        eq(automations.kind, AutomationKinds.WEBHOOK),
+        inArray(automations.id, input.automationIds),
+      ),
+    );
+
+  const rowsByAutomationId = new Map(
+    rows.map((row) => {
+      const targetMetadata = resolveTargetMetadataFromPersistedTarget({
+        familyId: row.integrationTargetFamilyId,
+        variantId: row.integrationTargetVariantId,
+        displayNameOverride: row.integrationTargetDisplayNameOverride,
+        descriptionOverride: row.integrationTargetDescriptionOverride,
+      });
+
+      return [
+        row.automationId,
+        {
+          id: row.automationId,
+          name: row.automationName,
+          enabled: row.enabled,
+          createdAt: row.createdAt,
+          targetName: row.sandboxProfileDisplayName,
+          events: resolveAutomationListEvents({
+            eventTypes: row.eventTypes,
+            integrationConnectionId: row.integrationConnectionId,
+            ...(targetMetadata.supportedWebhookEvents === undefined
+              ? {}
+              : {
+                  supportedWebhookEvents: targetMetadata.supportedWebhookEvents.map(
+                    (eventDefinition) => ({
+                      eventType: eventDefinition.eventType,
+                      displayName: eventDefinition.displayName,
+                    }),
+                  ),
+                }),
+            ...(targetMetadata.logoKey === undefined ? {} : { logoKey: targetMetadata.logoKey }),
+          }),
+          updatedAt: row.updatedAt,
+        } satisfies AutomationWebhookListPageItem,
+      ];
+    }),
+  );
+
+  return input.automationIds.map((automationId) => {
+    const row = rowsByAutomationId.get(automationId);
+    if (row === undefined) {
+      throw new Error(
+        `Webhook automation '${automationId}' could not be loaded for the list page.`,
+      );
+    }
+
+    return row;
+  });
+}
+
 export async function listAutomationWebhooks(
   ctx: { db: ControlPlaneDatabase },
   input: ListWebhookAutomationsInput,
-): Promise<KeysetPaginatedResult<AutomationWebhookAggregate>> {
+): Promise<KeysetPaginatedResult<AutomationWebhookListItem>> {
   let pageSize: number;
 
   try {
@@ -68,7 +239,10 @@ export async function listAutomationWebhooks(
   }
 
   try {
-    return await paginateKeyset({
+    const result = await paginateKeyset<
+      AutomationWebhookListPageItem,
+      z.infer<typeof CursorSchema>
+    >({
       query: {
         after: input.after,
         before: input.before,
@@ -134,17 +308,11 @@ export async function listAutomationWebhooks(
           limit: limitPlusOne,
         });
 
-        return Promise.all(
-          automationRows.map((automation) =>
-            loadWebhookAutomationAggregateOrThrow(
-              { db: ctx.db },
-              {
-                organizationId: input.organizationId,
-                automationId: automation.id,
-              },
-            ),
-          ),
-        );
+        return loadAutomationListPageRows({
+          db: ctx.db,
+          organizationId: input.organizationId,
+          automationIds: automationRows.map((automation) => automation.id),
+        });
       },
       countTotalResults: async () => {
         const [result] = await ctx.db
@@ -162,6 +330,11 @@ export async function listAutomationWebhooks(
         return result?.totalResults ?? 0;
       },
     });
+
+    return {
+      ...result,
+      items: result.items.map(({ createdAt: _createdAt, ...item }) => item),
+    };
   } catch (error) {
     if (
       error instanceof KeysetPaginationInputError &&

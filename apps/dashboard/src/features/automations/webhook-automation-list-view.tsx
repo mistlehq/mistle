@@ -17,20 +17,15 @@ import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { useWebhookAutomationListState } from "./use-webhook-automation-list-state.js";
 import { WebhookAutomationListToolbar } from "./webhook-automation-list-toolbar.js";
-
-export type WebhookAutomationListItemEventViewModel = {
-  label: string;
-  logoKey?: string;
-  unavailable?: boolean;
-};
+import type { WebhookAutomationListEvent } from "./webhook-automations-types.js";
 
 export type WebhookAutomationListItemViewModel = {
   id: string;
   name: string;
-  sandboxProfileName: string;
-  events: readonly WebhookAutomationListItemEventViewModel[];
-  updatedAtLabel: string;
   enabled: boolean;
+  targetName: string;
+  events: readonly WebhookAutomationListEvent[];
+  updatedAtLabel: string;
 };
 
 function renderAutomationPagination(input: {
@@ -86,35 +81,55 @@ function LoadingState(): React.JSX.Element {
   );
 }
 
-function EventList(input: {
-  events: readonly WebhookAutomationListItemEventViewModel[];
-}): React.JSX.Element {
+export function buildEventSummaryTitle(events: readonly WebhookAutomationListEvent[]): string {
+  return events
+    .map((event) => `${event.label}${event.unavailable === true ? " (Unavailable)" : ""}`)
+    .join(", ");
+}
+
+export function resolveEventSummary(input: { events: readonly WebhookAutomationListEvent[] }): {
+  firstEvent: WebhookAutomationListEvent | null;
+  remainingCount: number;
+  title: string;
+} {
   const [firstEvent, ...remainingEvents] = input.events;
 
-  if (firstEvent === undefined) {
+  return {
+    firstEvent: firstEvent ?? null,
+    remainingCount: remainingEvents.length,
+    title: buildEventSummaryTitle(input.events),
+  };
+}
+
+function EventSummaryCell(input: {
+  events: readonly WebhookAutomationListEvent[];
+}): React.JSX.Element {
+  const eventSummary = resolveEventSummary({
+    events: input.events,
+  });
+
+  if (eventSummary.firstEvent === null) {
     return <span className="text-muted-foreground">No events</span>;
   }
 
-  const title = input.events
-    .map((event) => `${event.label}${event.unavailable === true ? " (Unavailable)" : ""}`)
-    .join(", ");
-
   return (
-    <div className="flex items-center gap-2" title={title}>
-      {firstEvent.logoKey === undefined ? null : (
+    <div className="flex items-center gap-2" title={eventSummary.title}>
+      {eventSummary.firstEvent.logoKey === undefined ? null : (
         <img
           alt=""
           aria-hidden
           className="size-4 shrink-0"
-          src={resolveIntegrationLogoPath({ logoKey: firstEvent.logoKey })}
+          src={resolveIntegrationLogoPath({ logoKey: eventSummary.firstEvent.logoKey })}
         />
       )}
-      <span className="truncate">{firstEvent.label}</span>
-      {firstEvent.unavailable === true ? (
+      <span className="truncate">{eventSummary.firstEvent.label}</span>
+      {eventSummary.firstEvent.unavailable === true ? (
         <span className="text-destructive text-xs whitespace-nowrap">Unavailable</span>
       ) : null}
-      {remainingEvents.length === 0 ? null : (
-        <span className="text-muted-foreground shrink-0 text-xs">+{remainingEvents.length}</span>
+      {eventSummary.remainingCount === 0 ? null : (
+        <span className="text-muted-foreground shrink-0 text-xs">
+          +{eventSummary.remainingCount}
+        </span>
       )}
     </div>
   );
@@ -208,9 +223,9 @@ export function WebhookAutomationListView(
                       </button>
                     </div>
                   </TableCell>
-                  <TableCell>{item.sandboxProfileName}</TableCell>
+                  <TableCell>{item.targetName}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    <EventList events={item.events} />
+                    <EventSummaryCell events={item.events} />
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {item.updatedAtLabel}
