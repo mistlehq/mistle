@@ -196,23 +196,28 @@ export function WebhookAutomationListView(
               {visibleItems.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span
-                        aria-hidden
-                        className={`inline-block size-2 shrink-0 rounded-full ${
-                          item.enabled ? "bg-emerald-500" : "bg-muted-foreground/35"
-                        }`}
-                      />
-                      <span className="sr-only">{item.enabled ? "Enabled" : "Disabled"}</span>
-                      <button
-                        className="text-left font-medium underline-offset-4 hover:underline"
-                        onClick={() => {
-                          input.onOpenAutomation(item.id);
-                        }}
-                        type="button"
-                      >
-                        {item.name}
-                      </button>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          aria-hidden
+                          className={`inline-block size-2 shrink-0 rounded-full ${
+                            item.enabled ? "bg-emerald-500" : "bg-muted-foreground/35"
+                          }`}
+                        />
+                        <span className="sr-only">{item.enabled ? "Enabled" : "Disabled"}</span>
+                        <button
+                          className="text-left font-medium underline-offset-4 hover:underline"
+                          onClick={() => {
+                            input.onOpenAutomation(item.id);
+                          }}
+                          type="button"
+                        >
+                          {item.name}
+                        </button>
+                      </div>
+                      {item.issue === undefined ? null : (
+                        <p className="text-destructive text-xs leading-5">{item.issue.message}</p>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>{item.targetName}</TableCell>

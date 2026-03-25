@@ -1,6 +1,12 @@
+// @vitest-environment jsdom
+
+import { render, screen } from "@testing-library/react";
+import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 
 import { buildEventSummaryTitle, resolveEventSummary } from "./webhook-automation-list-view.js";
+import { WebhookAutomationListView } from "./webhook-automation-list-view.js";
+import { createWebhookAutomationListItemViewModel } from "./webhook-automation-test-fixtures.js";
 import { createWebhookAutomationListEvent } from "./webhook-automation-test-fixtures.js";
 
 describe("buildEventSummaryTitle", () => {
@@ -55,5 +61,38 @@ describe("resolveEventSummary", () => {
       remainingCount: 0,
       title: "",
     });
+  });
+});
+
+describe("WebhookAutomationListView", () => {
+  it("shows row-level issue messages for affected automations", () => {
+    render(
+      createElement(WebhookAutomationListView, {
+        errorMessage: null,
+        hasNextPage: false,
+        hasPreviousPage: false,
+        isLoading: false,
+        items: [
+          createWebhookAutomationListItemViewModel({
+            issue: {
+              code: "MISSING_TARGET_METADATA",
+              message:
+                "This automation references an integration target definition that is no longer available. Event metadata may be incomplete.",
+            },
+          }),
+        ],
+        onNextPage: () => {},
+        onOpenAutomation: () => {},
+        onPreviousPage: () => {},
+        onRetry: () => {},
+        totalResults: 1,
+      }),
+    );
+
+    expect(
+      screen.getByText(
+        "This automation references an integration target definition that is no longer available. Event metadata may be incomplete.",
+      ),
+    ).toBeDefined();
   });
 });

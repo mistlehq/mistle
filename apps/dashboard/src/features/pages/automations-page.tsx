@@ -43,7 +43,12 @@ export function AutomationsPage(): React.JSX.Element {
 
   const items =
     automationsQuery.data?.items.map((automation) => ({
-      ...automation,
+      id: automation.id,
+      name: automation.name,
+      enabled: automation.enabled,
+      targetName: automation.targetName,
+      ...(automation.issue === undefined ? {} : { issue: automation.issue }),
+      events: automation.events,
       updatedAtLabel: formatWebhookAutomationUpdatedAt(automation.updatedAt),
     })) ?? [];
 

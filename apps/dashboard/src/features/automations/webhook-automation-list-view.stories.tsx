@@ -57,6 +57,25 @@ const SampleItems: readonly WebhookAutomationListItemViewModel[] = [
   },
 ];
 
+const RowLevelIssueItem: WebhookAutomationListItemViewModel = {
+  id: "aut_01jps82rc4z62qy0m7zdb8h5qn",
+  name: "Retired metadata triage",
+  targetName: "Incident Commander",
+  issue: {
+    code: "MISSING_TARGET_METADATA",
+    message:
+      "This automation references an integration target definition that is no longer available. Event metadata may be incomplete.",
+  },
+  events: [
+    {
+      label: "issue_comment.created",
+      unavailable: true,
+    },
+  ],
+  updatedAtLabel: "3 days ago",
+  enabled: true,
+};
+
 const meta = {
   title: "Dashboard/Automations/WebhookAutomationListView",
   component: WebhookAutomationListView,
@@ -117,6 +136,15 @@ export const ErrorState: Story = {
 export const UnavailableSavedEvent: Story = {
   args: {
     items: [SampleItems[2]].filter(
+      (item): item is WebhookAutomationListItemViewModel => item !== undefined,
+    ),
+    totalResults: 1,
+  },
+};
+
+export const RowLevelIssue: Story = {
+  args: {
+    items: [RowLevelIssueItem].filter(
       (item): item is WebhookAutomationListItemViewModel => item !== undefined,
     ),
     totalResults: 1,
