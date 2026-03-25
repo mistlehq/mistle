@@ -408,7 +408,7 @@ export const ValidationErrors: Story = {
     fieldErrors: {
       name: "Automation name is required.",
       triggerIds: "Select at least one trigger.",
-      sandboxProfileId: "Choose a sandbox profile for the automation target.",
+      sandboxProfileId: "Select a sandbox profile.",
       instructions: "Instructions are required.",
     },
     values: {
