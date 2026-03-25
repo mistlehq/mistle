@@ -41,7 +41,7 @@ export async function resumeSandbox(
         mountPath: SandboxRuntimeInstanceVolumeMountPath,
       },
     ],
-    previousRuntimeId: input.previousProviderRuntimeId,
+    id: input.previousProviderRuntimeId,
     env: createSandboxRuntimeEnv({
       config: ctx.config,
       sandboxInstanceId: input.sandboxInstanceId,
@@ -65,6 +65,6 @@ export async function resumeSandbox(
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     runtimeProvider: resumedSandbox.provider,
-    providerRuntimeId: resumedSandbox.runtimeId,
+    providerRuntimeId: resumedSandbox.id,
   };
 }

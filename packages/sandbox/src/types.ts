@@ -22,7 +22,7 @@ export interface SandboxVolumeHandleV1 {
 
 export interface SandboxHandle {
   readonly provider: SandboxRuntimeProvider;
-  readonly runtimeId: string;
+  readonly id: string;
   writeStdin(input: { payload: Uint8Array<ArrayBufferLike> }): Promise<void>;
   closeStdin(): Promise<void>;
 }
@@ -41,7 +41,7 @@ export interface SandboxStartRequest {
 export interface SandboxResumeRequestV1 {
   readonly image: SandboxImageHandle;
   readonly mounts?: ReadonlyArray<SandboxVolumeMountV1>;
-  readonly previousRuntimeId?: string | null;
+  readonly id?: string | null;
   readonly env?: Readonly<Record<string, string>>;
 }
 
@@ -52,11 +52,11 @@ export interface DeleteVolumeRequestV1 {
 }
 
 export interface SandboxStopRequest {
-  readonly runtimeId: string;
+  readonly id: string;
 }
 
 export interface SandboxDestroyRequest {
-  readonly runtimeId: string;
+  readonly id: string;
 }
 
 export interface SandboxAdapter {

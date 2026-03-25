@@ -88,6 +88,6 @@ export async function startSandbox(
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     runtimeProvider: startedSandbox.provider,
-    providerRuntimeId: startedSandbox.runtimeId,
+    providerRuntimeId: startedSandbox.id,
   };
 }
