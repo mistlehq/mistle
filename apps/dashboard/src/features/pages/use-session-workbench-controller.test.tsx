@@ -447,7 +447,7 @@ describe("useSessionWorkbenchController", () => {
   it("shows resume progress only while resume intent or request is active", () => {
     expect(
       shouldShowResumeInFlightState({
-        hasResumeOnOpenIntent: true,
+        shouldAutoResumeStoppedSandbox: true,
         isResumingStoppedSandbox: false,
         sandboxStatus: "stopped",
       }),
@@ -455,7 +455,7 @@ describe("useSessionWorkbenchController", () => {
 
     expect(
       shouldShowResumeInFlightState({
-        hasResumeOnOpenIntent: false,
+        shouldAutoResumeStoppedSandbox: false,
         isResumingStoppedSandbox: true,
         sandboxStatus: "stopped",
       }),
@@ -463,7 +463,7 @@ describe("useSessionWorkbenchController", () => {
 
     expect(
       shouldShowResumeInFlightState({
-        hasResumeOnOpenIntent: false,
+        shouldAutoResumeStoppedSandbox: false,
         isResumingStoppedSandbox: false,
         sandboxStatus: "stopped",
       }),
@@ -614,5 +614,61 @@ describe("useSessionWorkbenchController", () => {
       sandboxInstanceId,
       storage: window.localStorage,
     });
+  });
+
+  it("keeps resume-on-open latched after the router token is cleared", () => {
+    const sandboxInstanceId = `sbi-resume-on-open-${Date.now()}`;
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+
+    seedSandboxInstanceStatusQuery({
+      queryClient,
+      sandboxInstanceId,
+      sandboxStatus: {
+        id: sandboxInstanceId,
+        status: "stopped",
+        failureCode: null,
+        failureMessage: null,
+        automationConversation: null,
+      },
+    });
+
+    const wrapper = ({ children }: React.PropsWithChildren): React.JSX.Element => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const initialProps: {
+      resumeOnOpenRequestToken: string | null;
+    } = {
+      resumeOnOpenRequestToken: "resume-on-open-token",
+    };
+
+    const { result, rerender } = renderHook(
+      ({ resumeOnOpenRequestToken }: { resumeOnOpenRequestToken: string | null }) =>
+        useSessionWorkbenchController({
+          onResumeOnOpenHandled: () => {},
+          resumeOnOpenRequestToken,
+          sandboxInstanceId,
+        }),
+      {
+        initialProps,
+        wrapper,
+      },
+    );
+
+    expect(result.current.workbench.isResumingStoppedSandbox).toBe(true);
+    expect(result.current.workbench.stoppedSessionState.requiresManualResume).toBe(false);
+
+    rerender({
+      resumeOnOpenRequestToken: null,
+    });
+
+    expect(result.current.workbench.isResumingStoppedSandbox).toBe(true);
+    expect(result.current.workbench.stoppedSessionState.requiresManualResume).toBe(false);
   });
 });

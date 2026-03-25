@@ -315,12 +315,12 @@ export function shouldRetainResumeRetryWindowAfterError(error: unknown): boolean
 }
 
 export function shouldShowResumeInFlightState(input: {
-  hasResumeOnOpenIntent: boolean;
+  shouldAutoResumeStoppedSandbox: boolean;
   isResumingStoppedSandbox: boolean;
   sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
 }): boolean {
   return (
-    (input.hasResumeOnOpenIntent || input.isResumingStoppedSandbox) &&
+    (input.shouldAutoResumeStoppedSandbox || input.isResumingStoppedSandbox) &&
     input.sandboxStatus === "stopped"
   );
 }
@@ -528,7 +528,7 @@ export function useSessionWorkbenchController(input: {
 
       if (
         shouldPollStoppedSandboxStatus({
-          hasResumePolicy: hasResumePolicy || input.resumeOnOpenRequestToken !== null,
+          hasResumePolicy: hasResumePolicy || shouldAutoResumeStoppedSandbox,
           sandboxStatus: status ?? null,
         })
       ) {
@@ -540,7 +540,7 @@ export function useSessionWorkbenchController(input: {
   });
   const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
   const isShowingResumeInFlightState = shouldShowResumeInFlightState({
-    hasResumeOnOpenIntent: input.resumeOnOpenRequestToken !== null,
+    shouldAutoResumeStoppedSandbox,
     isResumingStoppedSandbox,
     sandboxStatus,
   });
