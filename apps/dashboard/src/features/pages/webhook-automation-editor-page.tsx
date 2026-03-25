@@ -1,4 +1,4 @@
-import { Alert, AlertDescription, AlertTitle, Button, Card, CardContent } from "@mistle/ui";
+import { Alert, AlertDescription, AlertTitle, Button } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router";
 
@@ -13,6 +13,7 @@ import { toWebhookAutomationFormValues } from "../automations/webhook-automation
 import { WebhookAutomationForm } from "../automations/webhook-automation-form.js";
 import { webhookAutomationDetailQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { getWebhookAutomation } from "../automations/webhook-automations-service.js";
+import { FormPageSection, FormPageShell } from "../shared/form-page.js";
 
 type WebhookAutomationEditorPageProps = {
   mode: "create" | "edit";
@@ -41,27 +42,31 @@ function renderWebhookAutomationEditorError(input: {
   onBack: () => void;
 }): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-4">
-      <Alert variant="destructive">
-        <AlertTitle>{input.title}</AlertTitle>
-        <AlertDescription>{input.description}</AlertDescription>
-      </Alert>
-      <div>
-        <Button onClick={input.onBack} type="button" variant="outline">
-          Back to automations
-        </Button>
-      </div>
-    </div>
+    <FormPageShell className="-my-6">
+      <FormPageSection>
+        <div className="flex flex-col gap-4 p-4">
+          <Alert variant="destructive">
+            <AlertTitle>{input.title}</AlertTitle>
+            <AlertDescription>{input.description}</AlertDescription>
+          </Alert>
+          <div>
+            <Button onClick={input.onBack} type="button" variant="outline">
+              Back to automations
+            </Button>
+          </div>
+        </div>
+      </FormPageSection>
+    </FormPageShell>
   );
 }
 
 function renderWebhookAutomationEditorLoading(): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardContent className="pt-4">Loading automation…</CardContent>
-      </Card>
-    </div>
+    <FormPageShell className="-my-6">
+      <FormPageSection>
+        <div className="p-4">Loading automation…</div>
+      </FormPageSection>
+    </FormPageShell>
   );
 }
 
@@ -192,35 +197,33 @@ function LoadedWebhookAutomationEditor(input: {
   const state = useLoadedWebhookAutomationEditorState(input);
 
   return (
-    <div className="-mx-4 -my-6 min-h-full bg-muted/30 px-4 py-6">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-        <WebhookAutomationForm
-          connectionOptions={state.connectionOptions}
-          fieldErrors={state.fieldErrors}
-          formError={state.formError}
-          isDeleting={state.isDeleting}
-          isSaving={state.isSaving}
-          mode={input.mode}
-          onDelete={state.onRequestDelete}
-          onSubmit={state.onSubmit}
-          onValueChange={state.onValueChange}
-          sandboxProfileOptions={state.sandboxProfileOptions}
-          triggerPickerDisabledReason={state.triggerPickerDisabledReason}
-          webhookEventOptions={state.webhookEventOptions}
-          values={state.values}
-        />
+    <FormPageShell className="-my-6">
+      <WebhookAutomationForm
+        connectionOptions={state.connectionOptions}
+        fieldErrors={state.fieldErrors}
+        formError={state.formError}
+        isDeleting={state.isDeleting}
+        isSaving={state.isSaving}
+        mode={input.mode}
+        onDelete={state.onRequestDelete}
+        onSubmit={state.onSubmit}
+        onValueChange={state.onValueChange}
+        sandboxProfileOptions={state.sandboxProfileOptions}
+        triggerPickerDisabledReason={state.triggerPickerDisabledReason}
+        webhookEventOptions={state.webhookEventOptions}
+        values={state.values}
+      />
 
-        {input.mode === "edit" ? (
-          <DeleteWebhookAutomationDialog
-            automationName={state.values.name}
-            errorMessage={state.deleteError}
-            isOpen={state.isDeleteDialogOpen}
-            isPending={state.isDeleting}
-            onConfirm={state.onConfirmDelete}
-            onOpenChange={state.onDeleteDialogOpenChange}
-          />
-        ) : null}
-      </div>
-    </div>
+      {input.mode === "edit" ? (
+        <DeleteWebhookAutomationDialog
+          automationName={state.values.name}
+          errorMessage={state.deleteError}
+          isOpen={state.isDeleteDialogOpen}
+          isPending={state.isDeleting}
+          onConfirm={state.onConfirmDelete}
+          onOpenChange={state.onDeleteDialogOpenChange}
+        />
+      ) : null}
+    </FormPageShell>
   );
 }

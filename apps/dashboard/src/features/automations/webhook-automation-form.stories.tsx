@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
+import { FormPageShell } from "../shared/form-page.js";
 import {
   WebhookAutomationForm,
   type WebhookAutomationEventOption,
@@ -378,6 +379,21 @@ export const Create: Story = {
   },
 };
 
+export const CreatePageLayout: Story = {
+  args: {
+    mode: "create",
+    triggerPickerDisabledReason: "Select a sandbox profile to choose triggers.",
+    values: EmptyCreateValues,
+  },
+  render: function RenderStory(args): React.JSX.Element {
+    return (
+      <FormPageShell>
+        <StoryHarness {...args} />
+      </FormPageShell>
+    );
+  },
+};
+
 export const Edit: Story = {
   args: {
     mode: "edit",
@@ -401,6 +417,21 @@ export const Edit: Story = {
         logoKey: "stripe",
       },
     ],
+  },
+};
+
+export const EditPageLayout: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    values: ExistingAutomationValues,
+  },
+  render: function RenderStory(args): React.JSX.Element {
+    return (
+      <FormPageShell>
+        <StoryHarness {...args} />
+      </FormPageShell>
+    );
   },
 };
 

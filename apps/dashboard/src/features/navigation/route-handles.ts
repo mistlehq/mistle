@@ -223,6 +223,7 @@ export const ROUTE_HANDLES = {
     breadcrumb: "Profile",
     title: "Profile",
     description: "",
+    settingsLayoutVariant: "form",
   },
   settingsOrganization: {
     breadcrumb: "Organization",
@@ -232,6 +233,7 @@ export const ROUTE_HANDLES = {
     breadcrumb: "General",
     title: "General",
     description: "",
+    settingsLayoutVariant: "form",
   },
   settingsOrganizationMembers: {
     breadcrumb: "Members",
