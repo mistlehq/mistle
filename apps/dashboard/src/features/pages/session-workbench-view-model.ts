@@ -125,7 +125,7 @@ export function shouldShowResumeAction(input: {
   requiresManualResume: boolean;
   isResumingStoppedSandbox: boolean;
 }): boolean {
-  return input.requiresManualResume || input.isResumingStoppedSandbox;
+  return input.requiresManualResume;
 }
 
 export type ChatComposerAction =

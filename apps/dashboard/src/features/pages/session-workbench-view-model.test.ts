@@ -132,7 +132,7 @@ describe("resolveStoppedSessionMessage", () => {
 });
 
 describe("shouldShowResumeAction", () => {
-  it("keeps the resume action visible while a stopped sandbox resume is in flight", () => {
+  it("shows the resume action only when manual resume is required", () => {
     expect(
       shouldShowResumeAction({
         requiresManualResume: true,
@@ -145,7 +145,7 @@ describe("shouldShowResumeAction", () => {
         requiresManualResume: false,
         isResumingStoppedSandbox: true,
       }),
-    ).toBe(true);
+    ).toBe(false);
 
     expect(
       shouldShowResumeAction({
