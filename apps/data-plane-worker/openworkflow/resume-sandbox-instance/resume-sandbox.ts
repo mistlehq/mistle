@@ -10,8 +10,6 @@ export async function resumeSandbox(
   },
   input: {
     sandboxInstanceId: string;
-    imageId: string;
-    imageCreatedAt: string;
     previousProviderSandboxId: string;
   },
 ): Promise<{
@@ -20,11 +18,6 @@ export async function resumeSandbox(
   providerSandboxId: string;
 }> {
   const resumedSandbox = await ctx.sandboxAdapter.resume({
-    image: {
-      provider: ctx.config.sandbox.provider,
-      imageId: input.imageId,
-      createdAt: input.imageCreatedAt,
-    },
     id: input.previousProviderSandboxId,
     env: createSandboxRuntimeEnv({
       config: ctx.config,

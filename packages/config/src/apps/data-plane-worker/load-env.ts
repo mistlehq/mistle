@@ -4,7 +4,6 @@ import {
   DataPlaneWorkerDatabaseConfigSchema,
   PartialDataPlaneWorkerRuntimeStateConfigSchema,
   DataPlaneWorkerSandboxDockerConfigSchema,
-  DataPlaneWorkerSandboxModalConfigSchema,
   DataPlaneWorkerTunnelConfigSchema,
   DataPlaneWorkerWorkflowConfigSchema,
   PartialDataPlaneWorkerConfigSchema,
@@ -60,25 +59,6 @@ const loadRuntimeStateEnv = createEnvLoader<typeof PartialDataPlaneWorkerRuntime
   },
 ]);
 
-const loadSandboxModalEnv = createEnvLoader<typeof DataPlaneWorkerSandboxModalConfigSchema>([
-  {
-    key: "tokenId",
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID",
-  },
-  {
-    key: "tokenSecret",
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET",
-  },
-  {
-    key: "appName",
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_APP_NAME",
-  },
-  {
-    key: "environmentName",
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME",
-  },
-]);
-
 const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneWorkerSandboxDockerConfigSchema>([
   {
     key: "socketPath",
@@ -127,17 +107,13 @@ export function loadDataPlaneWorkerFromEnv(
   }
 
   const sandbox = loadSandboxEnv(env);
-  const sandboxModal = loadSandboxModalEnv(env);
   const sandboxDocker = loadSandboxDockerEnv(env);
 
-  if (hasEntries(sandbox) || hasEntries(sandboxModal) || hasEntries(sandboxDocker)) {
+  if (hasEntries(sandbox) || hasEntries(sandboxDocker)) {
     const sandboxConfig: Record<string, unknown> = {
       ...sandbox,
     };
 
-    if (hasEntries(sandboxModal)) {
-      sandboxConfig.modal = sandboxModal;
-    }
     if (hasEntries(sandboxDocker)) {
       sandboxConfig.docker = sandboxDocker;
     }

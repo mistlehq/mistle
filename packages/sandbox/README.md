@@ -13,29 +13,22 @@ Current scope:
 Currently implemented providers:
 
 - Docker
-- Modal
 
 Provider-specific documentation lives with each provider:
 
-- [`src/providers/modal/README.md`](./src/providers/modal/README.md)
 - [`src/providers/docker/README.md`](./src/providers/docker/README.md)
 
-Provider-scoped integration tests live under `integration/<provider>/` (for example `integration/modal/`).
+Provider-scoped integration tests live under `integration/<provider>/` (for example `integration/docker/`).
 Integration test execution is gated at package level with `MISTLE_TEST_SANDBOX_INTEGRATION=1`, then narrowed by provider using `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS` (CSV). For example:
-
-```bash
-MISTLE_TEST_SANDBOX_INTEGRATION=1 MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=modal pnpm --filter @mistle/sandbox test:integration
-```
-
-Docker integration tests default `MISTLE_SANDBOX_DOCKER_SOCKET_PATH` to `/var/run/docker.sock`. Set it explicitly if your Docker socket is elsewhere:
 
 ```bash
 MISTLE_TEST_SANDBOX_INTEGRATION=1 MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm --filter @mistle/sandbox test:integration
 ```
 
+Docker integration tests default `MISTLE_SANDBOX_DOCKER_SOCKET_PATH` to `/var/run/docker.sock`. Set it explicitly if your Docker socket is elsewhere.
+
 List of valid providers for MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS:
 
-- `modal`
 - `docker`
 
 Unknown provider names fail fast during integration config parsing.
@@ -91,7 +84,6 @@ await runtimeControl.applyStartup({
 
 await adapter.stop({ id: sandbox.id });
 const resumedSandbox = await adapter.resume({
-  image: baseImage,
   id: sandbox.id,
 });
 await adapter.destroy({ id: resumedSandbox.id });
@@ -116,11 +108,11 @@ await runtimeControl.close();
 - destroy a sandbox runtime
 - apply runtime startup payloads through a separate runtime-control interface
 
-It is not responsible for provisioning or managing provider infrastructure/resources. For current and future adapters (for example Modal, Docker, Kubernetes), platform concerns such as autoscaling, cluster/node lifecycle, scheduling policy, capacity management, and other underlying resource orchestration are out of scope for this package.
+It is not responsible for provisioning or managing provider infrastructure/resources. For current and future adapters (for example Docker, E2B, Kubernetes), platform concerns such as autoscaling, cluster/node lifecycle, scheduling policy, capacity management, and other underlying resource orchestration are out of scope for this package.
 
 ## Adding a New Provider
 
-Use the current Modal provider as the reference implementation.
+Use the current Docker provider as the reference implementation.
 
 1. Add provider identity in `src/types.ts`.
 2. Create `src/providers/<provider>/schemas.ts` and define all config/request schemas with Zod.
@@ -132,7 +124,7 @@ Use the current Modal provider as the reference implementation.
 8. Create `src/providers/<provider>/index.ts` with both `create<Provider>Adapter(...)` and `create<Provider>RuntimeControl(...)` constructors.
 9. Wire the provider into both `createSandboxAdapter` and `createSandboxRuntimeControl` in `src/factory.ts`.
 10. Add unit tests next to each provider module, including config, errors, factory wiring, adapter behavior, and runtime-control construction.
-11. Add provider integration tests in `integration/<provider>/` (for example `integration/modal/modal-adapter.integration.test.ts`).
+11. Add provider integration tests in `integration/<provider>/` (for example `integration/docker/docker-adapter.integration.test.ts`).
 12. Integration tests must cover the provider lifecycle surface: `start`, `resume`, `stop`, and `destroy`, plus runtime-control behavior for startup payload application and any provider-specific stdin/filesystem interactions the package exposes.
 
 Design expectations:

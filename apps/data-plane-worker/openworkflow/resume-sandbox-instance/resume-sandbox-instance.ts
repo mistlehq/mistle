@@ -1,6 +1,5 @@
 import type { DataPlaneDatabase, SandboxInstanceProvider } from "@mistle/db/data-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
-import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import { SandboxProvider, type SandboxAdapter } from "@mistle/sandbox";
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
 import type { Clock, Sleeper } from "@mistle/time";
@@ -27,8 +26,6 @@ type ResumableSandboxInstanceState = {
   sandboxInstanceId: string;
   runtimeProvider: SandboxProvider;
   previousProviderSandboxId: string;
-  imageId: string;
-  imageCreatedAt: string;
 };
 
 function toSandboxProvider(provider: SandboxInstanceProvider): SandboxProvider {
@@ -36,7 +33,7 @@ function toSandboxProvider(provider: SandboxInstanceProvider): SandboxProvider {
     return SandboxProvider.DOCKER;
   }
 
-  return SandboxProvider.MODAL;
+  throw new Error("Unsupported sandbox runtime provider.");
 }
 
 async function resolveResumableSandboxInstanceState(input: {
@@ -78,29 +75,10 @@ async function resolveResumableSandboxInstanceState(input: {
     );
   }
 
-  const persistedRuntimePlan = await input.db.query.sandboxInstanceRuntimePlans.findFirst({
-    columns: {
-      compiledRuntimePlan: true,
-      createdAt: true,
-    },
-    where: (table, { and, eq, isNull }) =>
-      and(eq(table.sandboxInstanceId, input.sandboxInstanceId), isNull(table.supersededAt)),
-  });
-
-  if (persistedRuntimePlan === undefined) {
-    throw new Error(
-      `Expected resumable sandbox instance '${input.sandboxInstanceId}' to have an active runtime plan.`,
-    );
-  }
-
-  const runtimePlan = CompiledRuntimePlanSchema.parse(persistedRuntimePlan.compiledRuntimePlan);
-
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     runtimeProvider: toSandboxProvider(sandboxInstance.runtimeProvider),
     previousProviderSandboxId: sandboxInstance.providerSandboxId,
-    imageId: runtimePlan.image.imageRef,
-    imageCreatedAt: persistedRuntimePlan.createdAt,
   };
 }
 
@@ -214,8 +192,6 @@ export async function resumeSandboxInstance(
       },
       {
         sandboxInstanceId: resumableSandboxInstance.sandboxInstanceId,
-        imageId: resumableSandboxInstance.imageId,
-        imageCreatedAt: resumableSandboxInstance.imageCreatedAt,
         previousProviderSandboxId: resumableSandboxInstance.previousProviderSandboxId,
       },
     );

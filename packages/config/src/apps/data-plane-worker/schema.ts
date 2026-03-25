@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const SandboxProviders = ["modal", "docker"] as const;
+const SandboxProviders = ["docker"] as const;
 
 const HttpBaseUrlSchema = z.url().refine((value) => {
   const parsedUrl = new URL(value);
@@ -41,15 +41,6 @@ export const PartialDataPlaneWorkerRuntimeStateConfigSchema = z
   })
   .strict();
 
-export const DataPlaneWorkerSandboxModalConfigSchema = z
-  .object({
-    tokenId: z.string().min(1),
-    tokenSecret: z.string().min(1),
-    appName: z.string().min(1),
-    environmentName: z.string().min(1).optional(),
-  })
-  .strict();
-
 export const DataPlaneWorkerSandboxDockerConfigSchema = z
   .object({
     socketPath: z.string().min(1),
@@ -66,7 +57,6 @@ const DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema = z.url().refine((value) 
 export const DataPlaneWorkerSandboxConfigSchema = z
   .object({
     tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema,
-    modal: DataPlaneWorkerSandboxModalConfigSchema.optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.optional(),
   })
   .strict();
@@ -74,7 +64,6 @@ export const DataPlaneWorkerSandboxConfigSchema = z
 export const PartialDataPlaneWorkerSandboxConfigSchema = z
   .object({
     tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema.optional(),
-    modal: DataPlaneWorkerSandboxModalConfigSchema.partial().optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.partial().optional(),
   })
   .strict();
@@ -100,8 +89,6 @@ export const PartialDataPlaneWorkerConfigSchema = z
   .strict();
 
 const DataPlaneWorkerProviderRequirementMessages = {
-  MODAL:
-    "apps.data_plane_worker.sandbox.modal is required when global.sandbox.provider is 'modal'.",
   DOCKER:
     "apps.data_plane_worker.sandbox.docker is required when global.sandbox.provider is 'docker'.",
 } as const;
@@ -110,16 +97,9 @@ export function getDataPlaneWorkerSandboxProviderValidationIssue(input: {
   globalSandboxProvider: (typeof SandboxProviders)[number];
   appSandbox: DataPlaneWorkerConfig["sandbox"];
 }): {
-  path: readonly ["sandbox", "modal"] | readonly ["sandbox", "docker"];
+  path: readonly ["sandbox", "docker"];
   message: string;
 } | null {
-  if (input.globalSandboxProvider === "modal" && input.appSandbox.modal === undefined) {
-    return {
-      path: ["sandbox", "modal"],
-      message: DataPlaneWorkerProviderRequirementMessages.MODAL,
-    };
-  }
-
   if (input.globalSandboxProvider === "docker" && input.appSandbox.docker === undefined) {
     return {
       path: ["sandbox", "docker"],

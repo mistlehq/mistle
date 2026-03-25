@@ -26,7 +26,7 @@ controlPlaneApi:
     - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
       value: deployment.environment=production
     - name: MISTLE_GLOBAL_SANDBOX_PROVIDER
-      value: modal
+      value: docker
     - name: MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE
       value: ghcr.io/mistlehq/sandbox-base:0123456789abcdef
     - name: MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL
@@ -195,7 +195,7 @@ dataPlaneWorker:
     - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
       value: deployment.environment=production
     - name: MISTLE_GLOBAL_SANDBOX_PROVIDER
-      value: modal
+      value: docker
     - name: MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE
       value: ghcr.io/mistlehq/sandbox-base:0123456789abcdef
     - name: MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL
@@ -220,18 +220,12 @@ dataPlaneWorker:
       value: http://mistle-data-plane-gateway:8084
     - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL
       value: https://api.example.com/tokenizer-proxy/egress
-    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_APP_NAME
-      value: mistle-sandbox
-    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME
-      value: production
-    # For the docker sandbox provider, switch MISTLE_GLOBAL_SANDBOX_PROVIDER to docker
-    # and use the following keys instead of the modal keys above:
-    # - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH
-    #   value: /var/run/docker.sock
-    # - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME
-    #   value: mistle
-    # - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT
-    #   value: http://otel-collector:4318/v1/traces
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH
+      value: /var/run/docker.sock
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME
+      value: mistle
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT
+      value: http://otel-collector:4318/v1/traces
   secretEnv:
     - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
       secretName: mistle-runtime
@@ -242,12 +236,6 @@ dataPlaneWorker:
     - name: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL
       secretName: mistle-runtime
       secretKey: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL
-    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID
-      secretName: mistle-runtime
-      secretKey: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID
-    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET
-      secretName: mistle-runtime
-      secretKey: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET
 
 dataPlaneGateway:
   image:
