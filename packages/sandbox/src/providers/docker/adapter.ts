@@ -36,17 +36,6 @@ export class DockerSandboxAdapter implements SandboxAdapter {
     return {
       provider: SandboxProvider.DOCKER,
       id,
-      writeStdin: async (input) => {
-        await this.#client.writeSandboxStdin({
-          runtimeId: id,
-          payload: input.payload,
-        });
-      },
-      closeStdin: async () => {
-        await this.#client.closeSandboxStdin({
-          runtimeId: id,
-        });
-      },
     };
   }
 
@@ -63,17 +52,6 @@ export class DockerSandboxAdapter implements SandboxAdapter {
     return {
       provider: SandboxProvider.DOCKER,
       id,
-      writeStdin: async (input) => {
-        await this.#client.writeSandboxStdin({
-          runtimeId: id,
-          payload: input.payload,
-        });
-      },
-      closeStdin: async () => {
-        await this.#client.closeSandboxStdin({
-          runtimeId: id,
-        });
-      },
     };
   }
 

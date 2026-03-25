@@ -31,7 +31,7 @@ const adapter = createSandboxAdapter({
 - `resume({ id })` reconnects to the same E2B sandbox id.
 - `stop({ id })` pauses the sandbox.
 - `destroy({ id })` kills the sandbox permanently.
-- `createVolume`, `deleteVolume`, `SandboxHandle.writeStdin`, and `SandboxHandle.closeStdin` are not supported for E2B and fail fast when called.
+- `createSandboxRuntimeControl(...).applyStartup({ id, payload })` runs `sandboxd apply-startup` as `root` through the E2B commands API.
 
 ## Error Surface
 

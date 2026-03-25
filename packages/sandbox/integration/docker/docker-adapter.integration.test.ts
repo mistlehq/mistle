@@ -142,35 +142,6 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
     }
   }, 300_000);
 
-  it("writes and closes stdin via the sandbox handle", async ({ fixture }) => {
-    const startupToken = `mistle-startup-stdin-${randomUUID()}`;
-    const startupScript = Buffer.from(
-      `printf '%s' '${startupToken}' > /tmp/mistle-startup-token\nsleep 300\n`,
-      "utf8",
-    );
-    let id: string | undefined;
-
-    try {
-      const sandbox = await fixture.adapter.start({ image: fixture.startupStdinProbeImage });
-      id = sandbox.id;
-      await sandbox.writeStdin({
-        payload: startupScript,
-      });
-      await sandbox.closeStdin();
-
-      const tokenFromSandbox = await readSandboxFile({
-        dockerClient: fixture.dockerClient,
-        id: sandbox.id,
-        path: "/tmp/mistle-startup-token",
-      });
-      expect(tokenFromSandbox).toBe(startupToken);
-    } finally {
-      if (id !== undefined) {
-        await fixture.adapter.destroy({ id });
-      }
-    }
-  }, 300_000);
-
   it("injects start env into sandbox process", async ({ fixture }) => {
     const injectedEnvValue = `mistle-docker-env-${randomUUID()}`;
     let id: string | undefined;

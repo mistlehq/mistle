@@ -1,5 +1,3 @@
-import http from "node:http";
-
 import Docker from "dockerode";
 import { z } from "zod";
 
@@ -9,19 +7,15 @@ import {
   type DockerClientOperation,
 } from "./client-errors.js";
 import {
-  DockerCloseSandboxStdinRequestSchema,
   DockerDestroySandboxRequestSchema,
   DockerResumeSandboxRequestSchema,
   DockerStartSandboxRequestSchema,
   DockerStopSandboxRequestSchema,
-  DockerWriteSandboxStdinRequestSchema,
-  type DockerCloseSandboxStdinRequest,
   type DockerDestroySandboxRequest,
   type DockerResumeSandboxRequest,
   type DockerSandboxConfig,
   type DockerStartSandboxRequest,
   type DockerStopSandboxRequest,
-  type DockerWriteSandboxStdinRequest,
 } from "./schemas.js";
 
 export type DockerStartSandboxResponse = {
@@ -31,8 +25,6 @@ export type DockerStartSandboxResponse = {
 export interface DockerClient {
   startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse>;
   resumeSandbox(request: DockerResumeSandboxRequest): Promise<DockerStartSandboxResponse>;
-  writeSandboxStdin(request: DockerWriteSandboxStdinRequest): Promise<void>;
-  closeSandboxStdin(request: DockerCloseSandboxStdinRequest): Promise<void>;
   stopSandbox(request: DockerStopSandboxRequest): Promise<void>;
   destroySandbox(request: DockerDestroySandboxRequest): Promise<void>;
 }
@@ -113,7 +105,6 @@ function toDockerEnv(env: Record<string, string> | undefined): string[] | undefi
 export class DockerApiClient implements DockerClient {
   readonly #config: DockerSandboxConfig;
   readonly #docker: Docker;
-  readonly #attachedStdinStreams = new Map<string, NodeJS.ReadWriteStream>();
 
   constructor(config: DockerSandboxConfig) {
     this.#config = config;
@@ -133,9 +124,6 @@ export class DockerApiClient implements DockerClient {
     }
     const createContainerOptions: Docker.ContainerCreateOptions = {
       Image: parsedRequest.imageRef,
-      OpenStdin: true,
-      AttachStdin: true,
-      StdinOnce: true,
       ...(parsedRequest.env === undefined ? {} : { Env: toDockerEnv(parsedRequest.env) }),
       ...(Object.keys(hostConfig).length === 0 ? {} : { HostConfig: hostConfig }),
       Labels: {
@@ -151,43 +139,13 @@ export class DockerApiClient implements DockerClient {
       container.start(),
     );
 
-    const attachedStdinStream = await this.#runDockerClientOperation(
-      DockerClientOperationIds.ATTACH_STDIN,
-      () => this.#attachContainerStdin(container.id),
-    );
-    this.#trackAttachedStdinStream(container.id, attachedStdinStream);
-
     return {
       runtimeId: container.id,
     };
   }
 
-  async writeSandboxStdin(request: DockerWriteSandboxStdinRequest): Promise<void> {
-    const parsedRequest = DockerWriteSandboxStdinRequestSchema.parse(request);
-
-    await this.#runDockerClientOperation(DockerClientOperationIds.WRITE_STDIN, async () => {
-      const attachedStdinStream = await this.#getOrCreateAttachedStdinStream(
-        parsedRequest.runtimeId,
-      );
-      await this.#writeAttachedStdinStream(attachedStdinStream, parsedRequest.payload);
-    });
-  }
-
-  async closeSandboxStdin(request: DockerCloseSandboxStdinRequest): Promise<void> {
-    const parsedRequest = DockerCloseSandboxStdinRequestSchema.parse(request);
-
-    await this.#runDockerClientOperation(DockerClientOperationIds.CLOSE_STDIN, async () => {
-      const attachedStdinStream = await this.#getOrCreateAttachedStdinStream(
-        parsedRequest.runtimeId,
-      );
-      await this.#closeAttachedStdinStream(attachedStdinStream);
-      this.#attachedStdinStreams.delete(parsedRequest.runtimeId);
-    });
-  }
-
   async stopSandbox(request: DockerStopSandboxRequest): Promise<void> {
     const parsedRequest = DockerStopSandboxRequestSchema.parse(request);
-    this.#releaseTrackedStdinStream(parsedRequest.runtimeId);
     const container = await this.#resolveContainer(parsedRequest.runtimeId);
 
     await this.#runDockerClientOperation(DockerClientOperationIds.STOP_CONTAINER, () =>
@@ -203,12 +161,6 @@ export class DockerApiClient implements DockerClient {
       container.start(),
     );
 
-    const attachedStdinStream = await this.#runDockerClientOperation(
-      DockerClientOperationIds.ATTACH_STDIN,
-      () => this.#attachContainerStdin(parsedRequest.runtimeId),
-    );
-    this.#trackAttachedStdinStream(parsedRequest.runtimeId, attachedStdinStream);
-
     return {
       runtimeId: parsedRequest.runtimeId,
     };
@@ -216,7 +168,6 @@ export class DockerApiClient implements DockerClient {
 
   async destroySandbox(request: DockerDestroySandboxRequest): Promise<void> {
     const parsedRequest = DockerDestroySandboxRequestSchema.parse(request);
-    this.#releaseTrackedStdinStream(parsedRequest.runtimeId);
     const container = await this.#resolveContainer(parsedRequest.runtimeId);
 
     await this.#runDockerClientOperation(DockerClientOperationIds.REMOVE_CONTAINER, () =>
@@ -243,129 +194,6 @@ export class DockerApiClient implements DockerClient {
     );
 
     await this.#consumeProgressStream(DockerClientOperationIds.PULL_IMAGE, pullStream);
-  }
-
-  async #getOrCreateAttachedStdinStream(runtimeId: string): Promise<NodeJS.ReadWriteStream> {
-    const existingAttachedStdinStream = this.#attachedStdinStreams.get(runtimeId);
-    if (existingAttachedStdinStream !== undefined) {
-      return existingAttachedStdinStream;
-    }
-
-    const attachedStdinStream = await this.#runDockerClientOperation(
-      DockerClientOperationIds.ATTACH_STDIN,
-      () => this.#attachContainerStdin(runtimeId),
-    );
-    this.#trackAttachedStdinStream(runtimeId, attachedStdinStream);
-
-    return attachedStdinStream;
-  }
-
-  async #attachContainerStdin(runtimeId: string): Promise<NodeJS.ReadWriteStream> {
-    const query = new URLSearchParams({
-      stdin: "1",
-      stream: "1",
-      logs: "0",
-      stdout: "1",
-      stderr: "1",
-    });
-
-    return await new Promise<NodeJS.ReadWriteStream>((resolve, reject) => {
-      const request = http.request({
-        socketPath: this.#config.socketPath,
-        path: `/containers/${encodeURIComponent(runtimeId)}/attach?${query.toString()}`,
-        method: "POST",
-        headers: {
-          Connection: "Upgrade",
-          Upgrade: "tcp",
-          "Content-Length": "0",
-        },
-      });
-
-      const cleanup = (): void => {
-        request.removeAllListeners("upgrade");
-        request.removeAllListeners("response");
-        request.removeAllListeners("error");
-      };
-
-      request.once("upgrade", (_response, socket, head) => {
-        cleanup();
-        if (head.length > 0) {
-          socket.unshift(head);
-        }
-        resolve(socket);
-      });
-
-      request.once("response", (response) => {
-        cleanup();
-        request.destroy();
-        reject(
-          new Error(
-            `Docker attach did not upgrade the connection. Received HTTP ${response.statusCode ?? 0}.`,
-          ),
-        );
-      });
-
-      request.once("error", (error) => {
-        cleanup();
-        reject(error);
-      });
-
-      request.flushHeaders();
-    });
-  }
-
-  #trackAttachedStdinStream(runtimeId: string, attachedStdinStream: NodeJS.ReadWriteStream): void {
-    attachedStdinStream.on("data", () => {
-      // Drain attached stdout/stderr bytes so stream backpressure cannot block stdin writes.
-    });
-
-    const clearAttachedStdinStream = () => {
-      if (this.#attachedStdinStreams.get(runtimeId) === attachedStdinStream) {
-        this.#attachedStdinStreams.delete(runtimeId);
-      }
-    };
-    attachedStdinStream.once("close", clearAttachedStdinStream);
-    attachedStdinStream.once("error", clearAttachedStdinStream);
-
-    this.#attachedStdinStreams.set(runtimeId, attachedStdinStream);
-  }
-
-  async #writeAttachedStdinStream(
-    attachedStdinStream: NodeJS.ReadWriteStream,
-    payload: Uint8Array<ArrayBufferLike>,
-  ): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      attachedStdinStream.write(Buffer.from(payload), (error?: Error | null) => {
-        if (error !== undefined && error !== null) {
-          reject(error);
-          return;
-        }
-
-        resolve();
-      });
-    });
-  }
-
-  async #closeAttachedStdinStream(attachedStdinStream: NodeJS.ReadWriteStream): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      attachedStdinStream.end((error?: Error | null) => {
-        if (error !== undefined && error !== null) {
-          reject(error);
-          return;
-        }
-        resolve();
-      });
-    });
-  }
-
-  #releaseTrackedStdinStream(runtimeId: string): void {
-    const trackedAttachedStdinStream = this.#attachedStdinStreams.get(runtimeId);
-    if (trackedAttachedStdinStream === undefined) {
-      return;
-    }
-
-    this.#attachedStdinStreams.delete(runtimeId);
-    trackedAttachedStdinStream.end();
   }
 
   async #consumeProgressStream(

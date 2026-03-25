@@ -37,27 +37,6 @@ export const DockerResumeSandboxRequestSchema = z
   .strict();
 export type DockerResumeSandboxRequest = z.output<typeof DockerResumeSandboxRequestSchema>;
 
-export const DockerWriteSandboxStdinRequestSchema = z
-  .object({
-    runtimeId: z.string().trim().min(1, {
-      message: "Docker request field `runtimeId` is required.",
-    }),
-    payload: z.custom<Uint8Array<ArrayBufferLike>>((value) => value instanceof Uint8Array, {
-      message: "Docker request field `payload` must be a Uint8Array.",
-    }),
-  })
-  .strict();
-export type DockerWriteSandboxStdinRequest = z.output<typeof DockerWriteSandboxStdinRequestSchema>;
-
-export const DockerCloseSandboxStdinRequestSchema = z
-  .object({
-    runtimeId: z.string().trim().min(1, {
-      message: "Docker request field `runtimeId` is required.",
-    }),
-  })
-  .strict();
-export type DockerCloseSandboxStdinRequest = z.output<typeof DockerCloseSandboxStdinRequestSchema>;
-
 export const DockerStopSandboxRequestSchema = z
   .object({
     runtimeId: z.string().trim().min(1, {

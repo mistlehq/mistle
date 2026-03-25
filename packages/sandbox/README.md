@@ -107,6 +107,7 @@ await runtimeControl.close();
 - `SandboxRuntimeControl.close()` releases provider client resources held by runtime control.
 - E2B uses the same shared OCI base image reference but resolves provider-native templates internally.
 - `SandboxResumeRequestV1.id` is the durable provider-side sandbox identity returned by `start`.
+- `SandboxHandle` is a provider-agnostic reference to a running sandbox and currently carries only `provider` and `id`.
 - Operations may throw `SandboxError` subclasses. Configuration failures throw `SandboxConfigurationError`.
 
 ## Responsibility Boundary
@@ -136,7 +137,7 @@ Use the current Docker provider as the reference implementation.
 9. Wire the provider into both `createSandboxAdapter` and `createSandboxRuntimeControl` in `src/factory.ts`.
 10. Add unit tests next to each provider module, including config, errors, factory wiring, adapter behavior, and runtime-control construction.
 11. Add provider integration tests in `integration/<provider>/` (for example `integration/docker/docker-adapter.integration.test.ts`).
-12. Integration tests must cover the provider lifecycle surface: `start`, `resume`, `stop`, and `destroy`, plus runtime-control behavior for startup payload application and any provider-specific stdin/filesystem interactions the package exposes.
+12. Integration tests must cover the provider lifecycle surface: `start`, `resume`, `stop`, and `destroy`, plus runtime-control behavior for startup payload application and any provider-specific filesystem interactions the package exposes.
 
 Design expectations:
 
