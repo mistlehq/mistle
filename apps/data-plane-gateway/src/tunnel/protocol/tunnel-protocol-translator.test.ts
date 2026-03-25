@@ -96,6 +96,44 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
+  it("maps a connection fileUpload stream.open to the bootstrap stream id", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 42,
+          channel: {
+            kind: "fileUpload",
+            threadId: "thread_123",
+            mimeType: "image/png",
+            originalFilename: "screenshot.png",
+            sizeBytes: 128,
+          },
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "forward",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "fileUpload",
+            threadId: "thread_123",
+            mimeType: "image/png",
+            originalFilename: "screenshot.png",
+            sizeBytes: 128,
+          },
+        }),
+      },
+    });
+  });
+
   it("drops late bootstrap pty.exit events after the binding is gone", async () => {
     const { router, translator } = await createTranslatorHarness();
 
@@ -150,6 +188,90 @@ describe("TunnelProtocolTranslator", () => {
     ).resolves.toEqual({
       delivery: {
         kind: "drop",
+      },
+    });
+  });
+
+  it("keeps fileUpload bindings alive after client stream.close until completion arrives", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await translator.translateInboundMessage({
+      clientSessionId: "conn_1",
+      payload: JSON.stringify({
+        type: "stream.open",
+        streamId: 42,
+        channel: {
+          kind: "fileUpload",
+          threadId: "thread_123",
+          mimeType: "image/png",
+          originalFilename: "upload.png",
+          sizeBytes: 3,
+        },
+      }),
+      sandboxInstanceId: SandboxInstanceId,
+      sourcePeerSide: "connection",
+    });
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: JSON.stringify({
+          type: "stream.close",
+          streamId: 42,
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "forward",
+        payload: JSON.stringify({
+          type: "stream.close",
+          streamId: 1,
+        }),
+      },
+    });
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: JSON.stringify({
+          type: "stream.event",
+          streamId: 1,
+          event: {
+            type: "fileUpload.completed",
+            attachmentId: "att_123",
+            threadId: "thread_123",
+            originalFilename: "upload.png",
+            mimeType: "image/png",
+            sizeBytes: 3,
+            path: "/tmp/attachments/thread_123/upload.png",
+          },
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "forward",
+        payload: JSON.stringify({
+          type: "stream.event",
+          streamId: 42,
+          event: {
+            type: "fileUpload.completed",
+            attachmentId: "att_123",
+            threadId: "thread_123",
+            originalFilename: "upload.png",
+            mimeType: "image/png",
+            sizeBytes: 3,
+            path: "/tmp/attachments/thread_123/upload.png",
+          },
+        }),
+        targetConnectionSessionId: "conn_1",
+      },
+      releaseInteractiveStream: {
+        clientSessionId: "conn_1",
+        clientStreamId: 42,
       },
     });
   });
@@ -236,6 +358,52 @@ describe("TunnelProtocolTranslator", () => {
       releaseInteractiveStream: {
         clientSessionId: "conn_1",
         clientStreamId: 41,
+      },
+    });
+  });
+
+  it("responds with a reset and releases the binding when fileUpload data is not raw bytes", async () => {
+    const { router, translator } = await createTranslatorHarness();
+
+    await router.openInteractiveStream({
+      sandboxInstanceId: SandboxInstanceId,
+      channelKind: "fileUpload",
+      clientSessionId: "conn_1",
+      clientStreamId: 42,
+    });
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: toArrayBuffer(
+          encodeDataFrame({
+            streamId: 42,
+            payloadKind: PayloadKindWebSocketText,
+            payload: new TextEncoder().encode("invalid-upload-data"),
+          }),
+        ),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "respond",
+        payload: JSON.stringify({
+          type: "stream.reset",
+          streamId: 42,
+          code: "invalid_stream_data",
+          message: "File upload streams only accept raw-bytes data frames.",
+        }),
+      },
+      notifyBootstrapPeerOfReleasedStream: {
+        channelKind: "fileUpload",
+        clientSessionId: "conn_1",
+        clientStreamId: 42,
+        tunnelStreamId: 1,
+      },
+      releaseInteractiveStream: {
+        clientSessionId: "conn_1",
+        clientStreamId: 42,
       },
     });
   });

@@ -117,6 +117,81 @@ export function connectWebSocket(url: string, signal: AbortSignal): Promise<WebS
   });
 }
 
+export function connectWebSocketWithMessageQueue(input: {
+  url: string;
+  signal: AbortSignal;
+}): Promise<{
+  socket: WebSocket;
+  messages: AsyncQueue<TunnelSocketMessage>;
+}> {
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket(input.url);
+    const messages = createWebSocketMessageQueue(socket);
+    const swallowPostAbortError = (): void => undefined;
+    const handleLateOpenAfterAbort = (): void => {
+      try {
+        socket.terminate();
+      } catch {
+        // The post-abort error/close listeners below handle the remainder of
+        // connection teardown even if ws throws while settling the socket.
+      }
+    };
+    const removePostAbortListeners = (): void => {
+      socket.off("error", swallowPostAbortError);
+      socket.off("close", removePostAbortListeners);
+      socket.off("open", handleLateOpenAfterAbort);
+    };
+
+    const cleanup = (): void => {
+      socket.off("open", handleOpen);
+      socket.off("error", handleError);
+      input.signal.removeEventListener("abort", handleAbort);
+    };
+    const handleAbort = (): void => {
+      cleanup();
+      socket.on("error", swallowPostAbortError);
+      socket.on("close", removePostAbortListeners);
+      if (socket.readyState === WebSocket.CONNECTING) {
+        socket.once("open", handleLateOpenAfterAbort);
+        try {
+          socket.close();
+        } catch {
+          // Some ws states still throw synchronously here; a late open is still
+          // terminated by handleLateOpenAfterAbort.
+        }
+      } else if (socket.readyState === WebSocket.OPEN) {
+        try {
+          socket.terminate();
+        } catch {
+          // ws can throw here while still establishing a connection; the abort
+          // rejection below is the signal the caller actually consumes.
+        }
+      }
+      reject(input.signal.reason ?? new Error("websocket connection was aborted"));
+    };
+    const handleOpen = (): void => {
+      cleanup();
+      resolve({
+        socket,
+        messages,
+      });
+    };
+    const handleError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+
+    if (input.signal.aborted) {
+      handleAbort();
+      return;
+    }
+
+    socket.once("open", handleOpen);
+    socket.once("error", handleError);
+    input.signal.addEventListener("abort", handleAbort, { once: true });
+  });
+}
+
 export function closeWebSocket(socket: WebSocket): Promise<void> {
   if (socket.readyState === WebSocket.CLOSED) {
     return Promise.resolve();

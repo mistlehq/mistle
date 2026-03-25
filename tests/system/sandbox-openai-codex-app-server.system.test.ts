@@ -1361,6 +1361,7 @@ async function uploadImageOverTunnel(input: {
   const socket = await connectWebSocket(input.websocketUrl, WEBSOCKET_CONNECT_TIMEOUT_MS);
 
   try {
+    getWebSocketJsonMessagePump(socket);
     const streamId = 1;
     sendJson(socket, {
       type: "stream.open",
