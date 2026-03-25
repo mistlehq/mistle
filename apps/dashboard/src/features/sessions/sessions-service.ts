@@ -63,6 +63,8 @@ export type MintSandboxConnectionTokenResult = {
   connectionExpiresAt: string;
 };
 
+export type ResumeSandboxInstanceResult = SandboxInstanceStatusResult;
+
 export async function listSandboxInstances(input: {
   limit: number;
   after: string | null;
@@ -224,6 +226,49 @@ export async function mintSandboxInstanceConnectionToken(input: {
         operation: "mintSandboxInstanceConnectionToken",
         error,
         fallbackMessage: "Could not establish sandbox session.",
+      }),
+    );
+  }
+}
+
+export async function resumeSandboxInstance(input: {
+  instanceId: string;
+  idempotencyKey?: string;
+  signal?: AbortSignal;
+}): Promise<ResumeSandboxInstanceResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "resumeSandboxInstance",
+      method: "POST",
+      pathname: `/v1/sandbox/instances/${encodeURIComponent(input.instanceId)}/resume`,
+      body:
+        input.idempotencyKey === undefined
+          ? {}
+          : {
+              idempotencyKey: input.idempotencyKey,
+            },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not resume sandbox session.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxInstanceStatusResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "resumeSandboxInstance",
+        status: 500,
+        body: responseBody,
+        message: "Resume sandbox instance response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "resumeSandboxInstance",
+        error,
+        fallbackMessage: "Could not resume sandbox session.",
       }),
     );
   }

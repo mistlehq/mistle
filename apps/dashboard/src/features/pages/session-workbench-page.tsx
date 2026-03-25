@@ -1,7 +1,7 @@
 import { Badge, Button } from "@mistle/ui";
 import { TerminalIcon } from "@phosphor-icons/react";
-import { useMemo } from "react";
-import { useParams } from "react-router";
+import { useEffect, useMemo } from "react";
+import { useLocation, useParams } from "react-router";
 
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import {
@@ -14,13 +14,22 @@ import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
 } from "./session-workbench-page-view.js";
+import { shouldShowResumeAction } from "./session-workbench-view-model.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
 export function SessionWorkbenchPage(): React.JSX.Element {
+  const location = useLocation();
   const params = useParams();
   const sandboxInstanceId = params["sandboxInstanceId"] ?? null;
+
+  return <SessionWorkbenchPageContent key={location.key} sandboxInstanceId={sandboxInstanceId} />;
+}
+
+function SessionWorkbenchPageContent(input: {
+  sandboxInstanceId: string | null;
+}): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
-    sandboxInstanceId,
+    sandboxInstanceId: input.sandboxInstanceId,
   });
   const isTerminalOpenDisabled =
     !workbench.terminalPanelState.isVisible && !workbench.connectionReadiness.canConnect;
@@ -29,6 +38,10 @@ export function SessionWorkbenchPage(): React.JSX.Element {
     ? (workbench.stoppedSessionState.message ??
       "Terminal is available only when the sandbox is running.")
     : terminalButtonLabel;
+  const showResumeButton = shouldShowResumeAction({
+    requiresManualResume: workbench.stoppedSessionState.requiresManualResume,
+    isResumingStoppedSandbox: workbench.isResumingStoppedSandbox,
+  });
   const headerActions = useMemo(
     () => (
       <div className="flex items-center gap-2">
@@ -39,6 +52,19 @@ export function SessionWorkbenchPage(): React.JSX.Element {
           {workbench.sessionHeaderStatusUi.label}
         </Badge>
         <span aria-hidden className="h-5 w-px bg-stone-200" />
+        {showResumeButton ? (
+          <Button
+            disabled={workbench.isResumingStoppedSandbox}
+            onClick={() => {
+              void workbench.requestStoppedSandboxResume();
+            }}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {workbench.isResumingStoppedSandbox ? "Resuming..." : "Resume"}
+          </Button>
+        ) : null}
         <Button
           aria-label={terminalButtonLabel}
           aria-pressed={workbench.terminalPanelState.isVisible}
@@ -68,8 +94,11 @@ export function SessionWorkbenchPage(): React.JSX.Element {
     ),
     [
       isTerminalOpenDisabled,
+      showResumeButton,
       terminalButtonTitle,
+      workbench.isResumingStoppedSandbox,
       workbench.ptyState.actions.disconnectPty,
+      workbench.requestStoppedSandboxResume,
       workbench.sessionHeaderStatusUi.className,
       workbench.sessionHeaderStatusUi.label,
       workbench.sessionHeaderStatusUi.variant,
@@ -103,7 +132,7 @@ export function SessionWorkbenchPage(): React.JSX.Element {
     },
   );
   const terminalPanelKey = [
-    sandboxInstanceId,
+    input.sandboxInstanceId,
     workbench.sandboxStatusQuery.data?.status ?? "unknown",
     workbench.terminalPanelState.isVisible ? "visible" : "hidden",
   ].join(":");
@@ -136,7 +165,7 @@ export function SessionWorkbenchPage(): React.JSX.Element {
       description: workbench.sandboxFailureMessage,
     });
   }
-  if (sandboxInstanceId === null) {
+  if (input.sandboxInstanceId === null) {
     return (
       <SessionWorkbenchPageView
         alerts={[]}
@@ -184,15 +213,22 @@ export function SessionWorkbenchPage(): React.JSX.Element {
       }
       onSecondaryPanelResize={workbench.terminalPanelState.setPanelSize}
       primaryBottomPanel={
-        <SessionConversationBottomPanel
-          chatEntries={conversationPane.chatState.entries}
-          composerProps={conversationPane.composerProps}
-          isRespondingToServerRequest={
-            conversationPane.serverRequestsState.isRespondingToServerRequest
-          }
-          onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
-          serverRequestPanelEntries={unmatchedServerRequests}
-        />
+        <>
+          {workbench.shouldAutoResumeOnEntry ? (
+            <SessionWorkbenchAutoResumeOnEntry
+              requestStoppedSandboxResume={workbench.requestStoppedSandboxResume}
+            />
+          ) : null}
+          <SessionConversationBottomPanel
+            chatEntries={conversationPane.chatState.entries}
+            composerProps={conversationPane.composerProps}
+            isRespondingToServerRequest={
+              conversationPane.serverRequestsState.isRespondingToServerRequest
+            }
+            onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
+            serverRequestPanelEntries={unmatchedServerRequests}
+          />
+        </>
       }
       secondaryPanel={
         <SessionTerminalPanel
@@ -205,13 +241,24 @@ export function SessionWorkbenchPage(): React.JSX.Element {
             await workbench.ptyState.actions.disconnectPty();
           }}
           ptyState={workbench.ptyState}
-          sandboxInstanceId={sandboxInstanceId}
+          sandboxInstanceId={input.sandboxInstanceId}
         />
       }
       secondaryPanelSize={workbench.terminalPanelState.panelSize}
-      sandboxInstanceId={sandboxInstanceId}
+      sandboxInstanceId={input.sandboxInstanceId}
     />
   );
+}
+
+function SessionWorkbenchAutoResumeOnEntry(input: {
+  requestStoppedSandboxResume: () => Promise<void>;
+}): null {
+  // Syncs this mount with the external resume API; render logic alone cannot start the network request.
+  useEffect(() => {
+    void input.requestStoppedSandboxResume();
+  }, [input.requestStoppedSandboxResume]);
+
+  return null;
 }
 
 function createEmptyComposerProps(): SessionConversationComposerProps {

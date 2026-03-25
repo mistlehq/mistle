@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  getBestEffortBrowserStorage,
+  readBrowserStorageJson,
+  writeBrowserStorageJson,
+} from "../shared/browser-storage.js";
+
 const DEFAULT_TERMINAL_PANEL_SIZE = 38;
 const TERMINAL_WORKBENCH_STORAGE_KEY_PREFIX = "dashboard:session-terminal-workbench:";
 
@@ -43,25 +49,6 @@ function normalizePanelSize(size: number): number {
   return Math.min(75, Math.max(20, size));
 }
 
-function getBrowserStorage(): Pick<Storage, "getItem" | "removeItem" | "setItem"> | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const storage = window.localStorage;
-  if (
-    typeof storage !== "object" ||
-    storage === null ||
-    typeof storage.getItem !== "function" ||
-    typeof storage.setItem !== "function" ||
-    typeof storage.removeItem !== "function"
-  ) {
-    return null;
-  }
-
-  return storage;
-}
-
 function readPersistedTerminalWorkbenchState(
   sandboxInstanceId: string | null,
 ): PersistedTerminalWorkbenchState {
@@ -72,7 +59,7 @@ function readPersistedTerminalWorkbenchState(
     };
   }
 
-  const storage = getBrowserStorage();
+  const storage = getBestEffortBrowserStorage("local");
   if (storage === null) {
     return {
       isVisible: false,
@@ -80,7 +67,11 @@ function readPersistedTerminalWorkbenchState(
     };
   }
 
-  const storedValue = storage.getItem(getTerminalWorkbenchStorageKey(sandboxInstanceId));
+  const storedValue = readBrowserStorageJson({
+    key: getTerminalWorkbenchStorageKey(sandboxInstanceId),
+    storage,
+    isValue: isPersistedTerminalWorkbenchState,
+  });
   if (storedValue === null) {
     return {
       isVisible: false,
@@ -88,33 +79,16 @@ function readPersistedTerminalWorkbenchState(
     };
   }
 
-  let parsedValue: unknown;
-  try {
-    parsedValue = JSON.parse(storedValue);
-  } catch {
-    return {
-      isVisible: false,
-      panelSize: DEFAULT_TERMINAL_PANEL_SIZE,
-    };
-  }
-
-  if (!isPersistedTerminalWorkbenchState(parsedValue)) {
-    return {
-      isVisible: false,
-      panelSize: DEFAULT_TERMINAL_PANEL_SIZE,
-    };
-  }
-
   return {
-    isVisible: parsedValue.isVisible,
-    panelSize: normalizePanelSize(parsedValue.panelSize),
+    isVisible: storedValue.isVisible,
+    panelSize: normalizePanelSize(storedValue.panelSize),
   };
 }
 
 export function useSessionTerminalWorkbenchState(input: {
   sandboxInstanceId: string | null;
 }): SessionTerminalWorkbenchState {
-  const storage = getBrowserStorage();
+  const storage = getBestEffortBrowserStorage("local");
   const previousSandboxInstanceIdRef = useRef(input.sandboxInstanceId);
   const volatileStateGenerationRef = useRef(0);
   if (previousSandboxInstanceIdRef.current !== input.sandboxInstanceId) {
@@ -181,13 +155,14 @@ export function useSessionTerminalWorkbenchState(input: {
       return;
     }
 
-    storage.setItem(
-      getTerminalWorkbenchStorageKey(input.sandboxInstanceId),
-      JSON.stringify({
+    writeBrowserStorageJson({
+      key: getTerminalWorkbenchStorageKey(input.sandboxInstanceId),
+      value: {
         isVisible: resolvedState.isVisible,
         panelSize: resolvedState.panelSize,
-      }),
-    );
+      },
+      storage,
+    });
   }, [input.sandboxInstanceId, resolvedState]);
 
   const openPanel = useCallback((): void => {

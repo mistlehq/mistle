@@ -1,4 +1,6 @@
-import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
+import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
+import type { CompiledRuntimePlan } from "@mistle/integrations-core";
+import type { SandboxImageHandle } from "@mistle/sandbox";
 import type { Client } from "openapi-fetch";
 import createClient from "openapi-fetch";
 import { z } from "zod";
@@ -22,10 +24,17 @@ export type CreateDataPlaneSandboxInstancesClientInput = {
   requestTimeoutMs?: number;
 };
 
-export type StartSandboxInstanceInput = Omit<
-  StartSandboxInstanceWorkflowInput,
-  "sandboxInstanceId"
-> & {
+export type StartSandboxInstanceInput = {
+  organizationId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  runtimePlan: CompiledRuntimePlan;
+  startedBy: {
+    kind: SandboxInstanceStarterKind;
+    id: string;
+  };
+  source: SandboxInstanceSource;
+  image: Pick<SandboxImageHandle, "imageId" | "createdAt">;
   idempotencyKey?: string;
 };
 export type StartSandboxInstanceAcceptedResponse =

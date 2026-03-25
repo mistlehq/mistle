@@ -33,7 +33,9 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@mistle/workflow-registry": "workspace:*",
+    "@mistle/db": "workspace:*",
+    "@mistle/integrations-core": "workspace:*",
+    "@mistle/sandbox": "workspace:*",
     "openapi-fetch": "^0.17.0",
     "zod": "^4.3.6"
   },
