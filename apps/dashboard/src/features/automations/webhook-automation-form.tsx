@@ -230,27 +230,27 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       ) : null}
 
       <FormPageSection>
+        {input.mode === "create" ? (
+          <div className="p-4">
+            <Field orientation="horizontal">
+              <FieldHeader>
+                <FieldLabel htmlFor="automation-name">Automation name</FieldLabel>
+              </FieldHeader>
+              <FieldContent>
+                <Input
+                  id="automation-name"
+                  disabled={input.isDeleting || input.isSaving}
+                  onChange={(event) => {
+                    input.onValueChange("name", event.currentTarget.value);
+                  }}
+                  value={input.values.name}
+                />
+                <FieldError message={input.fieldErrors.name} />
+              </FieldContent>
+            </Field>
+          </div>
+        ) : null}
         <div className="p-4">
-          {input.mode === "create" ? (
-            <div className="mb-4">
-              <Field orientation="horizontal">
-                <FieldHeader>
-                  <FieldLabel htmlFor="automation-name">Automation name</FieldLabel>
-                </FieldHeader>
-                <FieldContent>
-                  <Input
-                    id="automation-name"
-                    disabled={input.isDeleting || input.isSaving}
-                    onChange={(event) => {
-                      input.onValueChange("name", event.currentTarget.value);
-                    }}
-                    value={input.values.name}
-                  />
-                  <FieldError message={input.fieldErrors.name} />
-                </FieldContent>
-              </Field>
-            </div>
-          ) : null}
           <SelectField
             error={input.fieldErrors.sandboxProfileId}
             label="Sandbox profile"

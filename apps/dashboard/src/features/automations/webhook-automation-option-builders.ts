@@ -4,7 +4,6 @@ import type {
 } from "../integrations/integrations-service.js";
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { formatRelativeOrDate } from "../shared/date-formatters.js";
 import type {
   WebhookAutomationEventOption,
   WebhookAutomationFormOption,
@@ -35,10 +34,6 @@ function formatWebhookAutomationTriggerGroupLabel(input: {
   }
 
   return `${integrationDisplayName} - ${connectionDisplayName}`;
-}
-
-export function formatWebhookAutomationUpdatedAt(isoDateTime: string): string {
-  return formatRelativeOrDate(isoDateTime);
 }
 
 export function createWebhookAutomationTriggerId(input: {

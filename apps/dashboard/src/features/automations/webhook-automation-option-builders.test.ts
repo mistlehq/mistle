@@ -5,7 +5,7 @@ import {
   buildWebhookAutomationSandboxProfileOptions,
   createWebhookAutomationTriggerId,
   resolveEligibleProfileAutomationConnectionIds,
-} from "./webhook-automation-list-helpers.js";
+} from "./webhook-automation-option-builders.js";
 
 describe("buildWebhookAutomationEventOptions", () => {
   it("returns connection-scoped supported webhook events from all connected integrations", () => {

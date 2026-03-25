@@ -31,7 +31,7 @@ import {
   buildWebhookAutomationEventOptions,
   createWebhookAutomationTriggerId,
   resolveEligibleProfileAutomationConnectionIds,
-} from "./webhook-automation-list-helpers.js";
+} from "./webhook-automation-option-builders.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
 import { AUTOMATIONS_QUERY_KEY_PREFIX } from "./webhook-automations-query-keys.js";
 import {

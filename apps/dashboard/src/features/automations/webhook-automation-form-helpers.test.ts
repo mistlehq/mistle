@@ -8,7 +8,7 @@ import {
 } from "./webhook-automation-form-helpers.js";
 import type { WebhookAutomationFormValues } from "./webhook-automation-form.js";
 import { buildWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-list-helpers.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 import type { WebhookAutomation } from "./webhook-automations-types.js";
 
@@ -146,7 +146,7 @@ const BaseFormValues: WebhookAutomationFormValues = {
 describe("toWebhookAutomationFormValues", () => {
   it("creates defaults for create mode", () => {
     expect(toWebhookAutomationFormValues(null)).toEqual({
-      name: "Your automation",
+      name: "",
       sandboxProfileId: "",
       enabled: true,
       instructions: "",

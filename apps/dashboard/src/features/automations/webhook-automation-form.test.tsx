@@ -11,7 +11,7 @@ import {
   type WebhookAutomationFormOption,
   type WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-list-helpers.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 
 const ConnectionOptions: readonly WebhookAutomationFormOption[] = [
   {
@@ -239,12 +239,16 @@ describe("WebhookAutomationForm", () => {
   it("renders a fixed create title and a separate automation name field", () => {
     const { container } = renderFormWithOptions({
       mode: "create",
+      values: {
+        ...FormValues,
+        name: "",
+      },
     });
     const form = within(container);
 
     expect(form.getAllByRole("heading", { name: "Create Automation" }).length).toBeGreaterThan(0);
     expect(form.getByText("Automation name")).toBeDefined();
-    expect(form.getByDisplayValue("Repo triage")).toBeDefined();
+    expect(form.queryByDisplayValue("Your automation")).toBeNull();
     expect(form.queryByRole("button", { name: "Edit automation name" })).toBeNull();
   });
 

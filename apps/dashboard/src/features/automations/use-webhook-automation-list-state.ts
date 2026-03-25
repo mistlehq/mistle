@@ -4,7 +4,7 @@ import {
   filterWebhookAutomationListItems,
   type WebhookAutomationListFilter,
 } from "./webhook-automation-list-model.js";
-import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-view.js";
+import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-types.js";
 
 export function useWebhookAutomationListState(input: {
   items: readonly WebhookAutomationListItemViewModel[];

@@ -1,10 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
-import {
-  WebhookAutomationListView,
-  type WebhookAutomationListItemViewModel,
-} from "./webhook-automation-list-view.js";
+import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-types.js";
+import { WebhookAutomationListView } from "./webhook-automation-list-view.js";
 
 const SampleItems: readonly WebhookAutomationListItemViewModel[] = [
   {

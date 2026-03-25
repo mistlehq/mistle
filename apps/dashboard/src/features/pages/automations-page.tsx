@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { formatWebhookAutomationUpdatedAt } from "../automations/webhook-automation-list-helpers.js";
+import { formatWebhookAutomationUpdatedAt } from "../automations/webhook-automation-formatters.js";
 import { WebhookAutomationListView } from "../automations/webhook-automation-list-view.js";
 import { webhookAutomationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { listWebhookAutomations } from "../automations/webhook-automations-service.js";

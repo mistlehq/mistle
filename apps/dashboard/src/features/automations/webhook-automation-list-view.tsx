@@ -17,16 +17,8 @@ import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { useWebhookAutomationListState } from "./use-webhook-automation-list-state.js";
 import { WebhookAutomationListToolbar } from "./webhook-automation-list-toolbar.js";
+import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-types.js";
 import type { WebhookAutomationListEvent } from "./webhook-automations-types.js";
-
-export type WebhookAutomationListItemViewModel = {
-  id: string;
-  name: string;
-  enabled: boolean;
-  targetName: string;
-  events: readonly WebhookAutomationListEvent[];
-  updatedAtLabel: string;
-};
 
 function renderAutomationPagination(input: {
   hasNextPage: boolean;

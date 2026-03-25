@@ -1,4 +1,4 @@
-import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-view.js";
+import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-types.js";
 
 export type WebhookAutomationListFilter = "all" | "enabled" | "disabled";
 

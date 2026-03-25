@@ -6,7 +6,7 @@ import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-list-helpers.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   groupWebhookAutomationEventOptions,
   WebhookAutomationTriggerPicker,
