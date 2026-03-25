@@ -4,10 +4,6 @@ const fs = require("node:fs");
 const { createRequire } = require("node:module");
 const path = require("node:path");
 
-function isFunction(value) {
-  return typeof value === "function";
-}
-
 function resolveNativeAddonPath() {
   const sidecarDirectory = path.dirname(process.execPath);
   const candidates = fs
@@ -33,24 +29,6 @@ function loadNativeBinding() {
   return nativeBinding;
 }
 
-function readExport(binding, key) {
-  const value = binding[key];
-  if (!isFunction(value)) {
-    throw new Error(`sandbox native addon export "${key}" is missing or invalid`);
-  }
-
-  return value;
-}
-
 const nativeBinding = loadNativeBinding();
 
-module.exports = {
-  NativePtySession: readExport(nativeBinding, "NativePtySession"),
-  execRuntimeAsUser: readExport(nativeBinding, "execRuntimeAsUser"),
-  generateProxyCa: readExport(nativeBinding, "generateProxyCa"),
-  issueProxyLeafCertificate: readExport(nativeBinding, "issueProxyLeafCertificate"),
-  prepareProxyCaRuntime: readExport(nativeBinding, "prepareProxyCaRuntime"),
-  setCurrentProcessNonDumpable: readExport(nativeBinding, "setCurrentProcessNonDumpable"),
-  spawnManagedProcess: readExport(nativeBinding, "spawnManagedProcess"),
-  spawnPty: readExport(nativeBinding, "spawnPty"),
-};
+module.exports = nativeBinding;
