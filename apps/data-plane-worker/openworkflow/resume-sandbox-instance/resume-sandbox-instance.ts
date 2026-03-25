@@ -6,17 +6,15 @@ import type { Clock, Sleeper } from "@mistle/time";
 
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
-import { destroySandbox } from "../shared/destroy-sandbox.js";
+import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "../start-sandbox-instance/mark-sandbox-instance-running.js";
 import { waitForSandboxTunnelReadiness } from "../start-sandbox-instance/wait-for-sandbox-tunnel-readiness.js";
 import { markSandboxInstanceStarting } from "./mark-sandbox-instance-starting.js";
-import { persistSandboxInstanceRuntimeAttachment } from "./persist-sandbox-instance-runtime-attachment.js";
 import { resumeSandbox } from "./resume-sandbox.js";
 
 const ResumeSandboxFailureCodes = {
   RESUME_SANDBOX_FAILED: "resume_sandbox_failed",
-  PERSIST_RUNTIME_ATTACHMENT_FAILED: "persist_runtime_attachment_failed",
   TUNNEL_CONNECT_ACK_TIMEOUT: "tunnel_connect_ack_timeout",
   TUNNEL_CONNECT_ACK_WAIT_FAILED: "tunnel_connect_ack_wait_failed",
   STATUS_TRANSITION_TO_RUNNING_FAILED: "status_transition_to_running_failed",
@@ -119,10 +117,10 @@ export async function resumeSandboxInstance(
     failureCode: string;
     failureMessage: string;
   }): Promise<void> {
-    let destroySandboxError: unknown;
+    let stopSandboxError: unknown;
     if (input.runtimeProvider !== undefined && input.providerSandboxId !== undefined) {
       try {
-        await destroySandbox(
+        await stopSandbox(
           {
             config: ctx.config,
             sandboxAdapter: ctx.sandboxAdapter,
@@ -134,7 +132,7 @@ export async function resumeSandboxInstance(
         );
       } catch (error) {
         if (!isSandboxResourceNotFoundError(error)) {
-          destroySandboxError = error;
+          stopSandboxError = error;
         }
       }
     }
@@ -155,21 +153,21 @@ export async function resumeSandboxInstance(
       markFailedError = error;
     }
 
-    if (destroySandboxError !== undefined && markFailedError !== undefined) {
+    if (stopSandboxError !== undefined && markFailedError !== undefined) {
       throw new Error(
-        "Failed to destroy sandbox and failed to mark sandbox instance as failed after resume failure.",
+        "Failed to stop sandbox and failed to mark sandbox instance as failed after resume failure.",
         {
           cause: {
-            destroySandboxError,
+            stopSandboxError,
             markFailedError,
           },
         },
       );
     }
 
-    if (destroySandboxError !== undefined) {
-      throw new Error("Failed to destroy sandbox after resume failure.", {
-        cause: destroySandboxError,
+    if (stopSandboxError !== undefined) {
+      throw new Error("Failed to stop sandbox after resume failure.", {
+        cause: stopSandboxError,
       });
     }
 
@@ -200,27 +198,6 @@ export async function resumeSandboxInstance(
       sandboxInstanceId: input.sandboxInstanceId,
       failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
       failureMessage: "Failed to resume sandbox runtime.",
-    });
-    throw error;
-  }
-
-  try {
-    await persistSandboxInstanceRuntimeAttachment(
-      {
-        db: ctx.db,
-      },
-      {
-        sandboxInstanceId: input.sandboxInstanceId,
-        providerSandboxId: resumedRuntime.providerSandboxId,
-      },
-    );
-  } catch (error) {
-    await handleFailedResume({
-      sandboxInstanceId: input.sandboxInstanceId,
-      runtimeProvider: resumedRuntime.runtimeProvider,
-      providerSandboxId: resumedRuntime.providerSandboxId,
-      failureCode: ResumeSandboxFailureCodes.PERSIST_RUNTIME_ATTACHMENT_FAILED,
-      failureMessage: "Failed to persist resumed runtime attachment metadata.",
     });
     throw error;
   }

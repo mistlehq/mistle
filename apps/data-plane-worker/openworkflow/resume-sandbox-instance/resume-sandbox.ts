@@ -28,6 +28,9 @@ export async function resumeSandbox(
   if (resumedSandbox.provider !== ctx.config.sandbox.provider) {
     throw new Error("Sandbox adapter returned sandbox handle with unexpected provider.");
   }
+  if (resumedSandbox.id !== input.previousProviderSandboxId) {
+    throw new Error("Sandbox adapter returned a different sandbox id during resume.");
+  }
 
   return {
     sandboxInstanceId: input.sandboxInstanceId,
