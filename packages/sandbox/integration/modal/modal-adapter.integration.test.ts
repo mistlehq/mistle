@@ -68,21 +68,21 @@ async function runSandboxCommand(input: {
 describeModalAdapterIntegration("modal adapter integration", () => {
   it("starts a sandbox from a base image and exposes its filesystem", async ({ fixture }) => {
     const startMarker = `mistle-modal-start-${randomUUID()}`;
-    let runtimeId: string | undefined;
+    let id: string | undefined;
 
     try {
       const sandbox = await fixture.adapter.start({ image: fixture.baseImage });
-      runtimeId = sandbox.runtimeId;
+      id = sandbox.id;
       expect(sandbox.provider).toBe(SandboxProvider.MODAL);
-      expect(sandbox.runtimeId).not.toBe("");
+      expect(sandbox.id).not.toBe("");
 
-      const startedSandbox = await fixture.modalClient.sandboxes.fromId(sandbox.runtimeId);
+      const startedSandbox = await fixture.modalClient.sandboxes.fromId(sandbox.id);
       await writeSandboxFile(startedSandbox, START_MARKER_FILE_PATH, startMarker);
       const readback = await readSandboxFile(startedSandbox, START_MARKER_FILE_PATH);
       expect(readback).toBe(startMarker);
     } finally {
-      if (runtimeId !== undefined) {
-        await fixture.adapter.destroy({ runtimeId });
+      if (id !== undefined) {
+        await fixture.adapter.destroy({ id });
       }
     }
   }, 300_000);
@@ -92,29 +92,29 @@ describeModalAdapterIntegration("modal adapter integration", () => {
     const stdinScript = textEncoder.encode(
       `printf '%s' '${stdinMarker}' > ${STDIN_MARKER_FILE_PATH}\nsleep 300\n`,
     );
-    let runtimeId: string | undefined;
+    let id: string | undefined;
 
     try {
       const sandbox = await fixture.adapter.start({ image: fixture.stdinProbeImage });
-      runtimeId = sandbox.runtimeId;
+      id = sandbox.id;
       await sandbox.writeStdin({
         payload: stdinScript,
       });
       await sandbox.closeStdin();
 
-      const startedSandbox = await fixture.modalClient.sandboxes.fromId(sandbox.runtimeId);
+      const startedSandbox = await fixture.modalClient.sandboxes.fromId(sandbox.id);
       const markerFromSandbox = await readSandboxFile(startedSandbox, STDIN_MARKER_FILE_PATH);
       expect(markerFromSandbox).toBe(stdinMarker);
     } finally {
-      if (runtimeId !== undefined) {
-        await fixture.adapter.destroy({ runtimeId });
+      if (id !== undefined) {
+        await fixture.adapter.destroy({ id });
       }
     }
   }, 300_000);
 
   it("injects start env into sandbox process", async ({ fixture }) => {
     const injectedEnvValue = `mistle-modal-env-${randomUUID()}`;
-    let runtimeId: string | undefined;
+    let id: string | undefined;
 
     try {
       const sandbox = await fixture.adapter.start({
@@ -123,9 +123,9 @@ describeModalAdapterIntegration("modal adapter integration", () => {
           [INJECTED_ENV_KEY]: injectedEnvValue,
         },
       });
-      runtimeId = sandbox.runtimeId;
+      id = sandbox.id;
 
-      const startedSandbox = await fixture.modalClient.sandboxes.fromId(sandbox.runtimeId);
+      const startedSandbox = await fixture.modalClient.sandboxes.fromId(sandbox.id);
       const commandResult = await runSandboxCommand({
         sandbox: startedSandbox,
         command: ["sh", "-lc", `printenv ${INJECTED_ENV_KEY}`],
@@ -133,8 +133,8 @@ describeModalAdapterIntegration("modal adapter integration", () => {
       expect(commandResult.exitCode).toBe(0);
       expect(commandResult.stdout.trimEnd()).toBe(injectedEnvValue);
     } finally {
-      if (runtimeId !== undefined) {
-        await fixture.adapter.destroy({ runtimeId });
+      if (id !== undefined) {
+        await fixture.adapter.destroy({ id });
       }
     }
   }, 300_000);
@@ -176,14 +176,12 @@ describeModalAdapterIntegration("modal adapter integration", () => {
           },
         ],
       });
-      firstRuntimeId = firstSandbox.runtimeId;
+      firstRuntimeId = firstSandbox.id;
 
-      const firstStartedSandbox = await fixture.modalClient.sandboxes.fromId(
-        firstSandbox.runtimeId,
-      );
+      const firstStartedSandbox = await fixture.modalClient.sandboxes.fromId(firstSandbox.id);
       await writeSandboxFile(firstStartedSandbox, VOLUME_MARKER_FILE_PATH, marker);
 
-      await fixture.adapter.destroy({ runtimeId: firstSandbox.runtimeId });
+      await fixture.adapter.destroy({ id: firstSandbox.id });
       firstRuntimeId = undefined;
 
       const secondSandbox = await fixture.adapter.start({
@@ -195,19 +193,17 @@ describeModalAdapterIntegration("modal adapter integration", () => {
           },
         ],
       });
-      secondRuntimeId = secondSandbox.runtimeId;
+      secondRuntimeId = secondSandbox.id;
 
-      const secondStartedSandbox = await fixture.modalClient.sandboxes.fromId(
-        secondSandbox.runtimeId,
-      );
+      const secondStartedSandbox = await fixture.modalClient.sandboxes.fromId(secondSandbox.id);
       const readback = await readSandboxFile(secondStartedSandbox, VOLUME_MARKER_FILE_PATH);
       expect(readback).toBe(marker);
     } finally {
       if (firstRuntimeId !== undefined) {
-        await fixture.adapter.destroy({ runtimeId: firstRuntimeId });
+        await fixture.adapter.destroy({ id: firstRuntimeId });
       }
       if (secondRuntimeId !== undefined) {
-        await fixture.adapter.destroy({ runtimeId: secondRuntimeId });
+        await fixture.adapter.destroy({ id: secondRuntimeId });
       }
       await fixture.adapter.deleteVolume({ volumeId: volume.volumeId });
     }
@@ -231,12 +227,12 @@ describeModalAdapterIntegration("modal adapter integration", () => {
           },
         ],
       });
-      firstRuntimeId = sandbox.runtimeId;
+      firstRuntimeId = sandbox.id;
 
-      const startedSandbox = await fixture.modalClient.sandboxes.fromId(sandbox.runtimeId);
+      const startedSandbox = await fixture.modalClient.sandboxes.fromId(sandbox.id);
       await writeSandboxFile(startedSandbox, VOLUME_MARKER_FILE_PATH, marker);
 
-      await fixture.adapter.stop({ runtimeId: sandbox.runtimeId });
+      await fixture.adapter.stop({ id: sandbox.id });
       firstRuntimeId = undefined;
 
       const resumedSandbox = await fixture.adapter.resume({
@@ -247,24 +243,22 @@ describeModalAdapterIntegration("modal adapter integration", () => {
             mountPath: VOLUME_MOUNT_PATH,
           },
         ],
-        previousRuntimeId: sandbox.runtimeId,
+        id: sandbox.id,
       });
-      resumedRuntimeId = resumedSandbox.runtimeId;
+      resumedRuntimeId = resumedSandbox.id;
 
       expect(resumedSandbox.provider).toBe(SandboxProvider.MODAL);
-      expect(resumedSandbox.runtimeId).not.toBe(sandbox.runtimeId);
+      expect(resumedSandbox.id).not.toBe(sandbox.id);
 
-      const resumedModalSandbox = await fixture.modalClient.sandboxes.fromId(
-        resumedSandbox.runtimeId,
-      );
+      const resumedModalSandbox = await fixture.modalClient.sandboxes.fromId(resumedSandbox.id);
       const readback = await readSandboxFile(resumedModalSandbox, VOLUME_MARKER_FILE_PATH);
       expect(readback).toBe(marker);
     } finally {
       if (firstRuntimeId !== undefined) {
-        await fixture.adapter.destroy({ runtimeId: firstRuntimeId });
+        await fixture.adapter.destroy({ id: firstRuntimeId });
       }
       if (resumedRuntimeId !== undefined) {
-        await fixture.adapter.destroy({ runtimeId: resumedRuntimeId });
+        await fixture.adapter.destroy({ id: resumedRuntimeId });
       }
       await fixture.adapter.deleteVolume({ volumeId: volume.volumeId });
     }

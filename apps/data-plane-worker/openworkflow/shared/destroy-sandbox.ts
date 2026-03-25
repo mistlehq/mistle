@@ -19,6 +19,6 @@ export async function destroySandbox(
   }
 
   await ctx.sandboxAdapter.destroy({
-    runtimeId: input.providerRuntimeId,
+    id: input.providerRuntimeId,
   });
 }
