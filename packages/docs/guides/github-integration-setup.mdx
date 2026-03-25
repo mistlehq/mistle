@@ -11,7 +11,7 @@ Use this guide to:
 
 1. Create and configure a GitHub App for connect and webhook flows.
 2. Sync integration targets into the control-plane database.
-3. Provision a GitHub target using the current `integration-targets.provision.json` manifest format.
+3. Provision a GitHub target using `integration-targets.provision.json` plus environment-backed secrets.
 
 ## Prerequisites
 
@@ -120,7 +120,7 @@ There are two setup steps:
 Run the control-plane target sync script after database setup:
 
 ```bash
-pnpm --filter @mistle/control-plane-api db:seed:integration-targets
+pnpm --filter @mistle/control-plane-api integration-targets:sync
 ```
 
 This creates or updates built-in target records such as:
@@ -130,7 +130,7 @@ This creates or updates built-in target records such as:
 
 ### 2. Provision a target manifest
 
-Create `integration-targets.provision.json` in the repository root. Start from [`integration-targets.provision.example.json`](https://github.com/mistledev/mistle/blob/main/integration-targets.provision.example.json) and keep only the targets you want to manage.
+Create `integration-targets.provision.json` in the repository root. Start from [`integration-targets.provision.example.json`](https://github.com/mistledev/mistle/blob/main/integration-targets.provision.example.json) and keep only the targets you want to manage. For secret fields, reference environment variable names through `secretEnv` instead of embedding secret values in the manifest.
 
 GitHub.com example:
 
@@ -148,9 +148,9 @@ GitHub.com example:
         "app_id": "123456",
         "client_id": "Iv1.yourclientid"
       },
-      "secrets": {
-        "app_private_key_pem": "-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----",
-        "webhook_secret": "replace-with-random-webhook-secret"
+      "secretEnv": {
+        "app_private_key_pem": "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM",
+        "webhook_secret": "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET"
       }
     }
   ]
@@ -173,30 +173,34 @@ GHES example:
         "app_id": "7890",
         "client_id": "Iv1.yourgheclientid"
       },
-      "secrets": {
-        "app_private_key_pem": "-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----",
-        "webhook_secret": "replace-with-random-webhook-secret"
+      "secretEnv": {
+        "app_private_key_pem": "MISTLE_INTEGRATION_TARGET_GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM",
+        "webhook_secret": "MISTLE_INTEGRATION_TARGET_GITHUB_ENTERPRISE_SERVER_WEBHOOK_SECRET"
       }
     }
   ]
 }
 ```
 
-Apply the manifest with the control-plane provisioning workflow you use for your environment.
+Export the referenced environment variables before running the sync command. For example, in local development you can inject them with your external secrets workflow and then run:
+
+```bash
+pnpm --filter @mistle/control-plane-api integration-targets:sync
+```
 
 ## Config Field Reference
 
 For GitHub targets, the current schemas expect:
 
-| Field                 | Where   | Meaning                                        |
-| --------------------- | ------- | ---------------------------------------------- |
-| `api_base_url`        | config  | Base REST API URL                              |
-| `web_base_url`        | config  | Base web URL                                   |
-| `app_id`              | config  | GitHub App ID                                  |
-| `app_slug`            | config  | GitHub App slug                                |
-| `client_id`           | config  | Optional GitHub App client ID                  |
-| `app_private_key_pem` | secrets | GitHub App private key in PEM format           |
-| `webhook_secret`      | secrets | Shared secret for webhook signature validation |
+| Field                 | Where             | Meaning                                        |
+| --------------------- | ----------------- | ---------------------------------------------- |
+| `api_base_url`        | config            | Base REST API URL                              |
+| `web_base_url`        | config            | Base web URL                                   |
+| `app_id`              | config            | GitHub App ID                                  |
+| `app_slug`            | config            | GitHub App slug                                |
+| `client_id`           | config            | Optional GitHub App client ID                  |
+| `app_private_key_pem` | secretEnv/secrets | GitHub App private key in PEM format           |
+| `webhook_secret`      | secretEnv/secrets | Shared secret for webhook signature validation |
 
 ## GitHub.com vs GHES
 

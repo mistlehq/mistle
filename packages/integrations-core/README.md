@@ -256,7 +256,7 @@ This is the recommended workflow.
 10. Make the target available.
 
 - Register the definition in `packages/integrations-definitions/src/index.ts`.
-- Control-plane target sync scripts will insert/update the `integration_targets` row from registry definitions.
+- Control-plane `integration-targets:sync` will insert/update the `integration_targets` row from registry definitions.
 - Provide operator-owned config/secrets through `integration-targets.provision.json`.
 
 11. Add tests.
