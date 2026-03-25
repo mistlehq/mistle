@@ -6,6 +6,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   discoverIntegrationTargetProvisionManifestPath,
+  IntegrationTargetsProvisionManifestJsonEnvVarName,
+  IntegrationTargetsProvisionManifestPathEnvVarName,
+  loadIntegrationTargetsProvisionManifest,
   parseIntegrationTargetsProvisionManifest,
   resolveRepositoryRootFromDirectory,
 } from "./provision-integration-targets.js";
@@ -26,6 +29,7 @@ describe("provision-integration-targets", () => {
           },
         ],
       }),
+      {},
     );
 
     expect(parsedManifest).toEqual({
@@ -63,6 +67,7 @@ describe("provision-integration-targets", () => {
             },
           ],
         }),
+        {},
       ),
     ).toThrow(/Duplicate provision target key 'github-cloud'\./u);
   });
@@ -84,6 +89,7 @@ describe("provision-integration-targets", () => {
           },
         ],
       }),
+      {},
     );
 
     expect(parsedManifest).toEqual({
@@ -120,6 +126,7 @@ describe("provision-integration-targets", () => {
           },
         ],
       }),
+      {},
     );
 
     expect(parsedManifest).toEqual({
@@ -165,6 +172,196 @@ describe("provision-integration-targets", () => {
         repositoryRoot: resolvedRepositoryRoot,
       });
       expect(discoveredManifestPath).toBe(manifestPath);
+    } finally {
+      await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves provision target secrets from secretEnv", () => {
+    const parsedManifest = parseIntegrationTargetsProvisionManifest(
+      JSON.stringify({
+        version: 1,
+        targets: [
+          {
+            targetKey: "github-cloud",
+            enabled: true,
+            config: {},
+            secretEnv: {
+              app_private_key_pem: "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM",
+              webhook_secret: "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET",
+            },
+          },
+        ],
+      }),
+      {
+        MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM:
+          "-----BEGIN KEY-----\\nabc\\n-----END KEY-----",
+        MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET: "whsec_123",
+      },
+    );
+
+    expect(parsedManifest).toEqual({
+      version: 1,
+      targets: [
+        {
+          targetKey: "github-cloud",
+          enabled: true,
+          config: {},
+          secrets: {
+            app_private_key_pem: "-----BEGIN KEY-----\nabc\n-----END KEY-----",
+            webhook_secret: "whsec_123",
+          },
+        },
+      ],
+    });
+  });
+
+  it("rejects provision targets that specify both secrets and secretEnv", () => {
+    expect(() =>
+      parseIntegrationTargetsProvisionManifest(
+        JSON.stringify({
+          version: 1,
+          targets: [
+            {
+              targetKey: "github-cloud",
+              enabled: true,
+              config: {},
+              secrets: {
+                webhook_secret: "whsec_123",
+              },
+              secretEnv: {
+                app_private_key_pem: "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM",
+              },
+            },
+          ],
+        }),
+        {
+          MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM:
+            "-----BEGIN KEY-----\\nabc\\n-----END KEY-----",
+        },
+      ),
+    ).toThrow(/Provide exactly one of 'secrets' or 'secretEnv'/u);
+  });
+
+  it("rejects missing secretEnv variables", () => {
+    expect(() =>
+      parseIntegrationTargetsProvisionManifest(
+        JSON.stringify({
+          version: 1,
+          targets: [
+            {
+              targetKey: "github-cloud",
+              enabled: true,
+              config: {},
+              secretEnv: {
+                webhook_secret: "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET",
+              },
+            },
+          ],
+        }),
+        {},
+      ),
+    ).toThrow(
+      /Missing integration target secret environment variable 'MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET'/u,
+    );
+  });
+
+  it("loads a manifest from the JSON environment variable before checking paths", async () => {
+    const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-provision-manifest-"));
+    const repoRoot = join(temporaryWorkspaceRoot, "repo");
+    const nestedWorkingDirectory = join(repoRoot, "apps", "control-plane-api");
+
+    await mkdir(join(repoRoot, ".git"), { recursive: true });
+    await mkdir(nestedWorkingDirectory, { recursive: true });
+
+    try {
+      const loadedManifest = loadIntegrationTargetsProvisionManifest({
+        env: {
+          [IntegrationTargetsProvisionManifestJsonEnvVarName]: JSON.stringify({
+            version: 1,
+            targets: [
+              {
+                targetKey: "openai-default",
+                enabled: true,
+                config: {
+                  api_base_url: "https://api.openai.com",
+                },
+              },
+            ],
+          }),
+        },
+        startDirectory: nestedWorkingDirectory,
+        repositoryRoot: repoRoot,
+      });
+
+      expect(loadedManifest).toEqual({
+        source: "env-json",
+        sourceValue: IntegrationTargetsProvisionManifestJsonEnvVarName,
+        manifest: {
+          version: 1,
+          targets: [
+            {
+              targetKey: "openai-default",
+              enabled: true,
+              config: {
+                api_base_url: "https://api.openai.com",
+              },
+              secrets: {},
+            },
+          ],
+        },
+      });
+    } finally {
+      await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("loads a manifest from the path environment variable", async () => {
+    const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-provision-manifest-"));
+    const manifestPath = join(temporaryWorkspaceRoot, "integration-targets.custom.json");
+
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        version: 1,
+        targets: [
+          {
+            targetKey: "openai-default",
+            enabled: true,
+            config: {
+              api_base_url: "https://api.openai.com",
+            },
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    try {
+      const loadedManifest = loadIntegrationTargetsProvisionManifest({
+        env: {
+          [IntegrationTargetsProvisionManifestPathEnvVarName]: manifestPath,
+        },
+        startDirectory: temporaryWorkspaceRoot,
+      });
+
+      expect(loadedManifest).toEqual({
+        source: "env-path",
+        sourceValue: manifestPath,
+        manifest: {
+          version: 1,
+          targets: [
+            {
+              targetKey: "openai-default",
+              enabled: true,
+              config: {
+                api_base_url: "https://api.openai.com",
+              },
+              secrets: {},
+            },
+          ],
+        },
+      });
     } finally {
       await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
     }

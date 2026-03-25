@@ -38,14 +38,12 @@
             "gpt-5.1-codex-mini": "medium"
           }
         }
-      },
-      "secrets": {}
+      }
     },
     {
       "targetKey": "atlassian-default",
       "enabled": false,
-      "config": {},
-      "secrets": {}
+      "config": {}
     },
     {
       "targetKey": "github-cloud",
@@ -57,9 +55,9 @@
         "app_id": "123456",
         "client_id": "Iv1.yourclientid"
       },
-      "secrets": {
-        "app_private_key_pem": "-----BEGIN PRIVATE KEY-----\\n<replace-with-real-key>\\n-----END PRIVATE KEY-----",
-        "webhook_secret": "<replace-with-random-webhook-secret>"
+      "secretEnv": {
+        "app_private_key_pem": "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM",
+        "webhook_secret": "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET"
       }
     },
     {
@@ -72,9 +70,9 @@
         "app_id": "7890",
         "client_id": "Iv1.yourgheclientid"
       },
-      "secrets": {
-        "app_private_key_pem": "-----BEGIN PRIVATE KEY-----\\n<replace-with-real-key>\\n-----END PRIVATE KEY-----",
-        "webhook_secret": "<replace-with-random-webhook-secret>"
+      "secretEnv": {
+        "app_private_key_pem": "MISTLE_INTEGRATION_TARGET_GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM",
+        "webhook_secret": "MISTLE_INTEGRATION_TARGET_GITHUB_ENTERPRISE_SERVER_WEBHOOK_SECRET"
       }
     }
   ]

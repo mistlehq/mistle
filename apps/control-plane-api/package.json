@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx watch --import ./src/instrument.ts src/index.ts",
     "db:migrate": "tsx scripts/run-control-plane-migrations.ts",
-    "db:seed:integration-targets": "tsx scripts/seed-integration-targets.ts",
+    "integration-targets:sync": "tsx scripts/run-integration-targets-sync.ts",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && tsc -p tsconfig.build.scripts.json && tsc-alias -p tsconfig.build.scripts.json",
     "start": "node --import ./dist/instrument.js dist/index.js",
     "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc . && pnpm run openapi:check",
