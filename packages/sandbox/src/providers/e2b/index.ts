@@ -1,5 +1,6 @@
 import type { SandboxAdapter, SandboxRuntimeControl } from "../../types.js";
 import { createE2BSandboxAdapter } from "./adapter.js";
+import { E2BApiClient } from "./client.js";
 import { validateE2BSandboxConfig, type E2BSandboxConfig } from "./config.js";
 import { createE2BSandboxRuntimeControl } from "./runtime-control.js";
 
@@ -9,12 +10,12 @@ export function createE2BAdapter(config: E2BSandboxConfig): SandboxAdapter {
   const validatedConfig = validateE2BSandboxConfig(config);
 
   return createE2BSandboxAdapter({
-    config: validatedConfig,
+    client: new E2BApiClient(validatedConfig),
   });
 }
 
 export function createE2BRuntimeControl(config: E2BSandboxConfig): SandboxRuntimeControl {
   const validatedConfig = validateE2BSandboxConfig(config);
 
-  return createE2BSandboxRuntimeControl(validatedConfig);
+  return createE2BSandboxRuntimeControl(new E2BApiClient(validatedConfig));
 }

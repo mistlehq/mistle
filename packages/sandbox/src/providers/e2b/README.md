@@ -35,5 +35,5 @@ const adapter = createSandboxAdapter({
 
 ## Error Surface
 
-- E2B not-found errors are normalized to `SandboxResourceNotFoundError`.
-- Authentication, rate-limit, template-build, and command/runtime failures are left explicit.
+- Raw E2B SDK failures are normalized in `client-errors.ts` before adapter/runtime-control translate sandbox not-found cases to `SandboxResourceNotFoundError`.
+- Authentication, rate-limit, template, build, and command-exit failures remain explicit through the E2B client error cause chain.

@@ -1,8 +1,3 @@
-import { createHash } from "node:crypto";
-
-import type { ConnectionOpts } from "e2b";
-import { Sandbox, SandboxNotFoundError, Template } from "e2b";
-
 import {
   SandboxConfigurationError,
   SandboxProviderNotImplementedError,
@@ -17,53 +12,8 @@ import {
   type SandboxStartRequest,
   type SandboxStopRequest,
 } from "../../types.js";
-import type { E2BSandboxConfig } from "./config.js";
-
-const E2BTemplateAliasPrefix = "mistle-sandbox-base";
-const E2BSandboxTemplateCache = new Map<string, Promise<string>>();
-
-function createE2BConnectionOptions(config: E2BSandboxConfig): ConnectionOpts {
-  return {
-    apiKey: config.apiKey,
-    ...(config.domain === undefined ? {} : { domain: config.domain }),
-  };
-}
-
-function createE2BTemplateAlias(baseRef: string): string {
-  const hash = createHash("sha256").update(baseRef).digest("hex");
-  return `${E2BTemplateAliasPrefix}-${hash.slice(0, 24)}`;
-}
-
-async function resolveE2BTemplateAlias(input: {
-  baseRef: string;
-  connectionOptions: ConnectionOpts;
-}): Promise<string> {
-  const cachedAlias = E2BSandboxTemplateCache.get(input.baseRef);
-  if (cachedAlias !== undefined) {
-    return cachedAlias;
-  }
-
-  const aliasPromise = (async () => {
-    const alias = createE2BTemplateAlias(input.baseRef);
-    const templateExists = await Template.exists(alias, input.connectionOptions);
-
-    if (!templateExists) {
-      const template = Template().fromImage(input.baseRef);
-      await Template.build(template, alias, input.connectionOptions);
-    }
-
-    return alias;
-  })();
-
-  E2BSandboxTemplateCache.set(input.baseRef, aliasPromise);
-
-  try {
-    return await aliasPromise;
-  } catch (error) {
-    E2BSandboxTemplateCache.delete(input.baseRef);
-    throw error;
-  }
-}
+import { E2BClientError, E2BClientErrorCodes } from "./client-errors.js";
+import type { E2BClient } from "./client.js";
 
 function createSandboxHandle(sandboxId: string): SandboxHandle {
   return {
@@ -87,10 +37,10 @@ function requireSandboxId(id: string): void {
 }
 
 export class E2BSandboxAdapter implements SandboxAdapter {
-  readonly #config: E2BSandboxConfig;
+  readonly #client: E2BClient;
 
-  constructor(config: E2BSandboxConfig) {
-    this.#config = config;
+  constructor(client: E2BClient) {
+    this.#client = client;
   }
 
   async start(request: SandboxStartRequest): Promise<SandboxHandle> {
@@ -98,30 +48,22 @@ export class E2BSandboxAdapter implements SandboxAdapter {
       throw new SandboxConfigurationError("E2B adapter received a non-E2B image handle.");
     }
 
-    const connectionOptions = createE2BConnectionOptions(this.#config);
-    const templateAlias = await resolveE2BTemplateAlias({
-      baseRef: request.image.imageId,
-      connectionOptions,
-    });
-    const sandbox = await Sandbox.create(templateAlias, {
-      ...connectionOptions,
-      lifecycle: {
-        onTimeout: "pause",
-      },
-      ...(request.env === undefined ? {} : { envs: { ...request.env } }),
+    const response = await this.#client.startSandbox({
+      imageRef: request.image.imageId,
+      ...(request.env === undefined ? {} : { env: request.env }),
     });
 
-    return createSandboxHandle(sandbox.sandboxId);
+    return createSandboxHandle(response.sandboxId);
   }
 
   async resume(request: SandboxResumeRequestV1): Promise<SandboxHandle> {
     requireSandboxId(request.id);
 
     try {
-      const sandbox = await Sandbox.connect(request.id, createE2BConnectionOptions(this.#config));
+      const sandbox = await this.#client.resumeSandbox({ sandboxId: request.id });
       return createSandboxHandle(sandbox.sandboxId);
     } catch (error) {
-      if (error instanceof SandboxNotFoundError) {
+      if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
         throw toSandboxNotFoundError(request.id, error);
       }
 
@@ -133,10 +75,9 @@ export class E2BSandboxAdapter implements SandboxAdapter {
     requireSandboxId(request.id);
 
     try {
-      const sandbox = await Sandbox.connect(request.id, createE2BConnectionOptions(this.#config));
-      await sandbox.pause();
+      await this.#client.stopSandbox({ sandboxId: request.id });
     } catch (error) {
-      if (error instanceof SandboxNotFoundError) {
+      if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
         throw toSandboxNotFoundError(request.id, error);
       }
 
@@ -148,10 +89,9 @@ export class E2BSandboxAdapter implements SandboxAdapter {
     requireSandboxId(request.id);
 
     try {
-      const sandbox = await Sandbox.connect(request.id, createE2BConnectionOptions(this.#config));
-      await sandbox.kill();
+      await this.#client.destroySandbox({ sandboxId: request.id });
     } catch (error) {
-      if (error instanceof SandboxNotFoundError) {
+      if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
         throw toSandboxNotFoundError(request.id, error);
       }
 
@@ -160,10 +100,10 @@ export class E2BSandboxAdapter implements SandboxAdapter {
   }
 }
 
-export function createE2BSandboxAdapter(input: { config: E2BSandboxConfig }): SandboxAdapter {
-  if (input.config === undefined) {
-    throw new SandboxProviderNotImplementedError("E2B config is required to construct adapter.");
+export function createE2BSandboxAdapter(input: { client: E2BClient }): SandboxAdapter {
+  if (input.client === undefined) {
+    throw new SandboxProviderNotImplementedError("E2B client is required to construct adapter.");
   }
 
-  return new E2BSandboxAdapter(input.config);
+  return new E2BSandboxAdapter(input.client);
 }

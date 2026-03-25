@@ -1,37 +1,11 @@
-import { CommandExitError, Sandbox, SandboxNotFoundError } from "e2b";
-
 import {
   SandboxConfigurationError,
   SandboxProviderNotImplementedError,
   SandboxResourceNotFoundError,
 } from "../../errors.js";
 import type { SandboxRuntimeControl } from "../../types.js";
-import type { E2BSandboxConfig } from "./config.js";
-
-const ApplyStartupCommand = "/usr/local/bin/sandboxd apply-startup";
-
-function createConnectOptions(config: E2BSandboxConfig): { apiKey: string; domain?: string } {
-  return {
-    apiKey: config.apiKey,
-    ...(config.domain === undefined ? {} : { domain: config.domain }),
-  };
-}
-
-function formatCommandOutput(input: { stdout: string; stderr: string }): string {
-  const outputs: string[] = [];
-
-  const trimmedStdout = input.stdout.trim();
-  if (trimmedStdout.length > 0) {
-    outputs.push(`stdout: ${trimmedStdout}`);
-  }
-
-  const trimmedStderr = input.stderr.trim();
-  if (trimmedStderr.length > 0) {
-    outputs.push(`stderr: ${trimmedStderr}`);
-  }
-
-  return outputs.length === 0 ? "" : ` ${outputs.join(" ")}`;
-}
+import { E2BClientError, E2BClientErrorCodes } from "./client-errors.js";
+import type { E2BClient } from "./client.js";
 
 function requireSandboxId(id: string): void {
   if (id.trim().length === 0) {
@@ -48,43 +22,22 @@ function toSandboxNotFoundError(resourceId: string, error: unknown): SandboxReso
 }
 
 export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
-  readonly #config: E2BSandboxConfig;
+  readonly #client: E2BClient;
 
-  constructor(config: E2BSandboxConfig) {
-    this.#config = config;
+  constructor(client: E2BClient) {
+    this.#client = client;
   }
 
   async applyStartup(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
     requireSandboxId(input.id);
 
     try {
-      const sandbox = await Sandbox.connect(input.id, createConnectOptions(this.#config));
-      const handle = await sandbox.commands.run(ApplyStartupCommand, {
-        background: true,
-        stdin: true,
-        user: "root",
+      await this.#client.applyStartup({
+        sandboxId: input.id,
+        payload: input.payload,
       });
-
-      try {
-        await sandbox.commands.sendStdin(handle.pid, input.payload);
-        await sandbox.commands.closeStdin(handle.pid);
-        await handle.wait();
-      } catch (error) {
-        if (error instanceof CommandExitError) {
-          throw new Error(
-            `E2B startup apply command exited with code ${String(error.exitCode)}.${formatCommandOutput(
-              {
-                stdout: error.stdout,
-                stderr: error.stderr,
-              },
-            )}`,
-          );
-        }
-
-        throw error;
-      }
     } catch (error) {
-      if (error instanceof SandboxNotFoundError) {
+      if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
         throw toSandboxNotFoundError(input.id, error);
       }
 
@@ -95,12 +48,12 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
   async close(): Promise<void> {}
 }
 
-export function createE2BSandboxRuntimeControl(config: E2BSandboxConfig): SandboxRuntimeControl {
-  if (config === undefined) {
+export function createE2BSandboxRuntimeControl(client: E2BClient): SandboxRuntimeControl {
+  if (client === undefined) {
     throw new SandboxProviderNotImplementedError(
-      "E2B config is required to construct runtime control.",
+      "E2B client is required to construct runtime control.",
     );
   }
 
-  return new E2BSandboxRuntimeControl(config);
+  return new E2BSandboxRuntimeControl(client);
 }
