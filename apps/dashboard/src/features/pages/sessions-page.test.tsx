@@ -3,7 +3,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter, Route, Routes, type MemoryRouterProps, useLocation } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
@@ -36,11 +36,23 @@ type SessionListItem = {
   failureMessage: string | null;
 };
 
+type SelectableProfile = {
+  id: string;
+  displayName: string;
+  status: "active";
+  latestVersion: number;
+  createdAt: string;
+  updatedAt: string;
+  organizationId: string;
+};
+
 function buildListedSession(
   overrides: Partial<SessionListItem> & Pick<SessionListItem, "id">,
 ): SessionListItem {
+  const { id, ...restOverrides } = overrides;
+
   return {
-    id: overrides.id,
+    id,
     sandboxProfileId: "sbp_123",
     sandboxProfileDisplayName: "Profile 123",
     sandboxProfileVersion: 2,
@@ -55,6 +67,21 @@ function buildListedSession(
     updatedAt: "2026-03-10T00:00:00.000Z",
     failureCode: null,
     failureMessage: null,
+    ...restOverrides,
+  };
+}
+
+function buildSelectableProfile(
+  overrides: Partial<SelectableProfile> & Pick<SelectableProfile, "id">,
+): SelectableProfile {
+  return {
+    id: overrides.id,
+    displayName: "Alpha Profile",
+    status: "active",
+    latestVersion: 3,
+    createdAt: "2026-03-10T00:00:00.000Z",
+    updatedAt: "2026-03-10T00:00:00.000Z",
+    organizationId: "org_123",
     ...overrides,
   };
 }
@@ -89,14 +116,16 @@ function seedSessionsList(input: {
 
 function renderSessionsPage(input?: {
   queryClient?: ReturnType<typeof createTestQueryClient>;
-  initialEntries?: MemoryRouterProps["initialEntries"];
+  initialEntries?: string[];
   routes?: React.ReactNode;
 }) {
   const queryClient = input?.queryClient ?? createSessionsPageQueryClient();
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={input?.initialEntries}>
+      <MemoryRouter
+        {...(input?.initialEntries === undefined ? {} : { initialEntries: input.initialEntries })}
+      >
         {input?.routes ?? <SessionsPage />}
       </MemoryRouter>
     </QueryClientProvider>,
@@ -290,15 +319,9 @@ describe("SessionsPage", () => {
   it("clears a stale selected profile after launchable profiles finish refetching without it", () => {
     expect(
       shouldClearSelectedProfile({
-        selectedProfile: {
+        selectedProfile: buildSelectableProfile({
           id: "sbp_profile_alpha",
-          displayName: "Alpha Profile",
-          status: "active",
-          latestVersion: 3,
-          createdAt: "2026-03-10T00:00:00.000Z",
-          updatedAt: "2026-03-10T00:00:00.000Z",
-          organizationId: "org_123",
-        },
+        }),
         selectableProfiles: [],
         isSelectableProfilesPending: false,
       }),
@@ -308,15 +331,9 @@ describe("SessionsPage", () => {
   it("keeps the current selection while launchable profiles are still loading", () => {
     expect(
       shouldClearSelectedProfile({
-        selectedProfile: {
+        selectedProfile: buildSelectableProfile({
           id: "sbp_profile_alpha",
-          displayName: "Alpha Profile",
-          status: "active",
-          latestVersion: 3,
-          createdAt: "2026-03-10T00:00:00.000Z",
-          updatedAt: "2026-03-10T00:00:00.000Z",
-          organizationId: "org_123",
-        },
+        }),
         selectableProfiles: [],
         isSelectableProfilesPending: true,
       }),
@@ -326,25 +343,13 @@ describe("SessionsPage", () => {
   it("keeps the current selection when the selected profile is still launchable", () => {
     expect(
       shouldClearSelectedProfile({
-        selectedProfile: {
+        selectedProfile: buildSelectableProfile({
           id: "sbp_profile_alpha",
-          displayName: "Alpha Profile",
-          status: "active",
-          latestVersion: 3,
-          createdAt: "2026-03-10T00:00:00.000Z",
-          updatedAt: "2026-03-10T00:00:00.000Z",
-          organizationId: "org_123",
-        },
+        }),
         selectableProfiles: [
-          {
+          buildSelectableProfile({
             id: "sbp_profile_alpha",
-            displayName: "Alpha Profile",
-            status: "active",
-            latestVersion: 3,
-            createdAt: "2026-03-10T00:00:00.000Z",
-            updatedAt: "2026-03-10T00:00:00.000Z",
-            organizationId: "org_123",
-          },
+          }),
         ],
         isSelectableProfilesPending: false,
       }),

@@ -20,14 +20,20 @@ import {
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
 
-function createControllerQueryClient(
-  input?: Parameters<typeof QueryClient>[0]["defaultOptions"]["queries"],
-): QueryClient {
+function createControllerQueryClient(input?: {
+  gcTime?: number;
+  refetchOnMount?: boolean;
+  retry?: boolean;
+  staleTime?: number;
+}): QueryClient {
   return new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
-        ...input,
+        ...(input?.gcTime === undefined ? {} : { gcTime: input.gcTime }),
+        ...(input?.refetchOnMount === undefined ? {} : { refetchOnMount: input.refetchOnMount }),
+        ...(input?.retry === undefined ? {} : { retry: input.retry }),
+        ...(input?.staleTime === undefined ? {} : { staleTime: input.staleTime }),
       },
     },
   });
@@ -39,19 +45,31 @@ function createControllerWrapper(queryClient: QueryClient) {
   };
 }
 
+function renderSessionWorkbenchController(input: {
+  queryClient: QueryClient;
+  sandboxInstanceId: string | null;
+}) {
+  return renderHook(
+    ({ sandboxInstanceId }: { sandboxInstanceId: string | null }) =>
+      useSessionWorkbenchController({
+        sandboxInstanceId,
+      }),
+    {
+      initialProps: {
+        sandboxInstanceId: input.sandboxInstanceId,
+      },
+      wrapper: createControllerWrapper(input.queryClient),
+    },
+  );
+}
+
 describe("useSessionWorkbenchController", () => {
   it("returns separate workbench and conversation pane state for a missing session id", () => {
     const queryClient = createControllerQueryClient();
-
-    const { result } = renderHook(
-      () =>
-        useSessionWorkbenchController({
-          sandboxInstanceId: null,
-        }),
-      {
-        wrapper: createControllerWrapper(queryClient),
-      },
-    );
+    const { result } = renderSessionWorkbenchController({
+      queryClient,
+      sandboxInstanceId: null,
+    });
 
     expect(Object.keys(result.current)).toEqual(["workbench", "conversationPane"]);
     expect(result.current.workbench.connectionReadiness).toEqual({
@@ -95,19 +113,10 @@ describe("useSessionWorkbenchController", () => {
     }
 
     const queryClient = createControllerQueryClient();
-
-    const { result, rerender } = renderHook(
-      ({ sandboxInstanceId }: { sandboxInstanceId: string | null }) =>
-        useSessionWorkbenchController({
-          sandboxInstanceId,
-        }),
-      {
-        initialProps: {
-          sandboxInstanceId: sandboxInstanceIdOne,
-        },
-        wrapper: createControllerWrapper(queryClient),
-      },
-    );
+    const { result, rerender } = renderSessionWorkbenchController({
+      queryClient,
+      sandboxInstanceId: sandboxInstanceIdOne,
+    });
 
     act(() => {
       result.current.workbench.terminalPanelState.openPanel();
@@ -515,15 +524,10 @@ describe("useSessionWorkbenchController", () => {
       },
     });
 
-    const { result } = renderHook(
-      () =>
-        useSessionWorkbenchController({
-          sandboxInstanceId,
-        }),
-      {
-        wrapper: createControllerWrapper(queryClient),
-      },
-    );
+    const { result } = renderSessionWorkbenchController({
+      queryClient,
+      sandboxInstanceId,
+    });
 
     expect(result.current.workbench.isResumingStoppedSandbox).toBe(false);
     expect(result.current.workbench.connectionReadiness.reason).toBe("unknown");
