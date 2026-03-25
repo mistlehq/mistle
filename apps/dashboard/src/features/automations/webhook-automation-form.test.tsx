@@ -277,6 +277,5 @@ describe("WebhookAutomationForm", () => {
     const selectTriggers = container.querySelectorAll('[data-slot="select-trigger"]');
     expect(selectTriggers[0]?.getAttribute("aria-invalid")).toBe("true");
     expect(selectTriggers[1]?.getAttribute("aria-invalid")).toBe("true");
-    expect(container.querySelectorAll('[data-invalid="true"]').length).toBe(4);
   });
 });

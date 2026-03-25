@@ -92,10 +92,7 @@ function SelectField(input: {
   const isInvalid = input.error !== undefined;
 
   return (
-    <Field
-      data-invalid={isInvalid ? true : undefined}
-      orientation={input.orientation ?? "vertical"}
-    >
+    <Field orientation={input.orientation ?? "vertical"}>
       <FieldLabel>{input.label}</FieldLabel>
       <FieldContent>
         <Select
@@ -242,10 +239,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       <FormPageSection>
         {input.mode === "create" ? (
           <div className="p-4">
-            <Field
-              data-invalid={input.fieldErrors.name !== undefined ? true : undefined}
-              orientation="horizontal"
-            >
+            <Field orientation="horizontal">
               <FieldHeader>
                 <FieldLabel htmlFor="automation-name">Automation name</FieldLabel>
               </FieldHeader>
@@ -325,12 +319,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
         {input.values.triggerIds.length === 0 ? null : (
           <div className="p-4">
-            <Field
-              data-invalid={
-                input.fieldErrors.conversationKeyTemplate !== undefined ? true : undefined
-              }
-              orientation="horizontal"
-            >
+            <Field orientation="horizontal">
               <FieldHeader>
                 <FieldLabel>Group events by</FieldLabel>
               </FieldHeader>
@@ -378,7 +367,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
       <FormPageSection>
         <div className="p-4">
-          <Field data-invalid={input.fieldErrors.instructions !== undefined ? true : undefined}>
+          <Field>
             <FieldHeader>
               <FieldLabel htmlFor="automation-instructions">Agent Instructions</FieldLabel>
               <FieldDescription>
