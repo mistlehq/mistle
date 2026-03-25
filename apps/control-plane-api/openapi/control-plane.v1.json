@@ -4591,7 +4591,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["NOT_FOUND"]
+                      "enum": ["INSTANCE_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -4781,7 +4781,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["NOT_FOUND"]
+                      "enum": ["INSTANCE_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -4941,7 +4941,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["NOT_FOUND"]
+                      "enum": ["INSTANCE_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
