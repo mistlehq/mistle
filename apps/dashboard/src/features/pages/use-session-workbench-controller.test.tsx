@@ -6,19 +6,14 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
-  clearStoredResumeIdempotencyKey,
-  createResumeIdempotencyStorageKey,
   getSandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
+  hasFreshSandboxStatusRead,
   isActiveResumeRequest,
-  persistResumeIdempotencyKey,
-  readStoredResumeIdempotencyRecord,
-  readStoredResumeIdempotencyKey,
   resolveSessionEntryPhase,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForEntryPhase,
   seedSandboxInstanceStatusQuery,
-  shouldClearStoredResumeIdempotencyKey,
   shouldPollStoppedSandboxStatus,
   shouldShowResumeInFlightState,
   shouldWaitForAutomationSessionThread,
@@ -225,90 +220,27 @@ describe("useSessionWorkbenchController", () => {
     ).toBe(0);
   });
 
-  it("namespaces resume idempotency storage keys per sandbox instance", () => {
-    const sandboxInstanceId = `sbi-resume-${Date.now()}`;
-    const otherSandboxInstanceId = `sbi-other-${Date.now()}`;
-
-    expect(createResumeIdempotencyStorageKey(sandboxInstanceId)).not.toBe(
-      createResumeIdempotencyStorageKey(otherSandboxInstanceId),
-    );
-  });
-
-  it("treats missing browser storage as empty and no-ops writes", () => {
-    const sandboxInstanceId = `sbi-resume-${Date.now()}`;
-
+  it("treats status data as fresh only after a post-mount query update", () => {
     expect(
-      readStoredResumeIdempotencyKey({
-        sandboxInstanceId,
-        storage: null,
-        nowMs: Date.now(),
+      hasFreshSandboxStatusRead({
+        initialDataUpdatedAtMs: null,
+        currentDataUpdatedAtMs: 0,
       }),
-    ).toBeNull();
-
-    expect(() => {
-      persistResumeIdempotencyKey({
-        sandboxInstanceId,
-        idempotencyKey: "resume-key-001",
-        storage: null,
-        nowMs: Date.now(),
-      });
-
-      clearStoredResumeIdempotencyKey({
-        sandboxInstanceId,
-        storage: null,
-      });
-    }).not.toThrow();
-  });
-
-  it("expires stored resume idempotency keys after the retry window", () => {
-    let storedValue: string | null = null;
-    const storage = {
-      getItem(): string | null {
-        return storedValue;
-      },
-      removeItem(): void {
-        storedValue = null;
-      },
-      setItem(_key: string, value: string): void {
-        storedValue = value;
-      },
-    };
+    ).toBe(false);
 
     expect(
-      persistResumeIdempotencyKey({
-        sandboxInstanceId: "sbi_resume_001",
-        idempotencyKey: "resume-key-001",
-        storage,
-        nowMs: 1_000,
+      hasFreshSandboxStatusRead({
+        initialDataUpdatedAtMs: 0,
+        currentDataUpdatedAtMs: 0,
+      }),
+    ).toBe(false);
+
+    expect(
+      hasFreshSandboxStatusRead({
+        initialDataUpdatedAtMs: 123,
+        currentDataUpdatedAtMs: 124,
       }),
     ).toBe(true);
-
-    expect(
-      readStoredResumeIdempotencyKey({
-        sandboxInstanceId: "sbi_resume_001",
-        storage,
-        nowMs: 1_000 + 60_000,
-      }),
-    ).toBe("resume-key-001");
-
-    expect(
-      readStoredResumeIdempotencyRecord({
-        sandboxInstanceId: "sbi_resume_001",
-        storage,
-        nowMs: 1_000 + 60_000,
-      }),
-    ).toEqual({
-      value: "resume-key-001",
-      expiresAtMs: 1_000 + 5 * 60 * 1_000,
-    });
-
-    expect(
-      readStoredResumeIdempotencyKey({
-        sandboxInstanceId: "sbi_resume_001",
-        storage,
-        nowMs: 1_000 + 5 * 60 * 1_000,
-      }),
-    ).toBeNull();
   });
 
   it("seeds the sandbox status query from a successful resume response", () => {
@@ -339,15 +271,6 @@ describe("useSessionWorkbenchController", () => {
       failureMessage: null,
       automationConversation: null,
     });
-  });
-
-  it("preserves the stored resume key while the sandbox is still starting", () => {
-    expect(shouldClearStoredResumeIdempotencyKey("stopped")).toBe(false);
-    expect(shouldClearStoredResumeIdempotencyKey("starting")).toBe(false);
-    expect(shouldClearStoredResumeIdempotencyKey(null)).toBe(false);
-
-    expect(shouldClearStoredResumeIdempotencyKey("running")).toBe(true);
-    expect(shouldClearStoredResumeIdempotencyKey("failed")).toBe(true);
   });
 
   it("keeps polling while a stopped sandbox is still resuming", () => {
@@ -572,7 +495,7 @@ describe("useSessionWorkbenchController", () => {
     ).toBe(true);
   });
 
-  it("auto-resumes a stopped sandbox on page entry even when a stored resume key exists", () => {
+  it("does not auto-resume from a seeded stopped cache before a fresh fetch", () => {
     const sandboxInstanceId = `sbi-resume-${Date.now()}`;
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -583,12 +506,6 @@ describe("useSessionWorkbenchController", () => {
       },
     });
 
-    persistResumeIdempotencyKey({
-      sandboxInstanceId,
-      idempotencyKey: "resume-key-001",
-      storage: window.localStorage,
-      nowMs: Date.now(),
-    });
     seedSandboxInstanceStatusQuery({
       queryClient,
       sandboxInstanceId,
@@ -615,13 +532,8 @@ describe("useSessionWorkbenchController", () => {
       },
     );
 
-    expect(result.current.workbench.isResumingStoppedSandbox).toBe(true);
-    expect(result.current.workbench.connectionReadiness.reason).toBe("resuming");
+    expect(result.current.workbench.isResumingStoppedSandbox).toBe(false);
+    expect(result.current.workbench.connectionReadiness.reason).toBe("unknown");
     expect(result.current.workbench.stoppedSessionState.requiresManualResume).toBe(false);
-
-    clearStoredResumeIdempotencyKey({
-      sandboxInstanceId,
-      storage: window.localStorage,
-    });
   });
 });

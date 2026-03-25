@@ -10,13 +10,6 @@ import {
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
-  getBestEffortBrowserStorage,
-  isExpiringBrowserStorageRecord,
-  readBrowserStorageJson,
-  removeBrowserStorageItem,
-  writeBrowserStorageJson,
-} from "../shared/browser-storage.js";
-import {
   hasSessionTopAlert,
   resolveChatComposerAction,
   resolveSessionHeaderStatusUi,
@@ -36,8 +29,6 @@ const AutomationSessionStatusRefetchIntervalMs = 2_000;
 const AutomationSessionPreparationTimeoutMs = 30_000;
 const AutomationSessionPreparationTimeoutMessage =
   "This chat session is taking longer than expected to become ready. Please try again shortly.";
-const ResumeIdempotencyKeyStorageKeyPrefix = "dashboard:session-workbench:resume-idempotency:";
-const ResumeIdempotencyKeyTtlMs = 5 * 60 * 1_000;
 
 type SandboxAutomationConversation = {
   conversationId: string;
@@ -197,11 +188,6 @@ export type {
   UseSessionWorkbenchControllerResult,
 };
 
-type ResumeIdempotencyStorageRecord = {
-  value: string;
-  expiresAtMs: number;
-};
-
 type ResumeRequestGuard = {
   requestId: number;
   sandboxInstanceId: string;
@@ -222,96 +208,15 @@ export function getSandboxInstanceStatusQueryKey(
   return ["sandbox-instance-status", sandboxInstanceId];
 }
 
-export function createResumeIdempotencyStorageKey(sandboxInstanceId: string): string {
-  return `${ResumeIdempotencyKeyStorageKeyPrefix}${sandboxInstanceId}`;
-}
-
-function isResumeIdempotencyStorageRecord(value: unknown): value is ResumeIdempotencyStorageRecord {
-  return isExpiringBrowserStorageRecord(value, (storedValue): storedValue is string => {
-    return typeof storedValue === "string" && storedValue.length > 0;
-  });
-}
-
-function createResumeIdempotencyStorageRecord(input: {
-  idempotencyKey: string;
-  nowMs: number;
-}): ResumeIdempotencyStorageRecord {
-  return {
-    value: input.idempotencyKey,
-    expiresAtMs: input.nowMs + ResumeIdempotencyKeyTtlMs,
-  };
-}
-
-export function readStoredResumeIdempotencyRecord(input: {
-  sandboxInstanceId: string;
-  storage: Pick<Storage, "getItem" | "removeItem"> | null;
-  nowMs: number;
-}): ResumeIdempotencyStorageRecord | null {
-  const storageKey = createResumeIdempotencyStorageKey(input.sandboxInstanceId);
-  const storedRecord = readBrowserStorageJson({
-    key: storageKey,
-    storage: input.storage,
-    isValue: isResumeIdempotencyStorageRecord,
-  });
-  if (storedRecord === null) {
-    return null;
+export function hasFreshSandboxStatusRead(input: {
+  initialDataUpdatedAtMs: number | null;
+  currentDataUpdatedAtMs: number;
+}): boolean {
+  if (input.initialDataUpdatedAtMs === null) {
+    return false;
   }
 
-  if (storedRecord.expiresAtMs <= input.nowMs) {
-    removeBrowserStorageItem({
-      key: storageKey,
-      storage: input.storage,
-    });
-    return null;
-  }
-
-  return storedRecord;
-}
-
-export function readStoredResumeIdempotencyKey(input: {
-  sandboxInstanceId: string;
-  storage: Pick<Storage, "getItem" | "removeItem"> | null;
-  nowMs: number;
-}): string | null {
-  return (
-    readStoredResumeIdempotencyRecord({
-      sandboxInstanceId: input.sandboxInstanceId,
-      storage: input.storage,
-      nowMs: input.nowMs,
-    })?.value ?? null
-  );
-}
-
-export function persistResumeIdempotencyKey(input: {
-  sandboxInstanceId: string;
-  idempotencyKey: string;
-  storage: Pick<Storage, "setItem"> | null;
-  nowMs: number;
-}): boolean {
-  return writeBrowserStorageJson({
-    key: createResumeIdempotencyStorageKey(input.sandboxInstanceId),
-    value: createResumeIdempotencyStorageRecord({
-      idempotencyKey: input.idempotencyKey,
-      nowMs: input.nowMs,
-    }),
-    storage: input.storage,
-  });
-}
-
-export function clearStoredResumeIdempotencyKey(input: {
-  sandboxInstanceId: string;
-  storage: Pick<Storage, "removeItem"> | null;
-}): boolean {
-  return removeBrowserStorageItem({
-    key: createResumeIdempotencyStorageKey(input.sandboxInstanceId),
-    storage: input.storage,
-  });
-}
-
-export function shouldClearStoredResumeIdempotencyKey(
-  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null,
-): boolean {
-  return sandboxStatus === "running" || sandboxStatus === "failed";
+  return input.currentDataUpdatedAtMs > input.initialDataUpdatedAtMs;
 }
 
 export function shouldShowResumeInFlightState(input: {
@@ -461,6 +366,7 @@ export function useSessionWorkbenchController(input: {
   const [resumeActionErrorMessage, setResumeActionErrorMessage] = useState<string | null>(null);
   const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
   const activeResumeRequestRef = useRef<ResumeRequestGuard | null>(null);
+  const resumeIdempotencyKeyRef = useRef<string | null>(null);
   const nextResumeRequestIdRef = useRef(0);
   const initialSandboxStatusDataUpdatedAtRef = useRef<number | null>(null);
   const queryClient = useQueryClient();
@@ -546,7 +452,11 @@ export function useSessionWorkbenchController(input: {
   if (initialSandboxStatusDataUpdatedAtRef.current === null) {
     initialSandboxStatusDataUpdatedAtRef.current = sandboxStatusQuery.dataUpdatedAt;
   }
-  const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
+  const hasFreshSandboxStatus = hasFreshSandboxStatusRead({
+    initialDataUpdatedAtMs: initialSandboxStatusDataUpdatedAtRef.current,
+    currentDataUpdatedAtMs: sandboxStatusQuery.dataUpdatedAt,
+  });
+  const sandboxStatus = hasFreshSandboxStatus ? (sandboxStatusQuery.data?.status ?? null) : null;
   const shouldAttemptInitialStoppedResume =
     input.sandboxInstanceId !== null &&
     sandboxStatus === "stopped" &&
@@ -595,24 +505,13 @@ export function useSessionWorkbenchController(input: {
     setHasAttemptedInitialStoppedResume(false);
     setIsResumingStoppedSandbox(false);
     setResumeActionErrorMessage(null);
+    resumeIdempotencyKeyRef.current = null;
     activeResumeRequestRef.current = null;
     initialSandboxStatusDataUpdatedAtRef.current = sandboxStatusQuery.dataUpdatedAt;
     clearStartErrorMessage();
     disconnectSession();
     void disconnectPty();
   }, [clearStartErrorMessage, disconnectPty, disconnectSession, input.sandboxInstanceId]);
-
-  useEffect(() => {
-    if (input.sandboxInstanceId === null || !shouldClearStoredResumeIdempotencyKey(sandboxStatus)) {
-      return;
-    }
-
-    clearStoredResumeIdempotencyKey({
-      sandboxInstanceId: input.sandboxInstanceId,
-      storage: getBestEffortBrowserStorage("local"),
-    });
-    setResumeActionErrorMessage(null);
-  }, [input.sandboxInstanceId, sandboxStatus]);
 
   useEffect(() => {
     if (!isWaitingForAutomationThread) {
@@ -819,32 +718,14 @@ export function useSessionWorkbenchController(input: {
       return;
     }
 
-    const nowMs = Date.now();
-    const storage = getBestEffortBrowserStorage("local");
-    const storedResumeRecord =
-      readStoredResumeIdempotencyRecord({
-        sandboxInstanceId: input.sandboxInstanceId,
-        storage,
-        nowMs,
-      }) ??
-      createResumeIdempotencyStorageRecord({
-        idempotencyKey: crypto.randomUUID(),
-        nowMs,
-      });
-    const idempotencyKey = storedResumeRecord.value;
+    const idempotencyKey = resumeIdempotencyKeyRef.current ?? crypto.randomUUID();
+    resumeIdempotencyKeyRef.current = idempotencyKey;
     const requestId = nextResumeRequestIdRef.current + 1;
     nextResumeRequestIdRef.current = requestId;
     activeResumeRequestRef.current = {
       requestId,
       sandboxInstanceId: input.sandboxInstanceId,
     };
-
-    persistResumeIdempotencyKey({
-      sandboxInstanceId: input.sandboxInstanceId,
-      idempotencyKey,
-      storage,
-      nowMs,
-    });
     setHasAttemptedInitialStoppedResume(true);
     setResumeActionErrorMessage(null);
 
@@ -869,6 +750,9 @@ export function useSessionWorkbenchController(input: {
         sandboxInstanceId: input.sandboxInstanceId,
         sandboxStatus: resumedSandboxStatus,
       });
+      if (resumedSandboxStatus.status !== "stopped") {
+        resumeIdempotencyKeyRef.current = null;
+      }
       clearStartErrorMessage();
       setHasAttemptedAutoConnect(false);
 
@@ -884,10 +768,7 @@ export function useSessionWorkbenchController(input: {
         return;
       }
       if (error instanceof SandboxProfilesApiError && error.status < 500) {
-        clearStoredResumeIdempotencyKey({
-          sandboxInstanceId: input.sandboxInstanceId,
-          storage,
-        });
+        resumeIdempotencyKeyRef.current = null;
       }
       setResumeActionErrorMessage(resolveResumeFailureMessage(error));
     } finally {
