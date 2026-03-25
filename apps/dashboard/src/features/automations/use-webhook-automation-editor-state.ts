@@ -115,7 +115,7 @@ function applyWebhookAutomationValueChange(input: {
 }
 
 type LoadedWebhookAutomationEditorStateInput = {
-  mode: "create" | "edit";
+  mode: "create" | "edit" | "view";
   automationId: string | undefined;
   navigate: NavigateFunction;
   initialValues: WebhookAutomationFormValues;
@@ -125,6 +125,15 @@ type LoadedWebhookAutomationEditorStateInput = {
   directoryData: DirectoryData;
   preservedConnectionId?: string;
 };
+
+export type WebhookAutomationEditorPresentationMode =
+  | {
+      kind: "editable";
+    }
+  | {
+      kind: "view";
+      reason: "stale_profile";
+    };
 
 function resolveNormalizedConversationKeyTemplate(input: {
   values: WebhookAutomationFormValues;
@@ -175,6 +184,43 @@ export function resolveWebhookAutomationEditInitialValues(input: {
   });
 
   return toWebhookAutomationFormValues(input.automation, hydrationEventOptions);
+}
+
+export function resolveWebhookAutomationReconfigureInitialValues(
+  values: WebhookAutomationFormValues,
+): WebhookAutomationFormValues {
+  return {
+    ...values,
+    sandboxProfileId: "",
+    conversationKeyTemplate: "",
+    triggerIds: [],
+    triggerParameterValues: {},
+  };
+}
+
+export function resolveWebhookAutomationEditorPresentationMode(input: {
+  isReconfiguring: boolean;
+  mode: "create" | "edit";
+  selectedProfileId: string;
+  automationApplicableSandboxProfiles: readonly AutomationApplicableSandboxProfile[];
+}): WebhookAutomationEditorPresentationMode {
+  if (input.mode === "create" || input.isReconfiguring) {
+    return { kind: "editable" };
+  }
+
+  if (
+    input.selectedProfileId.trim().length > 0 &&
+    !input.automationApplicableSandboxProfiles.some(
+      (profile) => profile.id === input.selectedProfileId,
+    )
+  ) {
+    return {
+      kind: "view",
+      reason: "stale_profile",
+    };
+  }
+
+  return { kind: "editable" };
 }
 
 export function useLoadedWebhookAutomationEditorState(

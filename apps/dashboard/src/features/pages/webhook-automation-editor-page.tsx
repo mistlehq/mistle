@@ -1,18 +1,24 @@
 import { Alert, AlertDescription, AlertTitle, Button } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { DeleteWebhookAutomationDialog } from "../automations/delete-webhook-automation-dialog.js";
 import {
+  resolveWebhookAutomationEditorPresentationMode,
   resolveWebhookAutomationEditInitialValues,
+  resolveWebhookAutomationReconfigureInitialValues,
   useLoadedWebhookAutomationEditorState,
 } from "../automations/use-webhook-automation-editor-state.js";
 import { useWebhookAutomationPrerequisites } from "../automations/use-webhook-automation-prerequisites.js";
 import { toWebhookAutomationFormValues } from "../automations/webhook-automation-form-helpers.js";
 import { WebhookAutomationForm } from "../automations/webhook-automation-form.js";
+import { buildWebhookAutomationEventOptions } from "../automations/webhook-automation-list-helpers.js";
+import { WebhookAutomationReadOnlyView } from "../automations/webhook-automation-read-only-view.js";
 import { webhookAutomationDetailQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { getWebhookAutomation } from "../automations/webhook-automations-service.js";
+import type { WebhookAutomation } from "../automations/webhook-automations-types.js";
 import { FormPageSection, FormPageShell } from "../shared/form-page.js";
 
 type WebhookAutomationEditorPageProps = {
@@ -110,6 +116,7 @@ function EditWebhookAutomationEditor(input: {
   automationId: string;
   navigate: (to: string) => void | Promise<void>;
 }): React.JSX.Element {
+  const [isReconfiguring, setIsReconfiguring] = useState(false);
   const automationQuery = useQuery({
     queryKey: webhookAutomationDetailQueryKey(input.automationId),
     queryFn: async ({ signal }) =>
@@ -174,13 +181,29 @@ function EditWebhookAutomationEditor(input: {
     });
   }
 
+  const pageMode = resolveWebhookAutomationEditorPresentationMode({
+    mode: "edit",
+    isReconfiguring,
+    selectedProfileId: initialValues.sandboxProfileId,
+    automationApplicableSandboxProfiles:
+      prerequisites.automationApplicableSandboxProfilesQuery.data?.items ?? [],
+  });
+
+  const effectiveInitialValues =
+    pageMode.kind === "view"
+      ? initialValues
+      : isReconfiguring
+        ? resolveWebhookAutomationReconfigureInitialValues(initialValues)
+        : initialValues;
+
   return (
     <LoadedWebhookAutomationEditor
-      key={input.automationId}
-      mode="edit"
+      key={`${input.automationId}:${pageMode.kind}:${isReconfiguring ? "reconfigure" : "default"}`}
+      mode={pageMode.kind === "view" ? "view" : "edit"}
       automationId={input.automationId}
       navigate={input.navigate}
-      initialValues={initialValues}
+      initialValues={effectiveInitialValues}
+      automation={automationQuery.data}
       preservedConnectionId={automationQuery.data.integrationConnectionId}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
@@ -188,15 +211,19 @@ function EditWebhookAutomationEditor(input: {
         prerequisites.automationApplicableSandboxProfilesQuery.data?.items ?? []
       }
       directoryData={prerequisites.integrationDirectoryQuery.data}
+      onReconfigure={() => {
+        setIsReconfiguring(true);
+      }}
     />
   );
 }
 
 function LoadedWebhookAutomationEditor(input: {
-  mode: "create" | "edit";
+  mode: "create" | "edit" | "view";
   automationId: string | undefined;
   navigate: (to: string) => void | Promise<void>;
   initialValues: ReturnType<typeof toWebhookAutomationFormValues>;
+  automation?: WebhookAutomation;
   connectionOptions: ReturnType<typeof useWebhookAutomationPrerequisites>["connectionOptions"];
   sandboxProfileOptions: ReturnType<
     typeof useWebhookAutomationPrerequisites
@@ -210,28 +237,65 @@ function LoadedWebhookAutomationEditor(input: {
     ReturnType<typeof useWebhookAutomationPrerequisites>["integrationDirectoryQuery"]["data"]
   >;
   preservedConnectionId?: string;
+  onReconfigure?: () => void;
 }): React.JSX.Element {
   const state = useLoadedWebhookAutomationEditorState(input);
+  const readOnlyTriggerOptions =
+    input.mode !== "view"
+      ? []
+      : buildWebhookAutomationEventOptions({
+          connections: input.directoryData.connections,
+          targets: input.directoryData.targets,
+          ...(input.preservedConnectionId === undefined
+            ? {}
+            : { preservedConnectionId: input.preservedConnectionId }),
+          selectedTriggerIds: input.initialValues.triggerIds,
+        });
+  const sandboxProfileName =
+    input.automation?.target.sandboxProfileDisplayName ??
+    input.sandboxProfileOptions.find(
+      (option) => option.value === input.initialValues.sandboxProfileId,
+    )?.label ??
+    input.initialValues.sandboxProfileId;
 
   return (
     <FormPageShell className="-my-6">
-      <WebhookAutomationForm
-        connectionOptions={state.connectionOptions}
-        fieldErrors={state.fieldErrors}
-        formError={state.formError}
-        isDeleting={state.isDeleting}
-        isSaving={state.isSaving}
-        mode={input.mode}
-        onDelete={state.onRequestDelete}
-        onSubmit={state.onSubmit}
-        onValueChange={state.onValueChange}
-        sandboxProfileOptions={state.sandboxProfileOptions}
-        triggerPickerDisabledReason={state.triggerPickerDisabledReason}
-        webhookEventOptions={state.webhookEventOptions}
-        values={state.values}
-      />
+      {input.mode === "view" ? (
+        <WebhookAutomationReadOnlyView
+          isDeleting={state.isDeleting}
+          onDelete={() => {
+            if (state.onRequestDelete === null) {
+              throw new Error("Delete action is unavailable.");
+            }
 
-      {input.mode === "edit" ? (
+            state.onRequestDelete();
+          }}
+          onReconfigure={() => {
+            input.onReconfigure?.();
+          }}
+          sandboxProfileName={sandboxProfileName}
+          triggerOptions={readOnlyTriggerOptions}
+          values={state.values}
+        />
+      ) : (
+        <WebhookAutomationForm
+          connectionOptions={state.connectionOptions}
+          fieldErrors={state.fieldErrors}
+          formError={state.formError}
+          isDeleting={state.isDeleting}
+          isSaving={state.isSaving}
+          mode={input.mode}
+          onDelete={state.onRequestDelete}
+          onSubmit={state.onSubmit}
+          onValueChange={state.onValueChange}
+          sandboxProfileOptions={state.sandboxProfileOptions}
+          triggerPickerDisabledReason={state.triggerPickerDisabledReason}
+          webhookEventOptions={state.webhookEventOptions}
+          values={state.values}
+        />
+      )}
+
+      {input.mode === "create" ? null : (
         <DeleteWebhookAutomationDialog
           automationName={state.values.name}
           errorMessage={state.deleteError}
@@ -240,7 +304,7 @@ function LoadedWebhookAutomationEditor(input: {
           onConfirm={state.onConfirmDelete}
           onOpenChange={state.onDeleteDialogOpenChange}
         />
-      ) : null}
+      )}
     </FormPageShell>
   );
 }

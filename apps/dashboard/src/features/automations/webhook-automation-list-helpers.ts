@@ -261,7 +261,10 @@ export function buildWebhookAutomationListItems(input: {
       id: automation.id,
       name: automation.name,
       integrationConnectionName: connection?.displayName ?? automation.integrationConnectionId,
-      sandboxProfileName: sandboxProfile?.displayName ?? automation.target.sandboxProfileId,
+      sandboxProfileName:
+        sandboxProfile?.displayName ??
+        automation.target.sandboxProfileDisplayName ??
+        automation.target.sandboxProfileId,
       eventSummary: summarizeEventTypes(automation.eventTypes),
       updatedAtLabel: formatWebhookAutomationUpdatedAt(automation.updatedAt),
       enabled: automation.enabled,

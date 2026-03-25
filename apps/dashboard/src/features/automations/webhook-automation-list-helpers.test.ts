@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildWebhookAutomationEventOptions,
+  buildWebhookAutomationListItems,
   buildWebhookAutomationSandboxProfileOptions,
   createWebhookAutomationTriggerId,
 } from "./webhook-automation-list-helpers.js";
@@ -264,6 +265,43 @@ describe("buildWebhookAutomationSandboxProfileOptions", () => {
       {
         value: "sbp_1",
         label: "Repo Maintainer",
+      },
+    ]);
+  });
+});
+
+describe("buildWebhookAutomationListItems", () => {
+  it("prefers the saved sandbox profile display name when the current profile lookup misses", () => {
+    expect(
+      buildWebhookAutomationListItems({
+        automations: [
+          {
+            conversationKeyTemplate: "{{event.id}}",
+            createdAt: "2026-03-11T10:00:00.000Z",
+            enabled: true,
+            eventTypes: ["github.push"],
+            id: "aut_123",
+            idempotencyKeyTemplate: null,
+            inputTemplate: "{}",
+            integrationConnectionId: "conn_123",
+            kind: "webhook",
+            name: "Automation",
+            payloadFilter: null,
+            target: {
+              id: "target_123",
+              sandboxProfileId: "sbp_stale",
+              sandboxProfileDisplayName: "Legacy Agent",
+              sandboxProfileVersion: null,
+            },
+            updatedAt: "2026-03-11T10:05:00.000Z",
+          },
+        ],
+        connections: [],
+        sandboxProfiles: [],
+      }),
+    ).toMatchObject([
+      {
+        sandboxProfileName: "Legacy Agent",
       },
     ]);
   });

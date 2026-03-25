@@ -7,7 +7,9 @@ import { describe, expect, it } from "vitest";
 import { createAutomationApplicableSandboxProfileFixture } from "../../test-support/automations.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import {
+  resolveWebhookAutomationEditorPresentationMode,
   resolveSelectedProfileTriggerState,
+  resolveWebhookAutomationReconfigureInitialValues,
   useLoadedWebhookAutomationEditorState,
 } from "./use-webhook-automation-editor-state.js";
 
@@ -90,6 +92,59 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     ).toEqual({
       disabledReason: null,
       eligibleConnectionIds: ["conn_linear"],
+    });
+  });
+
+  it("enters view mode for stale edit profiles until reconfiguration starts", () => {
+    expect(
+      resolveWebhookAutomationEditorPresentationMode({
+        mode: "edit",
+        isReconfiguring: false,
+        selectedProfileId: "sbp_stale",
+        automationApplicableSandboxProfiles: [],
+      }),
+    ).toEqual({
+      kind: "view",
+      reason: "stale_profile",
+    });
+  });
+
+  it("returns to editable mode when reconfiguring a stale automation", () => {
+    expect(
+      resolveWebhookAutomationEditorPresentationMode({
+        mode: "edit",
+        isReconfiguring: true,
+        selectedProfileId: "sbp_stale",
+        automationApplicableSandboxProfiles: [],
+      }),
+    ).toEqual({
+      kind: "editable",
+    });
+  });
+
+  it("clears stale profile and trigger selections when reconfiguring", () => {
+    expect(
+      resolveWebhookAutomationReconfigureInitialValues({
+        name: "Your automation",
+        sandboxProfileId: "sbp_stale",
+        enabled: true,
+        instructions: "Keep this",
+        conversationKeyTemplate: "{{payload.id}}",
+        triggerIds: ["conn_123::github.push"],
+        triggerParameterValues: {
+          "conn_123::github.push": {
+            repository: "mistlehq/mistle",
+          },
+        },
+      }),
+    ).toEqual({
+      name: "Your automation",
+      sandboxProfileId: "",
+      enabled: true,
+      instructions: "Keep this",
+      conversationKeyTemplate: "",
+      triggerIds: [],
+      triggerParameterValues: {},
     });
   });
 });
