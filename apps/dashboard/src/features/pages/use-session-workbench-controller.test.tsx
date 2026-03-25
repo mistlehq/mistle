@@ -20,19 +20,28 @@ import {
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
 
+function createControllerQueryClient(
+  input?: Parameters<typeof QueryClient>[0]["defaultOptions"]["queries"],
+): QueryClient {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        ...input,
+      },
+    },
+  });
+}
+
+function createControllerWrapper(queryClient: QueryClient) {
+  return function ControllerWrapper({ children }: React.PropsWithChildren): React.JSX.Element {
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  };
+}
+
 describe("useSessionWorkbenchController", () => {
   it("returns separate workbench and conversation pane state for a missing session id", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
-
-    const wrapper = ({ children }: React.PropsWithChildren): React.JSX.Element => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    const queryClient = createControllerQueryClient();
 
     const { result } = renderHook(
       () =>
@@ -40,7 +49,7 @@ describe("useSessionWorkbenchController", () => {
           sandboxInstanceId: null,
         }),
       {
-        wrapper,
+        wrapper: createControllerWrapper(queryClient),
       },
     );
 
@@ -85,17 +94,7 @@ describe("useSessionWorkbenchController", () => {
       );
     }
 
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
-
-    const wrapper = ({ children }: React.PropsWithChildren): React.JSX.Element => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    const queryClient = createControllerQueryClient();
 
     const { result, rerender } = renderHook(
       ({ sandboxInstanceId }: { sandboxInstanceId: string | null }) =>
@@ -106,7 +105,7 @@ describe("useSessionWorkbenchController", () => {
         initialProps: {
           sandboxInstanceId: sandboxInstanceIdOne,
         },
-        wrapper,
+        wrapper: createControllerWrapper(queryClient),
       },
     );
 
@@ -244,13 +243,7 @@ describe("useSessionWorkbenchController", () => {
   });
 
   it("seeds the sandbox status query from a successful resume response", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
+    const queryClient = createControllerQueryClient();
 
     seedSandboxInstanceStatusQuery({
       queryClient,
@@ -273,98 +266,107 @@ describe("useSessionWorkbenchController", () => {
     });
   });
 
-  it("keeps polling while a stopped sandbox is still resuming", () => {
-    expect(
-      shouldPollStoppedSandboxStatus({
-        sandboxStatus: "stopped",
+  it.each([
+    {
+      expected: true,
+      input: {
+        sandboxStatus: "stopped" as const,
         hasAttemptedInitialStoppedResume: true,
         isResumingStoppedSandbox: false,
         resumeActionErrorMessage: null,
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldPollStoppedSandboxStatus({
-        sandboxStatus: "stopped",
+      },
+    },
+    {
+      expected: false,
+      input: {
+        sandboxStatus: "stopped" as const,
         hasAttemptedInitialStoppedResume: true,
         isResumingStoppedSandbox: false,
         resumeActionErrorMessage: "Resume failed",
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldPollStoppedSandboxStatus({
-        sandboxStatus: "running",
+      },
+    },
+    {
+      expected: false,
+      input: {
+        sandboxStatus: "running" as const,
         hasAttemptedInitialStoppedResume: true,
         isResumingStoppedSandbox: false,
         resumeActionErrorMessage: null,
-      }),
-    ).toBe(false);
-  });
+      },
+    },
+  ])(
+    "keeps polling while a stopped sandbox is still resuming: $expected",
+    ({ input, expected }) => {
+      expect(shouldPollStoppedSandboxStatus(input)).toBe(expected);
+    },
+  );
 
-  it("routes session entry based on sandbox lifecycle status", () => {
-    expect(
-      resolveSessionEntryPhase({
+  it.each([
+    {
+      expected: "loading",
+      input: {
         connectedSession: false,
         hasResumeInFlightState: false,
         isStatusPending: true,
         sandboxStatus: null,
-      }),
-    ).toBe("loading");
-
-    expect(
-      resolveSessionEntryPhase({
+      },
+    },
+    {
+      expected: "resume_pending",
+      input: {
         connectedSession: false,
         hasResumeInFlightState: true,
         isStatusPending: false,
-        sandboxStatus: "stopped",
-      }),
-    ).toBe("resume_pending");
-
-    expect(
-      resolveSessionEntryPhase({
+        sandboxStatus: "stopped" as const,
+      },
+    },
+    {
+      expected: "manual_resume_required",
+      input: {
         connectedSession: false,
         hasResumeInFlightState: false,
         isStatusPending: false,
-        sandboxStatus: "stopped",
-      }),
-    ).toBe("manual_resume_required");
-
-    expect(
-      resolveSessionEntryPhase({
+        sandboxStatus: "stopped" as const,
+      },
+    },
+    {
+      expected: "sandbox_starting",
+      input: {
         connectedSession: false,
         hasResumeInFlightState: false,
         isStatusPending: false,
-        sandboxStatus: "starting",
-      }),
-    ).toBe("sandbox_starting");
-
-    expect(
-      resolveSessionEntryPhase({
+        sandboxStatus: "starting" as const,
+      },
+    },
+    {
+      expected: "connecting",
+      input: {
         connectedSession: false,
         hasResumeInFlightState: false,
         isStatusPending: false,
-        sandboxStatus: "running",
-      }),
-    ).toBe("connecting");
-
-    expect(
-      resolveSessionEntryPhase({
+        sandboxStatus: "running" as const,
+      },
+    },
+    {
+      expected: "ready",
+      input: {
         connectedSession: true,
         hasResumeInFlightState: false,
         isStatusPending: false,
-        sandboxStatus: "running",
-      }),
-    ).toBe("ready");
-
-    expect(
-      resolveSessionEntryPhase({
+        sandboxStatus: "running" as const,
+      },
+    },
+    {
+      expected: "sandbox_failed",
+      input: {
         connectedSession: false,
         hasResumeInFlightState: false,
         isStatusPending: false,
-        sandboxStatus: "failed",
-      }),
-    ).toBe("sandbox_failed");
+        sandboxStatus: "failed" as const,
+      },
+    },
+  ])("routes session entry based on sandbox lifecycle status: $expected", ({ input, expected }) => {
+    expect(resolveSessionEntryPhase(input)).toBe(expected);
   });
 
   it("shows resume progress while auto-resume is being kicked off or actively submitting", () => {
@@ -497,13 +499,8 @@ describe("useSessionWorkbenchController", () => {
 
   it("does not auto-resume from a seeded stopped cache before a fresh fetch", () => {
     const sandboxInstanceId = `sbi-resume-${Date.now()}`;
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: Number.POSITIVE_INFINITY,
-        },
-      },
+    const queryClient = createControllerQueryClient({
+      staleTime: Number.POSITIVE_INFINITY,
     });
 
     seedSandboxInstanceStatusQuery({
@@ -518,17 +515,13 @@ describe("useSessionWorkbenchController", () => {
       },
     });
 
-    const wrapper = ({ children }: React.PropsWithChildren): React.JSX.Element => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
-
     const { result } = renderHook(
       () =>
         useSessionWorkbenchController({
           sandboxInstanceId,
         }),
       {
-        wrapper,
+        wrapper: createControllerWrapper(queryClient),
       },
     );
 

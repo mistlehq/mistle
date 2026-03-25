@@ -3,7 +3,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { MemoryRouter, Route, Routes, type MemoryRouterProps, useLocation } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
@@ -14,9 +14,94 @@ import {
   resolveSessionResultsSummary,
   SandboxSessionStatusBadge,
   SessionsPage,
-  shouldUseResumeActionLabel,
   shouldClearSelectedProfile,
+  shouldUseResumeActionLabel,
 } from "./sessions-page.js";
+
+type SessionListItem = {
+  id: string;
+  sandboxProfileId: string;
+  sandboxProfileDisplayName?: string;
+  sandboxProfileVersion: number;
+  status: "starting" | "running" | "stopped" | "failed";
+  startedBy: {
+    kind: "user";
+    id: string;
+    name: string;
+  };
+  source: "dashboard";
+  createdAt: string;
+  updatedAt: string;
+  failureCode: string | null;
+  failureMessage: string | null;
+};
+
+function buildListedSession(
+  overrides: Partial<SessionListItem> & Pick<SessionListItem, "id">,
+): SessionListItem {
+  return {
+    id: overrides.id,
+    sandboxProfileId: "sbp_123",
+    sandboxProfileDisplayName: "Profile 123",
+    sandboxProfileVersion: 2,
+    status: "running",
+    startedBy: {
+      kind: "user",
+      id: "user-id",
+      name: "Mistle User",
+    },
+    source: "dashboard",
+    createdAt: "2026-03-10T00:00:00.000Z",
+    updatedAt: "2026-03-10T00:00:00.000Z",
+    failureCode: null,
+    failureMessage: null,
+    ...overrides,
+  };
+}
+
+function createSessionsPageQueryClient(
+  input?: Parameters<typeof createTestQueryClient>[0],
+): ReturnType<typeof createTestQueryClient> {
+  const queryClient = createTestQueryClient(input);
+  seedAuthenticatedSession(queryClient);
+  return queryClient;
+}
+
+function seedSessionsList(input: {
+  queryClient: ReturnType<typeof createTestQueryClient>;
+  items: SessionListItem[];
+  totalResults?: number;
+}): void {
+  input.queryClient.setQueryData(
+    sandboxInstancesListQueryKey({
+      limit: 20,
+      after: null,
+      before: null,
+    }),
+    {
+      items: input.items,
+      nextPage: null,
+      previousPage: null,
+      totalResults: input.totalResults ?? input.items.length,
+    },
+  );
+}
+
+function renderSessionsPage(input?: {
+  queryClient?: ReturnType<typeof createTestQueryClient>;
+  initialEntries?: MemoryRouterProps["initialEntries"];
+  routes?: React.ReactNode;
+}) {
+  const queryClient = input?.queryClient ?? createSessionsPageQueryClient();
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={input?.initialEntries}>
+        {input?.routes ?? <SessionsPage />}
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 describe("SessionsPage", () => {
   it("uses the authenticated user's display name for optimistic sessions", () => {
@@ -60,16 +145,9 @@ describe("SessionsPage", () => {
   });
 
   it("renders sandbox launcher controls", async () => {
-    const queryClient = createTestQueryClient();
-    seedAuthenticatedSession(queryClient);
+    const queryClient = createSessionsPageQueryClient();
 
-    const rendered = render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
-          <SessionsPage />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    const rendered = renderSessionsPage({ queryClient });
 
     try {
       expect(screen.getByText("Start a new session")).toBeDefined();
@@ -85,8 +163,7 @@ describe("SessionsPage", () => {
   });
 
   it("uses the shared dashboard table styling for the session list", () => {
-    const queryClient = createTestQueryClient();
-    seedAuthenticatedSession(queryClient);
+    const queryClient = createSessionsPageQueryClient();
 
     const markup = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
@@ -103,42 +180,15 @@ describe("SessionsPage", () => {
   });
 
   it("renders the result summary even when there is only one page", () => {
-    const queryClient = createTestQueryClient({
+    const queryClient = createSessionsPageQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
     });
-    seedAuthenticatedSession(queryClient);
-    queryClient.setQueryData(
-      sandboxInstancesListQueryKey({
-        limit: 20,
-        after: null,
-        before: null,
-      }),
-      {
-        items: [
-          {
-            id: "sbi_123",
-            sandboxProfileId: "sbp_123",
-            sandboxProfileDisplayName: "Profile 123",
-            sandboxProfileVersion: 2,
-            status: "running",
-            startedBy: {
-              kind: "user",
-              id: "user-id",
-              name: "Mistle User",
-            },
-            source: "dashboard",
-            createdAt: "2026-03-10T00:00:00.000Z",
-            updatedAt: "2026-03-10T00:00:00.000Z",
-            failureCode: null,
-            failureMessage: null,
-          },
-        ],
-        nextPage: null,
-        previousPage: null,
-        totalResults: 1,
-      },
-    );
+    seedSessionsList({
+      queryClient,
+      items: [buildListedSession({ id: "sbi_123" })],
+      totalResults: 1,
+    });
 
     const markup = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
@@ -196,41 +246,14 @@ describe("SessionsPage", () => {
   });
 
   it("routes stopped sessions into the workbench route directly", () => {
-    const queryClient = createTestQueryClient({
+    const queryClient = createSessionsPageQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
     });
-    seedAuthenticatedSession(queryClient);
-    queryClient.setQueryData(
-      sandboxInstancesListQueryKey({
-        limit: 20,
-        after: null,
-        before: null,
-      }),
-      {
-        items: [
-          {
-            id: "sbi_stopped",
-            sandboxProfileId: "sbp_123",
-            sandboxProfileVersion: 2,
-            status: "stopped",
-            startedBy: {
-              kind: "user",
-              id: "user-id",
-              name: "Mistle User",
-            },
-            source: "dashboard",
-            createdAt: "2026-03-10T00:00:00.000Z",
-            updatedAt: "2026-03-10T00:00:00.000Z",
-            failureCode: null,
-            failureMessage: null,
-          },
-        ],
-        nextPage: null,
-        previousPage: null,
-        totalResults: 1,
-      },
-    );
+    seedSessionsList({
+      queryClient,
+      items: [buildListedSession({ id: "sbi_stopped", status: "stopped" })],
+    });
 
     function SessionRouteProbe(): React.JSX.Element {
       const location = useLocation();
@@ -241,16 +264,16 @@ describe("SessionsPage", () => {
       );
     }
 
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/sessions"]}>
-          <Routes>
-            <Route element={<SessionsPage />} path="/sessions" />
-            <Route element={<SessionRouteProbe />} path="/sessions/:sandboxInstanceId" />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    renderSessionsPage({
+      queryClient,
+      initialEntries: ["/sessions"],
+      routes: (
+        <Routes>
+          <Route element={<SessionsPage />} path="/sessions" />
+          <Route element={<SessionRouteProbe />} path="/sessions/:sandboxInstanceId" />
+        </Routes>
+      ),
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Resume" }));
 
