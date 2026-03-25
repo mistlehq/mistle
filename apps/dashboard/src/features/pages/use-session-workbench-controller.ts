@@ -315,10 +315,14 @@ export function shouldRetainResumeRetryWindowAfterError(error: unknown): boolean
 }
 
 export function shouldShowResumeInFlightState(input: {
-  hasResumePolicy: boolean;
+  hasResumeOnOpenIntent: boolean;
+  isResumingStoppedSandbox: boolean;
   sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
 }): boolean {
-  return input.hasResumePolicy && input.sandboxStatus === "stopped";
+  return (
+    (input.hasResumeOnOpenIntent || input.isResumingStoppedSandbox) &&
+    input.sandboxStatus === "stopped"
+  );
 }
 
 export function shouldPollStoppedSandboxStatus(input: {
@@ -446,6 +450,9 @@ export function useSessionWorkbenchController(input: {
   const [storedResumeIdempotencyRecord, setStoredResumeIdempotencyRecord] =
     useState<ResumeIdempotencyStorageRecord | null>(initialStoredResumeIdempotencyRecord);
   const [hasResumePolicy, setHasResumePolicy] = useState(input.resumeOnOpenRequestToken !== null);
+  const [shouldAutoResumeStoppedSandbox, setShouldAutoResumeStoppedSandbox] = useState(
+    input.resumeOnOpenRequestToken !== null,
+  );
   const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(false);
   const [resumeActionErrorMessage, setResumeActionErrorMessage] = useState<string | null>(null);
   const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
@@ -532,7 +539,8 @@ export function useSessionWorkbenchController(input: {
   const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
   const hasActiveResumePolicy = hasResumePolicy || input.resumeOnOpenRequestToken !== null;
   const isShowingResumeInFlightState = shouldShowResumeInFlightState({
-    hasResumePolicy: hasActiveResumePolicy,
+    hasResumeOnOpenIntent: input.resumeOnOpenRequestToken !== null,
+    isResumingStoppedSandbox,
     sandboxStatus,
   });
   const sessionEntryPhase = resolveSessionEntryPhase({
@@ -580,6 +588,7 @@ export function useSessionWorkbenchController(input: {
     setAutomationPendingErrorMessage(null);
     setStoredResumeIdempotencyRecord(storedResumeRecord);
     setHasResumePolicy(false);
+    setShouldAutoResumeStoppedSandbox(false);
     setIsResumingStoppedSandbox(false);
     setResumeActionErrorMessage(null);
     activeResumeRequestRef.current = null;
@@ -631,6 +640,7 @@ export function useSessionWorkbenchController(input: {
     });
     setStoredResumeIdempotencyRecord(null);
     setHasResumePolicy(false);
+    setShouldAutoResumeStoppedSandbox(false);
     setResumeActionErrorMessage(null);
   }, [input.sandboxInstanceId, sandboxStatus]);
 
@@ -640,6 +650,7 @@ export function useSessionWorkbenchController(input: {
     }
 
     setHasResumePolicy(false);
+    setShouldAutoResumeStoppedSandbox(false);
     setResumeActionErrorMessage(null);
   }, [sandboxStatus]);
 
@@ -880,6 +891,7 @@ export function useSessionWorkbenchController(input: {
     });
     setStoredResumeIdempotencyRecord(nextStoredResumeRecord);
     setHasResumePolicy(true);
+    setShouldAutoResumeStoppedSandbox(false);
     setResumeActionErrorMessage(null);
 
     setIsResumingStoppedSandbox(true);
@@ -924,7 +936,7 @@ export function useSessionWorkbenchController(input: {
         setHasResumePolicy(false);
         setResumeActionErrorMessage(resolveResumeFailureMessage(error));
       } else {
-        setHasResumePolicy(false);
+        setResumeActionErrorMessage(null);
       }
     } finally {
       if (
@@ -952,6 +964,7 @@ export function useSessionWorkbenchController(input: {
     }
 
     setHasResumePolicy(true);
+    setShouldAutoResumeStoppedSandbox(true);
     input.onResumeOnOpenHandled();
   }, [input.onResumeOnOpenHandled, input.resumeOnOpenRequestToken]);
 
@@ -963,7 +976,8 @@ export function useSessionWorkbenchController(input: {
     if (
       input.sandboxInstanceId === null ||
       isResumingStoppedSandbox ||
-      sandboxStatus !== "stopped"
+      sandboxStatus !== "stopped" ||
+      !shouldAutoResumeStoppedSandbox
     ) {
       return;
     }
@@ -975,6 +989,7 @@ export function useSessionWorkbenchController(input: {
     requestStoppedSandboxResume,
     sandboxStatus,
     sessionEntryPhase,
+    shouldAutoResumeStoppedSandbox,
   ]);
 
   return {

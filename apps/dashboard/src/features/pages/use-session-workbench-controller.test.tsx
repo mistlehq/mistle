@@ -444,6 +444,32 @@ describe("useSessionWorkbenchController", () => {
     ).toBe(false);
   });
 
+  it("shows resume progress only while resume intent or request is active", () => {
+    expect(
+      shouldShowResumeInFlightState({
+        hasResumeOnOpenIntent: true,
+        isResumingStoppedSandbox: false,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowResumeInFlightState({
+        hasResumeOnOpenIntent: false,
+        isResumingStoppedSandbox: true,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowResumeInFlightState({
+        hasResumeOnOpenIntent: false,
+        isResumingStoppedSandbox: false,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe(false);
+  });
+
   it("retains the retry window only for ambiguous or server-side resume failures", () => {
     expect(shouldRetainResumeRetryWindowAfterError(new Error("network failure"))).toBe(true);
     expect(
@@ -588,28 +614,5 @@ describe("useSessionWorkbenchController", () => {
       sandboxInstanceId,
       storage: window.localStorage,
     });
-  });
-
-  it("treats resume-on-open intent as in-flight only while the sandbox is still stopped", () => {
-    expect(
-      shouldShowResumeInFlightState({
-        hasResumePolicy: true,
-        sandboxStatus: "stopped",
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldShowResumeInFlightState({
-        hasResumePolicy: true,
-        sandboxStatus: "starting",
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldShowResumeInFlightState({
-        hasResumePolicy: false,
-        sandboxStatus: "stopped",
-      }),
-    ).toBe(false);
   });
 });
