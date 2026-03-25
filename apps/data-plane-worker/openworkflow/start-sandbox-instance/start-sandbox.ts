@@ -52,7 +52,7 @@ export async function startSandbox(
 ): Promise<{
   sandboxInstanceId: string;
   runtimeProvider: SandboxProvider;
-  providerRuntimeId: string;
+  providerSandboxId: string;
 }> {
   const startedSandbox = await ctx.sandboxAdapter.start({
     image: {
@@ -88,6 +88,6 @@ export async function startSandbox(
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     runtimeProvider: startedSandbox.provider,
-    providerRuntimeId: startedSandbox.id,
+    providerSandboxId: startedSandbox.id,
   };
 }

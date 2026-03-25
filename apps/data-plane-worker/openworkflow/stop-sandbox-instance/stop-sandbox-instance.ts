@@ -18,7 +18,7 @@ import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 
 type RunningSandboxInstanceStopState = {
   runtimeProvider: SandboxInstanceProvider;
-  providerRuntimeId: string;
+  providerSandboxId: string;
 };
 
 /**
@@ -65,7 +65,7 @@ async function resolveRunningSandboxInstanceStopState(input: {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
       runtimeProvider: true,
-      providerRuntimeId: true,
+      providerSandboxId: true,
       status: true,
     },
     where: (table, { eq }) => eq(table.id, input.sandboxInstanceId),
@@ -85,15 +85,15 @@ async function resolveRunningSandboxInstanceStopState(input: {
     );
   }
 
-  if (sandboxInstance.providerRuntimeId === null) {
+  if (sandboxInstance.providerSandboxId === null) {
     throw new Error(
-      `Expected running sandbox instance '${input.sandboxInstanceId}' to have a providerRuntimeId.`,
+      `Expected running sandbox instance '${input.sandboxInstanceId}' to have a providerSandboxId.`,
     );
   }
 
   return {
     runtimeProvider: sandboxInstance.runtimeProvider,
-    providerRuntimeId: sandboxInstance.providerRuntimeId,
+    providerSandboxId: sandboxInstance.providerSandboxId,
   };
 }
 
@@ -141,7 +141,7 @@ export async function stopSandboxInstance(
       },
       {
         runtimeProvider: sandboxInstanceState.runtimeProvider,
-        providerRuntimeId: sandboxInstanceState.providerRuntimeId,
+        providerSandboxId: sandboxInstanceState.providerSandboxId,
       },
     );
   } catch (error) {

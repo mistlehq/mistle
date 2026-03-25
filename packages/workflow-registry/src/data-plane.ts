@@ -33,7 +33,7 @@ export type StartSandboxInstanceWorkflowInput = {
 
 export type StartSandboxInstanceWorkflowOutput = {
   sandboxInstanceId: string;
-  providerRuntimeId: string;
+  providerSandboxId: string;
 };
 
 export const StartSandboxInstanceWorkflowSpec = defineWorkflowSpec<

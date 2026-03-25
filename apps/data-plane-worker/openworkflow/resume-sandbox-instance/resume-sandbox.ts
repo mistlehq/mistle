@@ -21,13 +21,13 @@ export async function resumeSandbox(
     imageCreatedAt: string;
     instanceVolume: SandboxVolumeHandleV1;
     instanceVolumeMode: SandboxInstanceVolumeMode;
-    previousProviderRuntimeId: string | null;
+    previousProviderSandboxId: string | null;
     runtimePlan: CompiledRuntimePlan;
   },
 ): Promise<{
   sandboxInstanceId: string;
   runtimeProvider: SandboxProvider;
-  providerRuntimeId: string;
+  providerSandboxId: string;
 }> {
   const resumedSandbox = await ctx.sandboxAdapter.resume({
     image: {
@@ -41,7 +41,7 @@ export async function resumeSandbox(
         mountPath: SandboxRuntimeInstanceVolumeMountPath,
       },
     ],
-    id: input.previousProviderRuntimeId,
+    id: input.previousProviderSandboxId,
     env: createSandboxRuntimeEnv({
       config: ctx.config,
       sandboxInstanceId: input.sandboxInstanceId,
@@ -65,6 +65,6 @@ export async function resumeSandbox(
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     runtimeProvider: resumedSandbox.provider,
-    providerRuntimeId: resumedSandbox.id,
+    providerSandboxId: resumedSandbox.id,
   };
 }

@@ -30,7 +30,7 @@ export async function ensureSandboxInstance(
       sandboxProfileId: input.sandboxProfileId,
       sandboxProfileVersion: input.sandboxProfileVersion,
       runtimeProvider: ctx.runtimeProvider,
-      providerRuntimeId: null,
+      providerSandboxId: null,
       instanceVolumeProvider: null,
       instanceVolumeId: null,
       instanceVolumeMode: null,

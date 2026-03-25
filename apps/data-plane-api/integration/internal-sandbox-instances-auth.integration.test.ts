@@ -91,7 +91,7 @@ describe("internal sandbox instances auth integration", () => {
       sandboxProfileId: "sbp_dp_api_integration_auth_valid",
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
-      providerRuntimeId: "provider-sandbox-auth-valid",
+      providerSandboxId: "provider-sandbox-auth-valid",
       status: SandboxInstanceStatuses.STOPPED,
       startedByKind: "user",
       startedById: "usr_dp_api_integration_auth_valid",
