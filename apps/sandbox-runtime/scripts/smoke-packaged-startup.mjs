@@ -11,7 +11,9 @@ const RepositoryRootPath = resolve(AppRootPath, "../..");
 const SeaOutputDirectoryPath = resolve(AppRootPath, "dist-sea");
 const DockerImageTag = `mistle-sandbox-runtime-packaged-startup:${randomUUID()}`;
 const ContainerName = `mistle-sandbox-runtime-packaged-startup-${randomUUID()}`;
+const StartupSocketPath = "/run/mistle/startup-config.sock";
 const StartupTokenPath = "/run/mistle/startup-config.token";
+const TokenizerProxyEgressBaseUrl = "http://127.0.0.1:8091/tokenizer-proxy/egress";
 const ApplyStartupPayload = JSON.stringify({
   bootstrapToken: "test-bootstrap-token",
   tunnelExchangeToken: "test-exchange-token",
@@ -64,6 +66,8 @@ function startSandboxContainer() {
     "--rm",
     "--name",
     ContainerName,
+    "-e",
+    `SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL=${TokenizerProxyEgressBaseUrl}`,
     DockerImageTag,
   ]).trim();
 
@@ -95,6 +99,21 @@ async function waitForStartupToken() {
   throw new Error("Timed out waiting for packaged sandbox runtime startup token.");
 }
 
+async function waitForStartupSocket() {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    try {
+      runCommand("docker", ["exec", ContainerName, "test", "-S", StartupSocketPath]);
+      return;
+    } catch {
+      // The supervisor may still be binding the control socket.
+    }
+
+    sleep(100);
+  }
+
+  throw new Error("Timed out waiting for packaged sandbox runtime startup socket.");
+}
+
 function assertStartupTokenConsumed() {
   try {
     runCommand("docker", ["exec", ContainerName, "test", "-f", StartupTokenPath]);
@@ -103,6 +122,22 @@ function assertStartupTokenConsumed() {
   }
 
   throw new Error("Expected startup token to be consumed after packaged startup apply.");
+}
+
+function assertContainerStillRunning() {
+  const runningState = runCommand("docker", [
+    "inspect",
+    ContainerName,
+    "--format",
+    "{{.State.Running}}",
+  ]).trim();
+
+  if (runningState !== "true") {
+    const logs = runCommand("docker", ["logs", ContainerName]).trim();
+    throw new Error(
+      `Expected packaged sandbox runtime container to stay running after startup apply (logs=${JSON.stringify(logs)})`,
+    );
+  }
 }
 
 function cleanupContainer() {
@@ -128,6 +163,7 @@ async function main() {
   try {
     startSandboxContainer();
     await waitForStartupToken();
+    await waitForStartupSocket();
 
     execFileSync(
       "docker",
@@ -141,6 +177,8 @@ async function main() {
     );
 
     assertStartupTokenConsumed();
+    sleep(250);
+    assertContainerStillRunning();
   } finally {
     cleanupContainer();
     cleanupImage();
