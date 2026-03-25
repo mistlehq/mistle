@@ -1,0 +1,39 @@
+# E2B Provider
+
+E2B implementation for `@mistle/sandbox`.
+
+## Config
+
+`createSandboxAdapter({ provider: SandboxProvider.E2B, e2b: ... })` expects:
+
+- `apiKey`: E2B API key
+- `domain` (optional): override E2B domain when not using the default `e2b.app`
+
+All config fields are validated with Zod and fail fast when invalid.
+
+## Usage
+
+```ts
+import { createSandboxAdapter, SandboxProvider } from "@mistle/sandbox";
+
+const adapter = createSandboxAdapter({
+  provider: SandboxProvider.E2B,
+  e2b: {
+    apiKey: process.env.E2B_API_KEY ?? "",
+  },
+});
+```
+
+## Provider Behavior
+
+- `start({ image, env })` uses `image.imageId` as the canonical OCI image reference.
+- The provider resolves that image to a deterministic E2B template alias internally and builds it on demand when needed.
+- `resume({ id })` reconnects to the same E2B sandbox id.
+- `stop({ id })` pauses the sandbox.
+- `destroy({ id })` kills the sandbox permanently.
+- `createVolume`, `deleteVolume`, `SandboxHandle.writeStdin`, and `SandboxHandle.closeStdin` are not supported for E2B and fail fast when called.
+
+## Error Surface
+
+- E2B not-found errors are normalized to `SandboxResourceNotFoundError`.
+- Authentication, rate-limit, template-build, and command/runtime failures are left explicit.

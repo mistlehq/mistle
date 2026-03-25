@@ -4,19 +4,21 @@ Provider-agnostic sandbox lifecycle package used by Mistle services.
 
 Current scope:
 
-- start a sandbox from an image handle
+- start a sandbox from a shared OCI base image handle
 - resume a sandbox against existing provider-managed state
-- stop a running sandbox without destroying sandbox filesystem state
+- stop a running sandbox
 - destroy a sandbox runtime
 - apply runtime startup payloads through provider-scoped runtime control
 
 Currently implemented providers:
 
 - Docker
+- E2B
 
 Provider-specific documentation lives with each provider:
 
 - [`src/providers/docker/README.md`](./src/providers/docker/README.md)
+- [`src/providers/e2b/README.md`](./src/providers/e2b/README.md)
 
 Provider-scoped integration tests live under `integration/<provider>/` (for example `integration/docker/`).
 Integration test execution is gated at package level with `MISTLE_TEST_SANDBOX_INTEGRATION=1`, then narrowed by provider using `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS` (CSV). For example:
@@ -27,9 +29,16 @@ MISTLE_TEST_SANDBOX_INTEGRATION=1 MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=dock
 
 Docker integration tests default `MISTLE_SANDBOX_DOCKER_SOCKET_PATH` to `/var/run/docker.sock`. Set it explicitly if your Docker socket is elsewhere.
 
+E2B integration tests require `E2B_API_KEY` and default the shared base image to `ghcr.io/mistlehq/sandbox-base:latest`:
+
+```bash
+E2B_API_KEY=... MISTLE_TEST_SANDBOX_INTEGRATION=1 MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=e2b pnpm --filter @mistle/sandbox test:integration
+```
+
 List of valid providers for MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS:
 
 - `docker`
+- `e2b`
 
 Unknown provider names fail fast during integration config parsing.
 
@@ -96,6 +105,8 @@ await runtimeControl.close();
 - `SandboxResumeRequestV1` resumes provider compute against existing sandbox state using a previous sandbox `id`.
 - `SandboxRuntimeControl.applyStartup({ id, payload })` delivers runtime startup bytes to an already-running sandbox using provider-native control paths.
 - `SandboxRuntimeControl.close()` releases provider client resources held by runtime control.
+- E2B uses the same shared OCI base image reference but resolves provider-native templates internally.
+- `SandboxResumeRequestV1.id` is the durable provider-side sandbox identity returned by `start`.
 - Operations may throw `SandboxError` subclasses. Configuration failures throw `SandboxConfigurationError`.
 
 ## Responsibility Boundary
