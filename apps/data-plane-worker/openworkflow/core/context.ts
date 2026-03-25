@@ -8,12 +8,17 @@ import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runt
 import type { DataPlaneWorkerRuntimeConfig } from "./config.js";
 import { getOpenWorkflowRuntime } from "./runtime.js";
 import { createSandboxRuntimeAdapter } from "./sandbox-runtime-adapter.js";
+import {
+  createSandboxStartupConfigurator,
+  type SandboxStartupConfigurator,
+} from "./sandbox-startup-configurator.js";
 
 export type WorkflowContext = {
   config: DataPlaneWorkerRuntimeConfig;
   db: DataPlaneDatabase;
   dbPool: Pool;
   sandboxAdapter: SandboxAdapter;
+  startupConfigurator: SandboxStartupConfigurator;
   runtimeStateReader: SandboxRuntimeStateReader;
   tunnelReadinessPolicy: {
     timeoutMs: number;
@@ -52,13 +57,17 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
   const dbPool = new Pool({
     connectionString: workerConfig.database.url,
   });
+  let startupConfigurator: SandboxStartupConfigurator | undefined;
 
   try {
+    startupConfigurator = createSandboxStartupConfigurator(config);
+
     return {
       config,
       db: createDataPlaneDatabase(dbPool),
       dbPool,
       sandboxAdapter: createSandboxRuntimeAdapter(config),
+      startupConfigurator,
       runtimeStateReader: createSandboxRuntimeStateReader({
         gatewayBaseUrl: workerConfig.runtimeState.gatewayBaseUrl,
         serviceToken: globalConfig.internalAuth.serviceToken,
@@ -68,6 +77,7 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
       sleeper: systemSleeper,
     };
   } catch (error) {
+    await startupConfigurator?.close();
     await dbPool.end();
     throw error;
   }
@@ -99,6 +109,7 @@ export async function closeWorkflowContext(): Promise<void> {
 
   closeWorkflowContextPromise = (async () => {
     const context = await contextPromise;
+    await context.startupConfigurator.close();
     await context.dbPool.end();
     workflowContextPromise = undefined;
     closeWorkflowContextPromise = undefined;

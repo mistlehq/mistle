@@ -24,7 +24,9 @@
     "@mistle/time": "workspace:*",
     "@mistle/workflow-registry": "workspace:*",
     "@openworkflow/cli": "^0.4.3",
+    "dockerode": "^4.0.9",
     "drizzle-orm": "^0.45.1",
+    "modal": "^0.7.3",
     "openworkflow": "^0.8.1",
     "pg": "^8.20.0",
     "typeid-js": "^1.2.0",
@@ -32,6 +34,7 @@
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
+    "@types/dockerode": "^4.0.1",
     "@types/pg": "^8.18.0"
   }
 }

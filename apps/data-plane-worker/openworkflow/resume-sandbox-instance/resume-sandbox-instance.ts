@@ -1,11 +1,7 @@
-import type {
-  DataPlaneDatabase,
-  SandboxInstanceVolumeMode,
-  SandboxInstanceVolumeProvider,
-} from "@mistle/db/data-plane";
+import type { DataPlaneDatabase, SandboxInstanceProvider } from "@mistle/db/data-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
-import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "@mistle/integrations-core";
-import { SandboxProvider, type SandboxAdapter, type SandboxVolumeHandleV1 } from "@mistle/sandbox";
+import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
+import { SandboxProvider, type SandboxAdapter } from "@mistle/sandbox";
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
 import type { Clock, Sleeper } from "@mistle/time";
 
@@ -30,15 +26,12 @@ const ResumeSandboxFailureCodes = {
 type ResumableSandboxInstanceState = {
   sandboxInstanceId: string;
   runtimeProvider: SandboxProvider;
-  previousProviderSandboxId: string | null;
+  previousProviderSandboxId: string;
   imageId: string;
   imageCreatedAt: string;
-  instanceVolume: SandboxVolumeHandleV1;
-  instanceVolumeMode: SandboxInstanceVolumeMode;
-  runtimePlan: CompiledRuntimePlan;
 };
 
-function toSandboxProvider(provider: SandboxInstanceVolumeProvider): SandboxProvider {
+function toSandboxProvider(provider: SandboxInstanceProvider): SandboxProvider {
   if (provider === "docker") {
     return SandboxProvider.DOCKER;
   }
@@ -54,9 +47,6 @@ async function resolveResumableSandboxInstanceState(input: {
     columns: {
       runtimeProvider: true,
       providerSandboxId: true,
-      instanceVolumeProvider: true,
-      instanceVolumeId: true,
-      instanceVolumeMode: true,
       status: true,
     },
     where: (table, { eq }) => eq(table.id, input.sandboxInstanceId),
@@ -82,13 +72,9 @@ async function resolveResumableSandboxInstanceState(input: {
     );
   }
 
-  if (
-    sandboxInstance.instanceVolumeProvider === null ||
-    sandboxInstance.instanceVolumeId === null ||
-    sandboxInstance.instanceVolumeMode === null
-  ) {
+  if (sandboxInstance.providerSandboxId === null) {
     throw new Error(
-      `Expected resumable sandbox instance '${input.sandboxInstanceId}' to have instance volume metadata.`,
+      `Expected resumable sandbox instance '${input.sandboxInstanceId}' to have a provider sandbox id.`,
     );
   }
 
@@ -115,13 +101,6 @@ async function resolveResumableSandboxInstanceState(input: {
     previousProviderSandboxId: sandboxInstance.providerSandboxId,
     imageId: runtimePlan.image.imageRef,
     imageCreatedAt: persistedRuntimePlan.createdAt,
-    instanceVolume: {
-      provider: toSandboxProvider(sandboxInstance.instanceVolumeProvider),
-      volumeId: sandboxInstance.instanceVolumeId,
-      createdAt: persistedRuntimePlan.createdAt,
-    },
-    instanceVolumeMode: sandboxInstance.instanceVolumeMode,
-    runtimePlan,
   };
 }
 
@@ -237,10 +216,7 @@ export async function resumeSandboxInstance(
         sandboxInstanceId: resumableSandboxInstance.sandboxInstanceId,
         imageId: resumableSandboxInstance.imageId,
         imageCreatedAt: resumableSandboxInstance.imageCreatedAt,
-        instanceVolume: resumableSandboxInstance.instanceVolume,
-        instanceVolumeMode: resumableSandboxInstance.instanceVolumeMode,
         previousProviderSandboxId: resumableSandboxInstance.previousProviderSandboxId,
-        runtimePlan: resumableSandboxInstance.runtimePlan,
       },
     );
   } catch (error) {
