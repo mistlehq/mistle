@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-
 import { createControlPlaneDatabase } from "@mistle/db/control-plane";
 import { CONTROL_PLANE_SCHEMA_NAME } from "@mistle/db/control-plane";
 import {
@@ -19,10 +17,8 @@ import {
 import { Client as PgClient, Pool } from "pg";
 
 import {
-  discoverIntegrationTargetProvisionManifestPath,
-  parseIntegrationTargetsProvisionManifest,
+  loadIntegrationTargetsProvisionManifest,
   provisionIntegrationTargets,
-  resolveRepositoryRootFromDirectory,
 } from "../scripts/integration-targets/provision-integration-targets.js";
 import { syncIntegrationTargets } from "../scripts/integration-targets/sync-integration-targets.js";
 import { createControlPlaneBackend } from "../src/openworkflow.js";
@@ -154,15 +150,11 @@ export default async function setup(): Promise<() => Promise<void>> {
 
       await syncIntegrationTargets(database, integrationRegistry);
 
-      const repositoryRoot = resolveRepositoryRootFromDirectory(process.cwd());
-      const provisionManifestPath = discoverIntegrationTargetProvisionManifestPath({
+      const loadedManifest = loadIntegrationTargetsProvisionManifest({
+        env: process.env,
         startDirectory: process.cwd(),
-        repositoryRoot,
       });
-      if (provisionManifestPath !== undefined) {
-        const provisionManifest = parseIntegrationTargetsProvisionManifest(
-          await readFile(provisionManifestPath, "utf8"),
-        );
+      if (loadedManifest !== undefined) {
         await provisionIntegrationTargets({
           db: database,
           integrationRegistry,
@@ -172,7 +164,7 @@ export default async function setup(): Promise<() => Promise<void>> {
               [String(INTEGRATIONS_MASTER_KEY_VERSION)]: INTEGRATIONS_MASTER_KEY_MATERIAL,
             },
           },
-          manifest: provisionManifest,
+          manifest: loadedManifest.manifest,
         });
       }
     } finally {
