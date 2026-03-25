@@ -8,13 +8,12 @@ import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
-import { hasResumeOnOpenNavigationIntent } from "./session-workbench-page.js";
 import {
   buildOptimisticSessions,
   resolveSessionResultsSummary,
   SandboxSessionStatusBadge,
   SessionsPage,
-  shouldNavigateWithResumeIntent,
+  shouldUseResumeActionLabel,
 } from "./sessions-page.js";
 
 describe("SessionsPage", () => {
@@ -208,7 +207,7 @@ describe("SessionsPage", () => {
     expect(markup).not.toContain("text-destructive whitespace-pre-wrap text-xs");
   });
 
-  it("routes stopped sessions into the workbench with resume intent", () => {
+  it("routes stopped sessions into the workbench route directly", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -255,9 +254,6 @@ describe("SessionsPage", () => {
       return (
         <div>
           <span>{location.pathname}</span>
-          <span>
-            {hasResumeOnOpenNavigationIntent(location.state) ? "resume-intent" : "no-intent"}
-          </span>
         </div>
       );
     }
@@ -276,13 +272,12 @@ describe("SessionsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Resume" }));
 
     expect(screen.getByText("/sessions/sbi_stopped")).toBeDefined();
-    expect(screen.getByText("resume-intent")).toBeDefined();
   });
 
-  it("marks only stopped sessions for resume-on-open navigation", () => {
-    expect(shouldNavigateWithResumeIntent("stopped")).toBe(true);
-    expect(shouldNavigateWithResumeIntent("starting")).toBe(false);
-    expect(shouldNavigateWithResumeIntent("running")).toBe(false);
-    expect(shouldNavigateWithResumeIntent("failed")).toBe(false);
+  it("uses the resume action label only for stopped sessions", () => {
+    expect(shouldUseResumeActionLabel("stopped")).toBe(true);
+    expect(shouldUseResumeActionLabel("starting")).toBe(false);
+    expect(shouldUseResumeActionLabel("running")).toBe(false);
+    expect(shouldUseResumeActionLabel("failed")).toBe(false);
   });
 });

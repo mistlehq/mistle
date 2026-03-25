@@ -307,10 +307,14 @@ export function shouldClearStoredResumeIdempotencyKey(
 }
 
 export function shouldShowResumeInFlightState(input: {
+  shouldAttemptInitialStoppedResume: boolean;
   isResumingStoppedSandbox: boolean;
   sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
 }): boolean {
-  return input.isResumingStoppedSandbox && input.sandboxStatus === "stopped";
+  return (
+    input.sandboxStatus === "stopped" &&
+    (input.isResumingStoppedSandbox || input.shouldAttemptInitialStoppedResume)
+  );
 }
 
 export function resolveSessionEntryPhase(input: {
@@ -410,8 +414,6 @@ export function seedSandboxInstanceStatusQuery(input: {
 }
 
 export function useSessionWorkbenchController(input: {
-  onResumeOnOpenHandled: () => void;
-  resumeOnOpenRequestToken: string | null;
   sandboxInstanceId: string | null;
 }): UseSessionWorkbenchControllerResult {
   const [composerText, setComposerText] = useState("");
@@ -420,9 +422,7 @@ export function useSessionWorkbenchController(input: {
   const [automationPendingErrorMessage, setAutomationPendingErrorMessage] = useState<string | null>(
     null,
   );
-  const [shouldAutoResumeStoppedSandbox, setShouldAutoResumeStoppedSandbox] = useState(
-    input.resumeOnOpenRequestToken !== null,
-  );
+  const [hasAttemptedInitialStoppedResume, setHasAttemptedInitialStoppedResume] = useState(false);
   const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(false);
   const [resumeActionErrorMessage, setResumeActionErrorMessage] = useState<string | null>(null);
   const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
@@ -502,7 +502,12 @@ export function useSessionWorkbenchController(input: {
     initialSandboxStatusDataUpdatedAtRef.current = sandboxStatusQuery.dataUpdatedAt;
   }
   const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
+  const shouldAttemptInitialStoppedResume =
+    input.sandboxInstanceId !== null &&
+    sandboxStatus === "stopped" &&
+    !hasAttemptedInitialStoppedResume;
   const isShowingResumeInFlightState = shouldShowResumeInFlightState({
+    shouldAttemptInitialStoppedResume,
     isResumingStoppedSandbox,
     sandboxStatus,
   });
@@ -540,7 +545,7 @@ export function useSessionWorkbenchController(input: {
     setHasAttemptedAutoConnect(false);
     setAutomationPendingSinceMs(null);
     setAutomationPendingErrorMessage(null);
-    setShouldAutoResumeStoppedSandbox(input.resumeOnOpenRequestToken !== null);
+    setHasAttemptedInitialStoppedResume(false);
     setIsResumingStoppedSandbox(false);
     setResumeActionErrorMessage(null);
     activeResumeRequestRef.current = null;
@@ -559,23 +564,8 @@ export function useSessionWorkbenchController(input: {
       sandboxInstanceId: input.sandboxInstanceId,
       storage: getBestEffortBrowserStorage("local"),
     });
-    setShouldAutoResumeStoppedSandbox(false);
     setResumeActionErrorMessage(null);
   }, [input.sandboxInstanceId, sandboxStatus]);
-
-  useEffect(() => {
-    if (
-      !shouldAutoResumeStoppedSandbox ||
-      sandboxStatusQuery.dataUpdatedAt === initialSandboxStatusDataUpdatedAtRef.current ||
-      sandboxStatus === null ||
-      sandboxStatus === "stopped"
-    ) {
-      return;
-    }
-
-    setShouldAutoResumeStoppedSandbox(false);
-    setResumeActionErrorMessage(null);
-  }, [sandboxStatus, sandboxStatusQuery.dataUpdatedAt, shouldAutoResumeStoppedSandbox]);
 
   useEffect(() => {
     if (!isWaitingForAutomationThread) {
@@ -808,7 +798,6 @@ export function useSessionWorkbenchController(input: {
       storage,
       nowMs,
     });
-    setShouldAutoResumeStoppedSandbox(false);
     setResumeActionErrorMessage(null);
 
     clearStartErrorMessage();
@@ -852,7 +841,6 @@ export function useSessionWorkbenchController(input: {
           storage,
         });
       }
-      setShouldAutoResumeStoppedSandbox(false);
       setResumeActionErrorMessage(resolveResumeFailureMessage(error));
     } finally {
       if (
@@ -875,31 +863,23 @@ export function useSessionWorkbenchController(input: {
   ]);
 
   useEffect(() => {
-    if (input.resumeOnOpenRequestToken === null) {
-      return;
-    }
-
-    setShouldAutoResumeStoppedSandbox(true);
-    input.onResumeOnOpenHandled();
-  }, [input.onResumeOnOpenHandled, input.resumeOnOpenRequestToken]);
-
-  useEffect(() => {
     if (
       input.sandboxInstanceId === null ||
       isResumingStoppedSandbox ||
       sandboxStatus !== "stopped" ||
-      !shouldAutoResumeStoppedSandbox
+      hasAttemptedInitialStoppedResume
     ) {
       return;
     }
 
+    setHasAttemptedInitialStoppedResume(true);
     void requestStoppedSandboxResume();
   }, [
+    hasAttemptedInitialStoppedResume,
     input.sandboxInstanceId,
     isResumingStoppedSandbox,
     requestStoppedSandboxResume,
     sandboxStatus,
-    shouldAutoResumeStoppedSandbox,
   ]);
 
   return {

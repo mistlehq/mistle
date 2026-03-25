@@ -1,7 +1,7 @@
 import { Badge, Button } from "@mistle/ui";
 import { TerminalIcon } from "@phosphor-icons/react";
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router";
+import { useMemo } from "react";
+import { useLocation, useParams } from "react-router";
 
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import {
@@ -17,77 +17,19 @@ import {
 import { shouldShowResumeAction } from "./session-workbench-view-model.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-export function hasResumeOnOpenNavigationIntent(state: unknown): boolean {
-  if (!isRecord(state)) {
-    return false;
-  }
-
-  return state["resumeOnOpen"] === true;
-}
-
 export function SessionWorkbenchPage(): React.JSX.Element {
   const location = useLocation();
-  const navigate = useNavigate();
   const params = useParams();
   const sandboxInstanceId = params["sandboxInstanceId"] ?? null;
-  const [resumeOnOpenIntent, setResumeOnOpenIntent] = useState<{
-    sandboxInstanceId: string;
-    requestToken: string;
-  } | null>(null);
 
-  useEffect(() => {
-    if (sandboxInstanceId === null) {
-      setResumeOnOpenIntent(null);
-      return;
-    }
+  return <SessionWorkbenchPageContent key={location.key} sandboxInstanceId={sandboxInstanceId} />;
+}
 
-    if (hasResumeOnOpenNavigationIntent(location.state)) {
-      setResumeOnOpenIntent({
-        sandboxInstanceId,
-        requestToken: `${sandboxInstanceId}:${location.key}`,
-      });
-      void navigate(`${location.pathname}${location.search}`, {
-        replace: true,
-        state: null,
-      });
-      return;
-    }
-
-    setResumeOnOpenIntent((currentIntent) => {
-      if (currentIntent?.sandboxInstanceId === sandboxInstanceId) {
-        return currentIntent;
-      }
-
-      return null;
-    });
-  }, [
-    location.key,
-    location.pathname,
-    location.search,
-    location.state,
-    navigate,
-    sandboxInstanceId,
-  ]);
-
+function SessionWorkbenchPageContent(input: {
+  sandboxInstanceId: string | null;
+}): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
-    sandboxInstanceId,
-    onResumeOnOpenHandled: () => {
-      setResumeOnOpenIntent((currentIntent) => {
-        if (currentIntent === null || currentIntent.sandboxInstanceId !== sandboxInstanceId) {
-          return currentIntent;
-        }
-
-        return null;
-      });
-    },
-    resumeOnOpenRequestToken:
-      resumeOnOpenIntent?.sandboxInstanceId === sandboxInstanceId
-        ? resumeOnOpenIntent.requestToken
-        : null,
+    sandboxInstanceId: input.sandboxInstanceId,
   });
   const isTerminalOpenDisabled =
     !workbench.terminalPanelState.isVisible && !workbench.connectionReadiness.canConnect;
@@ -190,7 +132,7 @@ export function SessionWorkbenchPage(): React.JSX.Element {
     },
   );
   const terminalPanelKey = [
-    sandboxInstanceId,
+    input.sandboxInstanceId,
     workbench.sandboxStatusQuery.data?.status ?? "unknown",
     workbench.terminalPanelState.isVisible ? "visible" : "hidden",
   ].join(":");
@@ -223,7 +165,7 @@ export function SessionWorkbenchPage(): React.JSX.Element {
       description: workbench.sandboxFailureMessage,
     });
   }
-  if (sandboxInstanceId === null) {
+  if (input.sandboxInstanceId === null) {
     return (
       <SessionWorkbenchPageView
         alerts={[]}
@@ -292,11 +234,11 @@ export function SessionWorkbenchPage(): React.JSX.Element {
             await workbench.ptyState.actions.disconnectPty();
           }}
           ptyState={workbench.ptyState}
-          sandboxInstanceId={sandboxInstanceId}
+          sandboxInstanceId={input.sandboxInstanceId}
         />
       }
       secondaryPanelSize={workbench.terminalPanelState.panelSize}
-      sandboxInstanceId={sandboxInstanceId}
+      sandboxInstanceId={input.sandboxInstanceId}
     />
   );
 }

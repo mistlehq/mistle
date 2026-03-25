@@ -176,7 +176,7 @@ export function SandboxSessionStatusBadge(input: {
   );
 }
 
-export function shouldNavigateWithResumeIntent(status: SandboxSessionStatus): boolean {
+export function shouldUseResumeActionLabel(status: SandboxSessionStatus): boolean {
   return status === "stopped";
 }
 
@@ -657,23 +657,11 @@ export function SessionsPage(): React.JSX.Element {
                         <Button
                           disabled={!isSessionPageNavigableSandboxStatus(session.status)}
                           onClick={() => {
-                            const pathname = `/sessions/${encodeURIComponent(session.id)}`;
-                            if (shouldNavigateWithResumeIntent(session.status)) {
-                              navigate(pathname, {
-                                state: {
-                                  resumeOnOpen: true,
-                                },
-                              });
-                              return;
-                            }
-
-                            navigate(pathname);
+                            navigate(`/sessions/${encodeURIComponent(session.id)}`);
                           }}
                           type="button"
                         >
-                          {shouldNavigateWithResumeIntent(session.status)
-                            ? "Resume"
-                            : "Open session"}
+                          {shouldUseResumeActionLabel(session.status) ? "Resume" : "Open session"}
                         </Button>
                       </TableCell>
                     </TableRow>

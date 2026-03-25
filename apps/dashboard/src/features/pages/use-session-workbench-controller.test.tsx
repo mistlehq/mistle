@@ -41,8 +41,6 @@ describe("useSessionWorkbenchController", () => {
     const { result } = renderHook(
       () =>
         useSessionWorkbenchController({
-          onResumeOnOpenHandled: () => {},
-          resumeOnOpenRequestToken: null,
           sandboxInstanceId: null,
         }),
       {
@@ -106,8 +104,6 @@ describe("useSessionWorkbenchController", () => {
     const { result, rerender } = renderHook(
       ({ sandboxInstanceId }: { sandboxInstanceId: string | null }) =>
         useSessionWorkbenchController({
-          onResumeOnOpenHandled: () => {},
-          resumeOnOpenRequestToken: null,
           sandboxInstanceId,
         }),
       {
@@ -418,9 +414,10 @@ describe("useSessionWorkbenchController", () => {
     ).toBe("sandbox_failed");
   });
 
-  it("shows resume progress only while a local resume request is active", () => {
+  it("shows resume progress while auto-resume is being kicked off or actively submitting", () => {
     expect(
       shouldShowResumeInFlightState({
+        shouldAttemptInitialStoppedResume: false,
         isResumingStoppedSandbox: true,
         sandboxStatus: "stopped",
       }),
@@ -428,6 +425,15 @@ describe("useSessionWorkbenchController", () => {
 
     expect(
       shouldShowResumeInFlightState({
+        shouldAttemptInitialStoppedResume: true,
+        isResumingStoppedSandbox: false,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowResumeInFlightState({
+        shouldAttemptInitialStoppedResume: false,
         isResumingStoppedSandbox: false,
         sandboxStatus: "stopped",
       }),
@@ -435,6 +441,7 @@ describe("useSessionWorkbenchController", () => {
 
     expect(
       shouldShowResumeInFlightState({
+        shouldAttemptInitialStoppedResume: true,
         isResumingStoppedSandbox: false,
         sandboxStatus: "starting",
       }),
@@ -507,7 +514,7 @@ describe("useSessionWorkbenchController", () => {
     ).toBe(true);
   });
 
-  it("keeps a reloaded stopped sandbox resumable even when a stored resume key exists", () => {
+  it("auto-resumes a stopped sandbox on page entry even when a stored resume key exists", () => {
     const sandboxInstanceId = `sbi-resume-${Date.now()}`;
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -543,8 +550,6 @@ describe("useSessionWorkbenchController", () => {
     const { result } = renderHook(
       () =>
         useSessionWorkbenchController({
-          onResumeOnOpenHandled: () => {},
-          resumeOnOpenRequestToken: null,
           sandboxInstanceId,
         }),
       {
@@ -552,9 +557,9 @@ describe("useSessionWorkbenchController", () => {
       },
     );
 
-    expect(result.current.workbench.isResumingStoppedSandbox).toBe(false);
-    expect(result.current.workbench.connectionReadiness.reason).toBe("stopped");
-    expect(result.current.workbench.stoppedSessionState.requiresManualResume).toBe(true);
+    expect(result.current.workbench.isResumingStoppedSandbox).toBe(true);
+    expect(result.current.workbench.connectionReadiness.reason).toBe("starting");
+    expect(result.current.workbench.stoppedSessionState.requiresManualResume).toBe(false);
 
     clearStoredResumeIdempotencyKey({
       sandboxInstanceId,

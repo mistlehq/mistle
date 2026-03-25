@@ -6,7 +6,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
-import { hasResumeOnOpenNavigationIntent, SessionWorkbenchPage } from "./session-workbench-page.js";
+import { SessionWorkbenchPage } from "./session-workbench-page.js";
 
 describe("SessionWorkbenchPage", () => {
   it("renders the dedicated session shell for a sandbox instance route", () => {
@@ -64,7 +64,7 @@ describe("SessionWorkbenchPage", () => {
     expect(pageRoot?.firstElementChild?.getAttribute("role")).toBe("region");
   });
 
-  it("shows the stopped sandbox alert", () => {
+  it("starts the automatic resume flow for a stopped sandbox", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -95,16 +95,6 @@ describe("SessionWorkbenchPage", () => {
       </AppShellHeaderActionsContext.Provider>,
     );
 
-    expect(screen.getByText("Stopped sandbox")).toBeDefined();
-    expect(
-      screen.getByText("This sandbox is stopped. Resume it to reconnect chat and terminal."),
-    ).toBeDefined();
-  });
-
-  it("recognizes resume-on-open router state", () => {
-    expect(hasResumeOnOpenNavigationIntent(null)).toBe(false);
-    expect(hasResumeOnOpenNavigationIntent({})).toBe(false);
-    expect(hasResumeOnOpenNavigationIntent({ resumeOnOpen: false })).toBe(false);
-    expect(hasResumeOnOpenNavigationIntent({ resumeOnOpen: true })).toBe(true);
+    expect(screen.queryByText("Stopped sandbox")).toBeNull();
   });
 });
