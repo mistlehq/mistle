@@ -127,6 +127,7 @@ type SessionWorkbenchState = {
   };
   hasTopAlert: boolean;
   isResumingStoppedSandbox: boolean;
+  shouldAutoResumeOnEntry: boolean;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   requestStoppedSandboxResume: () => Promise<void>;
   sandboxFailureMessage: string | null;
@@ -498,21 +499,16 @@ export function useSessionWorkbenchController(input: {
     requiresManualResume: stoppedSessionMessage !== null,
   };
 
+  // Syncs teardown with the external Codex session and PTY lifecycles on unmount.
   useEffect(() => {
-    setHasAttemptedAutoConnect(false);
-    setAutomationPendingSinceMs(null);
-    setAutomationPendingErrorMessage(null);
-    setHasAttemptedInitialStoppedResume(false);
-    setIsResumingStoppedSandbox(false);
-    setResumeActionErrorMessage(null);
-    resumeIdempotencyKeyRef.current = null;
-    activeResumeRequestRef.current = null;
-    initialSandboxStatusDataUpdatedAtRef.current = sandboxStatusQuery.dataUpdatedAt;
-    clearStartErrorMessage();
-    disconnectSession();
-    void disconnectPty();
-  }, [clearStartErrorMessage, disconnectPty, disconnectSession, input.sandboxInstanceId]);
+    return () => {
+      clearStartErrorMessage();
+      disconnectSession();
+      void disconnectPty();
+    };
+  }, [clearStartErrorMessage, disconnectPty, disconnectSession]);
 
+  // Syncs a browser timer with the external automation-thread preparation window.
   useEffect(() => {
     if (!isWaitingForAutomationThread) {
       setAutomationPendingSinceMs(null);
@@ -555,6 +551,7 @@ export function useSessionWorkbenchController(input: {
 
   const resolvedStartErrorMessage = startErrorMessage ?? automationPendingErrorMessage;
 
+  // Syncs React with the external Codex session connection lifecycle.
   useEffect(() => {
     if (input.sandboxInstanceId === null) {
       return;
@@ -597,6 +594,7 @@ export function useSessionWorkbenchController(input: {
     resolvedStartErrorMessage,
   ]);
 
+  // Syncs a status refetch with the external sandbox startup lifecycle.
   useEffect(() => {
     if (input.sandboxInstanceId === null || connectedSession === null) {
       return;
@@ -631,6 +629,7 @@ export function useSessionWorkbenchController(input: {
     sandboxFailureMessage,
     stoppedSessionMessage: stoppedSessionState.message,
   });
+  // Syncs the connected admin channel with external model/config state.
   useEffect(() => {
     if (connectedSession === null) {
       return;
@@ -784,30 +783,12 @@ export function useSessionWorkbenchController(input: {
       }
     }
   }, [
+    clearStartErrorMessage,
     input.sandboxInstanceId,
     isResumingStoppedSandbox,
     queryClient,
     sandboxStatus,
     sandboxStatusQuery.refetch,
-  ]);
-
-  useEffect(() => {
-    if (
-      input.sandboxInstanceId === null ||
-      isResumingStoppedSandbox ||
-      sandboxStatus !== "stopped" ||
-      hasAttemptedInitialStoppedResume
-    ) {
-      return;
-    }
-
-    void requestStoppedSandboxResume();
-  }, [
-    hasAttemptedInitialStoppedResume,
-    input.sandboxInstanceId,
-    isResumingStoppedSandbox,
-    requestStoppedSandboxResume,
-    sandboxStatus,
   ]);
 
   return {
@@ -816,6 +797,7 @@ export function useSessionWorkbenchController(input: {
       stoppedSessionState,
       hasTopAlert,
       isResumingStoppedSandbox: isShowingResumeInFlightState,
+      shouldAutoResumeOnEntry: shouldAttemptInitialStoppedResume,
       ptyState,
       requestStoppedSandboxResume,
       sandboxFailureMessage,

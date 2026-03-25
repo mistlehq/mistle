@@ -1,6 +1,6 @@
 import { Badge, Button } from "@mistle/ui";
 import { TerminalIcon } from "@phosphor-icons/react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useLocation, useParams } from "react-router";
 
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
@@ -213,15 +213,22 @@ function SessionWorkbenchPageContent(input: {
       }
       onSecondaryPanelResize={workbench.terminalPanelState.setPanelSize}
       primaryBottomPanel={
-        <SessionConversationBottomPanel
-          chatEntries={conversationPane.chatState.entries}
-          composerProps={conversationPane.composerProps}
-          isRespondingToServerRequest={
-            conversationPane.serverRequestsState.isRespondingToServerRequest
-          }
-          onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
-          serverRequestPanelEntries={unmatchedServerRequests}
-        />
+        <>
+          {workbench.shouldAutoResumeOnEntry ? (
+            <SessionWorkbenchAutoResumeOnEntry
+              requestStoppedSandboxResume={workbench.requestStoppedSandboxResume}
+            />
+          ) : null}
+          <SessionConversationBottomPanel
+            chatEntries={conversationPane.chatState.entries}
+            composerProps={conversationPane.composerProps}
+            isRespondingToServerRequest={
+              conversationPane.serverRequestsState.isRespondingToServerRequest
+            }
+            onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
+            serverRequestPanelEntries={unmatchedServerRequests}
+          />
+        </>
       }
       secondaryPanel={
         <SessionTerminalPanel
@@ -241,6 +248,17 @@ function SessionWorkbenchPageContent(input: {
       sandboxInstanceId={input.sandboxInstanceId}
     />
   );
+}
+
+function SessionWorkbenchAutoResumeOnEntry(input: {
+  requestStoppedSandboxResume: () => Promise<void>;
+}): null {
+  // Syncs this mount with the external resume API; render logic alone cannot start the network request.
+  useEffect(() => {
+    void input.requestStoppedSandboxResume();
+  }, [input.requestStoppedSandboxResume]);
+
+  return null;
 }
 
 function createEmptyComposerProps(): SessionConversationComposerProps {

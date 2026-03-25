@@ -82,7 +82,7 @@ describe("useSessionWorkbenchController", () => {
     });
     expect(result.current.workbench.hasTopAlert).toBe(false);
     expect(result.current.workbench.ptyState.lifecycle.connectedSandboxInstanceId).toBeNull();
-    expect(result.current.workbench.ptyState.lifecycle.state).toBe("closed");
+    expect(result.current.workbench.ptyState.lifecycle.state).toBe("idle");
     expect(result.current.workbench.ptyState.output.chunks).toEqual([]);
     expect(result.current.workbench.terminalPanelState.isVisible).toBe(false);
     expect(result.current.workbench.terminalPanelState.panelSize).toBe(DEFAULT_TERMINAL_PANEL_SIZE);
