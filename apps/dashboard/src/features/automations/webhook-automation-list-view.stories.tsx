@@ -1,80 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
-import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-types.js";
 import { WebhookAutomationListView } from "./webhook-automation-list-view.js";
+import {
+  createDefaultWebhookAutomationListStoryItems,
+  createRowLevelIssueWebhookAutomationListItemViewModel,
+} from "./webhook-automation-test-fixtures.js";
 
-const SampleItems: readonly WebhookAutomationListItemViewModel[] = [
-  {
-    id: "aut_01jps7k2z2v3qj4k9m0n1p2q3r",
-    name: "GitHub pushes to repo triage",
-    targetName: "Repo Maintainer",
-    events: [
-      {
-        label: "CI completed",
-        logoKey: "github",
-      },
-      {
-        label: "Pull request opened",
-        logoKey: "github",
-      },
-      {
-        label: "Issue comment created",
-        logoKey: "github",
-      },
-    ],
-    updatedAtLabel: "6 min ago",
-    enabled: true,
-  },
-  {
-    id: "aut_01jps7mhvgc0p7e01b4z4r7c0m",
-    name: "Stripe payouts incident intake",
-    targetName: "Finance Investigator",
-    events: [
-      {
-        label: "Payout failed",
-      },
-    ],
-    updatedAtLabel: "1 day ago",
-    enabled: false,
-  },
-  {
-    id: "aut_01jps7qxbxw6kxdj1r9s9v8y2h",
-    name: "Legacy GitHub escalation",
-    targetName: "Incident Commander",
-    events: [
-      {
-        label: "github.push.deleted",
-        unavailable: true,
-      },
-      {
-        label: "Pull request opened",
-        logoKey: "github",
-      },
-    ],
-    updatedAtLabel: "3 days ago",
-    enabled: true,
-  },
-];
-
-const RowLevelIssueItem: WebhookAutomationListItemViewModel = {
-  id: "aut_01jps82rc4z62qy0m7zdb8h5qn",
-  name: "Retired metadata triage",
-  targetName: "Incident Commander",
-  issue: {
-    code: "MISSING_TARGET_METADATA",
-    message:
-      "This automation references an integration target definition that is no longer available. Event metadata may be incomplete.",
-  },
-  events: [
-    {
-      label: "issue_comment.created",
-      unavailable: true,
-    },
-  ],
-  updatedAtLabel: "3 days ago",
-  enabled: true,
-};
+const SampleItems = createDefaultWebhookAutomationListStoryItems();
+const UnavailableSavedEventItem = SampleItems[2];
+const RowLevelIssueItem = createRowLevelIssueWebhookAutomationListItemViewModel();
 
 const meta = {
   title: "Dashboard/Automations/WebhookAutomationListView",
@@ -135,18 +70,14 @@ export const ErrorState: Story = {
 
 export const UnavailableSavedEvent: Story = {
   args: {
-    items: [SampleItems[2]].filter(
-      (item): item is WebhookAutomationListItemViewModel => item !== undefined,
-    ),
+    items: UnavailableSavedEventItem === undefined ? [] : [UnavailableSavedEventItem],
     totalResults: 1,
   },
 };
 
 export const RowLevelIssue: Story = {
   args: {
-    items: [RowLevelIssueItem].filter(
-      (item): item is WebhookAutomationListItemViewModel => item !== undefined,
-    ),
+    items: [RowLevelIssueItem],
     totalResults: 1,
   },
 };

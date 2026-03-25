@@ -127,6 +127,53 @@ function EventSummaryCell(input: {
   );
 }
 
+function AutomationStatusDot(input: { enabled: boolean }): React.JSX.Element {
+  return (
+    <>
+      <span
+        aria-hidden
+        className={`inline-block size-2 shrink-0 rounded-full ${
+          input.enabled ? "bg-emerald-500" : "bg-muted-foreground/35"
+        }`}
+      />
+      <span className="sr-only">{input.enabled ? "Enabled" : "Disabled"}</span>
+    </>
+  );
+}
+
+function AutomationIssueMessage(input: {
+  issue: WebhookAutomationListItemViewModel["issue"];
+}): React.JSX.Element | null {
+  if (input.issue === undefined) {
+    return null;
+  }
+
+  return <p className="text-destructive text-xs leading-5">{input.issue.message}</p>;
+}
+
+function AutomationIdentityCell(input: {
+  item: WebhookAutomationListItemViewModel;
+  onOpenAutomation: (automationId: string) => void;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <AutomationStatusDot enabled={input.item.enabled} />
+        <button
+          className="text-left font-medium underline-offset-4 hover:underline"
+          onClick={() => {
+            input.onOpenAutomation(input.item.id);
+          }}
+          type="button"
+        >
+          {input.item.name}
+        </button>
+      </div>
+      <AutomationIssueMessage issue={input.item.issue} />
+    </div>
+  );
+}
+
 export function WebhookAutomationListView(
   input: WebhookAutomationListViewProps,
 ): React.JSX.Element {
@@ -196,29 +243,7 @@ export function WebhookAutomationListView(
               {visibleItems.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <span
-                          aria-hidden
-                          className={`inline-block size-2 shrink-0 rounded-full ${
-                            item.enabled ? "bg-emerald-500" : "bg-muted-foreground/35"
-                          }`}
-                        />
-                        <span className="sr-only">{item.enabled ? "Enabled" : "Disabled"}</span>
-                        <button
-                          className="text-left font-medium underline-offset-4 hover:underline"
-                          onClick={() => {
-                            input.onOpenAutomation(item.id);
-                          }}
-                          type="button"
-                        >
-                          {item.name}
-                        </button>
-                      </div>
-                      {item.issue === undefined ? null : (
-                        <p className="text-destructive text-xs leading-5">{item.issue.message}</p>
-                      )}
-                    </div>
+                    <AutomationIdentityCell item={item} onOpenAutomation={input.onOpenAutomation} />
                   </TableCell>
                   <TableCell>{item.targetName}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">
