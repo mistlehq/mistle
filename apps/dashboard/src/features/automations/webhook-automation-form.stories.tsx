@@ -379,6 +379,17 @@ export const Create: Story = {
   },
 };
 
+export const CreateWithDraftName: Story = {
+  args: {
+    mode: "create",
+    triggerPickerDisabledReason: "Select a sandbox profile to choose triggers.",
+    values: {
+      ...EmptyCreateValues,
+      name: "Repo automation draft",
+    },
+  },
+};
+
 export const CreatePageLayout: Story = {
   args: {
     mode: "create",

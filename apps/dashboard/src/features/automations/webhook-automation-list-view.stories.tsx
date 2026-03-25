@@ -18,6 +18,10 @@ const SampleItems: readonly WebhookAutomationListItemViewModel[] = [
         label: "Pull request opened",
         logoKey: "github",
       },
+      {
+        label: "Issue comment created",
+        logoKey: "github",
+      },
     ],
     updatedAtLabel: "6 min ago",
     enabled: true,
@@ -33,6 +37,23 @@ const SampleItems: readonly WebhookAutomationListItemViewModel[] = [
     ],
     updatedAtLabel: "1 day ago",
     enabled: false,
+  },
+  {
+    id: "aut_01jps7qxbxw6kxdj1r9s9v8y2h",
+    name: "Legacy GitHub escalation",
+    targetName: "Incident Commander",
+    events: [
+      {
+        label: "github.push.deleted",
+        unavailable: true,
+      },
+      {
+        label: "Pull request opened",
+        logoKey: "github",
+      },
+    ],
+    updatedAtLabel: "3 days ago",
+    enabled: true,
   },
 ];
 
@@ -65,6 +86,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const Paginated: Story = {
+  args: {
+    hasNextPage: true,
+    hasPreviousPage: true,
+    totalResults: 24,
+  },
+};
+
 export const Empty: Story = {
   args: {
     items: [],
@@ -82,5 +111,14 @@ export const ErrorState: Story = {
   args: {
     items: [],
     errorMessage: "The active organization could not be resolved for this request.",
+  },
+};
+
+export const UnavailableSavedEvent: Story = {
+  args: {
+    items: [SampleItems[2]].filter(
+      (item): item is WebhookAutomationListItemViewModel => item !== undefined,
+    ),
+    totalResults: 1,
   },
 };
