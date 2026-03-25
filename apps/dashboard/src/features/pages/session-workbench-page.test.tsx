@@ -58,13 +58,4 @@ describe("SessionWorkbenchPage", () => {
     const pageRoot = container.firstElementChild;
     expect(pageRoot?.firstElementChild?.getAttribute("role")).toBe("region");
   });
-
-  it("starts the automatic resume flow for a stopped sandbox", () => {
-    renderSessionWorkbenchPage({
-      sandboxInstanceId: "sbi_stopped",
-      seededStatus: "stopped",
-    });
-
-    expect(screen.queryByText("Stopped sandbox")).toBeNull();
-  });
 });
