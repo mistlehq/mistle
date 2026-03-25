@@ -1,11 +1,11 @@
 import { pathToFileURL } from "node:url";
 
-import { AppIds, loadConfig } from "@mistle/config";
 import { createControlPlaneDatabase } from "@mistle/db/control-plane";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { Pool } from "pg";
 
 import { logger } from "../src/logger.js";
+import { loadIntegrationTargetsSyncConfigFromModuleUrl } from "./integration-targets-sync-config-path.js";
 import {
   loadIntegrationTargetsProvisionManifest,
   provisionIntegrationTargets,
@@ -13,14 +13,13 @@ import {
 import { syncIntegrationTargets } from "./integration-targets/sync-integration-targets.js";
 
 async function main(): Promise<void> {
-  const loadedConfig = loadConfig({
-    app: AppIds.CONTROL_PLANE_API,
-    env: process.env,
-    includeGlobal: false,
+  const loadedConfig = loadIntegrationTargetsSyncConfigFromModuleUrl({
+    environment: process.env,
+    moduleUrl: import.meta.url,
   });
 
   const pool = new Pool({
-    connectionString: loadedConfig.app.database.url,
+    connectionString: loadedConfig.databaseUrl,
   });
   const db = createControlPlaneDatabase(pool);
   const integrationRegistry = createIntegrationRegistry();
@@ -50,8 +49,8 @@ async function main(): Promise<void> {
       integrationRegistry,
       integrationsConfig: {
         activeMasterEncryptionKeyVersion:
-          loadedConfig.app.integrations.activeMasterEncryptionKeyVersion,
-        masterEncryptionKeys: loadedConfig.app.integrations.masterEncryptionKeys,
+          loadedConfig.integrations.activeMasterEncryptionKeyVersion,
+        masterEncryptionKeys: loadedConfig.integrations.masterEncryptionKeys,
       },
       manifest: loadedManifest.manifest,
     });
