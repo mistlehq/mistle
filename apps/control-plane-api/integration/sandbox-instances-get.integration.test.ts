@@ -91,6 +91,9 @@ describe("sandbox instances get integration", () => {
       providerState: null,
       status: "active",
     });
+    await dataPlaneFixture.attachSandboxRuntime({
+      sandboxInstanceId: "sbi_cp_get_001",
+    });
 
     const response = await fixture.request("/v1/sandbox/instances/sbi_cp_get_001", {
       headers: {
@@ -175,6 +178,9 @@ describe("sandbox instances get integration", () => {
       providerExecutionId: null,
       providerState: null,
       status: "active",
+    });
+    await dataPlaneFixture.attachSandboxRuntime({
+      sandboxInstanceId: "sbi_cp_get_pending_001",
     });
 
     const response = await fixture.request("/v1/sandbox/instances/sbi_cp_get_pending_001", {
@@ -335,6 +341,9 @@ describe("sandbox instances get integration", () => {
         updatedAt: "2026-03-21T00:00:01.000Z",
       },
     ]);
+    await dataPlaneFixture.attachSandboxRuntime({
+      sandboxInstanceId: "sbi_cp_get_003",
+    });
 
     const response = await fixture.request("/v1/sandbox/instances/sbi_cp_get_003", {
       headers: {
@@ -449,6 +458,9 @@ describe("sandbox instances get integration", () => {
         createdAt: "2026-03-21T00:00:01.000Z",
       },
     ]);
+    await dataPlaneFixture.attachSandboxRuntime({
+      sandboxInstanceId: "sbi_cp_get_004",
+    });
 
     const response = await fixture.request("/v1/sandbox/instances/sbi_cp_get_004", {
       headers: {

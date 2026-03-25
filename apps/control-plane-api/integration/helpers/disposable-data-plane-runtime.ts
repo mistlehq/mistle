@@ -7,9 +7,17 @@ import {
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
 import { reserveAvailablePort } from "@mistle/test-harness";
+import { systemSleeper } from "@mistle/time";
 import { Client, Pool } from "pg";
 
 import { createDataPlaneApiRuntime } from "../../../data-plane-api/src/main.js";
+import {
+  closeWebSocket,
+  connectBootstrapSocket,
+  mintValidBootstrapToken,
+  startGatewayProcess,
+  type StartedGatewayProcess,
+} from "../../../data-plane-api/integration/runtime-status-test-helpers.js";
 import { createDataPlaneBackend } from "../../../data-plane-api/src/openworkflow/index.js";
 import type { DataPlaneApiConfig } from "../../../data-plane-api/src/types.js";
 
@@ -17,8 +25,88 @@ export type DisposableDataPlaneRuntime = {
   baseUrl: string;
   db: DataPlaneDatabase;
   dbPool: Pool;
+  attachSandboxRuntime: (input: { sandboxInstanceId: string }) => Promise<void>;
   stop: () => Promise<void>;
 };
+
+const RuntimeAttachmentReadyTimeoutMs = 5_000;
+const RuntimeAttachmentReadyPollIntervalMs = 50;
+
+type RuntimeStateSnapshot = {
+  ownerLeaseId: string | null;
+  attachment: {
+    sandboxInstanceId: string;
+    ownerLeaseId: string;
+  } | null;
+};
+
+function isRuntimeStateSnapshot(value: unknown): value is RuntimeStateSnapshot {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const ownerLeaseId = Object.getOwnPropertyDescriptor(value, "ownerLeaseId")?.value;
+  const attachment = Object.getOwnPropertyDescriptor(value, "attachment")?.value;
+  if (ownerLeaseId !== null && typeof ownerLeaseId !== "string") {
+    return false;
+  }
+  if (attachment === null) {
+    return true;
+  }
+  if (typeof attachment !== "object" || attachment === null) {
+    return false;
+  }
+
+  const sandboxInstanceId = Object.getOwnPropertyDescriptor(attachment, "sandboxInstanceId")?.value;
+  const attachmentOwnerLeaseId = Object.getOwnPropertyDescriptor(attachment, "ownerLeaseId")?.value;
+  return typeof sandboxInstanceId === "string" && typeof attachmentOwnerLeaseId === "string";
+}
+
+async function waitForRuntimeAttachment(input: {
+  gateway: StartedGatewayProcess;
+  internalAuthServiceToken: string;
+  sandboxInstanceId: string;
+}): Promise<void> {
+  const deadline = Date.now() + RuntimeAttachmentReadyTimeoutMs;
+
+  while (Date.now() < deadline) {
+    const response = await fetch(
+      new URL(
+        `/internal/sandbox-instances/${encodeURIComponent(input.sandboxInstanceId)}/runtime-state`,
+        input.gateway.baseUrl,
+      ),
+      {
+        headers: {
+          "x-mistle-service-token": input.internalAuthServiceToken,
+        },
+      },
+    );
+    if (!response.ok) {
+      throw new Error(
+        `Expected runtime-state route to respond successfully for sandbox '${input.sandboxInstanceId}', got status ${String(response.status)}.`,
+      );
+    }
+
+    const payload: unknown = await response.json();
+    if (!isRuntimeStateSnapshot(payload)) {
+      throw new Error("Runtime-state response payload is invalid.");
+    }
+
+    if (
+      payload.ownerLeaseId !== null &&
+      payload.attachment?.sandboxInstanceId === input.sandboxInstanceId &&
+      payload.attachment.ownerLeaseId === payload.ownerLeaseId
+    ) {
+      return;
+    }
+
+    await systemSleeper.sleep(RuntimeAttachmentReadyPollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for runtime attachment for sandbox '${input.sandboxInstanceId}'.`,
+  );
+}
 
 function parseDatabaseConnectionString(connectionString: string): {
   username: string;
@@ -71,7 +159,9 @@ export async function createDisposableDataPlaneRuntime(input: {
   });
 
   let runtime: Awaited<ReturnType<typeof createDataPlaneApiRuntime>> | undefined;
+  let gateway: StartedGatewayProcess | undefined;
   let dbPool: Pool | undefined;
+  const connectedBootstrapSockets: Array<{ close: () => Promise<void> }> = [];
 
   await adminClient.connect();
 
@@ -128,12 +218,52 @@ export async function createDisposableDataPlaneRuntime(input: {
       sandboxProvider: "docker",
     });
     await runtime.start();
+    gateway = await startGatewayProcess({
+      port: gatewayPort,
+      databaseUrl,
+      dataPlaneApiBaseUrl: `http://${host}:${String(port)}`,
+      internalAuthServiceToken: input.internalAuthServiceToken,
+    });
 
     return {
       baseUrl: `${configuredBaseUrl.protocol}//${host}:${String(port)}`,
       db: createDataPlaneDatabase(dbPool),
       dbPool,
+      attachSandboxRuntime: async ({ sandboxInstanceId }) => {
+        if (gateway === undefined) {
+          throw new Error("Expected gateway to be started before attaching sandbox runtime.");
+        }
+
+        const token = await mintValidBootstrapToken({
+          sandboxInstanceId,
+        });
+        const socket = await connectBootstrapSocket({
+          websocketBaseUrl: gateway.websocketBaseUrl,
+          sandboxInstanceId,
+          token,
+        });
+        connectedBootstrapSockets.push({
+          close: async () => {
+            await closeWebSocket(socket);
+          },
+        });
+
+        await waitForRuntimeAttachment({
+          gateway,
+          internalAuthServiceToken: input.internalAuthServiceToken,
+          sandboxInstanceId,
+        });
+      },
       stop: async () => {
+        while (connectedBootstrapSockets.length > 0) {
+          const connectedSocket = connectedBootstrapSockets.pop();
+          if (connectedSocket !== undefined) {
+            await connectedSocket.close();
+          }
+        }
+        if (gateway !== undefined) {
+          await gateway.stop();
+        }
         if (runtime !== undefined) {
           await runtime.stop();
         }
@@ -146,6 +276,15 @@ export async function createDisposableDataPlaneRuntime(input: {
       },
     };
   } catch (error) {
+    while (connectedBootstrapSockets.length > 0) {
+      const connectedSocket = connectedBootstrapSockets.pop();
+      if (connectedSocket !== undefined) {
+        await connectedSocket.close().catch(() => undefined);
+      }
+    }
+    if (gateway !== undefined) {
+      await gateway.stop();
+    }
     if (runtime !== undefined) {
       await runtime.stop();
     }
