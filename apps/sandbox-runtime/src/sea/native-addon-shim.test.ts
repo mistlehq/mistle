@@ -1,4 +1,4 @@
-import { chmod, copyFile, mkdtemp, rm } from "node:fs/promises";
+import { chmod, copyFile, mkdtemp, readdir, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -34,10 +34,15 @@ async function createSeaLikeRuntimeDirectory(): Promise<string> {
   await copyFile(process.execPath, fakeExecPath);
   await chmod(fakeExecPath, 0o755);
 
-  const nativeAddonPath = resolve(
-    process.cwd(),
-    "../../packages/sandbox-rs-napi/dist/index.darwin-arm64.node",
-  );
+  const nativeAddonDistPath = resolve(process.cwd(), "../../packages/sandbox-rs-napi/dist");
+  const nativeAddonFileNames = await readdir(nativeAddonDistPath);
+  const nativeAddonFileName = nativeAddonFileNames.find((fileName) => fileName.endsWith(".node"));
+
+  if (nativeAddonFileName === undefined) {
+    throw new Error("Expected a built sandbox-rs-napi native addon in dist.");
+  }
+
+  const nativeAddonPath = join(nativeAddonDistPath, nativeAddonFileName);
   await copyFile(nativeAddonPath, join(directoryPath, "index.test.node"));
 
   Object.defineProperty(process, "execPath", {
@@ -54,9 +59,7 @@ describe("native addon SEA shim", () => {
 
     const shimModulePath = require.resolve("../../scripts/sea/native-addon-shim.cjs");
     delete require.cache[shimModulePath];
-    const nativeAddonShim = require(shimModulePath) as {
-      assertUnixSocketPeerMatchesCurrentProcessUid: unknown;
-    };
+    const nativeAddonShim: Record<string, unknown> = require(shimModulePath);
 
     expect(typeof nativeAddonShim.assertUnixSocketPeerMatchesCurrentProcessUid).toBe("function");
   });
