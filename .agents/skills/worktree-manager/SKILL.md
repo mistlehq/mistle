@@ -26,9 +26,12 @@ Use the helper script as the source of truth for creation, local-file sync, boot
    - branch name
    - base ref
 2. Run `.agents/skills/worktree-manager/scripts/create-worktree.sh` with those four arguments in that order.
-3. The helper script copies these required developer-local files from the source worktree into the new worktree before bootstrap:
+3. The helper script attempts to carry these developer-local files from the source worktree into the new worktree:
    - `.env.dev`
    - `integration-targets.provision.json`
    - `config/config.development.toml`
-4. Treat a missing required local file as a bootstrap error, not something to regenerate or silently skip.
-5. Treat the script output as the source of truth for what happened and report the key fields back to the user.
+4. Missing local files are non-fatal by default:
+   - copy `.env.dev` when present
+   - copy `integration-targets.provision.json` when present
+   - copy `config/config.development.toml` when present, otherwise initialize it in the new worktree with `pnpm config:init:dev`
+5. Treat the script output as the source of truth for what happened and report the key fields back to the user, including copied, initialized, and missing local files when those lists are non-empty.
