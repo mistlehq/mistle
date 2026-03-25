@@ -7,6 +7,17 @@ import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 
 const IntegrationRegistry = createIntegrationRegistry();
 
+function getTargetDefinition(input: { familyId: string; variantId: string }) {
+  return IntegrationRegistry.getDefinition({
+    familyId: input.familyId,
+    variantId: input.variantId,
+  });
+}
+
+export function hasTargetDefinition(input: { familyId: string; variantId: string }): boolean {
+  return getTargetDefinition(input) !== undefined;
+}
+
 type ResolvedWebhookEventParameter =
   | {
       id: string;
@@ -152,7 +163,7 @@ export function resolveTargetMetadata(input: {
   displayNameOverride: string | null;
   descriptionOverride: string | null;
 }): ResolvedIntegrationTargetMetadata {
-  const definition = IntegrationRegistry.getDefinition({
+  const definition = getTargetDefinition({
     familyId: input.familyId,
     variantId: input.variantId,
   });

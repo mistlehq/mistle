@@ -370,6 +370,90 @@ describe("automation webhooks CRUD integration", () => {
     ]);
   });
 
+  it("lists retired targets with a row-level issue even when persisted overrides are present", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-list-retired-target-overrides@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "retired_target_with_overrides",
+      familyId: "retired",
+      variantId: "retired-variant-with-overrides",
+      enabled: true,
+      config: {},
+      displayNameOverride: "Retired target",
+      descriptionOverride: "Retired target description",
+    });
+    await insertIntegrationConnection(fixture, {
+      id: "icn_list_retired_overrides_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: "retired_target_with_overrides",
+    });
+    await insertSandboxProfile(fixture, {
+      id: "sbp_list_retired_overrides_001",
+      organizationId: authenticatedSession.organizationId,
+    });
+
+    await fixture.db.insert(automations).values({
+      id: "atm_webhook_list_retired_overrides_001",
+      organizationId: authenticatedSession.organizationId,
+      kind: AutomationKinds.WEBHOOK,
+      name: "Retired Target Automation With Overrides",
+      enabled: true,
+      createdAt: "2026-02-07T12:00:00.000Z",
+      updatedAt: "2026-02-07T12:00:00.000Z",
+    });
+    await fixture.db
+      .insert(webhookAutomations)
+      .values(
+        createPersistedWebhookAutomationConfig(
+          "atm_webhook_list_retired_overrides_001",
+          "icn_list_retired_overrides_001",
+        ),
+      );
+    await fixture.db
+      .insert(automationTargets)
+      .values(
+        createPersistedAutomationTarget(
+          "atg_list_retired_overrides_001",
+          "atm_webhook_list_retired_overrides_001",
+          "sbp_list_retired_overrides_001",
+          1,
+        ),
+      );
+
+    const response = await fixture.request("/v1/automations/webhooks", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = ListAutomationWebhooksResponseSchema.parse(await response.json());
+    expect(body.items).toHaveLength(1);
+
+    const [item] = body.items;
+    if (item === undefined) {
+      throw new Error("Expected a webhook automation list item.");
+    }
+
+    expect(item.id).toBe("atm_webhook_list_retired_overrides_001");
+    expect(item.issue).toEqual({
+      code: "MISSING_TARGET_METADATA",
+      message:
+        "This automation references an integration target definition that is no longer available. Event metadata may be incomplete.",
+    });
+    expect(item.events).toEqual([
+      {
+        label: "issue_comment.created",
+        unavailable: true,
+      },
+    ]);
+  });
+
   it("lists webhook automations when the referenced integration connection row is missing", async ({
     fixture,
   }) => {

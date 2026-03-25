@@ -24,7 +24,10 @@ import {
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { resolveTargetMetadataFromPersistedTarget } from "../../integration-targets/services/resolve-target-metadata.js";
+import {
+  hasTargetDefinition,
+  resolveTargetMetadataFromPersistedTarget,
+} from "../../integration-targets/services/resolve-target-metadata.js";
 import { AutomationWebhooksBadRequestCodes } from "../constants.js";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -221,38 +224,12 @@ function createAutomationListPageItem(row: AutomationListPageRow): AutomationWeb
     };
   }
 
-  try {
-    const targetMetadata = resolveTargetMetadataFromPersistedTarget({
+  if (
+    !hasTargetDefinition({
       familyId: row.integrationTargetFamilyId,
       variantId: row.integrationTargetVariantId,
-      displayNameOverride: row.integrationTargetDisplayNameOverride,
-      descriptionOverride: row.integrationTargetDescriptionOverride,
-    });
-
-    return {
-      id: row.automationId,
-      name: row.automationName,
-      enabled: row.enabled,
-      createdAt: row.createdAt,
-      targetName: row.sandboxProfileDisplayName,
-      events: resolveAutomationListEvents({
-        eventTypes: row.eventTypes,
-        integrationConnectionId: row.integrationConnectionId,
-        ...(targetMetadata.supportedWebhookEvents === undefined
-          ? {}
-          : {
-              supportedWebhookEvents: targetMetadata.supportedWebhookEvents.map(
-                (eventDefinition) => ({
-                  eventType: eventDefinition.eventType,
-                  displayName: eventDefinition.displayName,
-                }),
-              ),
-            }),
-        ...(targetMetadata.logoKey === undefined ? {} : { logoKey: targetMetadata.logoKey }),
-      }),
-      updatedAt: row.updatedAt,
-    };
-  } catch {
+    })
+  ) {
     return {
       id: row.automationId,
       name: row.automationName,
@@ -270,6 +247,37 @@ function createAutomationListPageItem(row: AutomationListPageRow): AutomationWeb
       updatedAt: row.updatedAt,
     };
   }
+
+  const targetMetadata = resolveTargetMetadataFromPersistedTarget({
+    familyId: row.integrationTargetFamilyId,
+    variantId: row.integrationTargetVariantId,
+    displayNameOverride: row.integrationTargetDisplayNameOverride,
+    descriptionOverride: row.integrationTargetDescriptionOverride,
+  });
+
+  return {
+    id: row.automationId,
+    name: row.automationName,
+    enabled: row.enabled,
+    createdAt: row.createdAt,
+    targetName: row.sandboxProfileDisplayName,
+    events: resolveAutomationListEvents({
+      eventTypes: row.eventTypes,
+      integrationConnectionId: row.integrationConnectionId,
+      ...(targetMetadata.supportedWebhookEvents === undefined
+        ? {}
+        : {
+            supportedWebhookEvents: targetMetadata.supportedWebhookEvents.map(
+              (eventDefinition) => ({
+                eventType: eventDefinition.eventType,
+                displayName: eventDefinition.displayName,
+              }),
+            ),
+          }),
+      ...(targetMetadata.logoKey === undefined ? {} : { logoKey: targetMetadata.logoKey }),
+    }),
+    updatedAt: row.updatedAt,
+  };
 }
 
 async function loadAutomationListPageRows(input: {
