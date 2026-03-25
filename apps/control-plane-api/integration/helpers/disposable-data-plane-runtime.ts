@@ -10,7 +10,6 @@ import { reserveAvailablePort } from "@mistle/test-harness";
 import { systemSleeper } from "@mistle/time";
 import { Client, Pool } from "pg";
 
-import { createDataPlaneApiRuntime } from "../../../data-plane-api/src/main.js";
 import {
   closeWebSocket,
   connectBootstrapSocket,
@@ -18,6 +17,7 @@ import {
   startGatewayProcess,
   type StartedGatewayProcess,
 } from "../../../data-plane-api/integration/runtime-status-test-helpers.js";
+import { createDataPlaneApiRuntime } from "../../../data-plane-api/src/main.js";
 import { createDataPlaneBackend } from "../../../data-plane-api/src/openworkflow/index.js";
 import type { DataPlaneApiConfig } from "../../../data-plane-api/src/types.js";
 
