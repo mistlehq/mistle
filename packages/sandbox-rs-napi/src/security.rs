@@ -15,13 +15,6 @@ pub struct ExecRuntimeAsUserInput {
     pub env: Vec<ProcessEnvironmentEntry>,
 }
 
-#[napi(object)]
-pub struct UnixSocketPeerCredentials {
-    pub pid: i32,
-    pub uid: i32,
-    pub gid: i32,
-}
-
 #[cfg(target_os = "linux")]
 pub fn set_current_process_non_dumpable_impl() -> Result<(), String> {
     let result = unsafe { nix::libc::prctl(nix::libc::PR_SET_DUMPABLE, 0, 0, 0, 0) };
@@ -98,9 +91,7 @@ pub fn exec_runtime_as_user_impl(input: ExecRuntimeAsUserInput) -> Result<(), St
 }
 
 #[cfg(target_os = "linux")]
-fn get_unix_socket_peer_credentials_impl(
-    fd: i32,
-) -> Result<Option<UnixSocketPeerCredentials>, String> {
+fn ensure_unix_socket_peer_matches_current_process_uid_impl(fd: i32) -> Result<(), String> {
     if fd < 0 {
         return Err("socket fd must be non-negative".to_string());
     }
@@ -129,18 +120,20 @@ fn get_unix_socket_peer_credentials_impl(
     }
 
     let credentials = unsafe { credentials.assume_init() };
-    Ok(Some(UnixSocketPeerCredentials {
-        pid: credentials.pid,
-        uid: credentials.uid as i32,
-        gid: credentials.gid as i32,
-    }))
+    let current_uid = nix::unistd::geteuid().as_raw();
+    if credentials.uid != current_uid {
+        return Err(format!(
+            "startup apply connection must come from uid {current_uid}, got uid {}",
+            credentials.uid
+        ));
+    }
+
+    Ok(())
 }
 
 #[cfg(not(target_os = "linux"))]
-fn get_unix_socket_peer_credentials_impl(
-    _fd: i32,
-) -> Result<Option<UnixSocketPeerCredentials>, String> {
-    Ok(None)
+fn ensure_unix_socket_peer_matches_current_process_uid_impl(_fd: i32) -> Result<(), String> {
+    Ok(())
 }
 
 fn clear_close_on_exec(fd: i32) -> Result<(), String> {
@@ -251,10 +244,8 @@ pub fn exec_runtime_as_user(input: ExecRuntimeAsUserInput) -> napi::Result<()> {
 }
 
 #[napi]
-pub fn get_unix_socket_peer_credentials(
-    fd: i32,
-) -> napi::Result<Option<UnixSocketPeerCredentials>> {
-    get_unix_socket_peer_credentials_impl(fd).map_err(napi::Error::from_reason)
+pub fn assert_unix_socket_peer_matches_current_process_uid(fd: i32) -> napi::Result<()> {
+    ensure_unix_socket_peer_matches_current_process_uid_impl(fd).map_err(napi::Error::from_reason)
 }
 
 #[cfg(test)]
@@ -263,9 +254,16 @@ mod tests {
         ExecRuntimeAsUserInput, ProcessEnvironmentEntry, build_exec_environment,
         clear_close_on_exec, ensure_running_as_root,
     };
+    #[cfg(target_os = "linux")]
+    use std::os::fd::AsRawFd;
+    #[cfg(target_os = "linux")]
+    use std::os::unix::net::UnixStream;
 
     #[cfg(target_os = "linux")]
-    use super::set_current_process_non_dumpable_impl;
+    use super::{
+        ensure_unix_socket_peer_matches_current_process_uid_impl,
+        set_current_process_non_dumpable_impl,
+    };
 
     #[test]
     fn rejects_invalid_environment_entry_name() {
@@ -329,6 +327,27 @@ mod tests {
             close_result, 0,
             "expected duplicated stdin close to succeed"
         );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn validates_unix_socket_peer_against_current_process_uid() {
+        let (client, _server) = UnixStream::pair().expect("expected unix stream pair");
+
+        let result = ensure_unix_socket_peer_matches_current_process_uid_impl(client.as_raw_fd());
+
+        assert!(result.is_ok(), "expected same-process uid check to succeed");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn rejects_negative_fd_for_unix_socket_peer_check() {
+        let result = ensure_unix_socket_peer_matches_current_process_uid_impl(-1);
+
+        assert!(matches!(
+            result,
+            Err(message) if message.contains("socket fd must be non-negative")
+        ));
     }
 
     #[cfg(target_os = "linux")]

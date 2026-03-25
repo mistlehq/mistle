@@ -36,12 +36,6 @@ export interface IssuedProxyLeafCertificateResult {
   privateKeyPem: string;
 }
 
-export interface UnixSocketPeerCredentials {
-  pid: number;
-  uid: number;
-  gid: number;
-}
-
 export interface PtyEnvironmentEntry {
   name: string;
   value: string;
@@ -95,9 +89,7 @@ export declare function prepareProxyCaRuntime(
 export declare function issueProxyLeafCertificate(
   input: IssueProxyLeafCertificateInput,
 ): IssuedProxyLeafCertificateResult;
-export declare function getUnixSocketPeerCredentials(
-  fd: number,
-): UnixSocketPeerCredentials | null | undefined;
+export declare function assertUnixSocketPeerMatchesCurrentProcessUid(fd: number): void;
 export declare function execRuntimeAsUser(input: ExecRuntimeAsUserInput): void;
 export declare function setCurrentProcessNonDumpable(): void;
 export declare function spawnManagedProcess(

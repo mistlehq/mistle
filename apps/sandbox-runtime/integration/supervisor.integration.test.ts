@@ -116,6 +116,48 @@ afterEach(async () => {
 });
 
 describe("startSupervisorServer", () => {
+  it("rejects invalid startup tokens without consuming the valid token", async () => {
+    const controlDirectoryPath = await createTemporaryDirectory("mistle-supervisor-");
+    const outputPath = join(controlDirectoryPath, "bootstrap-startup-input.json");
+    const lookupEnv = createLookupEnv(controlDirectoryPath);
+
+    const supervisor = await startSupervisorServer({
+      lookupEnv,
+      bootstrapLaunchTarget: {
+        command: process.execPath,
+        args: [SupervisorHelperPath],
+      },
+      bootstrapEnvironment: {
+        ...process.env,
+        MISTLE_SUPERVISOR_HELPER_OUTPUT_PATH: outputPath,
+      },
+    });
+    StartedSupervisors.push(supervisor);
+
+    await expect(
+      sendStartupApplyRequest({
+        socketPath: supervisor.socketPath,
+        request: {
+          token: "wrong-token",
+          startupInput: JSON.parse(ValidStartupInputJson),
+        },
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      error: "startup apply token is invalid",
+    });
+
+    await expect(readFile(supervisor.tokenPath, "utf8")).resolves.toMatch(/\S/u);
+
+    await applyStartupToSupervisor({
+      lookupEnv,
+      stdin: Readable.from([ValidStartupInputJson]),
+    });
+
+    const writtenStartupInput = await waitForFileContents(outputPath);
+    expect(JSON.parse(writtenStartupInput)).toEqual(JSON.parse(ValidStartupInputJson));
+  });
+
   it("applies startup input once and launches the bootstrap helper with stdin", async () => {
     const controlDirectoryPath = await createTemporaryDirectory("mistle-supervisor-");
     const outputPath = join(controlDirectoryPath, "bootstrap-startup-input.json");
@@ -169,5 +211,30 @@ describe("startSupervisorServer", () => {
       ok: false,
       error: "sandbox startup has already been applied",
     });
+  });
+
+  it("removes the startup socket and token file when the supervisor closes", async () => {
+    const controlDirectoryPath = await createTemporaryDirectory("mistle-supervisor-");
+    const lookupEnv = createLookupEnv(controlDirectoryPath);
+
+    const supervisor = await startSupervisorServer({
+      lookupEnv,
+      bootstrapLaunchTarget: {
+        command: process.execPath,
+        args: [SupervisorHelperPath],
+      },
+      bootstrapEnvironment: process.env,
+    });
+
+    await expect(readFile(supervisor.tokenPath, "utf8")).resolves.toMatch(/\S/u);
+
+    await supervisor.close();
+
+    await expect(readFile(supervisor.tokenPath, "utf8")).rejects.toThrow(
+      /ENOENT|no such file or directory/u,
+    );
+    await expect(readFile(supervisor.socketPath, "utf8")).rejects.toThrow(
+      /ENOENT|no such file or directory/u,
+    );
   });
 });

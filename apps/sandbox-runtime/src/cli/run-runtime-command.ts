@@ -2,6 +2,7 @@ import { type Readable, type Writable } from "node:stream";
 
 import { runRuntime } from "../runtime/run.js";
 import { resolveBootstrapLaunchTarget } from "../supervisor/bootstrap-launch-target.js";
+import { type BootstrapLaunchTarget } from "../supervisor/bootstrap-launch-target.js";
 import { applyStartupToSupervisor } from "../supervisor/client.js";
 import { startSupervisorServer } from "../supervisor/server.js";
 
@@ -35,25 +36,35 @@ function resolveRuntimeCommandName(processArgv: readonly string[]): RuntimeComma
   }
 }
 
+function resolveServeBootstrapLaunchTarget(
+  input: Pick<
+    RunRuntimeCommandInput,
+    "currentEntrypointPath" | "packagedRuntimeExecutablePath" | "processExecArgv"
+  >,
+): BootstrapLaunchTarget {
+  if (input.packagedRuntimeExecutablePath !== undefined) {
+    return resolveBootstrapLaunchTarget({
+      packagedRuntimeExecutablePath: input.packagedRuntimeExecutablePath,
+      processExecArgv: input.processExecArgv,
+    });
+  }
+
+  if (input.currentEntrypointPath === undefined) {
+    throw new Error("runtime entrypoint path is required for serve mode");
+  }
+
+  return resolveBootstrapLaunchTarget({
+    currentEntrypointPath: input.currentEntrypointPath,
+    processExecArgv: input.processExecArgv,
+  });
+}
+
 export async function runRuntimeCommand(input: RunRuntimeCommandInput): Promise<void> {
   switch (resolveRuntimeCommandName(input.processArgv)) {
     case "serve": {
       const supervisor = await startSupervisorServer({
         lookupEnv: input.lookupEnv,
-        bootstrapLaunchTarget:
-          input.packagedRuntimeExecutablePath !== undefined
-            ? resolveBootstrapLaunchTarget({
-                packagedRuntimeExecutablePath: input.packagedRuntimeExecutablePath,
-                processExecArgv: input.processExecArgv,
-              })
-            : resolveBootstrapLaunchTarget({
-                currentEntrypointPath:
-                  input.currentEntrypointPath ??
-                  (() => {
-                    throw new Error("runtime entrypoint path is required for serve mode");
-                  })(),
-                processExecArgv: input.processExecArgv,
-              }),
+        bootstrapLaunchTarget: resolveServeBootstrapLaunchTarget(input),
         stderr: input.stderr,
       });
 

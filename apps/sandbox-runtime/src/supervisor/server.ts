@@ -4,7 +4,7 @@ import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Socket } from "node:net";
 import { type Writable } from "node:stream";
 
-import { getUnixSocketPeerCredentials } from "@mistle/sandbox-rs-napi";
+import { assertUnixSocketPeerMatchesCurrentProcessUid } from "@mistle/sandbox-rs-napi";
 
 import { readJsonObjectFromStream } from "../io/read-json-object-from-stream.js";
 import { type StartupInput } from "../runtime/startup-input.js";
@@ -36,17 +36,19 @@ type ActiveBootstrapProcess = {
   child: ChildProcess;
 };
 
-function createToken(): string {
-  return randomBytes(32).toString("base64url");
-}
-
 function getSocketFileDescriptor(socket: Socket): number {
-  const handle = Reflect.get(socket, "_handle");
+  const handle = Object.getOwnPropertyDescriptor(
+    Object.getPrototypeOf(socket),
+    "_handle",
+  )?.get?.call(socket);
   if (typeof handle !== "object" || handle === null) {
     throw new Error("startup apply connection fd is unavailable");
   }
 
-  const fd = Reflect.get(handle, "fd");
+  const fd = Object.getOwnPropertyDescriptor(
+    Object.getPrototypeOf(Object.getPrototypeOf(handle)),
+    "fd",
+  )?.get?.call(handle);
   if (typeof fd !== "number" || !Number.isInteger(fd) || fd < 0) {
     throw new Error("startup apply connection fd is unavailable");
   }
@@ -76,21 +78,7 @@ async function writeResponse(socket: Socket, response: StartupApplyResponse): Pr
 }
 
 async function ensureAuthorizedPeer(socket: Socket): Promise<void> {
-  const credentials = getUnixSocketPeerCredentials(getSocketFileDescriptor(socket));
-  if (credentials === undefined || credentials === null) {
-    return;
-  }
-
-  const expectedUid = typeof process.geteuid === "function" ? process.geteuid() : undefined;
-  if (expectedUid === undefined) {
-    return;
-  }
-
-  if (credentials.uid !== expectedUid) {
-    throw new Error(
-      `startup apply connection must come from uid ${String(expectedUid)}, got uid ${String(credentials.uid)}`,
-    );
-  }
+  assertUnixSocketPeerMatchesCurrentProcessUid(getSocketFileDescriptor(socket));
 }
 
 async function launchBootstrapProcess(input: {
@@ -136,6 +124,14 @@ async function readStartupApplyToken(tokenPath: string): Promise<string> {
   return token;
 }
 
+async function writeStartupApplyToken(tokenPath: string): Promise<void> {
+  await writeFile(tokenPath, `${randomBytes(32).toString("base64url")}\n`, {
+    encoding: "utf8",
+    flag: "wx",
+    mode: 0o600,
+  });
+}
+
 export async function startSupervisorServer(
   input: StartSupervisorServerInput,
 ): Promise<StartedSupervisorServer> {
@@ -148,7 +144,61 @@ export async function startSupervisorServer(
   const activeSockets = new Set<Socket>();
   let activeBootstrapProcess: ActiveBootstrapProcess | undefined;
   let startupConsumed = false;
+  let startupApplying = false;
   let closing = false;
+
+  async function handleConnection(socket: Socket): Promise<void> {
+    await ensureAuthorizedPeer(socket);
+    const rawRequest = await readJsonObjectFromStream({
+      reader: socket,
+      maxBytes: DefaultSupervisorMessageMaxBytes,
+      label: "startup apply request",
+    });
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(rawRequest);
+    } catch (error) {
+      throw new Error(
+        `startup apply request must be valid json: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    if (startupConsumed || startupApplying) {
+      throw new Error("sandbox startup has already been applied");
+    }
+
+    const request = parseStartupApplyRequestPayload(payload);
+    const expectedToken = await readStartupApplyToken(config.tokenPath);
+    if (request.token !== expectedToken) {
+      throw new Error("startup apply token is invalid");
+    }
+
+    startupApplying = true;
+    try {
+      await rm(config.tokenPath, {
+        force: true,
+      });
+
+      activeBootstrapProcess = {
+        child: await launchBootstrapProcess({
+          startupInput: request.startupInput,
+          bootstrapLaunchTarget: input.bootstrapLaunchTarget,
+          bootstrapEnvironment: input.bootstrapEnvironment ?? process.env,
+          stderr,
+        }),
+      };
+      startupConsumed = true;
+    } finally {
+      if (!startupConsumed) {
+        startupApplying = false;
+      }
+    }
+
+    await writeResponse(socket, {
+      ok: true,
+    });
+  }
 
   server.on("connection", (socket) => {
     activeSockets.add(socket);
@@ -156,58 +206,12 @@ export async function startSupervisorServer(
       activeSockets.delete(socket);
     });
 
-    void (async () => {
-      try {
-        await ensureAuthorizedPeer(socket);
-        const rawRequest = await readJsonObjectFromStream({
-          reader: socket,
-          maxBytes: DefaultSupervisorMessageMaxBytes,
-          label: "startup apply request",
-        });
-
-        let payload: unknown;
-        try {
-          payload = JSON.parse(rawRequest);
-        } catch (error) {
-          throw new Error(
-            `startup apply request must be valid json: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-
-        if (startupConsumed) {
-          throw new Error("sandbox startup has already been applied");
-        }
-
-        const request = parseStartupApplyRequestPayload(payload);
-        const expectedToken = await readStartupApplyToken(config.tokenPath);
-        if (request.token !== expectedToken) {
-          throw new Error("startup apply token is invalid");
-        }
-
-        startupConsumed = true;
-        await rm(config.tokenPath, {
-          force: true,
-        });
-
-        activeBootstrapProcess = {
-          child: await launchBootstrapProcess({
-            startupInput: request.startupInput,
-            bootstrapLaunchTarget: input.bootstrapLaunchTarget,
-            bootstrapEnvironment: input.bootstrapEnvironment ?? process.env,
-            stderr,
-          }),
-        };
-
-        await writeResponse(socket, {
-          ok: true,
-        });
-      } catch (error) {
-        await writeResponse(socket, {
-          ok: false,
-          error: error instanceof Error ? error.message : String(error),
-        }).catch(() => undefined);
-      }
-    })();
+    void handleConnection(socket).catch(async (error) => {
+      await writeResponse(socket, {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      }).catch(() => undefined);
+    });
   });
 
   try {
@@ -216,11 +220,7 @@ export async function startSupervisorServer(
       mode: 0o700,
     });
     await chmod(config.controlDirectoryPath, 0o700);
-    await writeFile(config.tokenPath, `${createToken()}\n`, {
-      encoding: "utf8",
-      flag: "wx",
-      mode: 0o600,
-    });
+    await writeStartupApplyToken(config.tokenPath);
 
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject);
