@@ -147,14 +147,14 @@ describe("start sandbox instance provisioning integration", () => {
           runtimePlan: createRuntimePlan(),
           sandboxProfileId: "sbp_start_provisioning_integration",
           sandboxProfileVersion: 3,
-          providerRuntimeId: "provider-runtime-start-provisioning",
+          providerSandboxId: "provider-runtime-start-provisioning",
         },
       );
 
       const persistedProvisionedInstance = await db.query.sandboxInstances.findFirst({
         columns: {
           id: true,
-          providerRuntimeId: true,
+          providerSandboxId: true,
           instanceVolumeProvider: true,
           instanceVolumeId: true,
           instanceVolumeMode: true,
@@ -164,7 +164,7 @@ describe("start sandbox instance provisioning integration", () => {
 
       expect(persistedProvisionedInstance).toEqual({
         id: sandboxInstanceId,
-        providerRuntimeId: "provider-runtime-start-provisioning",
+        providerSandboxId: "provider-runtime-start-provisioning",
         instanceVolumeProvider: "docker",
         instanceVolumeId: "mistle-volume-start-provisioning",
         instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,

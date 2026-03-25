@@ -63,7 +63,7 @@ async function insertStoppedSandboxInstance(input: {
   fixture: DataPlaneApiIntegrationFixture;
   organizationId: string;
   sandboxInstanceId: string;
-  providerRuntimeId: string;
+  providerSandboxId: string;
   instanceVolumeId: string;
 }): Promise<void> {
   await input.fixture.db.insert(sandboxInstances).values({
@@ -72,7 +72,7 @@ async function insertStoppedSandboxInstance(input: {
     sandboxProfileId: "sbp_resume_integration",
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
-    providerRuntimeId: input.providerRuntimeId,
+    providerSandboxId: input.providerSandboxId,
     instanceVolumeProvider: "docker",
     instanceVolumeId: input.instanceVolumeId,
     instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,
@@ -124,7 +124,7 @@ describe("sandboxInstances.resume integration", () => {
       fixture,
       organizationId: workflowInput.organizationId,
       sandboxInstanceId,
-      providerRuntimeId: "provider-runtime-resume-integration-001",
+      providerSandboxId: "provider-runtime-resume-integration-001",
       instanceVolumeId: "volume-resume-integration-001",
     });
 
@@ -182,7 +182,7 @@ describe("sandboxInstances.resume integration", () => {
       fixture,
       organizationId: workflowInput.organizationId,
       sandboxInstanceId,
-      providerRuntimeId: "provider-runtime-resume-integration-002",
+      providerSandboxId: "provider-runtime-resume-integration-002",
       instanceVolumeId: "volume-resume-integration-002",
     });
 

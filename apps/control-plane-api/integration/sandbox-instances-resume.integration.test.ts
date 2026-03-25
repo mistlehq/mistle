@@ -103,7 +103,7 @@ async function insertResumableSandboxInstance(input: {
     sandboxProfileId: "sbp_resume_integration",
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
-    providerRuntimeId: "provider-runtime-resume-integration",
+    providerSandboxId: "provider-runtime-resume-integration",
     instanceVolumeProvider: "docker",
     instanceVolumeId: `volume-${input.sandboxInstanceId}`,
     instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,

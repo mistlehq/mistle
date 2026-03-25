@@ -30,7 +30,7 @@ const ResumeSandboxFailureCodes = {
 type ResumableSandboxInstanceState = {
   sandboxInstanceId: string;
   runtimeProvider: SandboxProvider;
-  previousProviderRuntimeId: string | null;
+  previousProviderSandboxId: string | null;
   imageId: string;
   imageCreatedAt: string;
   instanceVolume: SandboxVolumeHandleV1;
@@ -53,7 +53,7 @@ async function resolveResumableSandboxInstanceState(input: {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
       runtimeProvider: true,
-      providerRuntimeId: true,
+      providerSandboxId: true,
       instanceVolumeProvider: true,
       instanceVolumeId: true,
       instanceVolumeMode: true,
@@ -112,7 +112,7 @@ async function resolveResumableSandboxInstanceState(input: {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     runtimeProvider: toSandboxProvider(sandboxInstance.runtimeProvider),
-    previousProviderRuntimeId: sandboxInstance.providerRuntimeId,
+    previousProviderSandboxId: sandboxInstance.providerSandboxId,
     imageId: runtimePlan.image.imageRef,
     imageCreatedAt: persistedRuntimePlan.createdAt,
     instanceVolume: {
@@ -158,12 +158,12 @@ export async function resumeSandboxInstance(
   async function handleFailedResume(input: {
     sandboxInstanceId: string;
     runtimeProvider?: SandboxProvider;
-    providerRuntimeId?: string;
+    providerSandboxId?: string;
     failureCode: string;
     failureMessage: string;
   }): Promise<void> {
     let destroySandboxError: unknown;
-    if (input.runtimeProvider !== undefined && input.providerRuntimeId !== undefined) {
+    if (input.runtimeProvider !== undefined && input.providerSandboxId !== undefined) {
       try {
         await destroySandbox(
           {
@@ -172,7 +172,7 @@ export async function resumeSandboxInstance(
           },
           {
             runtimeProvider: input.runtimeProvider,
-            providerRuntimeId: input.providerRuntimeId,
+            providerSandboxId: input.providerSandboxId,
           },
         );
       } catch (error) {
@@ -225,7 +225,7 @@ export async function resumeSandboxInstance(
 
   let resumedRuntime: {
     runtimeProvider: SandboxProvider;
-    providerRuntimeId: string;
+    providerSandboxId: string;
   };
   try {
     resumedRuntime = await resumeSandbox(
@@ -239,7 +239,7 @@ export async function resumeSandboxInstance(
         imageCreatedAt: resumableSandboxInstance.imageCreatedAt,
         instanceVolume: resumableSandboxInstance.instanceVolume,
         instanceVolumeMode: resumableSandboxInstance.instanceVolumeMode,
-        previousProviderRuntimeId: resumableSandboxInstance.previousProviderRuntimeId,
+        previousProviderSandboxId: resumableSandboxInstance.previousProviderSandboxId,
         runtimePlan: resumableSandboxInstance.runtimePlan,
       },
     );
@@ -259,14 +259,14 @@ export async function resumeSandboxInstance(
       },
       {
         sandboxInstanceId: input.sandboxInstanceId,
-        providerRuntimeId: resumedRuntime.providerRuntimeId,
+        providerSandboxId: resumedRuntime.providerSandboxId,
       },
     );
   } catch (error) {
     await handleFailedResume({
       sandboxInstanceId: input.sandboxInstanceId,
       runtimeProvider: resumedRuntime.runtimeProvider,
-      providerRuntimeId: resumedRuntime.providerRuntimeId,
+      providerSandboxId: resumedRuntime.providerSandboxId,
       failureCode: ResumeSandboxFailureCodes.PERSIST_RUNTIME_ATTACHMENT_FAILED,
       failureMessage: "Failed to persist resumed runtime attachment metadata.",
     });
@@ -290,7 +290,7 @@ export async function resumeSandboxInstance(
     await handleFailedResume({
       sandboxInstanceId: input.sandboxInstanceId,
       runtimeProvider: resumedRuntime.runtimeProvider,
-      providerRuntimeId: resumedRuntime.providerRuntimeId,
+      providerSandboxId: resumedRuntime.providerSandboxId,
       failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
       failureMessage: "Failed while waiting for resumed sandbox tunnel readiness.",
     });
@@ -301,7 +301,7 @@ export async function resumeSandboxInstance(
     await handleFailedResume({
       sandboxInstanceId: input.sandboxInstanceId,
       runtimeProvider: resumedRuntime.runtimeProvider,
-      providerRuntimeId: resumedRuntime.providerRuntimeId,
+      providerSandboxId: resumedRuntime.providerSandboxId,
       failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_TIMEOUT,
       failureMessage: "Timed out waiting for resumed sandbox tunnel readiness.",
     });
@@ -321,7 +321,7 @@ export async function resumeSandboxInstance(
     await handleFailedResume({
       sandboxInstanceId: input.sandboxInstanceId,
       runtimeProvider: resumedRuntime.runtimeProvider,
-      providerRuntimeId: resumedRuntime.providerRuntimeId,
+      providerSandboxId: resumedRuntime.providerSandboxId,
       failureCode: ResumeSandboxFailureCodes.STATUS_TRANSITION_TO_RUNNING_FAILED,
       failureMessage: "Failed to mark resumed sandbox instance as running.",
     });

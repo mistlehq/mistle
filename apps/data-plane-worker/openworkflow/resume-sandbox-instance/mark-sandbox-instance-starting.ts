@@ -13,7 +13,7 @@ export async function markSandboxInstanceStarting(ctx: {
     .update(sandboxInstances)
     .set({
       status: SandboxInstanceStatuses.STARTING,
-      providerRuntimeId: null,
+      providerSandboxId: null,
       stoppedAt: null,
       stopReason: null,
       failedAt: null,

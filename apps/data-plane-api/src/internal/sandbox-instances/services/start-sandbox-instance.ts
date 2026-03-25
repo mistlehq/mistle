@@ -107,7 +107,7 @@ export async function startSandboxInstance(
       sandboxProfileId: input.sandboxProfileId,
       sandboxProfileVersion: input.sandboxProfileVersion,
       runtimeProvider: ctx.sandboxProvider,
-      providerRuntimeId: null,
+      providerSandboxId: null,
       instanceVolumeProvider: null,
       instanceVolumeId: null,
       instanceVolumeMode: null,

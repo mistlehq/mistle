@@ -34,7 +34,7 @@ async function insertSandboxInstanceRow(input: {
     sandboxProfileId: "sbp_sandbox_presence_it",
     sandboxProfileVersion: 1,
     runtimeProvider: input.fixture.config.sandbox.provider,
-    providerRuntimeId: `provider-${input.sandboxInstanceId}`,
+    providerSandboxId: `provider-${input.sandboxInstanceId}`,
     status: SandboxInstanceStatuses.STARTING,
     startedByKind: "system",
     startedById: "workflow_sandbox_presence_it",

@@ -11,13 +11,13 @@ export async function persistSandboxInstanceRuntimeAttachment(
   },
   input: {
     sandboxInstanceId: string;
-    providerRuntimeId: string;
+    providerSandboxId: string;
   },
 ): Promise<void> {
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
-      providerRuntimeId: input.providerRuntimeId,
+      providerSandboxId: input.providerSandboxId,
       updatedAt: sql`now()`,
     })
     .where(
@@ -32,7 +32,7 @@ export async function persistSandboxInstanceRuntimeAttachment(
 
   if (updatedRows[0] === undefined) {
     throw new Error(
-      "Failed to persist provider runtime id while sandbox instance was still starting.",
+      "Failed to persist provider sandbox id while sandbox instance was still starting.",
     );
   }
 }
