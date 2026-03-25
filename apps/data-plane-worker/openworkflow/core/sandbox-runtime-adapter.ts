@@ -1,4 +1,10 @@
-import { createSandboxAdapter, SandboxProvider, type SandboxAdapter } from "@mistle/sandbox";
+import {
+  createSandboxAdapter,
+  createSandboxRuntimeControl as createProviderSandboxRuntimeControl,
+  SandboxProvider,
+  type SandboxAdapter,
+  type SandboxRuntimeControl,
+} from "@mistle/sandbox";
 
 import type { DataPlaneWorkerRuntimeConfig } from "./config.js";
 
@@ -7,12 +13,24 @@ function assertUnreachable(_value: never): never {
 }
 
 export function createSandboxRuntimeAdapter(config: DataPlaneWorkerRuntimeConfig): SandboxAdapter {
+  return createSandboxAdapter(createSandboxProviderConfig(config));
+}
+
+export function createSandboxRuntimeControl(
+  config: DataPlaneWorkerRuntimeConfig,
+): SandboxRuntimeControl {
+  return createProviderSandboxRuntimeControl(createSandboxProviderConfig(config));
+}
+
+function createSandboxProviderConfig(
+  config: DataPlaneWorkerRuntimeConfig,
+): Parameters<typeof createSandboxAdapter>[0] {
   if (config.sandbox.provider === SandboxProvider.MODAL) {
     if (config.app.sandbox.modal === undefined) {
       throw new Error("Expected data-plane worker modal sandbox config for global provider modal.");
     }
 
-    return createSandboxAdapter({
+    return {
       provider: config.sandbox.provider,
       modal: {
         tokenId: config.app.sandbox.modal.tokenId,
@@ -20,7 +38,7 @@ export function createSandboxRuntimeAdapter(config: DataPlaneWorkerRuntimeConfig
         appName: config.app.sandbox.modal.appName,
         environmentName: config.app.sandbox.modal.environmentName,
       },
-    });
+    };
   }
 
   if (config.sandbox.provider === "docker") {
@@ -30,7 +48,7 @@ export function createSandboxRuntimeAdapter(config: DataPlaneWorkerRuntimeConfig
       );
     }
 
-    return createSandboxAdapter({
+    return {
       provider: config.sandbox.provider,
       docker: {
         socketPath: config.app.sandbox.docker.socketPath,
@@ -38,7 +56,7 @@ export function createSandboxRuntimeAdapter(config: DataPlaneWorkerRuntimeConfig
           ? {}
           : { networkName: config.app.sandbox.docker.networkName }),
       },
-    });
+    };
   }
 
   return assertUnreachable(config.sandbox.provider);

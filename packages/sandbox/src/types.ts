@@ -27,6 +27,11 @@ export interface SandboxHandle {
   closeStdin(): Promise<void>;
 }
 
+export interface SandboxRuntimeControl {
+  applyStartup(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void>;
+  close(): Promise<void>;
+}
+
 export interface SandboxVolumeMountV1 {
   readonly volume: SandboxVolumeHandleV1;
   readonly mountPath: string;

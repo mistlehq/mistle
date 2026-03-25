@@ -3,7 +3,6 @@ import {
   sandboxInstances,
   SandboxStopReasons,
   SandboxInstanceStatuses,
-  SandboxInstanceVolumeModes,
 } from "@mistle/db/data-plane";
 import {
   DATA_PLANE_MIGRATIONS_FOLDER_PATH,
@@ -77,9 +76,6 @@ describe("resume sandbox instance state integration", () => {
         sandboxProfileVersion: 1,
         runtimeProvider: "docker",
         providerSandboxId: "provider-runtime-old",
-        instanceVolumeProvider: "docker",
-        instanceVolumeId: "instance-volume-resume-state",
-        instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,
         status: SandboxInstanceStatuses.STOPPED,
         startedByKind: "system",
         startedById: "worker_resume_state_integration",
@@ -151,9 +147,6 @@ describe("resume sandbox instance state integration", () => {
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
       providerSandboxId: "provider-runtime-failed",
-      instanceVolumeProvider: "docker",
-      instanceVolumeId: "instance-volume-resume-failed-state",
-      instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,
       status: SandboxInstanceStatuses.FAILED,
       startedByKind: "system",
       startedById: "worker_resume_failed_state_integration",
