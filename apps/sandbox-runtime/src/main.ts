@@ -1,13 +1,19 @@
-import { runRuntime } from "./runtime/run.js";
+import { fileURLToPath } from "node:url";
+
+import { runRuntimeCommand } from "./cli/run-runtime-command.js";
 
 function lookupEnv(key: string): string | undefined {
   return process.env[key];
 }
 
 async function main(): Promise<void> {
-  await runRuntime({
+  await runRuntimeCommand({
     lookupEnv,
+    processArgv: process.argv,
+    processExecArgv: process.execArgv,
+    currentEntrypointPath: fileURLToPath(import.meta.url),
     stdin: process.stdin,
+    stderr: process.stderr,
   });
 }
 

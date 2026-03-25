@@ -23,10 +23,6 @@ function createStartupInputJson(tunnelGatewayWsUrl: string): string {
     "bootstrapToken": "test-token",
     "tunnelExchangeToken": "test-exchange-token",
     "tunnelGatewayWsUrl": "${tunnelGatewayWsUrl}",
-    "instanceVolume": {
-      "mode": "native",
-      "state": "new"
-    },
     "runtimePlan": {
       "sandboxProfileId": "sbp_123",
       "version": 1,

@@ -32,10 +32,10 @@ RUN groupadd --gid "${SANDBOX_GID}" "${SANDBOX_USER}" \
     /run/mistle \
     /var/lib/mistle/artifacts \
     /var/lib/mistle/bin \
+  && chmod 0700 /run/mistle \
   && chown -R "${SANDBOX_UID}:${SANDBOX_GID}" \
     /etc/codex \
     /home/${SANDBOX_USER} \
-    /run/mistle \
     /var/lib/mistle
 
 RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PATH="/usr/local/bin/mise" sh
@@ -67,4 +67,4 @@ RUN chmod +x \
   /usr/local/bin/sandbox-bootstrap \
   /usr/local/bin/sandboxd
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandbox-bootstrap"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandboxd", "serve"]
