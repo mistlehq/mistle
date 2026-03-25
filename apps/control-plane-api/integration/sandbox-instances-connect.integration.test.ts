@@ -66,7 +66,7 @@ async function insertSandboxInstance(input: {
   organizationId: string;
   sandboxInstanceId: string;
   status: "starting" | "running" | "stopped" | "failed";
-  providerRuntimeId?: string | null;
+  providerSandboxId?: string | null;
   failureCode?: string | null;
   failureMessage?: string | null;
 }) {
@@ -76,7 +76,7 @@ async function insertSandboxInstance(input: {
     sandboxProfileId: "sbp_connect_integration",
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
-    providerRuntimeId: input.providerRuntimeId ?? "provider-runtime-connect-001",
+    providerSandboxId: input.providerSandboxId ?? "provider-runtime-connect-001",
     instanceVolumeProvider: "docker",
     instanceVolumeId: `volume-${input.sandboxInstanceId}`,
     instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,
