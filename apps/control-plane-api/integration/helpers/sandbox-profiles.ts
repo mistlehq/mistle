@@ -32,13 +32,14 @@ export function createSandboxProfileVersionFixture(input: {
 }
 
 export function createIntegrationTargetFixture(input: {
+  familyId?: string;
   targetKey: string;
   variantId: string;
   enabled: boolean;
 }) {
   return {
     targetKey: input.targetKey,
-    familyId: "openai",
+    familyId: input.familyId ?? "openai",
     variantId: input.variantId,
     enabled: input.enabled,
     config: {
@@ -77,5 +78,53 @@ export function createSandboxProfileVersionIntegrationBindingFixture(input: {
     connectionId: input.connectionId,
     kind: input.kind,
     config: {},
+  };
+}
+
+export function createSandboxProfileGraphFixtures(input: {
+  organizationId: string;
+  profiles: ReadonlyArray<{
+    id: string;
+    displayName: string;
+    createdAt: string;
+    updatedAt?: string;
+    versions: readonly number[];
+    bindings?: ReadonlyArray<{
+      connectionId: string;
+      id: string;
+      kind: IntegrationBindingKind;
+      sandboxProfileVersion: number;
+    }>;
+  }>;
+}) {
+  return {
+    sandboxProfiles: input.profiles.map((profile) =>
+      createSandboxProfileFixture({
+        id: profile.id,
+        organizationId: input.organizationId,
+        displayName: profile.displayName,
+        createdAt: profile.createdAt,
+        ...(profile.updatedAt === undefined ? {} : { updatedAt: profile.updatedAt }),
+      }),
+    ),
+    sandboxProfileVersions: input.profiles.flatMap((profile) =>
+      profile.versions.map((version) =>
+        createSandboxProfileVersionFixture({
+          sandboxProfileId: profile.id,
+          version,
+        }),
+      ),
+    ),
+    sandboxProfileVersionIntegrationBindings: input.profiles.flatMap((profile) =>
+      (profile.bindings ?? []).map((binding) =>
+        createSandboxProfileVersionIntegrationBindingFixture({
+          id: binding.id,
+          sandboxProfileId: profile.id,
+          sandboxProfileVersion: binding.sandboxProfileVersion,
+          connectionId: binding.connectionId,
+          kind: binding.kind,
+        }),
+      ),
+    ),
   };
 }

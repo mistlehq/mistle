@@ -11,11 +11,9 @@ import { describe, expect } from "vitest";
 
 import { ListAutomationApplicableSandboxProfilesResponseSchema } from "../src/sandbox-profiles/index.js";
 import {
+  createSandboxProfileGraphFixtures,
   createIntegrationConnectionFixture,
   createIntegrationTargetFixture,
-  createSandboxProfileFixture,
-  createSandboxProfileVersionFixture,
-  createSandboxProfileVersionIntegrationBindingFixture,
 } from "./helpers/sandbox-profiles.js";
 import { it } from "./test-context.js";
 
@@ -27,78 +25,101 @@ describe("sandbox profiles automation applicable integration", () => {
       email: "integration-sandbox-profiles-automation-applicable@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values([
-      createSandboxProfileFixture({
-        id: "sbp_automation_applicable",
-        organizationId: authenticatedSession.organizationId,
-        displayName: "Automation Applicable",
-        createdAt: "2026-01-05T00:00:00.000Z",
-      }),
-      createSandboxProfileFixture({
-        id: "sbp_automation_old_only",
-        organizationId: authenticatedSession.organizationId,
-        displayName: "Old Version Only",
-        createdAt: "2026-01-04T00:00:00.000Z",
-      }),
-      createSandboxProfileFixture({
-        id: "sbp_automation_disabled_target",
-        organizationId: authenticatedSession.organizationId,
-        displayName: "Disabled Target",
-        createdAt: "2026-01-03T00:00:00.000Z",
-      }),
-      createSandboxProfileFixture({
-        id: "sbp_automation_inactive_connection",
-        organizationId: authenticatedSession.organizationId,
-        displayName: "Inactive Connection",
-        createdAt: "2026-01-02T00:00:00.000Z",
-      }),
-      createSandboxProfileFixture({
-        id: "sbp_automation_non_webhook_target",
-        organizationId: authenticatedSession.organizationId,
-        displayName: "Non Webhook Target",
-        createdAt: "2026-01-01T00:00:00.000Z",
-      }),
-    ]);
+    const profileGraph = createSandboxProfileGraphFixtures({
+      organizationId: authenticatedSession.organizationId,
+      profiles: [
+        {
+          id: "sbp_automation_applicable",
+          displayName: "Automation Applicable",
+          createdAt: "2026-01-05T00:00:00.000Z",
+          versions: [1, 2],
+          bindings: [
+            {
+              id: "ibd_automation_applicable_github",
+              sandboxProfileVersion: 2,
+              connectionId: "icn_automation_github",
+              kind: IntegrationBindingKinds.CONNECTOR,
+            },
+            {
+              id: "ibd_automation_applicable_slack",
+              sandboxProfileVersion: 2,
+              connectionId: "icn_automation_slack",
+              kind: IntegrationBindingKinds.CONNECTOR,
+            },
+          ],
+        },
+        {
+          id: "sbp_automation_old_only",
+          displayName: "Old Version Only",
+          createdAt: "2026-01-04T00:00:00.000Z",
+          versions: [1, 2],
+          bindings: [
+            {
+              id: "ibd_automation_old_only_v1",
+              sandboxProfileVersion: 1,
+              connectionId: "icn_automation_github",
+              kind: IntegrationBindingKinds.CONNECTOR,
+            },
+          ],
+        },
+        {
+          id: "sbp_automation_disabled_target",
+          displayName: "Disabled Target",
+          createdAt: "2026-01-03T00:00:00.000Z",
+          versions: [1],
+          bindings: [
+            {
+              id: "ibd_automation_disabled_target_v1",
+              sandboxProfileVersion: 1,
+              connectionId: "icn_automation_disabled_target",
+              kind: IntegrationBindingKinds.CONNECTOR,
+            },
+          ],
+        },
+        {
+          id: "sbp_automation_inactive_connection",
+          displayName: "Inactive Connection",
+          createdAt: "2026-01-02T00:00:00.000Z",
+          versions: [1],
+          bindings: [
+            {
+              id: "ibd_automation_inactive_connection_v1",
+              sandboxProfileVersion: 1,
+              connectionId: "icn_automation_inactive",
+              kind: IntegrationBindingKinds.CONNECTOR,
+            },
+          ],
+        },
+        {
+          id: "sbp_automation_non_webhook_target",
+          displayName: "Non Webhook Target",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          versions: [1],
+          bindings: [
+            {
+              id: "ibd_automation_non_webhook_target_v1",
+              sandboxProfileVersion: 1,
+              connectionId: "icn_automation_openai",
+              kind: IntegrationBindingKinds.CONNECTOR,
+            },
+          ],
+        },
+      ],
+    });
 
-    await fixture.db.insert(sandboxProfileVersions).values([
-      createSandboxProfileVersionFixture({
-        sandboxProfileId: "sbp_automation_applicable",
-        version: 1,
-      }),
-      createSandboxProfileVersionFixture({
-        sandboxProfileId: "sbp_automation_applicable",
-        version: 2,
-      }),
-      createSandboxProfileVersionFixture({
-        sandboxProfileId: "sbp_automation_old_only",
-        version: 1,
-      }),
-      createSandboxProfileVersionFixture({
-        sandboxProfileId: "sbp_automation_old_only",
-        version: 2,
-      }),
-      createSandboxProfileVersionFixture({
-        sandboxProfileId: "sbp_automation_disabled_target",
-        version: 1,
-      }),
-      createSandboxProfileVersionFixture({
-        sandboxProfileId: "sbp_automation_inactive_connection",
-        version: 1,
-      }),
-      createSandboxProfileVersionFixture({
-        sandboxProfileId: "sbp_automation_non_webhook_target",
-        version: 1,
-      }),
-    ]);
+    await fixture.db.insert(sandboxProfiles).values(profileGraph.sandboxProfiles);
+    await fixture.db.insert(sandboxProfileVersions).values(profileGraph.sandboxProfileVersions);
 
     await fixture.db.insert(integrationTargets).values([
       createIntegrationTargetFixture({
         targetKey: "github-automation-applicable",
+        familyId: "github",
         variantId: "github-cloud",
         enabled: true,
       }),
       createIntegrationTargetFixture({
         targetKey: "slack-automation-applicable",
+        familyId: "slack",
         variantId: "slack-default",
         enabled: true,
       }),
@@ -109,6 +130,7 @@ describe("sandbox profiles automation applicable integration", () => {
       }),
       createIntegrationTargetFixture({
         targetKey: "openai-automation-applicable",
+        familyId: "openai",
         variantId: "openai-default",
         enabled: true,
       }),
@@ -152,50 +174,9 @@ describe("sandbox profiles automation applicable integration", () => {
       }),
     ]);
 
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_automation_applicable_github",
-        sandboxProfileId: "sbp_automation_applicable",
-        sandboxProfileVersion: 2,
-        connectionId: "icn_automation_github",
-        kind: IntegrationBindingKinds.CONNECTOR,
-      }),
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_automation_applicable_slack",
-        sandboxProfileId: "sbp_automation_applicable",
-        sandboxProfileVersion: 2,
-        connectionId: "icn_automation_slack",
-        kind: IntegrationBindingKinds.CONNECTOR,
-      }),
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_automation_old_only_v1",
-        sandboxProfileId: "sbp_automation_old_only",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_automation_github",
-        kind: IntegrationBindingKinds.CONNECTOR,
-      }),
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_automation_disabled_target_v1",
-        sandboxProfileId: "sbp_automation_disabled_target",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_automation_disabled_target",
-        kind: IntegrationBindingKinds.CONNECTOR,
-      }),
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_automation_inactive_connection_v1",
-        sandboxProfileId: "sbp_automation_inactive_connection",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_automation_inactive",
-        kind: IntegrationBindingKinds.CONNECTOR,
-      }),
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_automation_non_webhook_target_v1",
-        sandboxProfileId: "sbp_automation_non_webhook_target",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_automation_openai",
-        kind: IntegrationBindingKinds.CONNECTOR,
-      }),
-    ]);
+    await fixture.db
+      .insert(sandboxProfileVersionIntegrationBindings)
+      .values(profileGraph.sandboxProfileVersionIntegrationBindings);
 
     const response = await fixture.request("/v1/sandbox/profiles/automation-applicable", {
       headers: {

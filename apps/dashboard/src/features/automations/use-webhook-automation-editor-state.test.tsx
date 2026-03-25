@@ -1,38 +1,20 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { createAutomationApplicableSandboxProfileFixture } from "../../test-support/automations.js";
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import {
   resolveSelectedProfileTriggerState,
   useLoadedWebhookAutomationEditorState,
 } from "./use-webhook-automation-editor-state.js";
 
-function createAutomationApplicableProfile(input?: {
-  eligibleIntegrationConnectionIds?: string[];
-}) {
-  return {
-    id: "sbp_123",
-    organizationId: "org_123",
-    displayName: "Support Agent",
-    status: "active" as const,
-    latestVersion: 3,
-    eligibleIntegrationConnectionIds: input?.eligibleIntegrationConnectionIds ?? [],
-    createdAt: "2026-03-24T00:00:00.000Z",
-    updatedAt: "2026-03-24T00:00:00.000Z",
-  };
-}
-
 describe("useLoadedWebhookAutomationEditorState", () => {
   it("renders in create mode with loaded prerequisites", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: Number.POSITIVE_INFINITY,
-        },
-      },
+    const queryClient = createTestQueryClient({
+      staleTime: Number.POSITIVE_INFINITY,
     });
 
     const { result } = renderHook(
@@ -83,7 +65,13 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   it("marks profiles without trigger-capable bindings as unavailable for automations", () => {
     expect(
       resolveSelectedProfileTriggerState({
-        selectedProfile: createAutomationApplicableProfile(),
+        selectedProfile: createAutomationApplicableSandboxProfileFixture({
+          displayName: "Support Agent",
+          latestVersion: 3,
+          createdAt: "2026-03-24T00:00:00.000Z",
+          updatedAt: "2026-03-24T00:00:00.000Z",
+          eligibleIntegrationConnectionIds: [],
+        }),
       }).disabledReason,
     ).toBe("The selected profile has no bindings with automation triggers.");
   });
@@ -91,7 +79,11 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   it("enables trigger selection when the selected profile exposes eligible connections", () => {
     expect(
       resolveSelectedProfileTriggerState({
-        selectedProfile: createAutomationApplicableProfile({
+        selectedProfile: createAutomationApplicableSandboxProfileFixture({
+          displayName: "Support Agent",
+          latestVersion: 3,
+          createdAt: "2026-03-24T00:00:00.000Z",
+          updatedAt: "2026-03-24T00:00:00.000Z",
           eligibleIntegrationConnectionIds: ["conn_linear"],
         }),
       }),

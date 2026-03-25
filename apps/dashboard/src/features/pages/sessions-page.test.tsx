@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
 
-import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
+import { renderPageToStaticMarkup, renderPageWithClient } from "../../test-support/page-render.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import {
@@ -62,13 +61,10 @@ describe("SessionsPage", () => {
     const queryClient = createTestQueryClient();
     seedAuthenticatedSession(queryClient);
 
-    const rendered = render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
-          <SessionsPage />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    const rendered = renderPageWithClient({
+      queryClient,
+      element: <SessionsPage />,
+    });
 
     try {
       expect(screen.getByText("Start a new session")).toBeDefined();
@@ -87,13 +83,10 @@ describe("SessionsPage", () => {
     const queryClient = createTestQueryClient();
     seedAuthenticatedSession(queryClient);
 
-    const markup = renderToStaticMarkup(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
-          <SessionsPage />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    const markup = renderPageToStaticMarkup({
+      queryClient,
+      element: <SessionsPage />,
+    });
 
     expect(markup).toContain('data-slot="table" class="w-full caption-bottom text-sm table-fixed"');
     expect(markup).toContain("bg-muted/60");
@@ -139,13 +132,10 @@ describe("SessionsPage", () => {
       },
     );
 
-    const markup = renderToStaticMarkup(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
-          <SessionsPage />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    const markup = renderPageToStaticMarkup({
+      queryClient,
+      element: <SessionsPage />,
+    });
 
     expect(markup).toContain("Showing 1 of 1");
     expect(markup).not.toContain(">Previous<");

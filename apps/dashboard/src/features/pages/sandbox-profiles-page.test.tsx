@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
 
-import { QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter } from "react-router";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { renderPageToStaticMarkup, renderPageWithClient } from "../../test-support/page-render.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxProfilesListQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { SandboxProfilesListResult } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -42,13 +40,10 @@ describe("SandboxProfilesPage", () => {
       listResult,
     );
 
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
-          <SandboxProfilesPage />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    renderPageWithClient({
+      queryClient,
+      element: <SandboxProfilesPage />,
+    });
 
     expect(screen.queryByRole("heading", { name: "Create profile" })).toBeNull();
 
@@ -92,13 +87,10 @@ describe("SandboxProfilesPage", () => {
       listResult,
     );
 
-    const markup = renderToStaticMarkup(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
-          <SandboxProfilesPage />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    const markup = renderPageToStaticMarkup({
+      queryClient,
+      element: <SandboxProfilesPage />,
+    });
 
     expect(markup).toContain("min-w-[32rem] table-fixed");
     expect(markup).toContain("bg-muted/60");
@@ -135,13 +127,10 @@ describe("SandboxProfilesPage", () => {
       listResult,
     );
 
-    const markup = renderToStaticMarkup(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
-          <SandboxProfilesPage />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    const markup = renderPageToStaticMarkup({
+      queryClient,
+      element: <SandboxProfilesPage />,
+    });
 
     expect(markup).toContain("Showing 1 of 1");
     expect(markup).not.toContain(">Previous<");
