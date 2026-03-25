@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildWebhookAutomationListItems,
   buildWebhookAutomationEventOptions,
   buildWebhookAutomationSandboxProfileOptions,
   createWebhookAutomationTriggerId,
+  formatWebhookAutomationUpdatedAt,
   resolveEligibleProfileAutomationConnectionIds,
 } from "./webhook-automation-list-helpers.js";
 
@@ -230,6 +232,171 @@ describe("buildWebhookAutomationSandboxProfileOptions", () => {
       {
         value: "sbp_1",
         label: "Repo Maintainer",
+      },
+    ]);
+  });
+});
+
+describe("buildWebhookAutomationListItems", () => {
+  it("resolves event labels and logos from integration target metadata", () => {
+    expect(
+      buildWebhookAutomationListItems({
+        automations: [
+          {
+            id: "atm_1",
+            kind: "webhook",
+            name: "PR triage",
+            enabled: true,
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+            integrationConnectionId: "conn_github",
+            eventTypes: ["github.pull_request.opened"],
+            payloadFilter: null,
+            inputTemplate: "template",
+            conversationKeyTemplate: "conversation-key",
+            idempotencyKeyTemplate: null,
+            target: {
+              id: "atg_1",
+              sandboxProfileId: "sbp_1",
+              sandboxProfileVersion: 1,
+            },
+          },
+        ],
+        connections: [
+          {
+            id: "conn_github",
+            targetKey: "github-cloud",
+            displayName: "GitHub Engineering",
+            status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        targets: [
+          {
+            targetKey: "github-cloud",
+            familyId: "github",
+            variantId: "github-cloud",
+            enabled: true,
+            config: {},
+            displayName: "GitHub",
+            description: "GitHub Cloud",
+            logoKey: "github",
+            supportedWebhookEvents: [
+              {
+                eventType: "github.pull_request.opened",
+                providerEventType: "pull_request",
+                displayName: "Pull request opened",
+                category: "Pull requests",
+              },
+            ],
+            targetHealth: {
+              configStatus: "valid",
+            },
+          },
+        ],
+        sandboxProfiles: [
+          {
+            id: "sbp_1",
+            organizationId: "org_1",
+            displayName: "Repo Maintainer",
+            status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        id: "atm_1",
+        name: "PR triage",
+        sandboxProfileName: "Repo Maintainer",
+        events: [
+          {
+            label: "Pull request opened",
+            logoKey: "github",
+          },
+        ],
+        updatedAtLabel: formatWebhookAutomationUpdatedAt("2026-03-16T10:00:00.000Z"),
+        enabled: true,
+      },
+    ]);
+  });
+
+  it("falls back to a target logo for all-events automations", () => {
+    expect(
+      buildWebhookAutomationListItems({
+        automations: [
+          {
+            id: "atm_2",
+            kind: "webhook",
+            name: "Everything listener",
+            enabled: false,
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+            integrationConnectionId: "conn_github",
+            eventTypes: null,
+            payloadFilter: null,
+            inputTemplate: "template",
+            conversationKeyTemplate: "conversation-key",
+            idempotencyKeyTemplate: null,
+            target: {
+              id: "atg_2",
+              sandboxProfileId: "sbp_1",
+              sandboxProfileVersion: 1,
+            },
+          },
+        ],
+        connections: [
+          {
+            id: "conn_github",
+            targetKey: "github-cloud",
+            displayName: "GitHub Engineering",
+            status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        targets: [
+          {
+            targetKey: "github-cloud",
+            familyId: "github",
+            variantId: "github-cloud",
+            enabled: true,
+            config: {},
+            displayName: "GitHub",
+            description: "GitHub Cloud",
+            logoKey: "github",
+            supportedWebhookEvents: [],
+            targetHealth: {
+              configStatus: "valid",
+            },
+          },
+        ],
+        sandboxProfiles: [
+          {
+            id: "sbp_1",
+            organizationId: "org_1",
+            displayName: "Repo Maintainer",
+            status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        id: "atm_2",
+        name: "Everything listener",
+        sandboxProfileName: "Repo Maintainer",
+        events: [
+          {
+            label: "All events",
+            logoKey: "github",
+          },
+        ],
+        updatedAtLabel: formatWebhookAutomationUpdatedAt("2026-03-16T10:00:00.000Z"),
+        enabled: false,
       },
     ]);
   });

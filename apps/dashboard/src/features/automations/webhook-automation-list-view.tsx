@@ -12,17 +12,23 @@ import {
   TableRow,
 } from "@mistle/ui";
 
+import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { useWebhookAutomationListState } from "./use-webhook-automation-list-state.js";
 import { WebhookAutomationListToolbar } from "./webhook-automation-list-toolbar.js";
 
+export type WebhookAutomationListItemEventViewModel = {
+  label: string;
+  logoKey?: string;
+  unavailable?: boolean;
+};
+
 export type WebhookAutomationListItemViewModel = {
   id: string;
   name: string;
-  integrationConnectionName: string;
   sandboxProfileName: string;
-  eventSummary: string;
+  events: readonly WebhookAutomationListItemEventViewModel[];
   updatedAtLabel: string;
   enabled: boolean;
 };
@@ -80,6 +86,40 @@ function LoadingState(): React.JSX.Element {
   );
 }
 
+function EventList(input: {
+  events: readonly WebhookAutomationListItemEventViewModel[];
+}): React.JSX.Element {
+  const [firstEvent, ...remainingEvents] = input.events;
+
+  if (firstEvent === undefined) {
+    return <span className="text-muted-foreground">No events</span>;
+  }
+
+  const title = input.events
+    .map((event) => `${event.label}${event.unavailable === true ? " (Unavailable)" : ""}`)
+    .join(", ");
+
+  return (
+    <div className="flex items-center gap-2" title={title}>
+      {firstEvent.logoKey === undefined ? null : (
+        <img
+          alt=""
+          aria-hidden
+          className="size-4 shrink-0"
+          src={resolveIntegrationLogoPath({ logoKey: firstEvent.logoKey })}
+        />
+      )}
+      <span className="truncate">{firstEvent.label}</span>
+      {firstEvent.unavailable === true ? (
+        <span className="text-destructive text-xs whitespace-nowrap">Unavailable</span>
+      ) : null}
+      {remainingEvents.length === 0 ? null : (
+        <span className="text-muted-foreground shrink-0 text-xs">+{remainingEvents.length}</span>
+      )}
+    </div>
+  );
+}
+
 export function WebhookAutomationListView(
   input: WebhookAutomationListViewProps,
 ): React.JSX.Element {
@@ -115,19 +155,15 @@ export function WebhookAutomationListView(
 
           <Table className="min-w-[56rem] table-fixed">
             <colgroup>
-              <col className="w-[30%]" />
-              <col className="w-[24%]" />
-              <col className="w-[18%]" />
-              <col className="w-[18%]" />
-              <col className="w-[10%]" />
+              <col className="w-[34%]" />
+              <col className="w-[22%]" />
+              <col className="w-[32%]" />
+              <col className="w-[12%]" />
             </colgroup>
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Automation
-                </TableHead>
-                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-                  Connection
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Target
@@ -143,7 +179,7 @@ export function WebhookAutomationListView(
             <TableBody>
               {visibleItems.length === 0 ? (
                 <TableRow>
-                  <TableCell className="text-muted-foreground" colSpan={5}>
+                  <TableCell className="text-muted-foreground" colSpan={4}>
                     {hasItems
                       ? "No automations match the current search or filter."
                       : "No automations have been created yet."}
@@ -172,10 +208,9 @@ export function WebhookAutomationListView(
                       </button>
                     </div>
                   </TableCell>
-                  <TableCell>{item.integrationConnectionName}</TableCell>
                   <TableCell>{item.sandboxProfileName}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {item.eventSummary}
+                    <EventList events={item.events} />
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {item.updatedAtLabel}

@@ -79,9 +79,8 @@ export function filterWebhookAutomationListItems(input: {
 
     return (
       includesSearchValue(item.name, searchValue) ||
-      includesSearchValue(item.integrationConnectionName, searchValue) ||
       includesSearchValue(item.sandboxProfileName, searchValue) ||
-      includesSearchValue(item.eventSummary, searchValue) ||
+      item.events.some((event) => includesSearchValue(event.label, searchValue)) ||
       includesSearchValue(item.enabled ? "enabled" : "disabled", searchValue)
     );
   });

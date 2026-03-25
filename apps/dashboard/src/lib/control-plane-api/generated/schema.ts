@@ -2334,7 +2334,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "NOT_FOUND";
+              code: "INSTANCE_NOT_FOUND";
               message: string;
             };
           };
@@ -2444,7 +2444,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "NOT_FOUND";
+              code: "INSTANCE_NOT_FOUND";
               message: string;
             };
           };
@@ -2572,7 +2572,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "NOT_FOUND";
+              code: "INSTANCE_NOT_FOUND";
               message: string;
             };
           };

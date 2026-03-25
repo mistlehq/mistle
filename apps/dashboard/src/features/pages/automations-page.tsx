@@ -51,6 +51,7 @@ export function AutomationsPage(): React.JSX.Element {
       : buildWebhookAutomationListItems({
           automations: automationsQuery.data.items,
           connections: prerequisites.integrationDirectoryQuery.data.connections,
+          targets: prerequisites.integrationDirectoryQuery.data.targets,
           sandboxProfiles: prerequisites.sandboxProfilesQuery.data,
         });
 

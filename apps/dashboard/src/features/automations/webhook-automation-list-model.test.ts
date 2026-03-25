@@ -11,18 +11,29 @@ const SampleItems: readonly WebhookAutomationListItemViewModel[] = [
   {
     id: "aut_01",
     name: "GitHub pushes to repo triage",
-    integrationConnectionName: "GitHub Engineering",
     sandboxProfileName: "Repo Maintainer",
-    eventSummary: "push, pull_request, issues",
+    events: [
+      {
+        label: "Pull request opened",
+        logoKey: "github",
+      },
+      {
+        label: "Issue comment created",
+        logoKey: "github",
+      },
+    ],
     updatedAtLabel: "6 min ago",
     enabled: true,
   },
   {
     id: "aut_02",
     name: "Stripe payouts incident intake",
-    integrationConnectionName: "Stripe Production",
     sandboxProfileName: "Finance Investigator",
-    eventSummary: "payout.failed",
+    events: [
+      {
+        label: "Payout failed",
+      },
+    ],
     updatedAtLabel: "1 day ago",
     enabled: false,
   },
