@@ -4,7 +4,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
   clearStoredResumeIdempotencyKey,
@@ -20,9 +19,7 @@ import {
   resolveStoppedSessionMessageForEntryPhase,
   seedSandboxInstanceStatusQuery,
   shouldClearStoredResumeIdempotencyKey,
-  shouldPollStoppedSandboxStatus,
   shouldShowResumeInFlightState,
-  shouldRetainResumeRetryWindowAfterError,
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
@@ -421,29 +418,6 @@ describe("useSessionWorkbenchController", () => {
     ).toBe("sandbox_failed");
   });
 
-  it("polls stopped sandbox status only while resume policy is active", () => {
-    expect(
-      shouldPollStoppedSandboxStatus({
-        hasResumePolicy: true,
-        sandboxStatus: "stopped",
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldPollStoppedSandboxStatus({
-        hasResumePolicy: false,
-        sandboxStatus: "stopped",
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldPollStoppedSandboxStatus({
-        hasResumePolicy: true,
-        sandboxStatus: "starting",
-      }),
-    ).toBe(false);
-  });
-
   it("shows resume progress only while resume intent or request is active", () => {
     expect(
       shouldShowResumeInFlightState({
@@ -467,31 +441,6 @@ describe("useSessionWorkbenchController", () => {
         isResumingStoppedSandbox: false,
         sandboxStatus: "stopped",
       }),
-    ).toBe(false);
-  });
-
-  it("retains the retry window only for ambiguous or server-side resume failures", () => {
-    expect(shouldRetainResumeRetryWindowAfterError(new Error("network failure"))).toBe(true);
-    expect(
-      shouldRetainResumeRetryWindowAfterError(
-        new SandboxProfilesApiError({
-          operation: "resumeSandboxInstance",
-          status: 500,
-          body: null,
-          message: "Server error",
-        }),
-      ),
-    ).toBe(true);
-
-    expect(
-      shouldRetainResumeRetryWindowAfterError(
-        new SandboxProfilesApiError({
-          operation: "resumeSandboxInstance",
-          status: 409,
-          body: null,
-          message: "Conflict",
-        }),
-      ),
     ).toBe(false);
   });
 
