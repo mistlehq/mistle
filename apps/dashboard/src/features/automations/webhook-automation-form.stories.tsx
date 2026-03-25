@@ -24,10 +24,6 @@ const PullRequestOpenedTriggerId = createWebhookAutomationTriggerId({
   connectionId: GitHubConnectionId,
   eventType: "github.pull_request.opened",
 });
-const StripePayoutFailedTriggerId = createWebhookAutomationTriggerId({
-  connectionId: StripeConnectionId,
-  eventType: "stripe.payout.failed",
-});
 const PushDeletedTriggerId = createWebhookAutomationTriggerId({
   connectionId: GitHubConnectionId,
   eventType: "github.push.deleted",
@@ -375,25 +371,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Create: Story = {
-  args: {
-    mode: "create",
-    triggerPickerDisabledReason: "Select a sandbox profile to choose triggers.",
-    values: EmptyCreateValues,
-  },
-};
-
-export const CreateWithDraftName: Story = {
-  args: {
-    mode: "create",
-    triggerPickerDisabledReason: "Select a sandbox profile to choose triggers.",
-    values: {
-      ...EmptyCreateValues,
-      name: "Repo automation draft",
-    },
-  },
-};
-
 export const CreatePageLayout: Story = {
   args: {
     mode: "create",
@@ -406,32 +383,6 @@ export const CreatePageLayout: Story = {
         <StoryHarness {...args} />
       </FormPageShell>
     );
-  },
-};
-
-export const Edit: Story = {
-  args: {
-    mode: "edit",
-    onDelete: function onDelete() {},
-    values: {
-      ...ExistingAutomationValues,
-      enabled: false,
-      triggerIds: [StripePayoutFailedTriggerId],
-      name: "Stripe payouts incident intake",
-      sandboxProfileId: "sbp_finance_investigator",
-      triggerParameterValues: {},
-    },
-    webhookEventOptions: [
-      {
-        id: StripePayoutFailedTriggerId,
-        eventType: "stripe.payout.failed",
-        connectionId: StripeConnectionId,
-        connectionLabel: "Stripe Production",
-        label: "Payout failed",
-        category: "Stripe Production / Payouts",
-        logoKey: "stripe",
-      },
-    ],
   },
 };
 
