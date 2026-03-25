@@ -400,6 +400,91 @@ describe("buildWebhookAutomationListItems", () => {
       },
     ]);
   });
+
+  it("preserves event labels for saved automations on inactive connections", () => {
+    expect(
+      buildWebhookAutomationListItems({
+        automations: [
+          {
+            id: "atm_3",
+            kind: "webhook",
+            name: "Inactive connection automation",
+            enabled: true,
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+            integrationConnectionId: "conn_github",
+            eventTypes: ["github.pull_request.opened"],
+            payloadFilter: null,
+            inputTemplate: "template",
+            conversationKeyTemplate: "conversation-key",
+            idempotencyKeyTemplate: null,
+            target: {
+              id: "atg_3",
+              sandboxProfileId: "sbp_1",
+              sandboxProfileVersion: 1,
+            },
+          },
+        ],
+        connections: [
+          {
+            id: "conn_github",
+            targetKey: "github-cloud",
+            displayName: "GitHub Engineering",
+            status: "revoked",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        targets: [
+          {
+            targetKey: "github-cloud",
+            familyId: "github",
+            variantId: "github-cloud",
+            enabled: true,
+            config: {},
+            displayName: "GitHub",
+            description: "GitHub Cloud",
+            logoKey: "github",
+            supportedWebhookEvents: [
+              {
+                eventType: "github.pull_request.opened",
+                providerEventType: "pull_request",
+                displayName: "Pull request opened",
+                category: "Pull requests",
+              },
+            ],
+            targetHealth: {
+              configStatus: "valid",
+            },
+          },
+        ],
+        sandboxProfiles: [
+          {
+            id: "sbp_1",
+            organizationId: "org_1",
+            displayName: "Repo Maintainer",
+            status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        id: "atm_3",
+        name: "Inactive connection automation",
+        sandboxProfileName: "Repo Maintainer",
+        events: [
+          {
+            label: "Pull request opened",
+            logoKey: "github",
+          },
+        ],
+        updatedAtLabel: formatWebhookAutomationUpdatedAt("2026-03-16T10:00:00.000Z"),
+        enabled: true,
+      },
+    ]);
+  });
 });
 
 describe("resolveEligibleProfileAutomationConnectionIds", () => {

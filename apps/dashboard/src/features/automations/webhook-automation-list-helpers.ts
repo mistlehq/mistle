@@ -265,6 +265,7 @@ export function buildWebhookAutomationListItems(input: {
         : buildWebhookAutomationEventOptions({
             connections: input.connections,
             targets: input.targets,
+            preservedConnectionId: automation.integrationConnectionId,
             selectedTriggerIds,
           }).filter((eventOption) => selectedTriggerIds.includes(eventOption.id));
     const target = input.targets.find((candidate) => candidate.targetKey === connection?.targetKey);
