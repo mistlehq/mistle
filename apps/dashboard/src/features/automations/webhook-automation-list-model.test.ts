@@ -5,27 +5,34 @@ import {
   formatWebhookAutomationListFilter,
   toWebhookAutomationListFilter,
 } from "./webhook-automation-list-model.js";
-import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-view.js";
+import {
+  createWebhookAutomationListEvent,
+  createWebhookAutomationListItemViewModel,
+} from "./webhook-automation-test-fixtures.js";
 
-const SampleItems: readonly WebhookAutomationListItemViewModel[] = [
-  {
+const SampleItems = [
+  createWebhookAutomationListItemViewModel({
     id: "aut_01",
     name: "GitHub pushes to repo triage",
-    integrationConnectionName: "GitHub Engineering",
-    sandboxProfileName: "Repo Maintainer",
-    eventSummary: "push, pull_request, issues",
-    updatedAtLabel: "6 min ago",
-    enabled: true,
-  },
-  {
+    events: [
+      createWebhookAutomationListEvent({
+        label: "Pull request opened",
+        logoKey: "github",
+      }),
+      createWebhookAutomationListEvent({
+        label: "Issue comment created",
+        logoKey: "github",
+      }),
+    ],
+  }),
+  createWebhookAutomationListItemViewModel({
     id: "aut_02",
     name: "Stripe payouts incident intake",
-    integrationConnectionName: "Stripe Production",
-    sandboxProfileName: "Finance Investigator",
-    eventSummary: "payout.failed",
+    targetName: "Finance Investigator",
+    events: [createWebhookAutomationListEvent({ label: "Payout failed" })],
     updatedAtLabel: "1 day ago",
     enabled: false,
-  },
+  }),
 ];
 
 describe("formatWebhookAutomationListFilter", () => {

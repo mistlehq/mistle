@@ -1,60 +1,42 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
   WebhookAutomationForm,
   resolveConversationKeyFieldOptions,
-  type WebhookAutomationEventOption,
   type WebhookAutomationFormOption,
   type WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-list-helpers.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
+import {
+  createGithubIssueCommentCreatedEventOption,
+  createGithubPullRequestOpenedEventOption,
+  GitHubConnectionId,
+  GitHubConnectionLabel,
+  RepoMaintainerSandboxProfileId,
+} from "./webhook-automation-test-fixtures.js";
 
 const ConnectionOptions: readonly WebhookAutomationFormOption[] = [
   {
-    value: "icn_01kkk1g84mfetvga8a4b853k27",
-    label: "GitHub Engineering",
+    value: GitHubConnectionId,
+    label: GitHubConnectionLabel,
     description: "github-cloud",
   },
 ];
 
 const SandboxProfileOptions: readonly WebhookAutomationFormOption[] = [
   {
-    value: "sbp_01kkk1mbmxfetvga8kcmw612jj",
+    value: RepoMaintainerSandboxProfileId,
     label: "Repo Maintainer",
     description: "Latest version pinned at runtime",
   },
 ];
 
-const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
-  {
-    id: createWebhookAutomationTriggerId({
-      connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-      eventType: "github.issue_comment.created",
-    }),
-    eventType: "github.issue_comment.created",
-    connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-    connectionLabel: "GitHub Engineering",
-    label: "Issue comment created",
-    category: "Issues",
-    logoKey: "github",
-    conversationKeyOptions: [
-      {
-        id: "issue",
-        label: "Issue",
-        description: "Events from the same issue go to the same conversation.",
-        template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
-      },
-      {
-        id: "repository",
-        label: "Repository",
-        description: "Events from the same repository go to the same conversation.",
-        template: "{{payload.repository.full_name}}",
-      },
-    ],
+const WebhookEventOptions = [
+  createGithubIssueCommentCreatedEventOption({
     parameters: [
       {
         id: "repository",
@@ -65,44 +47,19 @@ const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
         prefix: "in",
       },
     ],
-  },
-  {
-    id: createWebhookAutomationTriggerId({
-      connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-      eventType: "github.pull_request.opened",
-    }),
-    eventType: "github.pull_request.opened",
-    connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-    connectionLabel: "GitHub Engineering",
-    label: "Pull request opened",
-    category: "Pull requests",
-    logoKey: "github",
-    conversationKeyOptions: [
-      {
-        id: "pull-request",
-        label: "Pull request",
-        description: "Events from the same pull request go to the same conversation.",
-        template: "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
-      },
-      {
-        id: "repository",
-        label: "Repository",
-        description: "Events from the same repository go to the same conversation.",
-        template: "{{payload.repository.full_name}}",
-      },
-    ],
-  },
+  }),
+  createGithubPullRequestOpenedEventOption(),
 ];
 
 const FormValues: WebhookAutomationFormValues = {
   name: "Repo triage",
-  sandboxProfileId: "sbp_01kkk1mbmxfetvga8kcmw612jj",
+  sandboxProfileId: RepoMaintainerSandboxProfileId,
   enabled: true,
   instructions: "Please review the changes made.",
   conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
   triggerIds: [
     createWebhookAutomationTriggerId({
-      connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+      connectionId: GitHubConnectionId,
       eventType: "github.issue_comment.created",
     }),
   ],
@@ -145,8 +102,8 @@ describe("WebhookAutomationForm", () => {
     renderForm();
 
     expect(screen.getByText("Repo Maintainer")).toBeDefined();
-    expect(screen.queryByText("icn_01kkk1g84mfetvga8a4b853k27")).toBeNull();
-    expect(screen.queryByText("sbp_01kkk1mbmxfetvga8kcmw612jj")).toBeNull();
+    expect(screen.queryByText(GitHubConnectionId)).toBeNull();
+    expect(screen.queryByText(RepoMaintainerSandboxProfileId)).toBeNull();
   });
 
   it("shows selected trigger event labels instead of raw event types", () => {
@@ -236,15 +193,20 @@ describe("WebhookAutomationForm", () => {
     );
   });
 
-  it("renders the create automation name in the header with the inline edit affordance", () => {
-    renderForm("create");
+  it("renders a fixed create title and a separate automation name field", () => {
+    const { container } = renderFormWithOptions({
+      mode: "create",
+      values: {
+        ...FormValues,
+        name: "",
+      },
+    });
+    const form = within(container);
 
-    expect(screen.getAllByRole("heading", { name: "Repo triage" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: "Edit automation name" }).length).toBeGreaterThan(
-      0,
-    );
-    expect(screen.queryByText("Create Automation")).toBeNull();
-    expect(screen.queryByText("Automation name")).toBeNull();
+    expect(form.getAllByRole("heading", { name: "Create Automation" }).length).toBeGreaterThan(0);
+    expect(form.getByText("Automation name")).toBeDefined();
+    expect(form.queryByDisplayValue("Your automation")).toBeNull();
+    expect(form.queryByRole("button", { name: "Edit automation name" })).toBeNull();
   });
 
   it("shows the selected-profile trigger binding message when triggers are unavailable", () => {

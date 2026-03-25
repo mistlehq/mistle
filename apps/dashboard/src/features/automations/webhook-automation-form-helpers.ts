@@ -7,7 +7,7 @@ import {
   buildWebhookAutomationInputTemplate,
   parseWebhookAutomationInputTemplate,
 } from "./webhook-automation-input-template.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-list-helpers.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   extractWebhookAutomationTriggerParameterValues,
   mergeWebhookAutomationPayloadFilter,
@@ -84,7 +84,7 @@ export function toWebhookAutomationFormValues(
 ): WebhookAutomationFormValues {
   if (automation === null) {
     return {
-      name: "Your automation",
+      name: "",
       sandboxProfileId: "",
       enabled: true,
       instructions: "",

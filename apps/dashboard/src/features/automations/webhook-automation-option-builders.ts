@@ -4,13 +4,10 @@ import type {
 } from "../integrations/integrations-service.js";
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { formatRelativeOrDate } from "../shared/date-formatters.js";
 import type {
   WebhookAutomationEventOption,
   WebhookAutomationFormOption,
 } from "./webhook-automation-form.js";
-import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-view.js";
-import type { WebhookAutomation } from "./webhook-automations-types.js";
 
 function sortOptionsByLabel<T extends { label: string }>(items: readonly T[]): T[] {
   return [...items].sort((left, right) => left.label.localeCompare(right.label));
@@ -37,18 +34,6 @@ function formatWebhookAutomationTriggerGroupLabel(input: {
   }
 
   return `${integrationDisplayName} - ${connectionDisplayName}`;
-}
-
-export function formatWebhookAutomationUpdatedAt(isoDateTime: string): string {
-  return formatRelativeOrDate(isoDateTime);
-}
-
-function summarizeEventTypes(eventTypes: readonly string[] | null): string {
-  if (eventTypes === null || eventTypes.length === 0) {
-    return "All events";
-  }
-
-  return eventTypes.join(", ");
 }
 
 export function createWebhookAutomationTriggerId(input: {
@@ -247,30 +232,5 @@ export function buildWebhookAutomationEventOptions(input: {
     }
 
     return left.label.localeCompare(right.label);
-  });
-}
-
-export function buildWebhookAutomationListItems(input: {
-  automations: readonly WebhookAutomation[];
-  connections: readonly IntegrationConnection[];
-  sandboxProfiles: readonly SandboxProfile[];
-}): readonly WebhookAutomationListItemViewModel[] {
-  return input.automations.map((automation) => {
-    const connection = input.connections.find(
-      (candidate) => candidate.id === automation.integrationConnectionId,
-    );
-    const sandboxProfile = input.sandboxProfiles.find(
-      (candidate) => candidate.id === automation.target.sandboxProfileId,
-    );
-
-    return {
-      id: automation.id,
-      name: automation.name,
-      integrationConnectionName: connection?.displayName ?? automation.integrationConnectionId,
-      sandboxProfileName: sandboxProfile?.displayName ?? automation.target.sandboxProfileId,
-      eventSummary: summarizeEventTypes(automation.eventTypes),
-      updatedAtLabel: formatWebhookAutomationUpdatedAt(automation.updatedAt),
-      enabled: automation.enabled,
-    };
   });
 }

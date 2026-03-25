@@ -8,7 +8,11 @@ import {
 } from "./webhook-automation-form-helpers.js";
 import type { WebhookAutomationFormValues } from "./webhook-automation-form.js";
 import { buildWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-list-helpers.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
+import {
+  createGithubIssueCommentCreatedEventOption,
+  createGithubPullRequestOpenedEventOption,
+} from "./webhook-automation-test-fixtures.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 import type { WebhookAutomation } from "./webhook-automations-types.js";
 
@@ -23,12 +27,10 @@ const IssueCommentCreatedTriggerId = createWebhookAutomationTriggerId({
 });
 
 const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
-  {
+  createGithubIssueCommentCreatedEventOption({
     id: IssueCommentCreatedTriggerId,
-    eventType: "github.issue_comment.created",
     connectionId: GitHubConnectionId,
     connectionLabel: "GitHub Engineering",
-    label: "Issue comment created",
     conversationKeyOptions: [
       {
         id: "issue",
@@ -43,34 +45,11 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
         template: "{{payload.repository.full_name}}",
       },
     ],
-    parameters: [
-      {
-        id: "target",
-        label: "comment target",
-        kind: "enum-select",
-        payloadPath: ["issue", "pull_request"],
-        matchMode: "exists",
-        options: [
-          {
-            value: "exists",
-            label: "pull request",
-          },
-          {
-            value: "not_exists",
-            label: "issue",
-          },
-        ],
-        prefix: "in",
-        placeholder: "Any comment target",
-      },
-    ],
-  },
-  {
+  }),
+  createGithubPullRequestOpenedEventOption({
     id: PullRequestOpenedTriggerId,
-    eventType: "github.pull_request.opened",
     connectionId: GitHubConnectionId,
     connectionLabel: "GitHub Engineering",
-    label: "Pull request opened",
     conversationKeyOptions: [
       {
         id: "pull-request",
@@ -104,7 +83,7 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
         placeholder: "Any author",
       },
     ],
-  },
+  }),
 ];
 
 const SampleAutomation: WebhookAutomation = {
@@ -146,7 +125,7 @@ const BaseFormValues: WebhookAutomationFormValues = {
 describe("toWebhookAutomationFormValues", () => {
   it("creates defaults for create mode", () => {
     expect(toWebhookAutomationFormValues(null)).toEqual({
-      name: "Your automation",
+      name: "",
       sandboxProfileId: "",
       enabled: true,
       instructions: "",

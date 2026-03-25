@@ -1,31 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
+import { WebhookAutomationListView } from "./webhook-automation-list-view.js";
 import {
-  WebhookAutomationListView,
-  type WebhookAutomationListItemViewModel,
-} from "./webhook-automation-list-view.js";
+  createDefaultWebhookAutomationListStoryItems,
+  createRowLevelIssueWebhookAutomationListItemViewModel,
+} from "./webhook-automation-test-fixtures.js";
 
-const SampleItems: readonly WebhookAutomationListItemViewModel[] = [
-  {
-    id: "aut_01jps7k2z2v3qj4k9m0n1p2q3r",
-    name: "GitHub pushes to repo triage",
-    integrationConnectionName: "GitHub Engineering",
-    sandboxProfileName: "Repo Maintainer",
-    eventSummary: "push, pull_request, issues",
-    updatedAtLabel: "6 min ago",
-    enabled: true,
-  },
-  {
-    id: "aut_01jps7mhvgc0p7e01b4z4r7c0m",
-    name: "Stripe payouts incident intake",
-    integrationConnectionName: "Stripe Production",
-    sandboxProfileName: "Finance Investigator",
-    eventSummary: "payout.failed",
-    updatedAtLabel: "1 day ago",
-    enabled: false,
-  },
-];
+const SampleItems = createDefaultWebhookAutomationListStoryItems();
+const UnavailableSavedEventItem = SampleItems[2];
+const RowLevelIssueItem = createRowLevelIssueWebhookAutomationListItemViewModel();
 
 const meta = {
   title: "Dashboard/Automations/WebhookAutomationListView",
@@ -56,6 +40,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const Paginated: Story = {
+  args: {
+    hasNextPage: true,
+    hasPreviousPage: true,
+    totalResults: 24,
+  },
+};
+
 export const Empty: Story = {
   args: {
     items: [],
@@ -73,5 +65,19 @@ export const ErrorState: Story = {
   args: {
     items: [],
     errorMessage: "The active organization could not be resolved for this request.",
+  },
+};
+
+export const UnavailableSavedEvent: Story = {
+  args: {
+    items: UnavailableSavedEventItem === undefined ? [] : [UnavailableSavedEventItem],
+    totalResults: 1,
+  },
+};
+
+export const RowLevelIssue: Story = {
+  args: {
+    items: [RowLevelIssueItem],
+    totalResults: 1,
   },
 };

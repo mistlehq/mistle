@@ -3,8 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { useWebhookAutomationPrerequisites } from "../automations/use-webhook-automation-prerequisites.js";
-import { buildWebhookAutomationListItems } from "../automations/webhook-automation-list-helpers.js";
+import { formatWebhookAutomationUpdatedAt } from "../automations/webhook-automation-formatters.js";
 import { WebhookAutomationListView } from "../automations/webhook-automation-list-view.js";
 import { webhookAutomationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { listWebhookAutomations } from "../automations/webhook-automations-service.js";
@@ -23,7 +22,6 @@ function parseCursor(rawValue: string | null): string | null {
 export function AutomationsPage(): React.JSX.Element {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const prerequisites = useWebhookAutomationPrerequisites();
   const after = parseCursor(searchParams.get("after"));
   const before = after === null ? parseCursor(searchParams.get("before")) : null;
 
@@ -44,23 +42,22 @@ export function AutomationsPage(): React.JSX.Element {
   });
 
   const items =
-    automationsQuery.data === undefined ||
-    prerequisites.integrationDirectoryQuery.data === undefined ||
-    prerequisites.sandboxProfilesQuery.data === undefined
-      ? []
-      : buildWebhookAutomationListItems({
-          automations: automationsQuery.data.items,
-          connections: prerequisites.integrationDirectoryQuery.data.connections,
-          sandboxProfiles: prerequisites.sandboxProfilesQuery.data,
-        });
+    automationsQuery.data?.items.map((automation) => ({
+      id: automation.id,
+      name: automation.name,
+      enabled: automation.enabled,
+      targetName: automation.targetName,
+      ...(automation.issue === undefined ? {} : { issue: automation.issue }),
+      events: automation.events,
+      updatedAtLabel: formatWebhookAutomationUpdatedAt(automation.updatedAt),
+    })) ?? [];
 
-  const errorMessage =
-    automationsQuery.isError || prerequisites.errorMessage !== null
-      ? resolveApiErrorMessage({
-          error: automationsQuery.error,
-          fallbackMessage: prerequisites.errorMessage ?? "Could not load automations.",
-        })
-      : null;
+  const errorMessage = automationsQuery.isError
+    ? resolveApiErrorMessage({
+        error: automationsQuery.error,
+        fallbackMessage: "Could not load automations.",
+      })
+    : null;
 
   function updatePagination(input: { nextAfter: string | null; nextBefore: string | null }): void {
     const nextSearchParams = new URLSearchParams();
@@ -73,11 +70,7 @@ export function AutomationsPage(): React.JSX.Element {
     setSearchParams(nextSearchParams);
   }
 
-  const canShowSummary =
-    automationsQuery.data !== undefined &&
-    !automationsQuery.isError &&
-    !prerequisites.isPending &&
-    prerequisites.errorMessage === null;
+  const canShowSummary = automationsQuery.data !== undefined && !automationsQuery.isError;
 
   return (
     <div className="flex flex-col gap-4">
@@ -97,7 +90,7 @@ export function AutomationsPage(): React.JSX.Element {
         errorMessage={errorMessage}
         hasNextPage={automationsQuery.data?.nextPage != null}
         hasPreviousPage={automationsQuery.data?.previousPage != null}
-        isLoading={automationsQuery.isPending || prerequisites.isPending}
+        isLoading={automationsQuery.isPending}
         items={items}
         nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
         onNextPage={() => {
@@ -127,7 +120,6 @@ export function AutomationsPage(): React.JSX.Element {
         }}
         onRetry={() => {
           void automationsQuery.refetch();
-          prerequisites.refetchAll();
         }}
         previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
         totalResults={canShowSummary ? automationsQuery.data.totalResults : null}

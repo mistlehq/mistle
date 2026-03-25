@@ -22,7 +22,7 @@ export function WebhookAutomationListToolbar(input: {
       }
       onSearchValueChange={input.onSearchValueChange}
       searchAriaLabel="Search automations"
-      searchPlaceholder="Search automations"
+      searchPlaceholder="Search by automation, target, or event"
       searchValue={input.searchValue}
     />
   );

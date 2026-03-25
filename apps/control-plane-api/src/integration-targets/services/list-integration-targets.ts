@@ -12,17 +12,13 @@ import {
   paginateKeyset,
   parseKeysetPageSize,
 } from "@mistle/http/pagination";
-import type {
-  IntegrationWebhookEventDefinition,
-  IntegrationWebhookEventParameterDefinition,
-} from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { IntegrationTargetsBadRequestCodes } from "../constants.js";
 import { IntegrationTargetSchema } from "../schemas.js";
 import { projectTargetUi } from "./project-target-ui.js";
+import { resolveTargetMetadataFromPersistedTarget } from "./resolve-target-metadata.js";
 
 const PAGE_SIZE_OPTIONS = {
   defaultLimit: 20,
@@ -44,176 +40,6 @@ export type ListIntegrationTargetsInput = {
 type IntegrationTargetListItem = z.infer<typeof IntegrationTargetSchema>;
 
 type IntegrationTargetsCursor = z.infer<typeof CursorSchema>;
-
-const IntegrationRegistry = createIntegrationRegistry();
-
-type IntegrationTargetWebhookEvent = NonNullable<
-  IntegrationTargetListItem["supportedWebhookEvents"]
->[number];
-
-type IntegrationTargetWebhookEventParameter = NonNullable<
-  IntegrationTargetWebhookEvent["parameters"]
->[number];
-
-type IntegrationTargetWebhookEventConversationKeyOption = NonNullable<
-  IntegrationTargetWebhookEvent["conversationKeyOptions"]
->[number];
-
-function cloneWebhookEventParameters(
-  parameters: readonly IntegrationWebhookEventParameterDefinition[],
-): IntegrationTargetWebhookEventParameter[] {
-  return parameters.map((parameter) => cloneWebhookEventParameter(parameter));
-}
-
-function cloneWebhookEventConversationKeyOptions(
-  options: NonNullable<IntegrationWebhookEventDefinition["conversationKeyOptions"]>,
-): IntegrationTargetWebhookEventConversationKeyOption[] {
-  return options.map((option) => ({
-    id: option.id,
-    label: option.label,
-    description: option.description,
-    template: option.template,
-  }));
-}
-
-function cloneWebhookEventParameter(
-  parameter: IntegrationWebhookEventParameterDefinition,
-): IntegrationTargetWebhookEventParameter {
-  if (parameter.kind === "resource-select") {
-    return {
-      id: parameter.id,
-      label: parameter.label,
-      kind: parameter.kind,
-      resourceKind: parameter.resourceKind,
-      payloadPath: [...parameter.payloadPath],
-      ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-      ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
-    };
-  }
-
-  if (parameter.kind === "enum-select") {
-    return {
-      id: parameter.id,
-      label: parameter.label,
-      kind: parameter.kind,
-      payloadPath: [...parameter.payloadPath],
-      matchMode: parameter.matchMode,
-      options: parameter.options.map((option) => ({
-        value: option.value,
-        label: option.label,
-      })),
-      ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-      ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
-    };
-  }
-
-  return {
-    id: parameter.id,
-    label: parameter.label,
-    kind: parameter.kind,
-    payloadPath: [...parameter.payloadPath],
-    ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-    ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
-  };
-}
-
-function cloneWebhookEvents(
-  events: readonly IntegrationWebhookEventDefinition[],
-): IntegrationTargetWebhookEvent[] {
-  return events.map((eventDefinition) => ({
-    eventType: eventDefinition.eventType,
-    providerEventType: eventDefinition.providerEventType,
-    displayName: eventDefinition.displayName,
-    ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
-    ...(eventDefinition.conversationKeyOptions === undefined
-      ? {}
-      : {
-          conversationKeyOptions: cloneWebhookEventConversationKeyOptions(
-            eventDefinition.conversationKeyOptions,
-          ),
-        }),
-    ...(eventDefinition.parameters === undefined
-      ? {}
-      : {
-          parameters: cloneWebhookEventParameters(eventDefinition.parameters),
-        }),
-  }));
-}
-
-function resolveTargetMetadata(input: {
-  familyId: string;
-  variantId: string;
-  displayNameOverride: string | null;
-  descriptionOverride: string | null;
-}): {
-  displayName: string;
-  description: string;
-  logoKey?: string;
-  connectionMethods?: {
-    id: "api-key" | "oauth2" | "github-app-installation";
-    label: string;
-    kind: "api-key" | "oauth2" | "redirect";
-  }[];
-  supportedWebhookEvents?: IntegrationTargetListItem["supportedWebhookEvents"];
-} {
-  const definition = IntegrationRegistry.getDefinition({
-    familyId: input.familyId,
-    variantId: input.variantId,
-  });
-
-  if (definition === undefined) {
-    if (input.displayNameOverride !== null && input.descriptionOverride !== null) {
-      return {
-        displayName: input.displayNameOverride,
-        description: input.descriptionOverride,
-      };
-    }
-
-    throw new Error(
-      `Integration definition '${input.familyId}::${input.variantId}' was not found and target metadata overrides are incomplete.`,
-    );
-  }
-
-  if (definition.description === undefined || definition.description.trim().length === 0) {
-    if (input.descriptionOverride !== null) {
-      return {
-        displayName: input.displayNameOverride ?? definition.displayName,
-        description: input.descriptionOverride,
-        logoKey: definition.logoKey,
-        connectionMethods: definition.connectionMethods.map((method) => ({
-          id: method.id,
-          label: method.label,
-          kind: method.kind,
-        })),
-        ...(definition.supportedWebhookEvents === undefined
-          ? {}
-          : {
-              supportedWebhookEvents: cloneWebhookEvents(definition.supportedWebhookEvents),
-            }),
-      };
-    }
-
-    throw new Error(
-      `Integration definition '${input.familyId}::${input.variantId}' must provide a non-empty description.`,
-    );
-  }
-
-  return {
-    displayName: input.displayNameOverride ?? definition.displayName,
-    description: input.descriptionOverride ?? definition.description,
-    logoKey: definition.logoKey,
-    connectionMethods: definition.connectionMethods.map((method) => ({
-      id: method.id,
-      label: method.label,
-      kind: method.kind,
-    })),
-    ...(definition.supportedWebhookEvents === undefined
-      ? {}
-      : {
-          supportedWebhookEvents: cloneWebhookEvents(definition.supportedWebhookEvents),
-        }),
-  };
-}
 
 export async function listIntegrationTargets(
   ctx: { db: ControlPlaneDatabase },
@@ -299,12 +125,7 @@ export async function listIntegrationTargets(
     return {
       ...result,
       items: result.items.map((target) => {
-        const resolvedMetadata = resolveTargetMetadata({
-          familyId: target.familyId,
-          variantId: target.variantId,
-          displayNameOverride: target.displayNameOverride,
-          descriptionOverride: target.descriptionOverride,
-        });
+        const resolvedMetadata = resolveTargetMetadataFromPersistedTarget(target);
         const projectedTargetUi = projectTargetUi({
           familyId: target.familyId,
           variantId: target.variantId,

@@ -6,10 +6,10 @@ import {
 import { createKeysetPaginationEnvelopeSchema } from "@mistle/http/pagination";
 
 import { AutomationWebhooksBadRequestCodes } from "../constants.js";
-import { AutomationWebhookSchema } from "../schemas.js";
+import { AutomationWebhookListItemSchema } from "../schemas.js";
 
 export const ListAutomationWebhooksResponseSchema = createKeysetPaginationEnvelopeSchema(
-  AutomationWebhookSchema,
+  AutomationWebhookListItemSchema,
   {
     maxLimit: 100,
   },

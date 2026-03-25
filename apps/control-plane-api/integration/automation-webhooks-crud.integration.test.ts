@@ -13,6 +13,7 @@ import {
   webhookAutomations,
 } from "@mistle/db/control-plane";
 import { NotFoundResponseSchema, ValidationErrorResponseSchema } from "@mistle/http/errors.js";
+import { sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { CreateAutomationWebhookBadRequestResponseSchema } from "../src/automation-webhooks/create-automation-webhook/index.js";
@@ -283,6 +284,322 @@ describe("automation webhooks CRUD integration", () => {
     expect(secondPage.items.map((item) => item.id)).toEqual(["atm_webhook_list_001"]);
     expect(secondPage.nextPage).toBeNull();
     expect(secondPage.previousPage).not.toBeNull();
+  });
+
+  it("lists webhook automations with a row-level issue when target metadata cannot be resolved", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-list-missing-target-metadata@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "retired_target",
+      familyId: "retired",
+      variantId: "retired-variant",
+      enabled: true,
+      config: {},
+      displayNameOverride: "Retired target",
+      descriptionOverride: null,
+    });
+    await insertIntegrationConnection(fixture, {
+      id: "icn_list_retired_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: "retired_target",
+    });
+    await insertSandboxProfile(fixture, {
+      id: "sbp_list_retired_001",
+      organizationId: authenticatedSession.organizationId,
+    });
+
+    await fixture.db.insert(automations).values({
+      id: "atm_webhook_list_retired_001",
+      organizationId: authenticatedSession.organizationId,
+      kind: AutomationKinds.WEBHOOK,
+      name: "Retired Target Automation",
+      enabled: true,
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+    });
+    await fixture.db
+      .insert(webhookAutomations)
+      .values(
+        createPersistedWebhookAutomationConfig(
+          "atm_webhook_list_retired_001",
+          "icn_list_retired_001",
+        ),
+      );
+    await fixture.db
+      .insert(automationTargets)
+      .values(
+        createPersistedAutomationTarget(
+          "atg_list_retired_001",
+          "atm_webhook_list_retired_001",
+          "sbp_list_retired_001",
+          1,
+        ),
+      );
+
+    const response = await fixture.request("/v1/automations/webhooks", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = ListAutomationWebhooksResponseSchema.parse(await response.json());
+    expect(body.items).toHaveLength(1);
+
+    const [item] = body.items;
+    if (item === undefined) {
+      throw new Error("Expected a webhook automation list item.");
+    }
+
+    expect(item.id).toBe("atm_webhook_list_retired_001");
+    expect(item.issue).toEqual({
+      code: "MISSING_TARGET_METADATA",
+      message:
+        "This automation references an integration target definition that is no longer available. Event metadata may be incomplete.",
+    });
+    expect(item.events).toEqual([
+      {
+        label: "issue_comment.created",
+        unavailable: true,
+      },
+    ]);
+  });
+
+  it("lists retired targets with a row-level issue even when persisted overrides are present", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-list-retired-target-overrides@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "retired_target_with_overrides",
+      familyId: "retired",
+      variantId: "retired-variant-with-overrides",
+      enabled: true,
+      config: {},
+      displayNameOverride: "Retired target",
+      descriptionOverride: "Retired target description",
+    });
+    await insertIntegrationConnection(fixture, {
+      id: "icn_list_retired_overrides_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: "retired_target_with_overrides",
+    });
+    await insertSandboxProfile(fixture, {
+      id: "sbp_list_retired_overrides_001",
+      organizationId: authenticatedSession.organizationId,
+    });
+
+    await fixture.db.insert(automations).values({
+      id: "atm_webhook_list_retired_overrides_001",
+      organizationId: authenticatedSession.organizationId,
+      kind: AutomationKinds.WEBHOOK,
+      name: "Retired Target Automation With Overrides",
+      enabled: true,
+      createdAt: "2026-02-07T12:00:00.000Z",
+      updatedAt: "2026-02-07T12:00:00.000Z",
+    });
+    await fixture.db
+      .insert(webhookAutomations)
+      .values(
+        createPersistedWebhookAutomationConfig(
+          "atm_webhook_list_retired_overrides_001",
+          "icn_list_retired_overrides_001",
+        ),
+      );
+    await fixture.db
+      .insert(automationTargets)
+      .values(
+        createPersistedAutomationTarget(
+          "atg_list_retired_overrides_001",
+          "atm_webhook_list_retired_overrides_001",
+          "sbp_list_retired_overrides_001",
+          1,
+        ),
+      );
+
+    const response = await fixture.request("/v1/automations/webhooks", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = ListAutomationWebhooksResponseSchema.parse(await response.json());
+    expect(body.items).toHaveLength(1);
+
+    const [item] = body.items;
+    if (item === undefined) {
+      throw new Error("Expected a webhook automation list item.");
+    }
+
+    expect(item.id).toBe("atm_webhook_list_retired_overrides_001");
+    expect(item.issue).toEqual({
+      code: "MISSING_TARGET_METADATA",
+      message:
+        "This automation references an integration target definition that is no longer available. Event metadata may be incomplete.",
+    });
+    expect(item.events).toEqual([
+      {
+        label: "issue_comment.created",
+        unavailable: true,
+      },
+    ]);
+  });
+
+  it("lists webhook automations when the referenced integration connection row is missing", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-list-missing-connection@example.com",
+    });
+
+    await insertSandboxProfile(fixture, {
+      id: "sbp_list_missing_connection_001",
+      organizationId: authenticatedSession.organizationId,
+    });
+
+    await fixture.db.insert(automations).values({
+      id: "atm_webhook_list_missing_connection_001",
+      organizationId: authenticatedSession.organizationId,
+      kind: AutomationKinds.WEBHOOK,
+      name: "Missing connection",
+      enabled: true,
+      createdAt: "2026-02-08T00:00:00.000Z",
+      updatedAt: "2026-02-08T00:00:00.000Z",
+    });
+
+    await withDisabledTableTriggers(fixture, ["webhook_automations"], async () => {
+      await fixture.db.insert(webhookAutomations).values({
+        ...createPersistedWebhookAutomationConfig(
+          "atm_webhook_list_missing_connection_001",
+          "icn_missing_connection_001",
+        ),
+      });
+    });
+
+    await fixture.db
+      .insert(automationTargets)
+      .values(
+        createPersistedAutomationTarget(
+          "atg_list_missing_connection_001",
+          "atm_webhook_list_missing_connection_001",
+          "sbp_list_missing_connection_001",
+          1,
+        ),
+      );
+
+    const response = await fixture.request("/v1/automations/webhooks", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = ListAutomationWebhooksResponseSchema.parse(await response.json());
+    expect(body.items).toHaveLength(1);
+
+    const [item] = body.items;
+    if (item === undefined) {
+      throw new Error("Expected a webhook automation list item.");
+    }
+
+    expect(item.id).toBe("atm_webhook_list_missing_connection_001");
+    expect(item.targetName).toBe("sbp_list_missing_connection_001 display");
+    expect(item.issue).toEqual({
+      code: "MISSING_INTEGRATION_CONNECTION",
+      message:
+        "This automation references an integration connection that is no longer available. Event metadata may be incomplete.",
+    });
+    expect(item.events).toEqual([
+      {
+        label: "issue_comment.created",
+        unavailable: true,
+      },
+    ]);
+  });
+
+  it("lists webhook automations when the referenced sandbox profile row is missing", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-list-missing-profile@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await insertIntegrationConnection(fixture, {
+      id: "icn_list_missing_profile_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: GitHubTarget.targetKey,
+    });
+
+    await fixture.db.insert(automations).values({
+      id: "atm_webhook_list_missing_profile_001",
+      organizationId: authenticatedSession.organizationId,
+      kind: AutomationKinds.WEBHOOK,
+      name: "Missing profile",
+      enabled: true,
+      createdAt: "2026-02-09T00:00:00.000Z",
+      updatedAt: "2026-02-09T00:00:00.000Z",
+    });
+
+    await fixture.db
+      .insert(webhookAutomations)
+      .values(
+        createPersistedWebhookAutomationConfig(
+          "atm_webhook_list_missing_profile_001",
+          "icn_list_missing_profile_001",
+        ),
+      );
+
+    await withDisabledTableTriggers(fixture, ["automation_targets"], async () => {
+      await fixture.db
+        .insert(automationTargets)
+        .values(
+          createPersistedAutomationTarget(
+            "atg_list_missing_profile_001",
+            "atm_webhook_list_missing_profile_001",
+            "sbp_missing_profile_001",
+            1,
+          ),
+        );
+    });
+
+    const response = await fixture.request("/v1/automations/webhooks", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = ListAutomationWebhooksResponseSchema.parse(await response.json());
+    expect(body.items).toHaveLength(1);
+
+    const [item] = body.items;
+    if (item === undefined) {
+      throw new Error("Expected a webhook automation list item.");
+    }
+
+    expect(item.id).toBe("atm_webhook_list_missing_profile_001");
+    expect(item.targetName).toBe("sbp_missing_profile_001");
+    expect(item.issue).toEqual({
+      code: "MISSING_SANDBOX_PROFILE",
+      message:
+        "This automation references a sandbox profile that is no longer available. The target name may be incomplete.",
+    });
+    expect(item.events).toEqual([
+      {
+        label: "Issue comment created",
+        logoKey: "github",
+      },
+    ]);
   });
 
   it("gets and updates a webhook automation aggregate while preserving omitted PATCH fields", async ({
@@ -697,6 +1014,27 @@ async function insertSandboxProfileBinding(
     createdAt: "2026-02-01T00:00:00.000Z",
     updatedAt: "2026-02-01T00:00:00.000Z",
   });
+}
+
+async function withDisabledTableTriggers<T>(
+  fixture: ControlPlaneApiIntegrationFixture,
+  tableNames: readonly string[],
+  callback: () => Promise<T>,
+): Promise<T> {
+  const disableSql = tableNames
+    .map((tableName) => `alter table control_plane.${tableName} disable trigger all;`)
+    .join("\n");
+  const enableSql = tableNames
+    .map((tableName) => `alter table control_plane.${tableName} enable trigger all;`)
+    .join("\n");
+
+  await fixture.db.execute(sql.raw(disableSql));
+
+  try {
+    return await callback();
+  } finally {
+    await fixture.db.execute(sql.raw(enableSql));
+  }
 }
 
 function createPersistedWebhookAutomationConfig(

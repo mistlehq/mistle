@@ -24,6 +24,37 @@ const WebhookAutomationTargetSchema = z
   })
   .strict();
 
+export const WebhookAutomationListEventSchema = z
+  .object({
+    label: z.string().min(1),
+    logoKey: z.string().min(1).optional(),
+    unavailable: z.boolean().optional(),
+  })
+  .strict();
+
+export const WebhookAutomationListIssueSchema = z
+  .object({
+    code: z.enum([
+      "MISSING_TARGET_METADATA",
+      "MISSING_INTEGRATION_CONNECTION",
+      "MISSING_SANDBOX_PROFILE",
+    ]),
+    message: z.string().min(1),
+  })
+  .strict();
+
+export const WebhookAutomationListItemSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    enabled: z.boolean(),
+    targetName: z.string().min(1),
+    issue: WebhookAutomationListIssueSchema.optional(),
+    events: z.array(WebhookAutomationListEventSchema),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
 export const WebhookAutomationSchema = z
   .object({
     conversationKeyTemplate: z.string(),
@@ -44,7 +75,7 @@ export const WebhookAutomationSchema = z
 
 export const WebhookAutomationsListResultSchema = z
   .object({
-    items: z.array(WebhookAutomationSchema),
+    items: z.array(WebhookAutomationListItemSchema),
     nextPage: KeysetPageSchema.nullable(),
     previousPage: PreviousPageSchema.nullable(),
     totalResults: z.number().int().min(0),
@@ -58,6 +89,9 @@ export const DeleteWebhookAutomationResultSchema = z
   .strict();
 
 export type WebhookAutomation = z.infer<typeof WebhookAutomationSchema>;
+export type WebhookAutomationListEvent = z.infer<typeof WebhookAutomationListEventSchema>;
+export type WebhookAutomationListIssue = z.infer<typeof WebhookAutomationListIssueSchema>;
+export type WebhookAutomationListItem = z.infer<typeof WebhookAutomationListItemSchema>;
 export type WebhookAutomationsListResult = z.infer<typeof WebhookAutomationsListResultSchema>;
 export type DeleteWebhookAutomationResult = z.infer<typeof DeleteWebhookAutomationResultSchema>;
 

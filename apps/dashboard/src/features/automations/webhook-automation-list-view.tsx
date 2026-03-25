@@ -12,20 +12,13 @@ import {
   TableRow,
 } from "@mistle/ui";
 
+import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { useWebhookAutomationListState } from "./use-webhook-automation-list-state.js";
 import { WebhookAutomationListToolbar } from "./webhook-automation-list-toolbar.js";
-
-export type WebhookAutomationListItemViewModel = {
-  id: string;
-  name: string;
-  integrationConnectionName: string;
-  sandboxProfileName: string;
-  eventSummary: string;
-  updatedAtLabel: string;
-  enabled: boolean;
-};
+import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-types.js";
+import type { WebhookAutomationListEvent } from "./webhook-automations-types.js";
 
 function renderAutomationPagination(input: {
   hasNextPage: boolean;
@@ -80,6 +73,107 @@ function LoadingState(): React.JSX.Element {
   );
 }
 
+export function buildEventSummaryTitle(events: readonly WebhookAutomationListEvent[]): string {
+  return events
+    .map((event) => `${event.label}${event.unavailable === true ? " (Unavailable)" : ""}`)
+    .join(", ");
+}
+
+export function resolveEventSummary(input: { events: readonly WebhookAutomationListEvent[] }): {
+  firstEvent: WebhookAutomationListEvent | null;
+  remainingCount: number;
+  title: string;
+} {
+  const [firstEvent, ...remainingEvents] = input.events;
+
+  return {
+    firstEvent: firstEvent ?? null,
+    remainingCount: remainingEvents.length,
+    title: buildEventSummaryTitle(input.events),
+  };
+}
+
+function EventSummaryCell(input: {
+  events: readonly WebhookAutomationListEvent[];
+}): React.JSX.Element {
+  const eventSummary = resolveEventSummary({
+    events: input.events,
+  });
+
+  if (eventSummary.firstEvent === null) {
+    return <span className="text-muted-foreground">No events</span>;
+  }
+
+  return (
+    <div className="flex items-center gap-2" title={eventSummary.title}>
+      {eventSummary.firstEvent.logoKey === undefined ? null : (
+        <img
+          alt=""
+          aria-hidden
+          className="size-4 shrink-0"
+          src={resolveIntegrationLogoPath({ logoKey: eventSummary.firstEvent.logoKey })}
+        />
+      )}
+      <span className="truncate">{eventSummary.firstEvent.label}</span>
+      {eventSummary.firstEvent.unavailable === true ? (
+        <span className="text-destructive text-xs whitespace-nowrap">Unavailable</span>
+      ) : null}
+      {eventSummary.remainingCount === 0 ? null : (
+        <span className="text-muted-foreground shrink-0 text-xs">
+          +{eventSummary.remainingCount}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function AutomationStatusDot(input: { enabled: boolean }): React.JSX.Element {
+  return (
+    <>
+      <span
+        aria-hidden
+        className={`inline-block size-2 shrink-0 rounded-full ${
+          input.enabled ? "bg-emerald-500" : "bg-muted-foreground/35"
+        }`}
+      />
+      <span className="sr-only">{input.enabled ? "Enabled" : "Disabled"}</span>
+    </>
+  );
+}
+
+function AutomationIssueMessage(input: {
+  issue: WebhookAutomationListItemViewModel["issue"];
+}): React.JSX.Element | null {
+  if (input.issue === undefined) {
+    return null;
+  }
+
+  return <p className="text-destructive text-xs leading-5">{input.issue.message}</p>;
+}
+
+function AutomationIdentityCell(input: {
+  item: WebhookAutomationListItemViewModel;
+  onOpenAutomation: (automationId: string) => void;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <AutomationStatusDot enabled={input.item.enabled} />
+        <button
+          className="text-left font-medium underline-offset-4 hover:underline"
+          onClick={() => {
+            input.onOpenAutomation(input.item.id);
+          }}
+          type="button"
+        >
+          {input.item.name}
+        </button>
+      </div>
+      <AutomationIssueMessage issue={input.item.issue} />
+    </div>
+  );
+}
+
 export function WebhookAutomationListView(
   input: WebhookAutomationListViewProps,
 ): React.JSX.Element {
@@ -115,19 +209,15 @@ export function WebhookAutomationListView(
 
           <Table className="min-w-[56rem] table-fixed">
             <colgroup>
-              <col className="w-[30%]" />
-              <col className="w-[24%]" />
-              <col className="w-[18%]" />
-              <col className="w-[18%]" />
-              <col className="w-[10%]" />
+              <col className="w-[34%]" />
+              <col className="w-[22%]" />
+              <col className="w-[32%]" />
+              <col className="w-[12%]" />
             </colgroup>
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Automation
-                </TableHead>
-                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-                  Connection
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Target
@@ -143,7 +233,7 @@ export function WebhookAutomationListView(
             <TableBody>
               {visibleItems.length === 0 ? (
                 <TableRow>
-                  <TableCell className="text-muted-foreground" colSpan={5}>
+                  <TableCell className="text-muted-foreground" colSpan={4}>
                     {hasItems
                       ? "No automations match the current search or filter."
                       : "No automations have been created yet."}
@@ -153,29 +243,11 @@ export function WebhookAutomationListView(
               {visibleItems.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span
-                        aria-hidden
-                        className={`inline-block size-2 shrink-0 rounded-full ${
-                          item.enabled ? "bg-emerald-500" : "bg-muted-foreground/35"
-                        }`}
-                      />
-                      <span className="sr-only">{item.enabled ? "Enabled" : "Disabled"}</span>
-                      <button
-                        className="text-left font-medium underline-offset-4 hover:underline"
-                        onClick={() => {
-                          input.onOpenAutomation(item.id);
-                        }}
-                        type="button"
-                      >
-                        {item.name}
-                      </button>
-                    </div>
+                    <AutomationIdentityCell item={item} onOpenAutomation={input.onOpenAutomation} />
                   </TableCell>
-                  <TableCell>{item.integrationConnectionName}</TableCell>
-                  <TableCell>{item.sandboxProfileName}</TableCell>
+                  <TableCell>{item.targetName}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {item.eventSummary}
+                    <EventSummaryCell events={item.events} />
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {item.updatedAtLabel}

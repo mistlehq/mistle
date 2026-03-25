@@ -8,6 +8,7 @@ import {
   FieldDescription,
   FieldHeader,
   FieldLabel,
+  Input,
   Select,
   SelectContent,
   SelectItem,
@@ -18,7 +19,7 @@ import {
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
 
-import { FormPageFooter, FormPageSection } from "../shared/form-page.js";
+import { FormPageFooter, FormPageHeader, FormPageSection } from "../shared/form-page.js";
 import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
@@ -173,31 +174,35 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <WebhookAutomationTitleEditor
-            errorMessage={input.fieldErrors.name}
-            onCommit={(nextValue) => {
-              input.onValueChange("name", nextValue);
-            }}
-            saveDisabled={input.isDeleting || input.isSaving}
-            title={input.values.name}
-          />
-        </div>
+      {input.mode === "create" ? (
+        <FormPageHeader title="Create Automation" />
+      ) : (
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <WebhookAutomationTitleEditor
+              errorMessage={input.fieldErrors.name}
+              onCommit={(nextValue) => {
+                input.onValueChange("name", nextValue);
+              }}
+              saveDisabled={input.isDeleting || input.isSaving}
+              title={input.values.name}
+            />
+          </div>
 
-        {input.onDelete === null ? null : (
-          <Button
-            aria-label="Delete automation"
-            disabled={input.isDeleting || input.isSaving}
-            onClick={input.onDelete}
-            size="icon-sm"
-            type="button"
-            variant="outline"
-          >
-            <TrashIcon aria-hidden className="size-4" />
-          </Button>
-        )}
-      </div>
+          {input.onDelete === null ? null : (
+            <Button
+              aria-label="Delete automation"
+              disabled={input.isDeleting || input.isSaving}
+              onClick={input.onDelete}
+              size="icon-sm"
+              type="button"
+              variant="outline"
+            >
+              <TrashIcon aria-hidden className="size-4" />
+            </Button>
+          )}
+        </div>
+      )}
 
       {input.formError === null ? null : (
         <Alert variant="destructive">
@@ -225,6 +230,26 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       ) : null}
 
       <FormPageSection>
+        {input.mode === "create" ? (
+          <div className="p-4">
+            <Field orientation="horizontal">
+              <FieldHeader>
+                <FieldLabel htmlFor="automation-name">Automation name</FieldLabel>
+              </FieldHeader>
+              <FieldContent>
+                <Input
+                  id="automation-name"
+                  disabled={input.isDeleting || input.isSaving}
+                  onChange={(event) => {
+                    input.onValueChange("name", event.currentTarget.value);
+                  }}
+                  value={input.values.name}
+                />
+                <FieldError message={input.fieldErrors.name} />
+              </FieldContent>
+            </Field>
+          </div>
+        ) : null}
         <div className="p-4">
           <SelectField
             error={input.fieldErrors.sandboxProfileId}

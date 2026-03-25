@@ -6,7 +6,13 @@ import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-list-helpers.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
+import {
+  createGithubIssueCommentCreatedEventOption,
+  createGithubPullRequestOpenedEventOption,
+  GitHubConnectionId,
+  GitHubGroupedConnectionLabel,
+} from "./webhook-automation-test-fixtures.js";
 import {
   groupWebhookAutomationEventOptions,
   WebhookAutomationTriggerPicker,
@@ -14,62 +20,12 @@ import {
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 
 const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
-  {
-    id: createWebhookAutomationTriggerId({
-      connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-      eventType: "github.issue_comment.created",
-    }),
-    eventType: "github.issue_comment.created",
-    connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-    connectionLabel: "GitHub - GitHub Engineering",
-    label: "Issue comment created",
-    category: "Issues",
-    logoKey: "github",
-    parameters: [
-      {
-        id: "target",
-        label: "comment target",
-        kind: "enum-select",
-        payloadPath: ["issue", "pull_request"],
-        matchMode: "exists",
-        options: [
-          {
-            value: "exists",
-            label: "pull request",
-          },
-          {
-            value: "not_exists",
-            label: "issue",
-          },
-        ],
-        prefix: "in",
-        placeholder: "Any comment target",
-      },
-    ],
-  },
-  {
-    id: createWebhookAutomationTriggerId({
-      connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-      eventType: "github.pull_request.opened",
-    }),
-    eventType: "github.pull_request.opened",
-    connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-    connectionLabel: "GitHub - GitHub Engineering",
-    label: "Pull request opened",
-    category: "Pull requests",
-    logoKey: "github",
-    parameters: [
-      {
-        id: "author",
-        label: "author",
-        kind: "resource-select",
-        resourceKind: "user",
-        payloadPath: ["sender", "login"],
-        prefix: "by",
-        placeholder: "Any author",
-      },
-    ],
-  },
+  createGithubIssueCommentCreatedEventOption({
+    connectionLabel: GitHubGroupedConnectionLabel,
+  }),
+  createGithubPullRequestOpenedEventOption({
+    connectionLabel: GitHubGroupedConnectionLabel,
+  }),
 ];
 
 function renderTriggerPicker(input: {
@@ -166,10 +122,10 @@ describe("WebhookAutomationTriggerPicker", () => {
   it("renders selected triggers with provider logos", () => {
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
-      selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+      selectedConnectionId: GitHubConnectionId,
       selectedTriggerIds: [
         createWebhookAutomationTriggerId({
-          connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+          connectionId: GitHubConnectionId,
           eventType: "github.issue_comment.created",
         }),
       ],
@@ -188,17 +144,17 @@ describe("WebhookAutomationTriggerPicker", () => {
   it("shows unavailable saved triggers when they are no longer present in current options", () => {
     renderTriggerPicker({
       hasConnectedIntegrations: true,
-      selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+      selectedConnectionId: GitHubConnectionId,
       selectedTriggerIds: [
         createWebhookAutomationTriggerId({
-          connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+          connectionId: GitHubConnectionId,
           eventType: "github.push.deleted",
         }),
       ],
       triggerParameterValues: {},
     });
 
-    expect(screen.getByText("icn_01kkk1g84mfetvga8a4b853k27::github.push.deleted")).toBeDefined();
+    expect(screen.getByText(`${GitHubConnectionId}::github.push.deleted`)).toBeDefined();
     expect(screen.getByText("Unavailable")).toBeDefined();
   });
 
@@ -225,7 +181,7 @@ describe("WebhookAutomationTriggerPicker", () => {
   it("shows a disabled no-triggers placeholder when connected integrations expose no triggers", () => {
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
-      selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+      selectedConnectionId: GitHubConnectionId,
       selectedTriggerIds: [],
       triggerParameterValues: {},
       eventOptions: [],

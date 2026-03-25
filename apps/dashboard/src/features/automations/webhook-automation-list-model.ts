@@ -1,4 +1,4 @@
-import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-view.js";
+import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-types.js";
 
 export type WebhookAutomationListFilter = "all" | "enabled" | "disabled";
 
@@ -79,9 +79,8 @@ export function filterWebhookAutomationListItems(input: {
 
     return (
       includesSearchValue(item.name, searchValue) ||
-      includesSearchValue(item.integrationConnectionName, searchValue) ||
-      includesSearchValue(item.sandboxProfileName, searchValue) ||
-      includesSearchValue(item.eventSummary, searchValue) ||
+      includesSearchValue(item.targetName, searchValue) ||
+      item.events.some((event) => includesSearchValue(event.label, searchValue)) ||
       includesSearchValue(item.enabled ? "enabled" : "disabled", searchValue)
     );
   });

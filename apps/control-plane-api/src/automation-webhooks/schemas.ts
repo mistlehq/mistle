@@ -8,6 +8,37 @@ export const AutomationWebhookTargetSchema = z
   })
   .strict();
 
+export const AutomationWebhookListEventSchema = z
+  .object({
+    label: z.string().min(1),
+    logoKey: z.string().min(1).optional(),
+    unavailable: z.boolean().optional(),
+  })
+  .strict();
+
+export const AutomationWebhookListIssueSchema = z
+  .object({
+    code: z.enum([
+      "MISSING_TARGET_METADATA",
+      "MISSING_INTEGRATION_CONNECTION",
+      "MISSING_SANDBOX_PROFILE",
+    ]),
+    message: z.string().min(1),
+  })
+  .strict();
+
+export const AutomationWebhookListItemSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    enabled: z.boolean(),
+    targetName: z.string().min(1),
+    issue: AutomationWebhookListIssueSchema.optional(),
+    events: z.array(AutomationWebhookListEventSchema),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
 export const AutomationWebhookSchema = z
   .object({
     id: z.string().min(1),

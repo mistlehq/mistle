@@ -7,7 +7,7 @@ import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.
 import {
   buildWebhookAutomationConnectionOptions,
   buildWebhookAutomationSandboxProfileOptions,
-} from "./webhook-automation-list-helpers.js";
+} from "./webhook-automation-option-builders.js";
 
 export const WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY: readonly [
   "automations",
@@ -84,11 +84,6 @@ export function useWebhookAutomationPrerequisites(input?: { preservedConnectionI
         })
       : null;
 
-  function refetchAll(): void {
-    void integrationDirectoryQuery.refetch();
-    void sandboxProfilesQuery.refetch();
-  }
-
   return {
     connectionOptions,
     sandboxProfileOptions,
@@ -96,6 +91,5 @@ export function useWebhookAutomationPrerequisites(input?: { preservedConnectionI
     sandboxProfilesQuery,
     errorMessage,
     isPending: integrationDirectoryQuery.isPending || sandboxProfilesQuery.isPending,
-    refetchAll,
   };
 }

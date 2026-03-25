@@ -64,10 +64,6 @@
                             "type": "string",
                             "minLength": 1
                           },
-                          "kind": {
-                            "type": "string",
-                            "enum": ["webhook"]
-                          },
                           "name": {
                             "type": "string",
                             "minLength": 1
@@ -75,76 +71,56 @@
                           "enabled": {
                             "type": "boolean"
                           },
-                          "integrationConnectionId": {
+                          "targetName": {
                             "type": "string",
                             "minLength": 1
                           },
-                          "eventTypes": {
-                            "type": ["array", "null"],
-                            "items": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "payloadFilter": {
-                            "type": ["object", "null"],
-                            "additionalProperties": {}
-                          },
-                          "inputTemplate": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "conversationKeyTemplate": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "idempotencyKeyTemplate": {
-                            "type": ["string", "null"],
-                            "minLength": 1
-                          },
-                          "target": {
+                          "issue": {
                             "type": "object",
                             "properties": {
-                              "id": {
+                              "code": {
+                                "type": "string",
+                                "enum": [
+                                  "MISSING_TARGET_METADATA",
+                                  "MISSING_INTEGRATION_CONNECTION",
+                                  "MISSING_SANDBOX_PROFILE"
+                                ]
+                              },
+                              "message": {
                                 "type": "string",
                                 "minLength": 1
-                              },
-                              "sandboxProfileId": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "sandboxProfileVersion": {
-                                "type": ["integer", "null"],
-                                "minimum": 1
                               }
                             },
-                            "required": ["id", "sandboxProfileId", "sandboxProfileVersion"],
+                            "required": ["code", "message"],
                             "additionalProperties": false
                           },
-                          "createdAt": {
-                            "type": "string",
-                            "minLength": 1
+                          "events": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "label": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "logoKey": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "unavailable": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": ["label"],
+                              "additionalProperties": false
+                            }
                           },
                           "updatedAt": {
                             "type": "string",
                             "minLength": 1
                           }
                         },
-                        "required": [
-                          "id",
-                          "kind",
-                          "name",
-                          "enabled",
-                          "integrationConnectionId",
-                          "eventTypes",
-                          "payloadFilter",
-                          "inputTemplate",
-                          "conversationKeyTemplate",
-                          "idempotencyKeyTemplate",
-                          "target",
-                          "createdAt",
-                          "updatedAt"
-                        ],
+                        "required": ["id", "name", "enabled", "targetName", "events", "updatedAt"],
                         "additionalProperties": false
                       }
                     },
