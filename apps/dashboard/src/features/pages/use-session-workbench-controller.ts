@@ -307,14 +307,10 @@ export function shouldClearStoredResumeIdempotencyKey(
 }
 
 export function shouldShowResumeInFlightState(input: {
-  shouldAutoResumeStoppedSandbox: boolean;
   isResumingStoppedSandbox: boolean;
   sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
 }): boolean {
-  return (
-    (input.shouldAutoResumeStoppedSandbox || input.isResumingStoppedSandbox) &&
-    input.sandboxStatus === "stopped"
-  );
+  return input.isResumingStoppedSandbox && input.sandboxStatus === "stopped";
 }
 
 export function resolveSessionEntryPhase(input: {
@@ -507,7 +503,6 @@ export function useSessionWorkbenchController(input: {
   }
   const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
   const isShowingResumeInFlightState = shouldShowResumeInFlightState({
-    shouldAutoResumeStoppedSandbox,
     isResumingStoppedSandbox,
     sandboxStatus,
   });
@@ -889,10 +884,6 @@ export function useSessionWorkbenchController(input: {
   }, [input.onResumeOnOpenHandled, input.resumeOnOpenRequestToken]);
 
   useEffect(() => {
-    if (sessionEntryPhase !== "resume_pending") {
-      return;
-    }
-
     if (
       input.sandboxInstanceId === null ||
       isResumingStoppedSandbox ||
@@ -908,7 +899,6 @@ export function useSessionWorkbenchController(input: {
     isResumingStoppedSandbox,
     requestStoppedSandboxResume,
     sandboxStatus,
-    sessionEntryPhase,
     shouldAutoResumeStoppedSandbox,
   ]);
 
