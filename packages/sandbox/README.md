@@ -56,6 +56,8 @@ The package root exports:
 - `SandboxStopRequest`
 - `SandboxDestroyRequest`
 - `SandboxAdapter`
+- `SandboxRuntimeEnv`
+- `SandboxRuntimeEnvDefaults`
 - `SandboxError`
 - `SandboxConfigurationError`
 - `SandboxProviderNotImplementedError`
@@ -105,6 +107,7 @@ await runtimeControl.close();
 - `SandboxResumeRequestV1` resumes provider compute against existing sandbox state using a previous sandbox `id`.
 - `SandboxRuntimeControl.applyStartup({ id, payload })` delivers runtime startup bytes to an already-running sandbox using provider-native control paths.
 - `SandboxRuntimeControl.close()` releases provider client resources held by runtime control.
+- Official providers inject the required runtime env through `withRequiredSandboxRuntimeEnv(...)` instead of relying on image-level runtime env defaults.
 - E2B uses the same shared OCI base image reference but resolves provider-native templates internally.
 - `SandboxResumeRequestV1.id` is the durable provider-side sandbox identity returned by `start`.
 - `SandboxHandle` is a provider-agnostic reference to a running sandbox and currently carries only `provider` and `id`.

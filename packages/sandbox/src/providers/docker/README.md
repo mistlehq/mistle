@@ -39,7 +39,7 @@ const runtimeControl = createSandboxRuntimeControl({
 
 ## Provider Behavior
 
-- `start({ image })` pulls the image reference and starts a Docker container from it.
+- `start({ image, env })` pulls the image reference, injects the shared required runtime env, and starts a Docker container from it.
 - `resume({ id })` restarts the existing stopped Docker container identified by `id`.
 - `createSandboxRuntimeControl(...).applyStartup({ id, payload })` runs `sandboxd apply-startup` as `root` inside the target container.
 - `stop({ id })` stops the Docker container without removing it.

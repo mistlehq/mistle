@@ -5,6 +5,7 @@ import { resolveBootstrapLaunchTarget } from "../supervisor/bootstrap-launch-tar
 import { type BootstrapLaunchTarget } from "../supervisor/bootstrap-launch-target.js";
 import { applyStartupToSupervisor } from "../supervisor/client.js";
 import { startSupervisorServer } from "../supervisor/server.js";
+import { resolveRuntimeCommandName } from "./runtime-command-name.js";
 
 type LookupEnv = (key: string) => string | undefined;
 
@@ -17,24 +18,6 @@ type RunRuntimeCommandInput = {
   currentEntrypointPath?: string;
   packagedRuntimeExecutablePath?: string;
 };
-
-type RuntimeCommandName = "serve" | "apply-startup" | "runtime-internal";
-
-function resolveRuntimeCommandName(processArgv: readonly string[]): RuntimeCommandName {
-  const commandName = processArgv[2];
-  if (commandName === undefined) {
-    return "serve";
-  }
-
-  switch (commandName) {
-    case "serve":
-    case "apply-startup":
-    case "runtime-internal":
-      return commandName;
-    default:
-      throw new Error(`unsupported sandbox runtime command "${commandName}"`);
-  }
-}
 
 function resolveServeBootstrapLaunchTarget(
   input: Pick<

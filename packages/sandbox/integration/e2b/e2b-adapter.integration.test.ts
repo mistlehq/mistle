@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect } from "vitest";
 
-import { SandboxProvider } from "../../src/index.js";
+import { SandboxProvider, SandboxRuntimeEnv, SandboxRuntimeEnvDefaults } from "../../src/index.js";
 import { e2bAdapterIntegrationEnabled, it } from "./test-context.js";
 
 const describeE2BAdapterIntegration = e2bAdapterIntegrationEnabled ? describe : describe.skip;
@@ -36,9 +36,17 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
       expect(sandbox.id).not.toBe("");
 
       const connectedSandbox = await fixture.connectSandbox(sandbox.id);
-      const result = await connectedSandbox.commands.run(`printf '%s' "$${INJECTED_ENV_KEY}"`);
+      const result = await connectedSandbox.commands.run(
+        `printf '%s\\n%s\\n%s' "$${INJECTED_ENV_KEY}" "$${SandboxRuntimeEnv.LISTEN_ADDR}" "$${SandboxRuntimeEnv.USER}"`,
+      );
 
-      expect(result.stdout).toBe(injectedEnvValue);
+      expect(result.stdout).toBe(
+        [
+          injectedEnvValue,
+          SandboxRuntimeEnvDefaults.LISTEN_ADDR,
+          SandboxRuntimeEnvDefaults.USER,
+        ].join("\n"),
+      );
     } finally {
       if (id !== undefined) {
         await fixture.adapter.destroy({ id });

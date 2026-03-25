@@ -6,8 +6,7 @@ ARG SANDBOX_GID=10001
 ARG MISE_VERSION=2026.2.20
 
 ENV DEBIAN_FRONTEND=noninteractive \
-  SANDBOX_RUNTIME_LISTEN_ADDR=:8090 \
-  SANDBOX_USER=${SANDBOX_USER}
+  PATH="/var/lib/mistle/bin:/home/${SANDBOX_USER}/.local/share/mise/shims:/usr/local/bin:${PATH}"
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -45,8 +44,6 @@ COPY apps/sandbox-runtime/mistle-path.sh /etc/profile.d/mistle-path.sh
 RUN chmod +x \
   /etc/profile.d/mistle-path.sh \
   /usr/local/bin/mise
-
-ENV PATH="/var/lib/mistle/bin:/home/${SANDBOX_USER}/.local/share/mise/shims:/usr/local/bin:${PATH}"
 
 WORKDIR /home/${SANDBOX_USER}
 USER root
