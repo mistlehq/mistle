@@ -15,9 +15,9 @@ import {
   persistResumeIdempotencyKey,
   readStoredResumeIdempotencyRecord,
   readStoredResumeIdempotencyKey,
+  resolveSessionEntryPhase,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   seedSandboxInstanceStatusQuery,
-  shouldClearResumeErrorMessage,
   shouldShowResumeInFlightState,
   shouldClearStoredResumeIdempotencyKey,
   shouldRetainResumeRetryWindowAfterError,
@@ -354,13 +354,69 @@ describe("useSessionWorkbenchController", () => {
     expect(shouldClearStoredResumeIdempotencyKey("failed")).toBe(true);
   });
 
-  it("clears stale resume errors only after the sandbox starts progressing again", () => {
-    expect(shouldClearResumeErrorMessage(null)).toBe(false);
-    expect(shouldClearResumeErrorMessage("stopped")).toBe(false);
-    expect(shouldClearResumeErrorMessage("failed")).toBe(false);
+  it("routes session entry based on sandbox lifecycle status", () => {
+    expect(
+      resolveSessionEntryPhase({
+        connectedSession: false,
+        hasResumePolicy: false,
+        isStatusPending: true,
+        sandboxStatus: null,
+      }),
+    ).toBe("loading");
 
-    expect(shouldClearResumeErrorMessage("starting")).toBe(true);
-    expect(shouldClearResumeErrorMessage("running")).toBe(true);
+    expect(
+      resolveSessionEntryPhase({
+        connectedSession: false,
+        hasResumePolicy: true,
+        isStatusPending: false,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe("resume_pending");
+
+    expect(
+      resolveSessionEntryPhase({
+        connectedSession: false,
+        hasResumePolicy: false,
+        isStatusPending: false,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe("manual_resume_required");
+
+    expect(
+      resolveSessionEntryPhase({
+        connectedSession: false,
+        hasResumePolicy: false,
+        isStatusPending: false,
+        sandboxStatus: "starting",
+      }),
+    ).toBe("starting");
+
+    expect(
+      resolveSessionEntryPhase({
+        connectedSession: false,
+        hasResumePolicy: false,
+        isStatusPending: false,
+        sandboxStatus: "running",
+      }),
+    ).toBe("connecting");
+
+    expect(
+      resolveSessionEntryPhase({
+        connectedSession: true,
+        hasResumePolicy: false,
+        isStatusPending: false,
+        sandboxStatus: "running",
+      }),
+    ).toBe("ready");
+
+    expect(
+      resolveSessionEntryPhase({
+        connectedSession: false,
+        hasResumePolicy: false,
+        isStatusPending: false,
+        sandboxStatus: "failed",
+      }),
+    ).toBe("failed");
   });
 
   it("retains the retry window only for ambiguous or server-side resume failures", () => {
@@ -489,26 +545,23 @@ describe("useSessionWorkbenchController", () => {
   it("treats resume-on-open intent as in-flight only while the sandbox is still stopped", () => {
     expect(
       shouldShowResumeInFlightState({
-        isResumingStoppedSandbox: false,
-        resumeOnOpenRequestToken: "resume-on-open",
+        hasResumePolicy: true,
         sandboxStatus: "stopped",
       }),
     ).toBe(true);
 
     expect(
       shouldShowResumeInFlightState({
-        isResumingStoppedSandbox: false,
-        resumeOnOpenRequestToken: "resume-on-open",
+        hasResumePolicy: true,
         sandboxStatus: "starting",
       }),
     ).toBe(false);
 
     expect(
       shouldShowResumeInFlightState({
-        isResumingStoppedSandbox: true,
-        resumeOnOpenRequestToken: null,
+        hasResumePolicy: false,
         sandboxStatus: "stopped",
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 });

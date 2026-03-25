@@ -20,7 +20,6 @@ import {
   hasSessionTopAlert,
   resolveChatComposerAction,
   resolveSessionHeaderStatusUi,
-  resolveStoppedSessionMessage,
 } from "./session-workbench-view-model.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 
@@ -200,6 +199,15 @@ type ResumeRequestGuard = {
   sandboxInstanceId: string;
 };
 
+type SessionEntryPhase =
+  | "connecting"
+  | "failed"
+  | "loading"
+  | "manual_resume_required"
+  | "ready"
+  | "resume_pending"
+  | "starting";
+
 export function getSandboxInstanceStatusQueryKey(
   sandboxInstanceId: string | null,
 ): readonly ["sandbox-instance-status", string | null] {
@@ -298,12 +306,6 @@ export function shouldClearStoredResumeIdempotencyKey(
   return sandboxStatus === "running" || sandboxStatus === "failed";
 }
 
-export function shouldClearResumeErrorMessage(
-  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null,
-): boolean {
-  return sandboxStatus === "starting" || sandboxStatus === "running";
-}
-
 export function shouldRetainResumeRetryWindowAfterError(error: unknown): boolean {
   if (!(error instanceof SandboxProfilesApiError)) {
     return true;
@@ -313,14 +315,63 @@ export function shouldRetainResumeRetryWindowAfterError(error: unknown): boolean
 }
 
 export function shouldShowResumeInFlightState(input: {
-  isResumingStoppedSandbox: boolean;
-  resumeOnOpenRequestToken: string | null;
+  hasResumePolicy: boolean;
   sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
 }): boolean {
-  return (
-    input.isResumingStoppedSandbox ||
-    (input.resumeOnOpenRequestToken !== null && input.sandboxStatus === "stopped")
-  );
+  return input.hasResumePolicy && input.sandboxStatus === "stopped";
+}
+
+export function resolveSessionEntryPhase(input: {
+  connectedSession: boolean;
+  hasResumePolicy: boolean;
+  isStatusPending: boolean;
+  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
+}): SessionEntryPhase {
+  if (input.sandboxStatus === "failed") {
+    return "failed";
+  }
+
+  if (input.sandboxStatus === "running") {
+    return input.connectedSession ? "ready" : "connecting";
+  }
+
+  if (input.sandboxStatus === "starting") {
+    return "starting";
+  }
+
+  if (input.sandboxStatus === "stopped") {
+    return input.hasResumePolicy ? "resume_pending" : "manual_resume_required";
+  }
+
+  return input.isStatusPending ? "loading" : "loading";
+}
+
+function resolveSandboxStatusForEntryPhase(
+  phase: SessionEntryPhase,
+): "starting" | "running" | "stopped" | "failed" | null {
+  if (phase === "failed") {
+    return "failed";
+  }
+
+  if (phase === "resume_pending" || phase === "starting") {
+    return "starting";
+  }
+
+  if (phase === "connecting" || phase === "ready") {
+    return "running";
+  }
+
+  if (phase === "manual_resume_required") {
+    return "stopped";
+  }
+
+  return null;
+}
+
+function resolveStoppedSessionMessageForEntryPhase(phase: SessionEntryPhase): string | null {
+  return phase === "manual_resume_required"
+    ? "This sandbox is stopped. Resume it to reconnect chat and terminal."
+    : null;
 }
 
 export function isActiveResumeRequest(input: {
@@ -368,8 +419,8 @@ export function useSessionWorkbenchController(input: {
   const [storedResumeIdempotencyRecord, setStoredResumeIdempotencyRecord] =
     useState<ResumeIdempotencyStorageRecord | null>(initialStoredResumeIdempotencyRecord);
   const hasStoredResumeIdempotencyKey = storedResumeIdempotencyRecord !== null;
+  const [hasResumePolicy, setHasResumePolicy] = useState(input.resumeOnOpenRequestToken !== null);
   const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(false);
-  const [resumeErrorMessage, setResumeErrorMessage] = useState<string | null>(null);
   const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
   const activeResumeRequestRef = useRef<ResumeRequestGuard | null>(null);
   const nextResumeRequestIdRef = useRef(0);
@@ -441,8 +492,7 @@ export function useSessionWorkbenchController(input: {
 
       if (
         status === "stopped" &&
-        ((input.resumeOnOpenRequestToken !== null && status === "stopped") ||
-          isResumingStoppedSandbox ||
+        (((hasResumePolicy || input.resumeOnOpenRequestToken !== null) && status === "stopped") ||
           hasStoredResumeIdempotencyKey)
       ) {
         return 1_000;
@@ -452,16 +502,21 @@ export function useSessionWorkbenchController(input: {
     },
   });
   const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
+  const hasActiveResumePolicy = hasResumePolicy || input.resumeOnOpenRequestToken !== null;
   const isShowingResumeInFlightState = shouldShowResumeInFlightState({
-    isResumingStoppedSandbox,
-    resumeOnOpenRequestToken: input.resumeOnOpenRequestToken,
+    hasResumePolicy: hasActiveResumePolicy,
     sandboxStatus,
   });
-  const effectiveSandboxStatus =
-    sandboxStatus === "stopped" && isShowingResumeInFlightState ? "starting" : sandboxStatus;
+  const sessionEntryPhase = resolveSessionEntryPhase({
+    connectedSession: connectedSession !== null,
+    hasResumePolicy: hasActiveResumePolicy,
+    isStatusPending: sandboxStatusQuery.isPending,
+    sandboxStatus,
+  });
+  const effectiveSandboxStatus = resolveSandboxStatusForEntryPhase(sessionEntryPhase);
   const automationConversation = sandboxStatusQuery.data?.automationConversation ?? null;
   const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
-    sandboxStatus,
+    sandboxStatus: effectiveSandboxStatus,
     automationConversation,
   });
   const connectionReadiness = resolveSessionConnectionReadiness({
@@ -469,9 +524,7 @@ export function useSessionWorkbenchController(input: {
     sandboxStatus: effectiveSandboxStatus,
     isStatusPending: sandboxStatusQuery.isPending,
   });
-  const stoppedSessionMessage = resolveStoppedSessionMessage({
-    connectionReadinessReason: connectionReadiness.reason,
-  });
+  const stoppedSessionMessage = resolveStoppedSessionMessageForEntryPhase(sessionEntryPhase);
   const stoppedSessionState = {
     // Mirror the policy contract: stopped-state messaging stays separate from
     // connection readiness until the control-plane API exposes a dedicated
@@ -495,8 +548,8 @@ export function useSessionWorkbenchController(input: {
     setAutomationPendingSinceMs(null);
     setAutomationPendingErrorMessage(null);
     setStoredResumeIdempotencyRecord(storedResumeRecord);
+    setHasResumePolicy(false);
     setIsResumingStoppedSandbox(false);
-    setResumeErrorMessage(null);
     activeResumeRequestRef.current = null;
     clearStartErrorMessage();
     disconnectSession();
@@ -545,14 +598,15 @@ export function useSessionWorkbenchController(input: {
       storage: getBestEffortBrowserStorage("local"),
     });
     setStoredResumeIdempotencyRecord(null);
+    setHasResumePolicy(false);
   }, [input.sandboxInstanceId, sandboxStatus]);
 
   useEffect(() => {
-    if (!shouldClearResumeErrorMessage(sandboxStatus)) {
+    if (sandboxStatus === null || sandboxStatus === "stopped") {
       return;
     }
 
-    setResumeErrorMessage(null);
+    setHasResumePolicy(false);
   }, [sandboxStatus]);
 
   useEffect(() => {
@@ -662,14 +716,14 @@ export function useSessionWorkbenchController(input: {
     sandboxStatus: sandboxStatusLabel.toLowerCase(),
     agentConnectionState,
     step,
-    hasConnectionError: resolvedStartErrorMessage !== null || resumeErrorMessage !== null,
+    hasConnectionError: resolvedStartErrorMessage !== null,
   });
 
   const hasActiveTurn = canInterruptTurn || canSteerTurn;
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: sandboxStatusQuery.isError,
-    startErrorMessage: resolvedStartErrorMessage ?? resumeErrorMessage,
+    startErrorMessage: resolvedStartErrorMessage,
     sandboxFailureMessage,
     stoppedSessionMessage: stoppedSessionState.message,
   });
@@ -791,8 +845,8 @@ export function useSessionWorkbenchController(input: {
       nowMs,
     });
     setStoredResumeIdempotencyRecord(nextStoredResumeRecord);
+    setHasResumePolicy(true);
 
-    setResumeErrorMessage(null);
     setIsResumingStoppedSandbox(true);
     try {
       const resumedSandboxStatus = await resumeSandboxInstance({
@@ -832,11 +886,8 @@ export function useSessionWorkbenchController(input: {
           storage,
         });
         setStoredResumeIdempotencyRecord(null);
+        setHasResumePolicy(false);
       }
-
-      setResumeErrorMessage(
-        error instanceof Error ? error.message : "Could not resume sandbox session.",
-      );
     } finally {
       if (
         isActiveResumeRequest({
@@ -862,23 +913,30 @@ export function useSessionWorkbenchController(input: {
       return;
     }
 
-    if (input.sandboxInstanceId === null || sandboxStatus === null) {
+    setHasResumePolicy(true);
+    input.onResumeOnOpenHandled();
+  }, [input.onResumeOnOpenHandled, input.resumeOnOpenRequestToken]);
+
+  useEffect(() => {
+    if (sessionEntryPhase !== "resume_pending") {
       return;
     }
 
-    input.onResumeOnOpenHandled();
-
-    if (sandboxStatus !== "stopped") {
+    if (
+      input.sandboxInstanceId === null ||
+      isResumingStoppedSandbox ||
+      sandboxStatus !== "stopped"
+    ) {
       return;
     }
 
     void requestStoppedSandboxResume();
   }, [
-    input.onResumeOnOpenHandled,
-    input.resumeOnOpenRequestToken,
     input.sandboxInstanceId,
+    isResumingStoppedSandbox,
     requestStoppedSandboxResume,
     sandboxStatus,
+    sessionEntryPhase,
   ]);
 
   return {
@@ -892,7 +950,7 @@ export function useSessionWorkbenchController(input: {
       sandboxFailureMessage,
       sandboxStatusQuery,
       sessionHeaderStatusUi,
-      startErrorMessage: resolvedStartErrorMessage ?? resumeErrorMessage,
+      startErrorMessage: resolvedStartErrorMessage,
       terminalPanelState,
     },
     conversationPane: {
