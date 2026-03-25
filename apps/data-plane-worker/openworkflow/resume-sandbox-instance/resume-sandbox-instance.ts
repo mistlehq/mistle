@@ -23,7 +23,7 @@ const ResumeSandboxFailureCodes = {
 type ResumableSandboxInstanceState = {
   sandboxInstanceId: string;
   runtimeProvider: SandboxProvider;
-  previousProviderSandboxId: string;
+  providerSandboxId: string;
 };
 
 function toSandboxProvider(provider: SandboxInstanceProvider): SandboxProvider {
@@ -76,7 +76,7 @@ async function resolveResumableSandboxInstanceState(input: {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     runtimeProvider: toSandboxProvider(sandboxInstance.runtimeProvider),
-    previousProviderSandboxId: sandboxInstance.providerSandboxId,
+    providerSandboxId: sandboxInstance.providerSandboxId,
   };
 }
 
@@ -190,7 +190,7 @@ export async function resumeSandboxInstance(
       },
       {
         sandboxInstanceId: resumableSandboxInstance.sandboxInstanceId,
-        previousProviderSandboxId: resumableSandboxInstance.previousProviderSandboxId,
+        providerSandboxId: resumableSandboxInstance.providerSandboxId,
       },
     );
   } catch (error) {
