@@ -33,6 +33,7 @@
     "test:integration": "tsx ./scripts/test/run-integration-vitest.ts",
     "test:integration:all": "pnpm test:integration",
     "test:sandbox-runtime:sea:linux": "node ./scripts/test/run-sandbox-runtime-sea-linux.mjs",
+    "test:sandbox-runtime:packaged-startup:linux": "node ./scripts/test/run-sandbox-runtime-packaged-startup-linux.mjs",
     "test:system": "pnpm --filter @mistle/tests test:system",
     "test:e2e": "pnpm --filter @mistle/tests test:e2e",
     "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm storybook:build && pnpm test",
