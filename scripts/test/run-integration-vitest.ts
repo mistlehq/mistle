@@ -2,76 +2,58 @@ import { spawn } from "node:child_process";
 
 import { ensureIntegrationRunId } from "./integration-run-id.ts";
 
-const IntegrationProjects = [
+const IntegrationVitestProjects = [
   {
-    kind: "vitest",
     projectName: "@mistle/control-plane-api",
     packageName: "@mistle/control-plane-api",
   },
   {
-    kind: "vitest",
     projectName: "@mistle/control-plane-worker",
     packageName: "@mistle/control-plane-worker",
   },
   {
-    kind: "vitest",
     projectName: "@mistle/dashboard",
     packageName: "@mistle/dashboard",
   },
   {
-    kind: "vitest",
     projectName: "@mistle/data-plane-api",
     packageName: "@mistle/data-plane-api",
   },
   {
-    kind: "vitest",
     projectName: "@mistle/data-plane-gateway",
     packageName: "@mistle/data-plane-gateway",
   },
   {
-    kind: "vitest",
     projectName: "@mistle/tokenizer-proxy",
     packageName: "@mistle/tokenizer-proxy",
   },
   {
-    kind: "vitest",
     projectName: "@mistle/config",
     packageName: "@mistle/config",
   },
   {
-    kind: "vitest",
     projectName: "@mistle/db",
     packageName: "@mistle/db",
   },
   {
-    kind: "vitest",
     projectName: "@mistle/emails",
     packageName: "@mistle/emails",
   },
   {
-    kind: "vitest",
     projectName: "@mistle/integrations-core",
     packageName: "@mistle/integrations-core",
   },
   {
-    kind: "vitest",
     projectName: "@mistle/sandbox",
     packageName: "@mistle/sandbox",
   },
   {
-    kind: "command",
-    projectName: "@mistle/sandbox-runtime",
-    packageName: "@mistle/sandbox-runtime",
-    command: ["node", "./scripts/test/run-sandbox-runtime-packaged-startup-linux.mjs"],
-  },
-  {
-    kind: "vitest",
     projectName: "@mistle/test-harness",
     packageName: "@mistle/test-harness",
   },
 ] as const;
 
-type IntegrationProject = (typeof IntegrationProjects)[number];
+type IntegrationVitestProject = (typeof IntegrationVitestProjects)[number];
 
 function normalizeCliArgs(rawArgs: ReadonlyArray<string>): string[] {
   if (rawArgs[0] === "--") {
@@ -112,44 +94,22 @@ function parseProjectFilters(args: ReadonlyArray<string>): string[] {
   return projectFilters;
 }
 
-function stripProjectArgs(args: ReadonlyArray<string>): string[] {
-  const forwardedArgs: string[] = [];
-
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index];
-    if (argument === undefined) {
-      throw new Error(`Expected an argument at index ${String(index)}.`);
-    }
-
-    if (argument === "--project") {
-      index += 1;
-      continue;
-    }
-
-    if (argument.startsWith("--project=")) {
-      continue;
-    }
-
-    forwardedArgs.push(argument);
-  }
-
-  return forwardedArgs;
-}
-
-function resolveSelectedProjects(projectFilters: ReadonlyArray<string>): IntegrationProject[] {
+function resolveSelectedProjects(
+  projectFilters: ReadonlyArray<string>,
+): IntegrationVitestProject[] {
   if (projectFilters.length === 0) {
-    return [...IntegrationProjects];
+    return [...IntegrationVitestProjects];
   }
 
-  const selectedProjects: IntegrationProject[] = [];
+  const selectedProjects: IntegrationVitestProject[] = [];
 
   for (const projectFilter of projectFilters) {
-    const project = IntegrationProjects.find(
+    const project = IntegrationVitestProjects.find(
       (candidate) => candidate.projectName === projectFilter,
     );
     if (project === undefined) {
       throw new Error(
-        `Unknown integration project '${projectFilter}'. Expected one of: ${IntegrationProjects.map((candidate) => candidate.projectName).join(", ")}.`,
+        `Unknown integration Vitest project '${projectFilter}'. Expected one of: ${IntegrationVitestProjects.map((candidate) => candidate.projectName).join(", ")}.`,
       );
     }
     if (!selectedProjects.includes(project)) {
@@ -188,10 +148,7 @@ async function main(): Promise<void> {
   const integrationRunId = ensureIntegrationRunId(process.env);
   const cliArgs = normalizeCliArgs(process.argv.slice(2));
   const projectFilters = parseProjectFilters(cliArgs);
-  const forwardedCliArgs = stripProjectArgs(cliArgs);
   const selectedProjects = resolveSelectedProjects(projectFilters);
-  const selectedVitestProjects = selectedProjects.filter((project) => project.kind === "vitest");
-  const selectedCommandProjects = selectedProjects.filter((project) => project.kind === "command");
 
   console.info(`Using integration run id ${integrationRunId}.`);
 
@@ -202,21 +159,14 @@ async function main(): Promise<void> {
     ...selectedProjects.flatMap((project) => ["--filter", `${project.packageName}...`]),
   ]);
 
-  if (selectedVitestProjects.length > 0) {
-    await runCommand("pnpm", [
-      "exec",
-      "vitest",
-      "run",
-      "-c",
-      "vitest.integration.root.ts",
-      ...selectedVitestProjects.flatMap((project) => ["--project", project.projectName]),
-      ...forwardedCliArgs,
-    ]);
-  }
-
-  for (const project of selectedCommandProjects) {
-    await runCommand(project.command[0], project.command.slice(1));
-  }
+  await runCommand("pnpm", [
+    "exec",
+    "vitest",
+    "run",
+    "-c",
+    "vitest.integration.root.ts",
+    ...cliArgs,
+  ]);
 }
 
 main().catch((error: unknown) => {
