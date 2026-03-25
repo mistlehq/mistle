@@ -46,6 +46,10 @@ const nativeBinding = loadNativeBinding();
 
 module.exports = {
   NativePtySession: readExport(nativeBinding, "NativePtySession"),
+  assertUnixSocketPeerMatchesCurrentProcessUid: readExport(
+    nativeBinding,
+    "assertUnixSocketPeerMatchesCurrentProcessUid",
+  ),
   execRuntimeAsUser: readExport(nativeBinding, "execRuntimeAsUser"),
   generateProxyCa: readExport(nativeBinding, "generateProxyCa"),
   issueProxyLeafCertificate: readExport(nativeBinding, "issueProxyLeafCertificate"),
