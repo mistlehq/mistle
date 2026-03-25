@@ -329,6 +329,24 @@ export function shouldShowResumeInFlightState(input: {
   );
 }
 
+export function shouldPollStoppedSandboxStatus(input: {
+  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
+  hasAttemptedInitialStoppedResume: boolean;
+  isResumingStoppedSandbox: boolean;
+  resumeActionErrorMessage: string | null;
+}): boolean {
+  return (
+    input.sandboxStatus === "stopped" &&
+    shouldShowResumeInFlightState({
+      hasAttemptedInitialStoppedResume: input.hasAttemptedInitialStoppedResume,
+      resumeActionErrorMessage: input.resumeActionErrorMessage,
+      shouldAttemptInitialStoppedResume: false,
+      isResumingStoppedSandbox: input.isResumingStoppedSandbox,
+      sandboxStatus: input.sandboxStatus,
+    })
+  );
+}
+
 export function resolveSessionEntryPhase(input: {
   connectedSession: boolean;
   hasResumeInFlightState: boolean;
@@ -509,6 +527,17 @@ export function useSessionWorkbenchController(input: {
         })
       ) {
         return AutomationSessionStatusRefetchIntervalMs;
+      }
+
+      if (
+        shouldPollStoppedSandboxStatus({
+          sandboxStatus: status ?? null,
+          hasAttemptedInitialStoppedResume,
+          isResumingStoppedSandbox,
+          resumeActionErrorMessage,
+        })
+      ) {
+        return 1_000;
       }
 
       return status === "running" || status === "failed" || status === "stopped" ? false : 1_000;

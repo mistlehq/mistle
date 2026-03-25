@@ -19,6 +19,7 @@ import {
   resolveStoppedSessionMessageForEntryPhase,
   seedSandboxInstanceStatusQuery,
   shouldClearStoredResumeIdempotencyKey,
+  shouldPollStoppedSandboxStatus,
   shouldShowResumeInFlightState,
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
@@ -347,6 +348,35 @@ describe("useSessionWorkbenchController", () => {
 
     expect(shouldClearStoredResumeIdempotencyKey("running")).toBe(true);
     expect(shouldClearStoredResumeIdempotencyKey("failed")).toBe(true);
+  });
+
+  it("keeps polling while a stopped sandbox is still resuming", () => {
+    expect(
+      shouldPollStoppedSandboxStatus({
+        sandboxStatus: "stopped",
+        hasAttemptedInitialStoppedResume: true,
+        isResumingStoppedSandbox: false,
+        resumeActionErrorMessage: null,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldPollStoppedSandboxStatus({
+        sandboxStatus: "stopped",
+        hasAttemptedInitialStoppedResume: true,
+        isResumingStoppedSandbox: false,
+        resumeActionErrorMessage: "Resume failed",
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldPollStoppedSandboxStatus({
+        sandboxStatus: "running",
+        hasAttemptedInitialStoppedResume: true,
+        isResumingStoppedSandbox: false,
+        resumeActionErrorMessage: null,
+      }),
+    ).toBe(false);
   });
 
   it("routes session entry based on sandbox lifecycle status", () => {
