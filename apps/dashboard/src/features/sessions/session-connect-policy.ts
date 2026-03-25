@@ -6,7 +6,15 @@ export function isSessionPageNavigableSandboxStatus(
 
 export type SessionConnectionReadiness = {
   canConnect: boolean;
-  reason: "failed" | "loading" | "missing-session" | "ready" | "starting" | "stopped" | "unknown";
+  reason:
+    | "failed"
+    | "loading"
+    | "missing-session"
+    | "ready"
+    | "resuming"
+    | "starting"
+    | "stopped"
+    | "unknown";
 };
 
 export function isSandboxReadyForConnections(
@@ -48,11 +56,14 @@ export function resolveSessionConnectionReadiness(input: {
     };
   }
 
+  if (input.sandboxStatus === "resuming") {
+    return {
+      canConnect: false,
+      reason: "resuming",
+    };
+  }
+
   if (input.sandboxStatus === "stopped") {
-    // Intentional product constraint: the dashboard only treats `running` as
-    // connection-ready. `stopped` remains disconnected until the control-plane API
-    // exposes a dedicated resume sandbox endpoint and the dashboard adopts that
-    // endpoint as the supported resume flow.
     return {
       canConnect: false,
       reason: "stopped",

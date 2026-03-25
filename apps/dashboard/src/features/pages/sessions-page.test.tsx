@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
@@ -15,7 +15,124 @@ import {
   SandboxSessionStatusBadge,
   SessionsPage,
   shouldClearSelectedProfile,
+  shouldUseResumeActionLabel,
 } from "./sessions-page.js";
+
+type SessionListItem = {
+  id: string;
+  sandboxProfileId: string;
+  sandboxProfileDisplayName?: string;
+  sandboxProfileVersion: number;
+  status: "starting" | "running" | "stopped" | "failed";
+  startedBy: {
+    kind: "user";
+    id: string;
+    name: string;
+  };
+  source: "dashboard";
+  createdAt: string;
+  updatedAt: string;
+  failureCode: string | null;
+  failureMessage: string | null;
+};
+
+type SelectableProfile = {
+  id: string;
+  displayName: string;
+  status: "active";
+  latestVersion: number;
+  createdAt: string;
+  updatedAt: string;
+  organizationId: string;
+};
+
+function buildListedSession(
+  overrides: Partial<SessionListItem> & Pick<SessionListItem, "id">,
+): SessionListItem {
+  const { id, ...restOverrides } = overrides;
+
+  return {
+    id,
+    sandboxProfileId: "sbp_123",
+    sandboxProfileDisplayName: "Profile 123",
+    sandboxProfileVersion: 2,
+    status: "running",
+    startedBy: {
+      kind: "user",
+      id: "user-id",
+      name: "Mistle User",
+    },
+    source: "dashboard",
+    createdAt: "2026-03-10T00:00:00.000Z",
+    updatedAt: "2026-03-10T00:00:00.000Z",
+    failureCode: null,
+    failureMessage: null,
+    ...restOverrides,
+  };
+}
+
+function buildSelectableProfile(
+  overrides: Partial<SelectableProfile> & Pick<SelectableProfile, "id">,
+): SelectableProfile {
+  const { id, ...restOverrides } = overrides;
+
+  return {
+    id,
+    displayName: "Alpha Profile",
+    status: "active",
+    latestVersion: 3,
+    createdAt: "2026-03-10T00:00:00.000Z",
+    updatedAt: "2026-03-10T00:00:00.000Z",
+    organizationId: "org_123",
+    ...restOverrides,
+  };
+}
+
+function createSessionsPageQueryClient(
+  input?: Parameters<typeof createTestQueryClient>[0],
+): ReturnType<typeof createTestQueryClient> {
+  const queryClient = createTestQueryClient(input);
+  seedAuthenticatedSession(queryClient);
+  return queryClient;
+}
+
+function seedSessionsList(input: {
+  queryClient: ReturnType<typeof createTestQueryClient>;
+  items: SessionListItem[];
+  totalResults?: number;
+}): void {
+  input.queryClient.setQueryData(
+    sandboxInstancesListQueryKey({
+      limit: 20,
+      after: null,
+      before: null,
+    }),
+    {
+      items: input.items,
+      nextPage: null,
+      previousPage: null,
+      totalResults: input.totalResults ?? input.items.length,
+    },
+  );
+}
+
+function renderSessionsPage(input?: {
+  queryClient?: ReturnType<typeof createTestQueryClient>;
+  initialEntries?: string[];
+  routes?: React.ReactNode;
+}) {
+  const queryClient = input?.queryClient ?? createSessionsPageQueryClient();
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter
+        {...(input?.initialEntries === undefined ? {} : { initialEntries: input.initialEntries })}
+      >
+        {input?.routes ?? <SessionsPage />}
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 describe("SessionsPage", () => {
   it("uses the authenticated user's display name for optimistic sessions", () => {
@@ -59,16 +176,9 @@ describe("SessionsPage", () => {
   });
 
   it("renders sandbox launcher controls", async () => {
-    const queryClient = createTestQueryClient();
-    seedAuthenticatedSession(queryClient);
+    const queryClient = createSessionsPageQueryClient();
 
-    const rendered = render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
-          <SessionsPage />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    const rendered = renderSessionsPage({ queryClient });
 
     try {
       expect(screen.getByText("Start a new session")).toBeDefined();
@@ -84,8 +194,7 @@ describe("SessionsPage", () => {
   });
 
   it("uses the shared dashboard table styling for the session list", () => {
-    const queryClient = createTestQueryClient();
-    seedAuthenticatedSession(queryClient);
+    const queryClient = createSessionsPageQueryClient();
 
     const markup = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
@@ -102,42 +211,15 @@ describe("SessionsPage", () => {
   });
 
   it("renders the result summary even when there is only one page", () => {
-    const queryClient = createTestQueryClient({
+    const queryClient = createSessionsPageQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
     });
-    seedAuthenticatedSession(queryClient);
-    queryClient.setQueryData(
-      sandboxInstancesListQueryKey({
-        limit: 20,
-        after: null,
-        before: null,
-      }),
-      {
-        items: [
-          {
-            id: "sbi_123",
-            sandboxProfileId: "sbp_123",
-            sandboxProfileDisplayName: "Profile 123",
-            sandboxProfileVersion: 2,
-            status: "running",
-            startedBy: {
-              kind: "user",
-              id: "user-id",
-              name: "Mistle User",
-            },
-            source: "dashboard",
-            createdAt: "2026-03-10T00:00:00.000Z",
-            updatedAt: "2026-03-10T00:00:00.000Z",
-            failureCode: null,
-            failureMessage: null,
-          },
-        ],
-        nextPage: null,
-        previousPage: null,
-        totalResults: 1,
-      },
-    );
+    seedSessionsList({
+      queryClient,
+      items: [buildListedSession({ id: "sbi_123" })],
+      totalResults: 1,
+    });
 
     const markup = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
@@ -182,30 +264,66 @@ describe("SessionsPage", () => {
     const markup = renderToStaticMarkup(
       <SandboxSessionStatusBadge
         status="failed"
-        failureCode="INSTANCE_VOLUME_PROVISION_FAILED"
-        failureMessage="Failed to provision instance volume before runtime startup."
+        failureCode="sandbox_start_failed"
+        failureMessage="Failed to start sandbox runtime."
       />,
     );
 
     expect(markup).toContain("View failure details");
     expect(markup).toContain("Failed");
-    expect(markup).toContain("INSTANCE_VOLUME_PROVISION_FAILED");
-    expect(markup).toContain("Failed to provision instance volume before runtime startup.");
+    expect(markup).toContain("sandbox_start_failed");
+    expect(markup).toContain("Failed to start sandbox runtime.");
     expect(markup).not.toContain("text-destructive whitespace-pre-wrap text-xs");
+  });
+
+  it("routes stopped sessions into the workbench route directly", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [buildListedSession({ id: "sbi_stopped", status: "stopped" })],
+    });
+
+    function SessionRouteProbe(): React.JSX.Element {
+      const location = useLocation();
+      return (
+        <div>
+          <span>{location.pathname}</span>
+        </div>
+      );
+    }
+
+    renderSessionsPage({
+      queryClient,
+      initialEntries: ["/sessions"],
+      routes: (
+        <Routes>
+          <Route element={<SessionsPage />} path="/sessions" />
+          <Route element={<SessionRouteProbe />} path="/sessions/:sandboxInstanceId" />
+        </Routes>
+      ),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+
+    expect(screen.getByText("/sessions/sbi_stopped")).toBeDefined();
+  });
+
+  it("uses the resume action label only for stopped sessions", () => {
+    expect(shouldUseResumeActionLabel("stopped")).toBe(true);
+    expect(shouldUseResumeActionLabel("starting")).toBe(false);
+    expect(shouldUseResumeActionLabel("running")).toBe(false);
+    expect(shouldUseResumeActionLabel("failed")).toBe(false);
   });
 
   it("clears a stale selected profile after launchable profiles finish refetching without it", () => {
     expect(
       shouldClearSelectedProfile({
-        selectedProfile: {
+        selectedProfile: buildSelectableProfile({
           id: "sbp_profile_alpha",
-          displayName: "Alpha Profile",
-          status: "active",
-          latestVersion: 3,
-          createdAt: "2026-03-10T00:00:00.000Z",
-          updatedAt: "2026-03-10T00:00:00.000Z",
-          organizationId: "org_123",
-        },
+        }),
         selectableProfiles: [],
         isSelectableProfilesPending: false,
       }),
@@ -215,15 +333,9 @@ describe("SessionsPage", () => {
   it("keeps the current selection while launchable profiles are still loading", () => {
     expect(
       shouldClearSelectedProfile({
-        selectedProfile: {
+        selectedProfile: buildSelectableProfile({
           id: "sbp_profile_alpha",
-          displayName: "Alpha Profile",
-          status: "active",
-          latestVersion: 3,
-          createdAt: "2026-03-10T00:00:00.000Z",
-          updatedAt: "2026-03-10T00:00:00.000Z",
-          organizationId: "org_123",
-        },
+        }),
         selectableProfiles: [],
         isSelectableProfilesPending: true,
       }),
@@ -233,25 +345,13 @@ describe("SessionsPage", () => {
   it("keeps the current selection when the selected profile is still launchable", () => {
     expect(
       shouldClearSelectedProfile({
-        selectedProfile: {
+        selectedProfile: buildSelectableProfile({
           id: "sbp_profile_alpha",
-          displayName: "Alpha Profile",
-          status: "active",
-          latestVersion: 3,
-          createdAt: "2026-03-10T00:00:00.000Z",
-          updatedAt: "2026-03-10T00:00:00.000Z",
-          organizationId: "org_123",
-        },
+        }),
         selectableProfiles: [
-          {
+          buildSelectableProfile({
             id: "sbp_profile_alpha",
-            displayName: "Alpha Profile",
-            status: "active",
-            latestVersion: 3,
-            createdAt: "2026-03-10T00:00:00.000Z",
-            updatedAt: "2026-03-10T00:00:00.000Z",
-            organizationId: "org_123",
-          },
+          }),
         ],
         isSelectableProfilesPending: false,
       }),

@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import http from "node:http";
 
 import Docker from "dockerode";
@@ -11,18 +10,14 @@ import {
 } from "./client-errors.js";
 import {
   DockerCloseSandboxStdinRequestSchema,
-  DockerCreateVolumeRequestSchema,
   DockerDestroySandboxRequestSchema,
   DockerResumeSandboxRequestSchema,
-  DockerDeleteVolumeRequestSchema,
   DockerStartSandboxRequestSchema,
   DockerStopSandboxRequestSchema,
   DockerWriteSandboxStdinRequestSchema,
   type DockerCloseSandboxStdinRequest,
-  type DockerCreateVolumeRequest,
   type DockerDestroySandboxRequest,
   type DockerResumeSandboxRequest,
-  type DockerDeleteVolumeRequest,
   type DockerSandboxConfig,
   type DockerStartSandboxRequest,
   type DockerStopSandboxRequest,
@@ -33,13 +28,7 @@ export type DockerStartSandboxResponse = {
   runtimeId: string;
 };
 
-export type DockerCreateVolumeResponse = {
-  volumeId: string;
-};
-
 export interface DockerClient {
-  createVolume(request: DockerCreateVolumeRequest): Promise<DockerCreateVolumeResponse>;
-  deleteVolume(request: DockerDeleteVolumeRequest): Promise<void>;
   startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse>;
   resumeSandbox(request: DockerResumeSandboxRequest): Promise<DockerStartSandboxResponse>;
   writeSandboxStdin(request: DockerWriteSandboxStdinRequest): Promise<void>;
@@ -121,10 +110,6 @@ function toDockerEnv(env: Record<string, string> | undefined): string[] | undefi
   return entries.map(([key, value]) => `${key}=${value}`);
 }
 
-function createDockerVolumeName(): string {
-  return `mistle-volume-${randomUUID().replaceAll("-", "")}`;
-}
-
 export class DockerApiClient implements DockerClient {
   readonly #config: DockerSandboxConfig;
   readonly #docker: Docker;
@@ -137,33 +122,6 @@ export class DockerApiClient implements DockerClient {
     });
   }
 
-  async createVolume(_request: DockerCreateVolumeRequest): Promise<DockerCreateVolumeResponse> {
-    DockerCreateVolumeRequestSchema.parse(_request);
-
-    const volumeId = createDockerVolumeName();
-    await this.#runDockerClientOperation(DockerClientOperationIds.CREATE_VOLUME, () =>
-      this.#docker.createVolume({
-        Name: volumeId,
-        Labels: {
-          "mistle.sandbox.provider": "docker",
-        },
-      }),
-    );
-
-    return {
-      volumeId,
-    };
-  }
-
-  async deleteVolume(request: DockerDeleteVolumeRequest): Promise<void> {
-    const parsedRequest = DockerDeleteVolumeRequestSchema.parse(request);
-    const volume = await this.#resolveVolume(parsedRequest.volumeId);
-
-    await this.#runDockerClientOperation(DockerClientOperationIds.REMOVE_VOLUME, () =>
-      volume.remove(),
-    );
-  }
-
   async startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse> {
     const parsedRequest = DockerStartSandboxRequestSchema.parse(request);
 
@@ -172,13 +130,6 @@ export class DockerApiClient implements DockerClient {
     const hostConfig: Docker.HostConfig = {};
     if (this.#config.networkName !== undefined) {
       hostConfig.NetworkMode = this.#config.networkName;
-    }
-    if (parsedRequest.mounts !== undefined && parsedRequest.mounts.length > 0) {
-      hostConfig.Mounts = parsedRequest.mounts.map((mount) => ({
-        Source: mount.volumeId,
-        Target: mount.mountPath,
-        Type: "volume",
-      }));
     }
     const createContainerOptions: Docker.ContainerCreateOptions = {
       Image: parsedRequest.imageRef,
@@ -283,16 +234,6 @@ export class DockerApiClient implements DockerClient {
     );
 
     return container;
-  }
-
-  async #resolveVolume(volumeId: string): Promise<Docker.Volume> {
-    const volume = this.#docker.getVolume(volumeId);
-
-    await this.#runDockerClientOperation(DockerClientOperationIds.RESOLVE_VOLUME, () =>
-      volume.inspect(),
-    );
-
-    return volume;
   }
 
   async #pullImage(imageRef: string): Promise<void> {

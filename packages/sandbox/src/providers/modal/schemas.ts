@@ -23,24 +23,11 @@ export const ModalSandboxConfigSchema = z
 
 export type ModalSandboxConfig = z.output<typeof ModalSandboxConfigSchema>;
 
-const ModalVolumeMountSchema = z
-  .object({
-    volumeId: z.string().trim().min(1, {
-      message: "Modal request field `volumeId` is required.",
-    }),
-    mountPath: z.string().trim().min(1, {
-      message: "Modal request field `mountPath` is required.",
-    }),
-  })
-  .strict();
-export type ModalVolumeMount = z.output<typeof ModalVolumeMountSchema>;
-
 export const ModalStartSandboxRequestSchema = z
   .object({
     imageId: z.string().trim().min(1, {
       message: "Modal request field `imageId` is required.",
     }),
-    mounts: z.array(ModalVolumeMountSchema).optional(),
     env: z
       .record(
         z.string().trim().min(1, {
@@ -58,7 +45,6 @@ export const ModalResumeSandboxRequestSchema = z
     imageId: z.string().trim().min(1, {
       message: "Modal request field `imageId` is required.",
     }),
-    mounts: z.array(ModalVolumeMountSchema).optional(),
     env: z
       .record(
         z.string().trim().min(1, {
@@ -91,18 +77,6 @@ export const ModalCloseSandboxStdinRequestSchema = z
   })
   .strict();
 export type ModalCloseSandboxStdinRequest = z.output<typeof ModalCloseSandboxStdinRequestSchema>;
-
-export const ModalCreateVolumeRequestSchema = z.object({}).strict();
-export type ModalCreateVolumeRequest = z.output<typeof ModalCreateVolumeRequestSchema>;
-
-export const ModalDeleteVolumeRequestSchema = z
-  .object({
-    volumeId: z.string().trim().min(1, {
-      message: "Modal request field `volumeId` is required.",
-    }),
-  })
-  .strict();
-export type ModalDeleteVolumeRequest = z.output<typeof ModalDeleteVolumeRequestSchema>;
 
 export const ModalStopSandboxRequestSchema = z
   .object({

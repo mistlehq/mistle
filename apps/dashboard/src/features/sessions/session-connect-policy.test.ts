@@ -24,7 +24,7 @@ describe("session connect policy", () => {
     expect(isSandboxReadyForConnections(null)).toBe(false);
   });
 
-  it("resolves page-level connection readiness and keeps stopped sessions disconnected until the control-plane API exposes a resume endpoint", () => {
+  it("resolves page-level connection readiness and keeps stopped sessions disconnected until resume is requested", () => {
     expect(
       resolveSessionConnectionReadiness({
         sandboxInstanceId: null,

@@ -1,18 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import {
   resolveSessionConnectionReadiness,
   shouldAutoConnectSession,
 } from "../sessions/session-connect-policy.js";
-import { getSandboxInstanceStatus } from "../sessions/sessions-service.js";
+import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   hasSessionTopAlert,
   resolveChatComposerAction,
   resolveSessionHeaderStatusUi,
-  resolveStoppedSessionMessage,
 } from "./session-workbench-view-model.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 
@@ -111,14 +111,25 @@ export function resolveAutomationSessionPreparationTimeoutDelayMs(input: {
 type SessionWorkbenchState = {
   connectionReadiness: {
     canConnect: boolean;
-    reason: "failed" | "loading" | "missing-session" | "ready" | "starting" | "stopped" | "unknown";
+    reason:
+      | "failed"
+      | "loading"
+      | "missing-session"
+      | "ready"
+      | "resuming"
+      | "starting"
+      | "stopped"
+      | "unknown";
   };
   stoppedSessionState: {
     message: string | null;
     requiresManualResume: boolean;
   };
   hasTopAlert: boolean;
+  isResumingStoppedSandbox: boolean;
+  shouldAutoResumeOnEntry: boolean;
   ptyState: ReturnType<typeof useSandboxPtyState>;
+  requestStoppedSandboxResume: () => Promise<void>;
   sandboxFailureMessage: string | null;
   sandboxStatusQuery: ReturnType<
     typeof useQuery<Awaited<ReturnType<typeof getSandboxInstanceStatus>>, Error>
@@ -178,6 +189,170 @@ export type {
   UseSessionWorkbenchControllerResult,
 };
 
+type ResumeRequestGuard = {
+  requestId: number;
+  sandboxInstanceId: string;
+};
+
+type SessionEntryPhase =
+  | "connecting"
+  | "sandbox_failed"
+  | "loading"
+  | "manual_resume_required"
+  | "ready"
+  | "resume_pending"
+  | "sandbox_starting";
+
+export function getSandboxInstanceStatusQueryKey(
+  sandboxInstanceId: string | null,
+): readonly ["sandbox-instance-status", string | null] {
+  return ["sandbox-instance-status", sandboxInstanceId];
+}
+
+export function hasFreshSandboxStatusRead(input: {
+  initialDataUpdatedAtMs: number | null;
+  currentDataUpdatedAtMs: number;
+}): boolean {
+  if (input.initialDataUpdatedAtMs === null) {
+    return false;
+  }
+
+  return input.currentDataUpdatedAtMs > input.initialDataUpdatedAtMs;
+}
+
+export function shouldShowResumeInFlightState(input: {
+  hasAttemptedInitialStoppedResume: boolean;
+  resumeActionErrorMessage: string | null;
+  shouldAttemptInitialStoppedResume: boolean;
+  isResumingStoppedSandbox: boolean;
+  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
+}): boolean {
+  return (
+    input.sandboxStatus === "stopped" &&
+    (input.isResumingStoppedSandbox ||
+      input.shouldAttemptInitialStoppedResume ||
+      (input.hasAttemptedInitialStoppedResume && input.resumeActionErrorMessage === null))
+  );
+}
+
+export function shouldPollStoppedSandboxStatus(input: {
+  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
+  hasAttemptedInitialStoppedResume: boolean;
+  isResumingStoppedSandbox: boolean;
+  resumeActionErrorMessage: string | null;
+}): boolean {
+  return (
+    input.sandboxStatus === "stopped" &&
+    shouldShowResumeInFlightState({
+      hasAttemptedInitialStoppedResume: input.hasAttemptedInitialStoppedResume,
+      resumeActionErrorMessage: input.resumeActionErrorMessage,
+      shouldAttemptInitialStoppedResume: false,
+      isResumingStoppedSandbox: input.isResumingStoppedSandbox,
+      sandboxStatus: input.sandboxStatus,
+    })
+  );
+}
+
+export function resolveSessionEntryPhase(input: {
+  connectedSession: boolean;
+  hasResumeInFlightState: boolean;
+  isStatusPending: boolean;
+  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
+}): SessionEntryPhase {
+  if (input.sandboxStatus === "failed") {
+    return "sandbox_failed";
+  }
+
+  if (input.sandboxStatus === "running") {
+    return input.connectedSession ? "ready" : "connecting";
+  }
+
+  if (input.sandboxStatus === "starting") {
+    return "sandbox_starting";
+  }
+
+  if (input.sandboxStatus === "stopped") {
+    return input.hasResumeInFlightState ? "resume_pending" : "manual_resume_required";
+  }
+
+  return input.isStatusPending ? "loading" : "loading";
+}
+
+function resolveSandboxStatusForEntryPhase(
+  phase: SessionEntryPhase,
+): "resuming" | "starting" | "running" | "stopped" | "failed" | null {
+  if (phase === "sandbox_failed") {
+    return "failed";
+  }
+
+  if (phase === "resume_pending") {
+    return "resuming";
+  }
+
+  if (phase === "sandbox_starting") {
+    return "starting";
+  }
+
+  if (phase === "connecting" || phase === "ready") {
+    return "running";
+  }
+
+  if (phase === "manual_resume_required") {
+    return "stopped";
+  }
+
+  return null;
+}
+
+export function resolveStoppedSessionMessageForEntryPhase(input: {
+  phase: SessionEntryPhase;
+  resumeActionErrorMessage: string | null;
+}): string | null {
+  if (input.phase !== "manual_resume_required") {
+    return null;
+  }
+
+  return (
+    input.resumeActionErrorMessage ??
+    "This sandbox is stopped. Resume it to reconnect chat and terminal."
+  );
+}
+
+function resolveResumeFailureMessage(error: unknown): string {
+  if (error instanceof SandboxProfilesApiError) {
+    return error.message;
+  }
+
+  if (error instanceof Error && error.message.length > 0) {
+    return error.message;
+  }
+
+  return "Could not resume sandbox session.";
+}
+
+export function isActiveResumeRequest(input: {
+  activeRequest: ResumeRequestGuard | null;
+  requestId: number;
+  sandboxInstanceId: string;
+}): boolean {
+  return (
+    input.activeRequest !== null &&
+    input.activeRequest.requestId === input.requestId &&
+    input.activeRequest.sandboxInstanceId === input.sandboxInstanceId
+  );
+}
+
+export function seedSandboxInstanceStatusQuery(input: {
+  queryClient: QueryClient;
+  sandboxInstanceId: string;
+  sandboxStatus: Awaited<ReturnType<typeof getSandboxInstanceStatus>>;
+}): void {
+  input.queryClient.setQueryData(
+    getSandboxInstanceStatusQueryKey(input.sandboxInstanceId),
+    input.sandboxStatus,
+  );
+}
+
 export function useSessionWorkbenchController(input: {
   sandboxInstanceId: string | null;
 }): UseSessionWorkbenchControllerResult {
@@ -187,7 +362,15 @@ export function useSessionWorkbenchController(input: {
   const [automationPendingErrorMessage, setAutomationPendingErrorMessage] = useState<string | null>(
     null,
   );
+  const [hasAttemptedInitialStoppedResume, setHasAttemptedInitialStoppedResume] = useState(false);
+  const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(false);
+  const [resumeActionErrorMessage, setResumeActionErrorMessage] = useState<string | null>(null);
   const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
+  const activeResumeRequestRef = useRef<ResumeRequestGuard | null>(null);
+  const resumeIdempotencyKeyRef = useRef<string | null>(null);
+  const nextResumeRequestIdRef = useRef(0);
+  const initialSandboxStatusDataUpdatedAtRef = useRef<number | null>(null);
+  const queryClient = useQueryClient();
   const sessionState = useCodexSessionState();
   const ptyState = useSandboxPtyState();
   const terminalPanelState = useSessionTerminalWorkbenchState({
@@ -228,7 +411,7 @@ export function useSessionWorkbenchController(input: {
       : composerConfigSnapshot;
 
   const sandboxStatusQuery = useQuery({
-    queryKey: ["sandbox-instance-status", input.sandboxInstanceId],
+    queryKey: getSandboxInstanceStatusQueryKey(input.sandboxInstanceId),
     queryFn: async ({ signal }) => {
       if (input.sandboxInstanceId === null) {
         throw new Error("Session id is required.");
@@ -253,22 +436,59 @@ export function useSessionWorkbenchController(input: {
         return AutomationSessionStatusRefetchIntervalMs;
       }
 
+      if (
+        shouldPollStoppedSandboxStatus({
+          sandboxStatus: status ?? null,
+          hasAttemptedInitialStoppedResume,
+          isResumingStoppedSandbox,
+          resumeActionErrorMessage,
+        })
+      ) {
+        return 1_000;
+      }
+
       return status === "running" || status === "failed" || status === "stopped" ? false : 1_000;
     },
   });
-  const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
+  if (initialSandboxStatusDataUpdatedAtRef.current === null) {
+    initialSandboxStatusDataUpdatedAtRef.current = sandboxStatusQuery.dataUpdatedAt;
+  }
+  const hasFreshSandboxStatus = hasFreshSandboxStatusRead({
+    initialDataUpdatedAtMs: initialSandboxStatusDataUpdatedAtRef.current,
+    currentDataUpdatedAtMs: sandboxStatusQuery.dataUpdatedAt,
+  });
+  const sandboxStatus = hasFreshSandboxStatus ? (sandboxStatusQuery.data?.status ?? null) : null;
+  const shouldAttemptInitialStoppedResume =
+    input.sandboxInstanceId !== null &&
+    sandboxStatus === "stopped" &&
+    !hasAttemptedInitialStoppedResume;
+  const isShowingResumeInFlightState = shouldShowResumeInFlightState({
+    hasAttemptedInitialStoppedResume,
+    resumeActionErrorMessage,
+    shouldAttemptInitialStoppedResume,
+    isResumingStoppedSandbox,
+    sandboxStatus,
+  });
+  const sessionEntryPhase = resolveSessionEntryPhase({
+    connectedSession: connectedSession !== null,
+    hasResumeInFlightState: isShowingResumeInFlightState,
+    isStatusPending: sandboxStatusQuery.isPending,
+    sandboxStatus,
+  });
+  const effectiveSandboxStatus = resolveSandboxStatusForEntryPhase(sessionEntryPhase);
   const automationConversation = sandboxStatusQuery.data?.automationConversation ?? null;
   const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
-    sandboxStatus,
+    sandboxStatus: effectiveSandboxStatus,
     automationConversation,
   });
   const connectionReadiness = resolveSessionConnectionReadiness({
     sandboxInstanceId: input.sandboxInstanceId,
-    sandboxStatus,
+    sandboxStatus: effectiveSandboxStatus,
     isStatusPending: sandboxStatusQuery.isPending,
   });
-  const stoppedSessionMessage = resolveStoppedSessionMessage({
-    connectionReadinessReason: connectionReadiness.reason,
+  const stoppedSessionMessage = resolveStoppedSessionMessageForEntryPhase({
+    phase: sessionEntryPhase,
+    resumeActionErrorMessage,
   });
   const stoppedSessionState = {
     // Mirror the policy contract: stopped-state messaging stays separate from
@@ -279,15 +499,16 @@ export function useSessionWorkbenchController(input: {
     requiresManualResume: stoppedSessionMessage !== null,
   };
 
+  // Syncs teardown with the external Codex session and PTY lifecycles on unmount.
   useEffect(() => {
-    setHasAttemptedAutoConnect(false);
-    setAutomationPendingSinceMs(null);
-    setAutomationPendingErrorMessage(null);
-    clearStartErrorMessage();
-    disconnectSession();
-    void disconnectPty();
-  }, [clearStartErrorMessage, disconnectPty, disconnectSession, input.sandboxInstanceId]);
+    return () => {
+      clearStartErrorMessage();
+      disconnectSession();
+      void disconnectPty();
+    };
+  }, [clearStartErrorMessage, disconnectPty, disconnectSession]);
 
+  // Syncs a browser timer with the external automation-thread preparation window.
   useEffect(() => {
     if (!isWaitingForAutomationThread) {
       setAutomationPendingSinceMs(null);
@@ -330,6 +551,7 @@ export function useSessionWorkbenchController(input: {
 
   const resolvedStartErrorMessage = startErrorMessage ?? automationPendingErrorMessage;
 
+  // Syncs React with the external Codex session connection lifecycle.
   useEffect(() => {
     if (input.sandboxInstanceId === null) {
       return;
@@ -372,6 +594,7 @@ export function useSessionWorkbenchController(input: {
     resolvedStartErrorMessage,
   ]);
 
+  // Syncs a status refetch with the external sandbox startup lifecycle.
   useEffect(() => {
     if (input.sandboxInstanceId === null || connectedSession === null) {
       return;
@@ -390,7 +613,7 @@ export function useSessionWorkbenchController(input: {
   ]);
 
   const sandboxStatusLabel =
-    sandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
+    effectiveSandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
   const sessionHeaderStatusUi = resolveSessionHeaderStatusUi({
     sandboxStatus: sandboxStatusLabel.toLowerCase(),
     agentConnectionState,
@@ -406,6 +629,7 @@ export function useSessionWorkbenchController(input: {
     sandboxFailureMessage,
     stoppedSessionMessage: stoppedSessionState.message,
   });
+  // Syncs the connected admin channel with external model/config state.
   useEffect(() => {
     if (connectedSession === null) {
       return;
@@ -484,12 +708,98 @@ export function useSessionWorkbenchController(input: {
     }
   }, [composerText, hasActiveTurn, interruptTurn, startTurn, steerTurn]);
 
+  const requestStoppedSandboxResume = useCallback(async (): Promise<void> => {
+    if (
+      input.sandboxInstanceId === null ||
+      sandboxStatus !== "stopped" ||
+      isResumingStoppedSandbox
+    ) {
+      return;
+    }
+
+    const idempotencyKey = resumeIdempotencyKeyRef.current ?? crypto.randomUUID();
+    resumeIdempotencyKeyRef.current = idempotencyKey;
+    const requestId = nextResumeRequestIdRef.current + 1;
+    nextResumeRequestIdRef.current = requestId;
+    activeResumeRequestRef.current = {
+      requestId,
+      sandboxInstanceId: input.sandboxInstanceId,
+    };
+    setHasAttemptedInitialStoppedResume(true);
+    setResumeActionErrorMessage(null);
+
+    clearStartErrorMessage();
+    setIsResumingStoppedSandbox(true);
+    try {
+      const resumedSandboxStatus = await resumeSandboxInstance({
+        instanceId: input.sandboxInstanceId,
+        idempotencyKey,
+      });
+      if (
+        !isActiveResumeRequest({
+          activeRequest: activeResumeRequestRef.current,
+          requestId,
+          sandboxInstanceId: input.sandboxInstanceId,
+        })
+      ) {
+        return;
+      }
+      seedSandboxInstanceStatusQuery({
+        queryClient,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sandboxStatus: resumedSandboxStatus,
+      });
+      if (resumedSandboxStatus.status !== "stopped") {
+        resumeIdempotencyKeyRef.current = null;
+      }
+      clearStartErrorMessage();
+      setHasAttemptedAutoConnect(false);
+
+      void sandboxStatusQuery.refetch().catch(() => {});
+    } catch (error) {
+      if (
+        !isActiveResumeRequest({
+          activeRequest: activeResumeRequestRef.current,
+          requestId,
+          sandboxInstanceId: input.sandboxInstanceId,
+        })
+      ) {
+        return;
+      }
+      if (error instanceof SandboxProfilesApiError && error.status < 500) {
+        resumeIdempotencyKeyRef.current = null;
+      }
+      setResumeActionErrorMessage(resolveResumeFailureMessage(error));
+    } finally {
+      if (
+        isActiveResumeRequest({
+          activeRequest: activeResumeRequestRef.current,
+          requestId,
+          sandboxInstanceId: input.sandboxInstanceId,
+        })
+      ) {
+        activeResumeRequestRef.current = null;
+        setIsResumingStoppedSandbox(false);
+      }
+    }
+  }, [
+    clearStartErrorMessage,
+    input.sandboxInstanceId,
+    isResumingStoppedSandbox,
+    queryClient,
+    sandboxStatus,
+    sandboxStatusQuery.refetch,
+  ]);
+
   return {
     workbench: {
       connectionReadiness,
       stoppedSessionState,
       hasTopAlert,
+      isResumingStoppedSandbox: isShowingResumeInFlightState,
+      shouldAutoResumeOnEntry: shouldAttemptInitialStoppedResume,
       ptyState,
+      requestStoppedSandboxResume,
       sandboxFailureMessage,
       sandboxStatusQuery,
       sessionHeaderStatusUi,

@@ -9,8 +9,6 @@ import { dockerAdapterIntegrationEnabled, it } from "./test-context.js";
 const describeDockerAdapterIntegration = dockerAdapterIntegrationEnabled ? describe : describe.skip;
 const START_MARKER_FILE_PATH = "/tmp/mistle-start-marker.txt";
 const INJECTED_ENV_KEY = "MISTLE_SANDBOX_INJECTED_ENV";
-const VOLUME_MOUNT_PATH = "/mnt/mistle-volume";
-const VOLUME_MARKER_FILE_PATH = `${VOLUME_MOUNT_PATH}/mistle-volume-marker.txt`;
 
 type ContainerCommandResult = {
   exitCode: number;
@@ -198,81 +196,6 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       if (id !== undefined) {
         await fixture.adapter.destroy({ id });
       }
-    }
-  }, 300_000);
-
-  it("creates and deletes a docker volume", async ({ fixture }) => {
-    const volume = await fixture.adapter.createVolume({});
-
-    expect(volume.provider).toBe(SandboxProvider.DOCKER);
-    expect(volume.volumeId).not.toBe("");
-
-    await expect(fixture.dockerClient.getVolume(volume.volumeId).inspect()).resolves.toMatchObject({
-      Name: volume.volumeId,
-    });
-
-    await fixture.adapter.deleteVolume({ volumeId: volume.volumeId });
-
-    await expect(fixture.dockerClient.getVolume(volume.volumeId).inspect()).rejects.toMatchObject({
-      statusCode: 404,
-    });
-  }, 300_000);
-
-  it("mounts a created volume and preserves its contents across fresh runtime starts", async ({
-    fixture,
-  }) => {
-    const marker = `mistle-docker-volume-${randomUUID()}`;
-    const volume = await fixture.adapter.createVolume({});
-    let firstRuntimeId: string | undefined;
-    let secondRuntimeId: string | undefined;
-
-    try {
-      const firstSandbox = await fixture.adapter.start({
-        image: fixture.baseImage,
-        mounts: [
-          {
-            volume,
-            mountPath: VOLUME_MOUNT_PATH,
-          },
-        ],
-      });
-      firstRuntimeId = firstSandbox.id;
-
-      await writeSandboxFile({
-        dockerClient: fixture.dockerClient,
-        id: firstSandbox.id,
-        path: VOLUME_MARKER_FILE_PATH,
-        fileContents: marker,
-      });
-
-      await fixture.adapter.destroy({ id: firstSandbox.id });
-      firstRuntimeId = undefined;
-
-      const secondSandbox = await fixture.adapter.start({
-        image: fixture.baseImage,
-        mounts: [
-          {
-            volume,
-            mountPath: VOLUME_MOUNT_PATH,
-          },
-        ],
-      });
-      secondRuntimeId = secondSandbox.id;
-
-      const readback = await readSandboxFile({
-        dockerClient: fixture.dockerClient,
-        id: secondSandbox.id,
-        path: VOLUME_MARKER_FILE_PATH,
-      });
-      expect(readback).toBe(marker);
-    } finally {
-      if (firstRuntimeId !== undefined) {
-        await fixture.adapter.destroy({ id: firstRuntimeId });
-      }
-      if (secondRuntimeId !== undefined) {
-        await fixture.adapter.destroy({ id: secondRuntimeId });
-      }
-      await fixture.adapter.deleteVolume({ volumeId: volume.volumeId });
     }
   }, 300_000);
 

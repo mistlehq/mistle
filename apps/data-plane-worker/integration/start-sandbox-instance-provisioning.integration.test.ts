@@ -82,7 +82,7 @@ describe("start sandbox instance provisioning integration", () => {
   });
 
   it(
-    "persists provider sandbox metadata without writing instance volume metadata",
+    "persists provider sandbox metadata",
     async () => {
       const db = createDatabase();
       const sandboxInstanceId = "sbi_start_provisioning_integration";
@@ -109,9 +109,6 @@ describe("start sandbox instance provisioning integration", () => {
         columns: {
           id: true,
           status: true,
-          instanceVolumeProvider: true,
-          instanceVolumeId: true,
-          instanceVolumeMode: true,
         },
         where: (table, { eq }) => eq(table.id, sandboxInstanceId),
       });
@@ -119,9 +116,6 @@ describe("start sandbox instance provisioning integration", () => {
       expect(persistedStartingInstance).toEqual({
         id: sandboxInstanceId,
         status: SandboxInstanceStatuses.STARTING,
-        instanceVolumeProvider: null,
-        instanceVolumeId: null,
-        instanceVolumeMode: null,
       });
 
       await persistSandboxInstanceProvisioning(
@@ -141,9 +135,6 @@ describe("start sandbox instance provisioning integration", () => {
         columns: {
           id: true,
           providerSandboxId: true,
-          instanceVolumeProvider: true,
-          instanceVolumeId: true,
-          instanceVolumeMode: true,
         },
         where: (table, { eq }) => eq(table.id, sandboxInstanceId),
       });
@@ -151,9 +142,6 @@ describe("start sandbox instance provisioning integration", () => {
       expect(persistedProvisionedInstance).toEqual({
         id: sandboxInstanceId,
         providerSandboxId: "provider-runtime-start-provisioning",
-        instanceVolumeProvider: null,
-        instanceVolumeId: null,
-        instanceVolumeMode: null,
       });
 
       const persistedRuntimePlans = await db.query.sandboxInstanceRuntimePlans.findMany({

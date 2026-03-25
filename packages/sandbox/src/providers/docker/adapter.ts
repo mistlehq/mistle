@@ -11,20 +11,9 @@ import {
   type SandboxResumeRequestV1,
   type SandboxStartRequest,
   type SandboxStopRequest,
-  type CreateVolumeRequestV1,
-  type DeleteVolumeRequestV1,
-  type SandboxVolumeHandleV1,
 } from "../../types.js";
 import { DockerClientError, DockerClientErrorCodes } from "./client-errors.js";
 import type { DockerClient } from "./client.js";
-
-function createVolumeHandle(volumeId: string): SandboxVolumeHandleV1 {
-  return {
-    provider: SandboxProvider.DOCKER,
-    volumeId,
-    createdAt: new Date().toISOString(),
-  };
-}
 
 export class DockerSandboxAdapter implements SandboxAdapter {
   readonly #client: DockerClient;
@@ -33,53 +22,13 @@ export class DockerSandboxAdapter implements SandboxAdapter {
     this.#client = client;
   }
 
-  async createVolume(_request: CreateVolumeRequestV1): Promise<SandboxVolumeHandleV1> {
-    const response = await this.#client.createVolume({});
-
-    return createVolumeHandle(response.volumeId);
-  }
-
-  async deleteVolume(request: DeleteVolumeRequestV1): Promise<void> {
-    if (request.volumeId.trim().length === 0) {
-      throw new SandboxConfigurationError("Volume id is required.");
-    }
-
-    try {
-      await this.#client.deleteVolume({ volumeId: request.volumeId });
-    } catch (error) {
-      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
-        throw new SandboxResourceNotFoundError({
-          resourceType: "volume",
-          resourceId: request.volumeId,
-          cause: error,
-        });
-      }
-
-      throw error;
-    }
-  }
-
   async start(request: SandboxStartRequest): Promise<SandboxHandle> {
     if (request.image.provider !== SandboxProvider.DOCKER) {
       throw new SandboxConfigurationError("Docker adapter received a non-Docker image handle.");
     }
-    if (
-      request.mounts !== undefined &&
-      request.mounts.some((mount) => mount.volume.provider !== SandboxProvider.DOCKER)
-    ) {
-      throw new SandboxConfigurationError("Docker adapter received a non-Docker volume handle.");
-    }
 
     const response = await this.#client.startSandbox({
       imageRef: request.image.imageId,
-      ...(request.mounts === undefined
-        ? {}
-        : {
-            mounts: request.mounts.map((mount) => ({
-              volumeId: mount.volume.volumeId,
-              mountPath: mount.mountPath,
-            })),
-          }),
       ...(request.env === undefined ? {} : { env: request.env }),
     });
     const id = response.runtimeId;
@@ -104,12 +53,6 @@ export class DockerSandboxAdapter implements SandboxAdapter {
   async resume(request: SandboxResumeRequestV1): Promise<SandboxHandle> {
     if (request.image.provider !== SandboxProvider.DOCKER) {
       throw new SandboxConfigurationError("Docker adapter received a non-Docker image handle.");
-    }
-    if (
-      request.mounts !== undefined &&
-      request.mounts.some((mount) => mount.volume.provider !== SandboxProvider.DOCKER)
-    ) {
-      throw new SandboxConfigurationError("Docker adapter received a non-Docker volume handle.");
     }
     if (request.id === undefined || request.id === null) {
       throw new SandboxConfigurationError("Docker adapter resume requires a previous runtime id.");

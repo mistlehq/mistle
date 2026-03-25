@@ -28,18 +28,6 @@ export const ModalClientOperationIds = {
    */
   START_SANDBOX: "start_sandbox",
   /**
-   * `volumes.fromName(..., { createIfMissing: true })`.
-   */
-  CREATE_VOLUME: "create_volume",
-  /**
-   * `volumes.fromName(..., { createIfMissing: false })`.
-   */
-  RESOLVE_VOLUME: "resolve_volume",
-  /**
-   * `volumes.delete(...)`.
-   */
-  DELETE_VOLUME: "delete_volume",
-  /**
    * `sandboxes.fromId(...)`
    * Source:
    * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L455-L468
