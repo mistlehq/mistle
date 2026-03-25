@@ -43,6 +43,13 @@ export function resolveSessionHeaderStatusUi(input: {
     };
   }
 
+  if (input.sandboxStatus === "resuming") {
+    return {
+      label: "Resuming sandbox",
+      variant: "outline",
+    };
+  }
+
   if (input.sandboxStatus !== "running") {
     return {
       label: "Starting sandbox",
@@ -102,6 +109,7 @@ export function resolveStoppedSessionMessage(input: {
     | "loading"
     | "missing-session"
     | "ready"
+    | "resuming"
     | "starting"
     | "stopped"
     | "unknown";

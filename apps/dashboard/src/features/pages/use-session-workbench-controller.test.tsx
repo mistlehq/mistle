@@ -558,7 +558,7 @@ describe("useSessionWorkbenchController", () => {
     );
 
     expect(result.current.workbench.isResumingStoppedSandbox).toBe(true);
-    expect(result.current.workbench.connectionReadiness.reason).toBe("starting");
+    expect(result.current.workbench.connectionReadiness.reason).toBe("resuming");
     expect(result.current.workbench.stoppedSessionState.requiresManualResume).toBe(false);
 
     clearStoredResumeIdempotencyKey({

@@ -6,7 +6,15 @@ export function isSessionPageNavigableSandboxStatus(
 
 export type SessionConnectionReadiness = {
   canConnect: boolean;
-  reason: "failed" | "loading" | "missing-session" | "ready" | "starting" | "stopped" | "unknown";
+  reason:
+    | "failed"
+    | "loading"
+    | "missing-session"
+    | "ready"
+    | "resuming"
+    | "starting"
+    | "stopped"
+    | "unknown";
 };
 
 export function isSandboxReadyForConnections(
@@ -45,6 +53,13 @@ export function resolveSessionConnectionReadiness(input: {
     return {
       canConnect: false,
       reason: "starting",
+    };
+  }
+
+  if (input.sandboxStatus === "resuming") {
+    return {
+      canConnect: false,
+      reason: "resuming",
     };
   }
 

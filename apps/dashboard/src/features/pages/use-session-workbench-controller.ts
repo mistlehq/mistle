@@ -120,7 +120,15 @@ export function resolveAutomationSessionPreparationTimeoutDelayMs(input: {
 type SessionWorkbenchState = {
   connectionReadiness: {
     canConnect: boolean;
-    reason: "failed" | "loading" | "missing-session" | "ready" | "starting" | "stopped" | "unknown";
+    reason:
+      | "failed"
+      | "loading"
+      | "missing-session"
+      | "ready"
+      | "resuming"
+      | "starting"
+      | "stopped"
+      | "unknown";
   };
   stoppedSessionState: {
     message: string | null;
@@ -344,12 +352,16 @@ export function resolveSessionEntryPhase(input: {
 
 function resolveSandboxStatusForEntryPhase(
   phase: SessionEntryPhase,
-): "starting" | "running" | "stopped" | "failed" | null {
+): "resuming" | "starting" | "running" | "stopped" | "failed" | null {
   if (phase === "sandbox_failed") {
     return "failed";
   }
 
-  if (phase === "resume_pending" || phase === "sandbox_starting") {
+  if (phase === "resume_pending") {
+    return "resuming";
+  }
+
+  if (phase === "sandbox_starting") {
     return "starting";
   }
 

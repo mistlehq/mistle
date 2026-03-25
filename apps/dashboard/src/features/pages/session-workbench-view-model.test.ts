@@ -52,16 +52,16 @@ describe("resolveSessionHeaderStatusUi", () => {
     });
   });
 
-  it("shows connecting while a stopped sandbox is being resumed", () => {
+  it("shows resuming while a stopped sandbox resume is pending", () => {
     expect(
       resolveSessionHeaderStatusUi({
-        sandboxStatus: "stopped",
+        sandboxStatus: "resuming",
         agentConnectionState: "idle",
         step: "securing",
         hasConnectionError: false,
       }),
     ).toEqual({
-      label: "Starting sandbox",
+      label: "Resuming sandbox",
       variant: "outline",
     });
   });
