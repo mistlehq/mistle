@@ -25,12 +25,9 @@ import {
   applyEnvironmentEntries,
 } from "./proxy/proxy-environment.js";
 import { createProxyServer } from "./proxy/proxy-server.js";
-import {
-  readStartupInput,
-  DefaultStartupInputMaxBytes,
-  type StartupInput,
-} from "./read-startup-input.js";
+import { readStartupInput, DefaultStartupInputMaxBytes } from "./read-startup-input.js";
 import { applyCurrentProcessSecurity } from "./security.js";
+import { type StartupInput } from "./startup-input.js";
 
 type LookupEnv = (key: string) => string | undefined;
 
@@ -158,7 +155,6 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     });
     const applyRuntimePlanStartedAtMs = Date.now();
     await applyRuntimePlan({
-      instanceVolume: startupInput.instanceVolume,
       runtimePlan: startupInput.runtimePlan,
     });
     logSandboxRuntimeEvent({

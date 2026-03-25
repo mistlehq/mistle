@@ -11,10 +11,6 @@ const ValidStartupInputJson = `{
   "bootstrapToken": "test-token",
   "tunnelExchangeToken": "test-exchange-token",
   "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
-  "instanceVolume": {
-    "mode": "native",
-    "state": "new"
-  },
   "runtimePlan": {
     "sandboxProfileId": "sbp_123",
     "version": 1,
@@ -89,10 +85,6 @@ describe("startRuntime", () => {
       "bootstrapToken": "test-token",
       "tunnelExchangeToken": "test-exchange-token",
       "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
-      "instanceVolume": {
-        "mode": "native",
-        "state": "new"
-      },
       "runtimePlan": {
         "sandboxProfileId": "sbp_123",
         "version": 1,

@@ -206,10 +206,7 @@ fn build_event_callback(callback: Function<'_, PtyEventResult, ()>) -> Result<Ev
         })
 }
 
-fn spawn_pty_impl(
-    input: SpawnPtyInput,
-    event_callback: EventCallback,
-) -> Result<NativePtySession> {
+fn spawn_pty_impl(input: SpawnPtyInput, event_callback: EventCallback) -> Result<NativePtySession> {
     if input.command.trim().is_empty() {
         return Err(Error::new(
             Status::InvalidArg,

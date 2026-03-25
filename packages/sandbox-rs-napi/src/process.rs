@@ -44,9 +44,12 @@ pub struct NativeManagedProcess {
 }
 
 fn lock<'a, T>(mutex: &'a Mutex<T>, context: &str) -> Result<MutexGuard<'a, T>> {
-    mutex
-        .lock()
-        .map_err(|_| Error::new(Status::GenericFailure, format!("{context} lock is poisoned")))
+    mutex.lock().map_err(|_| {
+        Error::new(
+            Status::GenericFailure,
+            format!("{context} lock is poisoned"),
+        )
+    })
 }
 
 fn validate_environment_entry(entry: &ProcessEnvironmentEntry) -> Result<()> {
@@ -161,16 +164,14 @@ fn signal_from_input(signal: &str) -> Result<nix::sys::signal::Signal> {
     }
 }
 
-fn signal_managed_process_impl(
-    inner: &Arc<NativeManagedProcessInner>,
-    signal: &str,
-) -> Result<()> {
+fn signal_managed_process_impl(inner: &Arc<NativeManagedProcessInner>, signal: &str) -> Result<()> {
     if is_process_exited(inner)? {
         return Ok(());
     }
 
     let signal = signal_from_input(signal)?;
-    let result = nix::sys::signal::killpg(nix::unistd::Pid::from_raw(inner.process_group_id), signal);
+    let result =
+        nix::sys::signal::killpg(nix::unistd::Pid::from_raw(inner.process_group_id), signal);
     match result {
         Ok(()) => Ok(()),
         Err(nix::errno::Errno::ESRCH) => Ok(()),
@@ -303,7 +304,10 @@ mod tests {
     use std::path::Path;
     use std::time::Duration;
 
-    use super::{SpawnManagedProcessInput, signal_managed_process_impl, spawn_managed_process_impl, wait_for_exit_state};
+    use super::{
+        SpawnManagedProcessInput, signal_managed_process_impl, spawn_managed_process_impl,
+        wait_for_exit_state,
+    };
     use crate::security::ProcessEnvironmentEntry;
 
     #[test]
@@ -318,7 +322,9 @@ mod tests {
             None,
         );
 
-        assert!(matches!(result, Err(error) if error.to_string().contains("process command is required")));
+        assert!(
+            matches!(result, Err(error) if error.to_string().contains("process command is required"))
+        );
     }
 
     #[test]
@@ -334,9 +340,8 @@ mod tests {
         )
         .expect("expected managed process start to succeed");
 
-        let exit_result =
-            wait_for_exit_state(&process.inner, Some(Duration::from_secs(2)))
-                .expect("expected managed process to exit");
+        let exit_result = wait_for_exit_state(&process.inner, Some(Duration::from_secs(2)))
+            .expect("expected managed process to exit");
 
         assert_eq!(exit_result.exit_code, Some(17));
         assert_eq!(exit_result.signal, None);
@@ -366,9 +371,8 @@ mod tests {
         let child_pid = wait_for_child_pid(&child_pid_path);
         signal_managed_process_impl(&process.inner, "sigkill")
             .expect("expected process signal to succeed");
-        let exit_result =
-            wait_for_exit_state(&process.inner, Some(Duration::from_secs(2)))
-                .expect("expected managed process to exit");
+        let exit_result = wait_for_exit_state(&process.inner, Some(Duration::from_secs(2)))
+            .expect("expected managed process to exit");
 
         assert_eq!(exit_result.signal, Some("SIGKILL".to_string()));
         assert_process_absent(child_pid);

@@ -15,6 +15,13 @@ pub struct ExecRuntimeAsUserInput {
     pub env: Vec<ProcessEnvironmentEntry>,
 }
 
+#[napi(object)]
+pub struct UnixSocketPeerCredentials {
+    pub pid: i32,
+    pub uid: i32,
+    pub gid: i32,
+}
+
 #[cfg(target_os = "linux")]
 pub fn set_current_process_non_dumpable_impl() -> Result<(), String> {
     let result = unsafe { nix::libc::prctl(nix::libc::PR_SET_DUMPABLE, 0, 0, 0, 0) };
@@ -90,6 +97,52 @@ pub fn exec_runtime_as_user_impl(input: ExecRuntimeAsUserInput) -> Result<(), St
     }
 }
 
+#[cfg(target_os = "linux")]
+fn get_unix_socket_peer_credentials_impl(
+    fd: i32,
+) -> Result<Option<UnixSocketPeerCredentials>, String> {
+    if fd < 0 {
+        return Err("socket fd must be non-negative".to_string());
+    }
+
+    let mut credentials = std::mem::MaybeUninit::<nix::libc::ucred>::zeroed();
+    let mut credentials_length = std::mem::size_of::<nix::libc::ucred>() as nix::libc::socklen_t;
+    let result = unsafe {
+        nix::libc::getsockopt(
+            fd,
+            nix::libc::SOL_SOCKET,
+            nix::libc::SO_PEERCRED,
+            credentials.as_mut_ptr().cast(),
+            &mut credentials_length,
+        )
+    };
+
+    if result != 0 {
+        return Err(format!(
+            "failed to read unix socket peer credentials: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+
+    if credentials_length < std::mem::size_of::<nix::libc::ucred>() as nix::libc::socklen_t {
+        return Err("unix socket peer credentials were truncated".to_string());
+    }
+
+    let credentials = unsafe { credentials.assume_init() };
+    Ok(Some(UnixSocketPeerCredentials {
+        pid: credentials.pid,
+        uid: credentials.uid as i32,
+        gid: credentials.gid as i32,
+    }))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn get_unix_socket_peer_credentials_impl(
+    _fd: i32,
+) -> Result<Option<UnixSocketPeerCredentials>, String> {
+    Ok(None)
+}
+
 fn clear_close_on_exec(fd: i32) -> Result<(), String> {
     if fd < 0 {
         return Err("fd must be non-negative".to_string());
@@ -147,10 +200,7 @@ fn setgroups_count(group_count: usize) -> Result<nix::libc::c_int, String> {
         .map_err(|_| "supplementary group count overflow".to_string())
 }
 
-fn build_exec_argv(
-    command: &str,
-    args: &[String],
-) -> Result<Vec<std::ffi::CString>, String> {
+fn build_exec_argv(command: &str, args: &[String]) -> Result<Vec<std::ffi::CString>, String> {
     let mut argv = Vec::with_capacity(args.len() + 1);
     argv.push(
         std::ffi::CString::new(command)
@@ -181,8 +231,9 @@ fn build_exec_environment(
         }
 
         environment.push(
-            std::ffi::CString::new(format!("{}={}", entry.name, entry.value))
-                .map_err(|_| "runtime environment entries must not contain NUL bytes".to_string())?,
+            std::ffi::CString::new(format!("{}={}", entry.name, entry.value)).map_err(|_| {
+                "runtime environment entries must not contain NUL bytes".to_string()
+            })?,
         );
     }
 
@@ -199,11 +250,18 @@ pub fn exec_runtime_as_user(input: ExecRuntimeAsUserInput) -> napi::Result<()> {
     exec_runtime_as_user_impl(input).map_err(napi::Error::from_reason)
 }
 
+#[napi]
+pub fn get_unix_socket_peer_credentials(
+    fd: i32,
+) -> napi::Result<Option<UnixSocketPeerCredentials>> {
+    get_unix_socket_peer_credentials_impl(fd).map_err(napi::Error::from_reason)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        ExecRuntimeAsUserInput, ProcessEnvironmentEntry, build_exec_environment, clear_close_on_exec,
-        ensure_running_as_root,
+        ExecRuntimeAsUserInput, ProcessEnvironmentEntry, build_exec_environment,
+        clear_close_on_exec, ensure_running_as_root,
     };
 
     #[cfg(target_os = "linux")]
@@ -241,11 +299,12 @@ mod tests {
         let result = ensure_running_as_root();
 
         if nix::unistd::geteuid().is_root() {
-            assert!(result.is_ok(), "expected root test environment to satisfy root check");
-        } else {
             assert!(
-                matches!(result, Err(message) if message.contains("still be running as root"))
+                result.is_ok(),
+                "expected root test environment to satisfy root check"
             );
+        } else {
+            assert!(matches!(result, Err(message) if message.contains("still be running as root")));
         }
     }
 
@@ -254,8 +313,9 @@ mod tests {
         let duplicated_stdin = unsafe { nix::libc::dup(0) };
         assert!(duplicated_stdin >= 0, "expected stdin dup to succeed");
 
-        let set_result =
-            unsafe { nix::libc::fcntl(duplicated_stdin, nix::libc::F_SETFD, nix::libc::FD_CLOEXEC) };
+        let set_result = unsafe {
+            nix::libc::fcntl(duplicated_stdin, nix::libc::F_SETFD, nix::libc::FD_CLOEXEC)
+        };
         assert_eq!(set_result, 0, "expected setting cloexec to succeed");
 
         clear_close_on_exec(duplicated_stdin).expect("expected cloexec clearing to succeed");
@@ -265,7 +325,10 @@ mod tests {
         assert_eq!(flags & nix::libc::FD_CLOEXEC, 0);
 
         let close_result = unsafe { nix::libc::close(duplicated_stdin) };
-        assert_eq!(close_result, 0, "expected duplicated stdin close to succeed");
+        assert_eq!(
+            close_result, 0,
+            "expected duplicated stdin close to succeed"
+        );
     }
 
     #[cfg(target_os = "linux")]
@@ -291,8 +354,8 @@ mod tests {
             Ok(value) => value,
             Err(_) => return,
         };
-        let ready_path = std::env::var(DUMPABILITY_HELPER_READY_PATH_ENV)
-            .expect("expected helper ready path");
+        let ready_path =
+            std::env::var(DUMPABILITY_HELPER_READY_PATH_ENV).expect("expected helper ready path");
 
         match helper_mode.as_str() {
             "non-dumpable" => {
@@ -347,7 +410,10 @@ mod tests {
                 .wait()
                 .expect("expected helper process wait to succeed");
             let _ = std::fs::remove_file(&self.ready_path);
-            assert!(status.success(), "expected helper process to exit successfully");
+            assert!(
+                status.success(),
+                "expected helper process to exit successfully"
+            );
         }
     }
 
@@ -406,9 +472,7 @@ mod tests {
                                 continue;
                             }
 
-                            return Err(format!(
-                                "failed to parse helper dumpable state: {error}"
-                            ));
+                            return Err(format!("failed to parse helper dumpable state: {error}"));
                         }
                     }
                 }
@@ -438,10 +502,7 @@ mod tests {
     }
 
     #[cfg(target_os = "linux")]
-    fn cleanup_failed_helper(
-        child: &mut std::process::Child,
-        ready_path: &std::path::Path,
-    ) {
+    fn cleanup_failed_helper(child: &mut std::process::Child, ready_path: &std::path::Path) {
         let _ = child.kill();
         let _ = child.wait();
         let _ = std::fs::remove_file(ready_path);

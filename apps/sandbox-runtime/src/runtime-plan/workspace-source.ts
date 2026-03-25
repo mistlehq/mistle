@@ -3,7 +3,6 @@ import { dirname } from "node:path";
 
 import type { CompiledWorkspaceSource, RuntimeArtifactCommand } from "@mistle/integrations-core";
 
-import type { ApplyRuntimePlanInstanceVolume } from "./apply.js";
 import { runRuntimeArtifactCommand } from "./artifact-command.js";
 import { errorMessage } from "./error-message.js";
 
@@ -29,13 +28,8 @@ async function runGitCommand(args: ReadonlyArray<string>): Promise<void> {
 
 async function applyGitCloneWorkspaceSource(input: {
   workspaceSource: CompiledWorkspaceSource;
-  instanceVolume: ApplyRuntimePlanInstanceVolume;
 }): Promise<void> {
   if (await pathExists(input.workspaceSource.path)) {
-    if (input.instanceVolume.mode === "native" && input.instanceVolume.state === "existing") {
-      return;
-    }
-
     throw new Error(`workspace source path '${input.workspaceSource.path}' already exists`);
   }
 
@@ -68,7 +62,6 @@ function unsupportedWorkspaceSource(sourceKind: string): never {
 
 export async function applyWorkspaceSource(input: {
   workspaceSource: CompiledWorkspaceSource;
-  instanceVolume: ApplyRuntimePlanInstanceVolume;
 }): Promise<void> {
   switch (input.workspaceSource.sourceKind) {
     case "git-clone":

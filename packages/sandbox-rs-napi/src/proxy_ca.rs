@@ -10,8 +10,8 @@ use napi_derive::napi;
 use nix::fcntl::{FcntlArg, FdFlag, fcntl};
 use nix::unistd::{pipe, write};
 use rcgen::{
-    BasicConstraints, CertificateParams, DistinguishedName, DnType, IsCa, KeyPair,
-    KeyUsagePurpose, SanType,
+    BasicConstraints, CertificateParams, DistinguishedName, DnType, IsCa, KeyPair, KeyUsagePurpose,
+    SanType,
 };
 
 const PROXY_CA_COMMON_NAME: &str = "Mistle Sandbox Proxy CA";
@@ -179,7 +179,10 @@ fn base_proxy_ca_params() -> CertificateParams {
     let mut params = CertificateParams::default();
     params.distinguished_name = distinguished_name;
     params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
-    params.not_before = now.checked_sub(Duration::from_secs(60)).unwrap_or(now).into();
+    params.not_before = now
+        .checked_sub(Duration::from_secs(60))
+        .unwrap_or(now)
+        .into();
     params.not_after = now
         .checked_add(PROXY_CA_VALIDITY)
         .unwrap_or(now + PROXY_CA_VALIDITY)
@@ -193,12 +196,13 @@ fn base_proxy_ca_params() -> CertificateParams {
 }
 
 pub fn generate_proxy_ca_impl() -> std::result::Result<GeneratedProxyCa, ProxyCaError> {
-    let key_pair = KeyPair::generate()
-        .map_err(|error| ProxyCaError::new(format!("failed to generate proxy ca private key: {error}")))?;
+    let key_pair = KeyPair::generate().map_err(|error| {
+        ProxyCaError::new(format!("failed to generate proxy ca private key: {error}"))
+    })?;
     let params = base_proxy_ca_params();
-    let certificate = params
-        .self_signed(&key_pair)
-        .map_err(|error| ProxyCaError::new(format!("failed to generate proxy ca certificate: {error}")))?;
+    let certificate = params.self_signed(&key_pair).map_err(|error| {
+        ProxyCaError::new(format!("failed to generate proxy ca certificate: {error}"))
+    })?;
 
     Ok(GeneratedProxyCa {
         certificate_pem: certificate.pem(),
@@ -216,28 +220,39 @@ pub fn issue_proxy_leaf_certificate_impl(
         return Err(ProxyCaError::new("server name is required"));
     }
 
-    let ca_key_pair = KeyPair::from_pem(&ca_private_key_pem)
-        .map_err(|error| ProxyCaError::new(format!("failed to parse proxy ca private key: {error}")))?;
+    let ca_key_pair = KeyPair::from_pem(&ca_private_key_pem).map_err(|error| {
+        ProxyCaError::new(format!("failed to parse proxy ca private key: {error}"))
+    })?;
     if ca_certificate_pem.trim().is_empty() {
         return Err(ProxyCaError::new("proxy ca certificate pem is invalid"));
     }
 
     let issuer_certificate = base_proxy_ca_params()
         .self_signed(&ca_key_pair)
-        .map_err(|error| ProxyCaError::new(format!("failed to reconstruct proxy ca certificate: {error}")))?;
+        .map_err(|error| {
+            ProxyCaError::new(format!(
+                "failed to reconstruct proxy ca certificate: {error}"
+            ))
+        })?;
 
     let leaf_key_pair = KeyPair::generate().map_err(|error| {
-        ProxyCaError::new(format!("failed to generate leaf private key for \"{normalized_server_name}\": {error}"))
+        ProxyCaError::new(format!(
+            "failed to generate leaf private key for \"{normalized_server_name}\": {error}"
+        ))
     })?;
 
     let now = SystemTime::now();
     let mut distinguished_name = DistinguishedName::new();
     distinguished_name.push(DnType::CommonName, normalized_server_name.clone());
 
-    let mut params = CertificateParams::new(Vec::new())
-        .map_err(|error| ProxyCaError::new(format!("failed to create leaf certificate params: {error}")))?;
+    let mut params = CertificateParams::new(Vec::new()).map_err(|error| {
+        ProxyCaError::new(format!("failed to create leaf certificate params: {error}"))
+    })?;
     params.distinguished_name = distinguished_name;
-    params.not_before = now.checked_sub(Duration::from_secs(60)).unwrap_or(now).into();
+    params.not_before = now
+        .checked_sub(Duration::from_secs(60))
+        .unwrap_or(now)
+        .into();
     params.not_after = now
         .checked_add(PROXY_LEAF_VALIDITY)
         .unwrap_or(now + PROXY_LEAF_VALIDITY)
@@ -249,22 +264,26 @@ pub fn issue_proxy_leaf_certificate_impl(
     params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth];
 
     if let Ok(ip_address) = IpAddr::from_str(&normalized_server_name) {
-        params.subject_alt_names.push(SanType::IpAddress(ip_address));
-    } else {
         params
             .subject_alt_names
-            .push(SanType::DnsName(normalized_server_name.clone().try_into().map_err(
-                |error| ProxyCaError::new(format!("failed to encode leaf dns name \"{normalized_server_name}\": {error}")),
-            )?));
+            .push(SanType::IpAddress(ip_address));
+    } else {
+        params.subject_alt_names.push(SanType::DnsName(
+            normalized_server_name.clone().try_into().map_err(|error| {
+                ProxyCaError::new(format!(
+                    "failed to encode leaf dns name \"{normalized_server_name}\": {error}"
+                ))
+            })?,
+        ));
     }
 
     let leaf_certificate = params
         .signed_by(&leaf_key_pair, &issuer_certificate, &ca_key_pair)
         .map_err(|error| {
-        ProxyCaError::new(format!(
-            "failed to issue leaf certificate for \"{normalized_server_name}\": {error}"
-        ))
-    })?;
+            ProxyCaError::new(format!(
+                "failed to issue leaf certificate for \"{normalized_server_name}\": {error}"
+            ))
+        })?;
 
     Ok(IssuedProxyLeafCertificate {
         certificate_chain_pem: format!("{}{}", leaf_certificate.pem(), ca_certificate_pem),
@@ -347,8 +366,16 @@ mod tests {
         let generated_proxy_ca =
             generate_proxy_ca_impl().expect("expected proxy ca generation to succeed");
 
-        assert!(generated_proxy_ca.certificate_pem.contains("BEGIN CERTIFICATE"));
-        assert!(generated_proxy_ca.private_key_pem.contains("BEGIN PRIVATE KEY"));
+        assert!(
+            generated_proxy_ca
+                .certificate_pem
+                .contains("BEGIN CERTIFICATE")
+        );
+        assert!(
+            generated_proxy_ca
+                .private_key_pem
+                .contains("BEGIN PRIVATE KEY")
+        );
 
         let leaf_certificate = issue_proxy_leaf_certificate_impl(
             generated_proxy_ca.certificate_pem.clone(),
@@ -362,7 +389,11 @@ mod tests {
                 .certificate_chain_pem
                 .contains("BEGIN CERTIFICATE")
         );
-        assert!(leaf_certificate.private_key_pem.contains("BEGIN PRIVATE KEY"));
+        assert!(
+            leaf_certificate
+                .private_key_pem
+                .contains("BEGIN PRIVATE KEY")
+        );
         assert_eq!(
             leaf_certificate
                 .certificate_chain_pem
@@ -411,8 +442,11 @@ mod tests {
         let certificate_fd = prepared
             .certificate_fd()
             .expect("expected certificate fd to remain available");
-        let flags_bits = fcntl(unsafe { BorrowedFd::borrow_raw(certificate_fd) }, FcntlArg::F_GETFD)
-            .expect("expected certificate fd flags read to succeed");
+        let flags_bits = fcntl(
+            unsafe { BorrowedFd::borrow_raw(certificate_fd) },
+            FcntlArg::F_GETFD,
+        )
+        .expect("expected certificate fd flags read to succeed");
         let flags = FdFlag::from_bits_truncate(flags_bits);
         assert!(
             !flags.contains(FdFlag::FD_CLOEXEC),
@@ -436,8 +470,11 @@ mod tests {
             .expect("expected proxy ca runtime env cleanup to succeed");
 
         let mut chunk = [0_u8; 1];
-        let read_error = read(unsafe { BorrowedFd::borrow_raw(certificate_fd) }, &mut chunk)
-            .expect_err("expected cleaned up certificate fd to be closed");
+        let read_error = read(
+            unsafe { BorrowedFd::borrow_raw(certificate_fd) },
+            &mut chunk,
+        )
+        .expect_err("expected cleaned up certificate fd to be closed");
         assert_eq!(read_error, nix::errno::Errno::EBADF);
         assert!(prepared.certificate_fd().is_err());
         assert!(prepared.private_key_fd().is_err());
