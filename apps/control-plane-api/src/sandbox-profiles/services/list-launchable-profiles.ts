@@ -21,6 +21,9 @@ export async function listLaunchableProfiles(
 ): Promise<{
   items: LaunchableSandboxProfile[];
 }> {
+  // This endpoint is a fast structural eligibility filter for the sessions picker.
+  // It intentionally does not try to mirror every start-time runtime-plan validation,
+  // which still runs when a session is actually started.
   const latestVersionSql = sql<number>`(
     select max(spv.version)::int
     from "control_plane"."sandbox_profile_versions" as spv

@@ -228,6 +228,9 @@ export function SessionsPage(): React.JSX.Element {
   const navigate = useNavigate();
   const session = useCachedRequiredSession();
   const [searchParams, setSearchParams] = useSearchParams();
+  // Tradeoff: the selection intentionally snapshots the launchable profile, including latestVersion.
+  // This can lag behind a later refetch, but we prefer starting the exact version the picker
+  // validated at selection time over silently upgrading to a newer version after the user selects it.
   const [selectedProfile, setSelectedProfile] = useState<LaunchableSandboxProfile | null>(null);
   const {
     launchedSessions,
