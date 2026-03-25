@@ -53,13 +53,20 @@ export function FormPageHeader(input: FormPageHeaderProps): React.JSX.Element {
 
   return (
     <div className="flex items-start justify-between gap-3">
-      <div className="flex min-w-0 flex-1 items-start gap-3">
+      <div className={cn("flex min-w-0 flex-1 gap-3", hasIcon ? "items-center" : "items-start")}>
         {hasIcon ? <div className="shrink-0">{input.icon}</div> : null}
         <div className="min-w-0 flex-1">
           <div className={cn("flex flex-col", hasIcon ? "gap-0" : "gap-1")}>
-            <h1 className="text-xl font-semibold">{input.title}</h1>
+            <h1 className={cn("truncate text-xl font-semibold", hasIcon ? "leading-tight" : null)}>
+              {input.title}
+            </h1>
             {hasDescription ? (
-              <p className={cn("text-muted-foreground text-sm", hasIcon ? "leading-tight" : null)}>
+              <p
+                className={cn(
+                  "text-muted-foreground truncate text-sm",
+                  hasIcon ? "leading-tight" : null,
+                )}
+              >
                 {input.description}
               </p>
             ) : null}
