@@ -5,6 +5,11 @@ import {
   type DockerSandboxConfig,
 } from "./providers/docker/index.js";
 import {
+  createE2BAdapter,
+  createE2BRuntimeControl,
+  type E2BSandboxConfig,
+} from "./providers/e2b/index.js";
+import {
   SandboxProvider,
   type SandboxAdapter,
   type SandboxRuntimeControl,
@@ -14,6 +19,7 @@ import {
 export type CreateSandboxAdapterInput = {
   provider: SandboxProviderType;
   docker?: DockerSandboxConfig;
+  e2b?: E2BSandboxConfig;
 };
 
 function assertUnreachable(_value: never): never {
@@ -29,6 +35,14 @@ export function createSandboxAdapter(input: CreateSandboxAdapterInput): SandboxA
     return createDockerAdapter(input.docker);
   }
 
+  if (input.provider === SandboxProvider.E2B) {
+    if (input.e2b === undefined) {
+      throw new SandboxConfigurationError("E2B config is required when provider is e2b.");
+    }
+
+    return createE2BAdapter(input.e2b);
+  }
+
   return assertUnreachable(input.provider);
 }
 
@@ -41,6 +55,14 @@ export function createSandboxRuntimeControl(
     }
 
     return createDockerRuntimeControl(input.docker);
+  }
+
+  if (input.provider === SandboxProvider.E2B) {
+    if (input.e2b === undefined) {
+      throw new SandboxConfigurationError("E2B config is required when provider is e2b.");
+    }
+
+    return createE2BRuntimeControl(input.e2b);
   }
 
   return assertUnreachable(input.provider);

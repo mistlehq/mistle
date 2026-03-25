@@ -38,5 +38,21 @@ function createSandboxProviderConfig(
     };
   }
 
+  if (config.sandbox.provider === "e2b") {
+    if (config.app.sandbox.e2b === undefined) {
+      throw new Error("Expected data-plane worker E2B sandbox config for global provider e2b.");
+    }
+
+    return {
+      provider: config.sandbox.provider,
+      e2b: {
+        apiKey: config.app.sandbox.e2b.apiKey,
+        ...(config.app.sandbox.e2b.domain === undefined
+          ? {}
+          : { domain: config.app.sandbox.e2b.domain }),
+      },
+    };
+  }
+
   throw new Error("Unsupported sandbox provider.");
 }

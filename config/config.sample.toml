@@ -144,6 +144,10 @@ tokenizer_proxy_egress_base_url = "https://api.mistle.example/tokenizer-proxy/eg
 [apps.data_plane_worker.sandbox.docker]
 socket_path = "/var/run/docker.sock"
 
+[apps.data_plane_worker.sandbox.e2b]
+api_key = "replace-with-e2b-api-key"
+domain = "e2b.app"
+
 [apps.tokenizer_proxy.server]
 host = "0.0.0.0"
 port = 8085

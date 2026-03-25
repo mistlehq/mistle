@@ -5,6 +5,7 @@ import { dataPlaneSchema } from "./namespace.js";
 
 export const SandboxInstanceProviders = {
   DOCKER: "docker",
+  E2B: "e2b",
 } as const;
 
 export type SandboxInstanceProvider =

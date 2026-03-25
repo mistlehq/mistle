@@ -28,6 +28,10 @@ export const dataPlaneWorkerDevelopmentPreset = {
             network_name: "mistle-sandbox-dev",
             traces_endpoint: "http://otel-lgtm:4318/v1/traces",
           },
+          e2b: {
+            api_key: "replace-with-e2b-api-key",
+            domain: "e2b.app",
+          },
         },
       },
     },

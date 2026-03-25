@@ -16,6 +16,7 @@ export function loadDataPlaneWorkerFromToml(
   const runtimeState = asObjectRecord(dataPlaneWorker.runtime_state);
   const sandbox = asObjectRecord(dataPlaneWorker.sandbox);
   const sandboxDocker = asObjectRecord(sandbox.docker);
+  const sandboxE2B = asObjectRecord(sandbox.e2b);
 
   const sandboxConfig: Record<string, unknown> = {
     tokenizerProxyEgressBaseUrl: sandbox.tokenizer_proxy_egress_base_url,
@@ -26,6 +27,13 @@ export function loadDataPlaneWorkerFromToml(
       socketPath: sandboxDocker.socket_path,
       networkName: sandboxDocker.network_name,
       tracesEndpoint: sandboxDocker.traces_endpoint,
+    };
+  }
+
+  if (hasEntries(sandboxE2B)) {
+    sandboxConfig.e2b = {
+      apiKey: sandboxE2B.api_key,
+      domain: sandboxE2B.domain,
     };
   }
 

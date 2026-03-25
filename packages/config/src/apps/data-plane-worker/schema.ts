@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-const SandboxProviders = ["docker"] as const;
+const SandboxProviders = ["docker", "e2b"] as const;
+const DefaultE2BCloudDomain = "e2b.app";
 
 const HttpBaseUrlSchema = z.url().refine((value) => {
   const parsedUrl = new URL(value);
@@ -49,6 +50,13 @@ export const DataPlaneWorkerSandboxDockerConfigSchema = z
   })
   .strict();
 
+export const DataPlaneWorkerSandboxE2BConfigSchema = z
+  .object({
+    apiKey: z.string().min(1),
+    domain: z.string().min(1).default(DefaultE2BCloudDomain),
+  })
+  .strict();
+
 const DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema = z.url().refine((value) => {
   const parsedUrl = new URL(value);
   return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
@@ -58,6 +66,7 @@ export const DataPlaneWorkerSandboxConfigSchema = z
   .object({
     tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema,
     docker: DataPlaneWorkerSandboxDockerConfigSchema.optional(),
+    e2b: DataPlaneWorkerSandboxE2BConfigSchema.optional(),
   })
   .strict();
 
@@ -65,6 +74,7 @@ export const PartialDataPlaneWorkerSandboxConfigSchema = z
   .object({
     tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema.optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.partial().optional(),
+    e2b: DataPlaneWorkerSandboxE2BConfigSchema.partial().optional(),
   })
   .strict();
 
@@ -91,19 +101,27 @@ export const PartialDataPlaneWorkerConfigSchema = z
 const DataPlaneWorkerProviderRequirementMessages = {
   DOCKER:
     "apps.data_plane_worker.sandbox.docker is required when global.sandbox.provider is 'docker'.",
+  E2B: "apps.data_plane_worker.sandbox.e2b is required when global.sandbox.provider is 'e2b'.",
 } as const;
 
 export function getDataPlaneWorkerSandboxProviderValidationIssue(input: {
   globalSandboxProvider: (typeof SandboxProviders)[number];
   appSandbox: DataPlaneWorkerConfig["sandbox"];
 }): {
-  path: readonly ["sandbox", "docker"];
+  path: readonly ["sandbox", "docker"] | readonly ["sandbox", "e2b"];
   message: string;
 } | null {
   if (input.globalSandboxProvider === "docker" && input.appSandbox.docker === undefined) {
     return {
       path: ["sandbox", "docker"],
       message: DataPlaneWorkerProviderRequirementMessages.DOCKER,
+    };
+  }
+
+  if (input.globalSandboxProvider === "e2b" && input.appSandbox.e2b === undefined) {
+    return {
+      path: ["sandbox", "e2b"],
+      message: DataPlaneWorkerProviderRequirementMessages.E2B,
     };
   }
 

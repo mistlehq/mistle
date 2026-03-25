@@ -4,6 +4,7 @@ import {
   DataPlaneWorkerDatabaseConfigSchema,
   PartialDataPlaneWorkerRuntimeStateConfigSchema,
   DataPlaneWorkerSandboxDockerConfigSchema,
+  DataPlaneWorkerSandboxE2BConfigSchema,
   DataPlaneWorkerTunnelConfigSchema,
   DataPlaneWorkerWorkflowConfigSchema,
   PartialDataPlaneWorkerConfigSchema,
@@ -74,6 +75,17 @@ const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneWorkerSandboxDocker
   },
 ]);
 
+const loadSandboxE2BEnv = createEnvLoader<typeof DataPlaneWorkerSandboxE2BConfigSchema>([
+  {
+    key: "apiKey",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY",
+  },
+  {
+    key: "domain",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN",
+  },
+]);
+
 const loadSandboxEnv = createEnvLoader<typeof PartialDataPlaneWorkerSandboxConfigSchema>([
   {
     key: "tokenizerProxyEgressBaseUrl",
@@ -108,14 +120,19 @@ export function loadDataPlaneWorkerFromEnv(
 
   const sandbox = loadSandboxEnv(env);
   const sandboxDocker = loadSandboxDockerEnv(env);
+  const sandboxE2B = loadSandboxE2BEnv(env);
 
-  if (hasEntries(sandbox) || hasEntries(sandboxDocker)) {
+  if (hasEntries(sandbox) || hasEntries(sandboxDocker) || hasEntries(sandboxE2B)) {
     const sandboxConfig: Record<string, unknown> = {
       ...sandbox,
     };
 
     if (hasEntries(sandboxDocker)) {
       sandboxConfig.docker = sandboxDocker;
+    }
+
+    if (hasEntries(sandboxE2B)) {
+      sandboxConfig.e2b = sandboxE2B;
     }
 
     partialConfig.sandbox = sandboxConfig;
