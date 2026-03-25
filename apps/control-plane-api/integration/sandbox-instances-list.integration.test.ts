@@ -1,3 +1,4 @@
+import { sandboxProfiles, SandboxProfileStatuses } from "@mistle/db/control-plane";
 import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { afterEach, describe, expect } from "vitest";
 
@@ -38,6 +39,25 @@ describe("sandbox instances list integration", () => {
     const secondOrgSession = await fixture.authSession({
       email: "integration-sandbox-instances-list-org-b@example.com",
     });
+
+    await fixture.db.insert(sandboxProfiles).values([
+      {
+        id: "sbp_cp_list",
+        organizationId: firstOrgSession.organizationId,
+        displayName: "Control Plane Profile",
+        status: SandboxProfileStatuses.ACTIVE,
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+      {
+        id: "sbp_cp_other_org",
+        organizationId: secondOrgSession.organizationId,
+        displayName: "Other Org Profile",
+        status: SandboxProfileStatuses.ACTIVE,
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+    ]);
 
     await dataPlaneFixture.db.insert(sandboxInstances).values([
       {
@@ -115,6 +135,7 @@ describe("sandbox instances list integration", () => {
     ]);
     expect(firstPage.items[1]).toMatchObject({
       sandboxProfileId: "sbp_cp_list",
+      sandboxProfileDisplayName: "Control Plane Profile",
       sandboxProfileVersion: 2,
       status: "failed",
       startedBy: {
@@ -154,6 +175,7 @@ describe("sandbox instances list integration", () => {
       id: firstOrgSession.userId,
       name: expect.any(String),
     });
+    expect(secondPage.items[0]?.sandboxProfileDisplayName).toBe("Control Plane Profile");
     expect(secondPage.previousPage).not.toBeNull();
     expect(secondPage.nextPage).toBeNull();
 
@@ -166,6 +188,7 @@ describe("sandbox instances list integration", () => {
     const secondOrgList = ListSandboxInstancesResponseSchema.parse(await secondOrgResponse.json());
     expect(secondOrgList.totalResults).toBe(1);
     expect(secondOrgList.items.map((item) => item.id)).toEqual(["sbi_cp_list_b_001"]);
+    expect(secondOrgList.items[0]?.sandboxProfileDisplayName).toBe("Other Org Profile");
   });
 
   it("returns 400 when the list cursor is invalid", async ({ fixture }) => {

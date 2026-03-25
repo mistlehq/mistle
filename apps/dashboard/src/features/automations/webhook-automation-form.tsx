@@ -18,6 +18,7 @@ import {
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
 
+import { FormPageFooter, FormPageSection } from "../shared/form-page.js";
 import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
@@ -66,18 +67,6 @@ type WebhookAutomationFormProps = {
   onSubmit: () => void;
   onDelete: (() => void) | null;
 };
-
-function FormSection(input: {
-  children: React.ReactNode;
-  header?: React.ReactNode;
-}): React.JSX.Element {
-  return (
-    <section className="flex flex-col gap-2">
-      {input.header === undefined ? null : input.header}
-      <div className="divide-y rounded border bg-white">{input.children}</div>
-    </section>
-  );
-}
 
 function FieldError(input: { message: string | undefined }): React.JSX.Element | null {
   if (input.message === undefined) {
@@ -218,7 +207,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       )}
 
       {input.mode === "edit" ? (
-        <FormSection>
+        <FormPageSection>
           <div className="flex min-h-10 items-center justify-between gap-3 p-4">
             <div className="space-y-1">
               <FieldLabel htmlFor="automation-enabled">Automation enabled</FieldLabel>
@@ -232,10 +221,10 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
               }}
             />
           </div>
-        </FormSection>
+        </FormPageSection>
       ) : null}
 
-      <FormSection>
+      <FormPageSection>
         <div className="p-4">
           <SelectField
             error={input.fieldErrors.sandboxProfileId}
@@ -249,9 +238,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             value={input.values.sandboxProfileId}
           />
         </div>
-      </FormSection>
+      </FormPageSection>
 
-      <FormSection
+      <FormPageSection
         header={
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold">Triggers</h2>
@@ -336,9 +325,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             </Field>
           </div>
         )}
-      </FormSection>
+      </FormPageSection>
 
-      <FormSection>
+      <FormPageSection>
         <div className="p-4">
           <Field>
             <FieldHeader>
@@ -362,9 +351,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             </FieldContent>
           </Field>
         </div>
-      </FormSection>
+      </FormPageSection>
 
-      <div className="flex justify-end">
+      <FormPageFooter>
         <Button
           disabled={input.isDeleting || input.isSaving}
           onClick={input.onSubmit}
@@ -372,7 +361,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         >
           {input.isSaving ? "Saving..." : submitLabel}
         </Button>
-      </div>
+      </FormPageFooter>
     </div>
   );
 }

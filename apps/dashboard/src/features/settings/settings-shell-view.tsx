@@ -10,6 +10,7 @@ export type SettingsShellViewProps = {
   content: React.ReactNode;
   supportingText: string;
   headerActions: React.ReactNode | null;
+  layoutVariant?: "default" | "form";
   onBack: () => void;
   pathname: string;
   showBreadcrumbs: boolean;
@@ -27,6 +28,7 @@ export function SettingsShellView(input: SettingsShellViewProps): React.JSX.Elem
           supportingText={input.supportingText}
           headerActions={input.headerActions}
           title={input.title}
+          {...(input.layoutVariant === undefined ? {} : { layoutVariant: input.layoutVariant })}
         >
           {input.content}
         </SettingsLayoutView>

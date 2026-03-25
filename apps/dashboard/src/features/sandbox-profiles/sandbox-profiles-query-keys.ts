@@ -10,6 +10,10 @@ export function sandboxProfilesListQueryKey(input: {
   return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "list", input.limit, input.after, input.before];
 }
 
+export function launchableSandboxProfilesQueryKey(): readonly ["sandbox-profiles", "launchable"] {
+  return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "launchable"];
+}
+
 export function sandboxProfileDetailQueryKey(
   profileId: string,
 ): readonly ["sandbox-profiles", "detail", string] {

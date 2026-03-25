@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider, useMutation } from "@tanstack/react-query";
+import { QueryClientProvider, useMutation } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { SaveActions } from "../src/features/settings/save-actions.js";
 import { TopLoadingBar } from "../src/features/shell/top-loading-bar.js";
+import { createTestQueryClient } from "../src/test-support/query-client.js";
 
 function createDeferredPromise<T>() {
   let resolve: (value: T) => void = () => {};
@@ -53,13 +54,7 @@ describe("top loading bar integration mutation flow", () => {
   });
 
   it("shows progress while a page mutation is pending and hides after completion", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient();
     const pendingMutation = createDeferredPromise<string>();
     const router = createMemoryRouter(
       createRoutesFromElements(

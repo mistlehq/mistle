@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { integrationTargets, type ControlPlaneDatabase } from "@mistle/db/control-plane";
@@ -12,17 +12,37 @@ import {
 } from "../../src/lib/crypto.js";
 
 export const IntegrationTargetsProvisionManifestFileName = "integration-targets.provision.json";
+export const IntegrationTargetsProvisionManifestJsonEnvVarName =
+  "MISTLE_INTEGRATION_TARGETS_PROVISION_MANIFEST_JSON";
+export const IntegrationTargetsProvisionManifestPathEnvVarName =
+  "MISTLE_INTEGRATION_TARGETS_PROVISION_MANIFEST_PATH";
 
 const IntegrationTargetProvisionTargetSchema = z
   .object({
     targetKey: z.string().min(1),
     enabled: z.boolean(),
     config: z.record(z.string(), z.unknown()),
-    secrets: z.record(z.string(), z.string()).default({}),
+    secrets: z.record(z.string(), z.string()).optional(),
+    secretEnv: z.record(z.string(), z.string().min(1)).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((input, ctx) => {
+    if (input.secrets !== undefined && input.secretEnv !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["secretEnv"],
+        message: "Provide exactly one of 'secrets' or 'secretEnv' for a provision target.",
+      });
+    }
+  });
 
 type IntegrationTargetsProvisionTarget = z.output<typeof IntegrationTargetProvisionTargetSchema>;
+type ResolvedIntegrationTargetsProvisionTarget = {
+  targetKey: string;
+  enabled: boolean;
+  config: Record<string, unknown>;
+  secrets: Record<string, string>;
+};
 
 const IntegrationTargetsProvisionManifestSchema = z
   .object({
@@ -46,11 +66,21 @@ const IntegrationTargetsProvisionManifestSchema = z
 
 export type IntegrationTargetsProvisionManifest = z.output<
   typeof IntegrationTargetsProvisionManifestSchema
->;
+> & {
+  targets: ResolvedIntegrationTargetsProvisionTarget[];
+};
 
 type IntegrationsEncryptionConfig = {
   activeMasterEncryptionKeyVersion: number;
   masterEncryptionKeys: Record<string, string>;
+};
+
+type IntegrationTargetsProvisionEnv = Record<string, string | undefined>;
+
+type LoadedIntegrationTargetsProvisionManifest = {
+  manifest: IntegrationTargetsProvisionManifest;
+  source: "env-json" | "env-path" | "discovered-path";
+  sourceValue: string;
 };
 
 function normalizeEscapedNewlineString(value: string): string {
@@ -89,18 +119,54 @@ function normalizeEscapedNewlinesInUnknownObject(value: object): Record<string, 
 
 function normalizeProvisionTarget(
   target: IntegrationTargetsProvisionTarget,
-): IntegrationTargetsProvisionTarget {
-  const normalizedSecrets: Record<string, string> = {};
+  env: IntegrationTargetsProvisionEnv,
+): ResolvedIntegrationTargetsProvisionTarget {
+  const normalizedSecrets = resolveProvisionTargetSecrets(target, env);
 
-  for (const [secretKey, secretValue] of Object.entries(target.secrets)) {
+  for (const [secretKey, secretValue] of Object.entries(normalizedSecrets)) {
     normalizedSecrets[secretKey] = normalizeEscapedNewlineString(secretValue);
   }
 
   return {
-    ...target,
+    targetKey: target.targetKey,
+    enabled: target.enabled,
     config: normalizeEscapedNewlinesInUnknownObject(target.config),
     secrets: normalizedSecrets,
   };
+}
+
+function resolveProvisionTargetSecrets(
+  target: IntegrationTargetsProvisionTarget,
+  env: IntegrationTargetsProvisionEnv,
+): Record<string, string> {
+  if (target.secrets !== undefined) {
+    return { ...target.secrets };
+  }
+
+  if (target.secretEnv === undefined) {
+    return {};
+  }
+
+  const resolvedSecrets: Record<string, string> = {};
+
+  for (const [secretKey, envVarName] of Object.entries(target.secretEnv)) {
+    const envVarValue = env[envVarName];
+    if (envVarValue === undefined) {
+      throw new Error(
+        `Missing integration target secret environment variable '${envVarName}' for target '${target.targetKey}' secret '${secretKey}'.`,
+      );
+    }
+
+    if (envVarValue.length === 0) {
+      throw new Error(
+        `Integration target secret environment variable '${envVarName}' for target '${target.targetKey}' secret '${secretKey}' must not be empty.`,
+      );
+    }
+
+    resolvedSecrets[secretKey] = envVarValue;
+  }
+
+  return resolvedSecrets;
 }
 
 function isRepositoryRoot(directoryPath: string): boolean {
@@ -154,6 +220,7 @@ export function discoverIntegrationTargetProvisionManifestPath(input: {
 
 export function parseIntegrationTargetsProvisionManifest(
   rawManifestContent: string,
+  env: IntegrationTargetsProvisionEnv = process.env,
 ): IntegrationTargetsProvisionManifest {
   let parsedManifest: unknown;
   try {
@@ -168,7 +235,69 @@ export function parseIntegrationTargetsProvisionManifest(
 
   return {
     version: manifest.version,
-    targets: manifest.targets.map((target) => normalizeProvisionTarget(target)),
+    targets: manifest.targets.map((target) => normalizeProvisionTarget(target, env)),
+  };
+}
+
+export function loadIntegrationTargetsProvisionManifest(input: {
+  env?: IntegrationTargetsProvisionEnv;
+  startDirectory: string;
+  repositoryRoot?: string;
+}): LoadedIntegrationTargetsProvisionManifest | undefined {
+  const env = input.env ?? process.env;
+  const manifestJson = env[IntegrationTargetsProvisionManifestJsonEnvVarName];
+  if (manifestJson !== undefined) {
+    if (manifestJson.length === 0) {
+      throw new Error(
+        `${IntegrationTargetsProvisionManifestJsonEnvVarName} must not be empty when provided.`,
+      );
+    }
+
+    return {
+      manifest: parseIntegrationTargetsProvisionManifest(manifestJson, env),
+      source: "env-json",
+      sourceValue: IntegrationTargetsProvisionManifestJsonEnvVarName,
+    };
+  }
+
+  const manifestPathFromEnv = env[IntegrationTargetsProvisionManifestPathEnvVarName];
+  if (manifestPathFromEnv !== undefined) {
+    if (manifestPathFromEnv.length === 0) {
+      throw new Error(
+        `${IntegrationTargetsProvisionManifestPathEnvVarName} must not be empty when provided.`,
+      );
+    }
+
+    const resolvedManifestPath = resolve(manifestPathFromEnv);
+    return {
+      manifest: parseIntegrationTargetsProvisionManifest(
+        readFileSync(resolvedManifestPath, "utf8"),
+        env,
+      ),
+      source: "env-path",
+      sourceValue: resolvedManifestPath,
+    };
+  }
+
+  const repositoryRoot =
+    input.repositoryRoot === undefined
+      ? resolveRepositoryRootFromDirectory(input.startDirectory)
+      : resolve(input.repositoryRoot);
+  const discoveredManifestPath = discoverIntegrationTargetProvisionManifestPath({
+    startDirectory: input.startDirectory,
+    repositoryRoot,
+  });
+  if (discoveredManifestPath === undefined) {
+    return undefined;
+  }
+
+  return {
+    manifest: parseIntegrationTargetsProvisionManifest(
+      readFileSync(discoveredManifestPath, "utf8"),
+      env,
+    ),
+    source: "discovered-path",
+    sourceValue: discoveredManifestPath,
   };
 }
 

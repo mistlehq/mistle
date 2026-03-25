@@ -39,6 +39,7 @@ export interface paths {
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
+              /** @enum {string} */
               status: "starting" | "running" | "stopped" | "failed";
             } | null;
           };
@@ -49,21 +50,11 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json":
-              | {
-                  code: string;
-                  message: string;
-                }
-              | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
-                };
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
           };
         };
         /** @description Internal service authentication failed. */
@@ -73,7 +64,8 @@ export interface paths {
           };
           content: {
             "application/json": {
-              code: string;
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
               message: string;
             };
           };
@@ -136,11 +128,14 @@ export interface paths {
                 id: string;
                 sandboxProfileId: string;
                 sandboxProfileVersion: number;
+                /** @enum {string} */
                 source: "dashboard" | "webhook";
                 startedBy: {
                   id: string;
+                  /** @enum {string} */
                   kind: "user" | "system";
                 };
+                /** @enum {string} */
                 status: "starting" | "running" | "stopped" | "failed";
                 updatedAt: string;
               }[];
@@ -164,18 +159,13 @@ export interface paths {
           content: {
             "application/json":
               | {
-                  code: string;
+                  code: "INVALID_LIST_INPUT" | "INVALID_PAGINATION_CURSOR";
                   message: string;
                 }
               | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
                 };
           };
         };
@@ -186,7 +176,8 @@ export interface paths {
           };
           content: {
             "application/json": {
-              code: string;
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
               message: string;
             };
           };
@@ -254,21 +245,11 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json":
-              | {
-                  code: string;
-                  message: string;
-                }
-              | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
-                };
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
           };
         };
         /** @description Internal service authentication failed. */
@@ -278,7 +259,8 @@ export interface paths {
           };
           content: {
             "application/json": {
-              code: string;
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
               message: string;
             };
           };
@@ -326,13 +308,176 @@ export interface paths {
             };
             organizationId: string;
             runtimePlan: {
-              [key: string]: unknown;
+              agentRuntimes: {
+                adapterKey: string;
+                bindingId: string;
+                clientId: string;
+                endpointKey: string;
+                runtimeKey: string;
+              }[];
+              artifacts: {
+                artifactKey: string;
+                description?: string;
+                env?: {
+                  [key: string]: string;
+                };
+                lifecycle: {
+                  install: {
+                    args: string[];
+                    cwd?: string;
+                    env?: {
+                      [key: string]: string;
+                    };
+                    timeoutMs?: number;
+                  }[];
+                  remove: {
+                    args: string[];
+                    cwd?: string;
+                    env?: {
+                      [key: string]: string;
+                    };
+                    timeoutMs?: number;
+                  }[];
+                  update?: {
+                    args: string[];
+                    cwd?: string;
+                    env?: {
+                      [key: string]: string;
+                    };
+                    timeoutMs?: number;
+                  }[];
+                };
+                name: string;
+              }[];
+              egressRoutes: {
+                authInjection: {
+                  target: string;
+                  /** @enum {string} */
+                  type: "bearer" | "basic" | "header" | "query";
+                  username?: string;
+                };
+                bindingId: string;
+                credentialResolver: {
+                  connectionId: string;
+                  purpose?: string;
+                  resolverKey?: string;
+                  secretType: string;
+                };
+                egressRuleId: string;
+                match: {
+                  hosts: string[];
+                  methods?: string[];
+                  pathPrefixes?: string[];
+                };
+                upstream: {
+                  baseUrl: string;
+                };
+              }[];
+              image:
+                | {
+                    imageRef: string;
+                    sandboxProfileId: string;
+                    /** @enum {string} */
+                    source: "profile-base";
+                    version: number;
+                  }
+                | {
+                    imageRef: string;
+                    /** @enum {string} */
+                    source: "base";
+                  };
+              runtimeClients: {
+                clientId: string;
+                endpoints: {
+                  /** @enum {string} */
+                  connectionMode: "dedicated" | "shared";
+                  endpointKey: string;
+                  processKey?: string;
+                  transport: {
+                    /** @enum {string} */
+                    type: "ws";
+                    /** Format: uri */
+                    url: string;
+                  };
+                }[];
+                processes: {
+                  command: {
+                    args: string[];
+                    cwd?: string;
+                    env?: {
+                      [key: string]: string;
+                    };
+                    timeoutMs?: number;
+                  };
+                  processKey: string;
+                  readiness:
+                    | {
+                        /** @enum {string} */
+                        type: "none";
+                      }
+                    | {
+                        host: string;
+                        port: number;
+                        timeoutMs: number;
+                        /** @enum {string} */
+                        type: "tcp";
+                      }
+                    | {
+                        expectedStatus: number;
+                        timeoutMs: number;
+                        /** @enum {string} */
+                        type: "http";
+                        /** Format: uri */
+                        url: string;
+                      }
+                    | {
+                        timeoutMs: number;
+                        /** @enum {string} */
+                        type: "ws";
+                        /** Format: uri */
+                        url: string;
+                      };
+                  stop: {
+                    gracePeriodMs?: number;
+                    /** @enum {string} */
+                    signal: "sigterm" | "sigkill";
+                    timeoutMs: number;
+                  };
+                }[];
+                setup: {
+                  env: {
+                    [key: string]: string;
+                  };
+                  files: {
+                    content: string;
+                    fileId: string;
+                    mode: number;
+                    path: string;
+                    /** @enum {string} */
+                    writeMode?: "overwrite" | "if-absent";
+                  }[];
+                  launchArgs?: string[];
+                };
+              }[];
+              sandboxProfileId: string;
+              version: number;
+              workspaceSources: {
+                /** Format: uri */
+                originUrl: string;
+                path: string;
+                /** @enum {string} */
+                resourceKind: "repository";
+                /** @enum {string} */
+                sourceKind: "git-clone";
+              }[];
             };
             sandboxProfileId: string;
             sandboxProfileVersion: number;
+            /** @enum {string} */
             source: "dashboard" | "webhook";
             startedBy: {
               id: string;
+              /** @enum {string} */
               kind: "user" | "system";
             };
           };
@@ -359,21 +504,11 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json":
-              | {
-                  code: string;
-                  message: string;
-                }
-              | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
-                };
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
           };
         };
         /** @description Internal service authentication failed. */
@@ -383,7 +518,8 @@ export interface paths {
           };
           content: {
             "application/json": {
-              code: string;
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
               message: string;
             };
           };
@@ -427,6 +563,7 @@ export interface paths {
             expectedOwnerLeaseId: string;
             idempotencyKey: string;
             sandboxInstanceId: string;
+            /** @enum {string} */
             stopReason: "idle" | "disconnected";
           };
         };
@@ -452,21 +589,11 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json":
-              | {
-                  code: string;
-                  message: string;
-                }
-              | {
-                  error: {
-                    message: string;
-                    name: string;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {boolean} */
-                  success: false;
-                };
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
           };
         };
         /** @description Internal service authentication failed. */
@@ -476,7 +603,8 @@ export interface paths {
           };
           content: {
             "application/json": {
-              code: string;
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
               message: string;
             };
           };

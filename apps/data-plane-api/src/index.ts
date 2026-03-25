@@ -2,7 +2,7 @@ import { shutdownTelemetry } from "@mistle/telemetry";
 
 import { appConfig, globalConfig } from "./instrument.js";
 import { logger } from "./logger.js";
-import { createDataPlaneApiRuntime } from "./runtime/index.js";
+import { createDataPlaneApiRuntime } from "./main.js";
 
 async function startDataPlaneApi(): Promise<void> {
   const runtime = await createDataPlaneApiRuntime({

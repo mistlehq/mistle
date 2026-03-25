@@ -1,16 +1,8 @@
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  Field,
-  FieldContent,
-  FieldError,
-  FieldLabel,
-  Input,
-} from "@mistle/ui";
+import { Field, FieldContent, FieldError, FieldHeader, FieldLabel, Input } from "@mistle/ui";
 
 import { UserIdentitySummary } from "../account/user-identity-summary.js";
 import { SaveActions } from "../settings/save-actions.js";
+import { FormPageSection, FormPageShell } from "../shared/form-page.js";
 
 export type ProfileSettingsPageViewProps = {
   displayName: string;
@@ -27,19 +19,22 @@ export type ProfileSettingsPageViewProps = {
 
 export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader>
+    <FormPageShell className="pt-0">
+      <FormPageSection>
+        <div className="p-4">
           <UserIdentitySummary email={props.email} name={props.displayName} />
-        </CardHeader>
-      </Card>
-      <Card>
-        <CardContent className="flex flex-col gap-4">
+        </div>
+      </FormPageSection>
+
+      <FormPageSection>
+        <div className="flex flex-col gap-4 p-4">
           <p aria-live="polite" className="sr-only" role="status">
             {props.saveSuccess ? "Personal settings updated." : ""}
           </p>
-          <Field>
-            <FieldLabel htmlFor="display-name">Display name</FieldLabel>
+          <Field contentWidth="fill" orientation="horizontal">
+            <FieldHeader>
+              <FieldLabel htmlFor="display-name">Display name</FieldLabel>
+            </FieldHeader>
             <FieldContent>
               <Input
                 id="display-name"
@@ -51,22 +46,25 @@ export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): Re
             </FieldContent>
             {props.fieldError ? <FieldError errors={[{ message: props.fieldError }]} /> : null}
           </Field>
-          <Field>
-            <FieldLabel>Email</FieldLabel>
+          <Field contentWidth="fill" orientation="horizontal">
+            <FieldHeader>
+              <FieldLabel>Email</FieldLabel>
+            </FieldHeader>
             <FieldContent>
               <Input disabled readOnly value={props.email} />
             </FieldContent>
           </Field>
-          <SaveActions
-            cancelDisabled={!props.hasDirtyChanges || props.saving}
-            onCancel={props.onCancelChanges}
-            onSave={props.onSaveChanges}
-            saveDisabled={!props.hasDirtyChanges || props.saving}
-            saveSuccess={props.saveSuccess}
-            saving={props.saving}
-          />
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </FormPageSection>
+
+      <SaveActions
+        cancelDisabled={!props.hasDirtyChanges || props.saving}
+        onCancel={props.onCancelChanges}
+        onSave={props.onSaveChanges}
+        saveDisabled={!props.hasDirtyChanges || props.saving}
+        saveSuccess={props.saveSuccess}
+        saving={props.saving}
+      />
+    </FormPageShell>
   );
 }

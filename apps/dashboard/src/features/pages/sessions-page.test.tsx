@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import {
   buildOptimisticSessions,
@@ -14,6 +15,7 @@ import {
   SandboxSessionStatusBadge,
   SessionsPage,
   shouldUseResumeActionLabel,
+  shouldClearSelectedProfile,
 } from "./sessions-page.js";
 
 describe("SessionsPage", () => {
@@ -22,6 +24,7 @@ describe("SessionsPage", () => {
       launchedSessions: [
         {
           profileId: "sbp_profile_alpha",
+          profileDisplayName: "Alpha Profile",
           profileVersion: 3,
           sandboxInstanceId: "sbi_optimistic",
           createdAtIso: "2026-03-10T00:00:00.000Z",
@@ -39,6 +42,7 @@ describe("SessionsPage", () => {
       {
         id: "sbi_optimistic",
         sandboxProfileId: "sbp_profile_alpha",
+        sandboxProfileDisplayName: "Alpha Profile",
         sandboxProfileVersion: 3,
         status: "starting",
         startedBy: {
@@ -56,13 +60,7 @@ describe("SessionsPage", () => {
   });
 
   it("renders sandbox launcher controls", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient();
     seedAuthenticatedSession(queryClient);
 
     const rendered = render(
@@ -87,13 +85,7 @@ describe("SessionsPage", () => {
   });
 
   it("uses the shared dashboard table styling for the session list", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient();
     seedAuthenticatedSession(queryClient);
 
     const markup = renderToStaticMarkup(
@@ -111,14 +103,9 @@ describe("SessionsPage", () => {
   });
 
   it("renders the result summary even when there is only one page", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          refetchOnMount: false,
-          staleTime: Number.POSITIVE_INFINITY,
-        },
-      },
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
     });
     seedAuthenticatedSession(queryClient);
     queryClient.setQueryData(
@@ -132,6 +119,7 @@ describe("SessionsPage", () => {
           {
             id: "sbi_123",
             sandboxProfileId: "sbp_123",
+            sandboxProfileDisplayName: "Profile 123",
             sandboxProfileVersion: 2,
             status: "running",
             startedBy: {
@@ -208,14 +196,9 @@ describe("SessionsPage", () => {
   });
 
   it("routes stopped sessions into the workbench route directly", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          refetchOnMount: false,
-          staleTime: Number.POSITIVE_INFINITY,
-        },
-      },
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
     });
     seedAuthenticatedSession(queryClient);
     queryClient.setQueryData(
@@ -279,5 +262,69 @@ describe("SessionsPage", () => {
     expect(shouldUseResumeActionLabel("starting")).toBe(false);
     expect(shouldUseResumeActionLabel("running")).toBe(false);
     expect(shouldUseResumeActionLabel("failed")).toBe(false);
+  });
+
+  it("clears a stale selected profile after launchable profiles finish refetching without it", () => {
+    expect(
+      shouldClearSelectedProfile({
+        selectedProfile: {
+          id: "sbp_profile_alpha",
+          displayName: "Alpha Profile",
+          status: "active",
+          latestVersion: 3,
+          createdAt: "2026-03-10T00:00:00.000Z",
+          updatedAt: "2026-03-10T00:00:00.000Z",
+          organizationId: "org_123",
+        },
+        selectableProfiles: [],
+        isSelectableProfilesPending: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps the current selection while launchable profiles are still loading", () => {
+    expect(
+      shouldClearSelectedProfile({
+        selectedProfile: {
+          id: "sbp_profile_alpha",
+          displayName: "Alpha Profile",
+          status: "active",
+          latestVersion: 3,
+          createdAt: "2026-03-10T00:00:00.000Z",
+          updatedAt: "2026-03-10T00:00:00.000Z",
+          organizationId: "org_123",
+        },
+        selectableProfiles: [],
+        isSelectableProfilesPending: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps the current selection when the selected profile is still launchable", () => {
+    expect(
+      shouldClearSelectedProfile({
+        selectedProfile: {
+          id: "sbp_profile_alpha",
+          displayName: "Alpha Profile",
+          status: "active",
+          latestVersion: 3,
+          createdAt: "2026-03-10T00:00:00.000Z",
+          updatedAt: "2026-03-10T00:00:00.000Z",
+          organizationId: "org_123",
+        },
+        selectableProfiles: [
+          {
+            id: "sbp_profile_alpha",
+            displayName: "Alpha Profile",
+            status: "active",
+            latestVersion: 3,
+            createdAt: "2026-03-10T00:00:00.000Z",
+            updatedAt: "2026-03-10T00:00:00.000Z",
+            organizationId: "org_123",
+          },
+        ],
+        isSelectableProfilesPending: false,
+      }),
+    ).toBe(false);
   });
 });

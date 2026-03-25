@@ -1,24 +1,20 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
 import { SessionWorkbenchPage } from "./session-workbench-page.js";
 
 describe("SessionWorkbenchPage", () => {
   it("renders the dedicated session shell for a sandbox instance route", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          gcTime: Infinity,
-          refetchOnMount: false,
-          retry: false,
-          staleTime: Infinity,
-        },
-      },
+    const queryClient = createTestQueryClient({
+      gcTime: Infinity,
+      refetchOnMount: false,
+      staleTime: Infinity,
     });
 
     render(
@@ -37,15 +33,10 @@ describe("SessionWorkbenchPage", () => {
   });
 
   it("does not reserve alert space when there are no alerts", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          gcTime: Infinity,
-          refetchOnMount: false,
-          retry: false,
-          staleTime: Infinity,
-        },
-      },
+    const queryClient = createTestQueryClient({
+      gcTime: Infinity,
+      refetchOnMount: false,
+      staleTime: Infinity,
     });
 
     const { container } = render(
@@ -65,15 +56,10 @@ describe("SessionWorkbenchPage", () => {
   });
 
   it("starts the automatic resume flow for a stopped sandbox", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          gcTime: Infinity,
-          refetchOnMount: false,
-          retry: false,
-          staleTime: Infinity,
-        },
-      },
+    const queryClient = createTestQueryClient({
+      gcTime: Infinity,
+      refetchOnMount: false,
+      staleTime: Infinity,
     });
 
     queryClient.setQueryData(["sandbox-instance-status", "sbi_stopped"], {

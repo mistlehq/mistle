@@ -1,5 +1,7 @@
 import { Button } from "@mistle/ui";
 
+import { FormPageFooter } from "../shared/form-page.js";
+
 export type SaveActionsProps = {
   cancelDisabled: boolean;
   onCancel: () => void;
@@ -11,7 +13,15 @@ export type SaveActionsProps = {
 
 export function SaveActions(props: SaveActionsProps): React.JSX.Element {
   return (
-    <div className="flex gap-2">
+    <FormPageFooter>
+      <Button
+        disabled={props.cancelDisabled}
+        onClick={props.onCancel}
+        type="button"
+        variant="outline"
+      >
+        Cancel
+      </Button>
       <Button
         className={
           props.saveSuccess ? "bg-emerald-600 text-white hover:bg-emerald-600/90" : undefined
@@ -22,14 +32,6 @@ export function SaveActions(props: SaveActionsProps): React.JSX.Element {
       >
         {props.saving ? "Saving..." : props.saveSuccess ? "Saved" : "Save"}
       </Button>
-      <Button
-        disabled={props.cancelDisabled}
-        onClick={props.onCancel}
-        type="button"
-        variant="outline"
-      >
-        Cancel
-      </Button>
-    </div>
+    </FormPageFooter>
   );
 }
