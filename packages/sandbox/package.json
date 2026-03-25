@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "dockerode": "^4.0.9",
+    "e2b": "^2.16.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

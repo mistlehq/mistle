@@ -26,6 +26,28 @@ describe("createSandboxAdapter", () => {
       }),
     ).toThrow(SandboxConfigurationError);
   });
+
+  it("creates an E2B adapter when E2B config is provided", () => {
+    const adapter = createSandboxAdapter({
+      provider: SandboxProvider.E2B,
+      e2b: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    expect(typeof adapter.start).toBe("function");
+    expect(typeof adapter.resume).toBe("function");
+    expect(typeof adapter.stop).toBe("function");
+    expect(typeof adapter.destroy).toBe("function");
+  });
+
+  it("throws when E2B config is missing", () => {
+    expect(() =>
+      createSandboxAdapter({
+        provider: SandboxProvider.E2B,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
 });
 
 describe("createSandboxRuntimeControl", () => {
@@ -45,6 +67,26 @@ describe("createSandboxRuntimeControl", () => {
     expect(() =>
       createSandboxRuntimeControl({
         provider: SandboxProvider.DOCKER,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
+
+  it("creates an E2B runtime control when E2B config is provided", () => {
+    const runtimeControl = createSandboxRuntimeControl({
+      provider: SandboxProvider.E2B,
+      e2b: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    expect(typeof runtimeControl.applyStartup).toBe("function");
+    expect(typeof runtimeControl.close).toBe("function");
+  });
+
+  it("throws when E2B runtime control config is missing", () => {
+    expect(() =>
+      createSandboxRuntimeControl({
+        provider: SandboxProvider.E2B,
       }),
     ).toThrow(SandboxConfigurationError);
   });

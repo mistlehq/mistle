@@ -31,7 +31,11 @@ function toSandboxProvider(provider: SandboxInstanceProvider): SandboxProvider {
     return SandboxProvider.DOCKER;
   }
 
-  throw new Error("Unsupported sandbox runtime provider.");
+  if (provider === "e2b") {
+    return SandboxProvider.E2B;
+  }
+
+  throw new Error("Unsupported sandbox provider for resume flow.");
 }
 
 async function resolveResumableSandboxInstanceState(input: {

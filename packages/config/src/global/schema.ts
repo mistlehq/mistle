@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const SandboxProviders = ["docker"] as const;
+const SandboxProviders = ["docker", "e2b"] as const;
 
 const GlobalTelemetryEndpointSchema = z
   .url()
