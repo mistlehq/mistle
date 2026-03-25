@@ -1,6 +1,4 @@
-import { createHash } from "node:crypto";
-
-import { CommandExitError, Sandbox, Template, type ConnectionOpts } from "e2b";
+import { CommandExitError, Sandbox, type ConnectionOpts } from "e2b";
 
 import {
   E2BClientError,
@@ -21,10 +19,9 @@ import {
   type E2BStartSandboxRequest,
   type E2BStopSandboxRequest,
 } from "./schemas.js";
+import { E2BApiTemplateRegistry, type E2BTemplateRegistry } from "./template-registry.js";
 
 const ApplyStartupCommand = "/usr/local/bin/sandboxd apply-startup";
-const E2BTemplateAliasPrefix = "mistle-sandbox-base";
-const E2BSandboxTemplateCache = new Map<string, Promise<string>>();
 
 export type E2BStartSandboxResponse = {
   sandboxId: string;
@@ -43,11 +40,6 @@ function createE2BConnectionOptions(config: E2BSandboxConfig): ConnectionOpts {
     apiKey: config.apiKey,
     ...(config.domain === undefined ? {} : { domain: config.domain }),
   };
-}
-
-function createE2BTemplateAlias(baseRef: string): string {
-  const hash = createHash("sha256").update(baseRef).digest("hex");
-  return `${E2BTemplateAliasPrefix}-${hash.slice(0, 24)}`;
 }
 
 function formatCommandOutput(input: { stdout: string; stderr: string }): string {
@@ -86,14 +78,17 @@ function createCommandExitError(input: {
 
 export class E2BApiClient implements E2BClient {
   readonly #connectionOptions: ConnectionOpts;
+  readonly #templateRegistry: E2BTemplateRegistry;
 
-  constructor(config: E2BSandboxConfig) {
-    this.#connectionOptions = createE2BConnectionOptions(config);
+  constructor(input: { config: E2BSandboxConfig; templateRegistry?: E2BTemplateRegistry }) {
+    this.#connectionOptions = createE2BConnectionOptions(input.config);
+    this.#templateRegistry =
+      input.templateRegistry ?? new E2BApiTemplateRegistry(this.#connectionOptions);
   }
 
   async startSandbox(request: E2BStartSandboxRequest): Promise<E2BStartSandboxResponse> {
     const parsedRequest = E2BStartSandboxRequestSchema.parse(request);
-    const templateAlias = await this.#resolveTemplateAlias(parsedRequest.imageRef);
+    const templateAlias = await this.#templateRegistry.resolveAlias(parsedRequest.imageRef);
 
     try {
       const sandbox = await Sandbox.create(templateAlias, {
@@ -170,38 +165,6 @@ export class E2BApiClient implements E2BClient {
       }
 
       throw mapE2BClientError(E2BClientOperationIds.APPLY_STARTUP, error);
-    }
-  }
-
-  async #resolveTemplateAlias(baseRef: string): Promise<string> {
-    const cachedAlias = E2BSandboxTemplateCache.get(baseRef);
-    if (cachedAlias !== undefined) {
-      return cachedAlias;
-    }
-
-    const aliasPromise = (async () => {
-      try {
-        const alias = createE2BTemplateAlias(baseRef);
-        const templateExists = await Template.exists(alias, this.#connectionOptions);
-
-        if (!templateExists) {
-          const template = Template().fromImage(baseRef);
-          await Template.build(template, alias, this.#connectionOptions);
-        }
-
-        return alias;
-      } catch (error) {
-        throw mapE2BClientError(E2BClientOperationIds.RESOLVE_TEMPLATE_ALIAS, error);
-      }
-    })();
-
-    E2BSandboxTemplateCache.set(baseRef, aliasPromise);
-
-    try {
-      return await aliasPromise;
-    } catch (error) {
-      E2BSandboxTemplateCache.delete(baseRef);
-      throw error;
     }
   }
 }

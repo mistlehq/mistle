@@ -10,12 +10,18 @@ export function createE2BAdapter(config: E2BSandboxConfig): SandboxAdapter {
   const validatedConfig = validateE2BSandboxConfig(config);
 
   return createE2BSandboxAdapter({
-    client: new E2BApiClient(validatedConfig),
+    client: new E2BApiClient({
+      config: validatedConfig,
+    }),
   });
 }
 
 export function createE2BRuntimeControl(config: E2BSandboxConfig): SandboxRuntimeControl {
   const validatedConfig = validateE2BSandboxConfig(config);
 
-  return createE2BSandboxRuntimeControl(new E2BApiClient(validatedConfig));
+  return createE2BSandboxRuntimeControl(
+    new E2BApiClient({
+      config: validatedConfig,
+    }),
+  );
 }

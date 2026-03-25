@@ -7,12 +7,14 @@ import {
   type SandboxAdapter,
   type SandboxImageHandle,
 } from "../../src/index.js";
+import { E2BApiTemplateRegistry } from "../../src/providers/e2b/template-registry.js";
 import { resolveSandboxIntegrationSettings } from "../config.js";
 import { resolveE2BAdapterIntegrationSettings } from "./config.js";
 
 export type E2BAdapterIntegrationFixture = {
   adapter: SandboxAdapter;
   baseImage: SandboxImageHandle;
+  createTemplateRegistry(): E2BApiTemplateRegistry;
   connectSandbox(id: string): Promise<Sandbox>;
 };
 
@@ -73,6 +75,9 @@ export const it = vitestIt.extend<{ fixture: E2BAdapterIntegrationFixture }>({
       await use({
         adapter,
         baseImage: createBaseImageHandle(),
+        createTemplateRegistry() {
+          return new E2BApiTemplateRegistry(createConnectionOptions());
+        },
         connectSandbox(id: string) {
           return Sandbox.connect(id, createConnectionOptions());
         },
