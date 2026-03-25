@@ -45,10 +45,10 @@ async function readUtf8Stream(stream: NodeJS.ReadableStream): Promise<string> {
 
 async function runContainerCommand(input: {
   dockerClient: Docker;
-  runtimeId: string;
+  id: string;
   command: string[];
 }): Promise<ContainerCommandResult> {
-  const container = input.dockerClient.getContainer(input.runtimeId);
+  const container = input.dockerClient.getContainer(input.id);
   const exec = await container.exec({
     AttachStdout: true,
     AttachStderr: true,
@@ -63,9 +63,7 @@ async function runContainerCommand(input: {
   const inspect = await exec.inspect();
 
   if (inspect.ExitCode === null) {
-    throw new Error(
-      `Container command did not report an exit code for runtime ${input.runtimeId}.`,
-    );
+    throw new Error(`Container command did not report an exit code for runtime ${input.id}.`);
   }
 
   return {
@@ -76,14 +74,14 @@ async function runContainerCommand(input: {
 
 async function writeSandboxFile(input: {
   dockerClient: Docker;
-  runtimeId: string;
+  id: string;
   path: string;
   fileContents: string;
 }): Promise<void> {
   const command = ["sh", "-lc", `cat <<'EOF' > ${input.path}\n${input.fileContents}\nEOF`];
   const result = await runContainerCommand({
     dockerClient: input.dockerClient,
-    runtimeId: input.runtimeId,
+    id: input.id,
     command,
   });
 
@@ -96,12 +94,12 @@ async function writeSandboxFile(input: {
 
 async function readSandboxFile(input: {
   dockerClient: Docker;
-  runtimeId: string;
+  id: string;
   path: string;
 }): Promise<string> {
   const result = await runContainerCommand({
     dockerClient: input.dockerClient,
-    runtimeId: input.runtimeId,
+    id: input.id,
     command: ["cat", input.path],
   });
 
@@ -117,31 +115,31 @@ async function readSandboxFile(input: {
 describeDockerAdapterIntegration("docker adapter integration", () => {
   it("starts a sandbox from a base image and exposes its filesystem", async ({ fixture }) => {
     const startMarker = `mistle-docker-start-${randomUUID()}`;
-    let runtimeId: string | undefined;
+    let id: string | undefined;
 
     try {
       const sandbox = await fixture.adapter.start({ image: fixture.baseImage });
-      runtimeId = sandbox.runtimeId;
+      id = sandbox.id;
 
       expect(sandbox.provider).toBe(SandboxProvider.DOCKER);
-      expect(sandbox.runtimeId).not.toBe("");
+      expect(sandbox.id).not.toBe("");
 
       await writeSandboxFile({
         dockerClient: fixture.dockerClient,
-        runtimeId: sandbox.runtimeId,
+        id: sandbox.id,
         path: START_MARKER_FILE_PATH,
         fileContents: startMarker,
       });
 
       const readback = await readSandboxFile({
         dockerClient: fixture.dockerClient,
-        runtimeId: sandbox.runtimeId,
+        id: sandbox.id,
         path: START_MARKER_FILE_PATH,
       });
       expect(readback).toBe(startMarker);
     } finally {
-      if (runtimeId !== undefined) {
-        await fixture.adapter.destroy({ runtimeId });
+      if (id !== undefined) {
+        await fixture.adapter.destroy({ id });
       }
     }
   }, 300_000);
@@ -152,11 +150,11 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       `printf '%s' '${startupToken}' > /tmp/mistle-startup-token\nsleep 300\n`,
       "utf8",
     );
-    let runtimeId: string | undefined;
+    let id: string | undefined;
 
     try {
       const sandbox = await fixture.adapter.start({ image: fixture.startupStdinProbeImage });
-      runtimeId = sandbox.runtimeId;
+      id = sandbox.id;
       await sandbox.writeStdin({
         payload: startupScript,
       });
@@ -164,20 +162,20 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
 
       const tokenFromSandbox = await readSandboxFile({
         dockerClient: fixture.dockerClient,
-        runtimeId: sandbox.runtimeId,
+        id: sandbox.id,
         path: "/tmp/mistle-startup-token",
       });
       expect(tokenFromSandbox).toBe(startupToken);
     } finally {
-      if (runtimeId !== undefined) {
-        await fixture.adapter.destroy({ runtimeId });
+      if (id !== undefined) {
+        await fixture.adapter.destroy({ id });
       }
     }
   }, 300_000);
 
   it("injects start env into sandbox process", async ({ fixture }) => {
     const injectedEnvValue = `mistle-docker-env-${randomUUID()}`;
-    let runtimeId: string | undefined;
+    let id: string | undefined;
 
     try {
       const sandbox = await fixture.adapter.start({
@@ -186,19 +184,19 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
           [INJECTED_ENV_KEY]: injectedEnvValue,
         },
       });
-      runtimeId = sandbox.runtimeId;
+      id = sandbox.id;
 
       const result = await runContainerCommand({
         dockerClient: fixture.dockerClient,
-        runtimeId: sandbox.runtimeId,
+        id: sandbox.id,
         command: ["sh", "-lc", `printenv ${INJECTED_ENV_KEY}`],
       });
 
       expect(result.exitCode).toBe(0);
       expect(result.output.trimEnd()).toBe(injectedEnvValue);
     } finally {
-      if (runtimeId !== undefined) {
-        await fixture.adapter.destroy({ runtimeId });
+      if (id !== undefined) {
+        await fixture.adapter.destroy({ id });
       }
     }
   }, 300_000);
@@ -238,16 +236,16 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
           },
         ],
       });
-      firstRuntimeId = firstSandbox.runtimeId;
+      firstRuntimeId = firstSandbox.id;
 
       await writeSandboxFile({
         dockerClient: fixture.dockerClient,
-        runtimeId: firstSandbox.runtimeId,
+        id: firstSandbox.id,
         path: VOLUME_MARKER_FILE_PATH,
         fileContents: marker,
       });
 
-      await fixture.adapter.destroy({ runtimeId: firstSandbox.runtimeId });
+      await fixture.adapter.destroy({ id: firstSandbox.id });
       firstRuntimeId = undefined;
 
       const secondSandbox = await fixture.adapter.start({
@@ -259,20 +257,20 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
           },
         ],
       });
-      secondRuntimeId = secondSandbox.runtimeId;
+      secondRuntimeId = secondSandbox.id;
 
       const readback = await readSandboxFile({
         dockerClient: fixture.dockerClient,
-        runtimeId: secondSandbox.runtimeId,
+        id: secondSandbox.id,
         path: VOLUME_MARKER_FILE_PATH,
       });
       expect(readback).toBe(marker);
     } finally {
       if (firstRuntimeId !== undefined) {
-        await fixture.adapter.destroy({ runtimeId: firstRuntimeId });
+        await fixture.adapter.destroy({ id: firstRuntimeId });
       }
       if (secondRuntimeId !== undefined) {
-        await fixture.adapter.destroy({ runtimeId: secondRuntimeId });
+        await fixture.adapter.destroy({ id: secondRuntimeId });
       }
       await fixture.adapter.deleteVolume({ volumeId: volume.volumeId });
     }
@@ -282,38 +280,38 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
     fixture,
   }) => {
     const marker = `mistle-docker-resume-${randomUUID()}`;
-    let runtimeId: string | undefined;
+    let id: string | undefined;
 
     try {
       const sandbox = await fixture.adapter.start({ image: fixture.baseImage });
-      runtimeId = sandbox.runtimeId;
+      id = sandbox.id;
 
       await writeSandboxFile({
         dockerClient: fixture.dockerClient,
-        runtimeId: sandbox.runtimeId,
+        id: sandbox.id,
         path: START_MARKER_FILE_PATH,
         fileContents: marker,
       });
 
-      await fixture.adapter.stop({ runtimeId: sandbox.runtimeId });
+      await fixture.adapter.stop({ id: sandbox.id });
 
       const resumedSandbox = await fixture.adapter.resume({
         image: fixture.baseImage,
-        previousRuntimeId: sandbox.runtimeId,
+        id: sandbox.id,
       });
 
       expect(resumedSandbox.provider).toBe(SandboxProvider.DOCKER);
-      expect(resumedSandbox.runtimeId).toBe(sandbox.runtimeId);
+      expect(resumedSandbox.id).toBe(sandbox.id);
 
       const readback = await readSandboxFile({
         dockerClient: fixture.dockerClient,
-        runtimeId: resumedSandbox.runtimeId,
+        id: resumedSandbox.id,
         path: START_MARKER_FILE_PATH,
       });
       expect(readback).toBe(marker);
     } finally {
-      if (runtimeId !== undefined) {
-        await fixture.adapter.destroy({ runtimeId });
+      if (id !== undefined) {
+        await fixture.adapter.destroy({ id });
       }
     }
   }, 300_000);

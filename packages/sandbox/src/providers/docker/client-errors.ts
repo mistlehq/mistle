@@ -40,6 +40,7 @@ export const DockerClientOperationIds = {
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L737-L770
    */
   ATTACH_STDIN: "attach_stdin",
+  APPLY_STARTUP: "apply_startup",
   WRITE_STDIN: "write_stdin",
   CLOSE_STDIN: "close_stdin",
   /**

@@ -9,7 +9,7 @@ export async function destroySandbox(
   },
   input: {
     runtimeProvider: SandboxProvider;
-    providerRuntimeId: string;
+    providerSandboxId: string;
   },
 ): Promise<void> {
   if (input.runtimeProvider !== ctx.config.sandbox.provider) {
@@ -19,6 +19,6 @@ export async function destroySandbox(
   }
 
   await ctx.sandboxAdapter.destroy({
-    runtimeId: input.providerRuntimeId,
+    id: input.providerSandboxId,
   });
 }

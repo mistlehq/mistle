@@ -1,20 +1,21 @@
-mod proxy_ca;
 mod process;
+mod proxy_ca;
 mod pty;
 mod security;
 
 use napi_derive::napi;
+pub use process::{
+    NativeManagedProcess, ProcessExitResult, SpawnManagedProcessInput, spawn_managed_process,
+};
 use proxy_ca::{
     GeneratedProxyCa, IssuedProxyLeafCertificate, NativePreparedProxyCaRuntimeEnv,
     PrepareProxyCaRuntimeEnvInput, generate_proxy_ca_impl, issue_proxy_leaf_certificate_impl,
     prepare_proxy_ca_runtime_env,
 };
 pub use pty::{NativePtySession, PtyEnvironmentEntry, SpawnPtyInput, spawn_pty};
-pub use process::{
-    NativeManagedProcess, ProcessExitResult, SpawnManagedProcessInput, spawn_managed_process,
-};
 pub use security::{
-    ExecRuntimeAsUserInput, ProcessEnvironmentEntry, exec_runtime_as_user,
+    ExecRuntimeAsUserInput, ProcessEnvironmentEntry,
+    assert_unix_socket_peer_matches_current_process_uid, exec_runtime_as_user,
     set_current_process_non_dumpable,
 };
 

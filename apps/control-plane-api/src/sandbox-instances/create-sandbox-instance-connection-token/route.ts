@@ -1,12 +1,15 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   ForbiddenResponseSchema,
-  NotFoundResponseSchema,
   UnauthorizedResponseSchema,
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { sandboxInstanceConnectionTokenSchema, sandboxInstanceIdParamsSchema } from "../schemas.js";
+import {
+  sandboxInstanceConnectionTokenSchema,
+  sandboxInstanceIdParamsSchema,
+  sandboxInstancesNotFoundResponseSchema,
+} from "../schemas.js";
 import { conflictResponseSchema } from "./schema.js";
 
 const bodySchema = z.object({}).strict();
@@ -63,7 +66,7 @@ export const route = createRoute({
       description: "Sandbox instance was not found.",
       content: {
         "application/json": {
-          schema: NotFoundResponseSchema,
+          schema: sandboxInstancesNotFoundResponseSchema,
         },
       },
     },

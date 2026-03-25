@@ -1,11 +1,7 @@
-import type {
-  DataPlaneDatabase,
-  SandboxInstanceVolumeMode,
-  SandboxInstanceVolumeProvider,
-} from "@mistle/db/data-plane";
+import type { DataPlaneDatabase, SandboxInstanceProvider } from "@mistle/db/data-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
-import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "@mistle/integrations-core";
-import { SandboxProvider, type SandboxAdapter, type SandboxVolumeHandleV1 } from "@mistle/sandbox";
+import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
+import { SandboxProvider, type SandboxAdapter } from "@mistle/sandbox";
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
 import type { Clock, Sleeper } from "@mistle/time";
 
@@ -30,15 +26,12 @@ const ResumeSandboxFailureCodes = {
 type ResumableSandboxInstanceState = {
   sandboxInstanceId: string;
   runtimeProvider: SandboxProvider;
-  previousProviderRuntimeId: string | null;
+  previousProviderSandboxId: string;
   imageId: string;
   imageCreatedAt: string;
-  instanceVolume: SandboxVolumeHandleV1;
-  instanceVolumeMode: SandboxInstanceVolumeMode;
-  runtimePlan: CompiledRuntimePlan;
 };
 
-function toSandboxProvider(provider: SandboxInstanceVolumeProvider): SandboxProvider {
+function toSandboxProvider(provider: SandboxInstanceProvider): SandboxProvider {
   if (provider === "docker") {
     return SandboxProvider.DOCKER;
   }
@@ -53,10 +46,7 @@ async function resolveResumableSandboxInstanceState(input: {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
       runtimeProvider: true,
-      providerRuntimeId: true,
-      instanceVolumeProvider: true,
-      instanceVolumeId: true,
-      instanceVolumeMode: true,
+      providerSandboxId: true,
       status: true,
     },
     where: (table, { eq }) => eq(table.id, input.sandboxInstanceId),
@@ -82,13 +72,9 @@ async function resolveResumableSandboxInstanceState(input: {
     );
   }
 
-  if (
-    sandboxInstance.instanceVolumeProvider === null ||
-    sandboxInstance.instanceVolumeId === null ||
-    sandboxInstance.instanceVolumeMode === null
-  ) {
+  if (sandboxInstance.providerSandboxId === null) {
     throw new Error(
-      `Expected resumable sandbox instance '${input.sandboxInstanceId}' to have instance volume metadata.`,
+      `Expected resumable sandbox instance '${input.sandboxInstanceId}' to have a provider sandbox id.`,
     );
   }
 
@@ -112,16 +98,9 @@ async function resolveResumableSandboxInstanceState(input: {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     runtimeProvider: toSandboxProvider(sandboxInstance.runtimeProvider),
-    previousProviderRuntimeId: sandboxInstance.providerRuntimeId,
+    previousProviderSandboxId: sandboxInstance.providerSandboxId,
     imageId: runtimePlan.image.imageRef,
     imageCreatedAt: persistedRuntimePlan.createdAt,
-    instanceVolume: {
-      provider: toSandboxProvider(sandboxInstance.instanceVolumeProvider),
-      volumeId: sandboxInstance.instanceVolumeId,
-      createdAt: persistedRuntimePlan.createdAt,
-    },
-    instanceVolumeMode: sandboxInstance.instanceVolumeMode,
-    runtimePlan,
   };
 }
 
@@ -158,12 +137,12 @@ export async function resumeSandboxInstance(
   async function handleFailedResume(input: {
     sandboxInstanceId: string;
     runtimeProvider?: SandboxProvider;
-    providerRuntimeId?: string;
+    providerSandboxId?: string;
     failureCode: string;
     failureMessage: string;
   }): Promise<void> {
     let destroySandboxError: unknown;
-    if (input.runtimeProvider !== undefined && input.providerRuntimeId !== undefined) {
+    if (input.runtimeProvider !== undefined && input.providerSandboxId !== undefined) {
       try {
         await destroySandbox(
           {
@@ -172,7 +151,7 @@ export async function resumeSandboxInstance(
           },
           {
             runtimeProvider: input.runtimeProvider,
-            providerRuntimeId: input.providerRuntimeId,
+            providerSandboxId: input.providerSandboxId,
           },
         );
       } catch (error) {
@@ -225,7 +204,7 @@ export async function resumeSandboxInstance(
 
   let resumedRuntime: {
     runtimeProvider: SandboxProvider;
-    providerRuntimeId: string;
+    providerSandboxId: string;
   };
   try {
     resumedRuntime = await resumeSandbox(
@@ -237,10 +216,7 @@ export async function resumeSandboxInstance(
         sandboxInstanceId: resumableSandboxInstance.sandboxInstanceId,
         imageId: resumableSandboxInstance.imageId,
         imageCreatedAt: resumableSandboxInstance.imageCreatedAt,
-        instanceVolume: resumableSandboxInstance.instanceVolume,
-        instanceVolumeMode: resumableSandboxInstance.instanceVolumeMode,
-        previousProviderRuntimeId: resumableSandboxInstance.previousProviderRuntimeId,
-        runtimePlan: resumableSandboxInstance.runtimePlan,
+        previousProviderSandboxId: resumableSandboxInstance.previousProviderSandboxId,
       },
     );
   } catch (error) {
@@ -259,14 +235,14 @@ export async function resumeSandboxInstance(
       },
       {
         sandboxInstanceId: input.sandboxInstanceId,
-        providerRuntimeId: resumedRuntime.providerRuntimeId,
+        providerSandboxId: resumedRuntime.providerSandboxId,
       },
     );
   } catch (error) {
     await handleFailedResume({
       sandboxInstanceId: input.sandboxInstanceId,
       runtimeProvider: resumedRuntime.runtimeProvider,
-      providerRuntimeId: resumedRuntime.providerRuntimeId,
+      providerSandboxId: resumedRuntime.providerSandboxId,
       failureCode: ResumeSandboxFailureCodes.PERSIST_RUNTIME_ATTACHMENT_FAILED,
       failureMessage: "Failed to persist resumed runtime attachment metadata.",
     });
@@ -290,7 +266,7 @@ export async function resumeSandboxInstance(
     await handleFailedResume({
       sandboxInstanceId: input.sandboxInstanceId,
       runtimeProvider: resumedRuntime.runtimeProvider,
-      providerRuntimeId: resumedRuntime.providerRuntimeId,
+      providerSandboxId: resumedRuntime.providerSandboxId,
       failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
       failureMessage: "Failed while waiting for resumed sandbox tunnel readiness.",
     });
@@ -301,7 +277,7 @@ export async function resumeSandboxInstance(
     await handleFailedResume({
       sandboxInstanceId: input.sandboxInstanceId,
       runtimeProvider: resumedRuntime.runtimeProvider,
-      providerRuntimeId: resumedRuntime.providerRuntimeId,
+      providerSandboxId: resumedRuntime.providerSandboxId,
       failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_TIMEOUT,
       failureMessage: "Timed out waiting for resumed sandbox tunnel readiness.",
     });
@@ -321,7 +297,7 @@ export async function resumeSandboxInstance(
     await handleFailedResume({
       sandboxInstanceId: input.sandboxInstanceId,
       runtimeProvider: resumedRuntime.runtimeProvider,
-      providerRuntimeId: resumedRuntime.providerRuntimeId,
+      providerSandboxId: resumedRuntime.providerSandboxId,
       failureCode: ResumeSandboxFailureCodes.STATUS_TRANSITION_TO_RUNNING_FAILED,
       failureMessage: "Failed to mark resumed sandbox instance as running.",
     });

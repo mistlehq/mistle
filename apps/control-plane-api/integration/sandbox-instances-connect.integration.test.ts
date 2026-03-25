@@ -66,7 +66,7 @@ async function insertSandboxInstance(input: {
   organizationId: string;
   sandboxInstanceId: string;
   status: "starting" | "running" | "stopped" | "failed";
-  providerRuntimeId?: string | null;
+  providerSandboxId?: string | null;
   failureCode?: string | null;
   failureMessage?: string | null;
 }) {
@@ -76,7 +76,7 @@ async function insertSandboxInstance(input: {
     sandboxProfileId: "sbp_connect_integration",
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
-    providerRuntimeId: input.providerRuntimeId ?? "provider-runtime-connect-001",
+    providerSandboxId: input.providerSandboxId ?? "provider-runtime-connect-001",
     instanceVolumeProvider: "docker",
     instanceVolumeId: `volume-${input.sandboxInstanceId}`,
     instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,
@@ -183,6 +183,9 @@ describe("sandbox instance connect integration", () => {
         sandboxInstanceId: "sbi_cp_connect_running_001",
         status: "running",
       });
+      await dataPlaneFixture.attachSandboxRuntime({
+        sandboxInstanceId: "sbi_cp_connect_running_001",
+      });
 
       const response = await controlPlaneRuntime.request(
         "/v1/sandbox/instances/sbi_cp_connect_running_001/connection-tokens",
@@ -264,6 +267,9 @@ describe("sandbox instance connect integration", () => {
         sandboxInstanceId: "sbi_cp_connect_starting_001",
         status: "running",
       });
+      await dataPlaneFixture.attachSandboxRuntime({
+        sandboxInstanceId: "sbi_cp_connect_starting_001",
+      });
 
       const response = await responsePromise;
       expect(response.status).toBe(201);
@@ -338,6 +344,9 @@ describe("sandbox instance connect integration", () => {
         dataPlaneFixture,
         sandboxInstanceId: "sbi_cp_connect_stopped_001",
         status: "running",
+      });
+      await dataPlaneFixture.attachSandboxRuntime({
+        sandboxInstanceId: "sbi_cp_connect_stopped_001",
       });
 
       const response = await responsePromise;

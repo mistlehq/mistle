@@ -1,33 +1,29 @@
 import { randomUUID } from "node:crypto";
 
 import { mintBootstrapToken, mintTunnelExchangeToken } from "@mistle/gateway-tunnel-auth";
-import type { SandboxAdapter, SandboxHandle } from "@mistle/sandbox";
+import type { SandboxRuntimeControl } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import {
-  type SandboxStartupInstanceVolumeState,
-  type SandboxStartupInstanceVolumeMode,
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxStartupInput,
+  type SandboxStartupInput,
 } from "./sandbox-startup-input.js";
 
-export async function writeSandboxStartupInput(input: {
+function createSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
-  sandboxAdapter: SandboxAdapter;
   sandboxInstanceId: string;
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
-  instanceVolumeMode: SandboxStartupInstanceVolumeMode;
-  instanceVolumeState: SandboxStartupInstanceVolumeState;
-  sandbox: SandboxHandle;
-}): Promise<void> {
+}): Promise<SandboxStartupInput> {
   const bootstrapTokenJti = randomUUID();
   const tunnelExchangeTokenJti = randomUUID();
   const tunnelGatewayWsUrl = createSandboxTunnelGatewayWsUrl({
     gatewayWebsocketUrl: input.config.sandbox.internalGatewayWsUrl,
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  const [bootstrapToken, tunnelExchangeToken] = await Promise.all([
+
+  return Promise.all([
     mintBootstrapToken({
       config: {
         bootstrapTokenSecret: input.config.sandbox.bootstrap.tokenSecret,
@@ -50,41 +46,33 @@ export async function writeSandboxStartupInput(input: {
       exchangeTokenTtlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
       ttlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
     }),
-  ]);
+  ]).then(([bootstrapToken, tunnelExchangeToken]) => ({
+    bootstrapToken,
+    tunnelExchangeToken,
+    tunnelGatewayWsUrl,
+    runtimePlan: input.runtimePlan,
+  }));
+}
 
-  try {
-    await input.sandbox.writeStdin({
-      payload: encodeSandboxStartupInput({
-        bootstrapToken,
-        tunnelExchangeToken,
-        tunnelGatewayWsUrl,
-        instanceVolume: {
-          mode: input.instanceVolumeMode,
-          state: input.instanceVolumeState,
-        },
-        runtimePlan: input.runtimePlan,
-      }),
-    });
-    await input.sandbox.closeStdin();
-  } catch (writeError) {
-    try {
-      await input.sandboxAdapter.destroy({
-        runtimeId: input.sandbox.runtimeId,
-      });
-    } catch (destroyError) {
-      throw new Error(
-        "Failed to write sandbox startup input and failed to destroy sandbox after startup write failure.",
-        {
-          cause: {
-            writeError,
-            destroyError,
-          },
-        },
-      );
-    }
+export async function applySandboxStartupConfiguration(
+  ctx: {
+    config: DataPlaneWorkerRuntimeConfig;
+    sandboxRuntimeControl: SandboxRuntimeControl;
+  },
+  input: {
+    sandboxInstanceId: string;
+    providerSandboxId: string;
+    runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+  },
+): Promise<void> {
+  const startupInput = await createSandboxStartupInput({
+    config: ctx.config,
+    sandboxInstanceId: input.sandboxInstanceId,
+    runtimePlan: input.runtimePlan,
+  });
 
-    throw new Error("Failed to write sandbox startup input to sandbox stdin.", {
-      cause: writeError,
-    });
-  }
+  await ctx.sandboxRuntimeControl.applyStartup({
+    id: input.providerSandboxId,
+    payload: encodeSandboxStartupInput(startupInput),
+  });
 }

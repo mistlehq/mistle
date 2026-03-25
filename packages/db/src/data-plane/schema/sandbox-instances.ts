@@ -69,7 +69,7 @@ export const sandboxInstances = dataPlaneSchema.table(
     sandboxProfileId: text("sandbox_profile_id").notNull(),
     sandboxProfileVersion: bigint("sandbox_profile_version", { mode: "number" }).notNull(),
     runtimeProvider: text("runtime_provider").notNull().$type<SandboxInstanceProvider>(),
-    providerRuntimeId: text("provider_runtime_id"),
+    providerSandboxId: text("provider_sandbox_id"),
     instanceVolumeProvider: text("instance_volume_provider").$type<SandboxInstanceVolumeProvider>(),
     instanceVolumeId: text("instance_volume_id"),
     instanceVolumeMode: text("instance_volume_mode").$type<SandboxInstanceVolumeMode>(),
@@ -105,9 +105,9 @@ export const sandboxInstances = dataPlaneSchema.table(
       table.status,
       table.updatedAt,
     ),
-    uniqueIndex("sandbox_instances_provider_runtime_uidx").on(
+    uniqueIndex("sandbox_instances_provider_sandbox_uidx").on(
       table.runtimeProvider,
-      table.providerRuntimeId,
+      table.providerSandboxId,
     ),
     uniqueIndex("sandbox_instances_instance_volume_uidx").on(
       table.instanceVolumeProvider,

@@ -43,7 +43,7 @@ async function insertSandboxInstanceRow(input: {
     sandboxProfileId: "sbp_data_plane_gateway_integration",
     sandboxProfileVersion: 1,
     runtimeProvider: input.fixture.config.sandbox.provider,
-    providerRuntimeId: `provider-${input.sandboxInstanceId}`,
+    providerSandboxId: `provider-${input.sandboxInstanceId}`,
     status: input.status ?? SandboxInstanceStatuses.RUNNING,
     startedByKind: "system",
     startedById: "workflow_data_plane_gateway_integration",

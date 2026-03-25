@@ -9,6 +9,7 @@ Current scope:
 - resume a sandbox against existing provider-managed state
 - stop a running sandbox without destroying its durable volume state
 - destroy a sandbox runtime
+- apply runtime startup payloads through provider-scoped runtime control
 
 Currently implemented providers:
 
@@ -51,6 +52,7 @@ The package root exports:
 - `SandboxVolumeHandleV1`
 - `SandboxVolumeMountV1`
 - `SandboxHandle`
+- `SandboxRuntimeControl`
 - `CreateVolumeRequestV1`
 - `DeleteVolumeRequestV1`
 - `SandboxStartRequest`
@@ -62,15 +64,21 @@ The package root exports:
 - `SandboxConfigurationError`
 - `SandboxProviderNotImplementedError`
 - `createSandboxAdapter`
+- `createSandboxRuntimeControl`
 
-`createSandboxAdapter` is the main entrypoint.
+`createSandboxAdapter` and `createSandboxRuntimeControl` are the main entrypoints.
 
 ```ts
-import { createSandboxAdapter, type SandboxImageHandle } from "@mistle/sandbox";
+import {
+  createSandboxAdapter,
+  createSandboxRuntimeControl,
+  type SandboxImageHandle,
+} from "@mistle/sandbox";
 
 // See provider README for provider-specific configuration shape.
 const providerConfig = { provider: "..." };
 const adapter = createSandboxAdapter(providerConfig);
+const runtimeControl = createSandboxRuntimeControl(providerConfig);
 
 const baseImage: SandboxImageHandle = {
   provider: providerConfig.provider,
@@ -89,12 +97,13 @@ const sandbox = await adapter.start({
     },
   ],
 });
-await sandbox.writeStdin({
+
+await runtimeControl.applyStartup({
+  id: sandbox.id,
   payload: Buffer.from("bootstrap payload\n", "utf8"),
 });
-await sandbox.closeStdin();
 
-await adapter.stop({ runtimeId: sandbox.runtimeId });
+await adapter.stop({ id: sandbox.id });
 const resumedSandbox = await adapter.resume({
   image: baseImage,
   mounts: [
@@ -103,10 +112,11 @@ const resumedSandbox = await adapter.resume({
       mountPath: "/home/sandbox",
     },
   ],
-  previousRuntimeId: sandbox.runtimeId,
+  id: sandbox.id,
 });
-await adapter.destroy({ runtimeId: resumedSandbox.runtimeId });
+await adapter.destroy({ id: resumedSandbox.id });
 await adapter.deleteVolume({ volumeId: volume.volumeId });
+await runtimeControl.close();
 ```
 
 ## Usage Notes
@@ -114,9 +124,9 @@ await adapter.deleteVolume({ volumeId: volume.volumeId });
 - Sandbox image handles describe the provider image passed to `start({ image })`.
 - Sandbox volume handles are opaque provider-managed volume references returned by `createVolume({})`.
 - `SandboxStartRequest.mounts` attaches provider-backed volumes at the requested mount paths.
-- `SandboxResumeRequestV1` resumes provider compute against existing mounts. Providers may reuse the same runtime id or return a new one.
-- `SandboxHandle.writeStdin({ payload })` writes bytes to running sandbox stdin.
-- `SandboxHandle.closeStdin()` closes stdin to signal EOF.
+- `SandboxResumeRequestV1` resumes provider compute against existing mounts using a previous sandbox `id`.
+- `SandboxRuntimeControl.applyStartup({ id, payload })` delivers runtime startup bytes to an already-running sandbox using provider-native control paths.
+- `SandboxRuntimeControl.close()` releases provider client resources held by runtime control.
 - Operations may throw `SandboxError` subclasses. Configuration failures throw `SandboxConfigurationError`.
 
 ## Responsibility Boundary
@@ -128,6 +138,7 @@ await adapter.deleteVolume({ volumeId: volume.volumeId });
 - resume a sandbox runtime
 - stop a sandbox runtime
 - destroy a sandbox runtime
+- apply runtime startup payloads through a separate runtime-control interface
 
 It is not responsible for provisioning or managing provider infrastructure/resources. For current and future adapters (for example Modal, Docker, Kubernetes), platform concerns such as autoscaling, cluster/node lifecycle, scheduling policy, capacity management, and other underlying resource orchestration are out of scope for this package.
 
@@ -141,11 +152,12 @@ Use the current Modal provider as the reference implementation.
 4. Implement `src/providers/<provider>/client.ts` for raw SDK/API calls.
 5. Add provider error mapping in `src/providers/<provider>/client-errors.ts`.
 6. Implement `src/providers/<provider>/adapter.ts` that satisfies `SandboxAdapter`.
-7. Create `src/providers/<provider>/index.ts` with a `create<Provider>Adapter(...)` constructor.
-8. Wire the provider into `createSandboxAdapter` in `src/factory.ts`.
-9. Add unit tests next to each provider module (config, errors, factory wiring, and adapter behavior).
-10. Add provider integration tests in `integration/<provider>/` (for example `integration/modal/modal-adapter.integration.test.ts`).
-11. Integration tests must cover the provider lifecycle surface: `createVolume`, `deleteVolume`, `start`, `resume`, `stop`, and `destroy`, plus sandbox interaction such as stdin/filesystem/env behavior and mounted volume behavior.
+7. Implement `src/providers/<provider>/runtime-control.ts` that satisfies `SandboxRuntimeControl`.
+8. Create `src/providers/<provider>/index.ts` with both `create<Provider>Adapter(...)` and `create<Provider>RuntimeControl(...)` constructors.
+9. Wire the provider into both `createSandboxAdapter` and `createSandboxRuntimeControl` in `src/factory.ts`.
+10. Add unit tests next to each provider module, including config, errors, factory wiring, adapter behavior, and runtime-control construction.
+11. Add provider integration tests in `integration/<provider>/` (for example `integration/modal/modal-adapter.integration.test.ts`).
+12. Integration tests must cover the provider lifecycle surface: `createVolume`, `deleteVolume`, `start`, `resume`, `stop`, and `destroy`, plus runtime-control behavior for startup payload application and any provider-specific stdin/filesystem interactions the package exposes.
 
 Design expectations:
 
@@ -153,3 +165,4 @@ Design expectations:
 - fail fast on missing config/state
 - keep provider-specific concerns inside `src/providers/<provider>`
 - return provider-agnostic handles from the `SandboxAdapter` boundary
+- keep provider-specific runtime control inside `src/providers/<provider>/runtime-control.ts`

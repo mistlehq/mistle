@@ -3,7 +3,6 @@ import {
   sandboxInstances,
   SandboxStopReasons,
   SandboxInstanceStatuses,
-  SandboxInstanceVolumeModes,
 } from "@mistle/db/data-plane";
 import {
   DATA_PLANE_MIGRATIONS_FOLDER_PATH,
@@ -76,10 +75,7 @@ describe("resume sandbox instance state integration", () => {
         sandboxProfileId: "sbp_resume_state_integration",
         sandboxProfileVersion: 1,
         runtimeProvider: "docker",
-        providerRuntimeId: "provider-runtime-old",
-        instanceVolumeProvider: "docker",
-        instanceVolumeId: "instance-volume-resume-state",
-        instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,
+        providerSandboxId: "provider-runtime-old",
         status: SandboxInstanceStatuses.STOPPED,
         startedByKind: "system",
         startedById: "worker_resume_state_integration",
@@ -96,7 +92,7 @@ describe("resume sandbox instance state integration", () => {
       const startingSandboxInstance = await db.query.sandboxInstances.findFirst({
         columns: {
           status: true,
-          providerRuntimeId: true,
+          providerSandboxId: true,
           stoppedAt: true,
           stopReason: true,
           failureCode: true,
@@ -107,7 +103,7 @@ describe("resume sandbox instance state integration", () => {
 
       expect(startingSandboxInstance).toEqual({
         status: SandboxInstanceStatuses.STARTING,
-        providerRuntimeId: null,
+        providerSandboxId: null,
         stoppedAt: null,
         stopReason: null,
         failureCode: null,
@@ -120,20 +116,20 @@ describe("resume sandbox instance state integration", () => {
         },
         {
           sandboxInstanceId,
-          providerRuntimeId: "provider-runtime-new",
+          providerSandboxId: "provider-runtime-new",
         },
       );
 
       const attachedSandboxInstance = await db.query.sandboxInstances.findFirst({
         columns: {
-          providerRuntimeId: true,
+          providerSandboxId: true,
           status: true,
         },
         where: (table, { eq }) => eq(table.id, sandboxInstanceId),
       });
 
       expect(attachedSandboxInstance).toEqual({
-        providerRuntimeId: "provider-runtime-new",
+        providerSandboxId: "provider-runtime-new",
         status: SandboxInstanceStatuses.STARTING,
       });
     },
@@ -150,10 +146,7 @@ describe("resume sandbox instance state integration", () => {
       sandboxProfileId: "sbp_resume_failed_state_integration",
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
-      providerRuntimeId: "provider-runtime-failed",
-      instanceVolumeProvider: "docker",
-      instanceVolumeId: "instance-volume-resume-failed-state",
-      instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,
+      providerSandboxId: "provider-runtime-failed",
       status: SandboxInstanceStatuses.FAILED,
       startedByKind: "system",
       startedById: "worker_resume_failed_state_integration",
@@ -172,7 +165,7 @@ describe("resume sandbox instance state integration", () => {
     const startingSandboxInstance = await db.query.sandboxInstances.findFirst({
       columns: {
         status: true,
-        providerRuntimeId: true,
+        providerSandboxId: true,
         stoppedAt: true,
         stopReason: true,
         failedAt: true,
@@ -184,7 +177,7 @@ describe("resume sandbox instance state integration", () => {
 
     expect(startingSandboxInstance).toEqual({
       status: SandboxInstanceStatuses.STARTING,
-      providerRuntimeId: null,
+      providerSandboxId: null,
       stoppedAt: null,
       stopReason: null,
       failedAt: null,

@@ -1,14 +1,7 @@
-import type { SandboxInstanceVolumeMode } from "@mistle/db/data-plane";
-import type { CompiledRuntimePlan } from "@mistle/integrations-core";
-import type { SandboxAdapter, SandboxProvider, SandboxVolumeHandleV1 } from "@mistle/sandbox";
+import type { SandboxAdapter, SandboxProvider } from "@mistle/sandbox";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
-import { SandboxStartupInstanceVolumeStates } from "../start-sandbox-instance/sandbox-startup-input.js";
-import {
-  createSandboxRuntimeEnv,
-  SandboxRuntimeInstanceVolumeMountPath,
-} from "../start-sandbox-instance/start-sandbox.js";
-import { writeSandboxStartupInput } from "../start-sandbox-instance/write-sandbox-startup-input.js";
+import { createSandboxRuntimeEnv } from "../start-sandbox-instance/start-sandbox.js";
 
 export async function resumeSandbox(
   ctx: {
@@ -19,15 +12,12 @@ export async function resumeSandbox(
     sandboxInstanceId: string;
     imageId: string;
     imageCreatedAt: string;
-    instanceVolume: SandboxVolumeHandleV1;
-    instanceVolumeMode: SandboxInstanceVolumeMode;
-    previousProviderRuntimeId: string | null;
-    runtimePlan: CompiledRuntimePlan;
+    previousProviderSandboxId: string;
   },
 ): Promise<{
   sandboxInstanceId: string;
   runtimeProvider: SandboxProvider;
-  providerRuntimeId: string;
+  providerSandboxId: string;
 }> {
   const resumedSandbox = await ctx.sandboxAdapter.resume({
     image: {
@@ -35,13 +25,7 @@ export async function resumeSandbox(
       imageId: input.imageId,
       createdAt: input.imageCreatedAt,
     },
-    mounts: [
-      {
-        volume: input.instanceVolume,
-        mountPath: SandboxRuntimeInstanceVolumeMountPath,
-      },
-    ],
-    previousRuntimeId: input.previousProviderRuntimeId,
+    id: input.previousProviderSandboxId,
     env: createSandboxRuntimeEnv({
       config: ctx.config,
       sandboxInstanceId: input.sandboxInstanceId,
@@ -52,19 +36,9 @@ export async function resumeSandbox(
     throw new Error("Sandbox adapter returned sandbox handle with unexpected provider.");
   }
 
-  await writeSandboxStartupInput({
-    config: ctx.config,
-    sandboxAdapter: ctx.sandboxAdapter,
-    sandboxInstanceId: input.sandboxInstanceId,
-    runtimePlan: input.runtimePlan,
-    instanceVolumeMode: input.instanceVolumeMode,
-    instanceVolumeState: SandboxStartupInstanceVolumeStates.EXISTING,
-    sandbox: resumedSandbox,
-  });
-
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     runtimeProvider: resumedSandbox.provider,
-    providerRuntimeId: resumedSandbox.runtimeId,
+    providerSandboxId: resumedSandbox.id,
   };
 }

@@ -4,7 +4,8 @@ Modal implementation for `@mistle/sandbox`.
 
 ## Config
 
-`createSandboxAdapter({ provider: SandboxProvider.MODAL, modal: ... })` expects:
+`createSandboxAdapter({ provider: SandboxProvider.MODAL, modal: ... })` and
+`createSandboxRuntimeControl({ provider: SandboxProvider.MODAL, modal: ... })` both expect:
 
 - `tokenId`: Modal token id
 - `tokenSecret`: Modal token secret
@@ -22,9 +23,22 @@ All config fields are validated with Zod and fail fast when invalid.
 ## Usage
 
 ```ts
-import { createSandboxAdapter, SandboxProvider } from "@mistle/sandbox";
+import {
+  createSandboxAdapter,
+  createSandboxRuntimeControl,
+  SandboxProvider,
+} from "@mistle/sandbox";
 
 const adapter = createSandboxAdapter({
+  provider: SandboxProvider.MODAL,
+  modal: {
+    tokenId: process.env.MODAL_TOKEN_ID ?? "",
+    tokenSecret: process.env.MODAL_TOKEN_SECRET ?? "",
+    appName: "mistle-sandbox",
+    environmentName: process.env.MODAL_ENVIRONMENT,
+  },
+});
+const runtimeControl = createSandboxRuntimeControl({
   provider: SandboxProvider.MODAL,
   modal: {
     tokenId: process.env.MODAL_TOKEN_ID ?? "",
@@ -40,10 +54,11 @@ const adapter = createSandboxAdapter({
 - `createVolume({})` creates a named Modal volume and returns an opaque handle.
 - `deleteVolume({ volumeId })` deletes that named Modal volume.
 - `start({ image, mounts })` resolves Modal app and image, then creates a sandbox with optional volume mounts.
-- `resume({ image, mounts })` creates fresh Modal sandbox compute attached to the provided mounts. `previousRuntimeId` is accepted by the public API but not required by the provider implementation.
+- `resume({ image, mounts, id })` creates fresh Modal sandbox compute attached to the provided mounts. `id` is accepted by the public API but not required by the provider implementation.
+- `createSandboxRuntimeControl(...).applyStartup({ id, payload })` resolves the target sandbox and runs `sandboxd apply-startup`.
 - returned `SandboxHandle` supports `writeStdin({ payload })` and `closeStdin()` via Modal sandbox stdin stream APIs.
-- `stop({ runtimeId })` resolves sandbox and terminates the current runtime.
-- `destroy({ runtimeId })` resolves sandbox and terminates the current runtime.
+- `stop({ id })` resolves sandbox and terminates the current runtime.
+- `destroy({ id })` resolves sandbox and terminates the current runtime.
 
 ## Error Surface
 

@@ -82,20 +82,20 @@ export class ModalSandboxAdapter implements SandboxAdapter {
           }),
       ...(request.env === undefined ? {} : { env: request.env }),
     });
-    const runtimeId = response.runtimeId;
+    const id = response.runtimeId;
 
     return {
       provider: SandboxProvider.MODAL,
-      runtimeId,
+      id,
       writeStdin: async (input) => {
         await this.#client.writeSandboxStdin({
-          runtimeId,
+          runtimeId: id,
           payload: input.payload,
         });
       },
       closeStdin: async () => {
         await this.#client.closeSandboxStdin({
-          runtimeId,
+          runtimeId: id,
         });
       },
     };
@@ -124,37 +124,37 @@ export class ModalSandboxAdapter implements SandboxAdapter {
           }),
       ...(request.env === undefined ? {} : { env: request.env }),
     });
-    const runtimeId = response.runtimeId;
+    const id = response.runtimeId;
 
     return {
       provider: SandboxProvider.MODAL,
-      runtimeId,
+      id,
       writeStdin: async (input) => {
         await this.#client.writeSandboxStdin({
-          runtimeId,
+          runtimeId: id,
           payload: input.payload,
         });
       },
       closeStdin: async () => {
         await this.#client.closeSandboxStdin({
-          runtimeId,
+          runtimeId: id,
         });
       },
     };
   }
 
   async stop(request: SandboxStopRequest): Promise<void> {
-    if (request.runtimeId.trim().length === 0) {
+    if (request.id.trim().length === 0) {
       throw new SandboxConfigurationError("Runtime id is required.");
     }
 
     try {
-      await this.#client.stopSandbox({ runtimeId: request.runtimeId });
+      await this.#client.stopSandbox({ runtimeId: request.id });
     } catch (error) {
       if (error instanceof ModalClientError && error.code === ModalClientErrorCodes.NOT_FOUND) {
         throw new SandboxResourceNotFoundError({
           resourceType: "sandbox",
-          resourceId: request.runtimeId,
+          resourceId: request.id,
           cause: error,
         });
       }
@@ -164,17 +164,17 @@ export class ModalSandboxAdapter implements SandboxAdapter {
   }
 
   async destroy(request: SandboxDestroyRequest): Promise<void> {
-    if (request.runtimeId.trim().length === 0) {
+    if (request.id.trim().length === 0) {
       throw new SandboxConfigurationError("Runtime id is required.");
     }
 
     try {
-      await this.#client.stopSandbox({ runtimeId: request.runtimeId });
+      await this.#client.stopSandbox({ runtimeId: request.id });
     } catch (error) {
       if (error instanceof ModalClientError && error.code === ModalClientErrorCodes.NOT_FOUND) {
         throw new SandboxResourceNotFoundError({
           resourceType: "sandbox",
-          resourceId: request.runtimeId,
+          resourceId: request.id,
           cause: error,
         });
       }

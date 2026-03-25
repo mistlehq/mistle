@@ -1,8 +1,11 @@
 import { z } from "@hono/zod-openapi";
+import { createCodeMessageErrorSchema } from "@mistle/http/errors.js";
 import {
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
 } from "@mistle/http/pagination";
+
+import { SandboxInstancesNotFoundCodes } from "./constants.js";
 
 const sandboxInstanceStatusSchema = z.enum(["starting", "running", "stopped", "failed"]);
 const sandboxInstanceSourceSchema = z.enum(["dashboard", "webhook"]);
@@ -49,6 +52,10 @@ export const sandboxInstanceStatusResponseSchema = z
       .nullable(),
   })
   .strict();
+
+export const sandboxInstancesNotFoundResponseSchema = createCodeMessageErrorSchema(
+  z.literal(SandboxInstancesNotFoundCodes.INSTANCE_NOT_FOUND),
+);
 
 export const sandboxInstanceListItemSchema = z
   .object({

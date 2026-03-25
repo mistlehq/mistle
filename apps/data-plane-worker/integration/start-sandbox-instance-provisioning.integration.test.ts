@@ -3,7 +3,6 @@ import {
   sandboxInstanceRuntimePlans,
   sandboxInstances,
   SandboxInstanceStatuses,
-  SandboxInstanceVolumeModes,
 } from "@mistle/db/data-plane";
 import {
   DATA_PLANE_MIGRATIONS_FOLDER_PATH,
@@ -17,7 +16,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
 import { persistSandboxInstanceProvisioning } from "../openworkflow/start-sandbox-instance/persist-sandbox-instance-provisioning.js";
-import { persistSandboxInstanceVolumeProvisioning } from "../openworkflow/start-sandbox-instance/persist-sandbox-instance-volume-provisioning.js";
 
 const IntegrationTestTimeoutMs = 60_000;
 
@@ -84,7 +82,7 @@ describe("start sandbox instance provisioning integration", () => {
   });
 
   it(
-    "persists instance volume metadata before runtime provisioning metadata",
+    "persists provider sandbox metadata without writing instance volume metadata",
     async () => {
       const db = createDatabase();
       const sandboxInstanceId = "sbi_start_provisioning_integration";
@@ -126,18 +124,6 @@ describe("start sandbox instance provisioning integration", () => {
         instanceVolumeMode: null,
       });
 
-      await persistSandboxInstanceVolumeProvisioning(
-        {
-          db,
-        },
-        {
-          sandboxInstanceId,
-          instanceVolumeProvider: "docker",
-          instanceVolumeId: "mistle-volume-start-provisioning",
-          instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,
-        },
-      );
-
       await persistSandboxInstanceProvisioning(
         {
           db,
@@ -147,14 +133,14 @@ describe("start sandbox instance provisioning integration", () => {
           runtimePlan: createRuntimePlan(),
           sandboxProfileId: "sbp_start_provisioning_integration",
           sandboxProfileVersion: 3,
-          providerRuntimeId: "provider-runtime-start-provisioning",
+          providerSandboxId: "provider-runtime-start-provisioning",
         },
       );
 
       const persistedProvisionedInstance = await db.query.sandboxInstances.findFirst({
         columns: {
           id: true,
-          providerRuntimeId: true,
+          providerSandboxId: true,
           instanceVolumeProvider: true,
           instanceVolumeId: true,
           instanceVolumeMode: true,
@@ -164,10 +150,10 @@ describe("start sandbox instance provisioning integration", () => {
 
       expect(persistedProvisionedInstance).toEqual({
         id: sandboxInstanceId,
-        providerRuntimeId: "provider-runtime-start-provisioning",
-        instanceVolumeProvider: "docker",
-        instanceVolumeId: "mistle-volume-start-provisioning",
-        instanceVolumeMode: SandboxInstanceVolumeModes.NATIVE,
+        providerSandboxId: "provider-runtime-start-provisioning",
+        instanceVolumeProvider: null,
+        instanceVolumeId: null,
+        instanceVolumeMode: null,
       });
 
       const persistedRuntimePlans = await db.query.sandboxInstanceRuntimePlans.findMany({

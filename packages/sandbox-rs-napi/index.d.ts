@@ -89,6 +89,7 @@ export declare function prepareProxyCaRuntime(
 export declare function issueProxyLeafCertificate(
   input: IssueProxyLeafCertificateInput,
 ): IssuedProxyLeafCertificateResult;
+export declare function assertUnixSocketPeerMatchesCurrentProcessUid(fd: number): void;
 export declare function execRuntimeAsUser(input: ExecRuntimeAsUserInput): void;
 export declare function setCurrentProcessNonDumpable(): void;
 export declare function spawnManagedProcess(

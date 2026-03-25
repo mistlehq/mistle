@@ -9,7 +9,7 @@ export async function stopSandbox(
   },
   input: {
     runtimeProvider: SandboxProvider;
-    providerRuntimeId: string;
+    providerSandboxId: string;
   },
 ): Promise<void> {
   if (input.runtimeProvider !== ctx.config.sandbox.provider) {
@@ -19,6 +19,6 @@ export async function stopSandbox(
   }
 
   await ctx.sandboxAdapter.stop({
-    runtimeId: input.providerRuntimeId,
+    id: input.providerSandboxId,
   });
 }
