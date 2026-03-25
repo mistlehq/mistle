@@ -21,6 +21,7 @@ import { TrashIcon } from "@phosphor-icons/react";
 
 import { FormPageFooter, FormPageHeader, FormPageSection } from "../shared/form-page.js";
 import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
+import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
@@ -31,6 +32,7 @@ import type {
   WebhookAutomationTriggerParameterValueMap,
 } from "./webhook-automation-trigger-types.js";
 export type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
+export type { WebhookAutomationEventOptionAvailability } from "./webhook-automation-trigger-types.js";
 
 export type WebhookAutomationFormOption = {
   value: string;
@@ -155,6 +157,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
   });
   const selectedConnectionIds = new Set(
     selectedTriggerOptions
+      .filter((option) => !isWebhookAutomationEventOptionUnavailable(option))
       .map((option) => option.connectionId)
       .filter((connectionId) => connectionId.trim().length > 0),
   );

@@ -1,13 +1,18 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import {
+  sandboxProfileVersionIntegrationBindingsQueryKey,
+  sandboxProfileVersionsQueryKey,
+} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
   resolveSelectedProfileTriggerState,
   useLoadedWebhookAutomationEditorState,
 } from "./use-webhook-automation-editor-state.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 
 function createDirectoryData(input?: {
   supportedWebhookEvents?: {
@@ -137,5 +142,82 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         directoryData: createDirectoryData(),
       }).disabledReason,
     ).toBe("Could not load profile bindings.");
+  });
+
+  it("preserves selected triggers when the sandbox profile changes", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+    const triggerId = createWebhookAutomationTriggerId({
+      connectionId: "conn_linear",
+      eventType: "linear.issue.created",
+    });
+
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_456"), {
+      versions: [{ sandboxProfileId: "sbp_456", version: 1 }],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionIntegrationBindingsQueryKey({
+        profileId: "sbp_456",
+        version: 1,
+      }),
+      {
+        bindings: [],
+      },
+    );
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "create",
+          automationId: undefined,
+          navigate: async () => {},
+          initialValues: {
+            name: "Linear automation",
+            sandboxProfileId: "",
+            enabled: true,
+            instructions: "Watch for new Linear issues.",
+            conversationKeyTemplate: "{{payload.team.id}}",
+            triggerIds: [triggerId],
+            triggerParameterValues: {
+              [triggerId]: {
+                team: "eng",
+              },
+            },
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          directoryData: createDirectoryData({
+            supportedWebhookEvents: [
+              {
+                eventType: "linear.issue.created",
+                providerEventType: "Issue",
+                displayName: "Issue created",
+              },
+            ],
+          }),
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => {
+      result.current.onValueChange("sandboxProfileId", "sbp_456");
+    });
+
+    expect(result.current.values.triggerIds).toEqual([triggerId]);
+    expect(result.current.values.triggerParameterValues).toEqual({
+      [triggerId]: {
+        team: "eng",
+      },
+    });
   });
 });

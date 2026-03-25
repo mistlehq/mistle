@@ -55,7 +55,7 @@ type WebhookAutomationOption = {
 };
 
 type SelectedProfileTriggerState = {
-  eligibleConnectionIds: readonly string[];
+  selectableConnectionIds: readonly string[];
   disabledReason: string | null;
 };
 
@@ -76,34 +76,34 @@ export function resolveSelectedProfileTriggerState(input: {
 }): SelectedProfileTriggerState {
   if (input.selectedProfileId.trim().length === 0) {
     return {
-      eligibleConnectionIds: [],
+      selectableConnectionIds: [],
       disabledReason: NoProfileSelectedMessage,
     };
   }
 
   if (input.bindingErrorMessage !== null) {
     return {
-      eligibleConnectionIds: [],
+      selectableConnectionIds: [],
       disabledReason: input.bindingErrorMessage,
     };
   }
 
   if (input.isBindingDataPending || !input.hasBindingData) {
     return {
-      eligibleConnectionIds: [],
+      selectableConnectionIds: [],
       disabledReason: "Loading profile bindings...",
     };
   }
 
-  const eligibleConnectionIds = resolveEligibleProfileAutomationConnectionIds({
+  const selectableConnectionIds = resolveEligibleProfileAutomationConnectionIds({
     bindings: input.bindings,
     connections: input.directoryData.connections,
     targets: input.directoryData.targets,
   });
 
   return {
-    eligibleConnectionIds,
-    disabledReason: eligibleConnectionIds.length === 0 ? InvalidProfileBindingMessage : null,
+    selectableConnectionIds,
+    disabledReason: selectableConnectionIds.length === 0 ? InvalidProfileBindingMessage : null,
   };
 }
 
@@ -232,12 +232,26 @@ function applyWebhookAutomationValueChange(input: {
   }
 
   if (input.key === "sandboxProfileId") {
-    nextValues.triggerIds = [];
-    nextValues.triggerParameterValues = {};
-    nextValues.conversationKeyTemplate = "";
+    return applySandboxProfileSelectionChange({
+      values: nextValues,
+      eventOptions: input.eventOptions,
+    });
   }
 
   return nextValues;
+}
+
+function applySandboxProfileSelectionChange(input: {
+  values: WebhookAutomationFormValues;
+  eventOptions: readonly WebhookAutomationEventOption[];
+}): WebhookAutomationFormValues {
+  return {
+    ...input.values,
+    conversationKeyTemplate: resolveNormalizedConversationKeyTemplate({
+      values: input.values,
+      eventOptions: input.eventOptions,
+    }),
+  };
 }
 
 type LoadedWebhookAutomationEditorStateInput = {
@@ -342,10 +356,9 @@ export function useLoadedWebhookAutomationEditorState(
   const webhookEventOptions = useMemo(
     () =>
       buildWebhookAutomationEventOptions({
-        connections: input.directoryData.connections.filter((connection) =>
-          selectedProfileTriggerState.eligibleConnectionIds.includes(connection.id),
-        ),
+        connections: input.directoryData.connections,
         targets: input.directoryData.targets,
+        selectableConnectionIds: selectedProfileTriggerState.selectableConnectionIds,
         ...(input.preservedConnectionId === undefined
           ? {}
           : { preservedConnectionId: input.preservedConnectionId }),
@@ -355,7 +368,7 @@ export function useLoadedWebhookAutomationEditorState(
       formValues.triggerIds,
       input.directoryData,
       input.preservedConnectionId,
-      selectedProfileTriggerState.eligibleConnectionIds,
+      selectedProfileTriggerState.selectableConnectionIds,
     ],
   );
 

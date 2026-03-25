@@ -154,8 +154,33 @@ describe("WebhookAutomationTriggerPicker", () => {
       triggerParameterValues: {},
     });
 
-    expect(screen.getByText(`${GitHubConnectionId}::github.push.deleted`)).toBeDefined();
+    expect(screen.getByText("github.push.deleted")).toBeDefined();
     expect(screen.getByText("Unavailable")).toBeDefined();
+  });
+
+  it("shows selected triggers that are incompatible with the selected profile", () => {
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedTriggerIds: [
+        createWebhookAutomationTriggerId({
+          connectionId: GitHubConnectionId,
+          eventType: "github.issue_comment.created",
+        }),
+      ],
+      triggerParameterValues: {},
+      eventOptions: [
+        createGithubIssueCommentCreatedEventOption({
+          availability: "wrong_profile",
+          description: "This trigger is not available for the selected sandbox profile.",
+        }),
+      ],
+    });
+
+    expect(screen.getByText("Wrong profile")).toBeDefined();
+    expect(
+      screen.getByText("This trigger is not available for the selected sandbox profile."),
+    ).toBeDefined();
   });
 
   it("prompts the user to connect an integration when there are no connected integrations", () => {

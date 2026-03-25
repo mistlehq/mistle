@@ -21,6 +21,11 @@ import { useId, useState } from "react";
 
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import {
+  createSyntheticWebhookAutomationEventOption,
+  isWebhookAutomationEventOptionUnavailable,
+  resolveWebhookAutomationEventOptionAvailabilityCopy,
+} from "./webhook-automation-event-option-availability.js";
 import type {
   WebhookAutomationEventOption,
   WebhookAutomationTriggerParameterValueMap,
@@ -83,14 +88,10 @@ export function resolveSelectedWebhookAutomationEventOptions(input: {
     }
 
     return {
-      id: triggerId,
-      eventType: triggerId,
-      connectionId: "",
-      connectionLabel: "",
-      label: triggerId,
-      description: "No longer available from your connected integrations.",
-      category: "Unavailable",
-      unavailable: true,
+      ...createSyntheticWebhookAutomationEventOption({
+        triggerId,
+        availability: "missing_integration",
+      }),
     } satisfies WebhookAutomationEventOption;
   });
 }
@@ -113,7 +114,8 @@ function resolveWebhookAutomationTriggerPickerState(input: {
 
   const selectedTriggerIdSet = new Set(input.selectedTriggerIds);
   const availableEventOptions = input.eventOptions.filter(
-    (option) => option.unavailable !== true && !selectedTriggerIdSet.has(option.id),
+    (option) =>
+      !isWebhookAutomationEventOptionUnavailable(option) && !selectedTriggerIdSet.has(option.id),
   );
   const hasAvailableTriggers = availableEventOptions.length > 0;
 
@@ -193,15 +195,26 @@ export function WebhookAutomationTriggerPicker(input: {
                   />
                 )}
                 <p className="text-sm leading-none font-medium whitespace-nowrap">{option.label}</p>
-                {option.unavailable === true ? (
-                  <span className="text-destructive text-xs whitespace-nowrap">Unavailable</span>
+                {isWebhookAutomationEventOptionUnavailable(option) ? (
+                  <span className="text-destructive text-xs whitespace-nowrap">
+                    {
+                      resolveWebhookAutomationEventOptionAvailabilityCopy(
+                        option.availability ?? "missing_integration",
+                      ).badgeLabel
+                    }
+                  </span>
                 ) : null}
               </div>
+              {option.description === undefined ? null : (
+                <p className="text-muted-foreground col-start-1 row-start-2 text-xs">
+                  {option.description}
+                </p>
+              )}
               {option.parameters?.map((parameter, index) => (
                 <div
                   className="col-start-2 justify-self-end"
                   key={`${option.id}:${parameter.id}`}
-                  style={{ gridRowStart: index + 1 }}
+                  style={{ gridRowStart: index + 2 }}
                 >
                   <TriggerParameterField
                     connectionId={input.selectedConnectionId}

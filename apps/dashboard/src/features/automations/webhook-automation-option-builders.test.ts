@@ -105,6 +105,7 @@ describe("buildWebhookAutomationEventOptions", () => {
       }),
     ).toEqual([
       {
+        availability: "available",
         id: createWebhookAutomationTriggerId({
           connectionId: "conn_github",
           eventType: "github.pull_request.opened",
@@ -125,6 +126,7 @@ describe("buildWebhookAutomationEventOptions", () => {
         category: "GitHub Engineering / Pull requests",
       },
       {
+        availability: "available",
         id: createWebhookAutomationTriggerId({
           connectionId: "conn_github",
           eventType: "github.issue_comment.created",
@@ -144,6 +146,7 @@ describe("buildWebhookAutomationEventOptions", () => {
         category: "GitHub Engineering / Issues",
       },
       {
+        availability: "available",
         id: createWebhookAutomationTriggerId({
           connectionId: "conn_linear",
           eventType: "linear.issue.created",
@@ -201,11 +204,70 @@ describe("buildWebhookAutomationEventOptions", () => {
         }),
         eventType: "github.push.deleted",
         connectionId: "conn_github",
-        connectionLabel: "conn_github",
+        connectionLabel: "GitHub - GitHub Engineering",
         label: "github.push.deleted",
         description: "No longer available from your connected integrations.",
         category: "Unavailable",
-        unavailable: true,
+        availability: "missing_integration",
+      },
+    ]);
+  });
+
+  it("preserves selected triggers that are incompatible with the selected profile", () => {
+    expect(
+      buildWebhookAutomationEventOptions({
+        connections: [
+          {
+            id: "conn_github",
+            targetKey: "github-cloud",
+            displayName: "GitHub Engineering",
+            status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        targets: [
+          {
+            targetKey: "github-cloud",
+            familyId: "github",
+            variantId: "github-cloud",
+            enabled: true,
+            config: {},
+            displayName: "GitHub",
+            description: "GitHub Cloud",
+            supportedWebhookEvents: [
+              {
+                eventType: "github.issue_comment.created",
+                providerEventType: "issue_comment",
+                displayName: "Issue comment created",
+              },
+            ],
+            targetHealth: {
+              configStatus: "valid",
+            },
+          },
+        ],
+        selectableConnectionIds: [],
+        selectedTriggerIds: [
+          createWebhookAutomationTriggerId({
+            connectionId: "conn_github",
+            eventType: "github.issue_comment.created",
+          }),
+        ],
+      }),
+    ).toEqual([
+      {
+        id: createWebhookAutomationTriggerId({
+          connectionId: "conn_github",
+          eventType: "github.issue_comment.created",
+        }),
+        eventType: "github.issue_comment.created",
+        connectionId: "conn_github",
+        connectionLabel: "GitHub - GitHub Engineering",
+        label: "Issue comment created",
+        description: "This trigger is not available for the selected sandbox profile.",
+        category: "Unavailable",
+        availability: "wrong_profile",
       },
     ]);
   });

@@ -1,3 +1,4 @@
+import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
 import type {
   WebhookAutomationConversationKeyOption,
   WebhookAutomationEventOption,
@@ -7,7 +8,7 @@ export function resolveCommonWebhookAutomationConversationKeyOptions(input: {
   selectedEventOptions: readonly WebhookAutomationEventOption[];
 }): readonly WebhookAutomationConversationKeyOption[] {
   const availableEventOptions = input.selectedEventOptions.filter(
-    (eventOption) => eventOption.unavailable !== true,
+    (eventOption) => !isWebhookAutomationEventOptionUnavailable(eventOption),
   );
 
   if (availableEventOptions.length === 0) {
