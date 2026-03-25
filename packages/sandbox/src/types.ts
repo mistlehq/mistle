@@ -1,5 +1,4 @@
 export const SandboxProvider = {
-  MODAL: "modal",
   DOCKER: "docker",
 } as const;
 export type SandboxProvider = (typeof SandboxProvider)[keyof typeof SandboxProvider];
@@ -30,8 +29,7 @@ export interface SandboxStartRequest {
 }
 
 export interface SandboxResumeRequestV1 {
-  readonly image: SandboxImageHandle;
-  readonly id?: string | null;
+  readonly id: string;
   readonly env?: Readonly<Record<string, string>>;
 }
 

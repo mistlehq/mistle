@@ -4,7 +4,6 @@ import { typeid } from "typeid-js";
 import { dataPlaneSchema } from "./namespace.js";
 
 export const SandboxInstanceProviders = {
-  MODAL: "modal",
   DOCKER: "docker",
 } as const;
 

@@ -219,7 +219,6 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       await fixture.adapter.stop({ id: sandbox.id });
 
       const resumedSandbox = await fixture.adapter.resume({
-        image: fixture.baseImage,
         id: sandbox.id,
       });
 

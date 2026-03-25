@@ -26,7 +26,7 @@ describe("parseConfigRecord", () => {
           serviceToken: "test-service-token",
         },
         sandbox: {
-          provider: "modal",
+          provider: "docker",
           defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -136,11 +136,10 @@ describe("parseConfigRecord", () => {
           },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
-            modal: {
-              tokenId: "fixture-modal-token-id",
-              tokenSecret: "fixture-modal-token-secret",
-              appName: "mistle-sandbox",
-              environmentName: "development",
+            docker: {
+              socketPath: "/var/run/docker.sock",
+              networkName: "mistle-sandbox-dev",
+              tracesEndpoint: "http://otel-lgtm:4318/v1/traces",
             },
           },
         },

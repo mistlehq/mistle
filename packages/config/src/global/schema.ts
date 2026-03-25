@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const SandboxProviders = ["modal", "docker"] as const;
+const SandboxProviders = ["docker"] as const;
 
 const GlobalTelemetryEndpointSchema = z
   .url()

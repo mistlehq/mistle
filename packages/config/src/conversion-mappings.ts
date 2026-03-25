@@ -361,26 +361,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL",
   },
   {
-    configPath: ["apps", "data_plane_worker", "sandbox", "modal", "tokenId"],
-    tomlPath: ["apps", "data_plane_worker", "sandbox", "modal", "token_id"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID",
-  },
-  {
-    configPath: ["apps", "data_plane_worker", "sandbox", "modal", "tokenSecret"],
-    tomlPath: ["apps", "data_plane_worker", "sandbox", "modal", "token_secret"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET",
-  },
-  {
-    configPath: ["apps", "data_plane_worker", "sandbox", "modal", "appName"],
-    tomlPath: ["apps", "data_plane_worker", "sandbox", "modal", "app_name"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_APP_NAME",
-  },
-  {
-    configPath: ["apps", "data_plane_worker", "sandbox", "modal", "environmentName"],
-    tomlPath: ["apps", "data_plane_worker", "sandbox", "modal", "environment_name"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME",
-  },
-  {
     configPath: ["apps", "data_plane_worker", "sandbox", "docker", "socketPath"],
     tomlPath: ["apps", "data_plane_worker", "sandbox", "docker", "socket_path"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH",

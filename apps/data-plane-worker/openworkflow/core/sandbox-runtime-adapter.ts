@@ -1,16 +1,11 @@
 import {
   createSandboxAdapter,
   createSandboxRuntimeControl as createProviderSandboxRuntimeControl,
-  SandboxProvider,
   type SandboxAdapter,
   type SandboxRuntimeControl,
 } from "@mistle/sandbox";
 
 import type { DataPlaneWorkerRuntimeConfig } from "./config.js";
-
-function assertUnreachable(_value: never): never {
-  throw new Error("Unsupported sandbox provider.");
-}
 
 export function createSandboxRuntimeAdapter(config: DataPlaneWorkerRuntimeConfig): SandboxAdapter {
   return createSandboxAdapter(createSandboxProviderConfig(config));
@@ -25,22 +20,6 @@ export function createSandboxRuntimeControl(
 function createSandboxProviderConfig(
   config: DataPlaneWorkerRuntimeConfig,
 ): Parameters<typeof createSandboxAdapter>[0] {
-  if (config.sandbox.provider === SandboxProvider.MODAL) {
-    if (config.app.sandbox.modal === undefined) {
-      throw new Error("Expected data-plane worker modal sandbox config for global provider modal.");
-    }
-
-    return {
-      provider: config.sandbox.provider,
-      modal: {
-        tokenId: config.app.sandbox.modal.tokenId,
-        tokenSecret: config.app.sandbox.modal.tokenSecret,
-        appName: config.app.sandbox.modal.appName,
-        environmentName: config.app.sandbox.modal.environmentName,
-      },
-    };
-  }
-
   if (config.sandbox.provider === "docker") {
     if (config.app.sandbox.docker === undefined) {
       throw new Error(
@@ -59,5 +38,5 @@ function createSandboxProviderConfig(
     };
   }
 
-  return assertUnreachable(config.sandbox.provider);
+  throw new Error("Unsupported sandbox provider.");
 }
