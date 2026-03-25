@@ -89,9 +89,13 @@ function SelectField(input: {
   onValueChange: (value: string) => void;
 }): React.JSX.Element {
   const selectedOption = input.options.find((option) => option.value === input.value);
+  const isInvalid = input.error !== undefined;
 
   return (
-    <Field orientation={input.orientation ?? "vertical"}>
+    <Field
+      data-invalid={isInvalid ? true : undefined}
+      orientation={input.orientation ?? "vertical"}
+    >
       <FieldLabel>{input.label}</FieldLabel>
       <FieldContent>
         <Select
@@ -104,7 +108,10 @@ function SelectField(input: {
           }}
           value={input.value}
         >
-          <SelectTrigger className={input.orientation === "horizontal" ? undefined : "w-full"}>
+          <SelectTrigger
+            aria-invalid={isInvalid ? true : undefined}
+            className={input.orientation === "horizontal" ? undefined : "w-full"}
+          >
             <SelectValue placeholder={input.placeholder}>{selectedOption?.label}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -235,12 +242,16 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       <FormPageSection>
         {input.mode === "create" ? (
           <div className="p-4">
-            <Field orientation="horizontal">
+            <Field
+              data-invalid={input.fieldErrors.name !== undefined ? true : undefined}
+              orientation="horizontal"
+            >
               <FieldHeader>
                 <FieldLabel htmlFor="automation-name">Automation name</FieldLabel>
               </FieldHeader>
               <FieldContent>
                 <Input
+                  aria-invalid={input.fieldErrors.name !== undefined ? true : undefined}
                   id="automation-name"
                   disabled={input.isDeleting || input.isSaving}
                   onChange={(event) => {
@@ -314,7 +325,12 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
         {input.values.triggerIds.length === 0 ? null : (
           <div className="p-4">
-            <Field orientation="horizontal">
+            <Field
+              data-invalid={
+                input.fieldErrors.conversationKeyTemplate !== undefined ? true : undefined
+              }
+              orientation="horizontal"
+            >
               <FieldHeader>
                 <FieldLabel>Group events by</FieldLabel>
               </FieldHeader>
@@ -330,7 +346,12 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                   }}
                   value={conversationKeySelectionState.selectedTemplate}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger
+                    aria-invalid={
+                      input.fieldErrors.conversationKeyTemplate !== undefined ? true : undefined
+                    }
+                    className="w-full"
+                  >
                     <SelectValue placeholder="Select conversation grouping">
                       {selectedConversationGroupingLabel}
                     </SelectValue>
@@ -357,7 +378,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
       <FormPageSection>
         <div className="p-4">
-          <Field>
+          <Field data-invalid={input.fieldErrors.instructions !== undefined ? true : undefined}>
             <FieldHeader>
               <FieldLabel htmlFor="automation-instructions">Agent Instructions</FieldLabel>
               <FieldDescription>
@@ -366,6 +387,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             </FieldHeader>
             <FieldContent>
               <Textarea
+                aria-invalid={input.fieldErrors.instructions !== undefined ? true : undefined}
                 className="min-h-36"
                 id="automation-instructions"
                 disabled={input.isDeleting || input.isSaving}

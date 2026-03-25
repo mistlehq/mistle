@@ -240,4 +240,43 @@ describe("WebhookAutomationForm", () => {
       screen.getAllByText("The selected profile has no bindings with automation triggers.").length,
     ).toBeGreaterThan(0);
   });
+
+  it("marks invalid controls with aria-invalid when field errors are present", () => {
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WebhookAutomationForm
+          connectionOptions={ConnectionOptions}
+          fieldErrors={{
+            name: "Automation name is required.",
+            sandboxProfileId: "Select a sandbox profile.",
+            conversationKeyTemplate: "Select a supported conversation grouping.",
+            instructions: "Instructions are required.",
+          }}
+          formError={null}
+          isDeleting={false}
+          isSaving={false}
+          mode="create"
+          onDelete={null}
+          onSubmit={() => {}}
+          onValueChange={() => {}}
+          sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledReason={null}
+          webhookEventOptions={WebhookEventOptions}
+          values={FormValues}
+        />
+      </QueryClientProvider>,
+    );
+
+    const currentForm = within(container);
+    const automationNameInput = currentForm.getByDisplayValue("Repo triage");
+    const instructionsTextarea = currentForm.getByDisplayValue("Please review the changes made.");
+
+    expect(automationNameInput.getAttribute("aria-invalid")).toBe("true");
+    expect(instructionsTextarea.getAttribute("aria-invalid")).toBe("true");
+
+    const selectTriggers = container.querySelectorAll('[data-slot="select-trigger"]');
+    expect(selectTriggers[0]?.getAttribute("aria-invalid")).toBe("true");
+    expect(selectTriggers[1]?.getAttribute("aria-invalid")).toBe("true");
+    expect(container.querySelectorAll('[data-invalid="true"]').length).toBe(4);
+  });
 });
