@@ -39,6 +39,11 @@ export interface paths {
                   unavailable?: boolean;
                 }[];
                 id: string;
+                issue?: {
+                  /** @enum {string} */
+                  code: "MISSING_TARGET_METADATA";
+                  message: string;
+                };
                 name: string;
                 targetName: string;
                 updatedAt: string;

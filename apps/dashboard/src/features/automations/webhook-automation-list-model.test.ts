@@ -5,38 +5,34 @@ import {
   formatWebhookAutomationListFilter,
   toWebhookAutomationListFilter,
 } from "./webhook-automation-list-model.js";
-import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-types.js";
+import {
+  createWebhookAutomationListEvent,
+  createWebhookAutomationListItemViewModel,
+} from "./webhook-automation-test-fixtures.js";
 
-const SampleItems: readonly WebhookAutomationListItemViewModel[] = [
-  {
+const SampleItems = [
+  createWebhookAutomationListItemViewModel({
     id: "aut_01",
     name: "GitHub pushes to repo triage",
-    targetName: "Repo Maintainer",
     events: [
-      {
+      createWebhookAutomationListEvent({
         label: "Pull request opened",
         logoKey: "github",
-      },
-      {
+      }),
+      createWebhookAutomationListEvent({
         label: "Issue comment created",
         logoKey: "github",
-      },
+      }),
     ],
-    updatedAtLabel: "6 min ago",
-    enabled: true,
-  },
-  {
+  }),
+  createWebhookAutomationListItemViewModel({
     id: "aut_02",
     name: "Stripe payouts incident intake",
     targetName: "Finance Investigator",
-    events: [
-      {
-        label: "Payout failed",
-      },
-    ],
+    events: [createWebhookAutomationListEvent({ label: "Payout failed" })],
     updatedAtLabel: "1 day ago",
     enabled: false,
-  },
+  }),
 ];
 
 describe("formatWebhookAutomationListFilter", () => {

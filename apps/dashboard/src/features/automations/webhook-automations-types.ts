@@ -32,12 +32,20 @@ export const WebhookAutomationListEventSchema = z
   })
   .strict();
 
+export const WebhookAutomationListIssueSchema = z
+  .object({
+    code: z.literal("MISSING_TARGET_METADATA"),
+    message: z.string().min(1),
+  })
+  .strict();
+
 export const WebhookAutomationListItemSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1),
     enabled: z.boolean(),
     targetName: z.string().min(1),
+    issue: WebhookAutomationListIssueSchema.optional(),
     events: z.array(WebhookAutomationListEventSchema),
     updatedAt: z.string().min(1),
   })
@@ -78,6 +86,7 @@ export const DeleteWebhookAutomationResultSchema = z
 
 export type WebhookAutomation = z.infer<typeof WebhookAutomationSchema>;
 export type WebhookAutomationListEvent = z.infer<typeof WebhookAutomationListEventSchema>;
+export type WebhookAutomationListIssue = z.infer<typeof WebhookAutomationListIssueSchema>;
 export type WebhookAutomationListItem = z.infer<typeof WebhookAutomationListItemSchema>;
 export type WebhookAutomationsListResult = z.infer<typeof WebhookAutomationsListResultSchema>;
 export type DeleteWebhookAutomationResult = z.infer<typeof DeleteWebhookAutomationResultSchema>;

@@ -7,6 +7,10 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import {
+  createWebhookAutomationListEvent,
+  createWebhookAutomationListItem,
+} from "../automations/webhook-automation-test-fixtures.js";
 import { webhookAutomationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import type { WebhookAutomationsListResult } from "../automations/webhook-automations-types.js";
 import { AutomationsPage } from "./automations-page.js";
@@ -63,23 +67,7 @@ describe("AutomationsPage", () => {
       staleTime: Number.POSITIVE_INFINITY,
     });
 
-    seedAutomationsList(
-      queryClient,
-      createListResult([
-        {
-          id: "aut_123",
-          name: "Repo triage",
-          enabled: true,
-          targetName: "Repo Maintainer",
-          events: [
-            {
-              label: "Push",
-            },
-          ],
-          updatedAt: "2026-03-05T00:00:00.000Z",
-        },
-      ]),
-    );
+    seedAutomationsList(queryClient, createListResult([createWebhookAutomationListItem()]));
 
     const markup = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
@@ -103,23 +91,7 @@ describe("AutomationsPage", () => {
       staleTime: Number.POSITIVE_INFINITY,
     });
 
-    seedAutomationsList(
-      queryClient,
-      createListResult([
-        {
-          id: "aut_123",
-          name: "Repo triage",
-          enabled: true,
-          targetName: "Repo Maintainer",
-          events: [
-            {
-              label: "Push",
-            },
-          ],
-          updatedAt: "2026-03-05T00:00:00.000Z",
-        },
-      ]),
-    );
+    seedAutomationsList(queryClient, createListResult([createWebhookAutomationListItem()]));
 
     const markup = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
@@ -139,28 +111,12 @@ describe("AutomationsPage", () => {
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
     });
-    const listResult = createListResult(
-      [
-        {
-          id: "aut_123",
-          name: "Repo triage",
-          enabled: true,
-          targetName: "Repo Maintainer",
-          events: [
-            {
-              label: "Push",
-            },
-          ],
-          updatedAt: "2026-03-05T00:00:00.000Z",
-        },
-      ],
-      {
-        nextPage: {
-          after: "cursor_next",
-          limit: 25,
-        },
+    const listResult = createListResult([createWebhookAutomationListItem()], {
+      nextPage: {
+        after: "cursor_next",
+        limit: 25,
       },
-    );
+    });
 
     seedAutomationsList(queryClient, listResult);
     const automationsListQuery = queryClient.getQueryCache().build(queryClient, {
@@ -202,30 +158,12 @@ describe("AutomationsPage", () => {
     seedAutomationsList(
       queryClient,
       createListResult([
-        {
-          id: "aut_123",
-          name: "Repo triage",
-          enabled: true,
-          targetName: "Repo Maintainer",
-          events: [
-            {
-              label: "Push",
-            },
-          ],
-          updatedAt: "2026-03-05T00:00:00.000Z",
-        },
-        {
+        createWebhookAutomationListItem(),
+        createWebhookAutomationListItem({
           id: "aut_456",
           name: "Backlog sync",
-          enabled: true,
-          targetName: "Repo Maintainer",
-          events: [
-            {
-              label: "Issue comment created",
-            },
-          ],
-          updatedAt: "2026-03-05T00:00:00.000Z",
-        },
+          events: [createWebhookAutomationListEvent({ label: "Issue comment created" })],
+        }),
       ]),
     );
 
