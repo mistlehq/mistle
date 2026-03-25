@@ -38,7 +38,7 @@ const globalDevelopmentConfig = {
     serviceToken,
   },
   sandbox: {
-    provider: "modal",
+    provider: "docker",
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -75,7 +75,7 @@ const globalProductionConfig = {
     serviceToken,
   },
   sandbox: {
-    provider: "modal",
+    provider: "docker",
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -294,11 +294,10 @@ const dataPlaneWorkerEnvConfig = {
   },
   sandbox: {
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
-    modal: {
-      tokenId: "fixture-modal-token-id",
-      tokenSecret: "fixture-modal-token-secret",
-      appName: "mistle-sandbox",
-      environmentName: "development",
+    docker: {
+      socketPath: "/var/run/docker.sock",
+      networkName: "mistle-sandbox-dev",
+      tracesEndpoint: "http://otel-lgtm:4318/v1/traces",
     },
   },
 } as const;
@@ -660,10 +659,6 @@ describe("loadConfig integrations", () => {
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: "mistle-sandbox-dev",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT:
           "http://otel-lgtm:4318/v1/traces",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID: undefined,
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET: undefined,
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_APP_NAME: undefined,
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME: undefined,
       }),
     });
 
@@ -741,10 +736,9 @@ describe("loadConfig integrations", () => {
         env: createIntegrationEnv({
           NODE_ENV: "production",
           MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID: undefined,
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET: undefined,
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_APP_NAME: undefined,
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME: undefined,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: undefined,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: undefined,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT: undefined,
         }),
       }),
     ).toThrow(

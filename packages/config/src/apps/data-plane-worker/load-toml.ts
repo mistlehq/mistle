@@ -15,21 +15,12 @@ export function loadDataPlaneWorkerFromToml(
   const tunnel = asObjectRecord(dataPlaneWorker.tunnel);
   const runtimeState = asObjectRecord(dataPlaneWorker.runtime_state);
   const sandbox = asObjectRecord(dataPlaneWorker.sandbox);
-  const sandboxModal = asObjectRecord(sandbox.modal);
   const sandboxDocker = asObjectRecord(sandbox.docker);
 
   const sandboxConfig: Record<string, unknown> = {
     tokenizerProxyEgressBaseUrl: sandbox.tokenizer_proxy_egress_base_url,
   };
 
-  if (hasEntries(sandboxModal)) {
-    sandboxConfig.modal = {
-      tokenId: sandboxModal.token_id,
-      tokenSecret: sandboxModal.token_secret,
-      appName: sandboxModal.app_name,
-      environmentName: sandboxModal.environment_name,
-    };
-  }
   if (hasEntries(sandboxDocker)) {
     sandboxConfig.docker = {
       socketPath: sandboxDocker.socket_path,

@@ -51,12 +51,6 @@ export class DockerSandboxAdapter implements SandboxAdapter {
   }
 
   async resume(request: SandboxResumeRequestV1): Promise<SandboxHandle> {
-    if (request.image.provider !== SandboxProvider.DOCKER) {
-      throw new SandboxConfigurationError("Docker adapter received a non-Docker image handle.");
-    }
-    if (request.id === undefined || request.id === null) {
-      throw new SandboxConfigurationError("Docker adapter resume requires a previous runtime id.");
-    }
     if (request.id.trim().length === 0) {
       throw new SandboxConfigurationError("Previous runtime id is required.");
     }

@@ -14,7 +14,6 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { markSandboxInstanceStarting } from "../openworkflow/resume-sandbox-instance/mark-sandbox-instance-starting.js";
-import { persistSandboxInstanceRuntimeAttachment } from "../openworkflow/resume-sandbox-instance/persist-sandbox-instance-runtime-attachment.js";
 
 const IntegrationTestTimeoutMs = 60_000;
 
@@ -64,7 +63,7 @@ describe("resume sandbox instance state integration", () => {
   });
 
   it(
-    "transitions a stopped sandbox instance back to starting and clears stale stop state",
+    "transitions a stopped sandbox instance back to starting while preserving the provider sandbox id",
     async () => {
       const db = createDatabase();
       const sandboxInstanceId = "sbi_resume_state_integration";
@@ -103,34 +102,11 @@ describe("resume sandbox instance state integration", () => {
 
       expect(startingSandboxInstance).toEqual({
         status: SandboxInstanceStatuses.STARTING,
-        providerSandboxId: null,
+        providerSandboxId: "provider-runtime-old",
         stoppedAt: null,
         stopReason: null,
         failureCode: null,
         failureMessage: null,
-      });
-
-      await persistSandboxInstanceRuntimeAttachment(
-        {
-          db,
-        },
-        {
-          sandboxInstanceId,
-          providerSandboxId: "provider-runtime-new",
-        },
-      );
-
-      const attachedSandboxInstance = await db.query.sandboxInstances.findFirst({
-        columns: {
-          providerSandboxId: true,
-          status: true,
-        },
-        where: (table, { eq }) => eq(table.id, sandboxInstanceId),
-      });
-
-      expect(attachedSandboxInstance).toEqual({
-        providerSandboxId: "provider-runtime-new",
-        status: SandboxInstanceStatuses.STARTING,
       });
     },
     IntegrationTestTimeoutMs,
@@ -177,7 +153,7 @@ describe("resume sandbox instance state integration", () => {
 
     expect(startingSandboxInstance).toEqual({
       status: SandboxInstanceStatuses.STARTING,
-      providerSandboxId: null,
+      providerSandboxId: "provider-runtime-failed",
       stoppedAt: null,
       stopReason: null,
       failedAt: null,

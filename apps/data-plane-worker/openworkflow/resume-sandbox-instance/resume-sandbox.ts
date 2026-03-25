@@ -10,9 +10,7 @@ export async function resumeSandbox(
   },
   input: {
     sandboxInstanceId: string;
-    imageId: string;
-    imageCreatedAt: string;
-    previousProviderSandboxId: string;
+    providerSandboxId: string;
   },
 ): Promise<{
   sandboxInstanceId: string;
@@ -20,12 +18,7 @@ export async function resumeSandbox(
   providerSandboxId: string;
 }> {
   const resumedSandbox = await ctx.sandboxAdapter.resume({
-    image: {
-      provider: ctx.config.sandbox.provider,
-      imageId: input.imageId,
-      createdAt: input.imageCreatedAt,
-    },
-    id: input.previousProviderSandboxId,
+    id: input.providerSandboxId,
     env: createSandboxRuntimeEnv({
       config: ctx.config,
       sandboxInstanceId: input.sandboxInstanceId,
@@ -34,6 +27,9 @@ export async function resumeSandbox(
 
   if (resumedSandbox.provider !== ctx.config.sandbox.provider) {
     throw new Error("Sandbox adapter returned sandbox handle with unexpected provider.");
+  }
+  if (resumedSandbox.id !== input.providerSandboxId) {
+    throw new Error("Sandbox adapter returned a different sandbox id during resume.");
   }
 
   return {
