@@ -360,7 +360,7 @@ describe("useSessionWorkbenchController", () => {
     expect(
       resolveSessionEntryPhase({
         connectedSession: false,
-        hasResumePolicy: false,
+        hasResumeInFlightState: false,
         isStatusPending: true,
         sandboxStatus: null,
       }),
@@ -369,7 +369,7 @@ describe("useSessionWorkbenchController", () => {
     expect(
       resolveSessionEntryPhase({
         connectedSession: false,
-        hasResumePolicy: true,
+        hasResumeInFlightState: true,
         isStatusPending: false,
         sandboxStatus: "stopped",
       }),
@@ -378,7 +378,7 @@ describe("useSessionWorkbenchController", () => {
     expect(
       resolveSessionEntryPhase({
         connectedSession: false,
-        hasResumePolicy: false,
+        hasResumeInFlightState: false,
         isStatusPending: false,
         sandboxStatus: "stopped",
       }),
@@ -387,7 +387,7 @@ describe("useSessionWorkbenchController", () => {
     expect(
       resolveSessionEntryPhase({
         connectedSession: false,
-        hasResumePolicy: false,
+        hasResumeInFlightState: false,
         isStatusPending: false,
         sandboxStatus: "starting",
       }),
@@ -396,7 +396,7 @@ describe("useSessionWorkbenchController", () => {
     expect(
       resolveSessionEntryPhase({
         connectedSession: false,
-        hasResumePolicy: false,
+        hasResumeInFlightState: false,
         isStatusPending: false,
         sandboxStatus: "running",
       }),
@@ -405,7 +405,7 @@ describe("useSessionWorkbenchController", () => {
     expect(
       resolveSessionEntryPhase({
         connectedSession: true,
-        hasResumePolicy: false,
+        hasResumeInFlightState: false,
         isStatusPending: false,
         sandboxStatus: "running",
       }),
@@ -414,7 +414,7 @@ describe("useSessionWorkbenchController", () => {
     expect(
       resolveSessionEntryPhase({
         connectedSession: false,
-        hasResumePolicy: false,
+        hasResumeInFlightState: false,
         isStatusPending: false,
         sandboxStatus: "failed",
       }),

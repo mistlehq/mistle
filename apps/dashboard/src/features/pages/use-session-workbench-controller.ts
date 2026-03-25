@@ -334,7 +334,7 @@ export function shouldPollStoppedSandboxStatus(input: {
 
 export function resolveSessionEntryPhase(input: {
   connectedSession: boolean;
-  hasResumePolicy: boolean;
+  hasResumeInFlightState: boolean;
   isStatusPending: boolean;
   sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
 }): SessionEntryPhase {
@@ -351,7 +351,7 @@ export function resolveSessionEntryPhase(input: {
   }
 
   if (input.sandboxStatus === "stopped") {
-    return input.hasResumePolicy ? "resume_pending" : "manual_resume_required";
+    return input.hasResumeInFlightState ? "resume_pending" : "manual_resume_required";
   }
 
   return input.isStatusPending ? "loading" : "loading";
@@ -449,7 +449,9 @@ export function useSessionWorkbenchController(input: {
   );
   const [storedResumeIdempotencyRecord, setStoredResumeIdempotencyRecord] =
     useState<ResumeIdempotencyStorageRecord | null>(initialStoredResumeIdempotencyRecord);
-  const [hasResumePolicy, setHasResumePolicy] = useState(input.resumeOnOpenRequestToken !== null);
+  const [hasResumePolicy, setHasResumePolicy] = useState(
+    input.resumeOnOpenRequestToken !== null || initialStoredResumeIdempotencyRecord !== null,
+  );
   const [shouldAutoResumeStoppedSandbox, setShouldAutoResumeStoppedSandbox] = useState(
     input.resumeOnOpenRequestToken !== null,
   );
@@ -537,7 +539,6 @@ export function useSessionWorkbenchController(input: {
     },
   });
   const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
-  const hasActiveResumePolicy = hasResumePolicy || input.resumeOnOpenRequestToken !== null;
   const isShowingResumeInFlightState = shouldShowResumeInFlightState({
     hasResumeOnOpenIntent: input.resumeOnOpenRequestToken !== null,
     isResumingStoppedSandbox,
@@ -545,7 +546,7 @@ export function useSessionWorkbenchController(input: {
   });
   const sessionEntryPhase = resolveSessionEntryPhase({
     connectedSession: connectedSession !== null,
-    hasResumePolicy: hasActiveResumePolicy,
+    hasResumeInFlightState: isShowingResumeInFlightState,
     isStatusPending: sandboxStatusQuery.isPending,
     sandboxStatus,
   });
@@ -587,8 +588,8 @@ export function useSessionWorkbenchController(input: {
     setAutomationPendingSinceMs(null);
     setAutomationPendingErrorMessage(null);
     setStoredResumeIdempotencyRecord(storedResumeRecord);
-    setHasResumePolicy(false);
-    setShouldAutoResumeStoppedSandbox(false);
+    setHasResumePolicy(storedResumeRecord !== null);
+    setShouldAutoResumeStoppedSandbox(input.resumeOnOpenRequestToken !== null);
     setIsResumingStoppedSandbox(false);
     setResumeActionErrorMessage(null);
     activeResumeRequestRef.current = null;
@@ -934,9 +935,12 @@ export function useSessionWorkbenchController(input: {
         });
         setStoredResumeIdempotencyRecord(null);
         setHasResumePolicy(false);
+        setShouldAutoResumeStoppedSandbox(false);
         setResumeActionErrorMessage(resolveResumeFailureMessage(error));
       } else {
-        setResumeActionErrorMessage(null);
+        setHasResumePolicy(true);
+        setShouldAutoResumeStoppedSandbox(false);
+        setResumeActionErrorMessage(resolveResumeFailureMessage(error));
       }
     } finally {
       if (
