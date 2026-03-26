@@ -4,6 +4,7 @@
   "ignoreBinaries": ["codespell", "nix"],
   "workspaces": {
     ".": {
+      "ignoreDependencies": ["@vitest/coverage-v8"],
       "entry": [
         "package.json",
         "scripts/**/*.{js,mjs,ts}",

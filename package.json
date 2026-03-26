@@ -31,7 +31,7 @@
     "typecheck": "turbo run typecheck --output-logs=errors-only && pnpm typecheck:scripts",
     "typecheck:scripts": "tsc --project ./scripts/tsconfig.json",
     "test": "turbo run test --output-logs=errors-only",
-    "test:coverage": "turbo run test --force --output-logs=errors-only -- --coverage.enabled --coverage.reporter=lcov --coverage.reporter=json-summary --coverage.reporter=text-summary",
+    "test:coverage": "turbo run test --filter=!@mistle/docs --filter=!@mistle/sandbox-rs-napi --force --output-logs=errors-only -- --coverage.enabled --coverage.reporter=lcov --coverage.reporter=json-summary --coverage.reporter=text-summary",
     "test:property": "turbo run test:property",
     "test:integration": "tsx ./scripts/test/run-integration-vitest.ts",
     "test:integration:all": "pnpm test:integration",
