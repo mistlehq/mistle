@@ -265,7 +265,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     });
 
     expect(result.current.validationSummaryError).toBe(
-      "Please fill in the required fields highlighted in red.",
+      "Please address the fields highlighted in red.",
     );
     expect(result.current.formError).toBeNull();
     expect(result.current.fieldErrors).toMatchObject({

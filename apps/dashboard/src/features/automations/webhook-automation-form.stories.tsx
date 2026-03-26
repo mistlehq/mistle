@@ -406,7 +406,7 @@ export const EditPageLayout: Story = {
 export const ValidationErrors: Story = {
   args: {
     mode: "create",
-    validationSummaryError: "Please fill in the required fields highlighted in red.",
+    validationSummaryError: "Please address the fields highlighted in red.",
     fieldErrors: {
       name: "Automation name is required.",
       triggerIds: "Select at least one trigger.",

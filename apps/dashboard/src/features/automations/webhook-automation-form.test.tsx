@@ -294,7 +294,7 @@ describe("WebhookAutomationForm", () => {
             instructions: "Instructions are required.",
           }}
           formError={null}
-          validationSummaryError="Please fill in the required fields highlighted in red."
+          validationSummaryError="Please address the fields highlighted in red."
           isDeleting={false}
           isSaving={false}
           mode="create"
@@ -316,9 +316,7 @@ describe("WebhookAutomationForm", () => {
       </QueryClientProvider>,
     );
 
-    expect(
-      screen.getByText("Please fill in the required fields highlighted in red."),
-    ).toBeDefined();
+    expect(screen.getByText("Please address the fields highlighted in red.")).toBeDefined();
     expect(screen.queryByText("Automation name is required.")).toBeNull();
     expect(screen.queryByText("Select a sandbox profile.")).toBeNull();
     expect(screen.queryByText("Instructions are required.")).toBeNull();

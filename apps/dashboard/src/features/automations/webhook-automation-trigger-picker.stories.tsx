@@ -383,7 +383,13 @@ export const WrongProfileSavedTrigger: Story = {
     selectedTriggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
     eventOptions: [
       {
-        ...GitHubEventOptions[0],
+        id: IssueCommentCreatedTriggerId,
+        eventType: "github.issue_comment.created",
+        connectionId: GitHubConnectionId,
+        connectionLabel: "GitHub Engineering",
+        label: "Issue comment created",
+        category: "GitHub Engineering / Issues",
+        logoKey: "github",
         availability: "wrong_profile",
         description: "This trigger is not available for the selected sandbox profile.",
       },
