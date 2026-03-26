@@ -13,6 +13,10 @@ export const ImageSignatures = {
   WEBP_RIFF: new Uint8Array([0x52, 0x49, 0x46, 0x46]),
 } as const;
 
+// This upload-time screening is intentionally lightweight. It checks for a
+// supported image signature and declared MIME agreement only. It does not
+// perform full structural parsing or decode validation, so downstream image
+// consumers may still reject malformed or truncated files that pass here.
 function matchesBytes(input: {
   bytes: Uint8Array;
   offset?: number;
