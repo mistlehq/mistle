@@ -406,6 +406,6 @@ describe("compileGitHubCloudBinding", () => {
           artifactBinPath,
         },
       }),
-    ).toThrow();
+    ).toThrow(/Invalid input/);
   });
 });

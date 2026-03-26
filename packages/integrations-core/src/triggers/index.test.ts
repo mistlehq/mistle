@@ -116,6 +116,7 @@ describe("trigger rules", () => {
       ]),
     ).toThrow(IntegrationTriggerRulesError);
 
+    let caughtError: unknown;
     try {
       parseTriggerRules([
         {
@@ -135,10 +136,12 @@ describe("trigger rules", () => {
         },
       ]);
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationTriggerRulesError);
-      if (error instanceof IntegrationTriggerRulesError) {
-        expect(error.code).toBe(TriggerRulesErrorCodes.INVALID_TRIGGER_RULES);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationTriggerRulesError);
+    expect(caughtError).toMatchObject({
+      code: TriggerRulesErrorCodes.INVALID_TRIGGER_RULES,
+    });
   });
 });

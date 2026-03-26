@@ -1,5 +1,6 @@
 import { PassThrough } from "node:stream";
 
+import { systemSleeper } from "@mistle/time";
 import DockerClient from "dockerode";
 
 import {
@@ -21,9 +22,7 @@ const DockerExecExitPollIntervalMs = 50;
 const DockerExecExitPollAttempts = 200;
 
 async function sleep(ms: number): Promise<void> {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
+  await systemSleeper.sleep(ms);
 }
 
 function chunkToUtf8String(chunk: unknown): string {

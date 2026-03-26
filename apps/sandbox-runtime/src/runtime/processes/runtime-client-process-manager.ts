@@ -7,6 +7,7 @@ import type {
   RuntimeClientProcessReadiness,
   RuntimeClientProcessSpec,
 } from "@mistle/integrations-core";
+import { systemScheduler, systemSleeper } from "@mistle/time";
 
 import { startNativeManagedProcess, type NativeProcessSignal } from "../../native/process-host.js";
 
@@ -118,12 +119,12 @@ function waitForRuntimeClientProcessExit(
       return;
     }
 
-    const timer = setTimeout(() => {
+    const timer = systemScheduler.schedule(() => {
       reject(new Error("process exit wait timed out"));
     }, waitDurationMs);
 
     void process.exited.then(() => {
-      clearTimeout(timer);
+      systemScheduler.cancel(timer);
       resolve();
     });
   });
@@ -299,12 +300,7 @@ async function waitForRuntimeClientProcessCheck(
     }
 
     const pollWaitMs = Math.min(100, remainingDurationMs);
-    await Promise.race([
-      process.exited,
-      new Promise<void>((resolve) => {
-        setTimeout(resolve, pollWaitMs);
-      }),
-    ]);
+    await Promise.race([process.exited, systemSleeper.sleep(pollWaitMs)]);
   }
 
   throw new Error(

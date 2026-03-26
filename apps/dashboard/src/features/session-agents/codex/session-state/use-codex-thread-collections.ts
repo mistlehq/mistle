@@ -4,7 +4,7 @@ import {
   type CodexJsonRpcClient,
   type CodexThreadSummary,
 } from "@mistle/integrations-definitions/openai/agent/client";
-import { useCallback, useState, type MutableRefObject } from "react";
+import { useCallback, useState, type RefObject } from "react";
 
 type RefreshInput = {
   rpcClient?: CodexJsonRpcClient;
@@ -12,7 +12,7 @@ type RefreshInput = {
 };
 
 export function useCodexThreadCollections(input: {
-  rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
+  rpcClientRef: RefObject<CodexJsonRpcClient | null>;
   ensureCurrentGeneration: (generation: number) => void;
   recordRecentResponse: (payload: unknown) => void;
 }) {

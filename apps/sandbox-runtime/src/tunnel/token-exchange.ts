@@ -1,3 +1,5 @@
+import { systemScheduler } from "@mistle/time";
+
 import { logSandboxRuntimeEvent } from "../runtime/logger.js";
 
 const TUNNEL_TOKEN_EXCHANGE_ROUTE_SUFFIX = "/token-exchange";
@@ -234,12 +236,12 @@ export async function runTunnelTokenExchangeLoop(input: {
     input.sleep ??
     ((delayMs: number, signal: AbortSignal) =>
       new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
+        const timeout = systemScheduler.schedule(() => {
           signal.removeEventListener("abort", abortListener);
           resolve();
         }, delayMs);
         const abortListener = (): void => {
-          clearTimeout(timeout);
+          systemScheduler.cancel(timeout);
           reject(signal.reason ?? new Error("operation was aborted"));
         };
 

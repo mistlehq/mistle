@@ -13,7 +13,7 @@ import {
   type CodexModelSummary,
 } from "@mistle/integrations-definitions/openai/agent/client";
 import { useMutation } from "@tanstack/react-query";
-import { useCallback, useState, type MutableRefObject } from "react";
+import { useCallback, useState, type RefObject } from "react";
 
 type CodexConfigValueEdit = {
   keyPath: string;
@@ -31,7 +31,7 @@ type CodexExternalAgentConfigQuery = {
 };
 
 export function useCodexSessionAdmin(input: {
-  rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
+  rpcClientRef: RefObject<CodexJsonRpcClient | null>;
   recordRecentResponse: (payload: unknown) => void;
   setStartErrorMessage: (message: string | null) => void;
 }) {

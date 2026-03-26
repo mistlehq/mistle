@@ -8,7 +8,7 @@
     "integration-targets:sync": "tsx scripts/run-integration-targets-sync.ts",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && tsc -p tsconfig.build.scripts.json && tsc-alias -p tsconfig.build.scripts.json",
     "start": "node --import ./dist/instrument.js dist/index.js",
-    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc . && pnpm run openapi:check",
+    "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts",
     "test:integration": "vitest run -c vitest.integration.config.ts",

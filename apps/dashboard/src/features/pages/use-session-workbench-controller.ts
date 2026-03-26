@@ -1,6 +1,7 @@
 import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/openai/agent/client";
 import { uploadSandboxImage } from "@mistle/sandbox-session-client";
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
+import { systemScheduler } from "@mistle/time";
 import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -571,12 +572,12 @@ export function useSessionWorkbenchController(input: {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
+    const timeoutHandle = systemScheduler.schedule(() => {
       setAutomationPendingErrorMessage(AutomationSessionPreparationTimeoutMessage);
     }, timeoutDelayMs);
 
     return () => {
-      window.clearTimeout(timeoutId);
+      systemScheduler.cancel(timeoutHandle);
     };
   }, [automationPendingSinceMs, isWaitingForAutomationThread]);
 

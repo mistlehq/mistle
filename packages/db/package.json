@@ -42,7 +42,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
-    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
+    "lint": "oxlint --type-aware --deny-warnings .",
     "lint:sql": "squawk --config ./.squawk.toml --no-error-on-unmatched-pattern \"migrations/control-plane/**/*.sql\" \"migrations/data-plane/**/*.sql\"",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run --passWithNoTests",

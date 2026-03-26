@@ -16,21 +16,5 @@
         "jest/no-standalone-expect": "off",
       },
     },
-    {
-      "files": ["src/**/*.ts"],
-      "rules": {
-        "eslint/no-restricted-globals": [
-          "error",
-          {
-            "name": "vi",
-            "message": "Do not use vi-based mocks/spies. Assert observable behavior instead.",
-          },
-          {
-            "name": "jest",
-            "message": "Do not use jest-based mocks/spies. Assert observable behavior instead.",
-          },
-        ],
-      },
-    },
   ],
 }

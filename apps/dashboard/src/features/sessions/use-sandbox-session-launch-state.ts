@@ -1,3 +1,4 @@
+import { systemScheduler } from "@mistle/time";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
@@ -66,7 +67,7 @@ export function useSandboxSessionLaunchState(): UseSandboxSessionLaunchStateResu
     }
 
     let cancelled = false;
-    const timeoutId = window.setTimeout(() => {
+    const timeoutHandle = systemScheduler.schedule(() => {
       void Promise.all(
         sessionsPendingStatus.map(async (session) => {
           const status = await getSandboxInstanceStatus({
@@ -98,7 +99,7 @@ export function useSandboxSessionLaunchState(): UseSandboxSessionLaunchStateResu
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timeoutId);
+      systemScheduler.cancel(timeoutHandle);
     };
   }, [launchedSessions]);
 

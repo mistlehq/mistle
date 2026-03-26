@@ -754,6 +754,7 @@ function updateRawItemTextField(
   const ensured = ensureTurn(state.turnsById, state.turnOrder, input.turnId);
   const turn = ensured.turnsById[input.turnId] ?? createTurnState(input.turnId);
   const existingRawItem = turn.rawItemsById[input.itemId];
+  const existingFieldValue = isRecord(existingRawItem) ? existingRawItem[input.field] : undefined;
   const nextRawItem = isRecord(existingRawItem)
     ? {
         ...existingRawItem,
@@ -762,9 +763,7 @@ function updateRawItemTextField(
         status:
           typeof existingRawItem["status"] === "string" ? existingRawItem["status"] : "inProgress",
         [input.field]:
-          typeof existingRawItem[input.field] === "string"
-            ? `${existingRawItem[input.field]}${input.delta}`
-            : input.delta,
+          typeof existingFieldValue === "string" ? existingFieldValue + input.delta : input.delta,
       }
     : {
         type: input.itemType,

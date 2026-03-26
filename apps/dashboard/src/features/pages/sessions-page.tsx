@@ -569,7 +569,7 @@ export function SessionsPage(): React.JSX.Element {
                         <Button
                           disabled={!isSessionPageNavigableSandboxStatus(session.status)}
                           onClick={() => {
-                            navigate(`/sessions/${encodeURIComponent(session.id)}`);
+                            void navigate(`/sessions/${encodeURIComponent(session.id)}`);
                           }}
                           type="button"
                         >

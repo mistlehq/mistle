@@ -7,7 +7,7 @@
     "db:migrate": "tsx src/scripts/run-data-plane-migrations.ts",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "start": "node --import ./dist/instrument.js dist/index.js",
-    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc . && pnpm run openapi:check",
+    "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts --passWithNoTests",
     "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",

@@ -35,7 +35,7 @@ const IntegrationResourceStringArrayWidgetOptionsSchema = z
     refreshLabel: z.string().min(1).optional(),
     resourceSummary: IntegrationResourceSummaryOptionSchema.optional(),
   })
-  .passthrough();
+  .loose();
 
 type IntegrationResourceStringArrayWidgetOptions = z.infer<
   typeof IntegrationResourceStringArrayWidgetOptionsSchema
