@@ -11,7 +11,7 @@ import {
 } from "@mistle/sandbox-session-protocol";
 import type WebSocket from "ws";
 
-import { ignorePromiseRejectionAfterAbort } from "./abortable-race.js";
+import { createAbortRace, ignorePromiseRejectionAfterAbort } from "./abortable-race.js";
 import type { ActiveTunnelStreamRelay, ActiveTunnelStreamRelayResult } from "./active-relay.js";
 import { trackObservedExecutions } from "./agent-execution-monitor.js";
 import { AsyncQueue } from "./async-queue.js";
@@ -33,8 +33,8 @@ import {
 } from "./messages.js";
 import { StreamSendWindow } from "./stream-window.js";
 import {
-  connectWebSocket,
   closeWebSocket,
+  connectWebSocket,
   createWebSocketMessageQueue,
   isExpectedWebSocketClose,
 } from "./websocket.js";
@@ -164,20 +164,33 @@ async function relayTunnelFrames(input: {
 
   while (!input.signal.aborted) {
     const nextTunnelMessageAbortController = new AbortController();
-    const nextTunnelMessage = ignorePromiseRejectionAfterAbort(
-      input.messages
-        .next(AbortSignal.any([input.signal, nextTunnelMessageAbortController.signal]))
-        .then((message) => ({
+    const abortRace = createAbortRace(input.signal);
+
+    let nextEvent:
+      | {
+          source: "tunnel";
+          message: TunnelSocketMessage;
+        }
+      | {
+          source: "agent";
+        };
+
+    try {
+      const nextTunnelMessage = ignorePromiseRejectionAfterAbort(
+        input.messages.next(nextTunnelMessageAbortController.signal).then((message) => ({
           source: "tunnel" as const,
           message,
         })),
-      nextTunnelMessageAbortController.signal,
-    );
-    const nextAgentResult = outboundRelay.then(() => ({
-      source: "agent" as const,
-    }));
-    const nextEvent = await Promise.race([nextTunnelMessage, nextAgentResult]);
-    nextTunnelMessageAbortController.abort();
+        nextTunnelMessageAbortController.signal,
+      );
+      const nextAgentResult = outboundRelay.then(() => ({
+        source: "agent" as const,
+      }));
+      nextEvent = await Promise.race([nextTunnelMessage, nextAgentResult, abortRace.promise]);
+    } finally {
+      abortRace.dispose();
+      nextTunnelMessageAbortController.abort();
+    }
 
     if (nextEvent.source === "agent") {
       return;

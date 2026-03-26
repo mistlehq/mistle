@@ -5,7 +5,7 @@ import {
 } from "@mistle/sandbox-session-protocol";
 import type WebSocket from "ws";
 
-import { ignorePromiseRejectionAfterAbort } from "./abortable-race.js";
+import { createAbortRace, ignorePromiseRejectionAfterAbort } from "./abortable-race.js";
 import type { ActiveTunnelStreamRelay, ActiveTunnelStreamRelayResult } from "./active-relay.js";
 import { AsyncQueue } from "./async-queue.js";
 import type { TunnelSocketMessage } from "./connect-request.js";
@@ -147,33 +147,7 @@ async function relayPtySession(input: {
   while (!input.signal.aborted) {
     const nextMessageAbortController = new AbortController();
     const nextOutputAbortController = new AbortController();
-    const nextMessage = ignorePromiseRejectionAfterAbort(
-      input.messages
-        .next(AbortSignal.any([input.signal, nextMessageAbortController.signal]))
-        .then((message) => ({
-          source: "message" as const,
-          message,
-        })),
-      nextMessageAbortController.signal,
-    );
-    const nextOutput = ignorePromiseRejectionAfterAbort(
-      input.session
-        .nextOutput(AbortSignal.any([input.signal, nextOutputAbortController.signal]))
-        .then((output) => ({
-          source: "output" as const,
-          output,
-        }))
-        .catch((error: unknown) => {
-          if (error instanceof PtySessionOutputClosedError) {
-            return {
-              source: "output-closed" as const,
-            };
-          }
-
-          throw error;
-        }),
-      nextOutputAbortController.signal,
-    );
+    const abortRace = createAbortRace(input.signal);
     const nextExit =
       pendingExitCode === undefined
         ? exitPromise.then((exitCode) => ({
@@ -182,9 +156,56 @@ async function relayPtySession(input: {
           }))
         : new Promise<never>(() => undefined);
 
-    const event = await Promise.race([nextMessage, nextOutput, nextExit]);
-    nextMessageAbortController.abort();
-    nextOutputAbortController.abort();
+    let event:
+      | {
+          source: "message";
+          message: TunnelSocketMessage;
+        }
+      | {
+          source: "output";
+          output: Uint8Array;
+        }
+      | {
+          source: "output-closed";
+        }
+      | {
+          source: "exit";
+          exitCode: number;
+        };
+
+    try {
+      const nextMessage = ignorePromiseRejectionAfterAbort(
+        input.messages.next(nextMessageAbortController.signal).then((message) => ({
+          source: "message" as const,
+          message,
+        })),
+        nextMessageAbortController.signal,
+      );
+      const nextOutput = ignorePromiseRejectionAfterAbort(
+        input.session
+          .nextOutput(nextOutputAbortController.signal)
+          .then((output) => ({
+            source: "output" as const,
+            output,
+          }))
+          .catch((error: unknown) => {
+            if (error instanceof PtySessionOutputClosedError) {
+              return {
+                source: "output-closed" as const,
+              };
+            }
+
+            throw error;
+          }),
+        nextOutputAbortController.signal,
+      );
+
+      event = await Promise.race([nextMessage, nextOutput, nextExit, abortRace.promise]);
+    } finally {
+      abortRace.dispose();
+      nextMessageAbortController.abort();
+      nextOutputAbortController.abort();
+    }
 
     if (event.source === "output") {
       for (const attachedStreamId of attachedStreamIds) {
