@@ -11,6 +11,16 @@ export function ignorePromiseRejectionAfterAbort<T>(
   });
 }
 
+/**
+ * Creates a disposable promise that rejects when the parent abort signal fires.
+ *
+ * This is used in long-lived async loops where we need to race an operation
+ * against a session-level shutdown signal without creating a fresh
+ * `AbortSignal.any(...)` composite on every iteration.
+ *
+ * Callers must invoke `dispose()` in a `finally` block to remove the listener
+ * when the raced operation settles first.
+ */
 export function createAbortRace(abortSignal: AbortSignal): {
   promise: Promise<never>;
   dispose: () => void;
