@@ -5,6 +5,7 @@ export type StartupInput = {
   tunnelExchangeToken: string;
   tunnelGatewayWsUrl: string;
   runtimePlan: CompiledRuntimePlan;
+  egressGrantByRuleId: Record<string, string>;
 };
 
 function normalizeRequiredString(value: string, fieldLabel: string): string {
@@ -42,12 +43,55 @@ function readRequiredRuntimePlanField(payload: object): CompiledRuntimePlan {
   return parsedRuntimePlan.data;
 }
 
+function readRequiredEgressGrantByRuleIdField(
+  payload: object,
+  runtimePlan: CompiledRuntimePlan,
+): Record<string, string> {
+  const egressGrantByRuleIdValue = Object.getOwnPropertyDescriptor(
+    payload,
+    "egressGrantByRuleId",
+  )?.value;
+  if (
+    typeof egressGrantByRuleIdValue !== "object" ||
+    egressGrantByRuleIdValue === null ||
+    Array.isArray(egressGrantByRuleIdValue)
+  ) {
+    throw new Error("startup input egressGrantByRuleId is required");
+  }
+
+  const expectedRuleIds = new Set(runtimePlan.egressRoutes.map((route) => route.egressRuleId));
+  const egressGrantByRuleId: Record<string, string> = {};
+
+  for (const [ruleId, grant] of Object.entries(egressGrantByRuleIdValue)) {
+    if (!expectedRuleIds.has(ruleId)) {
+      throw new Error(`startup input egressGrantByRuleId has unexpected grant key ${ruleId}`);
+    }
+
+    if (typeof grant !== "string" || grant.trim().length === 0) {
+      throw new Error(`startup input egressGrantByRuleId.${ruleId} is required`);
+    }
+
+    egressGrantByRuleId[ruleId] = grant;
+  }
+
+  for (const route of runtimePlan.egressRoutes) {
+    if (egressGrantByRuleId[route.egressRuleId] === undefined) {
+      throw new Error(
+        `startup input egressGrantByRuleId is missing grant for route ${route.egressRuleId}`,
+      );
+    }
+  }
+
+  return egressGrantByRuleId;
+}
+
 function validateExpectedFields(payload: object): void {
   const allowedFields = new Set([
     "bootstrapToken",
     "tunnelExchangeToken",
     "tunnelGatewayWsUrl",
     "runtimePlan",
+    "egressGrantByRuleId",
   ]);
 
   for (const fieldName of Object.keys(payload)) {
@@ -64,6 +108,8 @@ export function parseStartupInputPayload(payload: unknown): StartupInput {
 
   validateExpectedFields(payload);
 
+  const runtimePlan = readRequiredRuntimePlanField(payload);
+
   return {
     bootstrapToken: normalizeRequiredString(
       readRequiredStringField(payload, "bootstrapToken"),
@@ -77,6 +123,7 @@ export function parseStartupInputPayload(payload: unknown): StartupInput {
       readRequiredStringField(payload, "tunnelGatewayWsUrl"),
       "tunnel gateway ws url",
     ),
-    runtimePlan: readRequiredRuntimePlanField(payload),
+    runtimePlan,
+    egressGrantByRuleId: readRequiredEgressGrantByRuleIdField(payload, runtimePlan),
   };
 }

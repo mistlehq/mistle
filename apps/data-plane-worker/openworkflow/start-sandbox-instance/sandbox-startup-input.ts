@@ -11,6 +11,7 @@ export type SandboxStartupInput = {
   tunnelExchangeToken: string;
   tunnelGatewayWsUrl: string;
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+  egressGrantByRuleId: Record<string, string>;
 };
 
 export function createSandboxTunnelGatewayWsUrl(input: {

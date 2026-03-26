@@ -490,6 +490,9 @@ importers:
       '@mistle/sandbox':
         specifier: workspace:*
         version: link:../../packages/sandbox
+      '@mistle/sandbox-egress-auth':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-egress-auth
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry

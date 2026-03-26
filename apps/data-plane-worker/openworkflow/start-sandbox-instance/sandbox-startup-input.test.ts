@@ -180,6 +180,7 @@ const SandboxStartupInputSchema = z.object({
   tunnelExchangeToken: z.string().min(1),
   tunnelGatewayWsUrl: z.string().min(1),
   runtimePlan: RuntimePlanSchema,
+  egressGrantByRuleId: z.record(z.string(), z.string()),
 });
 
 function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
@@ -245,6 +246,9 @@ describe("encodeSandboxStartupInput", () => {
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       runtimePlan: createRuntimePlan(),
+      egressGrantByRuleId: {
+        egress_rule_1: "egress-grant-token-value",
+      },
     });
 
     const encodedText = Decoder.decode(encoded);
@@ -256,6 +260,9 @@ describe("encodeSandboxStartupInput", () => {
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       runtimePlan: createRuntimePlan(),
+      egressGrantByRuleId: {
+        egress_rule_1: "egress-grant-token-value",
+      },
     });
   });
 });
