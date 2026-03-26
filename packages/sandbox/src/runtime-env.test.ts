@@ -30,7 +30,7 @@ describe("withRequiredSandboxRuntimeEnv", () => {
   it("rejects conflicting reserved listen address values", () => {
     expect(() =>
       withRequiredSandboxRuntimeEnv({
-        [SandboxRuntimeEnv.LISTEN_ADDR]: ":9000",
+        [SandboxRuntimeEnv.LISTEN_ADDR]: "127.0.0.1:9000",
       }),
     ).toThrow(SandboxConfigurationError);
   });
