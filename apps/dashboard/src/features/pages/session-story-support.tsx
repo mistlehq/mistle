@@ -2,7 +2,7 @@ import { Badge } from "@mistle/ui";
 
 import { noop, noopRespondToServerRequest } from "../chat/components/chat-story-support.js";
 import {
-  CodexFixtureSessionComposerProps,
+  SessionComposerFixtureProps,
   CodexFixtureSessionEntriesWithExploringGroup,
   CodexFixtureSessionServerRequests,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
@@ -32,7 +32,7 @@ export type SessionConversationStoryArgs = {
 
 export const StorySessionConversationPaneArgs = {
   chatEntries: CodexFixtureSessionEntriesWithExploringGroup,
-  composerProps: CodexFixtureSessionComposerProps,
+  composerProps: SessionComposerFixtureProps,
   isRespondingToServerRequest: false,
   onRespondToServerRequest: noopRespondToServerRequest,
   serverRequestPanelEntries: CodexFixtureSessionServerRequests,

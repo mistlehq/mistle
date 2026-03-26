@@ -3,6 +3,11 @@ import type { SessionConversationComposerProps } from "../../../pages/session-co
 import type { CodexApprovalRequestEntry } from "../approvals/codex-approval-requests-state.js";
 import { CodexFixtureExploringGroupEntry } from "./chat-fixtures.js";
 
+export const CodexFixtureSessionModelOptions = [
+  { value: "gpt-5.4", label: "GPT-5.4" },
+  { value: "gpt-5.3-codex-spark", label: "GPT-5.3 Codex Spark" },
+] as const;
+
 export const CodexFixtureSessionEntries: readonly ChatEntry[] = [
   {
     id: "user-1",
@@ -48,23 +53,26 @@ export const CodexFixtureSessionEntriesWithExploringGroup: readonly ChatEntry[] 
 
 export const CodexFixtureSessionServerRequests: readonly CodexApprovalRequestEntry[] = [];
 
-export const CodexFixtureSessionComposerProps: SessionConversationComposerProps = {
+export const SessionComposerFixtureProps: SessionConversationComposerProps = {
   composerText: "Focus on dashboard asset ownership next.",
-  modelOptions: [
-    { value: "gpt-5", label: "GPT-5" },
-    { value: "gpt-5-mini", label: "GPT-5 Mini" },
-  ],
-  selectedModel: "gpt-5",
+  composerUi: {
+    action: {
+      canInterruptTurn: false,
+      canSteerTurn: false,
+      canSubmitTurns: true,
+      isInterruptingTurn: false,
+      isStartingTurn: false,
+      isSteeringTurn: false,
+    },
+    completedErrorMessage: null,
+    isConnected: true,
+    isUpdatingConfig: false,
+    isUploadingAttachments: false,
+    statusMessage: null,
+  },
+  modelOptions: CodexFixtureSessionModelOptions,
+  selectedModel: "gpt-5.4",
   selectedReasoningEffort: "medium",
-  isConnected: true,
-  isStartingTurn: false,
-  isSteeringTurn: false,
-  isInterruptingTurn: false,
-  isUploadingAttachments: false,
-  isUpdatingComposerConfig: false,
-  canInterruptTurn: false,
-  canSteerTurn: false,
-  completedErrorMessage: null,
   onComposerTextChange: function onComposerTextChange() {},
   onModelChange: function onModelChange() {},
   onPendingImageFilesAdded: function onPendingImageFilesAdded() {},
@@ -72,4 +80,66 @@ export const CodexFixtureSessionComposerProps: SessionConversationComposerProps 
   onRemovePendingAttachment: function onRemovePendingAttachment() {},
   onSubmit: function onSubmit() {},
   pendingAttachments: [],
+};
+
+export const SessionComposerFixturePropsWithPendingImageAttachments: SessionConversationComposerProps =
+  {
+    ...SessionComposerFixtureProps,
+    composerText: "Compare the attached screenshots and summarize the UI differences.",
+    pendingAttachments: [
+      { id: "attachment-1", name: "session-workbench-overview.png" },
+      { id: "attachment-2", name: "terminal-panel-empty-state.webp" },
+    ],
+  };
+
+export const SessionComposerFixturePropsUploadingImageAttachments: SessionConversationComposerProps =
+  {
+    ...SessionComposerFixturePropsWithPendingImageAttachments,
+    composerUi: {
+      ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi,
+      isUploadingAttachments: true,
+    },
+  };
+
+export const SessionComposerFixturePropsForNonImageCapableModel: SessionConversationComposerProps =
+  {
+    ...SessionComposerFixturePropsWithPendingImageAttachments,
+    composerUi: {
+      ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi,
+      statusMessage: {
+        message:
+          "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
+        tone: "warning",
+      },
+    },
+    selectedModel: "gpt-5.3-codex-spark",
+  };
+
+export const SessionComposerFixturePropsForUnavailableModel: SessionConversationComposerProps = {
+  ...SessionComposerFixturePropsWithPendingImageAttachments,
+  composerUi: {
+    ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi,
+    statusMessage: {
+      message:
+        "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
+      tone: "error",
+    },
+  },
+  selectedModel: "gpt-legacy-preview",
+};
+
+export const SessionComposerFixturePropsForLoadingModel: SessionConversationComposerProps = {
+  ...SessionComposerFixturePropsWithPendingImageAttachments,
+  composerUi: {
+    ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi,
+    action: {
+      ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi.action,
+      canSubmitTurns: false,
+    },
+    statusMessage: {
+      message: "Wait for the selected model to finish loading before sending a message.",
+      tone: "error",
+    },
+  },
+  selectedModel: "gpt-5.4",
 };

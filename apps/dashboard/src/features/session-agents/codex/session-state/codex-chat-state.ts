@@ -23,6 +23,7 @@ import type {
   ChatSemanticGroupEntry,
   ChatUserEntry,
 } from "../../../chat/chat-types.js";
+import { splitPromptAndAttachedImagePaths } from "./codex-attachment-presentation.js";
 import { parseTurnPlanSnapshot } from "./codex-session-events.js";
 import type { CodexTurnPlanSnapshot } from "./codex-session-types.js";
 
@@ -730,6 +731,12 @@ function buildChatUserAttachments(
   return (attachments ?? []).map((attachment) => normalizeCodexLocalImageAttachment(attachment));
 }
 
+function buildChatUserAttachmentsFromPaths(
+  attachmentPaths: readonly string[],
+): NonNullable<ChatUserEntry["attachments"]> {
+  return attachmentPaths.map((path) => normalizeCodexLocalImageAttachment({ path }));
+}
+
 function mergeRawItem(existing: unknown, incoming: unknown): unknown {
   if (!isRecord(existing) || !isRecord(incoming)) {
     return incoming;
@@ -855,16 +862,23 @@ function hydrateTurns(turns: readonly CodexThreadReadTurn[]): CodexChatState {
     for (const item of turn.items) {
       const parsedUserMessage = ThreadReadUserMessageItemSchema.safeParse(item);
       if (parsedUserMessage.success) {
+        const parsedText = parsedUserMessage.data.content
+          .map((contentItem) => contentItem.text ?? "")
+          .join("");
+        const parsedAttachmentPaths = splitPromptAndAttachedImagePaths(parsedText);
         userEntry = buildUserEntry(
           turn.id,
-          parsedUserMessage.data.content.map((contentItem) => contentItem.text ?? "").join(""),
-          parsedUserMessage.data.content.flatMap((contentItem) => {
-            if (contentItem.type !== "localImage" || contentItem.path === undefined) {
-              return [];
-            }
+          parsedAttachmentPaths.prompt,
+          [
+            ...parsedUserMessage.data.content.flatMap((contentItem) => {
+              if (contentItem.type !== "localImage" || contentItem.path === undefined) {
+                return [];
+              }
 
-            return [normalizeCodexLocalImageAttachment({ path: contentItem.path })];
-          }),
+              return [normalizeCodexLocalImageAttachment({ path: contentItem.path })];
+            }),
+            ...buildChatUserAttachmentsFromPaths(parsedAttachmentPaths.attachmentPaths),
+          ],
           parsedUserMessage.data.id,
         );
         continue;

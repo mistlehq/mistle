@@ -141,6 +141,52 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
+  it("hydrates text-only attachment fallback paths from the submitted prompt text", () => {
+    const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_123",
+          status: "completed",
+          items: [
+            {
+              type: "userMessage",
+              id: "user_123",
+              content: [
+                {
+                  type: "text",
+                  text: [
+                    "Review these screenshots",
+                    "",
+                    "Attached images:",
+                    "- /tmp/attachments/thread_123/screenshot.png",
+                  ].join("\n"),
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(hydrated.entries).toEqual([
+      {
+        id: "user_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Review these screenshots",
+        attachments: [
+          {
+            kind: "image",
+            path: "/tmp/attachments/thread_123/screenshot.png",
+            name: "screenshot.png",
+          },
+        ],
+        status: "completed",
+      },
+    ]);
+  });
+
   it("accumulates assistant deltas for the active turn", () => {
     const started = reduceCodexChatState(
       reduceCodexChatState(createInitialCodexChatState(), {

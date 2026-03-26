@@ -1,5 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import {
+  SessionComposerFixtureProps,
+  SessionComposerFixturePropsForLoadingModel,
+  SessionComposerFixturePropsForUnavailableModel,
+  SessionComposerFixturePropsForNonImageCapableModel,
+  SessionComposerFixturePropsUploadingImageAttachments,
+  SessionComposerFixturePropsWithPendingImageAttachments,
+  CodexFixtureSessionModelOptions,
+} from "../../session-agents/codex/fixtures/session-fixtures.js";
 import { ChatComposer } from "./chat-composer.js";
 import {
   noop,
@@ -18,30 +27,14 @@ const meta = {
     layout: "padded",
   },
   args: {
-    composerText: "",
-    modelOptions: [
-      { value: "gpt-5", label: "GPT-5" },
-      { value: "gpt-5-mini", label: "GPT-5 Mini" },
-      { value: "gpt-4.1", label: "GPT-4.1" },
-    ],
-    selectedModel: "gpt-5",
-    selectedReasoningEffort: "medium",
-    isConnected: true,
-    isStartingTurn: false,
-    isSteeringTurn: false,
-    isInterruptingTurn: false,
-    isUploadingAttachments: false,
-    isUpdatingComposerConfig: false,
-    canInterruptTurn: false,
-    canSteerTurn: false,
-    completedErrorMessage: null,
+    ...SessionComposerFixtureProps,
+    modelOptions: CodexFixtureSessionModelOptions,
     onComposerTextChange: noopComposerTextChange,
     onModelChange: noopModelChange,
     onPendingImageFilesAdded: noopPendingImageFilesAdded,
     onReasoningEffortChange: noopReasoningEffortChange,
     onRemovePendingAttachment: noopRemovePendingAttachment,
     onSubmit: noop,
-    pendingAttachments: [],
   },
 } satisfies Meta<typeof ChatComposer>;
 
@@ -58,22 +51,67 @@ export const ReadyToSend: Story = {
 export const SteeringTurn: Story = {
   args: {
     composerText: "Focus only on Storybook asset ownership.",
-    canInterruptTurn: true,
-    canSteerTurn: true,
+    composerUi: {
+      ...SessionComposerFixtureProps.composerUi,
+      action: {
+        ...SessionComposerFixtureProps.composerUi.action,
+        canInterruptTurn: true,
+        canSteerTurn: true,
+      },
+    },
   },
 };
 
 export const InterruptOnly: Story = {
   args: {
     composerText: "",
-    canInterruptTurn: true,
-    canSteerTurn: false,
+    composerUi: {
+      ...SessionComposerFixtureProps.composerUi,
+      action: {
+        ...SessionComposerFixtureProps.composerUi.action,
+        canInterruptTurn: true,
+        canSteerTurn: false,
+      },
+    },
   },
 };
 
 export const DisconnectedWithError: Story = {
   args: {
-    isConnected: false,
-    completedErrorMessage: "The session disconnected before the turn could be submitted.",
+    composerUi: {
+      ...SessionComposerFixtureProps.composerUi,
+      completedErrorMessage: "The session disconnected before the turn could be submitted.",
+      isConnected: false,
+    },
+  },
+};
+
+export const WithPendingImageAttachments: Story = {
+  args: {
+    ...SessionComposerFixturePropsWithPendingImageAttachments,
+  },
+};
+
+export const UploadingImageAttachments: Story = {
+  args: {
+    ...SessionComposerFixturePropsUploadingImageAttachments,
+  },
+};
+
+export const NonImageCapableModelWithAttachments: Story = {
+  args: {
+    ...SessionComposerFixturePropsForNonImageCapableModel,
+  },
+};
+
+export const UnavailableSelectedModelWithAttachments: Story = {
+  args: {
+    ...SessionComposerFixturePropsForUnavailableModel,
+  },
+};
+
+export const LoadingSelectedModelWithAttachments: Story = {
+  args: {
+    ...SessionComposerFixturePropsForLoadingModel,
   },
 };

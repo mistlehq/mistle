@@ -1,4 +1,6 @@
 import {
+  Alert,
+  AlertDescription,
   Button,
   Select,
   SelectContent,
@@ -14,8 +16,30 @@ import { resolveSelectableValue } from "../../shared/select-value.js";
 
 const REASONING_EFFORT_OPTIONS = ["low", "medium", "high", "xhigh"] as const;
 
+export type ChatComposerStatusMessage = {
+  message: string;
+  tone: "error" | "warning";
+};
+
+export type ChatComposerUiState = {
+  statusMessage: ChatComposerStatusMessage | null;
+  completedErrorMessage: string | null;
+  isConnected: boolean;
+  isUpdatingConfig: boolean;
+  isUploadingAttachments: boolean;
+  action: {
+    canInterruptTurn: boolean;
+    canSteerTurn: boolean;
+    canSubmitTurns: boolean;
+    isInterruptingTurn: boolean;
+    isStartingTurn: boolean;
+    isSteeringTurn: boolean;
+  };
+};
+
 type ChatComposerProps = {
   composerText: string;
+  composerUi: ChatComposerUiState;
   pendingAttachments: readonly {
     id: string;
     name: string;
@@ -26,15 +50,6 @@ type ChatComposerProps = {
   }[];
   selectedModel: string | null;
   selectedReasoningEffort: string | null;
-  isConnected: boolean;
-  isStartingTurn: boolean;
-  isSteeringTurn: boolean;
-  isInterruptingTurn: boolean;
-  isUpdatingComposerConfig: boolean;
-  isUploadingAttachments: boolean;
-  canInterruptTurn: boolean;
-  canSteerTurn: boolean;
-  completedErrorMessage: string | null;
   onComposerTextChange: (value: string) => void;
   onModelChange: (value: string) => void;
   onReasoningEffortChange: (value: string) => void;
@@ -45,19 +60,11 @@ type ChatComposerProps = {
 
 export function ChatComposer({
   composerText,
+  composerUi,
   pendingAttachments,
   modelOptions,
   selectedModel,
   selectedReasoningEffort,
-  isConnected,
-  isStartingTurn,
-  isSteeringTurn,
-  isInterruptingTurn,
-  isUpdatingComposerConfig,
-  isUploadingAttachments,
-  canInterruptTurn,
-  canSteerTurn,
-  completedErrorMessage,
   onComposerTextChange,
   onModelChange,
   onReasoningEffortChange,
@@ -69,26 +76,32 @@ export function ChatComposer({
   const trimmedComposerText = composerText.trim();
   const hasPendingAttachments = pendingAttachments.length > 0;
   const hasComposerSubmissionContent = trimmedComposerText.length > 0 || hasPendingAttachments;
-  const hasActiveTurn = canInterruptTurn || canSteerTurn;
+  const hasActiveTurn = composerUi.action.canInterruptTurn || composerUi.action.canSteerTurn;
   const composerPlaceholder = hasActiveTurn ? "Steer the current turn" : "Ask anything";
   const composerActionLabel = hasActiveTurn
     ? hasComposerSubmissionContent
-      ? isSteeringTurn
+      ? composerUi.action.isSteeringTurn
         ? "Steering..."
         : "Steer"
-      : isInterruptingTurn
+      : composerUi.action.isInterruptingTurn
         ? "Stopping..."
         : "Stop"
-    : isUploadingAttachments
+    : composerUi.isUploadingAttachments
       ? "Uploading..."
-      : isStartingTurn
+      : composerUi.action.isStartingTurn
         ? "Sending..."
         : "Send";
   const isComposerActionDisabled = hasActiveTurn
     ? hasComposerSubmissionContent
-      ? !canSteerTurn || isUploadingAttachments
-      : !canInterruptTurn
-    : !isConnected || isStartingTurn || isUploadingAttachments || !hasComposerSubmissionContent;
+      ? !composerUi.action.canSteerTurn ||
+        composerUi.isUploadingAttachments ||
+        !composerUi.action.canSubmitTurns
+      : !composerUi.action.canInterruptTurn
+    : !composerUi.isConnected ||
+      composerUi.action.isStartingTurn ||
+      composerUi.isUploadingAttachments ||
+      !hasComposerSubmissionContent ||
+      !composerUi.action.canSubmitTurns;
   const composerActionIcon =
     hasActiveTurn && !hasComposerSubmissionContent ? (
       <StopCircleIcon aria-hidden="true" weight="fill" />
@@ -96,7 +109,7 @@ export function ChatComposer({
       <ArrowCircleUpIcon aria-hidden="true" weight="fill" />
     );
   const isComposerConfigDisabled =
-    !isConnected || isUpdatingComposerConfig || isUploadingAttachments;
+    !composerUi.isConnected || composerUi.isUpdatingConfig || composerUi.isUploadingAttachments;
   const selectableModelValue = resolveSelectableValue({
     selectedValue: selectedModel,
     optionValues: modelOptions.map((option) => option.value),
@@ -126,6 +139,14 @@ export function ChatComposer({
         addPendingFiles(Array.from(event.dataTransfer.files));
       }}
     >
+      {composerUi.statusMessage === null ? null : (
+        <Alert
+          className="mx-1 mt-1"
+          variant={composerUi.statusMessage.tone === "error" ? "destructive" : "default"}
+        >
+          <AlertDescription>{composerUi.statusMessage.message}</AlertDescription>
+        </Alert>
+      )}
       <input
         accept="image/*"
         className="hidden"
@@ -148,7 +169,7 @@ export function ChatComposer({
               <button
                 aria-label={`Remove ${attachment.name}`}
                 className="text-muted-foreground disabled:cursor-not-allowed"
-                disabled={isUploadingAttachments}
+                disabled={composerUi.isUploadingAttachments}
                 onClick={() => {
                   onRemovePendingAttachment(attachment.id);
                 }}
@@ -195,7 +216,7 @@ export function ChatComposer({
         <div className="flex flex-wrap items-center gap-2">
           <Button
             className="h-8 gap-1.5 rounded-full"
-            disabled={!isConnected || isUploadingAttachments}
+            disabled={!composerUi.isConnected || composerUi.isUploadingAttachments}
             onClick={() => {
               fileInputRef.current?.click();
             }}
@@ -274,12 +295,12 @@ export function ChatComposer({
           {composerActionIcon}
         </Button>
       </div>
-      {!isUploadingAttachments ? null : (
+      {!composerUi.isUploadingAttachments ? null : (
         <p className="text-muted-foreground text-sm">Uploading attachments...</p>
       )}
-      {completedErrorMessage === null ? null : (
+      {composerUi.completedErrorMessage === null ? null : (
         <p className="text-destructive text-sm">
-          <span className="font-medium">Turn error:</span> {completedErrorMessage}
+          <span className="font-medium">Turn error:</span> {composerUi.completedErrorMessage}
         </p>
       )}
     </div>

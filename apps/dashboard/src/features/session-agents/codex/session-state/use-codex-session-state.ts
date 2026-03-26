@@ -50,7 +50,7 @@ import {
   type StartSessionStep,
 } from "./codex-session-types.js";
 import { useCodexChatController, type CodexChatState } from "./use-codex-chat-controller.js";
-import { useCodexSessionAdmin } from "./use-codex-session-admin.js";
+import { useCodexSessionAdmin, type CodexModelCatalogStatus } from "./use-codex-session-admin.js";
 import { useCodexSessionDebugState } from "./use-codex-session-debug-state.js";
 import { useCodexThreadCollections } from "./use-codex-thread-collections.js";
 
@@ -113,19 +113,24 @@ type CodexSessionChatState = {
   canInterruptTurn: boolean;
   canSteerTurn: boolean;
   startTurn: (input: {
-    prompt: string;
-    attachments?: readonly CodexTurnInputLocalImageItem[];
+    submittedPrompt: string;
+    submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
+    transcriptPrompt?: string;
+    transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
   }) => Promise<void>;
   interruptTurn: () => void;
   steerTurn: (input: {
-    prompt: string;
-    attachments?: readonly CodexTurnInputLocalImageItem[];
+    submittedPrompt: string;
+    submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
+    transcriptPrompt?: string;
+    transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
   }) => Promise<void>;
   reloadChat: () => void;
 };
 
 type CodexSessionAdminState = {
   availableModels: readonly CodexModelSummary[];
+  modelCatalogStatus: CodexModelCatalogStatus;
   experimentalFeatures: readonly CodexExperimentalFeatureSummary[];
   configJson: string | null;
   configRequirementsJson: string | null;
@@ -259,6 +264,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   });
   const {
     availableModels,
+    modelCatalogStatus,
     experimentalFeatures,
     configJson,
     configRequirementsJson,
@@ -1026,6 +1032,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   const admin = useMemo<CodexSessionAdminState>(() => {
     return {
       availableModels,
+      modelCatalogStatus,
       experimentalFeatures,
       configJson,
       configRequirementsJson,
@@ -1055,6 +1062,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     detectExternalAgentConfig,
     detectedExternalAgentMigrationItems,
     experimentalFeatures,
+    modelCatalogStatus,
     importExternalAgentConfig,
     isBatchWritingConfig,
     isDetectingExternalAgentConfig,
