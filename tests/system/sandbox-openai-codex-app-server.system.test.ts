@@ -2157,7 +2157,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
   );
 
   it(
-    "uploads an image over fileUpload and sends it as localImage turn input",
+    "uploads an image over fileUpload and persists the localImage turn input path",
     async ({ fixture }) => {
       await runSandboxScenario({
         fixture,
