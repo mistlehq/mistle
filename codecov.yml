@@ -1,0 +1,37 @@
+codecov:
+  require_ci_to_pass: true
+
+comment:
+  layout: "header, diff, components, files"
+  require_changes: true
+
+component_management:
+  individual_components:
+    - component_id: control_plane_apps
+      name: control-plane-apps
+      paths:
+        - apps/control-plane-api/**
+        - apps/control-plane-worker/**
+    - component_id: data_plane_apps
+      name: data-plane-apps
+      paths:
+        - apps/data-plane-api/**
+        - apps/data-plane-worker/**
+        - apps/data-plane-gateway/**
+        - apps/tokenizer-proxy/**
+    - component_id: dashboard
+      name: dashboard
+      paths:
+        - apps/dashboard/**
+    - component_id: sandbox_runtime
+      name: sandbox-runtime
+      paths:
+        - apps/sandbox-runtime/**
+    - component_id: shared_packages
+      name: shared-packages
+      paths:
+        - packages/**
+    - component_id: cross_cutting_tests
+      name: cross-cutting-tests
+      paths:
+        - tests/**
