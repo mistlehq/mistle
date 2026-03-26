@@ -186,6 +186,7 @@ Release process documentation lives in [docs/release-process.md](docs/release-pr
 ```bash
 pnpm format
 pnpm lint
+pnpm lint:spelling
 pnpm typecheck
 pnpm test
 ```

@@ -17,6 +17,7 @@
     "format:check": "oxfmt --check .",
     "lint": "pnpm lint:workspace",
     "lint:workspace": "turbo run lint --output-logs=errors-only",
+    "lint:spelling": "codespell",
     "lint:knip": "knip --config knip.jsonc --no-progress --reporter compact --no-exit-code",
     "lint:jscpd": "jscpd --config .jscpd.json",
     "lint:sql": "pnpm --filter @mistle/db lint:sql",
