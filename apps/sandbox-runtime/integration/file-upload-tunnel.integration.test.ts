@@ -10,6 +10,7 @@ import WebSocket, { type RawData, WebSocketServer } from "ws";
 import { AsyncQueue } from "../src/tunnel/async-queue.js";
 import { startTunnelClient } from "../src/tunnel/client.js";
 import type { TunnelSocketMessage } from "../src/tunnel/connect-request.js";
+import { ImageSignatures } from "../src/tunnel/validate-uploaded-image.js";
 
 const IntegrationTestTimeoutMs = 40_000;
 const StepTimeoutMs = 5_000;
@@ -106,7 +107,7 @@ describe("startTunnelClient fileUpload integration", () => {
     "handles a fileUpload stream end to end and emits fileUpload.completed",
     async () => {
       const threadId = `thread_${randomUUID()}`;
-      const expectedBytes = new Uint8Array([1, 2, 3, 4]);
+      const expectedBytes = ImageSignatures.PNG;
       const expectedAttachmentDirectory = join("/tmp/attachments", threadId);
 
       await mkdir(expectedAttachmentDirectory, { recursive: true });

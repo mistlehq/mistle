@@ -1,6 +1,7 @@
 import {
   DefaultStreamWindowBytes,
   encodeDataFrame,
+  FileUploadResetCodes,
   parseStreamControlMessage,
   PayloadKindRawBytes,
   type FileUploadCompletedEvent,
@@ -32,6 +33,18 @@ export type UploadedSandboxImage = {
   sizeBytes: number;
   path: string;
 };
+
+export { FileUploadResetCodes };
+
+export class FileUploadRejectedError extends Error {
+  readonly code: string;
+
+  constructor(input: { code: string; message: string }) {
+    super(input.message);
+    this.code = input.code;
+    this.name = "FileUploadRejectedError";
+  }
+}
 
 type QueuedControlMessage =
   | {
@@ -93,6 +106,10 @@ function normalizeCompletionEvent(event: FileUploadCompletedEvent): UploadedSand
     sizeBytes: event.sizeBytes,
     path: event.path,
   };
+}
+
+function toFileUploadError(input: { code: string; message: string }): Error {
+  return new FileUploadRejectedError(input);
 }
 
 function getMessagePump(socket: SandboxSessionSocket): ControlMessagePump {
@@ -299,7 +316,10 @@ export async function uploadSandboxImage(
         if (nextControlMessage.type === "stream.window") {
           availableWindowBytes += nextControlMessage.bytes;
         } else if (nextControlMessage.type === "stream.reset") {
-          throw new Error(nextControlMessage.message);
+          throw toFileUploadError({
+            code: nextControlMessage.code,
+            message: nextControlMessage.message,
+          });
         } else if (
           nextControlMessage.type === "stream.event" &&
           nextControlMessage.event.type === "fileUpload.completed"
@@ -350,7 +370,10 @@ export async function uploadSandboxImage(
       timeoutMessage: "Timed out while waiting for upload completion.",
     });
     if (uploadResultMessage.type === "stream.reset") {
-      throw new Error(uploadResultMessage.message);
+      throw toFileUploadError({
+        code: uploadResultMessage.code,
+        message: uploadResultMessage.message,
+      });
     }
     if (
       uploadResultMessage.type !== "stream.event" ||

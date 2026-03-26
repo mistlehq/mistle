@@ -1,5 +1,6 @@
 import {
   decodeDataFrame,
+  FileUploadResetCodes,
   parseStreamControlMessage,
   PayloadKindRawBytes,
 } from "@mistle/sandbox-session-protocol";
@@ -7,7 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { type RawData, WebSocketServer } from "ws";
 
 import { createBrowserSandboxSessionRuntime } from "./browser.js";
-import { uploadSandboxImage } from "./file-upload-client.js";
+import { FileUploadRejectedError, uploadSandboxImage } from "./file-upload-client.js";
 
 function toUint8Array(data: RawData): Uint8Array {
   if (typeof data === "string") {
@@ -33,7 +34,13 @@ type TestUploadServer = {
   url: string;
 };
 
-async function startUploadTestServer(input?: { rejectOpen?: boolean }): Promise<TestUploadServer> {
+async function startUploadTestServer(input?: {
+  rejectOpen?: boolean;
+  resetAfterClose?: {
+    code: string;
+    message: string;
+  };
+}): Promise<TestUploadServer> {
   const receivedChunks: Uint8Array[] = [];
   const wsServer = new WebSocketServer({
     host: "127.0.0.1",
@@ -71,6 +78,18 @@ async function startUploadTestServer(input?: { rejectOpen?: boolean }): Promise<
       }
 
       if (controlMessage?.type === "stream.close" && streamId !== null) {
+        if (input?.resetAfterClose !== undefined) {
+          socket.send(
+            JSON.stringify({
+              type: "stream.reset",
+              streamId,
+              code: input.resetAfterClose.code,
+              message: input.resetAfterClose.message,
+            }),
+          );
+          return;
+        }
+
         socket.send(
           JSON.stringify({
             type: "stream.event",
@@ -179,5 +198,31 @@ describe("uploadSandboxImage", () => {
         threadId: "thread_123",
       }),
     ).rejects.toThrow("unsupported");
+  });
+
+  it("preserves reset codes when the runtime rejects the uploaded image", async () => {
+    const server = await startUploadTestServer({
+      resetAfterClose: {
+        code: FileUploadResetCodes.INVALID_FILE_TYPE,
+        message: "Uploaded file is not a supported image.",
+      },
+    });
+    openServers.add(server);
+    const file = new File([new Uint8Array([1, 2, 3, 4])], "screenshot.png", {
+      type: "image/png",
+    });
+
+    await expect(
+      uploadSandboxImage({
+        connectionUrl: server.url,
+        file,
+        runtime: createBrowserSandboxSessionRuntime(),
+        threadId: "thread_123",
+      }),
+    ).rejects.toMatchObject({
+      name: "FileUploadRejectedError",
+      code: FileUploadResetCodes.INVALID_FILE_TYPE,
+      message: "Uploaded file is not a supported image.",
+    } satisfies Pick<FileUploadRejectedError, "code" | "message" | "name">);
   });
 });

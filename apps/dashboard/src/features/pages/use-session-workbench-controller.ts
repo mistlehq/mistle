@@ -1,5 +1,9 @@
 import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/openai/agent/client";
-import { uploadSandboxImage } from "@mistle/sandbox-session-client";
+import {
+  FileUploadRejectedError,
+  FileUploadResetCodes,
+  uploadSandboxImage,
+} from "@mistle/sandbox-session-client";
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
 import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -85,6 +89,24 @@ function readComposerConfigSnapshot(configJson: string | null): ComposerConfigSn
     model: typeof model === "string" ? model : null,
     modelReasoningEffort: typeof modelReasoningEffort === "string" ? modelReasoningEffort : null,
   };
+}
+
+function resolveUploadErrorMessage(error: unknown): string {
+  if (error instanceof FileUploadRejectedError) {
+    if (error.code === FileUploadResetCodes.INVALID_FILE_TYPE) {
+      return "That file is not a supported PNG, JPEG, WebP, or GIF image.";
+    }
+
+    if (error.code === FileUploadResetCodes.MIME_TYPE_MISMATCH) {
+      return "That file's contents do not match its declared image type.";
+    }
+
+    if (error.code === FileUploadResetCodes.INVALID_IMAGE_CONTENT) {
+      return "That image file could not be validated.";
+    }
+  }
+
+  return error instanceof Error ? error.message : "Could not upload attached image.";
 }
 
 export function shouldWaitForAutomationSessionThread(input: {
@@ -794,9 +816,7 @@ export function useSessionWorkbenchController(input: {
             path: image.path,
           }));
         } catch (error) {
-          reportStartErrorMessage(
-            error instanceof Error ? error.message : "Could not upload attached image.",
-          );
+          reportStartErrorMessage(resolveUploadErrorMessage(error));
           return;
         } finally {
           setIsUploadingAttachments(false);

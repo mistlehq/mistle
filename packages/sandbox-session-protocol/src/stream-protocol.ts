@@ -3,6 +3,14 @@ import { z } from "zod";
 const PositiveIntegerSchema = z.int().positive();
 const NonEmptyStringSchema = z.string().min(1);
 
+export const FileUploadResetCodes = {
+  INVALID_FILE_TYPE: "invalid_file_type",
+  MIME_TYPE_MISMATCH: "mime_type_mismatch",
+  INVALID_IMAGE_CONTENT: "invalid_image_content",
+} as const;
+
+export type FileUploadResetCode = (typeof FileUploadResetCodes)[keyof typeof FileUploadResetCodes];
+
 const AgentStreamChannelSchema = z.object({
   kind: z.literal("agent"),
 });
@@ -42,6 +50,10 @@ const PTYExitEventSchema = z.object({
   exitCode: z.int(),
 });
 
+/**
+ * Emitted only after the runtime has accepted the upload as a supported,
+ * validated image and persisted it at the final attachment path.
+ */
 const FileUploadCompletedEventSchema = z.object({
   type: z.literal("fileUpload.completed"),
   attachmentId: NonEmptyStringSchema,

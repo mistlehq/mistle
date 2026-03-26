@@ -27,6 +27,7 @@ import {
   writeStreamWindow,
 } from "./messages.js";
 import { resolveImageExtension } from "./resolve-image-extension.js";
+import { validateUploadedImage } from "./validate-uploaded-image.js";
 
 const MaxUploadSizeBytes = 10 * 1024 * 1024;
 
@@ -87,6 +88,7 @@ export async function handleFileUploadStream(input: {
 
   const fileHandle = await open(tempPath, "w");
   let receivedBytes = 0;
+  let didPersistFinalFile = false;
 
   try {
     await writeStreamOpenOk(input.tunnelSocket, {
@@ -171,7 +173,22 @@ export async function handleFileUploadStream(input: {
       }
 
       await fileHandle.close();
+      const validationResult = await validateUploadedImage({
+        declaredMimeType: input.mimeType,
+        tempPath,
+      });
+      if (!validationResult.ok) {
+        await writeStreamReset(input.tunnelSocket, {
+          type: "stream.reset",
+          streamId: input.streamId,
+          code: validationResult.code,
+          message: validationResult.message,
+        });
+        return;
+      }
+
       await rename(tempPath, finalPath);
+      didPersistFinalFile = true;
 
       const completionEvent: StreamEventMessage = {
         type: "stream.event",
@@ -191,7 +208,7 @@ export async function handleFileUploadStream(input: {
     }
   } finally {
     await fileHandle.close().catch(() => undefined);
-    if (receivedBytes !== input.sizeBytes) {
+    if (!didPersistFinalFile) {
       await rm(tempPath, { force: true }).catch(() => undefined);
     }
   }
