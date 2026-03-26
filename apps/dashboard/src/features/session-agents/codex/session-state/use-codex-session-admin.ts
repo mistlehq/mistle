@@ -30,13 +30,15 @@ type CodexExternalAgentConfigQuery = {
   cwds: readonly string[];
 };
 
+export type CodexModelCatalogStatus = "idle" | "loading" | "loaded" | "error";
+
 export function useCodexSessionAdmin(input: {
   rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
   recordRecentResponse: (payload: unknown) => void;
   setStartErrorMessage: (message: string | null) => void;
 }) {
   const [availableModels, setAvailableModels] = useState<readonly CodexModelSummary[]>([]);
-  const [hasLoadedModels, setHasLoadedModels] = useState(false);
+  const [modelCatalogStatus, setModelCatalogStatus] = useState<CodexModelCatalogStatus>("idle");
   const [experimentalFeatures, setExperimentalFeatures] = useState<
     readonly CodexExperimentalFeatureSummary[]
   >([]);
@@ -48,7 +50,7 @@ export function useCodexSessionAdmin(input: {
 
   const resetAdminState = useCallback((): void => {
     setAvailableModels([]);
-    setHasLoadedModels(false);
+    setModelCatalogStatus("idle");
     setExperimentalFeatures([]);
     setConfigJson(null);
     setConfigRequirementsJson(null);
@@ -57,6 +59,7 @@ export function useCodexSessionAdmin(input: {
 
   const loadModelsMutation = useMutation({
     mutationFn: async () => {
+      setModelCatalogStatus("loading");
       const rpcClient = input.rpcClientRef.current;
       if (rpcClient === null) {
         throw new Error("Connect to a sandbox session before listing models.");
@@ -70,11 +73,11 @@ export function useCodexSessionAdmin(input: {
     },
     onSuccess: (result) => {
       setAvailableModels(result.models);
-      setHasLoadedModels(true);
+      setModelCatalogStatus("loaded");
       input.recordRecentResponse(result.response);
     },
     onError: (error) => {
-      setHasLoadedModels(false);
+      setModelCatalogStatus("error");
       input.setStartErrorMessage(error instanceof Error ? error.message : "Could not load models.");
     },
   });
@@ -256,7 +259,7 @@ export function useCodexSessionAdmin(input: {
 
   return {
     availableModels,
-    hasLoadedModels,
+    modelCatalogStatus,
     experimentalFeatures,
     configJson,
     configRequirementsJson,

@@ -4,23 +4,28 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
   buildAttachedImagePathsText,
+  buildPromptWithAttachedImagePaths,
+  buildTurnPrompt,
+  resolveTurnRepresentation,
+} from "../session-agents/codex/session-state/codex-attachment-presentation.js";
+import {
   buildModelSelectionLoadingMessage,
   buildModelSelectionRequiredMessage,
   buildNonImageCapableModelWarningMessage,
-  buildPromptWithAttachedImagePaths,
-  buildTurnPrompt,
   buildUnavailableModelErrorMessage,
+  resolveActiveComposerModel,
+  resolveComposerStatusMessage,
+  resolveComposerSubmitReadiness,
+  supportsImageInspection,
+} from "./use-session-conversation-composer-state.js";
+import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
+import {
   getSandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   isActiveResumeRequest,
-  resolveActiveComposerModel,
-  resolveComposerStatusMessage,
-  resolveComposerSubmitReadiness,
-  resolveTurnRepresentation,
   resolveSessionEntryPhase,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForEntryPhase,
@@ -28,7 +33,6 @@ import {
   shouldPollStoppedSandboxStatus,
   shouldShowResumeInFlightState,
   shouldWaitForAutomationSessionThread,
-  supportsImageInspection,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
 
@@ -324,7 +328,7 @@ describe("useSessionWorkbenchController", () => {
           isDefault: true,
         },
         resolvedModel: null,
-        isModelListLoaded: true,
+        modelCatalogStatus: "loaded",
       }),
     ).toEqual({
       status: "ready",
@@ -345,7 +349,7 @@ describe("useSessionWorkbenchController", () => {
         selectedModel: null,
         activeModel: null,
         resolvedModel: null,
-        isModelListLoaded: false,
+        modelCatalogStatus: "idle",
       }),
     ).toEqual({
       status: "loading-model",
@@ -358,7 +362,7 @@ describe("useSessionWorkbenchController", () => {
         selectedModel: "gpt-5.4",
         activeModel: null,
         resolvedModel: null,
-        isModelListLoaded: false,
+        modelCatalogStatus: "loading",
       }),
     ).toEqual({
       status: "loading-model",
@@ -371,7 +375,7 @@ describe("useSessionWorkbenchController", () => {
         selectedModel: "gpt-legacy-preview",
         activeModel: null,
         resolvedModel: null,
-        isModelListLoaded: true,
+        modelCatalogStatus: "loaded",
       }),
     ).toEqual({
       status: "unavailable-model",
@@ -394,7 +398,7 @@ describe("useSessionWorkbenchController", () => {
           supportsPersonality: false,
           isDefault: true,
         },
-        isModelListLoaded: false,
+        modelCatalogStatus: "error",
       }),
     ).toEqual({
       status: "ready",
@@ -415,7 +419,7 @@ describe("useSessionWorkbenchController", () => {
         selectedModel: null,
         activeModel: null,
         resolvedModel: null,
-        isModelListLoaded: true,
+        modelCatalogStatus: "loaded",
       }),
     ).toEqual({
       status: "missing-model",

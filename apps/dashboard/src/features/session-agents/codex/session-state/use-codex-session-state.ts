@@ -50,7 +50,7 @@ import {
   type StartSessionStep,
 } from "./codex-session-types.js";
 import { useCodexChatController, type CodexChatState } from "./use-codex-chat-controller.js";
-import { useCodexSessionAdmin } from "./use-codex-session-admin.js";
+import { useCodexSessionAdmin, type CodexModelCatalogStatus } from "./use-codex-session-admin.js";
 import { useCodexSessionDebugState } from "./use-codex-session-debug-state.js";
 import { useCodexThreadCollections } from "./use-codex-thread-collections.js";
 
@@ -130,7 +130,7 @@ type CodexSessionChatState = {
 
 type CodexSessionAdminState = {
   availableModels: readonly CodexModelSummary[];
-  hasLoadedModels: boolean;
+  modelCatalogStatus: CodexModelCatalogStatus;
   experimentalFeatures: readonly CodexExperimentalFeatureSummary[];
   configJson: string | null;
   configRequirementsJson: string | null;
@@ -264,7 +264,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   });
   const {
     availableModels,
-    hasLoadedModels,
+    modelCatalogStatus,
     experimentalFeatures,
     configJson,
     configRequirementsJson,
@@ -1032,7 +1032,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   const admin = useMemo<CodexSessionAdminState>(() => {
     return {
       availableModels,
-      hasLoadedModels,
+      modelCatalogStatus,
       experimentalFeatures,
       configJson,
       configRequirementsJson,
@@ -1062,7 +1062,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     detectExternalAgentConfig,
     detectedExternalAgentMigrationItems,
     experimentalFeatures,
-    hasLoadedModels,
+    modelCatalogStatus,
     importExternalAgentConfig,
     isBatchWritingConfig,
     isDetectingExternalAgentConfig,

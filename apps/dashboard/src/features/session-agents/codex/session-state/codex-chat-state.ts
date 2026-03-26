@@ -23,6 +23,7 @@ import type {
   ChatSemanticGroupEntry,
   ChatUserEntry,
 } from "../../../chat/chat-types.js";
+import { splitPromptAndAttachedImagePaths } from "./codex-attachment-presentation.js";
 import { parseTurnPlanSnapshot } from "./codex-session-events.js";
 import type { CodexTurnPlanSnapshot } from "./codex-session-types.js";
 
@@ -131,68 +132,6 @@ export type CodexChatAction =
       type: "notification_received";
       notification: CodexJsonRpcNotification;
     };
-
-const AttachedImagesHeader = "Attached images:";
-
-function splitPromptAndAttachedImagePaths(text: string): {
-  attachmentPaths: readonly string[];
-  prompt: string;
-} {
-  const trimmedText = text.trim();
-  if (trimmedText.length === 0) {
-    return {
-      attachmentPaths: [],
-      prompt: "",
-    };
-  }
-
-  const headerBlock = `${AttachedImagesHeader}\n`;
-  const separatorBlock = `\n\n${headerBlock}`;
-  const blockStartIndex = trimmedText.startsWith(headerBlock)
-    ? 0
-    : trimmedText.lastIndexOf(separatorBlock);
-
-  if (blockStartIndex === -1) {
-    return {
-      attachmentPaths: [],
-      prompt: trimmedText,
-    };
-  }
-
-  const attachmentSection =
-    blockStartIndex === 0 ? trimmedText : trimmedText.slice(blockStartIndex + 2);
-
-  if (!attachmentSection.startsWith(headerBlock)) {
-    return {
-      attachmentPaths: [],
-      prompt: trimmedText,
-    };
-  }
-
-  const attachmentLines = attachmentSection.slice(headerBlock.length).split("\n");
-  if (attachmentLines.length === 0 || attachmentLines.some((line) => !line.startsWith("- "))) {
-    return {
-      attachmentPaths: [],
-      prompt: trimmedText,
-    };
-  }
-
-  const attachmentPaths = attachmentLines
-    .map((line) => line.slice(2).trim())
-    .filter((line) => line.length > 0);
-
-  if (attachmentPaths.length !== attachmentLines.length) {
-    return {
-      attachmentPaths: [],
-      prompt: trimmedText,
-    };
-  }
-
-  return {
-    attachmentPaths,
-    prompt: blockStartIndex === 0 ? "" : trimmedText.slice(0, blockStartIndex).trimEnd(),
-  };
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
