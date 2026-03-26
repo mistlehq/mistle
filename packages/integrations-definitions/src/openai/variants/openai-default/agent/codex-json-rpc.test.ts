@@ -313,7 +313,9 @@ describe("openai codex json-rpc client", () => {
 
     const rpcClient = new CodexJsonRpcClient(sessionClient);
 
-    await expect(rpcClient.initialize()).rejects.toThrow();
+    await expect(rpcClient.initialize()).rejects.toThrow(
+      /Sandbox websocket connection closed|Sandbox session socket is not open|initialization completed/,
+    );
     expect(sessionClient.state).not.toBe("ready");
     await server.socketClosed;
   });
@@ -449,7 +451,9 @@ describe("openai codex json-rpc client", () => {
 
     const rpcClient = new CodexJsonRpcClient(sessionClient);
 
-    await expect(rpcClient.initialize()).rejects.toThrow();
+    await expect(rpcClient.initialize()).rejects.toThrow(
+      /Sandbox websocket connection closed|Sandbox session socket is not open|initialization completed/,
+    );
     expect(sessionClient.state).not.toBe("ready");
     await server.socketClosed;
   });

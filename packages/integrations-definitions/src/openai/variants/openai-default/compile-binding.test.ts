@@ -388,6 +388,6 @@ describe("compileOpenAiApiKeyBinding", () => {
           artifactBinPath,
         },
       }),
-    ).toThrow();
+    ).toThrow(/Invalid input/);
   });
 });
