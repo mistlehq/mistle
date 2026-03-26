@@ -263,17 +263,22 @@ function SessionWorkbenchAutoResumeOnEntry(input: {
 
 function createEmptyComposerProps(): SessionConversationComposerProps {
   return {
-    canInterruptTurn: false,
-    canSteerTurn: false,
-    completedErrorMessage: null,
-    composerStatusMessage: null,
     composerText: "",
-    isConnected: false,
-    isInterruptingTurn: false,
-    isStartingTurn: false,
-    isSteeringTurn: false,
-    isUploadingAttachments: false,
-    isUpdatingComposerConfig: false,
+    composerUi: {
+      action: {
+        canInterruptTurn: false,
+        canSteerTurn: false,
+        canSubmitTurns: false,
+        isInterruptingTurn: false,
+        isStartingTurn: false,
+        isSteeringTurn: false,
+      },
+      completedErrorMessage: null,
+      isConnected: false,
+      isUpdatingConfig: false,
+      isUploadingAttachments: false,
+      statusMessage: null,
+    },
     modelOptions: [],
     onComposerTextChange: function onComposerTextChange() {},
     onModelChange: function onModelChange() {},

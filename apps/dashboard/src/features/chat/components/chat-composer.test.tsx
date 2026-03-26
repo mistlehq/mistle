@@ -7,17 +7,22 @@ import { ChatComposer } from "./chat-composer.js";
 
 function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
   return {
-    canInterruptTurn: false,
-    canSteerTurn: false,
-    completedErrorMessage: null,
-    composerStatusMessage: null,
     composerText: "Ship it",
-    isConnected: true,
-    isInterruptingTurn: false,
-    isStartingTurn: false,
-    isSteeringTurn: false,
-    isUpdatingComposerConfig: false,
-    isUploadingAttachments: false,
+    composerUi: {
+      action: {
+        canInterruptTurn: false,
+        canSteerTurn: false,
+        canSubmitTurns: true,
+        isInterruptingTurn: false,
+        isStartingTurn: false,
+        isSteeringTurn: false,
+      },
+      completedErrorMessage: null,
+      isConnected: true,
+      isUpdatingConfig: false,
+      isUploadingAttachments: false,
+      statusMessage: null,
+    },
     modelOptions: [{ value: "gpt-5.4-codex", label: "GPT-5.4" }],
     onComposerTextChange: () => {},
     onModelChange: () => {},
@@ -42,14 +47,36 @@ describe("ChatComposer", () => {
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
   });
 
-  it("renders composer-local status messages above the composer", () => {
+  it("disables send when turns are not submit-ready", () => {
+    const baseProps = createBaseComposerProps();
     render(
       <ChatComposer
-        {...createBaseComposerProps()}
-        composerStatusMessage={{
-          message:
-            "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
-          tone: "warning",
+        {...baseProps}
+        composerUi={{
+          ...baseProps.composerUi,
+          action: {
+            ...baseProps.composerUi.action,
+            canSubmitTurns: false,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Send" }).getAttribute("disabled")).not.toBeNull();
+  });
+
+  it("renders composer-local status messages above the composer", () => {
+    const baseProps = createBaseComposerProps();
+    render(
+      <ChatComposer
+        {...baseProps}
+        composerUi={{
+          ...baseProps.composerUi,
+          statusMessage: {
+            message:
+              "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
+            tone: "warning",
+          },
         }}
       />,
     );
@@ -62,12 +89,19 @@ describe("ChatComposer", () => {
   });
 
   it("renders a Stop action button when an active turn has no steering text", () => {
+    const baseProps = createBaseComposerProps();
     render(
       <ChatComposer
-        {...createBaseComposerProps()}
-        canInterruptTurn={true}
-        canSteerTurn={true}
+        {...baseProps}
         composerText="   "
+        composerUi={{
+          ...baseProps.composerUi,
+          action: {
+            ...baseProps.composerUi.action,
+            canInterruptTurn: true,
+            canSteerTurn: true,
+          },
+        }}
       />,
     );
 
@@ -75,12 +109,19 @@ describe("ChatComposer", () => {
   });
 
   it("renders a Steer action button when an active turn has steering text", () => {
+    const baseProps = createBaseComposerProps();
     render(
       <ChatComposer
-        {...createBaseComposerProps()}
-        canInterruptTurn={true}
-        canSteerTurn={true}
+        {...baseProps}
         composerText="Focus on the failing test."
+        composerUi={{
+          ...baseProps.composerUi,
+          action: {
+            ...baseProps.composerUi.action,
+            canInterruptTurn: true,
+            canSteerTurn: true,
+          },
+        }}
       />,
     );
 
@@ -124,10 +165,14 @@ describe("ChatComposer", () => {
   });
 
   it("renders pending image attachments and upload progress", () => {
+    const baseProps = createBaseComposerProps();
     render(
       <ChatComposer
-        {...createBaseComposerProps()}
-        isUploadingAttachments={true}
+        {...baseProps}
+        composerUi={{
+          ...baseProps.composerUi,
+          isUploadingAttachments: true,
+        }}
         pendingAttachments={[
           {
             id: "att_1",

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
   CodexFixtureSessionComposerProps,
+  CodexFixtureSessionComposerPropsForLoadingModel,
   CodexFixtureSessionComposerPropsForUnavailableModel,
   CodexFixtureSessionComposerPropsForNonImageCapableModel,
   CodexFixtureSessionComposerPropsUploadingImageAttachments,
@@ -50,23 +51,38 @@ export const ReadyToSend: Story = {
 export const SteeringTurn: Story = {
   args: {
     composerText: "Focus only on Storybook asset ownership.",
-    canInterruptTurn: true,
-    canSteerTurn: true,
+    composerUi: {
+      ...CodexFixtureSessionComposerProps.composerUi,
+      action: {
+        ...CodexFixtureSessionComposerProps.composerUi.action,
+        canInterruptTurn: true,
+        canSteerTurn: true,
+      },
+    },
   },
 };
 
 export const InterruptOnly: Story = {
   args: {
     composerText: "",
-    canInterruptTurn: true,
-    canSteerTurn: false,
+    composerUi: {
+      ...CodexFixtureSessionComposerProps.composerUi,
+      action: {
+        ...CodexFixtureSessionComposerProps.composerUi.action,
+        canInterruptTurn: true,
+        canSteerTurn: false,
+      },
+    },
   },
 };
 
 export const DisconnectedWithError: Story = {
   args: {
-    isConnected: false,
-    completedErrorMessage: "The session disconnected before the turn could be submitted.",
+    composerUi: {
+      ...CodexFixtureSessionComposerProps.composerUi,
+      completedErrorMessage: "The session disconnected before the turn could be submitted.",
+      isConnected: false,
+    },
   },
 };
 
@@ -91,5 +107,11 @@ export const NonImageCapableModelWithAttachments: Story = {
 export const UnavailableSelectedModelWithAttachments: Story = {
   args: {
     ...CodexFixtureSessionComposerPropsForUnavailableModel,
+  },
+};
+
+export const LoadingSelectedModelWithAttachments: Story = {
+  args: {
+    ...CodexFixtureSessionComposerPropsForLoadingModel,
   },
 };

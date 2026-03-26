@@ -7,18 +7,20 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
   buildAttachedImagePathsText,
+  buildModelSelectionLoadingMessage,
+  buildModelSelectionRequiredMessage,
   buildNonImageCapableModelWarningMessage,
   buildPromptWithAttachedImagePaths,
   buildTurnPrompt,
   buildUnavailableModelErrorMessage,
   getSandboxInstanceStatusQueryKey,
-  hasUnavailableSelectedModel,
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   isActiveResumeRequest,
   resolveActiveComposerModel,
-  resolveComposerNotice,
-  resolveTurnAttachments,
+  resolveComposerStatusMessage,
+  resolveComposerSubmitReadiness,
+  resolveTurnRepresentation,
   resolveSessionEntryPhase,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForEntryPhase,
@@ -187,31 +189,6 @@ describe("useSessionWorkbenchController", () => {
     ).toBeNull();
   });
 
-  it("flags unavailable selected models without treating defaults as implicit fallbacks", () => {
-    expect(
-      hasUnavailableSelectedModel({
-        selectedModel: "removed-model",
-        activeModel: null,
-      }),
-    ).toBe(true);
-
-    expect(
-      hasUnavailableSelectedModel({
-        selectedModel: null,
-        activeModel: {
-          id: "model_default",
-          model: "gpt-5.4",
-          displayName: "GPT-5.4",
-          hidden: false,
-          defaultReasoningEffort: null,
-          inputModalities: ["text", "image"],
-          supportsPersonality: false,
-          isDefault: true,
-        },
-      }),
-    ).toBe(false);
-  });
-
   it("formats uploaded attachment paths into prompt text", () => {
     expect(
       buildAttachedImagePathsText([
@@ -282,23 +259,34 @@ describe("useSessionWorkbenchController", () => {
     ];
 
     expect(
-      resolveTurnAttachments({
+      resolveTurnRepresentation({
+        prompt: "Please review these screenshots.",
+        attachmentPaths: ["/tmp/attachments/thread_123/image-1.png"],
         uploadedAttachments,
         supportsImageInspection: true,
       }),
     ).toEqual({
+      prompt: "Please review these screenshots.",
       submittedAttachments: uploadedAttachments,
-      displayAttachments: uploadedAttachments,
+      transcriptAttachments: uploadedAttachments,
     });
 
     expect(
-      resolveTurnAttachments({
+      resolveTurnRepresentation({
+        prompt: "Please review these screenshots.",
+        attachmentPaths: ["/tmp/attachments/thread_123/image-1.png"],
         uploadedAttachments,
         supportsImageInspection: false,
       }),
     ).toEqual({
+      prompt: [
+        "Please review these screenshots.",
+        "",
+        "Attached images:",
+        "- /tmp/attachments/thread_123/image-1.png",
+      ].join("\n"),
       submittedAttachments: [],
-      displayAttachments: uploadedAttachments,
+      transcriptAttachments: uploadedAttachments,
     });
   });
 
@@ -314,28 +302,106 @@ describe("useSessionWorkbenchController", () => {
     );
   });
 
-  it("does not report an unavailable model before the model list has loaded", () => {
-    expect(
-      resolveComposerNotice({
-        hasPendingAttachments: true,
-        hasUnavailableModel: true,
-        isModelListLoaded: false,
-        selectedModel: "gpt-legacy-preview",
-        supportsImages: true,
-        activeModel: null,
-      }),
-    ).toBeNull();
+  it("builds the missing-model and loading-model copy", () => {
+    expect(buildModelSelectionRequiredMessage()).toBe("Choose a model before sending a message.");
+    expect(buildModelSelectionLoadingMessage()).toBe(
+      "Wait for the selected model to finish loading before sending a message.",
+    );
   });
 
-  it("prefers the unavailable-model and non-image-capable composer notices only when no real composer error exists", () => {
+  it("resolves composer submission readiness from the selected model state", () => {
     expect(
-      resolveComposerNotice({
-        hasPendingAttachments: true,
-        hasUnavailableModel: true,
-        isModelListLoaded: true,
-        selectedModel: "gpt-legacy-preview",
-        supportsImages: true,
+      resolveComposerSubmitReadiness({
+        selectedModel: null,
         activeModel: null,
+        isModelListLoaded: false,
+      }),
+    ).toEqual({
+      status: "missing-model",
+      message: "Choose a model before sending a message.",
+    });
+
+    expect(
+      resolveComposerSubmitReadiness({
+        selectedModel: "gpt-5.4",
+        activeModel: null,
+        isModelListLoaded: false,
+      }),
+    ).toEqual({
+      status: "loading-model",
+      selectedModel: "gpt-5.4",
+      message: "Wait for the selected model to finish loading before sending a message.",
+    });
+
+    expect(
+      resolveComposerSubmitReadiness({
+        selectedModel: "gpt-5.4",
+        activeModel: {
+          id: "model_default",
+          model: "gpt-5.4",
+          displayName: "GPT-5.4",
+          hidden: false,
+          defaultReasoningEffort: null,
+          inputModalities: ["text", "image"],
+          supportsPersonality: false,
+          isDefault: true,
+        },
+        isModelListLoaded: true,
+      }),
+    ).toEqual({
+      status: "ready",
+      activeModel: {
+        id: "model_default",
+        model: "gpt-5.4",
+        displayName: "GPT-5.4",
+        hidden: false,
+        defaultReasoningEffort: null,
+        inputModalities: ["text", "image"],
+        supportsPersonality: false,
+        isDefault: true,
+      },
+    });
+
+    expect(
+      resolveComposerSubmitReadiness({
+        selectedModel: "gpt-legacy-preview",
+        activeModel: null,
+        isModelListLoaded: true,
+      }),
+    ).toEqual({
+      status: "unavailable-model",
+      selectedModel: "gpt-legacy-preview",
+      message:
+        "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
+    });
+  });
+
+  it("resolves composer status message precedence", () => {
+    expect(
+      resolveComposerStatusMessage({
+        composerErrorMessage: null,
+        hasPendingAttachments: true,
+        submitReadiness: {
+          status: "loading-model",
+          selectedModel: "gpt-legacy-preview",
+          message: "Wait for the selected model to finish loading before sending a message.",
+        },
+      }),
+    ).toEqual({
+      message: "Wait for the selected model to finish loading before sending a message.",
+      tone: "error",
+    });
+
+    expect(
+      resolveComposerStatusMessage({
+        composerErrorMessage: null,
+        hasPendingAttachments: true,
+        submitReadiness: {
+          status: "unavailable-model",
+          selectedModel: "gpt-legacy-preview",
+          message:
+            "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
+        },
       }),
     ).toEqual({
       message:
@@ -344,27 +410,50 @@ describe("useSessionWorkbenchController", () => {
     });
 
     expect(
-      resolveComposerNotice({
+      resolveComposerStatusMessage({
+        composerErrorMessage: null,
         hasPendingAttachments: true,
-        hasUnavailableModel: false,
-        isModelListLoaded: true,
-        selectedModel: "gpt-5.3-codex-spark",
-        supportsImages: false,
-        activeModel: {
-          id: "text_model",
-          model: "gpt-5.3-codex-spark",
-          displayName: "GPT-5.3 Codex Spark",
-          hidden: false,
-          defaultReasoningEffort: null,
-          inputModalities: ["text"],
-          supportsPersonality: false,
-          isDefault: false,
+        submitReadiness: {
+          status: "ready",
+          activeModel: {
+            id: "text_model",
+            model: "gpt-5.3-codex-spark",
+            displayName: "GPT-5.3 Codex Spark",
+            hidden: false,
+            defaultReasoningEffort: null,
+            inputModalities: ["text"],
+            supportsPersonality: false,
+            isDefault: false,
+          },
         },
       }),
     ).toEqual({
       message:
         "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
       tone: "warning",
+    });
+
+    expect(
+      resolveComposerStatusMessage({
+        composerErrorMessage: "That file is not a supported PNG, JPEG, WebP, or GIF image.",
+        hasPendingAttachments: true,
+        submitReadiness: {
+          status: "ready",
+          activeModel: {
+            id: "image_model",
+            model: "gpt-5.4",
+            displayName: "GPT-5.4",
+            hidden: false,
+            defaultReasoningEffort: null,
+            inputModalities: ["text", "image"],
+            supportsPersonality: false,
+            isDefault: true,
+          },
+        },
+      }),
+    ).toEqual({
+      message: "That file is not a supported PNG, JPEG, WebP, or GIF image.",
+      tone: "error",
     });
   });
 
@@ -393,7 +482,7 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.startErrorMessage).toBeNull();
     expect(result.current.workbench.sandboxFailureMessage).toBeNull();
     expect(result.current.conversationPane.chatState.entries).toEqual([]);
-    expect(result.current.conversationPane.composerProps.isConnected).toBe(false);
+    expect(result.current.conversationPane.composerProps.composerUi.isConnected).toBe(false);
     expect(result.current.conversationPane.composerProps.modelOptions).toEqual([]);
     expect(result.current.conversationPane.serverRequestsState.pendingServerRequests).toEqual([]);
   });

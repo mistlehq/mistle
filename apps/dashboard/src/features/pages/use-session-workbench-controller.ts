@@ -49,6 +49,9 @@ const NonImageCapableModelWarningMessageSuffix =
   " is not image-capable. Images can remain attached, but the model will not inspect them.";
 const UnavailableModelErrorMessageSuffix =
   " is no longer available. Switch to another model to continue.";
+const ModelSelectionRequiredMessage = "Choose a model before sending a message.";
+const ModelSelectionLoadingMessage =
+  "Wait for the selected model to finish loading before sending a message.";
 
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
 const AutomationSessionPreparationTimeoutMs = 30_000;
@@ -132,13 +135,6 @@ export function supportsImageInspection(model: CodexModelSummary | null): boolea
   return model?.inputModalities.includes("image") ?? false;
 }
 
-export function hasUnavailableSelectedModel(input: {
-  selectedModel: string | null;
-  activeModel: CodexModelSummary | null;
-}): boolean {
-  return input.selectedModel !== null && input.activeModel === null;
-}
-
 export function buildUnavailableModelErrorMessage(modelName: string): string {
   return `Model ${modelName}${UnavailableModelErrorMessageSuffix}`;
 }
@@ -146,6 +142,39 @@ export function buildUnavailableModelErrorMessage(modelName: string): string {
 export function buildNonImageCapableModelWarningMessage(modelName: string): string {
   return `Model ${modelName}${NonImageCapableModelWarningMessageSuffix}`;
 }
+
+export function buildModelSelectionRequiredMessage(): string {
+  return ModelSelectionRequiredMessage;
+}
+
+export function buildModelSelectionLoadingMessage(): string {
+  return ModelSelectionLoadingMessage;
+}
+
+export type ComposerSubmitReadiness =
+  | {
+      status: "ready";
+      activeModel: CodexModelSummary;
+    }
+  | {
+      status: "missing-model";
+      message: string;
+    }
+  | {
+      status: "loading-model";
+      selectedModel: string;
+      message: string;
+    }
+  | {
+      status: "unavailable-model";
+      selectedModel: string;
+      message: string;
+    };
+
+export type ComposerStatusMessage = {
+  message: string;
+  tone: "error" | "warning";
+};
 
 export function buildAttachedImagePathsText(paths: readonly string[]): string {
   if (paths.length === 0) {
@@ -188,40 +217,85 @@ export function buildTurnPrompt(input: {
   });
 }
 
-export function resolveTurnAttachments(input: {
+export function resolveTurnRepresentation(input: {
+  prompt: string;
+  attachmentPaths: readonly string[];
   uploadedAttachments: readonly CodexTurnInputLocalImageItem[];
   supportsImageInspection: boolean;
 }): {
+  prompt: string;
   submittedAttachments: readonly CodexTurnInputLocalImageItem[];
-  displayAttachments: readonly CodexTurnInputLocalImageItem[];
+  transcriptAttachments: readonly CodexTurnInputLocalImageItem[];
 } {
   return {
+    prompt: buildTurnPrompt({
+      prompt: input.prompt,
+      attachmentPaths: input.attachmentPaths,
+      supportsImageInspection: input.supportsImageInspection,
+    }),
     submittedAttachments: input.supportsImageInspection ? input.uploadedAttachments : [],
-    displayAttachments: input.uploadedAttachments,
+    transcriptAttachments: input.uploadedAttachments,
   };
 }
 
-export function resolveComposerNotice(input: {
-  hasPendingAttachments: boolean;
-  hasUnavailableModel: boolean;
+export function resolveComposerSubmitReadiness(input: {
   isModelListLoaded: boolean;
   selectedModel: string | null;
-  supportsImages: boolean;
   activeModel: CodexModelSummary | null;
-}): {
-  message: string;
-  tone: "error" | "warning";
-} | null {
-  if (input.hasUnavailableModel && input.isModelListLoaded && input.selectedModel !== null) {
+}): ComposerSubmitReadiness {
+  if (input.selectedModel === null) {
     return {
-      message: buildUnavailableModelErrorMessage(input.selectedModel),
+      status: "missing-model",
+      message: buildModelSelectionRequiredMessage(),
+    };
+  }
+
+  if (input.activeModel !== null) {
+    return {
+      status: "ready",
+      activeModel: input.activeModel,
+    };
+  }
+
+  if (!input.isModelListLoaded) {
+    return {
+      status: "loading-model",
+      selectedModel: input.selectedModel,
+      message: buildModelSelectionLoadingMessage(),
+    };
+  }
+
+  return {
+    status: "unavailable-model",
+    selectedModel: input.selectedModel,
+    message: buildUnavailableModelErrorMessage(input.selectedModel),
+  };
+}
+
+export function resolveComposerStatusMessage(input: {
+  composerErrorMessage: string | null;
+  hasPendingAttachments: boolean;
+  submitReadiness: ComposerSubmitReadiness;
+}): ComposerStatusMessage | null {
+  if (input.composerErrorMessage !== null) {
+    return {
+      message: input.composerErrorMessage,
       tone: "error",
     };
   }
 
-  if (input.hasPendingAttachments && input.activeModel !== null && !input.supportsImages) {
+  if (input.submitReadiness.status !== "ready") {
     return {
-      message: buildNonImageCapableModelWarningMessage(input.activeModel.displayName),
+      message: input.submitReadiness.message,
+      tone: "error",
+    };
+  }
+
+  if (input.hasPendingAttachments && !supportsImageInspection(input.submitReadiness.activeModel)) {
+    return {
+      message: buildNonImageCapableModelWarningMessage(
+        input.submitReadiness.activeModel.displayName,
+      ),
       tone: "warning",
     };
   }
@@ -304,20 +378,22 @@ type SessionWorkbenchState = {
 type SessionConversationPaneState = {
   chatState: ReturnType<typeof useCodexSessionState>["chat"]["chatState"];
   composerProps: {
-    canInterruptTurn: boolean;
-    canSteerTurn: boolean;
-    completedErrorMessage: string | null;
-    composerStatusMessage: {
-      message: string;
-      tone: "error" | "warning";
-    } | null;
     composerText: string;
-    isConnected: boolean;
-    isInterruptingTurn: boolean;
-    isStartingTurn: boolean;
-    isSteeringTurn: boolean;
-    isUploadingAttachments: boolean;
-    isUpdatingComposerConfig: boolean;
+    composerUi: {
+      action: {
+        canInterruptTurn: boolean;
+        canSteerTurn: boolean;
+        canSubmitTurns: boolean;
+        isInterruptingTurn: boolean;
+        isStartingTurn: boolean;
+        isSteeringTurn: boolean;
+      };
+      completedErrorMessage: string | null;
+      isConnected: boolean;
+      isUpdatingConfig: boolean;
+      isUploadingAttachments: boolean;
+      statusMessage: ComposerStatusMessage | null;
+    };
     modelOptions: Array<{
       value: string;
       label: string;
@@ -874,26 +950,17 @@ export function useSessionWorkbenchController(input: {
     availableModels: admin.availableModels,
     selectedModel: activeComposerConfig.model,
   });
-  const hasUnavailableComposerModel = hasUnavailableSelectedModel({
+  const isComposerModelListLoaded = admin.hasLoadedModels;
+  const composerSubmitReadiness = resolveComposerSubmitReadiness({
     selectedModel: activeComposerConfig.model,
     activeModel: activeComposerModel,
+    isModelListLoaded: isComposerModelListLoaded,
   });
-  const activeComposerModelSupportsImages = supportsImageInspection(activeComposerModel);
-  const isComposerModelListLoaded = admin.hasLoadedModels;
-  const composerNotice =
-    composerErrorMessage === null
-      ? resolveComposerNotice({
-          hasPendingAttachments: pendingComposerAttachments.length > 0,
-          hasUnavailableModel: hasUnavailableComposerModel,
-          isModelListLoaded: isComposerModelListLoaded,
-          selectedModel: activeComposerConfig.model,
-          supportsImages: activeComposerModelSupportsImages,
-          activeModel: activeComposerModel,
-        })
-      : {
-          message: composerErrorMessage,
-          tone: "error" as const,
-        };
+  const composerStatusMessage = resolveComposerStatusMessage({
+    composerErrorMessage,
+    hasPendingAttachments: pendingComposerAttachments.length > 0,
+    submitReadiness: composerSubmitReadiness,
+  });
 
   const addPendingComposerFiles = useCallback((files: readonly File[]): void => {
     const nextAttachments = files.flatMap((file) => {
@@ -942,12 +1009,8 @@ export function useSessionWorkbenchController(input: {
         return;
       }
 
-      if (
-        hasUnavailableComposerModel &&
-        isComposerModelListLoaded &&
-        activeComposerConfig.model !== null
-      ) {
-        setComposerErrorMessage(buildUnavailableModelErrorMessage(activeComposerConfig.model));
+      if (composerSubmitReadiness.status !== "ready") {
+        setComposerErrorMessage(composerSubmitReadiness.message);
         return;
       }
 
@@ -993,28 +1056,25 @@ export function useSessionWorkbenchController(input: {
         }
       }
 
-      const promptWithAttachedImages = buildTurnPrompt({
+      const turnRepresentation = resolveTurnRepresentation({
         prompt: action.prompt,
         attachmentPaths: uploadedAttachmentPaths,
-        supportsImageInspection: activeComposerModelSupportsImages,
-      });
-      const turnAttachments = resolveTurnAttachments({
         uploadedAttachments,
-        supportsImageInspection: activeComposerModelSupportsImages,
+        supportsImageInspection: supportsImageInspection(composerSubmitReadiness.activeModel),
       });
 
       try {
         if (action.type === "steer_turn") {
           await steerTurn({
-            prompt: promptWithAttachedImages,
-            attachments: turnAttachments.submittedAttachments,
-            displayAttachments: turnAttachments.displayAttachments,
+            prompt: turnRepresentation.prompt,
+            submittedAttachments: turnRepresentation.submittedAttachments,
+            transcriptAttachments: turnRepresentation.transcriptAttachments,
           });
         } else {
           await startTurn({
-            prompt: promptWithAttachedImages,
-            attachments: turnAttachments.submittedAttachments,
-            displayAttachments: turnAttachments.displayAttachments,
+            prompt: turnRepresentation.prompt,
+            submittedAttachments: turnRepresentation.submittedAttachments,
+            transcriptAttachments: turnRepresentation.transcriptAttachments,
           });
         }
       } catch (error) {
@@ -1037,9 +1097,8 @@ export function useSessionWorkbenchController(input: {
     hasActiveTurn,
     interruptTurn,
     activeComposerConfig.model,
-    activeComposerModelSupportsImages,
-    hasUnavailableComposerModel,
     isComposerModelListLoaded,
+    composerSubmitReadiness,
     pendingComposerAttachments,
     startTurn,
     steerTurn,
@@ -1146,21 +1205,26 @@ export function useSessionWorkbenchController(input: {
     conversationPane: {
       chatState: chat.chatState,
       composerProps: {
-        canInterruptTurn: chat.canInterruptTurn,
-        canSteerTurn: chat.canSteerTurn,
-        completedErrorMessage: chat.chatState.completedErrorMessage,
-        composerStatusMessage: composerNotice,
         composerText,
-        isConnected: lifecycle.connectedSession !== null,
-        isInterruptingTurn: chat.isInterruptingTurn,
-        isStartingTurn: chat.isStartingTurn,
-        isSteeringTurn: chat.isSteeringTurn,
-        isUploadingAttachments,
-        isUpdatingComposerConfig:
-          admin.isBatchWritingConfig ||
-          admin.isLoadingModels ||
-          admin.isReadingConfig ||
-          admin.isWritingConfigValue,
+        composerUi: {
+          action: {
+            canInterruptTurn: chat.canInterruptTurn,
+            canSteerTurn: chat.canSteerTurn,
+            canSubmitTurns: composerSubmitReadiness.status === "ready",
+            isInterruptingTurn: chat.isInterruptingTurn,
+            isStartingTurn: chat.isStartingTurn,
+            isSteeringTurn: chat.isSteeringTurn,
+          },
+          completedErrorMessage: chat.chatState.completedErrorMessage,
+          isConnected: lifecycle.connectedSession !== null,
+          isUpdatingConfig:
+            admin.isBatchWritingConfig ||
+            admin.isLoadingModels ||
+            admin.isReadingConfig ||
+            admin.isWritingConfigValue,
+          isUploadingAttachments,
+          statusMessage: composerStatusMessage,
+        },
         modelOptions: composerModelOptions,
         onComposerTextChange: handleComposerTextChange,
         onModelChange: setComposerModel,

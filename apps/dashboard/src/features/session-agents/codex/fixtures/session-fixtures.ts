@@ -55,19 +55,24 @@ export const CodexFixtureSessionServerRequests: readonly CodexApprovalRequestEnt
 
 export const CodexFixtureSessionComposerProps: SessionConversationComposerProps = {
   composerText: "Focus on dashboard asset ownership next.",
-  composerStatusMessage: null,
+  composerUi: {
+    action: {
+      canInterruptTurn: false,
+      canSteerTurn: false,
+      canSubmitTurns: true,
+      isInterruptingTurn: false,
+      isStartingTurn: false,
+      isSteeringTurn: false,
+    },
+    completedErrorMessage: null,
+    isConnected: true,
+    isUpdatingConfig: false,
+    isUploadingAttachments: false,
+    statusMessage: null,
+  },
   modelOptions: CodexFixtureSessionModelOptions,
   selectedModel: "gpt-5.4",
   selectedReasoningEffort: "medium",
-  isConnected: true,
-  isStartingTurn: false,
-  isSteeringTurn: false,
-  isInterruptingTurn: false,
-  isUploadingAttachments: false,
-  isUpdatingComposerConfig: false,
-  canInterruptTurn: false,
-  canSteerTurn: false,
-  completedErrorMessage: null,
   onComposerTextChange: function onComposerTextChange() {},
   onModelChange: function onModelChange() {},
   onPendingImageFilesAdded: function onPendingImageFilesAdded() {},
@@ -90,16 +95,22 @@ export const CodexFixtureSessionComposerPropsWithPendingImageAttachments: Sessio
 export const CodexFixtureSessionComposerPropsUploadingImageAttachments: SessionConversationComposerProps =
   {
     ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
-    isUploadingAttachments: true,
+    composerUi: {
+      ...CodexFixtureSessionComposerPropsWithPendingImageAttachments.composerUi,
+      isUploadingAttachments: true,
+    },
   };
 
 export const CodexFixtureSessionComposerPropsForNonImageCapableModel: SessionConversationComposerProps =
   {
     ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
-    composerStatusMessage: {
-      message:
-        "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
-      tone: "warning",
+    composerUi: {
+      ...CodexFixtureSessionComposerPropsWithPendingImageAttachments.composerUi,
+      statusMessage: {
+        message:
+          "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
+        tone: "warning",
+      },
     },
     selectedModel: "gpt-5.3-codex-spark",
   };
@@ -107,10 +118,29 @@ export const CodexFixtureSessionComposerPropsForNonImageCapableModel: SessionCon
 export const CodexFixtureSessionComposerPropsForUnavailableModel: SessionConversationComposerProps =
   {
     ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
-    composerStatusMessage: {
-      message:
-        "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
-      tone: "error",
+    composerUi: {
+      ...CodexFixtureSessionComposerPropsWithPendingImageAttachments.composerUi,
+      statusMessage: {
+        message:
+          "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
+        tone: "error",
+      },
     },
     selectedModel: "gpt-legacy-preview",
   };
+
+export const CodexFixtureSessionComposerPropsForLoadingModel: SessionConversationComposerProps = {
+  ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+  composerUi: {
+    ...CodexFixtureSessionComposerPropsWithPendingImageAttachments.composerUi,
+    action: {
+      ...CodexFixtureSessionComposerPropsWithPendingImageAttachments.composerUi.action,
+      canSubmitTurns: false,
+    },
+    statusMessage: {
+      message: "Wait for the selected model to finish loading before sending a message.",
+      tone: "error",
+    },
+  },
+  selectedModel: "gpt-5.4",
+};

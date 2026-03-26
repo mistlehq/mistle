@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { noop } from "../chat/components/chat-story-support.js";
 import {
+  CodexFixtureSessionComposerPropsForLoadingModel,
   CodexFixtureSessionComposerPropsForNonImageCapableModel,
   CodexFixtureSessionComposerPropsForUnavailableModel,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
@@ -80,6 +81,14 @@ export const WithUnavailableModelAlert: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
       composerProps: CodexFixtureSessionComposerPropsForUnavailableModel,
+    }),
+  },
+};
+
+export const WithLoadingSelectedModelAlert: Story = {
+  args: {
+    primaryBottomPanel: createStorySessionBottomPanel({
+      composerProps: CodexFixtureSessionComposerPropsForLoadingModel,
     }),
   },
 };

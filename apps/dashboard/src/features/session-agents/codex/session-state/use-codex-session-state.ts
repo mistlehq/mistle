@@ -114,14 +114,14 @@ type CodexSessionChatState = {
   canSteerTurn: boolean;
   startTurn: (input: {
     prompt: string;
-    attachments?: readonly CodexTurnInputLocalImageItem[];
-    displayAttachments?: readonly CodexTurnInputLocalImageItem[];
+    submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
+    transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
   }) => Promise<void>;
   interruptTurn: () => void;
   steerTurn: (input: {
     prompt: string;
-    attachments?: readonly CodexTurnInputLocalImageItem[];
-    displayAttachments?: readonly CodexTurnInputLocalImageItem[];
+    submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
+    transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
   }) => Promise<void>;
   reloadChat: () => void;
 };
