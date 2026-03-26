@@ -18,7 +18,18 @@ function assertSafeDatabaseIdentifier(identifier: string, label: string): string
 }
 
 function trimIdentifierBoundaryUnderscores(identifier: string): string {
-  return identifier.replace(/^_+|_+$/gu, "");
+  let startIndex = 0;
+  let endIndex = identifier.length;
+
+  while (startIndex < endIndex && identifier[startIndex] === "_") {
+    startIndex += 1;
+  }
+
+  while (endIndex > startIndex && identifier[endIndex - 1] === "_") {
+    endIndex -= 1;
+  }
+
+  return identifier.slice(startIndex, endIndex);
 }
 
 function normalizeDatabasePrefix(prefix: string): string {
