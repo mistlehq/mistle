@@ -130,4 +130,26 @@ trust_level = "trusted"
       }),
     ).toThrow(IntegrationCompilerError);
   });
+
+  it("fails when the configured path would mutate an object prototype", () => {
+    expect(() =>
+      applyMcpConfigToRuntimeClients({
+        runtimeClients: [
+          createRuntimeClient({
+            clientId: "claude-code",
+            fileId: "claude_config",
+            path: "/home/sandbox/.claude/settings.json",
+            content: '{\n  "theme": "dark"\n}\n',
+          }),
+        ],
+        mcpConfig: {
+          clientId: "claude-code",
+          fileId: "claude_config",
+          format: "json",
+          path: ["__proto__", "mcpServers"],
+        },
+        mcpServers: [createLinearMcpServer()],
+      }),
+    ).toThrow(IntegrationCompilerError);
+  });
 });

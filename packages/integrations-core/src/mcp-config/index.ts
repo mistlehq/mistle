@@ -1,6 +1,7 @@
 import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
 
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
+import { assertSafeObjectPath } from "../object-path.js";
 import type {
   CompiledRuntimeClient,
   IntegrationMcpConfig,
@@ -120,6 +121,7 @@ function replaceJsonMcpConfig(input: {
   mcpConfig: IntegrationMcpConfig;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): string {
+  const invalidPathMessage = `MCP config path '${input.mcpConfig.path.join(".")}' is not writable in '${input.mcpConfig.fileId}'.`;
   let parsedContent: unknown;
   try {
     parsedContent = JSON.parse(input.content);
@@ -135,6 +137,11 @@ function replaceJsonMcpConfig(input: {
     parsedContent,
     `MCP config target '${input.mcpConfig.fileId}' must contain a JSON object.`,
   );
+  try {
+    assertSafeObjectPath(input.mcpConfig.path, invalidPathMessage);
+  } catch {
+    throw new IntegrationCompilerError(CompilerErrorCodes.MCP_CONFLICT, invalidPathMessage);
+  }
 
   setObjectValueAtPath({
     root,
@@ -143,7 +150,7 @@ function replaceJsonMcpConfig(input: {
       mcpServers: input.mcpServers,
       format: input.mcpConfig.format,
     }),
-    invalidPathMessage: `MCP config path '${input.mcpConfig.path.join(".")}' is not writable in '${input.mcpConfig.fileId}'.`,
+    invalidPathMessage,
   });
 
   return `${JSON.stringify(root, null, 2)}\n`;
@@ -154,6 +161,7 @@ function replaceTomlMcpConfig(input: {
   mcpConfig: IntegrationMcpConfig;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): string {
+  const invalidPathMessage = `MCP config path '${input.mcpConfig.path.join(".")}' is not writable in '${input.mcpConfig.fileId}'.`;
   let parsedContent: unknown;
   try {
     parsedContent = parseToml(input.content);
@@ -169,6 +177,11 @@ function replaceTomlMcpConfig(input: {
     parsedContent,
     `MCP config target '${input.mcpConfig.fileId}' must contain a TOML table.`,
   );
+  try {
+    assertSafeObjectPath(input.mcpConfig.path, invalidPathMessage);
+  } catch {
+    throw new IntegrationCompilerError(CompilerErrorCodes.MCP_CONFLICT, invalidPathMessage);
+  }
 
   setObjectValueAtPath({
     root,
@@ -177,7 +190,7 @@ function replaceTomlMcpConfig(input: {
       mcpServers: input.mcpServers,
       format: input.mcpConfig.format,
     }),
-    invalidPathMessage: `MCP config path '${input.mcpConfig.path.join(".")}' is not writable in '${input.mcpConfig.fileId}'.`,
+    invalidPathMessage,
   });
 
   return stringifyToml(root);
