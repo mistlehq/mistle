@@ -3,10 +3,7 @@ import type {
   WebhookAutomationFormValueKey,
   WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
-import {
-  buildWebhookAutomationInputTemplate,
-  parseWebhookAutomationInputTemplate,
-} from "./webhook-automation-input-template.js";
+import { buildDefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   extractWebhookAutomationTriggerParameterValues,
@@ -72,12 +69,6 @@ function parseOptionalEventTypes(value: readonly string[]): string[] | null {
   return items.length === 0 ? null : items;
 }
 
-function containsLiquidSyntax(value: string): boolean {
-  return (
-    value.includes("{{") || value.includes("}}") || value.includes("{%") || value.includes("%}")
-  );
-}
-
 export function toWebhookAutomationFormValues(
   automation: WebhookAutomation | null,
   eventOptions: readonly WebhookAutomationEventOption[] = [],
@@ -87,18 +78,11 @@ export function toWebhookAutomationFormValues(
       name: "",
       sandboxProfileId: "",
       enabled: true,
-      instructions: "",
+      inputTemplate: buildDefaultWebhookAutomationInputTemplate(),
       conversationKeyTemplate: "",
       triggerIds: [],
       triggerParameterValues: {},
     };
-  }
-
-  const parsedInputTemplate = parseWebhookAutomationInputTemplate({
-    template: automation.inputTemplate,
-  });
-  if (!parsedInputTemplate.ok) {
-    throw new Error(parsedInputTemplate.reason);
   }
 
   const selectedTriggerIds = (automation.eventTypes ?? []).map((eventType) =>
@@ -117,7 +101,7 @@ export function toWebhookAutomationFormValues(
     name: automation.name,
     sandboxProfileId: automation.target.sandboxProfileId,
     enabled: automation.enabled,
-    instructions: parsedInputTemplate.instructions,
+    inputTemplate: automation.inputTemplate,
     conversationKeyTemplate: automation.conversationKeyTemplate,
     triggerIds: selectedTriggerIds,
     triggerParameterValues: extractedTriggerParameterValues.triggerParameterValues,
@@ -154,10 +138,8 @@ export function validateWebhookAutomationFormValues(
     errors.sandboxProfileId = "Select a sandbox profile.";
   }
 
-  if (values.instructions.trim().length === 0) {
-    errors.instructions = "Instructions are required.";
-  } else if (containsLiquidSyntax(values.instructions)) {
-    errors.instructions = "Instructions must be plain text and cannot include Liquid syntax.";
+  if (values.inputTemplate.trim().length === 0) {
+    errors.inputTemplate = "Input template is required.";
   }
 
   if (values.conversationKeyTemplate.trim().length === 0) {
@@ -237,9 +219,7 @@ export function toCreateWebhookAutomationPayload(
     name: values.name.trim(),
     enabled: values.enabled,
     integrationConnectionId: resolvedSubmissionShape.integrationConnectionId,
-    inputTemplate: buildWebhookAutomationInputTemplate({
-      instructions: values.instructions,
-    }),
+    inputTemplate: values.inputTemplate.trim(),
     conversationKeyTemplate: values.conversationKeyTemplate,
     idempotencyKeyTemplate: null,
     eventTypes: resolvedSubmissionShape.eventTypes,
@@ -263,9 +243,7 @@ export function toUpdateWebhookAutomationPayload(
     name: values.name.trim(),
     enabled: values.enabled,
     integrationConnectionId: resolvedSubmissionShape.integrationConnectionId,
-    inputTemplate: buildWebhookAutomationInputTemplate({
-      instructions: values.instructions,
-    }),
+    inputTemplate: values.inputTemplate.trim(),
     conversationKeyTemplate: values.conversationKeyTemplate,
     idempotencyKeyTemplate: null,
     eventTypes: resolvedSubmissionShape.eventTypes,

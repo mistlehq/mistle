@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -10,6 +10,7 @@ import {
   type WebhookAutomationFormOption,
   type WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
+import { buildDefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
@@ -55,7 +56,7 @@ const FormValues: WebhookAutomationFormValues = {
   name: "Repo triage",
   sandboxProfileId: RepoMaintainerSandboxProfileId,
   enabled: true,
-  instructions: "Please review the changes made.",
+  inputTemplate: "Please review the changes made.\n\nPayload:\n{{payload}}",
   conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
   triggerIds: [
     createWebhookAutomationTriggerId({
@@ -157,26 +158,26 @@ describe("WebhookAutomationForm", () => {
     ).toBe(false);
   });
 
-  it("shows the instructions editor copy", () => {
+  it("shows the input template editor copy", () => {
     renderForm("create");
 
-    expect(screen.getByLabelText("Agent Instructions")).toBeDefined();
+    expect(screen.getByLabelText("Input Template")).toBeDefined();
     expect(
-      screen.getAllByText(
-        "These instructions are sent together with the webhook payload and event type.",
-      ).length,
+      screen.getAllByText((content) => content.includes("Use Liquid templates.")).length,
     ).toBeGreaterThan(0);
+    expect(screen.getAllByText("{{webhookEvent.eventType}}").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("{{payload}}").length).toBeGreaterThan(0);
     expect(screen.queryByText("Basics")).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Agent Instructions" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Input Template" })).toBeNull();
   });
 
-  it("renders triggers before instructions", () => {
+  it("renders triggers before input template", () => {
     const { container } = renderFormWithOptions({
       mode: "create",
     });
 
     const [triggersHeading] = screen.getAllByRole("heading", { name: "Triggers" });
-    const instructionsField = screen.getByLabelText("Agent Instructions");
+    const inputTemplateField = screen.getByLabelText("Input Template");
 
     if (triggersHeading === undefined) {
       throw new Error("Expected triggers heading to be rendered.");
@@ -184,13 +185,76 @@ describe("WebhookAutomationForm", () => {
 
     expect(
       Boolean(
-        triggersHeading.compareDocumentPosition(instructionsField) &
+        triggersHeading.compareDocumentPosition(inputTemplateField) &
         Node.DOCUMENT_POSITION_FOLLOWING,
       ),
     ).toBe(true);
     expect(container.textContent?.indexOf("Triggers")).toBeLessThan(
-      container.textContent?.indexOf("Agent Instructions") ?? Number.POSITIVE_INFINITY,
+      container.textContent?.indexOf("Input Template") ?? Number.POSITIVE_INFINITY,
     );
+  });
+
+  it("disables reset when the default template is already shown", () => {
+    renderFormWithOptions({
+      mode: "create",
+      values: {
+        ...FormValues,
+        inputTemplate: buildDefaultWebhookAutomationInputTemplate(),
+      },
+    });
+
+    const resetButtons = screen.getAllByRole("button", { name: "Reset to default" });
+    const resetButton = resetButtons.at(-1);
+
+    if (resetButton === undefined) {
+      throw new Error("Expected reset button to be rendered.");
+    }
+
+    expect(resetButton.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("resets the template field to the default", () => {
+    let nextInputTemplate: string | null = null;
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WebhookAutomationForm
+          connectionOptions={ConnectionOptions}
+          fieldErrors={{}}
+          formError={null}
+          isDeleting={false}
+          isSaving={false}
+          mode="create"
+          onDelete={null}
+          onSubmit={() => {}}
+          onValueChange={(key, value) => {
+            if (key !== "inputTemplate") {
+              return;
+            }
+
+            if (typeof value !== "string") {
+              throw new Error("Expected input template reset value to be a string.");
+            }
+
+            nextInputTemplate = value;
+          }}
+          sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledReason={null}
+          values={FormValues}
+          webhookEventOptions={WebhookEventOptions}
+        />
+      </QueryClientProvider>,
+    );
+
+    const resetButtons = screen.getAllByRole("button", { name: "Reset to default" });
+    const resetButton = resetButtons.at(-1);
+
+    if (resetButton === undefined) {
+      throw new Error("Expected reset button to be rendered.");
+    }
+
+    fireEvent.click(resetButton);
+    expect(nextInputTemplate).toBe(buildDefaultWebhookAutomationInputTemplate());
   });
 
   it("renders a fixed create title and a separate automation name field", () => {

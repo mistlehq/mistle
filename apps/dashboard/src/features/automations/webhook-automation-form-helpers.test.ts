@@ -7,7 +7,7 @@ import {
   validateWebhookAutomationFormValues,
 } from "./webhook-automation-form-helpers.js";
 import type { WebhookAutomationFormValues } from "./webhook-automation-form.js";
-import { buildWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
+import { buildDefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
@@ -92,9 +92,7 @@ const SampleAutomation: WebhookAutomation = {
   name: "GitHub pushes to repo triage",
   enabled: true,
   integrationConnectionId: GitHubConnectionId,
-  inputTemplate: buildWebhookAutomationInputTemplate({
-    instructions: "Please write a review of the changes made.",
-  }),
+  inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
   conversationKeyTemplate: "{{event.repository.id}}",
   idempotencyKeyTemplate: null,
   eventTypes: ["push", "pull_request"],
@@ -116,7 +114,7 @@ const BaseFormValues: WebhookAutomationFormValues = {
   name: "Pull request routing",
   sandboxProfileId: "sbp_repo",
   enabled: true,
-  instructions: "Please write a review of the changes made.",
+  inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
   conversationKeyTemplate: "{{event.id}}",
   triggerIds: [PullRequestOpenedTriggerId],
   triggerParameterValues: {},
@@ -128,7 +126,7 @@ describe("toWebhookAutomationFormValues", () => {
       name: "",
       sandboxProfileId: "",
       enabled: true,
-      instructions: "",
+      inputTemplate: buildDefaultWebhookAutomationInputTemplate(),
       conversationKeyTemplate: "",
       triggerIds: [],
       triggerParameterValues: {},
@@ -140,7 +138,7 @@ describe("toWebhookAutomationFormValues", () => {
       name: "GitHub pushes to repo triage",
       sandboxProfileId: "sbp_repo",
       enabled: true,
-      instructions: "Please write a review of the changes made.",
+      inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       conversationKeyTemplate: "{{event.repository.id}}",
       triggerIds: [
         createWebhookAutomationTriggerId({
@@ -156,15 +154,15 @@ describe("toWebhookAutomationFormValues", () => {
     });
   });
 
-  it("rejects non-canonical stored templates", () => {
-    expect(() =>
+  it("accepts custom stored templates", () => {
+    expect(
       toWebhookAutomationFormValues({
         ...SampleAutomation,
         inputTemplate: "Handle {{payload.comment.body}}",
       }),
-    ).toThrow(
-      "This automation uses a custom input template that cannot be edited in the instructions editor.",
-    );
+    ).toMatchObject({
+      inputTemplate: "Handle {{payload.comment.body}}",
+    });
   });
 
   it("hydrates supported trigger parameters out of payload filters", () => {
@@ -223,7 +221,7 @@ describe("validateWebhookAutomationFormValues", () => {
           name: "",
           sandboxProfileId: "",
           enabled: true,
-          instructions: "",
+          inputTemplate: "",
           conversationKeyTemplate: "",
           triggerIds: [],
           triggerParameterValues: {},
@@ -234,22 +232,8 @@ describe("validateWebhookAutomationFormValues", () => {
       name: "Automation name is required.",
       triggerIds: "Select at least one trigger.",
       sandboxProfileId: "Select a sandbox profile.",
-      instructions: "Instructions are required.",
+      inputTemplate: "Input template is required.",
       conversationKeyTemplate: "Conversation key template is required.",
-    });
-  });
-
-  it("rejects liquid syntax in instructions", () => {
-    expect(
-      validateWebhookAutomationFormValues(
-        {
-          ...BaseFormValues,
-          instructions: "Review {{payload.comment.body}}",
-        },
-        GitHubEventOptions,
-      ),
-    ).toMatchObject({
-      instructions: "Instructions must be plain text and cannot include Liquid syntax.",
     });
   });
 
@@ -316,9 +300,7 @@ describe("automation payload transforms", () => {
       name: "GitHub pushes to repo triage",
       enabled: true,
       integrationConnectionId: GitHubConnectionId,
-      inputTemplate: buildWebhookAutomationInputTemplate({
-        instructions: "Please write a review of the changes made.",
-      }),
+      inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.pull_request.opened", "github.issue_comment.created"],
@@ -344,9 +326,7 @@ describe("automation payload transforms", () => {
       name: "Stripe payouts incident intake",
       enabled: false,
       integrationConnectionId: GitHubConnectionId,
-      inputTemplate: buildWebhookAutomationInputTemplate({
-        instructions: "Please write a review of the changes made.",
-      }),
+      inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.pull_request.opened"],
@@ -375,9 +355,7 @@ describe("automation payload transforms", () => {
       name: "Pull request routing",
       enabled: true,
       integrationConnectionId: GitHubConnectionId,
-      inputTemplate: buildWebhookAutomationInputTemplate({
-        instructions: "Please write a review of the changes made.",
-      }),
+      inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.pull_request.opened"],
@@ -420,9 +398,7 @@ describe("automation payload transforms", () => {
       name: "Pull request routing",
       enabled: true,
       integrationConnectionId: GitHubConnectionId,
-      inputTemplate: buildWebhookAutomationInputTemplate({
-        instructions: "Please write a review of the changes made.",
-      }),
+      inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.issue_comment.created"],

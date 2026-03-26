@@ -21,6 +21,7 @@ import { TrashIcon } from "@phosphor-icons/react";
 
 import { FormPageFooter, FormPageHeader, FormPageSection } from "../shared/form-page.js";
 import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
+import { buildDefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
@@ -42,7 +43,7 @@ export type WebhookAutomationFormValues = {
   name: string;
   sandboxProfileId: string;
   enabled: boolean;
-  instructions: string;
+  inputTemplate: string;
   conversationKeyTemplate: string;
   triggerIds: string[];
   triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
@@ -171,6 +172,8 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
     selectedConversationGroupingOption === undefined
       ? undefined
       : selectedConversationGroupingOption.label;
+  const defaultInputTemplate = buildDefaultWebhookAutomationInputTemplate();
+  const isInputTemplateDefault = input.values.inputTemplate === defaultInputTemplate;
 
   return (
     <div className="flex flex-col gap-6">
@@ -356,23 +359,38 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         <div className="p-4">
           <Field>
             <FieldHeader>
-              <FieldLabel htmlFor="automation-instructions">Agent Instructions</FieldLabel>
-              <FieldDescription>
-                These instructions are sent together with the webhook payload and event type.
-              </FieldDescription>
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <FieldLabel htmlFor="automation-input-template">Input Template</FieldLabel>
+                  <FieldDescription>
+                    Use Liquid templates. Available variables include{" "}
+                    <code>{"{{webhookEvent.eventType}}"}</code> and <code>{"{{payload}}"}</code>.
+                  </FieldDescription>
+                </div>
+                <Button
+                  disabled={input.isDeleting || input.isSaving || isInputTemplateDefault}
+                  onClick={() => {
+                    input.onValueChange("inputTemplate", defaultInputTemplate);
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  Reset to default
+                </Button>
+              </div>
             </FieldHeader>
             <FieldContent>
               <Textarea
-                className="min-h-36"
-                id="automation-instructions"
+                className="min-h-48 font-mono text-sm"
+                id="automation-input-template"
                 disabled={input.isDeleting || input.isSaving}
                 onChange={(event) => {
-                  input.onValueChange("instructions", event.currentTarget.value);
+                  input.onValueChange("inputTemplate", event.currentTarget.value);
                 }}
-                rows={5}
-                value={input.values.instructions}
+                rows={8}
+                value={input.values.inputTemplate}
               />
-              <FieldError message={input.fieldErrors.instructions} />
+              <FieldError message={input.fieldErrors.inputTemplate} />
             </FieldContent>
           </Field>
         </div>
