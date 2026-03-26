@@ -32,24 +32,24 @@ function buildTurnRequest(input: {
   submittedPrompt: string;
   submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
   transcriptPrompt?: string;
-  transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
+  displayAttachments?: readonly CodexTurnInputLocalImageItem[];
 }): {
   submittedPrompt: string;
   transcriptPrompt: string;
   submittedAttachments: readonly CodexTurnInputLocalImageItem[];
-  transcriptAttachments: readonly CodexTurnInputLocalImageItem[];
+  displayAttachments: readonly CodexTurnInputLocalImageItem[];
   items: ReturnType<typeof buildCodexTurnInputItems>;
 } {
   const submittedPrompt = input.submittedPrompt.trim();
   const transcriptPrompt = (input.transcriptPrompt ?? input.submittedPrompt).trim();
   const submittedAttachments = input.submittedAttachments ?? [];
-  const transcriptAttachments = input.transcriptAttachments ?? submittedAttachments;
+  const displayAttachments = input.displayAttachments ?? submittedAttachments;
 
   return {
     submittedPrompt,
     transcriptPrompt,
     submittedAttachments,
-    transcriptAttachments,
+    displayAttachments,
     items: buildCodexTurnInputItems({
       text: submittedPrompt,
       attachments: submittedAttachments,
@@ -134,7 +134,7 @@ export function useCodexChatController(input: {
       submittedPrompt: string;
       submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
       transcriptPrompt?: string;
-      transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
+      displayAttachments?: readonly CodexTurnInputLocalImageItem[];
     }) => {
       const rpcClient = input.rpcClientRef.current;
       const threadId = input.threadIdRef.current;
@@ -150,7 +150,7 @@ export function useCodexChatController(input: {
         type: "start_turn_requested",
         clientTurnId,
         prompt: turnRequest.transcriptPrompt,
-        attachments: turnRequest.transcriptAttachments,
+        attachments: turnRequest.displayAttachments,
       });
 
       try {
@@ -215,7 +215,7 @@ export function useCodexChatController(input: {
       submittedPrompt: string;
       submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
       transcriptPrompt?: string;
-      transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
+      displayAttachments?: readonly CodexTurnInputLocalImageItem[];
     }) => {
       const rpcClient = input.rpcClientRef.current;
       const threadId = input.threadIdRef.current;
@@ -266,7 +266,7 @@ export function useCodexChatController(input: {
         submittedPrompt: string;
         submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
         transcriptPrompt?: string;
-        transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
+        displayAttachments?: readonly CodexTurnInputLocalImageItem[];
       }): Promise<void> => {
         await startTurnMutation.mutateAsync(turnInput);
       },
@@ -283,7 +283,7 @@ export function useCodexChatController(input: {
         submittedPrompt: string;
         submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
         transcriptPrompt?: string;
-        transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
+        displayAttachments?: readonly CodexTurnInputLocalImageItem[];
       }): Promise<void> => {
         await steerTurnMutation.mutateAsync(turnInput);
       },

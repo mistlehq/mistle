@@ -37,6 +37,8 @@ export function buildTurnPrompt(input: {
     return input.prompt.trim();
   }
 
+  // Text-only models receive attachment paths as prompt text only. This fallback
+  // is not hydrated back into structured image attachments from thread history.
   return buildPromptWithAttachedImagePaths({
     prompt: input.prompt,
     attachmentPaths: input.attachmentPaths,
@@ -51,7 +53,7 @@ export function resolveTurnRepresentation(input: {
 }): {
   prompt: string;
   submittedAttachments: readonly CodexTurnInputLocalImageItem[];
-  transcriptAttachments: readonly CodexTurnInputLocalImageItem[];
+  displayAttachments: readonly CodexTurnInputLocalImageItem[];
 } {
   return {
     prompt: buildTurnPrompt({
@@ -60,66 +62,6 @@ export function resolveTurnRepresentation(input: {
       supportsImageInspection: input.supportsImageInspection,
     }),
     submittedAttachments: input.supportsImageInspection ? input.uploadedAttachments : [],
-    transcriptAttachments: input.uploadedAttachments,
-  };
-}
-
-export function splitPromptAndAttachedImagePaths(text: string): {
-  attachmentPaths: readonly string[];
-  prompt: string;
-} {
-  const trimmedText = text.trim();
-  if (trimmedText.length === 0) {
-    return {
-      attachmentPaths: [],
-      prompt: "",
-    };
-  }
-
-  const headerBlock = `${AttachedImagesHeader}\n`;
-  const separatorBlock = `\n\n${headerBlock}`;
-  const blockStartIndex = trimmedText.startsWith(headerBlock)
-    ? 0
-    : trimmedText.lastIndexOf(separatorBlock);
-
-  if (blockStartIndex === -1) {
-    return {
-      attachmentPaths: [],
-      prompt: trimmedText,
-    };
-  }
-
-  const attachmentSection =
-    blockStartIndex === 0 ? trimmedText : trimmedText.slice(blockStartIndex + 2);
-
-  if (!attachmentSection.startsWith(headerBlock)) {
-    return {
-      attachmentPaths: [],
-      prompt: trimmedText,
-    };
-  }
-
-  const attachmentLines = attachmentSection.slice(headerBlock.length).split("\n");
-  if (attachmentLines.length === 0 || attachmentLines.some((line) => !line.startsWith("- "))) {
-    return {
-      attachmentPaths: [],
-      prompt: trimmedText,
-    };
-  }
-
-  const attachmentPaths = attachmentLines
-    .map((line) => line.slice(2).trim())
-    .filter((line) => line.length > 0);
-
-  if (attachmentPaths.length !== attachmentLines.length) {
-    return {
-      attachmentPaths: [],
-      prompt: trimmedText,
-    };
-  }
-
-  return {
-    attachmentPaths,
-    prompt: blockStartIndex === 0 ? "" : trimmedText.slice(0, blockStartIndex).trimEnd(),
+    displayAttachments: input.uploadedAttachments,
   };
 }

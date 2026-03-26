@@ -3,7 +3,7 @@ import type { CodexModelSummary } from "@mistle/integrations-definitions/openai/
 import type { CodexModelCatalogStatus } from "../session-agents/codex/session-state/use-codex-session-admin.js";
 
 const NonImageCapableModelWarningMessageSuffix =
-  " is not image-capable. Images can remain attached, but the model will not inspect them.";
+  " cannot inspect images. Images will only be sent as file path references.";
 const UnavailableModelErrorMessageSuffix =
   " is no longer available. Switch to another model to continue.";
 const ModelSelectionRequiredMessage = "Choose a model before sending a message.";

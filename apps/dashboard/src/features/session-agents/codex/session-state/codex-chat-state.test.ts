@@ -141,7 +141,7 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
-  it("hydrates text-only attachment fallback paths from the submitted prompt text", () => {
+  it("leaves user-authored trailing attachment-style text as plain text during hydration", () => {
     const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
       type: "hydrate_from_thread_read",
       turns: [
@@ -174,14 +174,12 @@ describe("reduceCodexChatState", () => {
         id: "user_123",
         turnId: "turn_123",
         kind: "user-message",
-        text: "Review these screenshots",
-        attachments: [
-          {
-            kind: "image",
-            path: "/tmp/attachments/thread_123/screenshot.png",
-            name: "screenshot.png",
-          },
-        ],
+        text: [
+          "Review these screenshots",
+          "",
+          "Attached images:",
+          "- /tmp/attachments/thread_123/screenshot.png",
+        ].join("\n"),
         status: "completed",
       },
     ]);

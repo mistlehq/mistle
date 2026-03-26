@@ -108,7 +108,7 @@ export const SessionComposerFixturePropsForNonImageCapableModel: SessionConversa
       ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi,
       statusMessage: {
         message:
-          "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
+          "Model GPT-5.3 Codex Spark cannot inspect images. Images will only be sent as file path references.",
         tone: "warning",
       },
     },

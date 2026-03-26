@@ -6,12 +6,7 @@ import { uploadSandboxImage } from "@mistle/sandbox-session-client";
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
 import { useCallback, useEffect, useState } from "react";
 
-import {
-  buildAttachedImagePathsText,
-  buildPromptWithAttachedImagePaths,
-  buildTurnPrompt,
-  resolveTurnRepresentation,
-} from "../session-agents/codex/session-state/codex-attachment-presentation.js";
+import { resolveTurnRepresentation } from "../session-agents/codex/session-state/codex-attachment-presentation.js";
 import type { CodexModelCatalogStatus } from "../session-agents/codex/session-state/use-codex-session-admin.js";
 import { mintSandboxInstanceConnectionToken } from "../sessions/sessions-service.js";
 import {
@@ -19,10 +14,6 @@ import {
   type ComposerConfigSnapshot,
 } from "./session-composer-config.js";
 import {
-  buildModelSelectionLoadingMessage,
-  buildModelSelectionRequiredMessage,
-  buildNonImageCapableModelWarningMessage,
-  buildUnavailableModelErrorMessage,
   getComposerSelectionKey,
   resolveActiveComposerModel,
   resolveComposerStatusMessage,
@@ -84,30 +75,16 @@ type ComposerChatState = {
     submittedPrompt: string;
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
     transcriptPrompt?: string;
-    transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
+    displayAttachments?: readonly CodexTurnInputLocalImageItem[];
   }) => Promise<void>;
   steerTurn: (input: {
     submittedPrompt: string;
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
     transcriptPrompt?: string;
-    transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
+    displayAttachments?: readonly CodexTurnInputLocalImageItem[];
   }) => Promise<void>;
 };
 
-export {
-  buildAttachedImagePathsText,
-  buildPromptWithAttachedImagePaths,
-  buildTurnPrompt,
-  buildModelSelectionLoadingMessage,
-  buildModelSelectionRequiredMessage,
-  buildNonImageCapableModelWarningMessage,
-  buildUnavailableModelErrorMessage,
-  resolveActiveComposerModel,
-  resolveComposerStatusMessage,
-  resolveComposerSubmitReadiness,
-  resolveTurnRepresentation,
-  supportsImageInspection,
-};
 export type { ComposerStatusMessage, ComposerSubmitReadiness, ResolvedComposerModelContext };
 
 export function useSessionConversationComposerState(input: {
@@ -380,14 +357,14 @@ export function useSessionConversationComposerState(input: {
           await input.chat.steerTurn({
             submittedPrompt: turnRepresentation.prompt,
             submittedAttachments: turnRepresentation.submittedAttachments,
-            transcriptAttachments: turnRepresentation.transcriptAttachments,
+            displayAttachments: turnRepresentation.displayAttachments,
             transcriptPrompt: action.prompt,
           });
         } else {
           await input.chat.startTurn({
             submittedPrompt: turnRepresentation.prompt,
             submittedAttachments: turnRepresentation.submittedAttachments,
-            transcriptAttachments: turnRepresentation.transcriptAttachments,
+            displayAttachments: turnRepresentation.displayAttachments,
             transcriptPrompt: action.prompt,
           });
         }

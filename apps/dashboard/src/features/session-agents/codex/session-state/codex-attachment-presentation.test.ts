@@ -5,7 +5,6 @@ import {
   buildPromptWithAttachedImagePaths,
   buildTurnPrompt,
   resolveTurnRepresentation,
-  splitPromptAndAttachedImagePaths,
 } from "./codex-attachment-presentation.js";
 
 describe("codex-attachment-presentation", () => {
@@ -69,23 +68,7 @@ describe("codex-attachment-presentation", () => {
         "- /tmp/attachments/thread_123/image-1.png",
       ].join("\n"),
       submittedAttachments: [],
-      transcriptAttachments: uploadedAttachments,
-    });
-  });
-
-  it("parses the standardized attachment suffix back out of transcript text", () => {
-    expect(
-      splitPromptAndAttachedImagePaths(
-        [
-          "Review these screenshots",
-          "",
-          "Attached images:",
-          "- /tmp/attachments/thread_123/image-1.png",
-        ].join("\n"),
-      ),
-    ).toEqual({
-      prompt: "Review these screenshots",
-      attachmentPaths: ["/tmp/attachments/thread_123/image-1.png"],
+      displayAttachments: uploadedAttachments,
     });
   });
 });

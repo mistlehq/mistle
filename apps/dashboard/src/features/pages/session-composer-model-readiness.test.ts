@@ -80,7 +80,7 @@ describe("session-composer-model-readiness", () => {
       "Wait for the selected model to finish loading before sending a message.",
     );
     expect(buildNonImageCapableModelWarningMessage("Codex Spark")).toBe(
-      "Model Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
+      "Model Codex Spark cannot inspect images. Images will only be sent as file path references.",
     );
   });
 
@@ -191,7 +191,7 @@ describe("session-composer-model-readiness", () => {
       }),
     ).toEqual({
       message:
-        "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
+        "Model GPT-5.3 Codex Spark cannot inspect images. Images will only be sent as file path references.",
       tone: "warning",
     });
   });
