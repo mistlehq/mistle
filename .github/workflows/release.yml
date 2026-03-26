@@ -1,0 +1,311 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      release_version: ${{ steps.release.outputs.version }}
+      stable_release: ${{ steps.release.outputs.stable_release }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 25
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate tag matches VERSION
+        run: pnpm release:validate-tag "${GITHUB_REF_NAME}"
+
+      - name: Resolve release metadata
+        id: release
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          stable_release=true
+          if [[ "${version}" == *-alpha.* ]]; then
+            stable_release=false
+          fi
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "stable_release=${stable_release}" >> "${GITHUB_OUTPUT}"
+
+  publish-services:
+    name: Publish ${{ matrix.component }}
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: control-plane-api
+            target: control-plane-api-runtime
+          - component: control-plane-worker
+            target: control-plane-worker-runtime
+          - component: data-plane-api
+            target: data-plane-api-runtime
+          - component: data-plane-worker
+            target: data-plane-worker-runtime
+          - component: data-plane-gateway
+            target: data-plane-gateway-runtime
+          - component: tokenizer-proxy
+            target: tokenizer-proxy-runtime
+    env:
+      IMAGE_REPOSITORY: ghcr.io/mistlehq/${{ matrix.component }}
+      IMAGE_SHA_TAG: ${{ github.sha }}
+      IMAGE_RELEASE_TAG: v${{ needs.validate.outputs.release_version }}
+      IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build service image
+        run: |
+          tags=(
+            --tag "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}"
+            --tag "${IMAGE_REPOSITORY}:${IMAGE_RELEASE_TAG}"
+          )
+
+          if [ "${{ needs.validate.outputs.stable_release }}" = "true" ]; then
+            tags+=(--tag "${IMAGE_REPOSITORY}:latest")
+          fi
+
+          docker build \
+            --platform linux/amd64 \
+            --target "${{ matrix.target }}" \
+            --file Dockerfile \
+            --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${{ needs.validate.outputs.release_version }}" \
+            --label "org.opencontainers.image.title=${{ matrix.component }}" \
+            "${tags[@]}" \
+            .
+
+      - name: Push service image
+        run: |
+          docker push "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}"
+          docker push "${IMAGE_REPOSITORY}:${IMAGE_RELEASE_TAG}"
+
+          if [ "${{ needs.validate.outputs.stable_release }}" = "true" ]; then
+            docker push "${IMAGE_REPOSITORY}:latest"
+          fi
+
+      - name: Resolve pushed digest
+        id: publish
+        run: |
+          image_ref="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${IMAGE_RELEASE_TAG}")"
+          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
+
+      - name: Write release manifest fragment
+        run: |
+          mkdir -p dist/release-manifest
+          cat <<EOF > "dist/release-manifest/${{ matrix.component }}.json"
+          {"component":"${{ matrix.component }}","image_ref":"${{ steps.publish.outputs.image_ref }}"}
+          EOF
+
+      - name: Upload release manifest fragment
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-image-${{ matrix.component }}
+          path: dist/release-manifest/${{ matrix.component }}.json
+
+  publish-sandbox-base:
+    name: Publish sandbox base
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      IMAGE_REPOSITORY: ghcr.io/mistlehq/sandbox-base
+      IMAGE_SHA_TAG: ${{ github.sha }}
+      IMAGE_RELEASE_TAG: v${{ needs.validate.outputs.release_version }}
+      IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 25
+
+      - name: Build Linux SEA artifacts
+        run: node ./scripts/build/build-sandbox-runtime-sea-linux.mjs
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build sandbox base image
+        run: |
+          tags=(
+            --tag "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}"
+            --tag "${IMAGE_REPOSITORY}:${IMAGE_RELEASE_TAG}"
+          )
+
+          if [ "${{ needs.validate.outputs.stable_release }}" = "true" ]; then
+            tags+=(--tag "${IMAGE_REPOSITORY}:latest")
+          fi
+
+          docker build \
+            --platform linux/amd64 \
+            --target sandbox-base \
+            --file apps/sandbox-runtime/Dockerfile \
+            --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${{ needs.validate.outputs.release_version }}" \
+            "${tags[@]}" \
+            .
+
+      - name: Push sandbox base image
+        run: |
+          docker push "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}"
+          docker push "${IMAGE_REPOSITORY}:${IMAGE_RELEASE_TAG}"
+
+          if [ "${{ needs.validate.outputs.stable_release }}" = "true" ]; then
+            docker push "${IMAGE_REPOSITORY}:latest"
+          fi
+
+      - name: Resolve pushed digest
+        id: publish
+        run: |
+          image_ref="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${IMAGE_RELEASE_TAG}")"
+          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
+
+      - name: Write release manifest fragment
+        run: |
+          mkdir -p dist/release-manifest
+          cat <<EOF > dist/release-manifest/sandbox-base.json
+          {"component":"sandbox-base","image_ref":"${{ steps.publish.outputs.image_ref }}"}
+          EOF
+
+      - name: Upload release manifest fragment
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-image-sandbox-base
+          path: dist/release-manifest/sandbox-base.json
+
+  publish-github-release:
+    name: Publish GitHub release
+    needs:
+      - validate
+      - publish-services
+      - publish-sandbox-base
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 25
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download release manifest fragments
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/release-artifacts
+
+      - name: Generate stable release notes
+        if: needs.validate.outputs.stable_release == 'true'
+        id: git-cliff
+        uses: orhun/git-cliff-action@v4
+        with:
+          version: v2.10.1
+          config: cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: dist/release-notes.md
+          GITHUB_REPO: ${{ github.repository }}
+
+      - name: Assemble release manifest
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path("dist/release-artifacts")
+          images = {}
+
+          for manifest_path in sorted(root.rglob("*.json")):
+              payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+              images[payload["component"]] = payload["image_ref"]
+
+          output = {
+              "version": f"v{os.environ['RELEASE_VERSION']}",
+              "commit": os.environ["GITHUB_SHA"],
+              "images": images,
+          }
+
+          Path("dist").mkdir(exist_ok=True)
+          Path("dist/release-manifest.json").write_text(
+              json.dumps(output, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+
+      - name: Publish GitHub release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          prerelease_args=()
+          notes_args=()
+
+          if [ "${{ needs.validate.outputs.stable_release }}" != "true" ]; then
+            prerelease_args+=(--prerelease)
+          else
+            notes_args+=(--notes-file dist/release-notes.md)
+          fi
+
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            "${notes_args[@]}" \
+            "${prerelease_args[@]}" \
+            dist/release-manifest.json

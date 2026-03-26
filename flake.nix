@@ -24,6 +24,7 @@
             pkgs.cloudflared
             pkgs.docker
             pkgs.git
+            pkgs.git-cliff
             pkgs.jq
           ];
 

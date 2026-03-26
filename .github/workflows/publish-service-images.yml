@@ -63,7 +63,7 @@ jobs:
         id: flags
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
-            echo "publish_latest=true" >> "${GITHUB_OUTPUT}"
+            echo "publish_latest=false" >> "${GITHUB_OUTPUT}"
             echo "selected_component=all" >> "${GITHUB_OUTPUT}"
           else
             echo "publish_latest=${{ inputs.publish_latest }}" >> "${GITHUB_OUTPUT}"

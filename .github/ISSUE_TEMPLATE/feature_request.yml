@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a concrete improvement to Mistle.
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please explain the problem first, then the proposed change.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or developer problem are you trying to solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the proposed behavior or interface.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe alternatives or workarounds you considered.
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Add mockups, references, examples, or constraints.

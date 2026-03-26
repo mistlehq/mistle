@@ -1,16 +1,19 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { readRepositoryVersion } from "@mistle/config";
 
 import { registerInternalApiRouteModules, registerPublicApiRouteModules } from "../../src/app.js";
 import type { AppContextBindings } from "../../src/types.js";
 
+const ControlPlaneReleaseVersion = readRepositoryVersion(import.meta.url);
+
 const ControlPlaneOpenApiInfo = {
   title: "Mistle Control Plane API",
-  version: "0.0.0",
+  version: ControlPlaneReleaseVersion,
 };
 
 const ControlPlaneInternalOpenApiInfo = {
   title: "Mistle Control Plane Internal API",
-  version: "0.0.0",
+  version: ControlPlaneReleaseVersion,
 };
 
 export function createControlPlaneOpenApiDocument(): ReturnType<
