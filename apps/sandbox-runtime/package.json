@@ -27,7 +27,7 @@
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/time": "workspace:*",
     "undici": "7.24.5",
-    "ws": "^8.19.0"
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@fast-check/vitest": "^0.3.0",

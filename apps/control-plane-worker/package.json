@@ -34,7 +34,7 @@
     "openworkflow": "^0.8.1",
     "pg": "^8.20.0",
     "typeid-js": "^1.2.0",
-    "ws": "^8.19.0",
+    "ws": "^8.20.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
