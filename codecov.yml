@@ -1,6 +1,9 @@
 codecov:
   require_ci_to_pass: true
 
+fixes:
+  - "/home/runner/_work/mistle/mistle/::"
+
 comment:
   layout: "header, diff, components, files, footer"
   hide_project_coverage: false
