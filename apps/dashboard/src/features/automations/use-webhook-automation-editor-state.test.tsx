@@ -220,4 +220,56 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       },
     });
   });
+
+  it("shows a required-fields summary on submit when basic required fields are missing", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "create",
+          automationId: undefined,
+          navigate: async () => {},
+          initialValues: {
+            name: "",
+            sandboxProfileId: "",
+            enabled: true,
+            instructions: "",
+            conversationKeyTemplate: "",
+            triggerIds: [],
+            triggerParameterValues: {},
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          directoryData: {
+            connections: [],
+            targets: [],
+          },
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => {
+      result.current.onSubmit();
+    });
+
+    expect(result.current.formError).toBe("Please fill in the required fields highlighted in red.");
+    expect(result.current.fieldErrors).toMatchObject({
+      name: "Automation name is required.",
+      sandboxProfileId: "Select a sandbox profile.",
+      instructions: "Instructions are required.",
+      triggerIds: "Select at least one trigger.",
+    });
+  });
 });

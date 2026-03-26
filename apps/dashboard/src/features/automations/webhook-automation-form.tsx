@@ -71,6 +71,17 @@ type WebhookAutomationFormProps = {
   onDelete: (() => void) | null;
 };
 
+function shouldRenderInlineFieldError(input: {
+  key: WebhookAutomationFormValueKey;
+  message: string | undefined;
+}): boolean {
+  if (input.message === undefined) {
+    return false;
+  }
+
+  return input.key !== "name" && input.key !== "sandboxProfileId" && input.key !== "instructions";
+}
+
 function FieldError(input: { message: string | undefined }): React.JSX.Element | null {
   if (input.message === undefined) {
     return null;
@@ -85,6 +96,7 @@ function SelectField(input: {
   placeholder: string;
   options: readonly WebhookAutomationFormOption[];
   error: string | undefined;
+  showInlineError?: boolean;
   orientation?: "vertical" | "horizontal";
   onValueChange: (value: string) => void;
 }): React.JSX.Element {
@@ -124,7 +136,7 @@ function SelectField(input: {
             ))}
           </SelectContent>
         </Select>
-        <FieldError message={input.error} />
+        <FieldError message={input.showInlineError === false ? undefined : input.error} />
       </FieldContent>
     </Field>
   );
@@ -187,7 +199,14 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <WebhookAutomationTitleEditor
-              errorMessage={input.fieldErrors.name}
+              errorMessage={
+                shouldRenderInlineFieldError({
+                  key: "name",
+                  message: input.fieldErrors.name,
+                })
+                  ? input.fieldErrors.name
+                  : undefined
+              }
               onCommit={(nextValue) => {
                 input.onValueChange("name", nextValue);
               }}
@@ -213,7 +232,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
       {input.formError === null ? null : (
         <Alert variant="destructive">
-          <AlertTitle>Could not save automation</AlertTitle>
+          <AlertTitle>Automation could not be saved</AlertTitle>
           <AlertDescription>{input.formError}</AlertDescription>
         </Alert>
       )}
@@ -253,7 +272,16 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                   }}
                   value={input.values.name}
                 />
-                <FieldError message={input.fieldErrors.name} />
+                <FieldError
+                  message={
+                    shouldRenderInlineFieldError({
+                      key: "name",
+                      message: input.fieldErrors.name,
+                    })
+                      ? input.fieldErrors.name
+                      : undefined
+                  }
+                />
               </FieldContent>
             </Field>
           </div>
@@ -268,6 +296,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             }}
             options={input.sandboxProfileOptions}
             placeholder="Select profile"
+            showInlineError={false}
             value={input.values.sandboxProfileId}
           />
         </div>
@@ -386,7 +415,16 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                 rows={5}
                 value={input.values.instructions}
               />
-              <FieldError message={input.fieldErrors.instructions} />
+              <FieldError
+                message={
+                  shouldRenderInlineFieldError({
+                    key: "instructions",
+                    message: input.fieldErrors.instructions,
+                  })
+                    ? input.fieldErrors.instructions
+                    : undefined
+                }
+              />
             </FieldContent>
           </Field>
         </div>

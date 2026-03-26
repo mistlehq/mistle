@@ -63,8 +63,19 @@ const NoProfileSelectedMessage = "Select a sandbox profile to choose triggers.";
 const InvalidProfileBindingMessage =
   "The selected profile has no bindings with automation triggers.";
 const LoadProfileBindingsErrorMessage = "Could not load profile bindings.";
+const RequiredFieldSummaryMessage = "Please fill in the required fields highlighted in red.";
 const UnselectedProfileQueryId = "__unselected__";
 const MissingProfileVersionQueryId = 0;
+
+function hasRequiredFieldErrors(
+  fieldErrors: Partial<Record<keyof WebhookAutomationFormValues, string>>,
+): boolean {
+  return (
+    fieldErrors.name !== undefined ||
+    fieldErrors.sandboxProfileId !== undefined ||
+    fieldErrors.instructions !== undefined
+  );
+}
 
 export function resolveSelectedProfileTriggerState(input: {
   selectedProfileId: string;
@@ -467,7 +478,7 @@ export function useLoadedWebhookAutomationEditorState(
   function onSubmit(): void {
     const nextFieldErrors = validateWebhookAutomationFormValues(formValues, webhookEventOptions);
     setFieldErrors(nextFieldErrors);
-    setFormError(null);
+    setFormError(hasRequiredFieldErrors(nextFieldErrors) ? RequiredFieldSummaryMessage : null);
 
     if (Object.keys(nextFieldErrors).length > 0) {
       return;

@@ -404,7 +404,7 @@ export const EditPageLayout: Story = {
 export const ValidationErrors: Story = {
   args: {
     mode: "create",
-    formError: "The selected triggers do not support this automation setup.",
+    formError: "Please fill in the required fields highlighted in red.",
     fieldErrors: {
       name: "Automation name is required.",
       triggerIds: "Select at least one trigger.",

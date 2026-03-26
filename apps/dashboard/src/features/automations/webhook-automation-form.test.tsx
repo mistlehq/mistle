@@ -278,4 +278,47 @@ describe("WebhookAutomationForm", () => {
     expect(selectTriggers[0]?.getAttribute("aria-invalid")).toBe("true");
     expect(selectTriggers[1]?.getAttribute("aria-invalid")).toBe("true");
   });
+
+  it("shows the required-fields summary without inline copy for basic required fields", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WebhookAutomationForm
+          connectionOptions={ConnectionOptions}
+          fieldErrors={{
+            name: "Automation name is required.",
+            sandboxProfileId: "Select a sandbox profile.",
+            triggerIds: "Select at least one trigger.",
+            instructions: "Instructions are required.",
+          }}
+          formError="Please fill in the required fields highlighted in red."
+          isDeleting={false}
+          isSaving={false}
+          mode="create"
+          onDelete={null}
+          onSubmit={() => {}}
+          onValueChange={() => {}}
+          sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledReason={null}
+          webhookEventOptions={WebhookEventOptions}
+          values={{
+            ...FormValues,
+            name: "",
+            sandboxProfileId: "",
+            triggerIds: [],
+            instructions: "",
+            conversationKeyTemplate: "",
+          }}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Automation could not be saved")).toBeDefined();
+    expect(
+      screen.getByText("Please fill in the required fields highlighted in red."),
+    ).toBeDefined();
+    expect(screen.queryByText("Automation name is required.")).toBeNull();
+    expect(screen.queryByText("Select a sandbox profile.")).toBeNull();
+    expect(screen.queryByText("Instructions are required.")).toBeNull();
+    expect(screen.getByText("Select at least one trigger.")).toBeDefined();
+  });
 });
