@@ -243,17 +243,17 @@ export function resolveComposerSubmitReadiness(input: {
   selectedModel: string | null;
   activeModel: CodexModelSummary | null;
 }): ComposerSubmitReadiness {
-  if (input.selectedModel === null) {
-    return {
-      status: "missing-model",
-      message: buildModelSelectionRequiredMessage(),
-    };
-  }
-
   if (input.activeModel !== null) {
     return {
       status: "ready",
       activeModel: input.activeModel,
+    };
+  }
+
+  if (input.selectedModel === null) {
+    return {
+      status: "missing-model",
+      message: buildModelSelectionRequiredMessage(),
     };
   }
 
@@ -1066,15 +1066,17 @@ export function useSessionWorkbenchController(input: {
       try {
         if (action.type === "steer_turn") {
           await steerTurn({
-            prompt: turnRepresentation.prompt,
+            submittedPrompt: turnRepresentation.prompt,
             submittedAttachments: turnRepresentation.submittedAttachments,
             transcriptAttachments: turnRepresentation.transcriptAttachments,
+            transcriptPrompt: action.prompt,
           });
         } else {
           await startTurn({
-            prompt: turnRepresentation.prompt,
+            submittedPrompt: turnRepresentation.prompt,
             submittedAttachments: turnRepresentation.submittedAttachments,
             transcriptAttachments: turnRepresentation.transcriptAttachments,
+            transcriptPrompt: action.prompt,
           });
         }
       } catch (error) {

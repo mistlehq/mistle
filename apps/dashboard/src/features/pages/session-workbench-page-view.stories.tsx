@@ -2,9 +2,9 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { noop } from "../chat/components/chat-story-support.js";
 import {
-  CodexFixtureSessionComposerPropsForLoadingModel,
-  CodexFixtureSessionComposerPropsForNonImageCapableModel,
-  CodexFixtureSessionComposerPropsForUnavailableModel,
+  SessionComposerFixturePropsForLoadingModel,
+  SessionComposerFixturePropsForNonImageCapableModel,
+  SessionComposerFixturePropsForUnavailableModel,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
 import {
   createStorySessionBottomPanel,
@@ -72,7 +72,7 @@ export const WithSecondaryPane: Story = {
 export const WithNonImageCapableModelWarning: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
-      composerProps: CodexFixtureSessionComposerPropsForNonImageCapableModel,
+      composerProps: SessionComposerFixturePropsForNonImageCapableModel,
     }),
   },
 };
@@ -80,7 +80,7 @@ export const WithNonImageCapableModelWarning: Story = {
 export const WithUnavailableModelAlert: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
-      composerProps: CodexFixtureSessionComposerPropsForUnavailableModel,
+      composerProps: SessionComposerFixturePropsForUnavailableModel,
     }),
   },
 };
@@ -88,7 +88,7 @@ export const WithUnavailableModelAlert: Story = {
 export const WithLoadingSelectedModelAlert: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
-      composerProps: CodexFixtureSessionComposerPropsForLoadingModel,
+      composerProps: SessionComposerFixturePropsForLoadingModel,
     }),
   },
 };

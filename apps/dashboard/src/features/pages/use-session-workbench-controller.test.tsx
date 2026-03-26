@@ -313,29 +313,6 @@ describe("useSessionWorkbenchController", () => {
     expect(
       resolveComposerSubmitReadiness({
         selectedModel: null,
-        activeModel: null,
-        isModelListLoaded: false,
-      }),
-    ).toEqual({
-      status: "missing-model",
-      message: "Choose a model before sending a message.",
-    });
-
-    expect(
-      resolveComposerSubmitReadiness({
-        selectedModel: "gpt-5.4",
-        activeModel: null,
-        isModelListLoaded: false,
-      }),
-    ).toEqual({
-      status: "loading-model",
-      selectedModel: "gpt-5.4",
-      message: "Wait for the selected model to finish loading before sending a message.",
-    });
-
-    expect(
-      resolveComposerSubmitReadiness({
-        selectedModel: "gpt-5.4",
         activeModel: {
           id: "model_default",
           model: "gpt-5.4",
@@ -360,6 +337,29 @@ describe("useSessionWorkbenchController", () => {
         supportsPersonality: false,
         isDefault: true,
       },
+    });
+
+    expect(
+      resolveComposerSubmitReadiness({
+        selectedModel: null,
+        activeModel: null,
+        isModelListLoaded: false,
+      }),
+    ).toEqual({
+      status: "missing-model",
+      message: "Choose a model before sending a message.",
+    });
+
+    expect(
+      resolveComposerSubmitReadiness({
+        selectedModel: "gpt-5.4",
+        activeModel: null,
+        isModelListLoaded: false,
+      }),
+    ).toEqual({
+      status: "loading-model",
+      selectedModel: "gpt-5.4",
+      message: "Wait for the selected model to finish loading before sending a message.",
     });
 
     expect(

@@ -53,7 +53,7 @@ export const CodexFixtureSessionEntriesWithExploringGroup: readonly ChatEntry[] 
 
 export const CodexFixtureSessionServerRequests: readonly CodexApprovalRequestEntry[] = [];
 
-export const CodexFixtureSessionComposerProps: SessionConversationComposerProps = {
+export const SessionComposerFixtureProps: SessionConversationComposerProps = {
   composerText: "Focus on dashboard asset ownership next.",
   composerUi: {
     action: {
@@ -82,9 +82,9 @@ export const CodexFixtureSessionComposerProps: SessionConversationComposerProps 
   pendingAttachments: [],
 };
 
-export const CodexFixtureSessionComposerPropsWithPendingImageAttachments: SessionConversationComposerProps =
+export const SessionComposerFixturePropsWithPendingImageAttachments: SessionConversationComposerProps =
   {
-    ...CodexFixtureSessionComposerProps,
+    ...SessionComposerFixtureProps,
     composerText: "Compare the attached screenshots and summarize the UI differences.",
     pendingAttachments: [
       { id: "attachment-1", name: "session-workbench-overview.png" },
@@ -92,20 +92,20 @@ export const CodexFixtureSessionComposerPropsWithPendingImageAttachments: Sessio
     ],
   };
 
-export const CodexFixtureSessionComposerPropsUploadingImageAttachments: SessionConversationComposerProps =
+export const SessionComposerFixturePropsUploadingImageAttachments: SessionConversationComposerProps =
   {
-    ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+    ...SessionComposerFixturePropsWithPendingImageAttachments,
     composerUi: {
-      ...CodexFixtureSessionComposerPropsWithPendingImageAttachments.composerUi,
+      ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi,
       isUploadingAttachments: true,
     },
   };
 
-export const CodexFixtureSessionComposerPropsForNonImageCapableModel: SessionConversationComposerProps =
+export const SessionComposerFixturePropsForNonImageCapableModel: SessionConversationComposerProps =
   {
-    ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+    ...SessionComposerFixturePropsWithPendingImageAttachments,
     composerUi: {
-      ...CodexFixtureSessionComposerPropsWithPendingImageAttachments.composerUi,
+      ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi,
       statusMessage: {
         message:
           "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
@@ -115,26 +115,25 @@ export const CodexFixtureSessionComposerPropsForNonImageCapableModel: SessionCon
     selectedModel: "gpt-5.3-codex-spark",
   };
 
-export const CodexFixtureSessionComposerPropsForUnavailableModel: SessionConversationComposerProps =
-  {
-    ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
-    composerUi: {
-      ...CodexFixtureSessionComposerPropsWithPendingImageAttachments.composerUi,
-      statusMessage: {
-        message:
-          "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
-        tone: "error",
-      },
-    },
-    selectedModel: "gpt-legacy-preview",
-  };
-
-export const CodexFixtureSessionComposerPropsForLoadingModel: SessionConversationComposerProps = {
-  ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+export const SessionComposerFixturePropsForUnavailableModel: SessionConversationComposerProps = {
+  ...SessionComposerFixturePropsWithPendingImageAttachments,
   composerUi: {
-    ...CodexFixtureSessionComposerPropsWithPendingImageAttachments.composerUi,
+    ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi,
+    statusMessage: {
+      message:
+        "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
+      tone: "error",
+    },
+  },
+  selectedModel: "gpt-legacy-preview",
+};
+
+export const SessionComposerFixturePropsForLoadingModel: SessionConversationComposerProps = {
+  ...SessionComposerFixturePropsWithPendingImageAttachments,
+  composerUi: {
+    ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi,
     action: {
-      ...CodexFixtureSessionComposerPropsWithPendingImageAttachments.composerUi.action,
+      ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi.action,
       canSubmitTurns: false,
     },
     statusMessage: {

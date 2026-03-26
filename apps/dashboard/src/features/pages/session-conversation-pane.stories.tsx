@@ -5,11 +5,11 @@ import {
   CodexFixtureChatThreadEntriesWithThinkingGroup,
 } from "../session-agents/codex/fixtures/chat-fixtures.js";
 import {
-  CodexFixtureSessionComposerPropsForLoadingModel,
-  CodexFixtureSessionComposerPropsForNonImageCapableModel,
-  CodexFixtureSessionComposerPropsUploadingImageAttachments,
-  CodexFixtureSessionComposerPropsWithPendingImageAttachments,
-  CodexFixtureSessionComposerProps,
+  SessionComposerFixturePropsForLoadingModel,
+  SessionComposerFixturePropsForNonImageCapableModel,
+  SessionComposerFixturePropsUploadingImageAttachments,
+  SessionComposerFixturePropsWithPendingImageAttachments,
+  SessionComposerFixtureProps,
   CodexFixtureSessionEntries,
   CodexFixtureSessionEntriesWithExploringGroup,
   CodexFixtureSessionServerRequests,
@@ -24,7 +24,7 @@ import {
 const baseArgs = {
   ...StorySessionConversationPaneArgs,
   chatEntries: CodexFixtureSessionEntries,
-  composerProps: CodexFixtureSessionComposerProps,
+  composerProps: SessionComposerFixtureProps,
   serverRequestPanelEntries: CodexFixtureSessionServerRequests,
 };
 
@@ -72,24 +72,24 @@ export const WithStructuredPlan: Story = {
 
 export const WithPendingImageAttachments: Story = {
   args: {
-    composerProps: CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+    composerProps: SessionComposerFixturePropsWithPendingImageAttachments,
   },
 };
 
 export const UploadingImageAttachments: Story = {
   args: {
-    composerProps: CodexFixtureSessionComposerPropsUploadingImageAttachments,
+    composerProps: SessionComposerFixturePropsUploadingImageAttachments,
   },
 };
 
 export const NonImageCapableModelWithAttachments: Story = {
   args: {
-    composerProps: CodexFixtureSessionComposerPropsForNonImageCapableModel,
+    composerProps: SessionComposerFixturePropsForNonImageCapableModel,
   },
 };
 
 export const LoadingSelectedModelWithAttachments: Story = {
   args: {
-    composerProps: CodexFixtureSessionComposerPropsForLoadingModel,
+    composerProps: SessionComposerFixturePropsForLoadingModel,
   },
 };

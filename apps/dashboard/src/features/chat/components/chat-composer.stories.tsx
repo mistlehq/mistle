@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
-  CodexFixtureSessionComposerProps,
-  CodexFixtureSessionComposerPropsForLoadingModel,
-  CodexFixtureSessionComposerPropsForUnavailableModel,
-  CodexFixtureSessionComposerPropsForNonImageCapableModel,
-  CodexFixtureSessionComposerPropsUploadingImageAttachments,
-  CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+  SessionComposerFixtureProps,
+  SessionComposerFixturePropsForLoadingModel,
+  SessionComposerFixturePropsForUnavailableModel,
+  SessionComposerFixturePropsForNonImageCapableModel,
+  SessionComposerFixturePropsUploadingImageAttachments,
+  SessionComposerFixturePropsWithPendingImageAttachments,
   CodexFixtureSessionModelOptions,
 } from "../../session-agents/codex/fixtures/session-fixtures.js";
 import { ChatComposer } from "./chat-composer.js";
@@ -27,7 +27,7 @@ const meta = {
     layout: "padded",
   },
   args: {
-    ...CodexFixtureSessionComposerProps,
+    ...SessionComposerFixtureProps,
     modelOptions: CodexFixtureSessionModelOptions,
     onComposerTextChange: noopComposerTextChange,
     onModelChange: noopModelChange,
@@ -52,9 +52,9 @@ export const SteeringTurn: Story = {
   args: {
     composerText: "Focus only on Storybook asset ownership.",
     composerUi: {
-      ...CodexFixtureSessionComposerProps.composerUi,
+      ...SessionComposerFixtureProps.composerUi,
       action: {
-        ...CodexFixtureSessionComposerProps.composerUi.action,
+        ...SessionComposerFixtureProps.composerUi.action,
         canInterruptTurn: true,
         canSteerTurn: true,
       },
@@ -66,9 +66,9 @@ export const InterruptOnly: Story = {
   args: {
     composerText: "",
     composerUi: {
-      ...CodexFixtureSessionComposerProps.composerUi,
+      ...SessionComposerFixtureProps.composerUi,
       action: {
-        ...CodexFixtureSessionComposerProps.composerUi.action,
+        ...SessionComposerFixtureProps.composerUi.action,
         canInterruptTurn: true,
         canSteerTurn: false,
       },
@@ -79,7 +79,7 @@ export const InterruptOnly: Story = {
 export const DisconnectedWithError: Story = {
   args: {
     composerUi: {
-      ...CodexFixtureSessionComposerProps.composerUi,
+      ...SessionComposerFixtureProps.composerUi,
       completedErrorMessage: "The session disconnected before the turn could be submitted.",
       isConnected: false,
     },
@@ -88,30 +88,30 @@ export const DisconnectedWithError: Story = {
 
 export const WithPendingImageAttachments: Story = {
   args: {
-    ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+    ...SessionComposerFixturePropsWithPendingImageAttachments,
   },
 };
 
 export const UploadingImageAttachments: Story = {
   args: {
-    ...CodexFixtureSessionComposerPropsUploadingImageAttachments,
+    ...SessionComposerFixturePropsUploadingImageAttachments,
   },
 };
 
 export const NonImageCapableModelWithAttachments: Story = {
   args: {
-    ...CodexFixtureSessionComposerPropsForNonImageCapableModel,
+    ...SessionComposerFixturePropsForNonImageCapableModel,
   },
 };
 
 export const UnavailableSelectedModelWithAttachments: Story = {
   args: {
-    ...CodexFixtureSessionComposerPropsForUnavailableModel,
+    ...SessionComposerFixturePropsForUnavailableModel,
   },
 };
 
 export const LoadingSelectedModelWithAttachments: Story = {
   args: {
-    ...CodexFixtureSessionComposerPropsForLoadingModel,
+    ...SessionComposerFixturePropsForLoadingModel,
   },
 };

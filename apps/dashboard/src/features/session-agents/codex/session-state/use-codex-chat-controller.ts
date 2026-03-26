@@ -29,25 +29,29 @@ function createPendingTurnId(): string {
 }
 
 function buildTurnRequest(input: {
-  prompt: string;
+  submittedPrompt: string;
   submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
+  transcriptPrompt?: string;
   transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
 }): {
-  trimmedPrompt: string;
+  submittedPrompt: string;
+  transcriptPrompt: string;
   submittedAttachments: readonly CodexTurnInputLocalImageItem[];
   transcriptAttachments: readonly CodexTurnInputLocalImageItem[];
   items: ReturnType<typeof buildCodexTurnInputItems>;
 } {
-  const trimmedPrompt = input.prompt.trim();
+  const submittedPrompt = input.submittedPrompt.trim();
+  const transcriptPrompt = (input.transcriptPrompt ?? input.submittedPrompt).trim();
   const submittedAttachments = input.submittedAttachments ?? [];
   const transcriptAttachments = input.transcriptAttachments ?? submittedAttachments;
 
   return {
-    trimmedPrompt,
+    submittedPrompt,
+    transcriptPrompt,
     submittedAttachments,
     transcriptAttachments,
     items: buildCodexTurnInputItems({
-      text: trimmedPrompt,
+      text: submittedPrompt,
       attachments: submittedAttachments,
     }),
   };
@@ -127,8 +131,9 @@ export function useCodexChatController(input: {
 
   const startTurnMutation = useMutation({
     mutationFn: async (turnInput: {
-      prompt: string;
+      submittedPrompt: string;
       submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
+      transcriptPrompt?: string;
       transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
     }) => {
       const rpcClient = input.rpcClientRef.current;
@@ -144,7 +149,7 @@ export function useCodexChatController(input: {
       dispatchChatAction({
         type: "start_turn_requested",
         clientTurnId,
-        prompt: turnRequest.trimmedPrompt,
+        prompt: turnRequest.transcriptPrompt,
         attachments: turnRequest.transcriptAttachments,
       });
 
@@ -207,8 +212,9 @@ export function useCodexChatController(input: {
 
   const steerTurnMutation = useMutation({
     mutationFn: async (turnInput: {
-      prompt: string;
+      submittedPrompt: string;
       submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
+      transcriptPrompt?: string;
       transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
     }) => {
       const rpcClient = input.rpcClientRef.current;
@@ -257,8 +263,9 @@ export function useCodexChatController(input: {
     canSteerTurn,
     startTurn: useCallback(
       async (turnInput: {
-        prompt: string;
+        submittedPrompt: string;
         submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
+        transcriptPrompt?: string;
         transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
       }): Promise<void> => {
         await startTurnMutation.mutateAsync(turnInput);
@@ -273,8 +280,9 @@ export function useCodexChatController(input: {
     }, [interruptTurnMutation]),
     steerTurn: useCallback(
       async (turnInput: {
-        prompt: string;
+        submittedPrompt: string;
         submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
+        transcriptPrompt?: string;
         transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
       }): Promise<void> => {
         await steerTurnMutation.mutateAsync(turnInput);

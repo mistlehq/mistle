@@ -132,6 +132,68 @@ export type CodexChatAction =
       notification: CodexJsonRpcNotification;
     };
 
+const AttachedImagesHeader = "Attached images:";
+
+function splitPromptAndAttachedImagePaths(text: string): {
+  attachmentPaths: readonly string[];
+  prompt: string;
+} {
+  const trimmedText = text.trim();
+  if (trimmedText.length === 0) {
+    return {
+      attachmentPaths: [],
+      prompt: "",
+    };
+  }
+
+  const headerBlock = `${AttachedImagesHeader}\n`;
+  const separatorBlock = `\n\n${headerBlock}`;
+  const blockStartIndex = trimmedText.startsWith(headerBlock)
+    ? 0
+    : trimmedText.lastIndexOf(separatorBlock);
+
+  if (blockStartIndex === -1) {
+    return {
+      attachmentPaths: [],
+      prompt: trimmedText,
+    };
+  }
+
+  const attachmentSection =
+    blockStartIndex === 0 ? trimmedText : trimmedText.slice(blockStartIndex + 2);
+
+  if (!attachmentSection.startsWith(headerBlock)) {
+    return {
+      attachmentPaths: [],
+      prompt: trimmedText,
+    };
+  }
+
+  const attachmentLines = attachmentSection.slice(headerBlock.length).split("\n");
+  if (attachmentLines.length === 0 || attachmentLines.some((line) => !line.startsWith("- "))) {
+    return {
+      attachmentPaths: [],
+      prompt: trimmedText,
+    };
+  }
+
+  const attachmentPaths = attachmentLines
+    .map((line) => line.slice(2).trim())
+    .filter((line) => line.length > 0);
+
+  if (attachmentPaths.length !== attachmentLines.length) {
+    return {
+      attachmentPaths: [],
+      prompt: trimmedText,
+    };
+  }
+
+  return {
+    attachmentPaths,
+    prompt: blockStartIndex === 0 ? "" : trimmedText.slice(0, blockStartIndex).trimEnd(),
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -730,6 +792,12 @@ function buildChatUserAttachments(
   return (attachments ?? []).map((attachment) => normalizeCodexLocalImageAttachment(attachment));
 }
 
+function buildChatUserAttachmentsFromPaths(
+  attachmentPaths: readonly string[],
+): NonNullable<ChatUserEntry["attachments"]> {
+  return attachmentPaths.map((path) => normalizeCodexLocalImageAttachment({ path }));
+}
+
 function mergeRawItem(existing: unknown, incoming: unknown): unknown {
   if (!isRecord(existing) || !isRecord(incoming)) {
     return incoming;
@@ -855,16 +923,23 @@ function hydrateTurns(turns: readonly CodexThreadReadTurn[]): CodexChatState {
     for (const item of turn.items) {
       const parsedUserMessage = ThreadReadUserMessageItemSchema.safeParse(item);
       if (parsedUserMessage.success) {
+        const parsedText = parsedUserMessage.data.content
+          .map((contentItem) => contentItem.text ?? "")
+          .join("");
+        const parsedAttachmentPaths = splitPromptAndAttachedImagePaths(parsedText);
         userEntry = buildUserEntry(
           turn.id,
-          parsedUserMessage.data.content.map((contentItem) => contentItem.text ?? "").join(""),
-          parsedUserMessage.data.content.flatMap((contentItem) => {
-            if (contentItem.type !== "localImage" || contentItem.path === undefined) {
-              return [];
-            }
+          parsedAttachmentPaths.prompt,
+          [
+            ...parsedUserMessage.data.content.flatMap((contentItem) => {
+              if (contentItem.type !== "localImage" || contentItem.path === undefined) {
+                return [];
+              }
 
-            return [normalizeCodexLocalImageAttachment({ path: contentItem.path })];
-          }),
+              return [normalizeCodexLocalImageAttachment({ path: contentItem.path })];
+            }),
+            ...buildChatUserAttachmentsFromPaths(parsedAttachmentPaths.attachmentPaths),
+          ],
           parsedUserMessage.data.id,
         );
         continue;
