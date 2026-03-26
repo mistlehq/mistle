@@ -25,6 +25,7 @@ export * from "./components/ui/hover-card.js";
 export * from "./components/ui/input-group.js";
 export * from "./components/ui/input-otp.js";
 export * from "./components/ui/input.js";
+export * from "./components/ui/inline-code.js";
 export * from "./components/ui/item.js";
 export * from "./components/ui/kbd.js";
 export * from "./components/ui/label.js";

@@ -9,6 +9,7 @@ import {
   FieldHeader,
   FieldLabel,
   Input,
+  InlineCode,
   Select,
   SelectContent,
   SelectItem,
@@ -20,13 +21,13 @@ import {
 import { TrashIcon } from "@phosphor-icons/react";
 
 import { FormPageFooter, FormPageHeader, FormPageSection } from "../shared/form-page.js";
-import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
+import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
+import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
 import type {
-  WebhookAutomationConversationKeyOption,
   WebhookAutomationEventOption,
   WebhookAutomationTriggerParameterValueMap,
 } from "./webhook-automation-trigger-types.js";
@@ -42,7 +43,7 @@ export type WebhookAutomationFormValues = {
   name: string;
   sandboxProfileId: string;
   enabled: boolean;
-  instructions: string;
+  inputTemplate: string;
   conversationKeyTemplate: string;
   triggerIds: string[];
   triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
@@ -124,29 +125,6 @@ function SelectField(input: {
   );
 }
 
-export function resolveConversationKeyFieldOptions(input: {
-  selectedEventOptions: readonly WebhookAutomationEventOption[];
-  currentTemplate: string;
-}): {
-  options: readonly WebhookAutomationConversationKeyOption[];
-  selectedTemplate: string;
-  hasUnsupportedCurrentTemplate: boolean;
-} {
-  const options = resolveCommonWebhookAutomationConversationKeyOptions({
-    selectedEventOptions: input.selectedEventOptions,
-  });
-  const isCurrentTemplateSupported =
-    input.currentTemplate.trim().length > 0 &&
-    options.some((option) => option.template === input.currentTemplate);
-
-  return {
-    options,
-    selectedTemplate: isCurrentTemplateSupported ? input.currentTemplate : "",
-    hasUnsupportedCurrentTemplate:
-      input.currentTemplate.trim().length > 0 && !isCurrentTemplateSupported,
-  };
-}
-
 export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.JSX.Element {
   const submitLabel = input.mode === "create" ? "Create automation" : "Save changes";
   const selectedTriggerOptions = resolveSelectedWebhookAutomationEventOptions({
@@ -171,6 +149,8 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
     selectedConversationGroupingOption === undefined
       ? undefined
       : selectedConversationGroupingOption.label;
+  const isInputTemplateDefault =
+    input.values.inputTemplate === DefaultWebhookAutomationInputTemplate;
 
   return (
     <div className="flex flex-col gap-6">
@@ -356,23 +336,44 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         <div className="p-4">
           <Field>
             <FieldHeader>
-              <FieldLabel htmlFor="automation-instructions">Agent Instructions</FieldLabel>
-              <FieldDescription>
-                These instructions are sent together with the webhook payload and event type.
-              </FieldDescription>
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <FieldLabel htmlFor="automation-input-template">Agent Instructions</FieldLabel>
+                  <FieldDescription>
+                    <span className="block">
+                      These are the instructions the agent will receive.
+                    </span>
+                    <span className="block">
+                      Use Liquid syntax with{" "}
+                      <InlineCode variant="muted">{"{{webhookEvent.eventType}}"}</InlineCode> and{" "}
+                      <InlineCode variant="muted">{"{{payload}}"}</InlineCode>.
+                    </span>
+                  </FieldDescription>
+                </div>
+                <Button
+                  disabled={input.isDeleting || input.isSaving || isInputTemplateDefault}
+                  onClick={() => {
+                    input.onValueChange("inputTemplate", DefaultWebhookAutomationInputTemplate);
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  Reset to default
+                </Button>
+              </div>
             </FieldHeader>
             <FieldContent>
               <Textarea
-                className="min-h-36"
-                id="automation-instructions"
+                className="min-h-48 text-sm"
+                id="automation-input-template"
                 disabled={input.isDeleting || input.isSaving}
                 onChange={(event) => {
-                  input.onValueChange("instructions", event.currentTarget.value);
+                  input.onValueChange("inputTemplate", event.currentTarget.value);
                 }}
-                rows={5}
-                value={input.values.instructions}
+                rows={8}
+                value={input.values.inputTemplate}
               />
-              <FieldError message={input.fieldErrors.instructions} />
+              <FieldError message={input.fieldErrors.inputTemplate} />
             </FieldContent>
           </Field>
         </div>
