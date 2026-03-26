@@ -266,6 +266,7 @@ function createEmptyComposerProps(): SessionConversationComposerProps {
     canInterruptTurn: false,
     canSteerTurn: false,
     completedErrorMessage: null,
+    composerStatusMessage: null,
     composerText: "",
     isConnected: false,
     isInterruptingTurn: false,

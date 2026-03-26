@@ -16,6 +16,7 @@ import {
   hasFreshSandboxStatusRead,
   isActiveResumeRequest,
   resolveActiveComposerModel,
+  resolveComposerNotice,
   resolveSessionEntryPhase,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForEntryPhase,
@@ -71,7 +72,7 @@ function renderSessionWorkbenchController(input: {
 }
 
 describe("useSessionWorkbenchController", () => {
-  it("resolves the selected composer model before falling back to the default model", () => {
+  it("resolves the explicitly selected composer model", () => {
     expect(
       resolveActiveComposerModel({
         availableModels: [
@@ -253,6 +254,60 @@ describe("useSessionWorkbenchController", () => {
     expect(buildUnavailableModelErrorMessage("gpt-legacy")).toBe(
       "Model gpt-legacy is no longer available. Switch to another model to continue.",
     );
+  });
+
+  it("does not report an unavailable model before the model list has loaded", () => {
+    expect(
+      resolveComposerNotice({
+        hasPendingAttachments: true,
+        hasUnavailableModel: true,
+        isModelListLoaded: false,
+        selectedModel: "gpt-legacy-preview",
+        supportsImages: true,
+        activeModel: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("prefers the unavailable-model and non-image-capable composer notices only when no real composer error exists", () => {
+    expect(
+      resolveComposerNotice({
+        hasPendingAttachments: true,
+        hasUnavailableModel: true,
+        isModelListLoaded: true,
+        selectedModel: "gpt-legacy-preview",
+        supportsImages: true,
+        activeModel: null,
+      }),
+    ).toEqual({
+      message:
+        "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
+      tone: "error",
+    });
+
+    expect(
+      resolveComposerNotice({
+        hasPendingAttachments: true,
+        hasUnavailableModel: false,
+        isModelListLoaded: true,
+        selectedModel: "gpt-5.3-codex-spark",
+        supportsImages: false,
+        activeModel: {
+          id: "text_model",
+          model: "gpt-5.3-codex-spark",
+          displayName: "GPT-5.3 Codex Spark",
+          hidden: false,
+          defaultReasoningEffort: null,
+          inputModalities: ["text"],
+          supportsPersonality: false,
+          isDefault: false,
+        },
+      }),
+    ).toEqual({
+      message:
+        "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
+      tone: "warning",
+    });
   });
 
   it("returns separate workbench and conversation pane state for a missing session id", () => {

@@ -1,4 +1,6 @@
 import {
+  Alert,
+  AlertDescription,
   Button,
   Select,
   SelectContent,
@@ -14,8 +16,14 @@ import { resolveSelectableValue } from "../../shared/select-value.js";
 
 const REASONING_EFFORT_OPTIONS = ["low", "medium", "high", "xhigh"] as const;
 
+type ChatComposerStatusMessage = {
+  message: string;
+  tone: "error" | "warning";
+};
+
 type ChatComposerProps = {
   composerText: string;
+  composerStatusMessage: ChatComposerStatusMessage | null;
   pendingAttachments: readonly {
     id: string;
     name: string;
@@ -45,6 +53,7 @@ type ChatComposerProps = {
 
 export function ChatComposer({
   composerText,
+  composerStatusMessage,
   pendingAttachments,
   modelOptions,
   selectedModel,
@@ -126,6 +135,14 @@ export function ChatComposer({
         addPendingFiles(Array.from(event.dataTransfer.files));
       }}
     >
+      {composerStatusMessage === null ? null : (
+        <Alert
+          className="mx-1 mt-1"
+          variant={composerStatusMessage.tone === "error" ? "destructive" : "default"}
+        >
+          <AlertDescription>{composerStatusMessage.message}</AlertDescription>
+        </Alert>
+      )}
       <input
         accept="image/*"
         className="hidden"

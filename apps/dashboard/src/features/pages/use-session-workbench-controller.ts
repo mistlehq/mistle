@@ -173,6 +173,34 @@ export function buildPromptWithAttachedImagePaths(input: {
   return `${trimmedPrompt}\n\n${attachedImagePathsText}`;
 }
 
+export function resolveComposerNotice(input: {
+  hasPendingAttachments: boolean;
+  hasUnavailableModel: boolean;
+  isModelListLoaded: boolean;
+  selectedModel: string | null;
+  supportsImages: boolean;
+  activeModel: CodexModelSummary | null;
+}): {
+  message: string;
+  tone: "error" | "warning";
+} | null {
+  if (input.hasUnavailableModel && input.isModelListLoaded && input.selectedModel !== null) {
+    return {
+      message: buildUnavailableModelErrorMessage(input.selectedModel),
+      tone: "error",
+    };
+  }
+
+  if (input.hasPendingAttachments && input.activeModel !== null && !input.supportsImages) {
+    return {
+      message: buildNonImageCapableModelWarningMessage(input.activeModel.displayName),
+      tone: "warning",
+    };
+  }
+
+  return null;
+}
+
 export function shouldWaitForAutomationSessionThread(input: {
   sandboxStatus: string | null;
   automationConversation: SandboxAutomationConversation;
@@ -251,6 +279,10 @@ type SessionConversationPaneState = {
     canInterruptTurn: boolean;
     canSteerTurn: boolean;
     completedErrorMessage: string | null;
+    composerStatusMessage: {
+      message: string;
+      tone: "error" | "warning";
+    } | null;
     composerText: string;
     isConnected: boolean;
     isInterruptingTurn: boolean;
@@ -463,6 +495,7 @@ export function useSessionWorkbenchController(input: {
   sandboxInstanceId: string | null;
 }): UseSessionWorkbenchControllerResult {
   const [composerText, setComposerText] = useState("");
+  const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null);
   const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
     readonly PendingComposerAttachment[]
   >([]);
@@ -498,7 +531,6 @@ export function useSessionWorkbenchController(input: {
     connectedSession,
     disconnectSession,
     isStartingSession,
-    reportStartErrorMessage,
     startErrorMessage,
     step,
   } = lifecycle;
@@ -621,6 +653,7 @@ export function useSessionWorkbenchController(input: {
 
   useEffect(() => {
     setComposerText("");
+    setComposerErrorMessage(null);
     setPendingComposerAttachments([]);
     setIsUploadingAttachments(false);
   }, [input.sandboxInstanceId]);
@@ -758,6 +791,7 @@ export function useSessionWorkbenchController(input: {
 
   const setComposerModel = useCallback(
     (nextModel: string): void => {
+      setComposerErrorMessage(null);
       setComposerConfigDraft((currentDraft) => ({
         baseConfigJson: admin.configJson,
         model: nextModel,
@@ -781,6 +815,7 @@ export function useSessionWorkbenchController(input: {
 
   const setComposerReasoningEffort = useCallback(
     (nextReasoningEffort: string): void => {
+      setComposerErrorMessage(null);
       setComposerConfigDraft((currentDraft) => ({
         baseConfigJson: admin.configJson,
         model:
@@ -798,6 +833,11 @@ export function useSessionWorkbenchController(input: {
     [admin.configJson, composerConfigSnapshot.model, writeConfigValue],
   );
 
+  const handleComposerTextChange = useCallback((nextText: string): void => {
+    setComposerErrorMessage(null);
+    setComposerText(nextText);
+  }, []);
+
   const composerModelOptions = admin.availableModels.map((model) => ({
     value: model.model,
     label: model.displayName,
@@ -811,6 +851,21 @@ export function useSessionWorkbenchController(input: {
     activeModel: activeComposerModel,
   });
   const activeComposerModelSupportsImages = supportsImageInspection(activeComposerModel);
+  const isComposerModelListLoaded = admin.availableModels.length > 0;
+  const composerNotice =
+    composerErrorMessage === null
+      ? resolveComposerNotice({
+          hasPendingAttachments: pendingComposerAttachments.length > 0,
+          hasUnavailableModel: hasUnavailableComposerModel,
+          isModelListLoaded: isComposerModelListLoaded,
+          selectedModel: activeComposerConfig.model,
+          supportsImages: activeComposerModelSupportsImages,
+          activeModel: activeComposerModel,
+        })
+      : {
+          message: composerErrorMessage,
+          tone: "error" as const,
+        };
 
   const addPendingComposerFiles = useCallback((files: readonly File[]): void => {
     const nextAttachments = files.flatMap((file) => {
@@ -831,6 +886,7 @@ export function useSessionWorkbenchController(input: {
       return;
     }
 
+    setComposerErrorMessage(null);
     setPendingComposerAttachments((currentAttachments) => [
       ...currentAttachments,
       ...nextAttachments,
@@ -838,48 +894,15 @@ export function useSessionWorkbenchController(input: {
   }, []);
 
   const removePendingComposerAttachment = useCallback((attachmentId: string): void => {
+    setComposerErrorMessage(null);
     setPendingComposerAttachments((currentAttachments) =>
       currentAttachments.filter((attachment) => attachment.id !== attachmentId),
     );
   }, []);
 
-  useEffect(() => {
-    if (hasUnavailableComposerModel && activeComposerConfig.model !== null) {
-      reportStartErrorMessage(buildUnavailableModelErrorMessage(activeComposerConfig.model));
-      return;
-    }
-
-    if (
-      pendingComposerAttachments.length > 0 &&
-      !activeComposerModelSupportsImages &&
-      activeComposerModel !== null
-    ) {
-      reportStartErrorMessage(
-        buildNonImageCapableModelWarningMessage(activeComposerModel.displayName),
-      );
-      return;
-    }
-
-    if (
-      startErrorMessage !== null &&
-      (startErrorMessage.endsWith(NonImageCapableModelWarningMessageSuffix) ||
-        startErrorMessage.endsWith(UnavailableModelErrorMessageSuffix))
-    ) {
-      clearStartErrorMessage();
-    }
-  }, [
-    activeComposerConfig.model,
-    activeComposerModel,
-    activeComposerModelSupportsImages,
-    clearStartErrorMessage,
-    hasUnavailableComposerModel,
-    pendingComposerAttachments.length,
-    reportStartErrorMessage,
-    startErrorMessage,
-  ]);
-
   const submitComposer = useCallback((): void => {
     void (async () => {
+      setComposerErrorMessage(null);
       const action = resolveChatComposerAction({
         composerText,
         hasActiveTurn,
@@ -891,8 +914,12 @@ export function useSessionWorkbenchController(input: {
         return;
       }
 
-      if (hasUnavailableComposerModel && activeComposerConfig.model !== null) {
-        reportStartErrorMessage(buildUnavailableModelErrorMessage(activeComposerConfig.model));
+      if (
+        hasUnavailableComposerModel &&
+        isComposerModelListLoaded &&
+        activeComposerConfig.model !== null
+      ) {
+        setComposerErrorMessage(buildUnavailableModelErrorMessage(activeComposerConfig.model));
         return;
       }
 
@@ -904,7 +931,7 @@ export function useSessionWorkbenchController(input: {
           connectedSession === null ||
           connectedSession.threadId === null
         ) {
-          reportStartErrorMessage("Connect to a sandbox session before uploading images.");
+          setComposerErrorMessage("Connect to a sandbox session before uploading images.");
           return;
         }
 
@@ -931,7 +958,7 @@ export function useSessionWorkbenchController(input: {
             path: image.path,
           }));
         } catch (error) {
-          reportStartErrorMessage(resolveUploadErrorMessage(error));
+          setComposerErrorMessage(resolveUploadErrorMessage(error));
           return;
         } finally {
           setIsUploadingAttachments(false);
@@ -957,7 +984,7 @@ export function useSessionWorkbenchController(input: {
           });
         }
       } catch (error) {
-        reportStartErrorMessage(
+        setComposerErrorMessage(
           error instanceof Error ? error.message : "Could not submit chat message.",
         );
         return;
@@ -966,6 +993,7 @@ export function useSessionWorkbenchController(input: {
       if (action.shouldClearComposer) {
         setComposerText("");
       }
+      setComposerErrorMessage(null);
       setPendingComposerAttachments([]);
     })();
   }, [
@@ -977,8 +1005,8 @@ export function useSessionWorkbenchController(input: {
     activeComposerConfig.model,
     activeComposerModelSupportsImages,
     hasUnavailableComposerModel,
+    isComposerModelListLoaded,
     pendingComposerAttachments,
-    reportStartErrorMessage,
     startTurn,
     steerTurn,
   ]);
@@ -1087,6 +1115,7 @@ export function useSessionWorkbenchController(input: {
         canInterruptTurn: chat.canInterruptTurn,
         canSteerTurn: chat.canSteerTurn,
         completedErrorMessage: chat.chatState.completedErrorMessage,
+        composerStatusMessage: composerNotice,
         composerText,
         isConnected: lifecycle.connectedSession !== null,
         isInterruptingTurn: chat.isInterruptingTurn,
@@ -1099,7 +1128,7 @@ export function useSessionWorkbenchController(input: {
           admin.isReadingConfig ||
           admin.isWritingConfigValue,
         modelOptions: composerModelOptions,
-        onComposerTextChange: setComposerText,
+        onComposerTextChange: handleComposerTextChange,
         onModelChange: setComposerModel,
         onPendingImageFilesAdded: addPendingComposerFiles,
         onReasoningEffortChange: setComposerReasoningEffort,

@@ -55,6 +55,7 @@ export const CodexFixtureSessionServerRequests: readonly CodexApprovalRequestEnt
 
 export const CodexFixtureSessionComposerProps: SessionConversationComposerProps = {
   composerText: "Focus on dashboard asset ownership next.",
+  composerStatusMessage: null,
   modelOptions: CodexFixtureSessionModelOptions,
   selectedModel: "gpt-5.4",
   selectedReasoningEffort: "medium",
@@ -95,11 +96,21 @@ export const CodexFixtureSessionComposerPropsUploadingImageAttachments: SessionC
 export const CodexFixtureSessionComposerPropsForNonImageCapableModel: SessionConversationComposerProps =
   {
     ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+    composerStatusMessage: {
+      message:
+        "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
+      tone: "warning",
+    },
     selectedModel: "gpt-5.3-codex-spark",
   };
 
 export const CodexFixtureSessionComposerPropsForUnavailableModel: SessionConversationComposerProps =
   {
     ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+    composerStatusMessage: {
+      message:
+        "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
+      tone: "error",
+    },
     selectedModel: "gpt-legacy-preview",
   };

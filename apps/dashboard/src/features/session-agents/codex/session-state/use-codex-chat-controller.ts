@@ -164,9 +164,6 @@ export function useCodexChatController(input: {
         throw error;
       }
     },
-    onError: (error) => {
-      input.setStartErrorMessage(error instanceof Error ? error.message : "Could not start turn.");
-    },
   });
 
   const reloadChatMutation = useMutation({
@@ -226,9 +223,6 @@ export function useCodexChatController(input: {
       });
 
       input.recordRecentResponse(steeredTurn.response);
-    },
-    onError: (error) => {
-      input.setStartErrorMessage(error instanceof Error ? error.message : "Could not steer turn.");
     },
   });
 

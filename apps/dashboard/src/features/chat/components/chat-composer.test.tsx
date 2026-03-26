@@ -10,6 +10,7 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
     canInterruptTurn: false,
     canSteerTurn: false,
     completedErrorMessage: null,
+    composerStatusMessage: null,
     composerText: "Ship it",
     isConnected: true,
     isInterruptingTurn: false,
@@ -39,6 +40,25 @@ describe("ChatComposer", () => {
     render(<ChatComposer {...createBaseComposerProps()} />);
 
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+  });
+
+  it("renders composer-local status messages above the composer", () => {
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        composerStatusMessage={{
+          message:
+            "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
+          tone: "warning",
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
+      ),
+    ).toBeTruthy();
   });
 
   it("renders a Stop action button when an active turn has no steering text", () => {
