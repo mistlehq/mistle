@@ -52,6 +52,7 @@ describe("keyset cursor codec", () => {
       }),
     ).toThrow(KeysetCursorDecodeError);
 
+    let caughtError: unknown;
     try {
       decodeKeysetCursor({
         encodedCursor: "%",
@@ -59,11 +60,11 @@ describe("keyset cursor codec", () => {
       });
       throw new Error("Expected decodeKeysetCursor to throw.");
     } catch (error) {
-      expect(error).toBeInstanceOf(KeysetCursorDecodeError);
-      if (error instanceof KeysetCursorDecodeError) {
-        expect(error.reason).toBe(KeysetCursorDecodeErrorReasons.INVALID_JSON);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(KeysetCursorDecodeError);
+    expect(caughtError).toMatchObject({ reason: KeysetCursorDecodeErrorReasons.INVALID_JSON });
   });
 
   it("throws a typed error for invalid cursor shape", () => {
@@ -75,6 +76,7 @@ describe("keyset cursor codec", () => {
       "utf8",
     ).toString("base64url");
 
+    let caughtError: unknown;
     try {
       decodeKeysetCursor({
         encodedCursor: invalidShapeCursor,
@@ -82,11 +84,11 @@ describe("keyset cursor codec", () => {
       });
       throw new Error("Expected decodeKeysetCursor to throw.");
     } catch (error) {
-      expect(error).toBeInstanceOf(KeysetCursorDecodeError);
-      if (error instanceof KeysetCursorDecodeError) {
-        expect(error.reason).toBe(KeysetCursorDecodeErrorReasons.INVALID_SHAPE);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(KeysetCursorDecodeError);
+    expect(caughtError).toMatchObject({ reason: KeysetCursorDecodeErrorReasons.INVALID_SHAPE });
   });
 
   it("maps decode errors through decodeKeysetCursorOrThrow", () => {
@@ -102,6 +104,7 @@ describe("keyset cursor codec", () => {
       }
     }
 
+    let caughtError: unknown;
     try {
       decodeKeysetCursorOrThrow({
         encodedCursor: "%",
@@ -111,11 +114,13 @@ describe("keyset cursor codec", () => {
       });
       throw new Error("Expected decodeKeysetCursorOrThrow to throw.");
     } catch (error) {
-      expect(error).toBeInstanceOf(CustomCursorError);
-      if (error instanceof CustomCursorError) {
-        expect(error.reason).toBe(KeysetCursorDecodeErrorReasons.INVALID_JSON);
-        expect(error.cursorName).toBe("after");
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(CustomCursorError);
+    expect(caughtError).toMatchObject({
+      reason: KeysetCursorDecodeErrorReasons.INVALID_JSON,
+      cursorName: "after",
+    });
   });
 });

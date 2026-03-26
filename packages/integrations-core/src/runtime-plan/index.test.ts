@@ -357,6 +357,7 @@ describe("assembleCompiledRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       assembleCompiledRuntimePlan({
         sandboxProfileId: "sbp_123",
@@ -407,11 +408,13 @@ describe("assembleCompiledRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({
+      code: CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+    });
   });
 
   it("fails on runtime client fileId merge conflicts", () => {
@@ -476,6 +479,7 @@ describe("assembleCompiledRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       assembleCompiledRuntimePlan({
         sandboxProfileId: "sbp_123",
@@ -536,10 +540,12 @@ describe("assembleCompiledRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({
+      code: CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+    });
   });
 });

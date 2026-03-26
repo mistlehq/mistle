@@ -192,16 +192,17 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.ROUTE_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.ROUTE_CONFLICT });
   });
 
   it("fails on duplicate workspace source paths", () => {
@@ -244,16 +245,19 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({
+      code: CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+    });
   });
 
   it("fails when a route contains an empty path prefix", () => {
@@ -273,16 +277,17 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.ROUTE_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.ROUTE_CONFLICT });
   });
 
   it("fails on runtime client env conflicts", () => {
@@ -323,16 +328,19 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({
+      code: CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+    });
   });
 
   it("fails on runtime client fileId conflicts", () => {
@@ -383,16 +391,19 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({
+      code: CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+    });
   });
 
   it("accepts runtime client env values that are structurally equivalent", () => {
@@ -852,16 +863,17 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.AGENT_RUNTIME_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.AGENT_RUNTIME_CONFLICT });
   });
 
   it("fails when an agent runtime references a missing endpoint", () => {
@@ -903,16 +915,17 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.AGENT_RUNTIME_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.AGENT_RUNTIME_CONFLICT });
   });
 
   it("fails when an agent runtime omits adapterKey", () => {

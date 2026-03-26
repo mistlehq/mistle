@@ -774,6 +774,7 @@ describe("compileRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       compileRuntimePlan({
         organizationId: "org_123",
@@ -863,11 +864,11 @@ describe("compileRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.MCP_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.MCP_CONFLICT });
   });
 
   it("fails when target is disabled", () => {
@@ -910,6 +911,7 @@ describe("compileRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       compileRuntimePlan({
         organizationId: "org_123",
@@ -945,11 +947,11 @@ describe("compileRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.TARGET_DISABLED);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.TARGET_DISABLED });
   });
 
   it("fails when resolved connection does not match binding connectionId", () => {
@@ -992,6 +994,7 @@ describe("compileRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       compileRuntimePlan({
         organizationId: "org_123",
@@ -1027,11 +1030,11 @@ describe("compileRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.CONNECTION_MISMATCH);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.CONNECTION_MISMATCH });
   });
 
   it("fails when target config does not satisfy schema", () => {
@@ -1078,6 +1081,7 @@ describe("compileRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       compileRuntimePlan({
         organizationId: "org_123",
@@ -1117,11 +1121,11 @@ describe("compileRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.INVALID_TARGET_CONFIG);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.INVALID_TARGET_CONFIG });
   });
 
   it("fails when target secrets do not satisfy schema", () => {
@@ -1193,6 +1197,7 @@ describe("compileRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       compileRuntimePlan({
         organizationId: "org_123",
@@ -1232,11 +1237,11 @@ describe("compileRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.INVALID_TARGET_SECRETS);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.INVALID_TARGET_SECRETS });
   });
 
   it("fails when binding config does not satisfy schema", () => {
@@ -1283,6 +1288,7 @@ describe("compileRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       compileRuntimePlan({
         organizationId: "org_123",
@@ -1322,11 +1328,11 @@ describe("compileRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.INVALID_BINDING_CONFIG);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.INVALID_BINDING_CONFIG });
   });
 
   it("passes parsed schema outputs into compileBinding", () => {
