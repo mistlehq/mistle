@@ -26,7 +26,7 @@
     "@mistle/sandbox-rs-napi": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/time": "workspace:*",
-    "undici": "7.24.4",
+    "undici": "7.24.5",
     "ws": "^8.19.0"
   },
   "devDependencies": {
