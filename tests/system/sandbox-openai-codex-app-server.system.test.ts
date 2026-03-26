@@ -249,6 +249,12 @@ type AgentSocketSession = {
   handshakeStreamId: number;
 };
 
+type SandboxScenarioContext = {
+  stepTrace: StepTraceEntry[];
+  websocketTraceEntries: WebSocketTraceEntry[];
+  registerWebsocketCleanup: (cleanup: { socket: WebSocket; detachTrace: () => void }) => void;
+};
+
 const WebSocketJsonMessagePumps = new WeakMap<WebSocket, WebSocketJsonMessagePump>();
 
 function hasRequiredGitHubEnv(): boolean {
@@ -1009,6 +1015,46 @@ async function buildFailureDiagnostics(input: {
   }
 
   return diagnostics;
+}
+
+async function runSandboxScenario(input: {
+  fixture: SystemTestFixture;
+  includeAppContainerDiagnostics?: boolean;
+  action: (context: SandboxScenarioContext) => Promise<void>;
+}): Promise<void> {
+  const stepTrace: StepTraceEntry[] = [];
+  const websocketTraceEntries: WebSocketTraceEntry[] = [];
+  let websocketForCleanup: WebSocket | null = null;
+  let detachWebSocketTrace: () => void = () => {};
+
+  try {
+    await input.action({
+      stepTrace,
+      websocketTraceEntries,
+      registerWebsocketCleanup: (cleanup) => {
+        websocketForCleanup = cleanup.socket;
+        detachWebSocketTrace = cleanup.detachTrace;
+      },
+    });
+  } catch (error) {
+    const diagnostics = await buildFailureDiagnostics({
+      websocketTraceEntries,
+      ...(input.includeAppContainerDiagnostics === true
+        ? {
+            fixture: input.fixture,
+          }
+        : {}),
+    });
+
+    throw new Error(
+      `System test failed. Step trace: ${formatStepTrace(stepTrace)}. Cause: ${describeUnknownError(error)}\n\nDiagnostics:\n${diagnostics}`,
+    );
+  } finally {
+    detachWebSocketTrace();
+    if (websocketForCleanup !== null) {
+      await closeWebSocket(websocketForCleanup);
+    }
+  }
 }
 
 async function waitForCondition<T>(input: {
@@ -1963,162 +2009,149 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
   it(
     "connects to an agent endpoint and exchanges Codex app-server JSON-RPC messages",
     async ({ fixture }) => {
-      const stepTrace: StepTraceEntry[] = [];
-      const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
-      const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
-      const connectionDisplayName = `System OpenAI Connection ${randomUUID()}`;
-      let websocketForCleanup: WebSocket | null = null;
-      let detachWebSocketTrace: (() => void) | null = null;
-      const websocketTraceEntries: WebSocketTraceEntry[] = [];
+      await runSandboxScenario({
+        fixture,
+        includeAppContainerDiagnostics: true,
+        action: async ({ stepTrace, websocketTraceEntries, registerWebsocketCleanup }) => {
+          const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
+          const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
+          const connectionDisplayName = `System OpenAI Connection ${randomUUID()}`;
+          const authenticatedSession = await runStep({
+            stepTrace,
+            stepName: "create authenticated session",
+            action: async () => {
+              return await fixture.authSession();
+            },
+          });
 
-      try {
-        const authenticatedSession = await runStep({
-          stepTrace,
-          stepName: "create authenticated session",
-          action: async () => {
-            return await fixture.authSession();
-          },
-        });
-
-        const connectionId = await createOpenAiConnection({
-          fixture,
-          authenticatedSession,
-          openAiApiKey,
-          displayName: connectionDisplayName,
-          stepTrace,
-        });
-        const profileId = await createSandboxProfile({
-          fixture,
-          authenticatedSession,
-          displayName: `System OpenAI App-Server ${randomUUID()}`,
-          stepTrace,
-        });
-        await updateSandboxBindings({
-          fixture,
-          authenticatedSession,
-          profileId,
-          stepTrace,
-          stepName: "bind OpenAI agent integration",
-          bindings: [
-            {
-              connectionId,
-              kind: "agent",
-              config: {
-                runtime: "codex-cli",
-                defaultModel: "gpt-5.3-codex",
-                reasoningEffort: "medium",
+          const connectionId = await createOpenAiConnection({
+            fixture,
+            authenticatedSession,
+            openAiApiKey,
+            displayName: connectionDisplayName,
+            stepTrace,
+          });
+          const profileId = await createSandboxProfile({
+            fixture,
+            authenticatedSession,
+            displayName: `System OpenAI App-Server ${randomUUID()}`,
+            stepTrace,
+          });
+          await updateSandboxBindings({
+            fixture,
+            authenticatedSession,
+            profileId,
+            stepTrace,
+            stepName: "bind OpenAI agent integration",
+            bindings: [
+              {
+                connectionId,
+                kind: "agent",
+                config: {
+                  runtime: "codex-cli",
+                  defaultModel: "gpt-5.3-codex",
+                  reasoningEffort: "medium",
+                },
               },
-            },
-          ],
-        });
-        const sandboxInstanceId = await startSandboxInstance({
-          fixture,
-          authenticatedSession,
-          profileId,
-          stepTrace,
-        });
-        await waitForSandboxInstanceRunningStep({
-          fixture,
-          authenticatedSession,
-          sandboxInstanceId,
-          stepTrace,
-        });
-
-        const agentSession = await connectInitializedAgentSession({
-          fixture,
-          authenticatedSession,
-          sandboxInstanceId,
-          dataPlaneGatewayBaseUrl,
-          stepTrace,
-          websocketTraceEntries,
-          initializeStepName: "connect and initialize Codex app-server",
-        });
-        const websocket = agentSession.websocket;
-        websocketForCleanup = websocket;
-        detachWebSocketTrace = agentSession.detachWebSocketTrace;
-        const handshakeStreamId = agentSession.handshakeStreamId;
-
-        const threadId = await startThread({
-          websocket,
-          handshakeStreamId,
-          model: "gpt-5.3-codex",
-          stepTrace,
-        });
-
-        const notificationsWhileStartingTurn: JsonRpcNotification[] = [];
-        const observedCommandExecutions: CommandExecutionItem[] = [];
-        const turnId = await startTurn({
-          websocket,
-          handshakeStreamId,
-          threadId,
-          requestId: 2,
-          stepTrace,
-          stepName: "json-rpc turn/start",
-          notificationSink: notificationsWhileStartingTurn,
-          turnInput: [
-            {
-              type: "text",
-              text: `Reply with exactly ${TEST_RESPONSE_MARKER} and nothing else.`,
-            },
-          ],
-        });
-
-        const agentTextParts: string[] = [];
-        let preBufferedTurnCompletion: TurnCompletion | null = null;
-        for (const notification of notificationsWhileStartingTurn) {
-          collectAgentMessageText({
-            method: notification.method,
-            params: notification.params,
-            sink: agentTextParts,
+            ],
           });
-          collectCommandExecutionItem({
-            method: notification.method,
-            params: notification.params,
-            sink: observedCommandExecutions,
+          const sandboxInstanceId = await startSandboxInstance({
+            fixture,
+            authenticatedSession,
+            profileId,
+            stepTrace,
           });
-          const completion = parseTurnCompletedNotification(notification);
-          if (completion !== null && completion.turnId === turnId) {
-            preBufferedTurnCompletion = completion;
+          await waitForSandboxInstanceRunningStep({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+            stepTrace,
+          });
+
+          const agentSession = await connectInitializedAgentSession({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+            dataPlaneGatewayBaseUrl,
+            stepTrace,
+            websocketTraceEntries,
+            initializeStepName: "connect and initialize Codex app-server",
+          });
+          const websocket = agentSession.websocket;
+          registerWebsocketCleanup({
+            socket: websocket,
+            detachTrace: agentSession.detachWebSocketTrace,
+          });
+          const handshakeStreamId = agentSession.handshakeStreamId;
+
+          const threadId = await startThread({
+            websocket,
+            handshakeStreamId,
+            model: "gpt-5.3-codex",
+            stepTrace,
+          });
+
+          const notificationsWhileStartingTurn: JsonRpcNotification[] = [];
+          const observedCommandExecutions: CommandExecutionItem[] = [];
+          const turnId = await startTurn({
+            websocket,
+            handshakeStreamId,
+            threadId,
+            requestId: 2,
+            stepTrace,
+            stepName: "json-rpc turn/start",
+            notificationSink: notificationsWhileStartingTurn,
+            turnInput: [
+              {
+                type: "text",
+                text: `Reply with exactly ${TEST_RESPONSE_MARKER} and nothing else.`,
+              },
+            ],
+          });
+
+          const agentTextParts: string[] = [];
+          let preBufferedTurnCompletion: TurnCompletion | null = null;
+          for (const notification of notificationsWhileStartingTurn) {
+            collectAgentMessageText({
+              method: notification.method,
+              params: notification.params,
+              sink: agentTextParts,
+            });
+            collectCommandExecutionItem({
+              method: notification.method,
+              params: notification.params,
+              sink: observedCommandExecutions,
+            });
+            const completion = parseTurnCompletedNotification(notification);
+            if (completion !== null && completion.turnId === turnId) {
+              preBufferedTurnCompletion = completion;
+            }
           }
-        }
 
-        const turnCompletion = await runStep({
-          stepTrace,
-          stepName: "wait for turn/completed",
-          action: async () => {
-            return (
-              preBufferedTurnCompletion ??
-              (await waitForTurnCompletion({
-                socket: websocket,
-                turnId,
-                timeoutMs: TURN_COMPLETION_TIMEOUT_MS,
-                agentTextSink: agentTextParts,
-                commandExecutionSink: observedCommandExecutions,
-              }))
-            );
-          },
-        });
-        expect(turnCompletion.status).toBe("completed");
-        expect(turnCompletion.errorMessage).toBeNull();
+          const turnCompletion = await runStep({
+            stepTrace,
+            stepName: "wait for turn/completed",
+            action: async () => {
+              return (
+                preBufferedTurnCompletion ??
+                (await waitForTurnCompletion({
+                  socket: websocket,
+                  turnId,
+                  timeoutMs: TURN_COMPLETION_TIMEOUT_MS,
+                  agentTextSink: agentTextParts,
+                  commandExecutionSink: observedCommandExecutions,
+                }))
+              );
+            },
+          });
+          expect(turnCompletion.status).toBe("completed");
+          expect(turnCompletion.errorMessage).toBeNull();
 
-        const combinedAgentText = agentTextParts.join("");
-        expect(combinedAgentText.length).toBeGreaterThan(0);
-        expect(combinedAgentText).toContain(TEST_RESPONSE_MARKER);
-      } catch (error) {
-        const diagnostics = await buildFailureDiagnostics({
-          websocketTraceEntries,
-          fixture,
-        });
-
-        throw new Error(
-          `System test failed. Step trace: ${formatStepTrace(stepTrace)}. Cause: ${describeUnknownError(error)}\n\nDiagnostics:\n${diagnostics}`,
-        );
-      } finally {
-        detachWebSocketTrace?.();
-        if (websocketForCleanup !== null) {
-          await closeWebSocket(websocketForCleanup);
-        }
-      }
+          const combinedAgentText = agentTextParts.join("");
+          expect(combinedAgentText.length).toBeGreaterThan(0);
+          expect(combinedAgentText).toContain(TEST_RESPONSE_MARKER);
+        },
+      });
     },
     SYSTEM_TEST_TIMEOUT_MS,
   );
@@ -2126,156 +2159,143 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
   it(
     "uploads an image over fileUpload and sends it as localImage turn input",
     async ({ fixture }) => {
-      const stepTrace: StepTraceEntry[] = [];
-      const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
-      const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
-      const connectionDisplayName = `System OpenAI Image Connection ${randomUUID()}`;
-      let websocketForCleanup: WebSocket | null = null;
-      let detachWebSocketTrace: (() => void) | null = null;
-      const websocketTraceEntries: WebSocketTraceEntry[] = [];
+      await runSandboxScenario({
+        fixture,
+        includeAppContainerDiagnostics: true,
+        action: async ({ stepTrace, websocketTraceEntries, registerWebsocketCleanup }) => {
+          const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
+          const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
+          const connectionDisplayName = `System OpenAI Image Connection ${randomUUID()}`;
+          const authenticatedSession = await runStep({
+            stepTrace,
+            stepName: "create authenticated session",
+            action: async () => {
+              return await fixture.authSession();
+            },
+          });
 
-      try {
-        const authenticatedSession = await runStep({
-          stepTrace,
-          stepName: "create authenticated session",
-          action: async () => {
-            return await fixture.authSession();
-          },
-        });
-
-        const connectionId = await createOpenAiConnection({
-          fixture,
-          authenticatedSession,
-          openAiApiKey,
-          displayName: connectionDisplayName,
-          stepTrace,
-        });
-        const profileId = await createSandboxProfile({
-          fixture,
-          authenticatedSession,
-          displayName: `System OpenAI Image App-Server ${randomUUID()}`,
-          stepTrace,
-        });
-        await updateSandboxBindings({
-          fixture,
-          authenticatedSession,
-          profileId,
-          stepTrace,
-          stepName: "bind OpenAI agent integration",
-          bindings: [
-            {
-              connectionId,
-              kind: "agent",
-              config: {
-                runtime: "codex-cli",
-                defaultModel: "gpt-5.3-codex",
-                reasoningEffort: "medium",
+          const connectionId = await createOpenAiConnection({
+            fixture,
+            authenticatedSession,
+            openAiApiKey,
+            displayName: connectionDisplayName,
+            stepTrace,
+          });
+          const profileId = await createSandboxProfile({
+            fixture,
+            authenticatedSession,
+            displayName: `System OpenAI Image App-Server ${randomUUID()}`,
+            stepTrace,
+          });
+          await updateSandboxBindings({
+            fixture,
+            authenticatedSession,
+            profileId,
+            stepTrace,
+            stepName: "bind OpenAI agent integration",
+            bindings: [
+              {
+                connectionId,
+                kind: "agent",
+                config: {
+                  runtime: "codex-cli",
+                  defaultModel: "gpt-5.3-codex",
+                  reasoningEffort: "medium",
+                },
               },
+            ],
+          });
+          const sandboxInstanceId = await startSandboxInstance({
+            fixture,
+            authenticatedSession,
+            profileId,
+            stepTrace,
+          });
+          await waitForSandboxInstanceRunningStep({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+            stepTrace,
+          });
+
+          const agentSession = await connectInitializedAgentSession({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+            dataPlaneGatewayBaseUrl,
+            stepTrace,
+            websocketTraceEntries,
+          });
+          const websocket = agentSession.websocket;
+          registerWebsocketCleanup({
+            socket: websocket,
+            detachTrace: agentSession.detachWebSocketTrace,
+          });
+          const handshakeStreamId = agentSession.handshakeStreamId;
+
+          const threadId = await startThread({
+            websocket,
+            handshakeStreamId,
+            model: "gpt-5.3-codex",
+            stepTrace,
+          });
+
+          const uploadedImage = await runStep({
+            stepTrace,
+            stepName: "upload image over fileUpload tunnel",
+            action: async () => {
+              const uploadWebsocketUrl = await mintSandboxWebSocketUrl({
+                request: fixture.request,
+                cookie: authenticatedSession.cookie,
+                sandboxInstanceId,
+                dataPlaneGatewayBaseUrl,
+              });
+
+              return await uploadImageOverTunnel({
+                websocketUrl: uploadWebsocketUrl,
+                threadId,
+                imageBytes: new Uint8Array(TinyPngBytes),
+              });
             },
-          ],
-        });
-        const sandboxInstanceId = await startSandboxInstance({
-          fixture,
-          authenticatedSession,
-          profileId,
-          stepTrace,
-        });
-        await waitForSandboxInstanceRunningStep({
-          fixture,
-          authenticatedSession,
-          sandboxInstanceId,
-          stepTrace,
-        });
+          });
 
-        const agentSession = await connectInitializedAgentSession({
-          fixture,
-          authenticatedSession,
-          sandboxInstanceId,
-          dataPlaneGatewayBaseUrl,
-          stepTrace,
-          websocketTraceEntries,
-        });
-        const websocket = agentSession.websocket;
-        websocketForCleanup = websocket;
-        detachWebSocketTrace = agentSession.detachWebSocketTrace;
-        const handshakeStreamId = agentSession.handshakeStreamId;
+          const notificationsWhileStartingTurn: JsonRpcNotification[] = [];
+          const turnId = await startTurn({
+            websocket,
+            handshakeStreamId,
+            threadId,
+            requestId: 2,
+            stepTrace,
+            stepName: "json-rpc turn/start with localImage input",
+            notificationSink: notificationsWhileStartingTurn,
+            turnInput: [
+              {
+                type: "text",
+                text: "Reply with exactly IMAGE_INPUT_OK and nothing else.",
+              },
+              {
+                type: "localImage",
+                path: uploadedImage.path,
+              },
+            ],
+          });
 
-        const threadId = await startThread({
-          websocket,
-          handshakeStreamId,
-          model: "gpt-5.3-codex",
-          stepTrace,
-        });
-
-        const uploadedImage = await runStep({
-          stepTrace,
-          stepName: "upload image over fileUpload tunnel",
-          action: async () => {
-            const uploadWebsocketUrl = await mintSandboxWebSocketUrl({
-              request: fixture.request,
-              cookie: authenticatedSession.cookie,
-              sandboxInstanceId,
-              dataPlaneGatewayBaseUrl,
-            });
-
-            return await uploadImageOverTunnel({
-              websocketUrl: uploadWebsocketUrl,
-              threadId,
-              imageBytes: new Uint8Array(TinyPngBytes),
-            });
-          },
-        });
-
-        const notificationsWhileStartingTurn: JsonRpcNotification[] = [];
-        const turnId = await startTurn({
-          websocket,
-          handshakeStreamId,
-          threadId,
-          requestId: 2,
-          stepTrace,
-          stepName: "json-rpc turn/start with localImage input",
-          notificationSink: notificationsWhileStartingTurn,
-          turnInput: [
-            {
-              type: "text",
-              text: "Reply with exactly IMAGE_INPUT_OK and nothing else.",
+          await runStep({
+            stepTrace,
+            stepName: "wait for localImage input to persist on thread",
+            action: async () => {
+              await waitForLocalImagePathOnTurn({
+                socket: websocket,
+                streamId: handshakeStreamId,
+                threadId,
+                turnId,
+                expectedPath: uploadedImage.path,
+                timeoutMs: TURN_COMPLETION_TIMEOUT_MS,
+              });
             },
-            {
-              type: "localImage",
-              path: uploadedImage.path,
-            },
-          ],
-        });
-
-        await runStep({
-          stepTrace,
-          stepName: "wait for localImage input to persist on thread",
-          action: async () => {
-            await waitForLocalImagePathOnTurn({
-              socket: websocket,
-              streamId: handshakeStreamId,
-              threadId,
-              turnId,
-              expectedPath: uploadedImage.path,
-              timeoutMs: TURN_COMPLETION_TIMEOUT_MS,
-            });
-          },
-        });
-      } catch (error) {
-        const diagnostics = await buildFailureDiagnostics({
-          websocketTraceEntries,
-          fixture,
-        });
-
-        throw new Error(
-          `System test failed. Step trace: ${formatStepTrace(stepTrace)}. Cause: ${describeUnknownError(error)}\n\nDiagnostics:\n${diagnostics}`,
-        );
-      } finally {
-        detachWebSocketTrace?.();
-        if (websocketForCleanup !== null) {
-          await closeWebSocket(websocketForCleanup);
-        }
-      }
+          });
+        },
+      });
     },
     SYSTEM_TEST_TIMEOUT_MS,
   );
@@ -2287,383 +2307,373 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
   it(
     "lets Codex detect the GitHub CLI binary through a shell tool call",
     async ({ fixture }) => {
-      const stepTrace: StepTraceEntry[] = [];
-      const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
-      const repository = parseGitHubRepository(requireEnv(GITHUB_TEST_REPOSITORY_ENV_NAME));
-      const githubInstallationId = requireEnv(GITHUB_INSTALLATION_ID_ENV_NAME);
-      const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
-      let websocketForCleanup: WebSocket | null = null;
-      let detachWebSocketTrace: (() => void) | null = null;
-      const websocketTraceEntries: WebSocketTraceEntry[] = [];
+      await runSandboxScenario({
+        fixture,
+        includeAppContainerDiagnostics: true,
+        action: async ({ stepTrace, websocketTraceEntries, registerWebsocketCleanup }) => {
+          const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
+          const repository = parseGitHubRepository(requireEnv(GITHUB_TEST_REPOSITORY_ENV_NAME));
+          const githubInstallationId = requireEnv(GITHUB_INSTALLATION_ID_ENV_NAME);
+          const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
+          const authenticatedSession = await runStep({
+            stepTrace,
+            stepName: "create authenticated session",
+            action: async () => {
+              return await fixture.authSession();
+            },
+          });
 
-      try {
-        const authenticatedSession = await runStep({
-          stepTrace,
-          stepName: "create authenticated session",
-          action: async () => {
-            return await fixture.authSession();
-          },
-        });
+          const openAiConnectionId = await createOpenAiConnection({
+            fixture,
+            authenticatedSession,
+            openAiApiKey,
+            displayName: `System OpenAI Connection ${randomUUID()}`,
+            stepTrace,
+          });
 
-        const openAiConnectionId = await createOpenAiConnection({
-          fixture,
-          authenticatedSession,
-          openAiApiKey,
-          displayName: `System OpenAI Connection ${randomUUID()}`,
-          stepTrace,
-        });
-
-        const githubConnectionId = await runStep({
-          stepTrace,
-          stepName: "create GitHub connection",
-          action: async () => {
-            const startResponse = await requestWithTimeout({
-              request: fixture.request,
-              path: `/v1/integration/connections/${encodeURIComponent(GITHUB_TARGET_KEY)}/github-app-installation/start`,
-              timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
-              description: "GitHub App installation start",
-              init: {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json",
-                  cookie: authenticatedSession.cookie,
+          const githubConnectionId = await runStep({
+            stepTrace,
+            stepName: "create GitHub connection",
+            action: async () => {
+              const startResponse = await requestWithTimeout({
+                request: fixture.request,
+                path: `/v1/integration/connections/${encodeURIComponent(GITHUB_TARGET_KEY)}/github-app-installation/start`,
+                timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
+                description: "GitHub App installation start",
+                init: {
+                  method: "POST",
+                  headers: {
+                    "content-type": "application/json",
+                    cookie: authenticatedSession.cookie,
+                  },
+                  body: JSON.stringify({
+                    displayName: `GitHub Codex System Test ${randomUUID()}`,
+                  }),
                 },
-                body: JSON.stringify({
-                  displayName: `GitHub Codex System Test ${randomUUID()}`,
-                }),
-              },
-            });
-            const startPayload = await expectStatusJson({
-              response: startResponse,
-              status: 200,
-              description: "GitHub App installation start",
-            });
-            const parsedStartPayload =
-              StartRedirectConnectionResponseSchema.safeParse(startPayload);
-            if (!parsedStartPayload.success) {
-              throw new Error(
-                `GitHub App installation start response did not match schema: ${formatJsonForError(startPayload)}`,
-              );
-            }
-
-            const githubOauthState = new URL(
-              parsedStartPayload.data.authorizationUrl,
-            ).searchParams.get("state");
-            if (githubOauthState === null || githubOauthState.length === 0) {
-              throw new Error(
-                "Expected GitHub App installation start response to include a non-empty state.",
-              );
-            }
-
-            const completeResponse = await requestWithTimeout({
-              request: fixture.request,
-              path: createGitHubAppInstallationCompletePath({
-                targetKey: GITHUB_TARGET_KEY,
-                query: {
-                  state: githubOauthState,
-                  installation_id: githubInstallationId,
-                  setup_action: "install",
-                },
-              }),
-              timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
-              description: "GitHub App installation completion",
-              init: {
-                method: "GET",
-                headers: {
-                  cookie: authenticatedSession.cookie,
-                },
-                redirect: "manual",
-              },
-            });
-            if (completeResponse.status !== 302) {
-              const responseBody = await completeResponse.text().catch(() => "");
-              throw new Error(
-                `GitHub App installation completion expected status 302, got ${String(completeResponse.status)}. Response body: ${responseBody}`,
-              );
-            }
-
-            const connection = await waitForCondition({
-              description: "persisted GitHub connection to be created",
-              timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
-              evaluate: async () => {
-                return (
-                  (await fixture.db.query.integrationConnections.findFirst({
-                    where: (table, { and, eq }) =>
-                      and(
-                        eq(table.organizationId, authenticatedSession.organizationId),
-                        eq(table.targetKey, GITHUB_TARGET_KEY),
-                        eq(table.externalSubjectId, githubInstallationId),
-                      ),
-                  })) ?? null
+              });
+              const startPayload = await expectStatusJson({
+                response: startResponse,
+                status: 200,
+                description: "GitHub App installation start",
+              });
+              const parsedStartPayload =
+                StartRedirectConnectionResponseSchema.safeParse(startPayload);
+              if (!parsedStartPayload.success) {
+                throw new Error(
+                  `GitHub App installation start response did not match schema: ${formatJsonForError(startPayload)}`,
                 );
-              },
-            });
+              }
 
-            return connection.id;
-          },
-        });
+              const githubOauthState = new URL(
+                parsedStartPayload.data.authorizationUrl,
+              ).searchParams.get("state");
+              if (githubOauthState === null || githubOauthState.length === 0) {
+                throw new Error(
+                  "Expected GitHub App installation start response to include a non-empty state.",
+                );
+              }
 
-        await runStep({
-          stepTrace,
-          stepName: "refresh GitHub repository resources",
-          action: async () => {
-            const response = await requestWithTimeout({
-              request: fixture.request,
-              path: `/v1/integration/connections/${encodeURIComponent(githubConnectionId)}/resources/repository/refresh`,
-              timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
-              description: "GitHub repository resource refresh",
-              init: {
-                method: "POST",
-                headers: {
-                  cookie: authenticatedSession.cookie,
-                },
-              },
-            });
-            const payload = await expectStatusJson({
-              response,
-              status: 202,
-              description: "GitHub repository resource refresh",
-            });
-            const parsedPayload =
-              RefreshIntegrationConnectionResourcesResponseSchema.safeParse(payload);
-            if (!parsedPayload.success) {
-              throw new Error(
-                `GitHub repository refresh response did not match schema: ${formatJsonForError(payload)}`,
-              );
-            }
-          },
-        });
-
-        await runStep({
-          stepTrace,
-          stepName: "wait for GitHub repository resource sync",
-          action: async () => {
-            await waitForCondition({
-              description: "GitHub repository resource sync to reach ready",
-              timeoutMs: RESOURCE_SYNC_TIMEOUT_MS,
-              evaluate: async () => {
-                const resourceState =
-                  await fixture.db.query.integrationConnectionResourceStates.findFirst({
-                    where: (table, { and, eq }) =>
-                      and(eq(table.connectionId, githubConnectionId), eq(table.kind, "repository")),
-                  });
-
-                if (resourceState === undefined) {
-                  return null;
-                }
-
-                if (resourceState.syncState === "error") {
-                  throw new Error(
-                    `GitHub resource sync failed: ${resourceState.lastErrorCode ?? "unknown"} ${resourceState.lastErrorMessage ?? ""}`,
-                  );
-                }
-
-                if (resourceState.syncState !== "ready") {
-                  return null;
-                }
-
-                const resource = await fixture.db.query.integrationConnectionResources.findFirst({
-                  where: (table, { and, eq }) =>
-                    and(
-                      eq(table.connectionId, githubConnectionId),
-                      eq(table.kind, "repository"),
-                      eq(table.handle, `${repository.owner}/${repository.repo}`),
-                    ),
-                });
-
-                return resource === undefined ? null : resource;
-              },
-            });
-          },
-        });
-
-        const profileId = await createSandboxProfile({
-          fixture,
-          authenticatedSession,
-          displayName: `System OpenAI App-Server GitHub ${randomUUID()}`,
-          stepTrace,
-        });
-
-        await updateSandboxBindings({
-          fixture,
-          authenticatedSession,
-          profileId,
-          stepTrace,
-          stepName: "bind OpenAI and GitHub integrations",
-          bindings: [
-            {
-              connectionId: openAiConnectionId,
-              kind: "agent",
-              config: {
-                runtime: "codex-cli",
-                defaultModel: "gpt-5.3-codex",
-                reasoningEffort: "medium",
-              },
-            },
-            {
-              connectionId: githubConnectionId,
-              kind: "git",
-              config: {
-                repositories: [`${repository.owner}/${repository.repo}`],
-              },
-            },
-          ],
-        });
-
-        const sandboxInstanceId = await startSandboxInstance({
-          fixture,
-          authenticatedSession,
-          profileId,
-          stepTrace,
-        });
-
-        await waitForSandboxInstanceRunningStep({
-          fixture,
-          authenticatedSession,
-          sandboxInstanceId,
-          stepTrace,
-        });
-
-        const agentSession = await connectInitializedAgentSession({
-          fixture,
-          authenticatedSession,
-          sandboxInstanceId,
-          dataPlaneGatewayBaseUrl,
-          stepTrace,
-          websocketTraceEntries,
-        });
-        const websocket = agentSession.websocket;
-        websocketForCleanup = websocket;
-        detachWebSocketTrace = agentSession.detachWebSocketTrace;
-        const handshakeStreamId = agentSession.handshakeStreamId;
-
-        const threadId = await startThread({
-          websocket,
-          handshakeStreamId,
-          model: "gpt-5.3-codex",
-          stepTrace,
-        });
-
-        const notificationsWhileStartingTurn: JsonRpcNotification[] = [];
-        const observedCommandExecutions: CommandExecutionItem[] = [];
-        const turnId = await startTurn({
-          websocket,
-          handshakeStreamId,
-          threadId,
-          requestId: 2,
-          stepTrace,
-          stepName: "json-rpc turn/start",
-          notificationSink: notificationsWhileStartingTurn,
-          turnInput: [
-            {
-              type: "text",
-              text: [
-                "Use the shell tool to run exactly `command -v gh`.",
-                `If it prints exactly ${GITHUB_BINARY_PATH}, reply with exactly ${GITHUB_TEST_RESPONSE_MARKER}.`,
-                "If it does not, reply with exactly GH_MISSING.",
-                "Do not use any other tool and do not add extra text.",
-              ].join(" "),
-            },
-          ],
-        });
-
-        const agentTextParts: string[] = [];
-        let preBufferedTurnCompletion: TurnCompletion | null = null;
-        for (const notification of notificationsWhileStartingTurn) {
-          collectAgentMessageText({
-            method: notification.method,
-            params: notification.params,
-            sink: agentTextParts,
-          });
-          collectCommandExecutionItem({
-            method: notification.method,
-            params: notification.params,
-            sink: observedCommandExecutions,
-          });
-          const completion = parseTurnCompletedNotification(notification);
-          if (completion !== null && completion.turnId === turnId) {
-            preBufferedTurnCompletion = completion;
-          }
-        }
-
-        const turnCompletion = await runStep({
-          stepTrace,
-          stepName: "wait for turn/completed",
-          action: async () => {
-            return (
-              preBufferedTurnCompletion ??
-              (await waitForTurnCompletion({
-                socket: websocket,
-                turnId,
-                timeoutMs: TURN_COMPLETION_TIMEOUT_MS,
-                agentTextSink: agentTextParts,
-                commandExecutionSink: observedCommandExecutions,
-              }))
-            );
-          },
-        });
-        expect(turnCompletion.status).toBe("completed");
-        expect(turnCompletion.errorMessage).toBeNull();
-
-        const combinedAgentText = agentTextParts.join("");
-        expect(combinedAgentText).toContain(GITHUB_TEST_RESPONSE_MARKER);
-
-        const commandExecutionItems: CommandExecutionItem[] =
-          observedCommandExecutions.length > 0
-            ? observedCommandExecutions
-            : readCommandExecutionItemsForTurn({
-                threadReadResult: await runStep({
-                  stepTrace,
-                  stepName: "json-rpc thread/read",
-                  action: async () => {
-                    sendAgentJson(websocket, handshakeStreamId, {
-                      method: "thread/read",
-                      id: 3,
-                      params: {
-                        threadId,
-                        includeTurns: true,
-                      },
-                    });
-                    return await waitForJsonRpcResult({
-                      socket: websocket,
-                      requestId: 3,
-                      timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
-                    });
+              const completeResponse = await requestWithTimeout({
+                request: fixture.request,
+                path: createGitHubAppInstallationCompletePath({
+                  targetKey: GITHUB_TARGET_KEY,
+                  query: {
+                    state: githubOauthState,
+                    installation_id: githubInstallationId,
+                    setup_action: "install",
                   },
                 }),
-                turnId,
+                timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
+                description: "GitHub App installation completion",
+                init: {
+                  method: "GET",
+                  headers: {
+                    cookie: authenticatedSession.cookie,
+                  },
+                  redirect: "manual",
+                },
               });
-        expect(commandExecutionItems.length).toBeGreaterThan(0);
+              if (completeResponse.status !== 302) {
+                const responseBody = await completeResponse.text().catch(() => "");
+                throw new Error(
+                  `GitHub App installation completion expected status 302, got ${String(completeResponse.status)}. Response body: ${responseBody}`,
+                );
+              }
 
-        const ghDetectionCommand = commandExecutionItems.find((item: CommandExecutionItem) =>
-          item.command.includes("command -v gh"),
-        );
-        expect(ghDetectionCommand).toBeDefined();
-        if (ghDetectionCommand === undefined) {
-          throw new Error(
-            `Expected Codex to execute 'command -v gh'. Commands: ${formatJsonForError(commandExecutionItems)}`,
+              const connection = await waitForCondition({
+                description: "persisted GitHub connection to be created",
+                timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
+                evaluate: async () => {
+                  return (
+                    (await fixture.db.query.integrationConnections.findFirst({
+                      where: (table, { and, eq }) =>
+                        and(
+                          eq(table.organizationId, authenticatedSession.organizationId),
+                          eq(table.targetKey, GITHUB_TARGET_KEY),
+                          eq(table.externalSubjectId, githubInstallationId),
+                        ),
+                    })) ?? null
+                  );
+                },
+              });
+
+              return connection.id;
+            },
+          });
+
+          await runStep({
+            stepTrace,
+            stepName: "refresh GitHub repository resources",
+            action: async () => {
+              const response = await requestWithTimeout({
+                request: fixture.request,
+                path: `/v1/integration/connections/${encodeURIComponent(githubConnectionId)}/resources/repository/refresh`,
+                timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
+                description: "GitHub repository resource refresh",
+                init: {
+                  method: "POST",
+                  headers: {
+                    cookie: authenticatedSession.cookie,
+                  },
+                },
+              });
+              const payload = await expectStatusJson({
+                response,
+                status: 202,
+                description: "GitHub repository resource refresh",
+              });
+              const parsedPayload =
+                RefreshIntegrationConnectionResourcesResponseSchema.safeParse(payload);
+              if (!parsedPayload.success) {
+                throw new Error(
+                  `GitHub repository refresh response did not match schema: ${formatJsonForError(payload)}`,
+                );
+              }
+            },
+          });
+
+          await runStep({
+            stepTrace,
+            stepName: "wait for GitHub repository resource sync",
+            action: async () => {
+              await waitForCondition({
+                description: "GitHub repository resource sync to reach ready",
+                timeoutMs: RESOURCE_SYNC_TIMEOUT_MS,
+                evaluate: async () => {
+                  const resourceState =
+                    await fixture.db.query.integrationConnectionResourceStates.findFirst({
+                      where: (table, { and, eq }) =>
+                        and(
+                          eq(table.connectionId, githubConnectionId),
+                          eq(table.kind, "repository"),
+                        ),
+                    });
+
+                  if (resourceState === undefined) {
+                    return null;
+                  }
+
+                  if (resourceState.syncState === "error") {
+                    throw new Error(
+                      `GitHub resource sync failed: ${resourceState.lastErrorCode ?? "unknown"} ${resourceState.lastErrorMessage ?? ""}`,
+                    );
+                  }
+
+                  if (resourceState.syncState !== "ready") {
+                    return null;
+                  }
+
+                  const resource = await fixture.db.query.integrationConnectionResources.findFirst({
+                    where: (table, { and, eq }) =>
+                      and(
+                        eq(table.connectionId, githubConnectionId),
+                        eq(table.kind, "repository"),
+                        eq(table.handle, `${repository.owner}/${repository.repo}`),
+                      ),
+                  });
+
+                  return resource === undefined ? null : resource;
+                },
+              });
+            },
+          });
+
+          const profileId = await createSandboxProfile({
+            fixture,
+            authenticatedSession,
+            displayName: `System OpenAI App-Server GitHub ${randomUUID()}`,
+            stepTrace,
+          });
+
+          await updateSandboxBindings({
+            fixture,
+            authenticatedSession,
+            profileId,
+            stepTrace,
+            stepName: "bind OpenAI and GitHub integrations",
+            bindings: [
+              {
+                connectionId: openAiConnectionId,
+                kind: "agent",
+                config: {
+                  runtime: "codex-cli",
+                  defaultModel: "gpt-5.3-codex",
+                  reasoningEffort: "medium",
+                },
+              },
+              {
+                connectionId: githubConnectionId,
+                kind: "git",
+                config: {
+                  repositories: [`${repository.owner}/${repository.repo}`],
+                },
+              },
+            ],
+          });
+
+          const sandboxInstanceId = await startSandboxInstance({
+            fixture,
+            authenticatedSession,
+            profileId,
+            stepTrace,
+          });
+
+          await waitForSandboxInstanceRunningStep({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+            stepTrace,
+          });
+
+          const agentSession = await connectInitializedAgentSession({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+            dataPlaneGatewayBaseUrl,
+            stepTrace,
+            websocketTraceEntries,
+          });
+          const websocket = agentSession.websocket;
+          registerWebsocketCleanup({
+            socket: websocket,
+            detachTrace: agentSession.detachWebSocketTrace,
+          });
+          const handshakeStreamId = agentSession.handshakeStreamId;
+
+          const threadId = await startThread({
+            websocket,
+            handshakeStreamId,
+            model: "gpt-5.3-codex",
+            stepTrace,
+          });
+
+          const notificationsWhileStartingTurn: JsonRpcNotification[] = [];
+          const observedCommandExecutions: CommandExecutionItem[] = [];
+          const turnId = await startTurn({
+            websocket,
+            handshakeStreamId,
+            threadId,
+            requestId: 2,
+            stepTrace,
+            stepName: "json-rpc turn/start",
+            notificationSink: notificationsWhileStartingTurn,
+            turnInput: [
+              {
+                type: "text",
+                text: [
+                  "Use the shell tool to run exactly `command -v gh`.",
+                  `If it prints exactly ${GITHUB_BINARY_PATH}, reply with exactly ${GITHUB_TEST_RESPONSE_MARKER}.`,
+                  "If it does not, reply with exactly GH_MISSING.",
+                  "Do not use any other tool and do not add extra text.",
+                ].join(" "),
+              },
+            ],
+          });
+
+          const agentTextParts: string[] = [];
+          let preBufferedTurnCompletion: TurnCompletion | null = null;
+          for (const notification of notificationsWhileStartingTurn) {
+            collectAgentMessageText({
+              method: notification.method,
+              params: notification.params,
+              sink: agentTextParts,
+            });
+            collectCommandExecutionItem({
+              method: notification.method,
+              params: notification.params,
+              sink: observedCommandExecutions,
+            });
+            const completion = parseTurnCompletedNotification(notification);
+            if (completion !== null && completion.turnId === turnId) {
+              preBufferedTurnCompletion = completion;
+            }
+          }
+
+          const turnCompletion = await runStep({
+            stepTrace,
+            stepName: "wait for turn/completed",
+            action: async () => {
+              return (
+                preBufferedTurnCompletion ??
+                (await waitForTurnCompletion({
+                  socket: websocket,
+                  turnId,
+                  timeoutMs: TURN_COMPLETION_TIMEOUT_MS,
+                  agentTextSink: agentTextParts,
+                  commandExecutionSink: observedCommandExecutions,
+                }))
+              );
+            },
+          });
+          expect(turnCompletion.status).toBe("completed");
+          expect(turnCompletion.errorMessage).toBeNull();
+
+          const combinedAgentText = agentTextParts.join("");
+          expect(combinedAgentText).toContain(GITHUB_TEST_RESPONSE_MARKER);
+
+          const commandExecutionItems: CommandExecutionItem[] =
+            observedCommandExecutions.length > 0
+              ? observedCommandExecutions
+              : readCommandExecutionItemsForTurn({
+                  threadReadResult: await runStep({
+                    stepTrace,
+                    stepName: "json-rpc thread/read",
+                    action: async () => {
+                      sendAgentJson(websocket, handshakeStreamId, {
+                        method: "thread/read",
+                        id: 3,
+                        params: {
+                          threadId,
+                          includeTurns: true,
+                        },
+                      });
+                      return await waitForJsonRpcResult({
+                        socket: websocket,
+                        requestId: 3,
+                        timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+                      });
+                    },
+                  }),
+                  turnId,
+                });
+          expect(commandExecutionItems.length).toBeGreaterThan(0);
+
+          const ghDetectionCommand = commandExecutionItems.find((item: CommandExecutionItem) =>
+            item.command.includes("command -v gh"),
           );
-        }
+          expect(ghDetectionCommand).toBeDefined();
+          if (ghDetectionCommand === undefined) {
+            throw new Error(
+              `Expected Codex to execute 'command -v gh'. Commands: ${formatJsonForError(commandExecutionItems)}`,
+            );
+          }
 
-        expect(ghDetectionCommand.status).toBe("completed");
-        expect(ghDetectionCommand.exitCode).toBe(0);
-        expect(ghDetectionCommand.aggregatedOutput).not.toBeNull();
-        expect(ghDetectionCommand.aggregatedOutput?.trim()).toBe(GITHUB_BINARY_PATH);
-      } catch (error) {
-        const diagnostics = await buildFailureDiagnostics({
-          websocketTraceEntries,
-          fixture,
-        });
-
-        throw new Error(
-          `System test failed. Step trace: ${formatStepTrace(stepTrace)}. Cause: ${describeUnknownError(error)}\n\nDiagnostics:\n${diagnostics}`,
-        );
-      } finally {
-        detachWebSocketTrace?.();
-        if (websocketForCleanup !== null) {
-          await closeWebSocket(websocketForCleanup);
-        }
-      }
+          expect(ghDetectionCommand.status).toBe("completed");
+          expect(ghDetectionCommand.exitCode).toBe(0);
+          expect(ghDetectionCommand.aggregatedOutput).not.toBeNull();
+          expect(ghDetectionCommand.aggregatedOutput?.trim()).toBe(GITHUB_BINARY_PATH);
+        },
+      });
     },
     SYSTEM_TEST_TIMEOUT_MS * 2,
   );
