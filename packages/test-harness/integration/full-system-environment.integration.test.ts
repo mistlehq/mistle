@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
+import { systemSleeper } from "@mistle/time";
 import { describe, expect, test } from "vitest";
 
 import {
@@ -42,7 +43,7 @@ describe("full system environment integration", () => {
         await expectHealthz(environment.dataPlaneGateway.hostBaseUrl);
         await expectHealthz(environment.tokenizerProxy.hostBaseUrl);
 
-        await new Promise((resolve) => setTimeout(resolve, 10_000));
+        await systemSleeper.sleep(10_000);
 
         await expectHealthz(environment.controlPlaneApi.hostBaseUrl);
         await expectHealthz(environment.dataPlaneApi.hostBaseUrl);

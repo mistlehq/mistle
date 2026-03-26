@@ -3,12 +3,7 @@ import { once } from "node:events";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import {
-  decodeDataFrame,
-  encodeDataFrame,
-  parseStreamControlMessage,
-  PayloadKindRawBytes,
-} from "@mistle/sandbox-session-protocol";
+import { encodeDataFrame, PayloadKindRawBytes } from "@mistle/sandbox-session-protocol";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 

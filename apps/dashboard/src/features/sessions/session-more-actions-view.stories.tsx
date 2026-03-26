@@ -19,6 +19,7 @@ const meta = {
       sandboxInstanceId: "sbi_storybook",
       connectedAtIso: "2026-03-08T08:00:00.000Z",
       expiresAtIso: "2026-03-08T10:00:00.000Z",
+      connectionUrl: "ws://localhost:5202/tunnel/sandbox?token=storybook",
       threadId: "thread_storybook",
     },
     configJson: JSON.stringify({ model: "gpt-5" }, null, 2),

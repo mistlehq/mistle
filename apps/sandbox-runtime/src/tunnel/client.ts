@@ -10,7 +10,11 @@ import {
 } from "./active-relay.js";
 import { handleAgentConnectRequest } from "./agent-channel.js";
 import { AsyncQueue } from "./async-queue.js";
-import { parseConnectRequestMessage, parsePtyConnectRequest } from "./connect-request.js";
+import {
+  parseConnectRequestMessage,
+  parsePtyConnectRequest,
+  type TunnelSocketMessage,
+} from "./connect-request.js";
 import { ExecutionLeaseEngine } from "./execution-lease-engine.js";
 import { handleFileUploadConnectRequest } from "./file-upload-channel.js";
 import {
@@ -33,7 +37,7 @@ import {
   runTunnelTokenExchangeLoop,
 } from "./token-exchange.js";
 import { parseTunnelMessageRouting } from "./tunnel-message.js";
-import { closeWebSocket, connectWebSocket, connectWebSocketWithMessageQueue } from "./websocket.js";
+import { closeWebSocket, connectWebSocketWithMessageQueue } from "./websocket.js";
 
 const FileUploadAttachmentRootPath = "/tmp/attachments";
 

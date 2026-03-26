@@ -1,6 +1,5 @@
 import {
   decodeDataFrame,
-  encodeDataFrame,
   parseStreamControlMessage,
   PayloadKindRawBytes,
 } from "@mistle/sandbox-session-protocol";
