@@ -863,9 +863,6 @@ function hydrateTurns(turns: readonly CodexThreadReadTurn[]): CodexChatState {
               return [];
             }
 
-            const pathSegments = contentItem.path.split("/");
-            const basename = pathSegments[pathSegments.length - 1] ?? contentItem.path;
-
             return [normalizeCodexLocalImageAttachment({ path: contentItem.path })];
           }),
           parsedUserMessage.data.id,
