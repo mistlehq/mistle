@@ -133,7 +133,7 @@ export interface paths {
             } | null;
             target: {
               sandboxProfileId: string;
-              sandboxProfileVersion?: number | null;
+              sandboxProfileVersion?: number;
             };
           };
         };
@@ -163,7 +163,7 @@ export interface paths {
               target: {
                 id: string;
                 sandboxProfileId: string;
-                sandboxProfileVersion: number | null;
+                sandboxProfileVersion: number;
               };
               updatedAt: string;
             };
@@ -268,7 +268,7 @@ export interface paths {
               target: {
                 id: string;
                 sandboxProfileId: string;
-                sandboxProfileVersion: number | null;
+                sandboxProfileVersion: number;
               };
               updatedAt: string;
             };
@@ -432,7 +432,7 @@ export interface paths {
             } | null;
             target?: {
               sandboxProfileId?: string;
-              sandboxProfileVersion?: number | null;
+              sandboxProfileVersion?: number;
             };
           };
         };
@@ -462,7 +462,7 @@ export interface paths {
               target: {
                 id: string;
                 sandboxProfileId: string;
-                sandboxProfileVersion: number | null;
+                sandboxProfileVersion: number;
               };
               updatedAt: string;
             };

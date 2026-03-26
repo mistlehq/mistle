@@ -14,7 +14,7 @@ export type ResolvedWebhookAutomationTarget = {
   automationId: string;
   automationTargetId: string;
   sandboxProfileId: string;
-  sandboxProfileVersion: number | null;
+  sandboxProfileVersion: number;
 };
 
 function isWebhookAutomationMatched(input: {
@@ -120,7 +120,7 @@ export async function resolveWebhookAutomationTargets(
         automationId: eligibleWebhookAutomation.automationId,
         automationTargetId: automationTarget.id,
         sandboxProfileId: automationTarget.sandboxProfileId,
-        sandboxProfileVersion: automationTarget.sandboxProfileVersion ?? null,
+        sandboxProfileVersion: automationTarget.sandboxProfileVersion,
       });
     }
   }

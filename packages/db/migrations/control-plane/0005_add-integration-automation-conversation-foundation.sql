@@ -20,7 +20,7 @@ CREATE TABLE "control_plane"."automation_targets" (
 	"id" text PRIMARY KEY NOT NULL,
 	"automation_id" text NOT NULL,
 	"sandbox_profile_id" text NOT NULL,
-	"sandbox_profile_version" bigint,
+	"sandbox_profile_version" bigint NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );

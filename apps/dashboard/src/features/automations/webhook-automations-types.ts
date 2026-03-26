@@ -20,7 +20,7 @@ const WebhookAutomationTargetSchema = z
   .object({
     id: z.string().min(1),
     sandboxProfileId: z.string().min(1),
-    sandboxProfileVersion: z.number().int().min(1).nullable(),
+    sandboxProfileVersion: z.number().int().min(1),
   })
   .strict();
 

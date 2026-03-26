@@ -9,7 +9,7 @@ import {
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
 import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-reference-or-throw.js";
-import { assertSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
+import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
 import { assertWebhookConnectionReferenceOrThrow } from "./assert-webhook-connection-reference-or-throw.js";
 import { loadWebhookAutomationAggregateOrThrow } from "./load-webhook-automation-aggregate-or-throw.js";
 
@@ -25,7 +25,14 @@ export type CreateWebhookAutomationInput = {
   idempotencyKeyTemplate?: string | null | undefined;
   target: {
     sandboxProfileId: string;
-    sandboxProfileVersion?: number | null | undefined;
+    sandboxProfileVersion?: number | undefined;
+  };
+};
+
+type CreateWebhookAutomationPersistenceInput = Omit<CreateWebhookAutomationInput, "target"> & {
+  target: {
+    sandboxProfileId: string;
+    sandboxProfileVersion: number;
   };
 };
 
@@ -50,7 +57,7 @@ export async function createAutomationWebhook(
       sandboxProfileId: input.target.sandboxProfileId,
     },
   );
-  await assertSandboxProfileTriggerReferenceOrThrow(
+  const sandboxProfileVersion = await resolveSandboxProfileTriggerReferenceOrThrow(
     { db: ctx.db },
     {
       sandboxProfileId: input.target.sandboxProfileId,
@@ -60,7 +67,13 @@ export async function createAutomationWebhook(
   );
 
   return ctx.db.transaction(async (tx) => {
-    const automation = await createAutomationAggregate(tx, input);
+    const automation = await createAutomationAggregate(tx, {
+      ...input,
+      target: {
+        sandboxProfileId: input.target.sandboxProfileId,
+        sandboxProfileVersion,
+      },
+    });
     return loadWebhookAutomationAggregateOrThrow(
       { db: tx },
       {
@@ -73,7 +86,7 @@ export async function createAutomationWebhook(
 
 async function createAutomationAggregate(
   tx: ControlPlaneTransaction,
-  input: CreateWebhookAutomationInput,
+  input: CreateWebhookAutomationPersistenceInput,
 ) {
   const insertedAutomationRows = await tx
     .insert(automations)
@@ -106,7 +119,7 @@ async function createAutomationAggregate(
   await tx.insert(automationTargets).values({
     automationId: insertedAutomation.id,
     sandboxProfileId: input.target.sandboxProfileId,
-    sandboxProfileVersion: input.target.sandboxProfileVersion ?? null,
+    sandboxProfileVersion: input.target.sandboxProfileVersion,
   });
 
   return insertedAutomation;
