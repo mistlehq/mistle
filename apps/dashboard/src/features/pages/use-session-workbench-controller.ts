@@ -879,7 +879,7 @@ export function useSessionWorkbenchController(input: {
     activeModel: activeComposerModel,
   });
   const activeComposerModelSupportsImages = supportsImageInspection(activeComposerModel);
-  const isComposerModelListLoaded = admin.availableModels.length > 0;
+  const isComposerModelListLoaded = admin.hasLoadedModels;
   const composerNotice =
     composerErrorMessage === null
       ? resolveComposerNotice({

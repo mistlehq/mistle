@@ -128,6 +128,7 @@ type CodexSessionChatState = {
 
 type CodexSessionAdminState = {
   availableModels: readonly CodexModelSummary[];
+  hasLoadedModels: boolean;
   experimentalFeatures: readonly CodexExperimentalFeatureSummary[];
   configJson: string | null;
   configRequirementsJson: string | null;
@@ -261,6 +262,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   });
   const {
     availableModels,
+    hasLoadedModels,
     experimentalFeatures,
     configJson,
     configRequirementsJson,
@@ -1028,6 +1030,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   const admin = useMemo<CodexSessionAdminState>(() => {
     return {
       availableModels,
+      hasLoadedModels,
       experimentalFeatures,
       configJson,
       configRequirementsJson,
@@ -1057,6 +1060,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     detectExternalAgentConfig,
     detectedExternalAgentMigrationItems,
     experimentalFeatures,
+    hasLoadedModels,
     importExternalAgentConfig,
     isBatchWritingConfig,
     isDetectingExternalAgentConfig,

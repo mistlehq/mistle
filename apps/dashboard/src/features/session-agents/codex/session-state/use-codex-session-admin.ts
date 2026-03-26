@@ -36,6 +36,7 @@ export function useCodexSessionAdmin(input: {
   setStartErrorMessage: (message: string | null) => void;
 }) {
   const [availableModels, setAvailableModels] = useState<readonly CodexModelSummary[]>([]);
+  const [hasLoadedModels, setHasLoadedModels] = useState(false);
   const [experimentalFeatures, setExperimentalFeatures] = useState<
     readonly CodexExperimentalFeatureSummary[]
   >([]);
@@ -47,6 +48,7 @@ export function useCodexSessionAdmin(input: {
 
   const resetAdminState = useCallback((): void => {
     setAvailableModels([]);
+    setHasLoadedModels(false);
     setExperimentalFeatures([]);
     setConfigJson(null);
     setConfigRequirementsJson(null);
@@ -68,9 +70,11 @@ export function useCodexSessionAdmin(input: {
     },
     onSuccess: (result) => {
       setAvailableModels(result.models);
+      setHasLoadedModels(true);
       input.recordRecentResponse(result.response);
     },
     onError: (error) => {
+      setHasLoadedModels(false);
       input.setStartErrorMessage(error instanceof Error ? error.message : "Could not load models.");
     },
   });
@@ -252,6 +256,7 @@ export function useCodexSessionAdmin(input: {
 
   return {
     availableModels,
+    hasLoadedModels,
     experimentalFeatures,
     configJson,
     configRequirementsJson,
