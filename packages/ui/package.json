@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "lint": "oxlint --deny-warnings -c ../../.oxlintrc.jsonc .",
+    "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run",
     "format": "oxfmt",

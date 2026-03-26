@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "oxlint --type-aware --deny-warnings -c ../.oxlintrc.jsonc .",
+    "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:system:prepare": "pnpm --filter @mistle/control-plane-api... --filter @mistle/control-plane-worker... --filter @mistle/data-plane-api... --filter @mistle/data-plane-worker... --filter @mistle/data-plane-gateway... --filter @mistle/tokenizer-proxy... build",
     "test:system": "pnpm run test:system:prepare && vitest -c vitest.system.config.ts --run --passWithNoTests",

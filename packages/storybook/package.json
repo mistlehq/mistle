@@ -5,7 +5,7 @@
   "scripts": {
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "lint": "oxlint --deny-warnings -c ../../.oxlintrc.jsonc .",
+    "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsc --noEmit --project ./tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "format": "oxfmt .",
