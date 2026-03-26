@@ -9,6 +9,7 @@ import {
   buildAttachedImagePathsText,
   buildNonImageCapableModelWarningMessage,
   buildPromptWithAttachedImagePaths,
+  buildTurnPrompt,
   buildUnavailableModelErrorMessage,
   getSandboxInstanceStatusQueryKey,
   hasUnavailableSelectedModel,
@@ -242,6 +243,31 @@ describe("useSessionWorkbenchController", () => {
         attachmentPaths: ["/tmp/attachments/thread_123/image-1.png"],
       }),
     ).toBe(["Attached images:", "- /tmp/attachments/thread_123/image-1.png"].join("\n"));
+  });
+
+  it("injects attachment paths only for non-image-capable turns", () => {
+    expect(
+      buildTurnPrompt({
+        prompt: "  Please review these screenshots.  ",
+        attachmentPaths: ["/tmp/attachments/thread_123/image-1.png"],
+        supportsImageInspection: true,
+      }),
+    ).toBe("Please review these screenshots.");
+
+    expect(
+      buildTurnPrompt({
+        prompt: "  Please review these screenshots.  ",
+        attachmentPaths: ["/tmp/attachments/thread_123/image-1.png"],
+        supportsImageInspection: false,
+      }),
+    ).toBe(
+      [
+        "Please review these screenshots.",
+        "",
+        "Attached images:",
+        "- /tmp/attachments/thread_123/image-1.png",
+      ].join("\n"),
+    );
   });
 
   it("builds the non-image-capable warning copy", () => {

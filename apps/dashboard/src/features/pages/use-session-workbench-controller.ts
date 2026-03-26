@@ -173,6 +173,21 @@ export function buildPromptWithAttachedImagePaths(input: {
   return `${trimmedPrompt}\n\n${attachedImagePathsText}`;
 }
 
+export function buildTurnPrompt(input: {
+  prompt: string;
+  attachmentPaths: readonly string[];
+  supportsImageInspection: boolean;
+}): string {
+  if (input.supportsImageInspection) {
+    return input.prompt.trim();
+  }
+
+  return buildPromptWithAttachedImagePaths({
+    prompt: input.prompt,
+    attachmentPaths: input.attachmentPaths,
+  });
+}
+
 export function resolveComposerNotice(input: {
   hasPendingAttachments: boolean;
   hasUnavailableModel: boolean;
@@ -965,9 +980,10 @@ export function useSessionWorkbenchController(input: {
         }
       }
 
-      const promptWithAttachedImages = buildPromptWithAttachedImagePaths({
+      const promptWithAttachedImages = buildTurnPrompt({
         prompt: action.prompt,
         attachmentPaths: uploadedAttachmentPaths,
+        supportsImageInspection: activeComposerModelSupportsImages,
       });
       const turnAttachments = activeComposerModelSupportsImages ? uploadedAttachments : [];
 
