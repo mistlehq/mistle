@@ -5,6 +5,7 @@ import {
   CodexFixtureCommandBlock,
 } from "../../session-agents/codex/fixtures/approval-fixtures.js";
 import { ChatCommandBlock } from "./chat-command-block.js";
+import { noopRespondToServerRequest } from "./chat-story-support.js";
 
 const meta = {
   title: "Dashboard/Chat/ChatCommandBlock",
@@ -17,7 +18,7 @@ const meta = {
     approvalRequest: null,
     block: CodexFixtureCommandBlock,
     isRespondingToServerRequest: false,
-    onRespondToServerRequest: function onRespondToServerRequest() {},
+    onRespondToServerRequest: noopRespondToServerRequest,
   },
 } satisfies Meta<typeof ChatCommandBlock>;
 

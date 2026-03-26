@@ -7,7 +7,14 @@ import {
   CodexFixtureChatThreadEntriesWithStructuredPlan,
   CodexFixtureChatThreadEntriesWithThinkingGroup,
 } from "../../session-agents/codex/fixtures/chat-fixtures.js";
+import { noopRespondToServerRequest } from "./chat-story-support.js";
 import { ChatThread } from "./chat-thread.js";
+
+const BaseArgs = {
+  isRespondingToServerRequest: false,
+  onRespondToServerRequest: noopRespondToServerRequest,
+  pendingServerRequests: [],
+} satisfies Omit<React.ComponentProps<typeof ChatThread>, "entries">;
 
 const meta = {
   title: "Dashboard/Chat/ChatThread",
@@ -25,44 +32,34 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     entries: CodexFixtureChatThreadEntries,
-    isRespondingToServerRequest: false,
-    onRespondToServerRequest: function onRespondToServerRequest() {},
-    pendingServerRequests: [],
+    ...BaseArgs,
   },
 };
 
 export const WithExploringGroup: Story = {
   args: {
     entries: CodexFixtureChatThreadEntriesWithExploringGroup,
-    isRespondingToServerRequest: false,
-    onRespondToServerRequest: function onRespondToServerRequest() {},
-    pendingServerRequests: [],
+    ...BaseArgs,
   },
 };
 
 export const WithThinkingGroup: Story = {
   args: {
     entries: CodexFixtureChatThreadEntriesWithThinkingGroup,
-    isRespondingToServerRequest: false,
-    onRespondToServerRequest: function onRespondToServerRequest() {},
-    pendingServerRequests: [],
+    ...BaseArgs,
   },
 };
 
 export const WithStructuredPlan: Story = {
   args: {
     entries: CodexFixtureChatThreadEntriesWithStructuredPlan,
-    isRespondingToServerRequest: false,
-    onRespondToServerRequest: function onRespondToServerRequest() {},
-    pendingServerRequests: [],
+    ...BaseArgs,
   },
 };
 
 export const WithGenericItem: Story = {
   args: {
     entries: CodexFixtureChatThreadEntriesWithGenericItem,
-    isRespondingToServerRequest: false,
-    onRespondToServerRequest: function onRespondToServerRequest() {},
-    pendingServerRequests: [],
+    ...BaseArgs,
   },
 };

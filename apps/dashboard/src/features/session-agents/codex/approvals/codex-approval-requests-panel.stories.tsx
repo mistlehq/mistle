@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { noopRespondToServerRequest } from "../../../chat/components/chat-story-support.js";
 import {
   createCodexFixturePanelEntriesWithResponseErrors,
   CodexFixturePanelEntries,
@@ -16,7 +17,7 @@ const meta = {
   args: {
     entries: CodexFixturePanelEntries,
     isRespondingToServerRequest: false,
-    onRespondToServerRequest: function onRespondToServerRequest() {},
+    onRespondToServerRequest: noopRespondToServerRequest,
   },
 } satisfies Meta<typeof CodexApprovalRequestsPanel>;
 

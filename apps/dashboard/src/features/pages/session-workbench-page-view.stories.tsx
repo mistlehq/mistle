@@ -1,15 +1,12 @@
-import { Badge } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { noop } from "../chat/components/chat-story-support.js";
 import {
-  CodexFixtureSessionComposerProps,
-  CodexFixtureSessionEntriesWithExploringGroup,
-  CodexFixtureSessionServerRequests,
-} from "../session-agents/codex/fixtures/session-fixtures.js";
-import {
-  SessionConversationBottomPanel,
-  SessionConversationMainContent,
-} from "./session-conversation-pane.js";
+  createStorySessionBottomPanel,
+  createStorySessionMainContent,
+  SessionWorkbenchStoryChrome,
+  StorySandboxInstanceId,
+} from "./session-story-support.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 const meta = {
@@ -20,47 +17,21 @@ const meta = {
     layout: "fullscreen",
   },
   args: {
-    sandboxInstanceId: "sbi_storybook",
+    sandboxInstanceId: StorySandboxInstanceId,
     alerts: [],
     isSecondaryPanelVisible: false,
-    mainContent: (
-      <SessionConversationMainContent
-        chatEntries={CodexFixtureSessionEntriesWithExploringGroup}
-        composerProps={CodexFixtureSessionComposerProps}
-        isRespondingToServerRequest={false}
-        onRespondToServerRequest={function onRespondToServerRequest() {}}
-        serverRequestPanelEntries={CodexFixtureSessionServerRequests}
-      />
-    ),
-    primaryBottomPanel: (
-      <SessionConversationBottomPanel
-        chatEntries={CodexFixtureSessionEntriesWithExploringGroup}
-        composerProps={CodexFixtureSessionComposerProps}
-        isRespondingToServerRequest={false}
-        onRespondToServerRequest={function onRespondToServerRequest() {}}
-        serverRequestPanelEntries={CodexFixtureSessionServerRequests}
-      />
-    ),
+    mainContent: createStorySessionMainContent(),
+    primaryBottomPanel: createStorySessionBottomPanel(),
     secondaryPanel: <div className="h-full w-full border-t bg-white" />,
     secondaryPanelSize: 38,
-    onSecondaryPanelResize: function onSecondaryPanelResize() {},
+    onSecondaryPanelResize: noop,
   },
   decorators: [
     function StoryDecorator(Story): React.JSX.Element {
       return (
-        <div className="from-background to-muted/20 min-h-screen bg-linear-to-b">
-          <div className="bg-background/80 flex h-12 items-center justify-end border-b px-4 backdrop-blur-sm">
-            <Badge
-              className="bg-emerald-600 text-white hover:bg-emerald-600/90"
-              variant="secondary"
-            >
-              Connected
-            </Badge>
-          </div>
-          <div className="h-[calc(100vh-3rem)]">
-            <Story />
-          </div>
-        </div>
+        <SessionWorkbenchStoryChrome>
+          <Story />
+        </SessionWorkbenchStoryChrome>
       );
     },
   ],
