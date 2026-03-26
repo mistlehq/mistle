@@ -1,8 +1,10 @@
 import {
+  buildCodexTurnInputItems,
   interruptCodexTurn,
   readCodexThread,
   startCodexTurn,
   steerCodexTurn,
+  type CodexTurnInputLocalImageItem,
   type CodexJsonRpcClient,
 } from "@mistle/integrations-definitions/openai/agent/client";
 import { useMutation } from "@tanstack/react-query";
@@ -99,7 +101,10 @@ export function useCodexChatController(input: {
   );
 
   const startTurnMutation = useMutation({
-    mutationFn: async (prompt: string) => {
+    mutationFn: async (turnInput: {
+      prompt: string;
+      attachments?: readonly CodexTurnInputLocalImageItem[];
+    }) => {
       const rpcClient = input.rpcClientRef.current;
       const threadId = input.threadIdRef.current;
 
@@ -107,10 +112,11 @@ export function useCodexChatController(input: {
         throw new Error("Choose a thread before starting a turn.");
       }
 
-      const trimmedPrompt = prompt.trim();
-      if (trimmedPrompt.length === 0) {
-        throw new Error("Enter a prompt before starting a turn.");
-      }
+      const trimmedPrompt = turnInput.prompt.trim();
+      const turnItems = buildCodexTurnInputItems({
+        text: trimmedPrompt,
+        attachments: turnInput.attachments ?? [],
+      });
 
       const clientTurnId = createPendingTurnId();
       dispatchChatAction({
@@ -123,7 +129,7 @@ export function useCodexChatController(input: {
         const startedTurn = await startCodexTurn({
           rpcClient,
           threadId,
-          text: trimmedPrompt,
+          input: turnItems,
         });
         dispatchChatAction({
           type: "turn_started_response",
@@ -180,7 +186,10 @@ export function useCodexChatController(input: {
   });
 
   const steerTurnMutation = useMutation({
-    mutationFn: async (prompt: string) => {
+    mutationFn: async (turnInput: {
+      prompt: string;
+      attachments?: readonly CodexTurnInputLocalImageItem[];
+    }) => {
       const rpcClient = input.rpcClientRef.current;
       const threadId = input.threadIdRef.current;
       const turnId = chatState.activeTurnId;
@@ -189,16 +198,17 @@ export function useCodexChatController(input: {
         throw new Error("No active turn is available to steer.");
       }
 
-      const trimmedPrompt = prompt.trim();
-      if (trimmedPrompt.length === 0) {
-        throw new Error("Enter steering guidance before sending it.");
-      }
+      const trimmedPrompt = turnInput.prompt.trim();
+      const turnItems = buildCodexTurnInputItems({
+        text: trimmedPrompt,
+        attachments: turnInput.attachments ?? [],
+      });
 
       const steeredTurn = await steerCodexTurn({
         rpcClient,
         threadId,
         turnId,
-        text: trimmedPrompt,
+        input: turnItems,
       });
 
       input.recordRecentResponse(steeredTurn.response);
@@ -232,8 +242,11 @@ export function useCodexChatController(input: {
     canInterruptTurn,
     canSteerTurn,
     startTurn: useCallback(
-      (prompt: string) => {
-        startTurnMutation.mutate(prompt);
+      async (turnInput: {
+        prompt: string;
+        attachments?: readonly CodexTurnInputLocalImageItem[];
+      }): Promise<void> => {
+        await startTurnMutation.mutateAsync(turnInput);
       },
       [startTurnMutation],
     ),
@@ -244,8 +257,11 @@ export function useCodexChatController(input: {
       interruptTurnMutation.mutate();
     }, [interruptTurnMutation]),
     steerTurn: useCallback(
-      (prompt: string) => {
-        steerTurnMutation.mutate(prompt);
+      async (turnInput: {
+        prompt: string;
+        attachments?: readonly CodexTurnInputLocalImageItem[];
+      }): Promise<void> => {
+        await steerTurnMutation.mutateAsync(turnInput);
       },
       [steerTurnMutation],
     ),

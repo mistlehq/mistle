@@ -70,6 +70,51 @@ describe("reduceCodexChatState", () => {
     expect(failed.entries).toEqual([]);
   });
 
+  it("hydrates user image attachments from thread/read items", () => {
+    const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_123",
+          status: "completed",
+          items: [
+            {
+              type: "userMessage",
+              id: "user_123",
+              content: [
+                {
+                  type: "text",
+                  text: "Review this image",
+                },
+                {
+                  type: "localImage",
+                  path: "/tmp/attachments/thread_123/screenshot.png",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(hydrated.entries).toEqual([
+      {
+        id: "user_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Review this image",
+        attachments: [
+          {
+            kind: "image",
+            path: "/tmp/attachments/thread_123/screenshot.png",
+            name: "screenshot.png",
+          },
+        ],
+        status: "completed",
+      },
+    ]);
+  });
+
   it("accumulates assistant deltas for the active turn", () => {
     const started = reduceCodexChatState(
       reduceCodexChatState(createInitialCodexChatState(), {

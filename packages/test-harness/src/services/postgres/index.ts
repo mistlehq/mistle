@@ -8,6 +8,7 @@ import {
 } from "testcontainers";
 
 import { registerProcessCleanupTask, runCleanupTasks } from "../../cleanup/index.js";
+import { stopContainerIgnoringMissing } from "../../docker/cleanup.js";
 
 const POSTGRES_IMAGE = "postgres:18-alpine";
 const PGBOUNCER_IMAGE = "edoburu/pgbouncer:v1.25.1-p0";
@@ -136,7 +137,7 @@ async function stopInReverseOrder(input: StackRuntimeResources): Promise<void> {
   const tasks = [
     async () => {
       if (input.pgbouncerContainer !== undefined) {
-        await input.pgbouncerContainer.stop({
+        await stopContainerIgnoringMissing(input.pgbouncerContainer, {
           remove: true,
           removeVolumes: true,
           timeout: 0,
@@ -145,7 +146,7 @@ async function stopInReverseOrder(input: StackRuntimeResources): Promise<void> {
     },
     async () => {
       if (input.postgresContainer !== undefined) {
-        await input.postgresContainer.stop({
+        await stopContainerIgnoringMissing(input.postgresContainer, {
           remove: true,
           removeVolumes: true,
           timeout: 0,

@@ -18,6 +18,11 @@ export type NormalizedCodexThreadItem =
       id: string;
       turnId: string;
       text: string;
+      attachments: readonly {
+        kind: "image";
+        path: string;
+        name: string;
+      }[];
     }
   | {
       kind: "assistant-message";

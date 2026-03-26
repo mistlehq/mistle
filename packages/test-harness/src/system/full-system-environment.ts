@@ -14,6 +14,7 @@ import { startDataPlaneGateway, type DataPlaneGatewayService } from "../apps/dat
 import { startDataPlaneWorker, type DataPlaneWorkerService } from "../apps/data-plane-worker.js";
 import { startTokenizerProxy, type TokenizerProxyService } from "../apps/tokenizer-proxy.js";
 import { runCleanupTasks } from "../cleanup/index.js";
+import { stopContainerIgnoringMissing } from "../docker/cleanup.js";
 import { startDockerNetwork } from "../network/start-docker-network.js";
 import { type StartPostgresWithPgBouncerInput } from "../services/postgres/index.js";
 import { acquireSharedPostgresMailpitInfra } from "../services/shared-postgres-mailpit.js";
@@ -313,7 +314,7 @@ export async function startFullSystemEnvironment(
       .withNetworkAliases(REGISTRY_NETWORK_ALIAS)
       .start();
     cleanupTasks.unshift(async () => {
-      await registryContainer.stop({
+      await stopContainerIgnoringMissing(registryContainer, {
         remove: true,
         removeVolumes: true,
         timeout: 0,

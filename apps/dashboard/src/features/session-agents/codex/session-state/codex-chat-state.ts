@@ -74,6 +74,7 @@ const ThreadReadUserMessageItemSchema = z.object({
     z.looseObject({
       type: z.string().optional(),
       text: z.string().optional(),
+      path: z.string().optional(),
     }),
   ),
 });
@@ -704,12 +705,18 @@ function buildState(input: {
   };
 }
 
-function buildUserEntry(turnId: string, text: string, id?: string): ChatUserEntry {
+function buildUserEntry(
+  turnId: string,
+  text: string,
+  attachments: NonNullable<ChatUserEntry["attachments"]> = [],
+  id?: string,
+): ChatUserEntry {
   return {
     id: id ?? `user:${turnId}`,
     turnId,
     kind: "user-message",
     text,
+    ...(attachments.length === 0 ? {} : { attachments }),
     status: "completed",
   };
 }
@@ -842,6 +849,22 @@ function hydrateTurns(turns: readonly CodexThreadReadTurn[]): CodexChatState {
         userEntry = buildUserEntry(
           turn.id,
           parsedUserMessage.data.content.map((contentItem) => contentItem.text ?? "").join(""),
+          parsedUserMessage.data.content.flatMap((contentItem) => {
+            if (contentItem.type !== "localImage" || contentItem.path === undefined) {
+              return [];
+            }
+
+            const pathSegments = contentItem.path.split("/");
+            const basename = pathSegments[pathSegments.length - 1] ?? contentItem.path;
+
+            return [
+              {
+                kind: "image" as const,
+                path: contentItem.path,
+                name: basename,
+              },
+            ];
+          }),
           parsedUserMessage.data.id,
         );
         continue;

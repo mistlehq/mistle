@@ -78,6 +78,24 @@ async function nextQueueItem<T>(
   }
 }
 
+async function nextQueueItemOrTunnelCompletion<T>(input: {
+  queue: AsyncQueue<T>;
+  signal: AbortSignal;
+  label: string;
+  tunnelCompletion: ReturnType<typeof startTunnelClient>["completion"];
+}): Promise<T> {
+  return await Promise.race([
+    nextQueueItem(input.queue, input.signal, input.label),
+    input.tunnelCompletion.then((completion) => {
+      throw new Error(
+        `${input.label}: tunnel client completed early with kind '${completion.kind}'${
+          completion.kind === "error" ? ` (${completion.error.message})` : ""
+        }`,
+      );
+    }),
+  ]);
+}
+
 async function closeWebSocket(socket: WebSocket): Promise<void> {
   if (socket.readyState === WebSocket.CLOSED) {
     return;
@@ -142,8 +160,12 @@ describe("startTunnelClient fileUpload integration", () => {
         socket.on("error", (error) => {
           messageQueue.fail(error);
         });
-        socket.on("close", () => {
-          messageQueue.fail(new Error("runtime tunnel websocket closed"));
+        socket.on("close", (code, reason) => {
+          messageQueue.fail(
+            new Error(
+              `runtime tunnel websocket closed (code=${String(code)}, reason='${reason.toString("utf8")}')`,
+            ),
+          );
         });
 
         return socket;
@@ -179,7 +201,12 @@ describe("startTunnelClient fileUpload integration", () => {
 
         expect(
           parseTextMessage(
-            await nextQueueItem(messageQueue, stepSignal, "waiting for stream.open.ok"),
+            await nextQueueItemOrTunnelCompletion({
+              queue: messageQueue,
+              signal: stepSignal,
+              label: "waiting for stream.open.ok",
+              tunnelCompletion: tunnelClient.completion,
+            }),
           ),
         ).toEqual({
           type: "stream.open.ok",
@@ -198,7 +225,12 @@ describe("startTunnelClient fileUpload integration", () => {
 
         expect(
           parseTextMessage(
-            await nextQueueItem(messageQueue, stepSignal, "waiting for stream.window"),
+            await nextQueueItemOrTunnelCompletion({
+              queue: messageQueue,
+              signal: stepSignal,
+              label: "waiting for stream.window",
+              tunnelCompletion: tunnelClient.completion,
+            }),
           ),
         ).toEqual({
           type: "stream.window",
@@ -214,7 +246,12 @@ describe("startTunnelClient fileUpload integration", () => {
         );
 
         const completionMessage = parseTextMessage(
-          await nextQueueItem(messageQueue, stepSignal, "waiting for fileUpload.completed"),
+          await nextQueueItemOrTunnelCompletion({
+            queue: messageQueue,
+            signal: stepSignal,
+            label: "waiting for fileUpload.completed",
+            tunnelCompletion: tunnelClient.completion,
+          }),
         );
         expect(completionMessage.type).toBe("stream.event");
         expect(completionMessage.streamId).toBe(17);

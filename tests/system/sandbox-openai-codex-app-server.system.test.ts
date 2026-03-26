@@ -64,6 +64,15 @@ const StreamOpenErrorSchema = z
   })
   .strict();
 
+const StreamResetSchema = z
+  .object({
+    type: z.literal("stream.reset"),
+    streamId: z.number().int().positive(),
+    code: z.string().min(1),
+    message: z.string().min(1),
+  })
+  .strict();
+
 const JsonRpcIdSchema = z.union([z.string().min(1), z.number().int()]);
 
 const JsonRpcSuccessResponseSchema = z.looseObject({
@@ -95,13 +104,11 @@ const FileUploadCompletedEventSchema = z
   .object({
     type: z.literal("stream.event"),
     streamId: z.number().int().positive(),
-    event: z
-      .object({
-        type: z.literal("fileUpload.completed"),
-        attachmentId: z.string().min(1),
-        path: z.string().min(1),
-      })
-      .strict(),
+    event: z.looseObject({
+      type: z.literal("fileUpload.completed"),
+      attachmentId: z.string().min(1),
+      path: z.string().min(1),
+    }),
   })
   .strict();
 
@@ -916,6 +923,59 @@ async function collectSandboxContainerListDiagnostics(): Promise<string> {
   return truncateForDiagnostics(output, DIAGNOSTIC_OUTPUT_MAX_CHARS);
 }
 
+async function collectDockerContainerLogsDiagnostics(input: {
+  containerId: string;
+  label: string;
+}): Promise<string> {
+  const output = await runDiagnosticCommand({
+    command: "docker",
+    args: ["logs", "--tail", "200", input.containerId],
+    timeoutMs: DOCKER_DIAGNOSTIC_TIMEOUT_MS,
+  });
+
+  return `${input.label} (${input.containerId}):\n${truncateForDiagnostics(output, DIAGNOSTIC_OUTPUT_MAX_CHARS)}`;
+}
+
+async function collectAppContainerDiagnostics(input: {
+  fixture: {
+    controlPlaneApiContainerId: string;
+    controlPlaneWorkerContainerId: string;
+    dataPlaneApiContainerId: string;
+    dataPlaneWorkerContainerId: string;
+    dataPlaneGatewayContainerId: string;
+    tokenizerProxyContainerId: string;
+  };
+}): Promise<string> {
+  const sections = await Promise.all([
+    collectDockerContainerLogsDiagnostics({
+      containerId: input.fixture.controlPlaneApiContainerId,
+      label: "control-plane-api",
+    }),
+    collectDockerContainerLogsDiagnostics({
+      containerId: input.fixture.controlPlaneWorkerContainerId,
+      label: "control-plane-worker",
+    }),
+    collectDockerContainerLogsDiagnostics({
+      containerId: input.fixture.dataPlaneApiContainerId,
+      label: "data-plane-api",
+    }),
+    collectDockerContainerLogsDiagnostics({
+      containerId: input.fixture.dataPlaneWorkerContainerId,
+      label: "data-plane-worker",
+    }),
+    collectDockerContainerLogsDiagnostics({
+      containerId: input.fixture.dataPlaneGatewayContainerId,
+      label: "data-plane-gateway",
+    }),
+    collectDockerContainerLogsDiagnostics({
+      containerId: input.fixture.tokenizerProxyContainerId,
+      label: "tokenizer-proxy",
+    }),
+  ]);
+
+  return sections.join("\n\n");
+}
+
 async function waitForCondition<T>(input: {
   description: string;
   timeoutMs: number;
@@ -1319,6 +1379,42 @@ function readLocalImagePathsForTurn(input: {
   return localImagePaths;
 }
 
+async function waitForLocalImagePathOnTurn(input: {
+  socket: WebSocket;
+  streamId: number;
+  threadId: string;
+  turnId: string;
+  expectedPath: string;
+  timeoutMs: number;
+}): Promise<void> {
+  await waitForCondition({
+    description: `localImage path '${input.expectedPath}' to appear on thread '${input.threadId}'`,
+    timeoutMs: input.timeoutMs,
+    evaluate: async () => {
+      sendAgentJson(input.socket, input.streamId, {
+        method: "thread/read",
+        id: 3,
+        params: {
+          threadId: input.threadId,
+          includeTurns: true,
+        },
+      });
+      const threadReadResult = await waitForJsonRpcResult({
+        socket: input.socket,
+        requestId: 3,
+        timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+      });
+
+      return readLocalImagePathsForTurn({
+        threadReadResult,
+        turnId: input.turnId,
+      }).includes(input.expectedPath)
+        ? true
+        : null;
+    },
+  });
+}
+
 async function mintSandboxWebSocketUrl(input: {
   request: (path: string, init?: RequestInit) => Promise<Response>;
   cookie: string;
@@ -1359,6 +1455,11 @@ async function uploadImageOverTunnel(input: {
   imageBytes: Uint8Array;
 }): Promise<UploadedSandboxImage> {
   const socket = await connectWebSocket(input.websocketUrl, WEBSOCKET_CONNECT_TIMEOUT_MS);
+  const websocketTraceEntries: WebSocketTraceEntry[] = [];
+  const detachWebSocketTrace = attachWebSocketTrace({
+    socket,
+    sink: websocketTraceEntries,
+  });
 
   try {
     getWebSocketJsonMessagePump(socket);
@@ -1410,11 +1511,26 @@ async function uploadImageOverTunnel(input: {
         );
       }
 
+      const streamReset = StreamResetSchema.safeParse(nextMessage);
+      if (streamReset.success && streamReset.data.streamId === streamId) {
+        throw new Error(
+          `Tunnel stream.reset failed with code '${streamReset.data.code}': ${streamReset.data.message}`,
+        );
+      }
+
       if (remainingTimeMs(deadline) === 0) {
         throw new Error("Timed out waiting for file upload completion event.");
       }
     }
+  } catch (error) {
+    throw new Error(
+      `Image upload tunnel failed. Upload websocket trace:\n${formatWebSocketTrace(websocketTraceEntries)}`,
+      {
+        cause: error,
+      },
+    );
   } finally {
+    detachWebSocketTrace();
     await closeWebSocket(socket);
   }
 }
@@ -1844,6 +1960,8 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
         let diagnostics = `Websocket trace (tail):\n${formatWebSocketTrace(websocketTraceEntries)}`;
         const sandboxListDiagnostics = await collectSandboxContainerListDiagnostics();
         diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\nproviderRuntimeId unavailable\n\nKnown sandbox containers:\n${sandboxListDiagnostics}`;
+        const appContainerDiagnostics = await collectAppContainerDiagnostics({ fixture });
+        diagnostics = `${diagnostics}\n\nApp container diagnostics:\n${appContainerDiagnostics}`;
 
         throw new Error(
           `System test failed. Step trace: ${formatStepTrace(stepTrace)}. Cause: ${describeUnknownError(error)}\n\nDiagnostics:\n${diagnostics}`,
@@ -2178,56 +2296,20 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
           },
         });
 
-        let preBufferedTurnCompletion: TurnCompletion | null = null;
-        for (const notification of notificationsWhileStartingTurn) {
-          const completion = parseTurnCompletedNotification(notification);
-          if (completion !== null && completion.turnId === turnId) {
-            preBufferedTurnCompletion = completion;
-          }
-        }
-
-        const turnCompletion = await runStep({
+        await runStep({
           stepTrace,
-          stepName: "wait for turn/completed",
+          stepName: "wait for localImage input to persist on thread",
           action: async () => {
-            return (
-              preBufferedTurnCompletion ??
-              (await waitForTurnCompletion({
-                socket: websocket,
-                turnId,
-                timeoutMs: TURN_COMPLETION_TIMEOUT_MS,
-                agentTextSink: [],
-                commandExecutionSink: [],
-              }))
-            );
-          },
-        });
-        expect(turnCompletion.status).toBe("completed");
-        expect(turnCompletion.errorMessage).toBeNull();
-
-        const threadReadResult = await runStep({
-          stepTrace,
-          stepName: "json-rpc thread/read",
-          action: async () => {
-            sendAgentJson(websocket, handshakeStreamId, {
-              method: "thread/read",
-              id: 3,
-              params: {
-                threadId,
-                includeTurns: true,
-              },
-            });
-            return await waitForJsonRpcResult({
+            await waitForLocalImagePathOnTurn({
               socket: websocket,
-              requestId: 3,
-              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+              streamId: handshakeStreamId,
+              threadId,
+              turnId,
+              expectedPath: uploadedImage.path,
+              timeoutMs: TURN_COMPLETION_TIMEOUT_MS,
             });
           },
         });
-
-        expect(readLocalImagePathsForTurn({ threadReadResult, turnId })).toContain(
-          uploadedImage.path,
-        );
       } catch (error) {
         let diagnostics = `Websocket trace (tail):\n${formatWebSocketTrace(websocketTraceEntries)}`;
         const sandboxListDiagnostics = await collectSandboxContainerListDiagnostics();

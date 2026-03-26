@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   parseConnectRequestMessage,
+  parseFileUploadConnectRequest,
   parsePtyConnectRequest,
   parsePtyResizeSignal,
   parseStreamCloseMessage,
@@ -146,5 +147,52 @@ describe("pty control message parsing", () => {
         }),
       ),
     ).toThrow("pty resize signal cols and rows must be greater than or equal to 1");
+  });
+});
+
+describe("file upload control message parsing", () => {
+  it("parses a file upload connect request", () => {
+    expect(
+      parseFileUploadConnectRequest(
+        JSON.stringify({
+          type: "stream.open",
+          streamId: 9,
+          channel: {
+            kind: "fileUpload",
+            threadId: "thread_123",
+            mimeType: "image/png",
+            originalFilename: "screenshot.png",
+            sizeBytes: 512,
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "stream.open",
+      streamId: 9,
+      channel: {
+        kind: "fileUpload",
+        threadId: "thread_123",
+        mimeType: "image/png",
+        originalFilename: "screenshot.png",
+        sizeBytes: 512,
+      },
+    });
+  });
+
+  it("rejects malformed file upload connect requests", () => {
+    expect(() =>
+      parseFileUploadConnectRequest(
+        JSON.stringify({
+          type: "stream.open",
+          streamId: 9,
+          channel: {
+            kind: "fileUpload",
+            threadId: "thread_123",
+            mimeType: "image/png",
+            originalFilename: "screenshot.png",
+          },
+        }),
+      ),
+    ).toThrow("file upload stream.open request must declare a valid fileUpload channel");
   });
 });

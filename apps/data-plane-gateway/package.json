@@ -30,14 +30,14 @@
     "hono": "^4.12.8",
     "pg": "^8.20.0",
     "redis": "^5.11.0",
-    "typeid-js": "^1.2.0"
+    "typeid-js": "^1.2.0",
+    "ws": "^8.18.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@fast-check/vitest": "^0.3.0",
     "@mistle/test-harness": "workspace:*",
     "@types/pg": "^8.18.0",
-    "@types/ws": "^8.18.1",
-    "ws": "^8.18.3",
-    "zod": "^4.3.6"
+    "@types/ws": "^8.18.1"
   }
 }

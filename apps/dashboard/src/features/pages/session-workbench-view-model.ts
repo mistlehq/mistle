@@ -142,8 +142,10 @@ export type ChatComposerAction =
 export function resolveChatComposerAction(input: {
   composerText: string;
   hasActiveTurn: boolean;
+  hasPendingAttachments: boolean;
 }): ChatComposerAction {
   const trimmedComposerText = input.composerText.trim();
+  const hasSubmissionContent = trimmedComposerText.length > 0 || input.hasPendingAttachments;
 
   if (!input.hasActiveTurn) {
     return {
@@ -153,7 +155,7 @@ export function resolveChatComposerAction(input: {
     };
   }
 
-  if (trimmedComposerText.length === 0) {
+  if (!hasSubmissionContent) {
     return {
       type: "interrupt_turn",
       shouldClearComposer: false,

@@ -32,6 +32,7 @@ function SessionMoreActionsHarness(input: {
                 sandboxInstanceId: "sbi_test",
                 connectedAtIso: "2026-03-07T12:00:00.000Z",
                 expiresAtIso: "2026-03-07T12:30:00.000Z",
+                connectionUrl: "wss://example.test/codex",
                 threadId: "thread_test",
               }
             : null
@@ -123,6 +124,7 @@ describe("SessionMoreActions", () => {
           sandboxInstanceId: "sbi_test",
           connectedAtIso: "2026-03-07T12:00:00.000Z",
           expiresAtIso: "2026-03-07T12:30:00.000Z",
+          connectionUrl: "wss://example.test/codex",
           threadId: null,
         }}
         isReadingConfig={false}

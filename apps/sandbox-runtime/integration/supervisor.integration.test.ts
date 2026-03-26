@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
@@ -18,6 +19,7 @@ import { startSupervisorServer, type StartedSupervisorServer } from "../src/supe
 
 const StartedSupervisors: StartedSupervisorServer[] = [];
 const TemporaryDirectories: string[] = [];
+const SandboxRuntimeProjectRootPath = fileURLToPath(new URL("..", import.meta.url));
 const SupervisorHelperPath = fileURLToPath(
   new URL("./helpers/supervisor-bootstrap-helper.mjs", import.meta.url),
 );
@@ -53,7 +55,7 @@ function createLookupEnv(controlDirectoryPath: string): (key: string) => string 
 }
 
 async function createTemporaryDirectory(prefix: string): Promise<string> {
-  const directoryPath = await mkdtemp(join(tmpdir(), prefix));
+  const directoryPath = await mkdtemp(`/tmp/${prefix}`);
   TemporaryDirectories.push(directoryPath);
   return directoryPath;
 }
@@ -94,6 +96,67 @@ async function sendStartupApplyRequest(input: {
   });
   const payload = JSON.parse(rawResponse);
   return parseStartupApplyResponsePayload(payload);
+}
+
+async function runApplyStartupCli(input: {
+  controlDirectoryPath: string;
+  startupInputJson: string;
+  timeoutMs: number;
+}): Promise<{ code: number; stderr: string }> {
+  const child = spawn("pnpm", ["exec", "tsx", "src/main.ts", "apply-startup"], {
+    cwd: SandboxRuntimeProjectRootPath,
+    env: {
+      ...process.env,
+      SANDBOX_RUNTIME_CONTROL_DIR: input.controlDirectoryPath,
+    },
+    stdio: ["pipe", "ignore", "pipe"],
+  });
+
+  if (child.stdin === null || child.stderr === null) {
+    throw new Error("apply-startup child stdio was not available.");
+  }
+
+  let stderr = "";
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (chunk: string) => {
+    stderr += chunk;
+  });
+
+  const exitPromise = new Promise<{ code: number; stderr: string }>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("exit", (code, signal) => {
+      if (signal !== null) {
+        reject(new Error(`apply-startup child exited with signal ${signal}. stderr: ${stderr}`));
+        return;
+      }
+      if (code === null) {
+        reject(new Error(`apply-startup child exited without code. stderr: ${stderr}`));
+        return;
+      }
+
+      resolve({
+        code,
+        stderr,
+      });
+    });
+  });
+
+  child.stdin.end(input.startupInputJson, "utf8");
+
+  try {
+    return await Promise.race([
+      exitPromise,
+      (async () => {
+        await systemSleeper.sleep(input.timeoutMs);
+        child.kill("SIGTERM");
+        throw new Error(
+          `apply-startup child did not exit within ${String(input.timeoutMs)}ms. stderr: ${stderr}`,
+        );
+      })(),
+    ]);
+  } finally {
+    child.kill("SIGTERM");
+  }
 }
 
 afterEach(async () => {
@@ -211,6 +274,39 @@ describe("startSupervisorServer", () => {
       ok: false,
       error: "sandbox startup has already been applied",
     });
+  });
+
+  it("lets the apply-startup CLI exit after supervisor acknowledges startup", async () => {
+    const controlDirectoryPath = await createTemporaryDirectory("ms-supervisor-");
+    const outputPath = join(controlDirectoryPath, "bootstrap-startup-input.json");
+    const lookupEnv = createLookupEnv(controlDirectoryPath);
+
+    const supervisor = await startSupervisorServer({
+      lookupEnv,
+      bootstrapLaunchTarget: {
+        command: process.execPath,
+        args: [SupervisorHelperPath],
+      },
+      bootstrapEnvironment: {
+        ...process.env,
+        MISTLE_SUPERVISOR_HELPER_OUTPUT_PATH: outputPath,
+      },
+    });
+    StartedSupervisors.push(supervisor);
+
+    await expect(
+      runApplyStartupCli({
+        controlDirectoryPath,
+        startupInputJson: ValidStartupInputJson,
+        timeoutMs: 2_000,
+      }),
+    ).resolves.toEqual({
+      code: 0,
+      stderr: "",
+    });
+
+    const writtenStartupInput = await waitForFileContents(outputPath);
+    expect(JSON.parse(writtenStartupInput)).toEqual(JSON.parse(ValidStartupInputJson));
   });
 
   it("removes the startup socket and token file when the supervisor closes", async () => {

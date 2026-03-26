@@ -7,7 +7,7 @@ import type { PtySession } from "./pty-session.js";
 
 function createRelay(
   primaryStreamId: number,
-  channelKind: "agent" | "pty",
+  channelKind: "agent" | "fileUpload" | "pty",
 ): ActiveTunnelStreamRelay {
   return {
     primaryStreamId,

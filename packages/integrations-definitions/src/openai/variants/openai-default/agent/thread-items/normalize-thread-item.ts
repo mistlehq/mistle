@@ -5,6 +5,12 @@ import type {
   NormalizedFileChange,
 } from "./types.js";
 
+function readPathBasename(path: string): string {
+  const segments = path.split("/");
+  const basename = segments[segments.length - 1];
+  return basename === undefined || basename.length === 0 ? path : basename;
+}
+
 function readOptionalString(record: Record<string, unknown>, key: string): string | null {
   const value = record[key];
   return typeof value === "string" ? value : null;
@@ -227,12 +233,34 @@ export function normalizeCodexThreadItem(input: {
   const itemType = readRequiredType(item);
 
   if (itemType === "userMessage") {
+    const attachments = Array.isArray(item["content"])
+      ? item["content"].flatMap((contentItem) => {
+          if (!isRecord(contentItem) || contentItem["type"] !== "localImage") {
+            return [];
+          }
+
+          const path = readOptionalString(contentItem, "path");
+          if (path === null || path.length === 0) {
+            return [];
+          }
+
+          return [
+            {
+              kind: "image" as const,
+              path,
+              name: readPathBasename(path),
+            },
+          ];
+        })
+      : [];
+
     return [
       {
         kind: "user-message",
         id: itemId,
         turnId: input.turnId,
         text: collectText(item["content"]),
+        attachments,
       },
     ];
   }

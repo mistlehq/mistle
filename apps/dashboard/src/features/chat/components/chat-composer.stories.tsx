@@ -22,14 +22,18 @@ const meta = {
     isStartingTurn: false,
     isSteeringTurn: false,
     isInterruptingTurn: false,
+    isUploadingAttachments: false,
     isUpdatingComposerConfig: false,
     canInterruptTurn: false,
     canSteerTurn: false,
     completedErrorMessage: null,
     onComposerTextChange: function onComposerTextChange() {},
     onModelChange: function onModelChange() {},
+    onPendingImageFilesAdded: function onPendingImageFilesAdded() {},
     onReasoningEffortChange: function onReasoningEffortChange() {},
+    onRemovePendingAttachment: function onRemovePendingAttachment() {},
     onSubmit: function onSubmit() {},
+    pendingAttachments: [],
   },
 } satisfies Meta<typeof ChatComposer>;
 

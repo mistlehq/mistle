@@ -39,6 +39,7 @@ describe("openai thread item semantics", () => {
         id: "user_1",
         turnId: "turn_1",
         text: "Inspect the grouped timeline flow",
+        attachments: [],
       },
     ]);
 
@@ -81,6 +82,42 @@ describe("openai thread item semantics", () => {
         turnId: "turn_1",
         text: "1. Inspect reducer",
         status: "completed",
+      },
+    ]);
+  });
+
+  it("preserves local image attachments on user messages", () => {
+    expect(
+      normalizeCodexThreadItem({
+        turnId: "turn_1",
+        item: {
+          type: "userMessage",
+          id: "user_2",
+          content: [
+            {
+              type: "text",
+              text: "Review this screenshot",
+            },
+            {
+              type: "localImage",
+              path: "/tmp/attachments/thread_123/screenshot.png",
+            },
+          ],
+        },
+      }),
+    ).toEqual([
+      {
+        kind: "user-message",
+        id: "user_2",
+        turnId: "turn_1",
+        text: "Review this screenshot",
+        attachments: [
+          {
+            kind: "image",
+            path: "/tmp/attachments/thread_123/screenshot.png",
+            name: "screenshot.png",
+          },
+        ],
       },
     ]);
   });

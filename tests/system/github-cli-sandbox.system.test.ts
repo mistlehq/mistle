@@ -543,7 +543,11 @@ async function runPtyCommand(input: {
   while (Date.now() < deadlineEpochMs) {
     const frame = await waitForNextPtyFrame(input.pump, Math.max(0, deadlineEpochMs - Date.now()));
     if (frame.kind === "control") {
-      if (frame.payload.type === "stream.event" && frame.payload.streamId === input.streamId) {
+      if (
+        frame.payload.type === "stream.event" &&
+        frame.payload.streamId === input.streamId &&
+        frame.payload.event.type === "pty.exit"
+      ) {
         throw new Error(
           `PTY exited unexpectedly with code ${String(frame.payload.event.exitCode)}.`,
         );
