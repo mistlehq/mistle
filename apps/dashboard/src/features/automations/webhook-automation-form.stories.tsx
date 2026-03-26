@@ -320,6 +320,7 @@ function StoryHarness(input: {
   mode: "create" | "edit";
   values: WebhookAutomationFormValues;
   fieldErrors?: Partial<Record<WebhookAutomationFormValueKey, string>>;
+  validationSummaryError?: string | null;
   formError?: string | null;
   isSaving?: boolean;
   isDeleting?: boolean;
@@ -338,6 +339,7 @@ function StoryHarness(input: {
         connectionOptions={input.connectionOptions ?? ConnectionOptions}
         fieldErrors={input.fieldErrors ?? {}}
         formError={input.formError ?? null}
+        validationSummaryError={input.validationSummaryError ?? null}
         isDeleting={input.isDeleting ?? false}
         isSaving={input.isSaving ?? false}
         mode={input.mode}
@@ -404,7 +406,7 @@ export const EditPageLayout: Story = {
 export const ValidationErrors: Story = {
   args: {
     mode: "create",
-    formError: "Please fill in the required fields highlighted in red.",
+    validationSummaryError: "Please fill in the required fields highlighted in red.",
     fieldErrors: {
       name: "Automation name is required.",
       triggerIds: "Select at least one trigger.",

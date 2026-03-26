@@ -83,6 +83,7 @@ describe("WebhookAutomationForm", () => {
           connectionOptions={ConnectionOptions}
           fieldErrors={{}}
           formError={null}
+          validationSummaryError={null}
           isDeleting={false}
           isSaving={false}
           mode={input.mode ?? "create"}
@@ -216,6 +217,7 @@ describe("WebhookAutomationForm", () => {
           connectionOptions={ConnectionOptions}
           fieldErrors={{}}
           formError={null}
+          validationSummaryError={null}
           isDeleting={false}
           isSaving={false}
           mode="create"
@@ -253,6 +255,7 @@ describe("WebhookAutomationForm", () => {
             instructions: "Instructions are required.",
           }}
           formError={null}
+          validationSummaryError={null}
           isDeleting={false}
           isSaving={false}
           mode="create"
@@ -290,7 +293,8 @@ describe("WebhookAutomationForm", () => {
             triggerIds: "Select at least one trigger.",
             instructions: "Instructions are required.",
           }}
-          formError="Please fill in the required fields highlighted in red."
+          formError={null}
+          validationSummaryError="Please fill in the required fields highlighted in red."
           isDeleting={false}
           isSaving={false}
           mode="create"
@@ -320,5 +324,35 @@ describe("WebhookAutomationForm", () => {
     expect(screen.queryByText("Select a sandbox profile.")).toBeNull();
     expect(screen.queryByText("Instructions are required.")).toBeNull();
     expect(screen.getByText("Select at least one trigger.")).toBeDefined();
+  });
+
+  it("shows save failures at the top of the form", () => {
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WebhookAutomationForm
+          connectionOptions={ConnectionOptions}
+          fieldErrors={{}}
+          formError="The selected triggers do not support this automation setup."
+          validationSummaryError={null}
+          isDeleting={false}
+          isSaving={false}
+          mode="create"
+          onDelete={null}
+          onSubmit={() => {}}
+          onValueChange={() => {}}
+          sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledReason={null}
+          webhookEventOptions={WebhookEventOptions}
+          values={FormValues}
+        />
+      </QueryClientProvider>,
+    );
+
+    const currentForm = within(container);
+
+    expect(currentForm.getByText("Automation could not be saved")).toBeDefined();
+    expect(
+      currentForm.getByText("The selected triggers do not support this automation setup."),
+    ).toBeDefined();
   });
 });

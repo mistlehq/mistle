@@ -336,6 +336,7 @@ export function useLoadedWebhookAutomationEditorState(
   triggerPickerDisabledReason: string | null;
   values: WebhookAutomationFormValues;
   fieldErrors: Partial<Record<keyof WebhookAutomationFormValues, string>>;
+  validationSummaryError: string | null;
   formError: string | null;
   deleteError: string | null;
   isDeleteDialogOpen: boolean;
@@ -355,6 +356,7 @@ export function useLoadedWebhookAutomationEditorState(
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<keyof WebhookAutomationFormValues, string>>
   >({});
+  const [validationSummaryError, setValidationSummaryError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -389,6 +391,7 @@ export function useLoadedWebhookAutomationEditorState(
         payload: toCreateWebhookAutomationPayload(values, webhookEventOptions),
       }),
     onSuccess: async (automation) => {
+      setValidationSummaryError(null);
       setFormError(null);
       await invalidateAutomationsQuery(queryClient);
       await input.navigate(`/automations/${automation.id}`);
@@ -419,6 +422,7 @@ export function useLoadedWebhookAutomationEditorState(
     onSuccess: async (automation) => {
       setFormValues(toWebhookAutomationFormValues(automation, webhookEventOptions));
       setFieldErrors({});
+      setValidationSummaryError(null);
       setFormError(null);
       await invalidateAutomationsQuery(queryClient);
     },
@@ -472,13 +476,17 @@ export function useLoadedWebhookAutomationEditorState(
       ...currentErrors,
       [key]: undefined,
     }));
+    setValidationSummaryError(null);
     setFormError(null);
   }
 
   function onSubmit(): void {
     const nextFieldErrors = validateWebhookAutomationFormValues(formValues, webhookEventOptions);
     setFieldErrors(nextFieldErrors);
-    setFormError(hasRequiredFieldErrors(nextFieldErrors) ? RequiredFieldSummaryMessage : null);
+    setValidationSummaryError(
+      hasRequiredFieldErrors(nextFieldErrors) ? RequiredFieldSummaryMessage : null,
+    );
+    setFormError(null);
 
     if (Object.keys(nextFieldErrors).length > 0) {
       return;
@@ -508,6 +516,7 @@ export function useLoadedWebhookAutomationEditorState(
     triggerPickerDisabledReason: selectedProfileTriggerState.disabledReason,
     values: formValues,
     fieldErrors,
+    validationSummaryError,
     formError,
     deleteError,
     isDeleteDialogOpen,

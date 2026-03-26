@@ -264,7 +264,10 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       result.current.onSubmit();
     });
 
-    expect(result.current.formError).toBe("Please fill in the required fields highlighted in red.");
+    expect(result.current.validationSummaryError).toBe(
+      "Please fill in the required fields highlighted in red.",
+    );
+    expect(result.current.formError).toBeNull();
     expect(result.current.fieldErrors).toMatchObject({
       name: "Automation name is required.",
       sandboxProfileId: "Select a sandbox profile.",

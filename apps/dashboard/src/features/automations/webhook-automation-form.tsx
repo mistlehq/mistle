@@ -60,6 +60,7 @@ type WebhookAutomationFormProps = {
   webhookEventOptions: readonly WebhookAutomationEventOption[];
   triggerPickerDisabledReason: string | null;
   fieldErrors: Partial<Record<WebhookAutomationFormValueKey, string>>;
+  validationSummaryError: string | null;
   formError: string | null;
   isSaving: boolean;
   isDeleting: boolean;
@@ -431,6 +432,12 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       </FormPageSection>
 
       <FormPageFooter>
+        {input.validationSummaryError === null ? null : (
+          <Alert variant="destructive">
+            <AlertTitle>Automation could not be saved</AlertTitle>
+            <AlertDescription>{input.validationSummaryError}</AlertDescription>
+          </Alert>
+        )}
         <Button
           disabled={input.isDeleting || input.isSaving}
           onClick={input.onSubmit}
