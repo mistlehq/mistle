@@ -408,10 +408,10 @@ export const ValidationErrors: Story = {
     mode: "create",
     validationSummaryError: "Please address the fields highlighted in red.",
     fieldErrors: {
-      name: "Automation name is required.",
       triggerIds: "Select at least one trigger.",
-      sandboxProfileId: "Select a sandbox profile.",
-      instructions: "Instructions are required.",
+      name: "Required field.",
+      sandboxProfileId: "Required field.",
+      instructions: "Required field.",
     },
     values: {
       ...EmptyCreateValues,
@@ -423,7 +423,6 @@ export const NoConnectedIntegrations: Story = {
   args: {
     mode: "create",
     connectionOptions: [],
-    formError: "Create an integration connection before you configure an automation.",
     values: EmptyCreateValues,
     webhookEventOptions: [],
   },

@@ -21,6 +21,7 @@ import { useId, useState } from "react";
 
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { StatusBox } from "../shared/status-box.js";
 import {
   createSyntheticWebhookAutomationEventOption,
   isWebhookAutomationEventOptionUnavailable,
@@ -172,28 +173,14 @@ export function WebhookAutomationTriggerPicker(input: {
       )}
 
       {pickerState.helperMessage === null ? null : (
-        <p className="text-muted-foreground text-sm">{pickerState.helperMessage}</p>
+        <StatusBox tone="destructive">{pickerState.helperMessage}</StatusBox>
       )}
 
       {selectedEventOptions.length === 0 ? (
         pickerState.disabled ? null : (
-          <div
-            className={
-              input.error === undefined
-                ? "bg-muted/20 rounded-lg border px-3.5 py-3"
-                : "bg-destructive/5 rounded-lg border border-destructive/40 px-3.5 py-3"
-            }
-          >
-            <p
-              className={
-                input.error === undefined
-                  ? "text-muted-foreground text-sm"
-                  : "text-destructive text-sm"
-              }
-            >
-              {emptyStateMessage}
-            </p>
-          </div>
+          <StatusBox tone={input.error === undefined ? "neutral" : "destructive"}>
+            {emptyStateMessage}
+          </StatusBox>
         )
       ) : (
         <div className="space-y-1.5">

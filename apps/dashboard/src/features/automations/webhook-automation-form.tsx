@@ -20,6 +20,7 @@ import {
 import { TrashIcon } from "@phosphor-icons/react";
 
 import { FormPageFooter, FormPageHeader, FormPageSection } from "../shared/form-page.js";
+import { StatusBox } from "../shared/status-box.js";
 import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
@@ -437,9 +438,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
       <FormPageFooter>
         {input.validationSummaryError === null ? null : (
-          <div className="bg-destructive/5 text-destructive rounded-md px-3 py-2 text-sm">
+          <StatusBox tone="destructive" variant="subtle">
             {input.validationSummaryError}
-          </div>
+          </StatusBox>
         )}
         <Button
           disabled={input.isDeleting || input.isSaving}

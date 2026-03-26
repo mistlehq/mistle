@@ -265,13 +265,13 @@ describe("WebhookAutomationTriggerPicker", () => {
 
     const errorMessage = screen.getByText("Select at least one trigger.");
     expect(errorMessage).toBeDefined();
-    expect(errorMessage.className.includes("text-destructive")).toBe(true);
 
-    const container = errorMessage.closest("div");
+    const container = errorMessage.parentElement;
     if (container === null) {
       throw new Error("Expected trigger empty state container.");
     }
 
+    expect(container.className.includes("text-destructive")).toBe(true);
     expect(container.className.includes("border-destructive/40")).toBe(true);
     expect(within(renderContainer).queryByText("No triggers added yet.")).toBeNull();
   });
