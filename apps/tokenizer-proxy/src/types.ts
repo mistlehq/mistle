@@ -13,6 +13,7 @@ export type TokenizerProxyGlobalConfig = NonNullable<LoadTokenizerProxyConfigRes
 export type TokenizerProxyRuntimeConfig = {
   app: TokenizerProxyConfig;
   internalAuthServiceToken: TokenizerProxyGlobalConfig["internalAuth"]["serviceToken"];
+  egressGrantConfig: TokenizerProxyGlobalConfig["sandbox"]["egress"];
 };
 
 export type AppContextBindings = {

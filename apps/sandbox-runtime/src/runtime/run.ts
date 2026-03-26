@@ -108,6 +108,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
   const proxyServer = createProxyServer({
     runtimePlan: startupInput.runtimePlan,
     tokenizerProxyEgressBaseUrl: config.tokenizerProxyEgressBaseUrl,
+    egressGrantByRuleId: startupInput.egressGrantByRuleId,
     ...(certificateAuthority === undefined ? {} : { certificateAuthority }),
   });
 

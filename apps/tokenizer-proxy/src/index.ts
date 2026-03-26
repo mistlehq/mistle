@@ -7,6 +7,7 @@ import { createTokenizerProxyRuntime } from "./runtime/index.js";
 const runtime = createTokenizerProxyRuntime({
   app: appConfig,
   internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
+  egressGrantConfig: globalConfig.sandbox.egress,
 });
 
 await runtime.start();

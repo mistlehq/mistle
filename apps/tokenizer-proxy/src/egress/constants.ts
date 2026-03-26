@@ -2,18 +2,7 @@ export const EGRESS_BASE_PATH = "/tokenizer-proxy/egress";
 export const EGRESS_WILDCARD_BASE_PATH = "/tokenizer-proxy/egress/*";
 
 export const EgressRequestHeaders = {
-  EGRESS_RULE_ID: "X-Mistle-Egress-Rule-Id",
-  BINDING_ID: "X-Mistle-Egress-Binding-Id",
-  UPSTREAM_BASE_URL: "X-Mistle-Egress-Upstream-Base-Url",
-  AUTH_INJECTION_TYPE: "X-Mistle-Egress-Auth-Injection-Type",
-  AUTH_INJECTION_TARGET: "X-Mistle-Egress-Auth-Injection-Target",
-  AUTH_INJECTION_USERNAME: "X-Mistle-Egress-Auth-Injection-Username",
-  CONNECTION_ID: "X-Mistle-Egress-Connection-Id",
-  CREDENTIAL_SECRET_TYPE: "X-Mistle-Egress-Credential-Secret-Type",
-  CREDENTIAL_PURPOSE: "X-Mistle-Egress-Credential-Purpose",
-  CREDENTIAL_RESOLVER_KEY: "X-Mistle-Egress-Credential-Resolver-Key",
-  SANDBOX_PROFILE_ID: "X-Mistle-Sandbox-Profile-Id",
-  SANDBOX_PROFILE_VERSION: "X-Mistle-Sandbox-Profile-Version",
+  GRANT: "X-Mistle-Egress-Grant",
 } as const;
 
 export const CREDENTIAL_RESOLVER_REQUEST_TIMEOUT_MS = 3000;
