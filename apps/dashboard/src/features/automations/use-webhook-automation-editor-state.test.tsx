@@ -276,4 +276,142 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       triggerIds: "Select at least one trigger.",
     });
   });
+
+  it("shows a required-fields summary when the only missing field is triggers", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "create",
+          automationId: undefined,
+          navigate: async () => {},
+          initialValues: {
+            name: "GitHub triage",
+            sandboxProfileId: "sbp_123",
+            enabled: true,
+            inputTemplate: DefaultWebhookAutomationInputTemplate,
+            conversationKeyTemplate: "",
+            triggerIds: [],
+            triggerParameterValues: {},
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          directoryData: {
+            connections: [],
+            targets: [],
+          },
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => {
+      result.current.onSubmit();
+    });
+
+    expect(result.current.validationSummaryError).toBe(
+      "Please address the fields highlighted in red.",
+    );
+    expect(result.current.fieldErrors.triggerIds).toBe("Select at least one trigger.");
+  });
+
+  it("clears stale trigger validation errors when the sandbox profile changes", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+    const triggerId = createWebhookAutomationTriggerId({
+      connectionId: "conn_linear",
+      eventType: "linear.issue.created",
+    });
+
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_invalid"), {
+      versions: [{ sandboxProfileId: "sbp_invalid", version: 1 }],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionIntegrationBindingsQueryKey({
+        profileId: "sbp_invalid",
+        version: 1,
+      }),
+      {
+        bindings: [],
+      },
+    );
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_valid"), {
+      versions: [{ sandboxProfileId: "sbp_valid", version: 1 }],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionIntegrationBindingsQueryKey({
+        profileId: "sbp_valid",
+        version: 1,
+      }),
+      {
+        bindings: [createBinding()],
+      },
+    );
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "create",
+          automationId: undefined,
+          navigate: async () => {},
+          initialValues: {
+            name: "Linear automation",
+            sandboxProfileId: "sbp_invalid",
+            enabled: true,
+            inputTemplate: DefaultWebhookAutomationInputTemplate,
+            conversationKeyTemplate: "",
+            triggerIds: [triggerId],
+            triggerParameterValues: {},
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          directoryData: createDirectoryData({
+            supportedWebhookEvents: [
+              {
+                eventType: "linear.issue.created",
+                providerEventType: "Issue",
+                displayName: "Issue created",
+              },
+            ],
+          }),
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => {
+      result.current.onSubmit();
+    });
+
+    expect(result.current.fieldErrors.triggerIds).toBe(
+      "Trigger is unavailable for the selected sandbox profile.",
+    );
+
+    act(() => {
+      result.current.onValueChange("sandboxProfileId", "sbp_valid");
+    });
+
+    expect(result.current.fieldErrors.triggerIds).toBeUndefined();
+    expect(result.current.validationSummaryError).toBeNull();
+  });
 });

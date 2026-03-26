@@ -64,6 +64,7 @@ const InvalidProfileBindingMessage =
   "The selected profile has no bindings with automation triggers.";
 const LoadProfileBindingsErrorMessage = "Could not load profile bindings.";
 const RequiredFieldSummaryMessage = "Please address the fields highlighted in red.";
+const RequiredTriggerSelectionMessage = "Select at least one trigger.";
 const UnselectedProfileQueryId = "__unselected__";
 const MissingProfileVersionQueryId = 0;
 
@@ -73,7 +74,8 @@ function hasRequiredFieldErrors(
   return (
     fieldErrors.name !== undefined ||
     fieldErrors.sandboxProfileId !== undefined ||
-    fieldErrors.inputTemplate !== undefined
+    fieldErrors.inputTemplate !== undefined ||
+    fieldErrors.triggerIds === RequiredTriggerSelectionMessage
   );
 }
 
@@ -472,10 +474,29 @@ export function useLoadedWebhookAutomationEditorState(
     });
 
     setFormValues(nextValues);
-    setFieldErrors((currentErrors) => ({
-      ...currentErrors,
-      [key]: undefined,
-    }));
+    setFieldErrors((currentErrors) => {
+      if (key === "sandboxProfileId") {
+        const {
+          sandboxProfileId: _sandboxProfileId,
+          triggerIds: _triggerIds,
+          conversationKeyTemplate: _conversationKeyTemplate,
+          ...remainingErrors
+        } = currentErrors;
+
+        void _sandboxProfileId;
+        void _triggerIds;
+        void _conversationKeyTemplate;
+
+        return {
+          ...remainingErrors,
+        };
+      }
+
+      return {
+        ...currentErrors,
+        [key]: undefined,
+      };
+    });
     setValidationSummaryError(null);
     setFormError(null);
   }

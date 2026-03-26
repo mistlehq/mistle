@@ -422,6 +422,7 @@ export const ValidationErrors: Story = {
     },
     values: {
       ...EmptyCreateValues,
+      inputTemplate: "",
     },
   },
 };
