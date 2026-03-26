@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildTokenizerProxyRequest, HEADER_EGRESS_GRANT } from "./forwarder.js";
 
 describe("buildTokenizerProxyRequest", () => {
-  it("uses header-addressed tokenizer path and forwards the signed grant", () => {
+  it("uses the tokenizer egress endpoint and forwards the signed grant", () => {
     const request = buildTokenizerProxyRequest({
       tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy.internal/tokenizer-proxy/egress",
       egressGrant: "signed-egress-grant",

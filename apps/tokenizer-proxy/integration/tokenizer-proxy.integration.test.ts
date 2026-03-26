@@ -357,6 +357,26 @@ describe("tokenizer proxy integration", () => {
     });
   });
 
+  it("returns 401 when forged authority headers are present without a grant", async ({
+    fixture,
+  }) => {
+    const response = await fetch(`${fixture.baseUrl}/tokenizer-proxy/egress/v1/responses`, {
+      method: "POST",
+      headers: {
+        "X-Mistle-Egress-Connection-Id": "icn_forged",
+        "X-Mistle-Egress-Binding-Id": "ibd_forged",
+        "X-Mistle-Egress-Upstream-Base-Url": "https://attacker.invalid",
+      },
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body).toEqual({
+      code: "INVALID_EGRESS_GRANT",
+      message: "Egress grant token is required.",
+    });
+  });
+
   it("returns 502 when control-plane credential resolution fails", async () => {
     const controlPlaneServer = await startControlPlaneCredentialServer({
       host: "127.0.0.1",
@@ -414,6 +434,122 @@ describe("tokenizer proxy integration", () => {
         code: "CREDENTIAL_RESOLUTION_FAILED",
         message: "Failed to resolve integration credential.",
       });
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop()]);
+    }
+  });
+
+  it("returns 403 when the request method falls outside the grant scope", async () => {
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "unused",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_openai",
+      upstreamBaseUrl: "https://api.openai.com/v1",
+      bindingId: "ibd_openai",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      connectionId: "icn_openai",
+      secretType: "api_key",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/v1"],
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/v1/responses`,
+        {
+          method: "GET",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+          },
+        },
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(body).toEqual({
+        code: "EGRESS_GRANT_SCOPE_VIOLATION",
+        message: "Egress grant does not allow method 'GET'.",
+      });
+      expect(controlPlaneServer.requests).toEqual([]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop()]);
+    }
+  });
+
+  it("returns 403 when the request path falls outside the grant scope", async () => {
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "unused",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_openai",
+      upstreamBaseUrl: "https://api.openai.com/v1",
+      bindingId: "ibd_openai",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      connectionId: "icn_openai",
+      secretType: "api_key",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/v1"],
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/graphql`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+          },
+        },
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(body).toEqual({
+        code: "EGRESS_GRANT_SCOPE_VIOLATION",
+        message: "Egress grant does not allow path '/graphql'.",
+      });
+      expect(controlPlaneServer.requests).toEqual([]);
     } finally {
       await Promise.all([runtime.stop(), controlPlaneServer.stop()]);
     }
