@@ -437,10 +437,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
       <FormPageFooter>
         {input.validationSummaryError === null ? null : (
-          <Alert variant="destructive">
-            <AlertTitle>Automation could not be saved</AlertTitle>
-            <AlertDescription>{input.validationSummaryError}</AlertDescription>
-          </Alert>
+          <div className="bg-destructive/5 text-destructive rounded-md px-3 py-2 text-sm">
+            {input.validationSummaryError}
+          </div>
         )}
         <Button
           disabled={input.isDeleting || input.isSaving}

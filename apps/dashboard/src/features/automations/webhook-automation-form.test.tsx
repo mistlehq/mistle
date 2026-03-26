@@ -316,7 +316,6 @@ describe("WebhookAutomationForm", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Automation could not be saved")).toBeDefined();
     expect(
       screen.getByText("Please fill in the required fields highlighted in red."),
     ).toBeDefined();
