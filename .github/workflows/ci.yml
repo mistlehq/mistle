@@ -217,8 +217,17 @@ jobs:
       - name: Generate CI config
         run: nix develop --command pnpm run config:init:ci
 
-      - name: Run tests in Nix shell
-        run: nix develop --command pnpm test
+      - name: Run tests with coverage in Nix shell
+        run: nix develop --command pnpm test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          fail_ci_if_error: true
+          flags: unit
+          name: unit-monorepo
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.test-turbo-cache.outputs.cache-hit != 'true' }}
