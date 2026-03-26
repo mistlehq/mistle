@@ -26,6 +26,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@mistle/time": "workspace:*",
     "dockerode": "^4.0.9",
     "e2b": "^2.18.0",
     "zod": "^4.3.6"

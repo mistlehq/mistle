@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 
 import type { RuntimeArtifactCommand } from "@mistle/integrations-core";
+import { systemScheduler } from "@mistle/time";
 
 type CommandResult = {
   code: number | null;
@@ -51,7 +52,7 @@ async function executeCommand(command: RuntimeArtifactCommand): Promise<CommandR
     const timeoutHandle =
       command.timeoutMs === undefined || command.timeoutMs <= 0
         ? undefined
-        : setTimeout(() => {
+        : systemScheduler.schedule(() => {
             timedOut = true;
             child.kill("SIGKILL");
           }, command.timeoutMs);
@@ -66,7 +67,7 @@ async function executeCommand(command: RuntimeArtifactCommand): Promise<CommandR
 
     child.on("error", (error) => {
       if (timeoutHandle !== undefined) {
-        clearTimeout(timeoutHandle);
+        systemScheduler.cancel(timeoutHandle);
       }
 
       reject(error);
@@ -74,7 +75,7 @@ async function executeCommand(command: RuntimeArtifactCommand): Promise<CommandR
 
     child.on("close", (code, signal) => {
       if (timeoutHandle !== undefined) {
-        clearTimeout(timeoutHandle);
+        systemScheduler.cancel(timeoutHandle);
       }
 
       resolve({

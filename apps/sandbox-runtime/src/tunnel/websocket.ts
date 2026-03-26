@@ -1,3 +1,4 @@
+import { systemScheduler } from "@mistle/time";
 import WebSocket, { type RawData } from "ws";
 
 import { AsyncQueue } from "./async-queue.js";
@@ -206,13 +207,13 @@ export function closeWebSocket(socket: WebSocket): Promise<void> {
       }
 
       settled = true;
-      clearTimeout(forceCloseTimer);
+      systemScheduler.cancel(forceCloseTimer);
       socket.off("close", finish);
       socket.off("error", finish);
       resolve();
     };
 
-    const forceCloseTimer = setTimeout(() => {
+    const forceCloseTimer = systemScheduler.schedule(() => {
       socket.terminate();
     }, WebSocketCloseTimeoutMs);
 

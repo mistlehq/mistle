@@ -1,4 +1,5 @@
 import type { CompiledAgentRuntime, CompiledRuntimeClient } from "@mistle/integrations-core";
+import { systemScheduler } from "@mistle/time";
 import type WebSocket from "ws";
 
 import { logSandboxRuntimeEvent } from "../runtime/logger.js";
@@ -114,12 +115,12 @@ function writeUnboundStreamReset(
 
 async function waitForReconnect(signal: AbortSignal, delayMs: number): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => {
+    const timeout = systemScheduler.schedule(() => {
       signal.removeEventListener("abort", abortListener);
       resolve();
     }, delayMs);
     const abortListener = (): void => {
-      clearTimeout(timeout);
+      systemScheduler.cancel(timeout);
       reject(signal.reason ?? new Error("operation was aborted"));
     };
 

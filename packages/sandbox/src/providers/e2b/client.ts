@@ -1,3 +1,4 @@
+import { systemSleeper } from "@mistle/time";
 import { CommandExitError, Sandbox, type ConnectionOpts } from "e2b";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
@@ -98,9 +99,7 @@ function createUnknownClientError(input: {
 }
 
 async function sleep(ms: number): Promise<void> {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
+  await systemSleeper.sleep(ms);
 }
 
 export class E2BApiClient implements E2BClient {
