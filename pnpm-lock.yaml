@@ -800,8 +800,8 @@ importers:
         specifier: ^4.0.9
         version: 4.0.9
       e2b:
-        specifier: ^2.16.0
-        version: 2.16.0
+        specifier: ^2.18.0
+        version: 2.18.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -6707,8 +6707,8 @@ packages:
   brace-expansion@2.0.2:
     resolution: {integrity: sha512-Jt0vHyM+jmUBqojB7E1NIYadt0vI0Qxjxd2TErW94wDz+E2LAm5vKMXXwg6ZZBTHPuUlDgQHKXvjGBdfcF1ZDQ==}
 
-  brace-expansion@5.0.4:
-    resolution: {integrity: sha512-h+DEnpVvxmfVefa4jFbCf5HdH5YMDXRsmKflpf1pILZWRFlTbJpxeU55nJl4Smt5HQaGzg1o6RHFPJaOqnmBDg==}
+  brace-expansion@5.0.5:
+    resolution: {integrity: sha512-VZznLgtwhn+Mact9tfiwx64fA9erHH/MCXEUfB/0bX/6Fz6ny5EGTXYltMocqg4xFAQZtnO3DHWWXi8RiuN7cQ==}
     engines: {node: 18 || 20 || >=22}
 
   braces@3.0.3:
@@ -7708,8 +7708,8 @@ packages:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
     engines: {node: '>= 0.4'}
 
-  e2b@2.16.0:
-    resolution: {integrity: sha512-ZQ+3fcvlTfHQ/0Al+KC/IvrVEI8OktFbKgOkAOHoJmD2gKZ6/umuf5szCbYIla0gW/pkfrMDzebH/s4yyK6jBQ==}
+  e2b@2.18.0:
+    resolution: {integrity: sha512-umWvNhKx3dWUfzcLPLO5Ep1qB5cTLuJlAlnxfKVUnOwx3yaO+H1PaAE2fihT4etEu3BNs3pHvdwa1VM+uMxe0w==}
     engines: {node: '>=20'}
 
   eastasianwidth@0.2.0:
@@ -18068,7 +18068,7 @@ snapshots:
     dependencies:
       balanced-match: 1.0.2
 
-  brace-expansion@5.0.4:
+  brace-expansion@5.0.5:
     dependencies:
       balanced-match: 4.0.4
 
@@ -18991,7 +18991,7 @@ snapshots:
       es-errors: 1.3.0
       gopd: 1.2.0
 
-  e2b@2.16.0:
+  e2b@2.18.0:
     dependencies:
       '@bufbuild/protobuf': 2.11.0
       '@connectrpc/connect': 2.0.0-rc.3(@bufbuild/protobuf@2.11.0)
@@ -21656,7 +21656,7 @@ snapshots:
 
   minimatch@10.2.4:
     dependencies:
-      brace-expansion: 5.0.4
+      brace-expansion: 5.0.5
 
   minimatch@3.1.2:
     dependencies:
