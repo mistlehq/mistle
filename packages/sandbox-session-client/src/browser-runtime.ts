@@ -1,3 +1,5 @@
+import { systemScheduler, type TimerHandle } from "@mistle/time";
+
 import {
   type SandboxScheduledTask,
   SandboxSessionSendGuarantees,
@@ -90,14 +92,14 @@ class BrowserSandboxSessionSocket implements SandboxSessionSocket {
 }
 
 class BrowserSandboxScheduledTask implements SandboxScheduledTask {
-  readonly #timeoutId: ReturnType<typeof globalThis.setTimeout>;
+  readonly #timeoutHandle: TimerHandle;
 
-  constructor(timeoutId: ReturnType<typeof globalThis.setTimeout>) {
-    this.#timeoutId = timeoutId;
+  constructor(timeoutHandle: TimerHandle) {
+    this.#timeoutHandle = timeoutHandle;
   }
 
   cancel(): void {
-    globalThis.clearTimeout(this.#timeoutId);
+    systemScheduler.cancel(this.#timeoutHandle);
   }
 }
 
@@ -118,6 +120,6 @@ export function createBrowserSandboxSessionRuntime(): SandboxSessionRuntime {
     createSocket: (connectionUrl) => new BrowserSandboxSessionSocket(connectionUrl),
     createStreamId,
     scheduleTimeout: (callback, timeoutMs) =>
-      new BrowserSandboxScheduledTask(globalThis.setTimeout(callback, timeoutMs)),
+      new BrowserSandboxScheduledTask(systemScheduler.schedule(callback, timeoutMs)),
   };
 }
