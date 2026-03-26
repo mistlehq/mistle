@@ -9,7 +9,9 @@ import {
   buildAttachedImagePathsText,
   buildNonImageCapableModelWarningMessage,
   buildPromptWithAttachedImagePaths,
+  buildUnavailableModelErrorMessage,
   getSandboxInstanceStatusQueryKey,
+  hasUnavailableSelectedModel,
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   isActiveResumeRequest,
@@ -85,8 +87,8 @@ describe("useSessionWorkbenchController", () => {
           },
           {
             id: "model_fast",
-            model: "codex-spark",
-            displayName: "Codex Spark",
+            model: "gpt-5.3-codex-spark",
+            displayName: "GPT-5.3 Codex Spark",
             hidden: false,
             defaultReasoningEffort: null,
             inputModalities: ["text"],
@@ -94,11 +96,11 @@ describe("useSessionWorkbenchController", () => {
             isDefault: false,
           },
         ],
-        selectedModel: "codex-spark",
+        selectedModel: "gpt-5.3-codex-spark",
       }),
     )?.toMatchObject({
-      model: "codex-spark",
-      displayName: "Codex Spark",
+      model: "gpt-5.3-codex-spark",
+      displayName: "GPT-5.3 Codex Spark",
     });
 
     expect(
@@ -139,13 +141,68 @@ describe("useSessionWorkbenchController", () => {
     expect(
       supportsImageInspection({
         id: "text_model",
-        model: "codex-spark",
-        displayName: "Codex Spark",
+        model: "gpt-5.3-codex-spark",
+        displayName: "GPT-5.3 Codex Spark",
         hidden: false,
         defaultReasoningEffort: null,
         inputModalities: ["text"],
         supportsPersonality: false,
         isDefault: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns null when the selected model is unavailable", () => {
+    expect(
+      resolveActiveComposerModel({
+        availableModels: [
+          {
+            id: "model_default",
+            model: "gpt-5.4",
+            displayName: "GPT-5.4",
+            hidden: false,
+            defaultReasoningEffort: null,
+            inputModalities: ["text", "image"],
+            supportsPersonality: false,
+            isDefault: true,
+          },
+          {
+            id: "model_fast",
+            model: "gpt-5.3-codex-spark",
+            displayName: "GPT-5.3 Codex Spark",
+            hidden: false,
+            defaultReasoningEffort: null,
+            inputModalities: ["text"],
+            supportsPersonality: false,
+            isDefault: false,
+          },
+        ],
+        selectedModel: "removed-model",
+      }),
+    ).toBeNull();
+  });
+
+  it("flags unavailable selected models without treating defaults as implicit fallbacks", () => {
+    expect(
+      hasUnavailableSelectedModel({
+        selectedModel: "removed-model",
+        activeModel: null,
+      }),
+    ).toBe(true);
+
+    expect(
+      hasUnavailableSelectedModel({
+        selectedModel: null,
+        activeModel: {
+          id: "model_default",
+          model: "gpt-5.4",
+          displayName: "GPT-5.4",
+          hidden: false,
+          defaultReasoningEffort: null,
+          inputModalities: ["text", "image"],
+          supportsPersonality: false,
+          isDefault: true,
+        },
       }),
     ).toBe(false);
   });
@@ -189,6 +246,12 @@ describe("useSessionWorkbenchController", () => {
   it("builds the non-image-capable warning copy", () => {
     expect(buildNonImageCapableModelWarningMessage("Codex Spark")).toBe(
       "Model Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
+    );
+  });
+
+  it("builds the unavailable-model error copy", () => {
+    expect(buildUnavailableModelErrorMessage("gpt-legacy")).toBe(
+      "Model gpt-legacy is no longer available. Switch to another model to continue.",
     );
   });
 

@@ -47,6 +47,8 @@ type PendingComposerAttachment = {
 
 const NonImageCapableModelWarningMessageSuffix =
   " is not image-capable. Images can remain attached, but the model will not inspect them.";
+const UnavailableModelErrorMessageSuffix =
+  " is no longer available. Switch to another model to continue.";
 
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
 const AutomationSessionPreparationTimeoutMs = 30_000;
@@ -128,6 +130,17 @@ export function resolveActiveComposerModel(input: {
 
 export function supportsImageInspection(model: CodexModelSummary | null): boolean {
   return model?.inputModalities.includes("image") ?? true;
+}
+
+export function hasUnavailableSelectedModel(input: {
+  selectedModel: string | null;
+  activeModel: CodexModelSummary | null;
+}): boolean {
+  return input.selectedModel !== null && input.activeModel === null;
+}
+
+export function buildUnavailableModelErrorMessage(modelName: string): string {
+  return `Model ${modelName}${UnavailableModelErrorMessageSuffix}`;
 }
 
 export function buildNonImageCapableModelWarningMessage(modelName: string): string {
@@ -793,6 +806,10 @@ export function useSessionWorkbenchController(input: {
     availableModels: admin.availableModels,
     selectedModel: activeComposerConfig.model,
   });
+  const hasUnavailableComposerModel = hasUnavailableSelectedModel({
+    selectedModel: activeComposerConfig.model,
+    activeModel: activeComposerModel,
+  });
   const activeComposerModelSupportsImages = supportsImageInspection(activeComposerModel);
 
   const addPendingComposerFiles = useCallback((files: readonly File[]): void => {
@@ -827,6 +844,11 @@ export function useSessionWorkbenchController(input: {
   }, []);
 
   useEffect(() => {
+    if (hasUnavailableComposerModel && activeComposerConfig.model !== null) {
+      reportStartErrorMessage(buildUnavailableModelErrorMessage(activeComposerConfig.model));
+      return;
+    }
+
     if (
       pendingComposerAttachments.length > 0 &&
       !activeComposerModelSupportsImages &&
@@ -840,14 +862,17 @@ export function useSessionWorkbenchController(input: {
 
     if (
       startErrorMessage !== null &&
-      startErrorMessage.endsWith(NonImageCapableModelWarningMessageSuffix)
+      (startErrorMessage.endsWith(NonImageCapableModelWarningMessageSuffix) ||
+        startErrorMessage.endsWith(UnavailableModelErrorMessageSuffix))
     ) {
       clearStartErrorMessage();
     }
   }, [
+    activeComposerConfig.model,
     activeComposerModel,
     activeComposerModelSupportsImages,
     clearStartErrorMessage,
+    hasUnavailableComposerModel,
     pendingComposerAttachments.length,
     reportStartErrorMessage,
     startErrorMessage,
@@ -863,6 +888,11 @@ export function useSessionWorkbenchController(input: {
 
       if (action.type === "interrupt_turn") {
         interruptTurn();
+        return;
+      }
+
+      if (hasUnavailableComposerModel && activeComposerConfig.model !== null) {
+        reportStartErrorMessage(buildUnavailableModelErrorMessage(activeComposerConfig.model));
         return;
       }
 
@@ -944,7 +974,9 @@ export function useSessionWorkbenchController(input: {
     input.sandboxInstanceId,
     hasActiveTurn,
     interruptTurn,
+    activeComposerConfig.model,
     activeComposerModelSupportsImages,
+    hasUnavailableComposerModel,
     pendingComposerAttachments,
     reportStartErrorMessage,
     startTurn,
