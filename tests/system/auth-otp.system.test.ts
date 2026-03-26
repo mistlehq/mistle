@@ -18,14 +18,20 @@ const AuthErrorSchema = z
 
 const MembershipCapabilitiesSuccessSchema = z
   .object({
-    ok: z.literal(true),
-    data: z.object({
-      organizationId: z.string().min(1),
-      actorRole: z.string().min(1),
+    organizationId: z.string().min(1),
+    actorRole: z.string().min(1),
+    invite: z
+      .object({
+        canExecute: z.boolean(),
+        assignableRoles: z.array(z.string().min(1)),
+      })
+      .strict(),
+    memberRoleUpdate: z.object({
+      canExecute: z.boolean(),
+      roleTransitionMatrix: z.record(z.string().min(1), z.array(z.string().min(1))),
     }),
-    error: z.null(),
   })
-  .catchall(z.unknown());
+  .strict();
 
 async function readAuthError(response: Response): Promise<z.infer<typeof AuthErrorSchema>> {
   const payload: unknown = await response.json().catch(() => null);
@@ -101,8 +107,8 @@ describe("system auth otp", () => {
     expect(capabilitiesResult.response.status).toBe(200);
 
     const capabilities = MembershipCapabilitiesSuccessSchema.parse(capabilitiesResult.data);
-    expect(capabilities.data.organizationId).toBe(organizationId);
-    expect(capabilities.data.actorRole).toBe("owner");
+    expect(capabilities.organizationId).toBe(organizationId);
+    expect(capabilities.actorRole).toBe("owner");
   });
 
   it("rejects sign-in with an incorrect otp and does not create a user", async ({ fixture }) => {
