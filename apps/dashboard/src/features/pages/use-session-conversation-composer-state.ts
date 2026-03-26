@@ -2,11 +2,7 @@ import type {
   CodexModelSummary,
   CodexTurnInputLocalImageItem,
 } from "@mistle/integrations-definitions/openai/agent/client";
-import {
-  FileUploadRejectedError,
-  FileUploadResetCodes,
-  uploadSandboxImage,
-} from "@mistle/sandbox-session-client";
+import { uploadSandboxImage } from "@mistle/sandbox-session-client";
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
 import { useCallback, useEffect, useState } from "react";
 
@@ -18,6 +14,10 @@ import {
 } from "../session-agents/codex/session-state/codex-attachment-presentation.js";
 import type { CodexModelCatalogStatus } from "../session-agents/codex/session-state/use-codex-session-admin.js";
 import { mintSandboxInstanceConnectionToken } from "../sessions/sessions-service.js";
+import {
+  readComposerConfigSnapshot,
+  type ComposerConfigSnapshot,
+} from "./session-composer-config.js";
 import {
   buildModelSelectionLoadingMessage,
   buildModelSelectionRequiredMessage,
@@ -32,13 +32,9 @@ import {
   type ComposerSubmitReadiness,
   type ResolvedComposerModelContext,
 } from "./session-composer-model-readiness.js";
+import { resolveUploadErrorMessage } from "./session-composer-upload-errors.js";
 import type { SessionConversationComposerProps } from "./session-conversation-pane.tsx";
 import { resolveChatComposerAction } from "./session-workbench-view-model.js";
-
-type ComposerConfigSnapshot = {
-  model: string | null;
-  modelReasoningEffort: string | null;
-};
 
 type ComposerConfigDraft = ComposerConfigSnapshot & {
   baseConfigJson: string | null;
@@ -97,62 +93,6 @@ type ComposerChatState = {
     transcriptAttachments?: readonly CodexTurnInputLocalImageItem[];
   }) => Promise<void>;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readComposerConfigSnapshot(configJson: string | null): ComposerConfigSnapshot {
-  if (configJson === null) {
-    return {
-      model: null,
-      modelReasoningEffort: null,
-    };
-  }
-
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(configJson);
-  } catch {
-    return {
-      model: null,
-      modelReasoningEffort: null,
-    };
-  }
-
-  if (!isRecord(parsedJson)) {
-    return {
-      model: null,
-      modelReasoningEffort: null,
-    };
-  }
-
-  const model = parsedJson["model"];
-  const modelReasoningEffort = parsedJson["model_reasoning_effort"];
-
-  return {
-    model: typeof model === "string" ? model : null,
-    modelReasoningEffort: typeof modelReasoningEffort === "string" ? modelReasoningEffort : null,
-  };
-}
-
-function resolveUploadErrorMessage(error: unknown): string {
-  if (error instanceof FileUploadRejectedError) {
-    if (error.code === FileUploadResetCodes.INVALID_FILE_TYPE) {
-      return "That file is not a supported PNG, JPEG, WebP, or GIF image.";
-    }
-
-    if (error.code === FileUploadResetCodes.MIME_TYPE_MISMATCH) {
-      return "That file's contents do not match its declared image type.";
-    }
-
-    if (error.code === FileUploadResetCodes.INVALID_IMAGE_CONTENT) {
-      return "That image file could not be validated.";
-    }
-  }
-
-  return error instanceof Error ? error.message : "Could not upload attached image.";
-}
 
 export {
   buildAttachedImagePathsText,
