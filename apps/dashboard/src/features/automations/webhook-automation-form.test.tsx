@@ -87,8 +87,8 @@ describe("WebhookAutomationForm", () => {
     return resetButton;
   }
 
-  function renderForm(mode: "create" | "edit" = "create"): void {
-    renderFormWithOptions({
+  function renderForm(mode: "create" | "edit" = "create"): ReturnType<typeof render> {
+    return renderFormWithOptions({
       mode,
     });
   }
@@ -184,16 +184,17 @@ describe("WebhookAutomationForm", () => {
   });
 
   it("shows the agent instructions editor copy", () => {
-    renderForm("create");
+    const { container } = renderForm("create");
+    const currentForm = within(container);
 
-    expect(screen.getByLabelText("Agent Instructions")).toBeDefined();
+    expect(currentForm.getByLabelText("Agent Instructions")).toBeDefined();
     expect(
-      screen.getAllByText((content) => content.includes("Use Liquid syntax with")).length,
+      currentForm.getAllByText((content) => content.includes("Use Liquid syntax with")).length,
     ).toBeGreaterThan(0);
-    expect(screen.getAllByText("{{webhookEvent.eventType}}").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("{{payload}}").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Basics")).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Agent Instructions" })).toBeNull();
+    expect(currentForm.getAllByText("{{webhookEvent.eventType}}").length).toBeGreaterThan(0);
+    expect(currentForm.getAllByText("{{payload}}").length).toBeGreaterThan(0);
+    expect(currentForm.queryByText("Basics")).toBeNull();
+    expect(currentForm.queryByRole("heading", { name: "Agent Instructions" })).toBeNull();
   });
 
   it("renders triggers before agent instructions", () => {
@@ -201,8 +202,9 @@ describe("WebhookAutomationForm", () => {
       mode: "create",
     });
 
-    const [triggersHeading] = screen.getAllByRole("heading", { name: "Triggers" });
-    const inputTemplateField = screen.getByLabelText("Agent Instructions");
+    const currentForm = within(container);
+    const [triggersHeading] = currentForm.getAllByRole("heading", { name: "Triggers" });
+    const inputTemplateField = currentForm.getByLabelText("Agent Instructions");
 
     if (triggersHeading === undefined) {
       throw new Error("Expected triggers heading to be rendered.");
@@ -312,10 +314,7 @@ describe("WebhookAutomationForm", () => {
 
     const currentForm = within(container);
     const automationNameInput = currentForm.getByDisplayValue("Repo triage");
-    const inputTemplateTextarea = container.querySelector('textarea[data-slot="textarea"]');
-    if (inputTemplateTextarea === null) {
-      throw new Error("Expected input template textarea.");
-    }
+    const inputTemplateTextarea = currentForm.getByLabelText("Agent Instructions");
 
     expect(automationNameInput.getAttribute("aria-invalid")).toBe("true");
     expect(inputTemplateTextarea.getAttribute("aria-invalid")).toBe("true");

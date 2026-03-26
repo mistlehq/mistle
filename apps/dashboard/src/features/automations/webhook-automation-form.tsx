@@ -146,6 +146,7 @@ function SelectField(input: {
 }
 
 export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.JSX.Element {
+  const inputTemplateLabelId = "automation-input-template-label";
   const submitLabel = input.mode === "create" ? "Create automation" : "Save changes";
   const selectedTriggerOptions = resolveSelectedWebhookAutomationEventOptions({
     eventOptions: input.webhookEventOptions,
@@ -392,7 +393,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             <FieldHeader>
               <div className="flex items-center justify-between gap-3">
                 <div className="space-y-1">
-                  <FieldLabel htmlFor="automation-input-template">Agent Instructions</FieldLabel>
+                  <FieldLabel id={inputTemplateLabelId}>Agent Instructions</FieldLabel>
                   <FieldDescription>
                     <span className="block">
                       These are the instructions the agent will receive.
@@ -419,6 +420,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             <FieldContent>
               <Textarea
                 aria-invalid={input.fieldErrors.inputTemplate !== undefined ? true : undefined}
+                aria-labelledby={inputTemplateLabelId}
                 className="min-h-48 text-sm"
                 id="automation-input-template"
                 disabled={input.isDeleting || input.isSaving}
