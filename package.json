@@ -37,6 +37,7 @@
     "typecheck:scripts": "tsc --project ./scripts/tsconfig.json",
     "test": "turbo run test --output-logs=errors-only",
     "test:coverage": "turbo run test --filter=!@mistle/docs --filter=!@mistle/sandbox-rs-napi --force --output-logs=errors-only -- --coverage.enabled --coverage.reporter=lcov --coverage.reporter=json-summary --coverage.reporter=text-summary",
+    "test:coverage:rust": "mkdir -p packages/sandbox-rs-napi/coverage && LLVM_COV=\"$(command -v llvm-cov)\" LLVM_PROFDATA=\"$(command -v llvm-profdata)\" cargo llvm-cov --manifest-path packages/sandbox-rs-napi/Cargo.toml --locked --lcov --output-path packages/sandbox-rs-napi/coverage/lcov.info",
     "test:property": "turbo run test:property",
     "test:integration": "tsx ./scripts/test/run-integration-vitest.ts",
     "test:integration:all": "pnpm test:integration",

@@ -17,6 +17,7 @@
           packages = [
             nodejs
             pkgs.codespell
+            pkgs.llvm
             pkgs.pnpm
             pkgs.rustc
             pkgs.cargo
