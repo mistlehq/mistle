@@ -22,7 +22,7 @@ export function resolveWebhookAutomationEventOptionAvailabilityCopy(
   if (availability === "wrong_profile") {
     return {
       badgeLabel: "Wrong profile",
-      description: "This trigger is not available for the selected sandbox profile.",
+      description: "Trigger is unavailable for the selected sandbox profile.",
     };
   }
 

@@ -502,7 +502,7 @@ export const WrongProfileSavedEvent: Story = {
     mode: "edit",
     onDelete: function onDelete() {},
     fieldErrors: {
-      triggerIds: "This trigger is not available for the selected sandbox profile.",
+      triggerIds: "Trigger is unavailable for the selected sandbox profile.",
     },
     values: {
       ...ExistingAutomationValues,
@@ -520,7 +520,7 @@ export const WrongProfileSavedEvent: Story = {
       {
         ...GitHubWebhookEventOptions[0]!,
         availability: "wrong_profile",
-        description: "This trigger is not available for the selected sandbox profile.",
+        description: "Trigger is unavailable for the selected sandbox profile.",
       },
       GitHubWebhookEventOptions[2]!,
     ],

@@ -192,6 +192,12 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
     selectedConversationGroupingOption === undefined
       ? undefined
       : selectedConversationGroupingOption.label;
+  const triggerHeaderMessage =
+    input.values.triggerIds.length > 0 &&
+    input.fieldErrors.triggerIds !== undefined &&
+    input.fieldErrors.triggerIds !== "Trigger is unavailable for the selected sandbox profile."
+      ? input.fieldErrors.triggerIds
+      : undefined;
 
   return (
     <div className="flex flex-col gap-6">
@@ -307,7 +313,12 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       <FormPageSection
         header={
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold">Triggers</h2>
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold">Triggers</h2>
+              {triggerHeaderMessage === undefined ? null : (
+                <p className="text-destructive text-sm">{triggerHeaderMessage}</p>
+              )}
+            </div>
             <WebhookAutomationTriggerPickerAddButton
               error={input.fieldErrors.triggerIds}
               disabledReason={input.triggerPickerDisabledReason}
@@ -344,11 +355,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             selectedTriggerIds={input.values.triggerIds}
             showAddTriggerControl={false}
             triggerParameterValues={input.values.triggerParameterValues}
-          />
-          <FieldError
-            message={
-              input.values.triggerIds.length === 0 ? undefined : input.fieldErrors.triggerIds
-            }
           />
         </div>
 

@@ -313,12 +313,12 @@ describe("validateWebhookAutomationFormValues", () => {
             connectionId: GitHubConnectionId,
             connectionLabel: "GitHub Engineering",
             availability: "wrong_profile",
-            description: "This trigger is not available for the selected sandbox profile.",
+            description: "Trigger is unavailable for the selected sandbox profile.",
           }),
         ],
       ),
     ).toEqual({
-      triggerIds: "This trigger is not available for the selected sandbox profile.",
+      triggerIds: "Trigger is unavailable for the selected sandbox profile.",
     });
   });
 });

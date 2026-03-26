@@ -391,7 +391,7 @@ export const WrongProfileSavedTrigger: Story = {
         category: "GitHub Engineering / Issues",
         logoKey: "github",
         availability: "wrong_profile",
-        description: "This trigger is not available for the selected sandbox profile.",
+        description: "Trigger is unavailable for the selected sandbox profile.",
       },
       GitHubEventOptions[2]!,
     ],

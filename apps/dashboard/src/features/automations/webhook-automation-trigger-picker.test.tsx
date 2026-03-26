@@ -143,7 +143,7 @@ describe("WebhookAutomationTriggerPicker", () => {
   });
 
   it("shows unavailable saved triggers when they are no longer present in current options", () => {
-    renderTriggerPicker({
+    const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
       selectedTriggerIds: [
@@ -156,11 +156,14 @@ describe("WebhookAutomationTriggerPicker", () => {
     });
 
     expect(screen.getByText("github.push.deleted")).toBeDefined();
-    expect(screen.getByText("Unavailable")).toBeDefined();
+    const highlightedRows = [...container.querySelectorAll("div")].filter((element) =>
+      element.className.includes("border-destructive/40"),
+    );
+    expect(highlightedRows.length).toBe(1);
   });
 
   it("shows selected triggers that are incompatible with the selected profile", () => {
-    renderTriggerPicker({
+    const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
       selectedTriggerIds: [
@@ -173,14 +176,18 @@ describe("WebhookAutomationTriggerPicker", () => {
       eventOptions: [
         createGithubIssueCommentCreatedEventOption({
           availability: "wrong_profile",
-          description: "This trigger is not available for the selected sandbox profile.",
+          description: "Trigger is unavailable for the selected sandbox profile.",
         }),
       ],
     });
 
-    expect(screen.getByText("Wrong profile")).toBeDefined();
+    const highlightedRows = [...container.querySelectorAll("div")].filter((element) =>
+      element.className.includes("border-destructive/40"),
+    );
+    expect(highlightedRows.length).toBe(1);
+    expect(screen.queryByText("Wrong profile")).toBeNull();
     expect(
-      screen.getByText("This trigger is not available for the selected sandbox profile."),
+      screen.getByText("Trigger is unavailable for the selected sandbox profile."),
     ).toBeDefined();
   });
 
