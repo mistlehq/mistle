@@ -33,6 +33,12 @@ function setObjectValueAtPath(input: {
     throw new IntegrationCompilerError(CompilerErrorCodes.MCP_CONFLICT, input.invalidPathMessage);
   }
 
+  try {
+    assertSafeObjectPath([firstKey], input.invalidPathMessage);
+  } catch {
+    throw new IntegrationCompilerError(CompilerErrorCodes.MCP_CONFLICT, input.invalidPathMessage);
+  }
+
   if (remainingPath.length === 0) {
     input.root[firstKey] = input.value;
     return;
@@ -137,12 +143,6 @@ function replaceJsonMcpConfig(input: {
     parsedContent,
     `MCP config target '${input.mcpConfig.fileId}' must contain a JSON object.`,
   );
-  try {
-    assertSafeObjectPath(input.mcpConfig.path, invalidPathMessage);
-  } catch {
-    throw new IntegrationCompilerError(CompilerErrorCodes.MCP_CONFLICT, invalidPathMessage);
-  }
-
   setObjectValueAtPath({
     root,
     path: input.mcpConfig.path,
@@ -177,12 +177,6 @@ function replaceTomlMcpConfig(input: {
     parsedContent,
     `MCP config target '${input.mcpConfig.fileId}' must contain a TOML table.`,
   );
-  try {
-    assertSafeObjectPath(input.mcpConfig.path, invalidPathMessage);
-  } catch {
-    throw new IntegrationCompilerError(CompilerErrorCodes.MCP_CONFLICT, invalidPathMessage);
-  }
-
   setObjectValueAtPath({
     root,
     path: input.mcpConfig.path,
