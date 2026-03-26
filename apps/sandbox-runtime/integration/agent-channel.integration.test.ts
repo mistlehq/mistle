@@ -546,7 +546,7 @@ describe("handleAgentConnectRequest", () => {
     }
   });
 
-  it("forwards localImage turn input to the agent endpoint", async () => {
+  it("forwards localImage turn input to the agent endpoint unchanged", async () => {
     const signal = new AbortController();
     const relayResultQueue = new AsyncQueue<ActiveTunnelStreamRelayResult>();
     const { server, serverSocket, clientSocket, clientMessages } =
@@ -556,6 +556,8 @@ describe("handleAgentConnectRequest", () => {
     const codexServer = await createCodexServer([
       async (socket) => {
         const messages = new JsonMessageQueue(socket);
+        // This integration test stops at the sandbox-runtime boundary. It proves the
+        // agent channel preserves localImage input when forwarding turn/start payloads.
         const request = await messages.next();
         expect(request).toMatchObject({
           id: "request_local_image",

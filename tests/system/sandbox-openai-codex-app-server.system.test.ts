@@ -2163,6 +2163,10 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
         fixture,
         includeAppContainerDiagnostics: true,
         action: async ({ stepTrace, websocketTraceEntries, registerWebsocketCleanup }) => {
+          // This system test stops at the repo-owned contract: the uploaded image becomes
+          // a persisted sandbox path on thread state. Provider-specific image handling is
+          // covered separately at a lower boundary. The OpenAI-backed runtime is incidental
+          // here; a provider-agnostic agent runtime would be a cleaner future fit.
           const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
           const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
           const connectionDisplayName = `System OpenAI Image Connection ${randomUUID()}`;
@@ -2266,7 +2270,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
             threadId,
             requestId: 2,
             stepTrace,
-            stepName: "json-rpc turn/start with localImage input",
+            stepName: "json-rpc turn/start to persist localImage input",
             notificationSink: notificationsWhileStartingTurn,
             turnInput: [
               {
