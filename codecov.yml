@@ -2,7 +2,8 @@ codecov:
   require_ci_to_pass: true
 
 comment:
-  layout: "header, diff, components, files"
+  layout: "header, diff, components, files, footer"
+  hide_project_coverage: false
   require_changes: true
 
 component_management:
