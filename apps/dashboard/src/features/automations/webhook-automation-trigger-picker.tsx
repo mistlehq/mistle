@@ -156,6 +156,7 @@ export function WebhookAutomationTriggerPicker(input: {
     eventOptions: input.eventOptions,
     selectedTriggerIds: input.selectedTriggerIds,
   });
+  const emptyStateMessage = input.error === undefined ? "No triggers added yet." : input.error;
 
   return (
     <div className="space-y-3">
@@ -176,7 +177,23 @@ export function WebhookAutomationTriggerPicker(input: {
 
       {selectedEventOptions.length === 0 ? (
         pickerState.disabled ? null : (
-          <p className="text-muted-foreground text-sm">No triggers added yet.</p>
+          <div
+            className={
+              input.error === undefined
+                ? "bg-muted/20 rounded-lg border px-3.5 py-3"
+                : "bg-destructive/5 rounded-lg border border-destructive/40 px-3.5 py-3"
+            }
+          >
+            <p
+              className={
+                input.error === undefined
+                  ? "text-muted-foreground text-sm"
+                  : "text-destructive text-sm"
+              }
+            >
+              {emptyStateMessage}
+            </p>
+          </div>
         )
       ) : (
         <div className="space-y-1.5">

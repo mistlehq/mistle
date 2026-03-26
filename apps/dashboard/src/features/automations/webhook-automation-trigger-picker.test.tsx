@@ -29,6 +29,7 @@ const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
 ];
 
 function renderTriggerPicker(input: {
+  error?: string;
   hasConnectedIntegrations: boolean;
   selectedConnectionId: string;
   selectedTriggerIds: readonly string[];
@@ -74,7 +75,7 @@ function renderTriggerPicker(input: {
 
     return (
       <WebhookAutomationTriggerPicker
-        error={undefined}
+        error={input.error}
         eventOptions={input.eventOptions ?? WebhookEventOptions}
         hasConnectedIntegrations={input.hasConnectedIntegrations}
         {...(input.disabledReason === undefined ? {} : { disabledReason: input.disabledReason })}
@@ -93,7 +94,7 @@ function renderTriggerPicker(input: {
         <StatefulTriggerPicker />
       ) : (
         <WebhookAutomationTriggerPicker
-          error={undefined}
+          error={input.error}
           eventOptions={input.eventOptions ?? WebhookEventOptions}
           hasConnectedIntegrations={input.hasConnectedIntegrations}
           {...(input.disabledReason === undefined ? {} : { disabledReason: input.disabledReason })}
@@ -251,6 +252,28 @@ describe("WebhookAutomationTriggerPicker", () => {
     });
 
     expect(screen.getAllByText("No triggers added yet.").length).toBeGreaterThan(0);
+  });
+
+  it("reuses the trigger validation copy in the empty state and highlights the container", () => {
+    const { container: renderContainer } = renderTriggerPicker({
+      error: "Select at least one trigger.",
+      hasConnectedIntegrations: true,
+      selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+      selectedTriggerIds: [],
+      triggerParameterValues: {},
+    });
+
+    const errorMessage = screen.getByText("Select at least one trigger.");
+    expect(errorMessage).toBeDefined();
+    expect(errorMessage.className.includes("text-destructive")).toBe(true);
+
+    const container = errorMessage.closest("div");
+    if (container === null) {
+      throw new Error("Expected trigger empty state container.");
+    }
+
+    expect(container.className.includes("border-destructive/40")).toBe(true);
+    expect(within(renderContainer).queryByText("No triggers added yet.")).toBeNull();
   });
 
   it("renders selector-backed trigger parameters", () => {

@@ -344,7 +344,11 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             showAddTriggerControl={false}
             triggerParameterValues={input.values.triggerParameterValues}
           />
-          <FieldError message={input.fieldErrors.triggerIds} />
+          <FieldError
+            message={
+              input.values.triggerIds.length === 0 ? undefined : input.fieldErrors.triggerIds
+            }
+          />
         </div>
 
         {input.values.triggerIds.length === 0 ? null : (
