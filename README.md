@@ -177,6 +177,10 @@ direnv allow
 
 This repo includes `.envrc` to auto-enter the flake shell and load `.env.dev`.
 
+## Releases
+
+Release process documentation lives in [docs/release-process.md](docs/release-process.md).
+
 ### Validation
 
 ```bash
