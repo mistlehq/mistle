@@ -16,15 +16,24 @@ export type ProxyMediationMatch = {
   request: TokenizerProxyRequest;
 };
 
+export type ProxyRoutingDecision =
+  | {
+      kind: "passthrough";
+    }
+  | {
+      kind: "mediated";
+      match: ProxyMediationMatch;
+    };
+
 export type ProxyMediator = {
-  match(
+  resolve(
     classification: ProxyRequestClassification,
     request: {
       headers: IncomingHttpHeaders;
       body: ReadableStream<Uint8Array> | undefined;
       rawQuery: string;
     },
-  ): ProxyMediationMatch | undefined;
+  ): ProxyRoutingDecision;
 };
 
 export function createProxyMediator(input: {
@@ -32,7 +41,7 @@ export function createProxyMediator(input: {
   tokenizerProxyEgressBaseUrl: string;
 }): ProxyMediator {
   return {
-    match(classification, request) {
+    resolve(classification, request) {
       const route = resolveMatchingEgressRoute({
         routes: input.runtimePlan.egressRoutes,
         host: classification.host,
@@ -41,21 +50,26 @@ export function createProxyMediator(input: {
       });
 
       if (route === undefined) {
-        return undefined;
+        return {
+          kind: "passthrough",
+        };
       }
 
       return {
-        route,
-        request: buildTokenizerProxyRequest({
-          tokenizerProxyEgressBaseUrl: input.tokenizerProxyEgressBaseUrl,
-          runtimePlan: input.runtimePlan,
+        kind: "mediated",
+        match: {
           route,
-          targetPath: classification.path,
-          rawQuery: request.rawQuery,
-          method: classification.method,
-          headers: request.headers,
-          body: request.body,
-        }),
+          request: buildTokenizerProxyRequest({
+            tokenizerProxyEgressBaseUrl: input.tokenizerProxyEgressBaseUrl,
+            runtimePlan: input.runtimePlan,
+            route,
+            targetPath: classification.path,
+            rawQuery: request.rawQuery,
+            method: classification.method,
+            headers: request.headers,
+            body: request.body,
+          }),
+        },
       };
     },
   };
