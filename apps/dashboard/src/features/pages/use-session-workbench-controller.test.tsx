@@ -18,6 +18,7 @@ import {
   isActiveResumeRequest,
   resolveActiveComposerModel,
   resolveComposerNotice,
+  resolveTurnAttachments,
   resolveSessionEntryPhase,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForEntryPhase,
@@ -152,6 +153,8 @@ describe("useSessionWorkbenchController", () => {
         isDefault: false,
       }),
     ).toBe(false);
+
+    expect(supportsImageInspection(null)).toBe(false);
   });
 
   it("returns null when the selected model is unavailable", () => {
@@ -268,6 +271,35 @@ describe("useSessionWorkbenchController", () => {
         "- /tmp/attachments/thread_123/image-1.png",
       ].join("\n"),
     );
+  });
+
+  it("keeps uploaded images visible while only submitting them to image-capable models", () => {
+    const uploadedAttachments = [
+      {
+        type: "localImage" as const,
+        path: "/tmp/attachments/thread_123/image-1.png",
+      },
+    ];
+
+    expect(
+      resolveTurnAttachments({
+        uploadedAttachments,
+        supportsImageInspection: true,
+      }),
+    ).toEqual({
+      submittedAttachments: uploadedAttachments,
+      displayAttachments: uploadedAttachments,
+    });
+
+    expect(
+      resolveTurnAttachments({
+        uploadedAttachments,
+        supportsImageInspection: false,
+      }),
+    ).toEqual({
+      submittedAttachments: [],
+      displayAttachments: uploadedAttachments,
+    });
   });
 
   it("builds the non-image-capable warning copy", () => {

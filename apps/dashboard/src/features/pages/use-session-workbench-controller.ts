@@ -129,7 +129,7 @@ export function resolveActiveComposerModel(input: {
 }
 
 export function supportsImageInspection(model: CodexModelSummary | null): boolean {
-  return model?.inputModalities.includes("image") ?? true;
+  return model?.inputModalities.includes("image") ?? false;
 }
 
 export function hasUnavailableSelectedModel(input: {
@@ -186,6 +186,19 @@ export function buildTurnPrompt(input: {
     prompt: input.prompt,
     attachmentPaths: input.attachmentPaths,
   });
+}
+
+export function resolveTurnAttachments(input: {
+  uploadedAttachments: readonly CodexTurnInputLocalImageItem[];
+  supportsImageInspection: boolean;
+}): {
+  submittedAttachments: readonly CodexTurnInputLocalImageItem[];
+  displayAttachments: readonly CodexTurnInputLocalImageItem[];
+} {
+  return {
+    submittedAttachments: input.supportsImageInspection ? input.uploadedAttachments : [],
+    displayAttachments: input.uploadedAttachments,
+  };
 }
 
 export function resolveComposerNotice(input: {
@@ -985,18 +998,23 @@ export function useSessionWorkbenchController(input: {
         attachmentPaths: uploadedAttachmentPaths,
         supportsImageInspection: activeComposerModelSupportsImages,
       });
-      const turnAttachments = activeComposerModelSupportsImages ? uploadedAttachments : [];
+      const turnAttachments = resolveTurnAttachments({
+        uploadedAttachments,
+        supportsImageInspection: activeComposerModelSupportsImages,
+      });
 
       try {
         if (action.type === "steer_turn") {
           await steerTurn({
             prompt: promptWithAttachedImages,
-            attachments: turnAttachments,
+            attachments: turnAttachments.submittedAttachments,
+            displayAttachments: turnAttachments.displayAttachments,
           });
         } else {
           await startTurn({
             prompt: promptWithAttachedImages,
-            attachments: turnAttachments,
+            attachments: turnAttachments.submittedAttachments,
+            displayAttachments: turnAttachments.displayAttachments,
           });
         }
       } catch (error) {

@@ -31,17 +31,21 @@ function createPendingTurnId(): string {
 function buildTurnRequest(input: {
   prompt: string;
   attachments?: readonly CodexTurnInputLocalImageItem[];
+  displayAttachments?: readonly CodexTurnInputLocalImageItem[];
 }): {
   trimmedPrompt: string;
   attachments: readonly CodexTurnInputLocalImageItem[];
+  displayAttachments: readonly CodexTurnInputLocalImageItem[];
   items: ReturnType<typeof buildCodexTurnInputItems>;
 } {
   const trimmedPrompt = input.prompt.trim();
   const attachments = input.attachments ?? [];
+  const displayAttachments = input.displayAttachments ?? attachments;
 
   return {
     trimmedPrompt,
     attachments,
+    displayAttachments,
     items: buildCodexTurnInputItems({
       text: trimmedPrompt,
       attachments,
@@ -140,7 +144,7 @@ export function useCodexChatController(input: {
         type: "start_turn_requested",
         clientTurnId,
         prompt: turnRequest.trimmedPrompt,
-        attachments: turnRequest.attachments,
+        attachments: turnRequest.displayAttachments,
       });
 
       try {
@@ -253,6 +257,7 @@ export function useCodexChatController(input: {
       async (turnInput: {
         prompt: string;
         attachments?: readonly CodexTurnInputLocalImageItem[];
+        displayAttachments?: readonly CodexTurnInputLocalImageItem[];
       }): Promise<void> => {
         await startTurnMutation.mutateAsync(turnInput);
       },
@@ -268,6 +273,7 @@ export function useCodexChatController(input: {
       async (turnInput: {
         prompt: string;
         attachments?: readonly CodexTurnInputLocalImageItem[];
+        displayAttachments?: readonly CodexTurnInputLocalImageItem[];
       }): Promise<void> => {
         await steerTurnMutation.mutateAsync(turnInput);
       },

@@ -115,11 +115,13 @@ type CodexSessionChatState = {
   startTurn: (input: {
     prompt: string;
     attachments?: readonly CodexTurnInputLocalImageItem[];
+    displayAttachments?: readonly CodexTurnInputLocalImageItem[];
   }) => Promise<void>;
   interruptTurn: () => void;
   steerTurn: (input: {
     prompt: string;
     attachments?: readonly CodexTurnInputLocalImageItem[];
+    displayAttachments?: readonly CodexTurnInputLocalImageItem[];
   }) => Promise<void>;
   reloadChat: () => void;
 };
