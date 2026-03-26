@@ -4,10 +4,12 @@ import type {
 } from "../integrations/integrations-service.js";
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { createSyntheticWebhookAutomationEventOption } from "./webhook-automation-event-option-availability.js";
 import type {
   WebhookAutomationEventOption,
   WebhookAutomationFormOption,
 } from "./webhook-automation-form.js";
+import type { WebhookAutomationEventOptionAvailability } from "./webhook-automation-trigger-types.js";
 
 function sortOptionsByLabel<T extends { label: string }>(items: readonly T[]): T[] {
   return [...items].sort((left, right) => left.label.localeCompare(right.label));
@@ -104,16 +106,69 @@ export function buildWebhookAutomationEventOptions(input: {
   connections: readonly IntegrationConnection[];
   targets: readonly IntegrationTarget[];
   preservedConnectionId?: string;
+  selectableConnectionIds?: readonly string[];
   selectedTriggerIds: readonly string[];
 }): readonly WebhookAutomationEventOption[] {
   const selectedTriggerIds = new Set(input.selectedTriggerIds);
-  const eligibleConnections = input.connections.filter(
+  const selectableConnectionIds =
+    input.selectableConnectionIds === undefined ? null : new Set(input.selectableConnectionIds);
+  const selectableConnections = input.connections.filter(
     (connection) => connection.status === "active" || connection.id === input.preservedConnectionId,
   );
 
+  const supportedEventOptions = buildSelectableWebhookAutomationEventOptions({
+    connections: selectableConnections,
+    targets: input.targets,
+    selectableConnectionIds,
+  });
+
+  const missingEventOptions = input.selectedTriggerIds
+    .filter(
+      (selectedTriggerId) =>
+        !supportedEventOptions.some((eventOption) => eventOption.id === selectedTriggerId),
+    )
+    .map((selectedTriggerId) =>
+      buildUnavailableSelectedWebhookAutomationEventOption({
+        selectedTriggerId,
+        connections: selectableConnections,
+        targets: input.targets,
+        selectableConnectionIds,
+      }),
+    );
+
+  return [...supportedEventOptions, ...missingEventOptions].sort((left, right) => {
+    const leftSelected = selectedTriggerIds.has(left.id);
+    const rightSelected = selectedTriggerIds.has(right.id);
+    if (leftSelected !== rightSelected) {
+      return leftSelected ? -1 : 1;
+    }
+
+    const leftCategory = left.category ?? "";
+    const rightCategory = right.category ?? "";
+    const categoryComparison = leftCategory.localeCompare(rightCategory);
+    if (categoryComparison !== 0) {
+      return categoryComparison;
+    }
+
+    return left.label.localeCompare(right.label);
+  });
+}
+
+function buildSelectableWebhookAutomationEventOptions(input: {
+  connections: readonly IntegrationConnection[];
+  targets: readonly IntegrationTarget[];
+  selectableConnectionIds: ReadonlySet<string> | null;
+}): WebhookAutomationEventOption[] {
   const supportedEventOptions: WebhookAutomationEventOption[] = [];
 
-  for (const connection of eligibleConnections) {
+  for (const connection of input.connections) {
+    if (
+      input.selectableConnectionIds !== null &&
+      !input.selectableConnectionIds.has(connection.id)
+    ) {
+      continue;
+    }
+
     const target = input.targets.find((candidate) => candidate.targetKey === connection.targetKey);
     if (target === undefined) {
       continue;
@@ -132,6 +187,7 @@ export function buildWebhookAutomationEventOptions(input: {
           connectionDisplayName: connection.displayName,
         }),
         label: eventDefinition.displayName,
+        availability: "available",
         ...(target.logoKey === undefined ? {} : { logoKey: target.logoKey }),
         ...(eventDefinition.conversationKeyOptions === undefined
           ? {}
@@ -196,41 +252,59 @@ export function buildWebhookAutomationEventOptions(input: {
     }
   }
 
-  const missingEventOptions = input.selectedTriggerIds
-    .filter(
-      (selectedTriggerId) =>
-        !supportedEventOptions.some((eventOption) => eventOption.id === selectedTriggerId),
-    )
-    .map((selectedTriggerId) => {
-      const [connectionId = "", ...eventTypeParts] = selectedTriggerId.split("::");
-      const eventType = eventTypeParts.join("::");
+  return supportedEventOptions;
+}
 
-      return {
-        id: selectedTriggerId,
-        eventType,
-        connectionId,
-        connectionLabel: connectionId,
-        label: eventType,
-        description: "No longer available from your connected integrations.",
-        category: "Unavailable",
-        unavailable: true,
-      } satisfies WebhookAutomationEventOption;
-    });
-
-  return [...supportedEventOptions, ...missingEventOptions].sort((left, right) => {
-    const leftSelected = selectedTriggerIds.has(left.id);
-    const rightSelected = selectedTriggerIds.has(right.id);
-    if (leftSelected !== rightSelected) {
-      return leftSelected ? -1 : 1;
-    }
-
-    const leftCategory = left.category ?? "";
-    const rightCategory = right.category ?? "";
-    const categoryComparison = leftCategory.localeCompare(rightCategory);
-    if (categoryComparison !== 0) {
-      return categoryComparison;
-    }
-
-    return left.label.localeCompare(right.label);
+function buildUnavailableSelectedWebhookAutomationEventOption(input: {
+  selectedTriggerId: string;
+  connections: readonly IntegrationConnection[];
+  targets: readonly IntegrationTarget[];
+  selectableConnectionIds: ReadonlySet<string> | null;
+}): WebhookAutomationEventOption {
+  const [connectionId = "", ...eventTypeParts] = input.selectedTriggerId.split("::");
+  const eventType = eventTypeParts.join("::");
+  const connection = input.connections.find((candidate) => candidate.id === connectionId);
+  const target =
+    connection === undefined
+      ? undefined
+      : input.targets.find((candidate) => candidate.targetKey === connection.targetKey);
+  const eventDefinition = target?.supportedWebhookEvents?.find(
+    (candidate) => candidate.eventType === eventType,
+  );
+  const availability = resolveUnavailableSelectedWebhookAutomationEventOptionAvailability({
+    connection,
+    target,
+    selectableConnectionIds: input.selectableConnectionIds,
   });
+
+  return createSyntheticWebhookAutomationEventOption({
+    triggerId: input.selectedTriggerId,
+    availability,
+    ...(target === undefined || connection === undefined
+      ? {}
+      : {
+          connectionLabel: formatWebhookAutomationTriggerGroupLabel({
+            integrationDisplayName: target.displayName,
+            connectionDisplayName: connection.displayName,
+          }),
+        }),
+    ...(eventDefinition === undefined ? {} : { label: eventDefinition.displayName }),
+  });
+}
+
+function resolveUnavailableSelectedWebhookAutomationEventOptionAvailability(input: {
+  connection: IntegrationConnection | undefined;
+  target: IntegrationTarget | undefined;
+  selectableConnectionIds: ReadonlySet<string> | null;
+}): Exclude<WebhookAutomationEventOptionAvailability, "available"> {
+  if (
+    input.selectableConnectionIds !== null &&
+    input.connection !== undefined &&
+    input.target !== undefined &&
+    !input.selectableConnectionIds.has(input.connection.id)
+  ) {
+    return "wrong_profile";
+  }
+
+  return "missing_integration";
 }

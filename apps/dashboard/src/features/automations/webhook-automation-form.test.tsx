@@ -87,8 +87,8 @@ describe("WebhookAutomationForm", () => {
     return resetButton;
   }
 
-  function renderForm(mode: "create" | "edit" = "create"): void {
-    renderFormWithOptions({
+  function renderForm(mode: "create" | "edit" = "create"): ReturnType<typeof render> {
+    return renderFormWithOptions({
       mode,
     });
   }
@@ -109,6 +109,7 @@ describe("WebhookAutomationForm", () => {
           connectionOptions={ConnectionOptions}
           fieldErrors={{}}
           formError={null}
+          validationSummaryError={null}
           isDeleting={false}
           isSaving={false}
           mode={input.mode ?? "create"}
@@ -183,16 +184,17 @@ describe("WebhookAutomationForm", () => {
   });
 
   it("shows the agent instructions editor copy", () => {
-    renderForm("create");
+    const { container } = renderForm("create");
+    const currentForm = within(container);
 
-    expect(screen.getByLabelText("Agent Instructions")).toBeDefined();
+    expect(currentForm.getByLabelText("Agent Instructions")).toBeDefined();
     expect(
-      screen.getAllByText((content) => content.includes("Use Liquid syntax with")).length,
+      currentForm.getAllByText((content) => content.includes("Use Liquid syntax with")).length,
     ).toBeGreaterThan(0);
-    expect(screen.getAllByText("{{webhookEvent.eventType}}").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("{{payload}}").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Basics")).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Agent Instructions" })).toBeNull();
+    expect(currentForm.getAllByText("{{webhookEvent.eventType}}").length).toBeGreaterThan(0);
+    expect(currentForm.getAllByText("{{payload}}").length).toBeGreaterThan(0);
+    expect(currentForm.queryByText("Basics")).toBeNull();
+    expect(currentForm.queryByRole("heading", { name: "Agent Instructions" })).toBeNull();
   });
 
   it("renders triggers before agent instructions", () => {
@@ -200,8 +202,9 @@ describe("WebhookAutomationForm", () => {
       mode: "create",
     });
 
-    const [triggersHeading] = screen.getAllByRole("heading", { name: "Triggers" });
-    const inputTemplateField = screen.getByLabelText("Agent Instructions");
+    const currentForm = within(container);
+    const [triggersHeading] = currentForm.getAllByRole("heading", { name: "Triggers" });
+    const inputTemplateField = currentForm.getByLabelText("Agent Instructions");
 
     if (triggersHeading === undefined) {
       throw new Error("Expected triggers heading to be rendered.");
@@ -280,5 +283,115 @@ describe("WebhookAutomationForm", () => {
     expect(
       screen.getAllByText("The selected profile has no bindings with automation triggers.").length,
     ).toBeGreaterThan(0);
+  });
+
+  it("marks invalid controls with aria-invalid when field errors are present", () => {
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WebhookAutomationForm
+          connectionOptions={ConnectionOptions}
+          fieldErrors={{
+            name: "Automation name is required.",
+            sandboxProfileId: "Select a sandbox profile.",
+            conversationKeyTemplate: "Select a supported conversation grouping.",
+            inputTemplate: "Input template is required.",
+          }}
+          formError={null}
+          validationSummaryError={null}
+          isDeleting={false}
+          isSaving={false}
+          mode="create"
+          onDelete={null}
+          onSubmit={() => {}}
+          onValueChange={() => {}}
+          sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledReason={null}
+          webhookEventOptions={WebhookEventOptions}
+          values={FormValues}
+        />
+      </QueryClientProvider>,
+    );
+
+    const currentForm = within(container);
+    const automationNameInput = currentForm.getByDisplayValue("Repo triage");
+    const inputTemplateTextarea = currentForm.getByLabelText("Agent Instructions");
+
+    expect(automationNameInput.getAttribute("aria-invalid")).toBe("true");
+    expect(inputTemplateTextarea.getAttribute("aria-invalid")).toBe("true");
+
+    const selectTriggers = container.querySelectorAll('[data-slot="select-trigger"]');
+    expect(selectTriggers[0]?.getAttribute("aria-invalid")).toBe("true");
+    expect(selectTriggers[1]?.getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("shows the required-fields summary without inline copy for basic required fields", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WebhookAutomationForm
+          connectionOptions={ConnectionOptions}
+          fieldErrors={{
+            name: "Automation name is required.",
+            sandboxProfileId: "Select a sandbox profile.",
+            triggerIds: "Select at least one trigger.",
+            inputTemplate: "Input template is required.",
+          }}
+          formError={null}
+          validationSummaryError="Please address the fields highlighted in red."
+          isDeleting={false}
+          isSaving={false}
+          mode="create"
+          onDelete={null}
+          onSubmit={() => {}}
+          onValueChange={() => {}}
+          sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledReason={null}
+          webhookEventOptions={WebhookEventOptions}
+          values={{
+            ...FormValues,
+            name: "",
+            sandboxProfileId: "",
+            triggerIds: [],
+            inputTemplate: "",
+            conversationKeyTemplate: "",
+          }}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Please address the fields highlighted in red.")).toBeDefined();
+    expect(screen.queryByText("Automation name is required.")).toBeNull();
+    expect(screen.queryByText("Select a sandbox profile.")).toBeNull();
+    expect(screen.queryByText("Input template is required.")).toBeNull();
+    expect(screen.getByText("Select at least one trigger.")).toBeDefined();
+  });
+
+  it("shows save failures at the top of the form", () => {
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WebhookAutomationForm
+          connectionOptions={ConnectionOptions}
+          fieldErrors={{}}
+          formError="The selected triggers do not support this automation setup."
+          validationSummaryError={null}
+          isDeleting={false}
+          isSaving={false}
+          mode="create"
+          onDelete={null}
+          onSubmit={() => {}}
+          onValueChange={() => {}}
+          sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledReason={null}
+          webhookEventOptions={WebhookEventOptions}
+          values={FormValues}
+        />
+      </QueryClientProvider>,
+    );
+
+    const currentForm = within(container);
+
+    expect(currentForm.getByText("Automation could not be saved")).toBeDefined();
+    expect(
+      currentForm.getByText("The selected triggers do not support this automation setup."),
+    ).toBeDefined();
   });
 });

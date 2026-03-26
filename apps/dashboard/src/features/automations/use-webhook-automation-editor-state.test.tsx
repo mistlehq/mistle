@@ -1,14 +1,19 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import {
+  sandboxProfileVersionIntegrationBindingsQueryKey,
+  sandboxProfileVersionsQueryKey,
+} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
   resolveSelectedProfileTriggerState,
   useLoadedWebhookAutomationEditorState,
 } from "./use-webhook-automation-editor-state.js";
 import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 
 function createDirectoryData(input?: {
   supportedWebhookEvents?: {
@@ -138,5 +143,275 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         directoryData: createDirectoryData(),
       }).disabledReason,
     ).toBe("Could not load profile bindings.");
+  });
+
+  it("preserves selected triggers when the sandbox profile changes", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+    const triggerId = createWebhookAutomationTriggerId({
+      connectionId: "conn_linear",
+      eventType: "linear.issue.created",
+    });
+
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_456"), {
+      versions: [{ sandboxProfileId: "sbp_456", version: 1 }],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionIntegrationBindingsQueryKey({
+        profileId: "sbp_456",
+        version: 1,
+      }),
+      {
+        bindings: [],
+      },
+    );
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "create",
+          automationId: undefined,
+          navigate: async () => {},
+          initialValues: {
+            name: "Linear automation",
+            sandboxProfileId: "",
+            enabled: true,
+            inputTemplate: "Watch for new Linear issues.",
+            conversationKeyTemplate: "{{payload.team.id}}",
+            triggerIds: [triggerId],
+            triggerParameterValues: {
+              [triggerId]: {
+                team: "eng",
+              },
+            },
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          directoryData: createDirectoryData({
+            supportedWebhookEvents: [
+              {
+                eventType: "linear.issue.created",
+                providerEventType: "Issue",
+                displayName: "Issue created",
+              },
+            ],
+          }),
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => {
+      result.current.onValueChange("sandboxProfileId", "sbp_456");
+    });
+
+    expect(result.current.values.triggerIds).toEqual([triggerId]);
+    expect(result.current.values.triggerParameterValues).toEqual({
+      [triggerId]: {
+        team: "eng",
+      },
+    });
+  });
+
+  it("shows a required-fields summary on submit when basic required fields are missing", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "create",
+          automationId: undefined,
+          navigate: async () => {},
+          initialValues: {
+            name: "",
+            sandboxProfileId: "",
+            enabled: true,
+            inputTemplate: "",
+            conversationKeyTemplate: "",
+            triggerIds: [],
+            triggerParameterValues: {},
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          directoryData: {
+            connections: [],
+            targets: [],
+          },
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => {
+      result.current.onSubmit();
+    });
+
+    expect(result.current.validationSummaryError).toBe(
+      "Please address the fields highlighted in red.",
+    );
+    expect(result.current.formError).toBeNull();
+    expect(result.current.fieldErrors).toMatchObject({
+      name: "Automation name is required.",
+      sandboxProfileId: "Select a sandbox profile.",
+      inputTemplate: "Input template is required.",
+      triggerIds: "Select at least one trigger.",
+    });
+  });
+
+  it("shows a required-fields summary when the only missing field is triggers", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "create",
+          automationId: undefined,
+          navigate: async () => {},
+          initialValues: {
+            name: "GitHub triage",
+            sandboxProfileId: "sbp_123",
+            enabled: true,
+            inputTemplate: DefaultWebhookAutomationInputTemplate,
+            conversationKeyTemplate: "",
+            triggerIds: [],
+            triggerParameterValues: {},
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          directoryData: {
+            connections: [],
+            targets: [],
+          },
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => {
+      result.current.onSubmit();
+    });
+
+    expect(result.current.validationSummaryError).toBe(
+      "Please address the fields highlighted in red.",
+    );
+    expect(result.current.fieldErrors.triggerIds).toBe("Select at least one trigger.");
+  });
+
+  it("clears stale trigger validation errors when the sandbox profile changes", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+    const triggerId = createWebhookAutomationTriggerId({
+      connectionId: "conn_linear",
+      eventType: "linear.issue.created",
+    });
+
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_invalid"), {
+      versions: [{ sandboxProfileId: "sbp_invalid", version: 1 }],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionIntegrationBindingsQueryKey({
+        profileId: "sbp_invalid",
+        version: 1,
+      }),
+      {
+        bindings: [],
+      },
+    );
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_valid"), {
+      versions: [{ sandboxProfileId: "sbp_valid", version: 1 }],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionIntegrationBindingsQueryKey({
+        profileId: "sbp_valid",
+        version: 1,
+      }),
+      {
+        bindings: [createBinding()],
+      },
+    );
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "create",
+          automationId: undefined,
+          navigate: async () => {},
+          initialValues: {
+            name: "Linear automation",
+            sandboxProfileId: "sbp_invalid",
+            enabled: true,
+            inputTemplate: DefaultWebhookAutomationInputTemplate,
+            conversationKeyTemplate: "",
+            triggerIds: [triggerId],
+            triggerParameterValues: {},
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          directoryData: createDirectoryData({
+            supportedWebhookEvents: [
+              {
+                eventType: "linear.issue.created",
+                providerEventType: "Issue",
+                displayName: "Issue created",
+              },
+            ],
+          }),
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => {
+      result.current.onSubmit();
+    });
+
+    expect(result.current.fieldErrors.triggerIds).toBe(
+      "Trigger is unavailable for the selected sandbox profile.",
+    );
+
+    act(() => {
+      result.current.onValueChange("sandboxProfileId", "sbp_valid");
+    });
+
+    expect(result.current.fieldErrors.triggerIds).toBeUndefined();
+    expect(result.current.validationSummaryError).toBeNull();
   });
 });

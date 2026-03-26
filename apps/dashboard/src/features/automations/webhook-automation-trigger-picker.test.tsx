@@ -29,6 +29,7 @@ const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
 ];
 
 function renderTriggerPicker(input: {
+  error?: string;
   hasConnectedIntegrations: boolean;
   selectedConnectionId: string;
   selectedTriggerIds: readonly string[];
@@ -74,7 +75,7 @@ function renderTriggerPicker(input: {
 
     return (
       <WebhookAutomationTriggerPicker
-        error={undefined}
+        error={input.error}
         eventOptions={input.eventOptions ?? WebhookEventOptions}
         hasConnectedIntegrations={input.hasConnectedIntegrations}
         {...(input.disabledReason === undefined ? {} : { disabledReason: input.disabledReason })}
@@ -93,7 +94,7 @@ function renderTriggerPicker(input: {
         <StatefulTriggerPicker />
       ) : (
         <WebhookAutomationTriggerPicker
-          error={undefined}
+          error={input.error}
           eventOptions={input.eventOptions ?? WebhookEventOptions}
           hasConnectedIntegrations={input.hasConnectedIntegrations}
           {...(input.disabledReason === undefined ? {} : { disabledReason: input.disabledReason })}
@@ -142,7 +143,7 @@ describe("WebhookAutomationTriggerPicker", () => {
   });
 
   it("shows unavailable saved triggers when they are no longer present in current options", () => {
-    renderTriggerPicker({
+    const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
       selectedTriggerIds: [
@@ -154,8 +155,40 @@ describe("WebhookAutomationTriggerPicker", () => {
       triggerParameterValues: {},
     });
 
-    expect(screen.getByText(`${GitHubConnectionId}::github.push.deleted`)).toBeDefined();
-    expect(screen.getByText("Unavailable")).toBeDefined();
+    expect(screen.getByText("github.push.deleted")).toBeDefined();
+    const highlightedRows = [...container.querySelectorAll("div")].filter((element) =>
+      element.className.includes("border-destructive/40"),
+    );
+    expect(highlightedRows.length).toBe(1);
+  });
+
+  it("shows selected triggers that are incompatible with the selected profile", () => {
+    const { container } = renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedTriggerIds: [
+        createWebhookAutomationTriggerId({
+          connectionId: GitHubConnectionId,
+          eventType: "github.issue_comment.created",
+        }),
+      ],
+      triggerParameterValues: {},
+      eventOptions: [
+        createGithubIssueCommentCreatedEventOption({
+          availability: "wrong_profile",
+          description: "Trigger is unavailable for the selected sandbox profile.",
+        }),
+      ],
+    });
+
+    const highlightedRows = [...container.querySelectorAll("div")].filter((element) =>
+      element.className.includes("border-destructive/40"),
+    );
+    expect(highlightedRows.length).toBe(1);
+    expect(screen.queryByText("Wrong profile")).toBeNull();
+    expect(
+      screen.getByText("Trigger is unavailable for the selected sandbox profile."),
+    ).toBeDefined();
   });
 
   it("prompts the user to connect an integration when there are no connected integrations", () => {
@@ -226,6 +259,28 @@ describe("WebhookAutomationTriggerPicker", () => {
     });
 
     expect(screen.getAllByText("No triggers added yet.").length).toBeGreaterThan(0);
+  });
+
+  it("reuses the trigger validation copy in the empty state and highlights the container", () => {
+    const { container: renderContainer } = renderTriggerPicker({
+      error: "Select at least one trigger.",
+      hasConnectedIntegrations: true,
+      selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+      selectedTriggerIds: [],
+      triggerParameterValues: {},
+    });
+
+    const errorMessage = screen.getByText("Select at least one trigger.");
+    expect(errorMessage).toBeDefined();
+
+    const container = errorMessage.parentElement;
+    if (container === null) {
+      throw new Error("Expected trigger empty state container.");
+    }
+
+    expect(container.className.includes("text-destructive")).toBe(true);
+    expect(container.className.includes("border-destructive/40")).toBe(true);
+    expect(within(renderContainer).queryByText("No triggers added yet.")).toBeNull();
   });
 
   it("renders selector-backed trigger parameters", () => {

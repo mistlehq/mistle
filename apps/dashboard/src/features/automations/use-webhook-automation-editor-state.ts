@@ -55,7 +55,7 @@ type WebhookAutomationOption = {
 };
 
 type SelectedProfileTriggerState = {
-  eligibleConnectionIds: readonly string[];
+  selectableConnectionIds: readonly string[];
   disabledReason: string | null;
 };
 
@@ -63,8 +63,21 @@ const NoProfileSelectedMessage = "Select a sandbox profile to choose triggers.";
 const InvalidProfileBindingMessage =
   "The selected profile has no bindings with automation triggers.";
 const LoadProfileBindingsErrorMessage = "Could not load profile bindings.";
+const RequiredFieldSummaryMessage = "Please address the fields highlighted in red.";
+const RequiredTriggerSelectionMessage = "Select at least one trigger.";
 const UnselectedProfileQueryId = "__unselected__";
 const MissingProfileVersionQueryId = 0;
+
+function hasRequiredFieldErrors(
+  fieldErrors: Partial<Record<keyof WebhookAutomationFormValues, string>>,
+): boolean {
+  return (
+    fieldErrors.name !== undefined ||
+    fieldErrors.sandboxProfileId !== undefined ||
+    fieldErrors.inputTemplate !== undefined ||
+    fieldErrors.triggerIds === RequiredTriggerSelectionMessage
+  );
+}
 
 export function resolveSelectedProfileTriggerState(input: {
   selectedProfileId: string;
@@ -76,34 +89,34 @@ export function resolveSelectedProfileTriggerState(input: {
 }): SelectedProfileTriggerState {
   if (input.selectedProfileId.trim().length === 0) {
     return {
-      eligibleConnectionIds: [],
+      selectableConnectionIds: [],
       disabledReason: NoProfileSelectedMessage,
     };
   }
 
   if (input.bindingErrorMessage !== null) {
     return {
-      eligibleConnectionIds: [],
+      selectableConnectionIds: [],
       disabledReason: input.bindingErrorMessage,
     };
   }
 
   if (input.isBindingDataPending || !input.hasBindingData) {
     return {
-      eligibleConnectionIds: [],
+      selectableConnectionIds: [],
       disabledReason: "Loading profile bindings...",
     };
   }
 
-  const eligibleConnectionIds = resolveEligibleProfileAutomationConnectionIds({
+  const selectableConnectionIds = resolveEligibleProfileAutomationConnectionIds({
     bindings: input.bindings,
     connections: input.directoryData.connections,
     targets: input.directoryData.targets,
   });
 
   return {
-    eligibleConnectionIds,
-    disabledReason: eligibleConnectionIds.length === 0 ? InvalidProfileBindingMessage : null,
+    selectableConnectionIds,
+    disabledReason: selectableConnectionIds.length === 0 ? InvalidProfileBindingMessage : null,
   };
 }
 
@@ -232,12 +245,26 @@ function applyWebhookAutomationValueChange(input: {
   }
 
   if (input.key === "sandboxProfileId") {
-    nextValues.triggerIds = [];
-    nextValues.triggerParameterValues = {};
-    nextValues.conversationKeyTemplate = "";
+    return applySandboxProfileSelectionChange({
+      values: nextValues,
+      eventOptions: input.eventOptions,
+    });
   }
 
   return nextValues;
+}
+
+function applySandboxProfileSelectionChange(input: {
+  values: WebhookAutomationFormValues;
+  eventOptions: readonly WebhookAutomationEventOption[];
+}): WebhookAutomationFormValues {
+  return {
+    ...input.values,
+    conversationKeyTemplate: resolveNormalizedConversationKeyTemplate({
+      values: input.values,
+      eventOptions: input.eventOptions,
+    }),
+  };
 }
 
 type LoadedWebhookAutomationEditorStateInput = {
@@ -311,6 +338,7 @@ export function useLoadedWebhookAutomationEditorState(
   triggerPickerDisabledReason: string | null;
   values: WebhookAutomationFormValues;
   fieldErrors: Partial<Record<keyof WebhookAutomationFormValues, string>>;
+  validationSummaryError: string | null;
   formError: string | null;
   deleteError: string | null;
   isDeleteDialogOpen: boolean;
@@ -330,6 +358,7 @@ export function useLoadedWebhookAutomationEditorState(
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<keyof WebhookAutomationFormValues, string>>
   >({});
+  const [validationSummaryError, setValidationSummaryError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -342,10 +371,9 @@ export function useLoadedWebhookAutomationEditorState(
   const webhookEventOptions = useMemo(
     () =>
       buildWebhookAutomationEventOptions({
-        connections: input.directoryData.connections.filter((connection) =>
-          selectedProfileTriggerState.eligibleConnectionIds.includes(connection.id),
-        ),
+        connections: input.directoryData.connections,
         targets: input.directoryData.targets,
+        selectableConnectionIds: selectedProfileTriggerState.selectableConnectionIds,
         ...(input.preservedConnectionId === undefined
           ? {}
           : { preservedConnectionId: input.preservedConnectionId }),
@@ -355,7 +383,7 @@ export function useLoadedWebhookAutomationEditorState(
       formValues.triggerIds,
       input.directoryData,
       input.preservedConnectionId,
-      selectedProfileTriggerState.eligibleConnectionIds,
+      selectedProfileTriggerState.selectableConnectionIds,
     ],
   );
 
@@ -365,6 +393,7 @@ export function useLoadedWebhookAutomationEditorState(
         payload: toCreateWebhookAutomationPayload(values, webhookEventOptions),
       }),
     onSuccess: async (automation) => {
+      setValidationSummaryError(null);
       setFormError(null);
       await invalidateAutomationsQuery(queryClient);
       await input.navigate(`/automations/${automation.id}`);
@@ -395,6 +424,7 @@ export function useLoadedWebhookAutomationEditorState(
     onSuccess: async (automation) => {
       setFormValues(toWebhookAutomationFormValues(automation, webhookEventOptions));
       setFieldErrors({});
+      setValidationSummaryError(null);
       setFormError(null);
       await invalidateAutomationsQuery(queryClient);
     },
@@ -444,16 +474,39 @@ export function useLoadedWebhookAutomationEditorState(
     });
 
     setFormValues(nextValues);
-    setFieldErrors((currentErrors) => ({
-      ...currentErrors,
-      [key]: undefined,
-    }));
+    setFieldErrors((currentErrors) => {
+      if (key === "sandboxProfileId") {
+        const {
+          sandboxProfileId: _sandboxProfileId,
+          triggerIds: _triggerIds,
+          conversationKeyTemplate: _conversationKeyTemplate,
+          ...remainingErrors
+        } = currentErrors;
+
+        void _sandboxProfileId;
+        void _triggerIds;
+        void _conversationKeyTemplate;
+
+        return {
+          ...remainingErrors,
+        };
+      }
+
+      return {
+        ...currentErrors,
+        [key]: undefined,
+      };
+    });
+    setValidationSummaryError(null);
     setFormError(null);
   }
 
   function onSubmit(): void {
     const nextFieldErrors = validateWebhookAutomationFormValues(formValues, webhookEventOptions);
     setFieldErrors(nextFieldErrors);
+    setValidationSummaryError(
+      hasRequiredFieldErrors(nextFieldErrors) ? RequiredFieldSummaryMessage : null,
+    );
     setFormError(null);
 
     if (Object.keys(nextFieldErrors).length > 0) {
@@ -484,6 +537,7 @@ export function useLoadedWebhookAutomationEditorState(
     triggerPickerDisabledReason: selectedProfileTriggerState.disabledReason,
     values: formValues,
     fieldErrors,
+    validationSummaryError,
     formError,
     deleteError,
     isDeleteDialogOpen,

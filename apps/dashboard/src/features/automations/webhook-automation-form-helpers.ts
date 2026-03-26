@@ -1,4 +1,5 @@
 import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
+import { resolveSelectedWebhookAutomationEventIssues } from "./webhook-automation-event-option-availability.js";
 import type {
   WebhookAutomationFormValueKey,
   WebhookAutomationFormValues,
@@ -121,15 +122,27 @@ export function validateWebhookAutomationFormValues(
   if (values.triggerIds.length === 0) {
     errors.triggerIds = "Select at least one trigger.";
   } else {
+    const selectedEventOptions = resolveSelectedWebhookAutomationEventOptions({
+      eventOptions,
+      selectedTriggerIds: values.triggerIds,
+    });
+    const triggerIssues = resolveSelectedWebhookAutomationEventIssues({
+      selectedEventOptions,
+    });
+    const firstTriggerIssue = triggerIssues[0];
+    if (firstTriggerIssue !== undefined) {
+      errors.triggerIds = firstTriggerIssue;
+    }
+
     const resolvedTriggers = resolveSelectedTriggers({
       triggerIds: values.triggerIds,
       eventOptions,
     });
 
-    if (resolvedTriggers.connectionIds.length > 1) {
+    if (errors.triggerIds === undefined && resolvedTriggers.connectionIds.length > 1) {
       errors.triggerIds =
         "All triggers in one automation must come from the same integration connection.";
-    } else if (resolvedTriggers.connectionId === null) {
+    } else if (errors.triggerIds === undefined && resolvedTriggers.connectionId === null) {
       errors.triggerIds = "Select triggers from an available integration connection.";
     }
   }

@@ -25,9 +25,9 @@ const PullRequestOpenedTriggerId = createWebhookAutomationTriggerId({
   connectionId: GitHubConnectionId,
   eventType: "github.pull_request.opened",
 });
-const StripePayoutFailedTriggerId = createWebhookAutomationTriggerId({
-  connectionId: StripeConnectionId,
-  eventType: "stripe.payout.failed",
+const PushDeletedTriggerId = createWebhookAutomationTriggerId({
+  connectionId: GitHubConnectionId,
+  eventType: "github.push.deleted",
 });
 
 const ConnectionOptions: readonly WebhookAutomationFormOption[] = [
@@ -327,6 +327,7 @@ function StoryHarness(input: {
   mode: "create" | "edit";
   values: WebhookAutomationFormValues;
   fieldErrors?: Partial<Record<WebhookAutomationFormValueKey, string>>;
+  validationSummaryError?: string | null;
   formError?: string | null;
   isSaving?: boolean;
   isDeleting?: boolean;
@@ -345,6 +346,7 @@ function StoryHarness(input: {
         connectionOptions={input.connectionOptions ?? ConnectionOptions}
         fieldErrors={input.fieldErrors ?? {}}
         formError={input.formError ?? null}
+        validationSummaryError={input.validationSummaryError ?? null}
         isDeleting={input.isDeleting ?? false}
         isSaving={input.isSaving ?? false}
         mode={input.mode}
@@ -378,25 +380,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Create: Story = {
-  args: {
-    mode: "create",
-    triggerPickerDisabledReason: "Select a sandbox profile to choose triggers.",
-    values: EmptyCreateValues,
-  },
-};
-
-export const CreateWithDraftName: Story = {
-  args: {
-    mode: "create",
-    triggerPickerDisabledReason: "Select a sandbox profile to choose triggers.",
-    values: {
-      ...EmptyCreateValues,
-      name: "Repo automation draft",
-    },
-  },
-};
-
 export const CreatePageLayout: Story = {
   args: {
     mode: "create",
@@ -409,32 +392,6 @@ export const CreatePageLayout: Story = {
         <StoryHarness {...args} />
       </FormPageShell>
     );
-  },
-};
-
-export const Edit: Story = {
-  args: {
-    mode: "edit",
-    onDelete: function onDelete() {},
-    values: {
-      ...ExistingAutomationValues,
-      enabled: false,
-      triggerIds: [StripePayoutFailedTriggerId],
-      name: "Stripe payouts incident intake",
-      sandboxProfileId: "sbp_finance_investigator",
-      triggerParameterValues: {},
-    },
-    webhookEventOptions: [
-      {
-        id: StripePayoutFailedTriggerId,
-        eventType: "stripe.payout.failed",
-        connectionId: StripeConnectionId,
-        connectionLabel: "Stripe Production",
-        label: "Payout failed",
-        category: "Stripe Production / Payouts",
-        logoKey: "stripe",
-      },
-    ],
   },
 };
 
@@ -456,15 +413,16 @@ export const EditPageLayout: Story = {
 export const ValidationErrors: Story = {
   args: {
     mode: "create",
-    formError: "The selected triggers do not support this automation setup.",
+    validationSummaryError: "Please address the fields highlighted in red.",
     fieldErrors: {
-      name: "Automation name is required.",
       triggerIds: "Select at least one trigger.",
-      sandboxProfileId: "Choose a sandbox profile for the automation target.",
-      inputTemplate: "Input template is required.",
+      name: "Required field.",
+      sandboxProfileId: "Required field.",
+      inputTemplate: "Required field.",
     },
     values: {
       ...EmptyCreateValues,
+      inputTemplate: "",
     },
   },
 };
@@ -473,7 +431,6 @@ export const NoConnectedIntegrations: Story = {
   args: {
     mode: "create",
     connectionOptions: [],
-    formError: "Create an integration connection before you configure an automation.",
     values: EmptyCreateValues,
     webhookEventOptions: [],
   },
@@ -528,22 +485,13 @@ export const UnavailableSavedEvent: Story = {
     onDelete: function onDelete() {},
     values: {
       ...ExistingAutomationValues,
-      triggerIds: [
-        IssueCommentCreatedTriggerId,
-        createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
-          eventType: "github.push.deleted",
-        }),
-      ],
+      triggerIds: [IssueCommentCreatedTriggerId, PushDeletedTriggerId],
       triggerParameterValues: {},
     },
     webhookEventOptions: [
       ...GitHubWebhookEventOptions,
       {
-        id: createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
-          eventType: "github.push.deleted",
-        }),
+        id: PushDeletedTriggerId,
         eventType: "github.push.deleted",
         connectionId: GitHubConnectionId,
         connectionLabel: "GitHub Engineering",
@@ -551,8 +499,38 @@ export const UnavailableSavedEvent: Story = {
         description: "No longer available from your connected integrations.",
         category: "Unavailable",
         logoKey: "github",
-        unavailable: true,
+        availability: "missing_integration",
       },
+    ],
+  },
+};
+
+export const WrongProfileSavedEvent: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    fieldErrors: {
+      triggerIds: "Trigger is unavailable for the selected sandbox profile.",
+    },
+    values: {
+      ...ExistingAutomationValues,
+      sandboxProfileId: "sbp_finance_investigator",
+      triggerIds: [IssueCommentCreatedTriggerId, PullRequestOpenedTriggerId],
+      triggerParameterValues: {
+        [PullRequestOpenedTriggerId]: {
+          repository: "mistlehq/platform",
+          author: "octocat",
+          baseBranch: "main",
+        },
+      },
+    },
+    webhookEventOptions: [
+      {
+        ...GitHubWebhookEventOptions[0]!,
+        availability: "wrong_profile",
+        description: "Trigger is unavailable for the selected sandbox profile.",
+      },
+      GitHubWebhookEventOptions[2]!,
     ],
   },
 };
