@@ -90,6 +90,21 @@ const loadSandboxConnectTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConf
   },
 ]);
 
+const loadSandboxEgressTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConfigSchema>([
+  {
+    key: "tokenSecret",
+    envVar: "MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_SECRET",
+  },
+  {
+    key: "tokenIssuer",
+    envVar: "MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_ISSUER",
+  },
+  {
+    key: "tokenAudience",
+    envVar: "MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE",
+  },
+]);
+
 const loadSandboxEnv = createEnvLoader<typeof PartialGlobalSandboxConfigSchema>([
   {
     key: "provider",
@@ -115,6 +130,7 @@ export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigIn
   const partialSandbox = loadSandboxEnv(env);
   const partialSandboxBootstrapToken = loadSandboxBootstrapTokenEnv(env);
   const partialSandboxConnectToken = loadSandboxConnectTokenEnv(env);
+  const partialSandboxEgressToken = loadSandboxEgressTokenEnv(env);
 
   if (hasEntries(partialTelemetry)) {
     partialGlobal.telemetry = partialTelemetry;
@@ -123,7 +139,8 @@ export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigIn
   if (
     hasEntries(partialSandbox) ||
     hasEntries(partialSandboxBootstrapToken) ||
-    hasEntries(partialSandboxConnectToken)
+    hasEntries(partialSandboxConnectToken) ||
+    hasEntries(partialSandboxEgressToken)
   ) {
     partialGlobal.sandbox = {
       ...partialSandbox,
@@ -135,6 +152,11 @@ export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigIn
       ...(hasEntries(partialSandboxConnectToken)
         ? {
             connect: partialSandboxConnectToken,
+          }
+        : {}),
+      ...(hasEntries(partialSandboxEgressToken)
+        ? {
+            egress: partialSandboxEgressToken,
           }
         : {}),
     };

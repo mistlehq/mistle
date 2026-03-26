@@ -26,6 +26,9 @@ Namespace in final config:
 | `sandbox.connect.tokenSecret`     | `string`                        | Shared signing secret for gateway connection JWTs.            | None    | `[global.sandbox.connect].token_secret`     | `MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET`     |
 | `sandbox.connect.tokenIssuer`     | `string`                        | JWT issuer used by control-plane connection token minting.    | None    | `[global.sandbox.connect].token_issuer`     | `MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER`     |
 | `sandbox.connect.tokenAudience`   | `string`                        | JWT audience expected by gateway connection token verify.     | None    | `[global.sandbox.connect].token_audience`   | `MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE`   |
+| `sandbox.egress.tokenSecret`      | `string`                        | Shared signing secret for sandbox egress route grants.        | None    | `[global.sandbox.egress].token_secret`      | `MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_SECRET`      |
+| `sandbox.egress.tokenIssuer`      | `string`                        | JWT issuer used by worker minting for egress grants.          | None    | `[global.sandbox.egress].token_issuer`      | `MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_ISSUER`      |
+| `sandbox.egress.tokenAudience`    | `string`                        | JWT audience expected by tokenizer-proxy egress verification. | None    | `[global.sandbox.egress].token_audience`    | `MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE`    |
 
 Env behavior:
 

@@ -31,6 +31,11 @@ token_secret = "replace-with-bootstrap-token-secret"
 token_issuer = "data-plane-worker"
 token_audience = "data-plane-gateway"
 
+[global.sandbox.egress]
+token_secret = "replace-with-egress-token-secret"
+token_issuer = "data-plane-worker"
+token_audience = "tokenizer-proxy"
+
 [global.sandbox]
 # Use "docker" for local development or "e2b" for cloud sandboxes.
 provider = "docker"

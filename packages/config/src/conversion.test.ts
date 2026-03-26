@@ -23,6 +23,9 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: "fixture-bootstrap-secret",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: "data-plane-worker",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE: "data-plane-gateway",
+      MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_SECRET: "fixture-egress-secret",
+      MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_ISSUER: "data-plane-worker",
+      MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE: "tokenizer-proxy",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: "fixture-connection-secret",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER: "control-plane-api",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE: "data-plane-gateway",
@@ -78,6 +81,11 @@ describe("convertEnvToTomlRecord", () => {
             token_secret: "fixture-bootstrap-secret",
             token_issuer: "data-plane-worker",
             token_audience: "data-plane-gateway",
+          },
+          egress: {
+            token_secret: "fixture-egress-secret",
+            token_issuer: "data-plane-worker",
+            token_audience: "tokenizer-proxy",
           },
           connect: {
             token_secret: "fixture-connection-secret",
@@ -180,6 +188,11 @@ describe("convertTomlToEnvRecord", () => {
             token_issuer: "data-plane-worker",
             token_audience: "data-plane-gateway",
           },
+          egress: {
+            token_secret: "prod-egress-secret",
+            token_issuer: "data-plane-worker",
+            token_audience: "tokenizer-proxy",
+          },
           connect: {
             token_secret: "prod-connection-secret",
             token_issuer: "control-plane-api",
@@ -257,6 +270,9 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: "prod-bootstrap-secret",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: "data-plane-worker",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE: "data-plane-gateway",
+      MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_SECRET: "prod-egress-secret",
+      MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_ISSUER: "data-plane-worker",
+      MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE: "tokenizer-proxy",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: "prod-connection-secret",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER: "control-plane-api",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE: "data-plane-gateway",

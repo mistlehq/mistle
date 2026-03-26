@@ -40,6 +40,11 @@ describe("parseConfigRecord", () => {
             tokenIssuer: "data-plane-worker",
             tokenAudience: "data-plane-gateway",
           },
+          egress: {
+            tokenSecret: "test-egress-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "tokenizer-proxy",
+          },
         },
       },
       apps: {
@@ -214,6 +219,11 @@ describe("parseConfigRecord", () => {
             tokenIssuer: "data-plane-worker",
             tokenAudience: "data-plane-gateway",
           },
+          egress: {
+            tokenSecret: "test-egress-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "tokenizer-proxy",
+          },
         },
       },
       apps: {
@@ -387,6 +397,11 @@ describe("parseConfigRecord", () => {
             tokenSecret: "test-bootstrap-token-secret",
             tokenIssuer: "data-plane-worker",
             tokenAudience: "data-plane-gateway",
+          },
+          egress: {
+            tokenSecret: "test-egress-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "tokenizer-proxy",
           },
         },
       },

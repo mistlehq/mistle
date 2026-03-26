@@ -33,6 +33,10 @@ export const globalDevelopmentPreset = {
           token_issuer: "data-plane-worker",
           token_audience: "data-plane-gateway",
         },
+        egress: {
+          token_issuer: "data-plane-worker",
+          token_audience: "tokenizer-proxy",
+        },
       },
     },
   },
@@ -49,6 +53,11 @@ export const globalDevelopmentPreset = {
     },
     {
       path: ["global", "sandbox", "bootstrap", "token_secret"],
+      when: "always",
+      generate: () => randomBytes(32).toString("base64url"),
+    },
+    {
+      path: ["global", "sandbox", "egress", "token_secret"],
       when: "always",
       generate: () => randomBytes(32).toString("base64url"),
     },
