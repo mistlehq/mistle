@@ -8,6 +8,17 @@ function normalizeTargetPath(targetPath: string): string {
   return targetPath.startsWith("/") ? targetPath : `/${targetPath}`;
 }
 
+function normalizePathPrefix(pathPrefix: string): string {
+  const normalizedPathPrefix = normalizeTargetPath(pathPrefix);
+  if (normalizedPathPrefix === "/") {
+    return normalizedPathPrefix;
+  }
+
+  return normalizedPathPrefix.endsWith("/")
+    ? normalizedPathPrefix.slice(0, -1)
+    : normalizedPathPrefix;
+}
+
 function normalizeTargetHost(targetHost: string): string {
   const trimmedTargetHost = targetHost.trim().toLowerCase();
   if (trimmedTargetHost.length === 0) {
@@ -44,7 +55,14 @@ function hostMatches(route: EgressCredentialRoute, targetHost: string): boolean 
 }
 
 function pathMatchesPrefixes(pathPrefixes: ReadonlyArray<string>, targetPath: string): boolean {
-  return pathPrefixes.some((pathPrefix) => targetPath.startsWith(pathPrefix));
+  return pathPrefixes.some((pathPrefix) => {
+    const normalizedPathPrefix = normalizePathPrefix(pathPrefix);
+    return (
+      normalizedPathPrefix === "/" ||
+      targetPath === normalizedPathPrefix ||
+      targetPath.startsWith(`${normalizedPathPrefix}/`)
+    );
+  });
 }
 
 export type ResolveMatchingRouteInput = {
