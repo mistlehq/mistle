@@ -158,26 +158,26 @@ describe("WebhookAutomationForm", () => {
     ).toBe(false);
   });
 
-  it("shows the input template editor copy", () => {
+  it("shows the agent instructions editor copy", () => {
     renderForm("create");
 
-    expect(screen.getByLabelText("Input Template")).toBeDefined();
+    expect(screen.getByLabelText("Agent Instructions")).toBeDefined();
     expect(
-      screen.getAllByText((content) => content.includes("Use Liquid templates.")).length,
+      screen.getAllByText((content) => content.includes("Use Liquid syntax with")).length,
     ).toBeGreaterThan(0);
     expect(screen.getAllByText("{{webhookEvent.eventType}}").length).toBeGreaterThan(0);
     expect(screen.getAllByText("{{payload}}").length).toBeGreaterThan(0);
     expect(screen.queryByText("Basics")).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Input Template" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Agent Instructions" })).toBeNull();
   });
 
-  it("renders triggers before input template", () => {
+  it("renders triggers before agent instructions", () => {
     const { container } = renderFormWithOptions({
       mode: "create",
     });
 
     const [triggersHeading] = screen.getAllByRole("heading", { name: "Triggers" });
-    const inputTemplateField = screen.getByLabelText("Input Template");
+    const inputTemplateField = screen.getByLabelText("Agent Instructions");
 
     if (triggersHeading === undefined) {
       throw new Error("Expected triggers heading to be rendered.");
@@ -190,7 +190,7 @@ describe("WebhookAutomationForm", () => {
       ),
     ).toBe(true);
     expect(container.textContent?.indexOf("Triggers")).toBeLessThan(
-      container.textContent?.indexOf("Input Template") ?? Number.POSITIVE_INFINITY,
+      container.textContent?.indexOf("Agent Instructions") ?? Number.POSITIVE_INFINITY,
     );
   });
 

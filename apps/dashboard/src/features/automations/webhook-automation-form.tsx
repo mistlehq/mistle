@@ -9,6 +9,7 @@ import {
   FieldHeader,
   FieldLabel,
   Input,
+  InlineCode,
   Select,
   SelectContent,
   SelectItem,
@@ -337,10 +338,16 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             <FieldHeader>
               <div className="flex items-center justify-between gap-3">
                 <div className="space-y-1">
-                  <FieldLabel htmlFor="automation-input-template">Input Template</FieldLabel>
+                  <FieldLabel htmlFor="automation-input-template">Agent Instructions</FieldLabel>
                   <FieldDescription>
-                    Use Liquid templates. Available variables include{" "}
-                    <code>{"{{webhookEvent.eventType}}"}</code> and <code>{"{{payload}}"}</code>.
+                    <span className="block">
+                      These are the instructions the agent will receive.
+                    </span>
+                    <span className="block">
+                      Use Liquid syntax with{" "}
+                      <InlineCode variant="muted">{"{{webhookEvent.eventType}}"}</InlineCode> and{" "}
+                      <InlineCode variant="muted">{"{{payload}}"}</InlineCode>.
+                    </span>
                   </FieldDescription>
                 </div>
                 <Button
@@ -357,7 +364,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             </FieldHeader>
             <FieldContent>
               <Textarea
-                className="min-h-48 font-mono text-sm"
+                className="min-h-48 text-sm"
                 id="automation-input-template"
                 disabled={input.isDeleting || input.isSaving}
                 onChange={(event) => {
