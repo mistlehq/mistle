@@ -18,6 +18,13 @@ on:
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - "tsconfig.base.json"
+  workflow_dispatch:
+    inputs:
+      publish_latest:
+        description: Also publish the latest tag
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -57,20 +64,28 @@ jobs:
 
       - name: Build sandbox base image
         run: |
+          tags=(--tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}")
+
+          if [ "${{ inputs.publish_latest }}" = "true" ]; then
+            tags+=(--tag "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}")
+          fi
+
           docker build \
             --platform linux/amd64 \
             --target sandbox-base \
             --file apps/sandbox-runtime/Dockerfile \
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}" \
-            --tag "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}" \
+            "${tags[@]}" \
             .
 
       - name: Push sandbox base image
         run: |
           docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
-          docker push "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}"
+
+          if [ "${{ inputs.publish_latest }}" = "true" ]; then
+            docker push "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}"
+          fi
 
       - name: Resolve pushed digest
         id: publish
@@ -84,7 +99,9 @@ jobs:
             echo "## Published image"
             echo
             echo "- Tag: \`${IMAGE_REPOSITORY}:${IMAGE_TAG}\`"
-            echo "- Alias: \`${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}\`"
+            if [ "${{ inputs.publish_latest }}" = "true" ]; then
+              echo "- Alias: \`${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}\`"
+            fi
             echo "- Digest: \`${{ steps.publish.outputs.image_ref }}\`"
           } >> "${GITHUB_STEP_SUMMARY}"
 

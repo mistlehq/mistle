@@ -30,11 +30,11 @@
     "@mistle/workflow-registry": "workspace:*",
     "@openworkflow/cli": "^0.4.3",
     "drizzle-orm": "^0.45.1",
-    "liquidjs": "^10.25.0",
+    "liquidjs": "^10.25.1",
     "openworkflow": "^0.8.1",
     "pg": "^8.20.0",
     "typeid-js": "^1.2.0",
-    "ws": "^8.19.0",
+    "ws": "^8.20.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

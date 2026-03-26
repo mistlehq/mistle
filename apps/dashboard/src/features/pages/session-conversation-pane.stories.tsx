@@ -10,18 +10,18 @@ import {
   CodexFixtureSessionEntriesWithExploringGroup,
   CodexFixtureSessionServerRequests,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
+import { SessionConversationMainContent } from "./session-conversation-pane.js";
 import {
-  SessionConversationBottomPanel,
-  SessionConversationMainContent,
-} from "./session-conversation-pane.js";
-import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
+  createStorySessionBottomPanel,
+  renderSessionWorkbenchStory,
+  StorySessionConversationPaneArgs,
+} from "./session-story-support.js";
 
 const baseArgs = {
+  ...StorySessionConversationPaneArgs,
   chatEntries: CodexFixtureSessionEntries,
-  serverRequestPanelEntries: CodexFixtureSessionServerRequests,
-  isRespondingToServerRequest: false,
-  onRespondToServerRequest: function onRespondToServerRequest() {},
   composerProps: CodexFixtureSessionComposerProps,
+  serverRequestPanelEntries: CodexFixtureSessionServerRequests,
 };
 
 const meta = {
@@ -34,18 +34,10 @@ const meta = {
   args: baseArgs,
   decorators: [
     function StoryDecorator(Story, context): React.JSX.Element {
-      return (
-        <SessionWorkbenchPageView
-          alerts={[]}
-          isSecondaryPanelVisible={false}
-          mainContent={<Story />}
-          onSecondaryPanelResize={function onSecondaryPanelResize() {}}
-          primaryBottomPanel={<SessionConversationBottomPanel {...context.args} />}
-          secondaryPanel={<></>}
-          secondaryPanelSize={38}
-          sandboxInstanceId="sbi_storybook"
-        />
-      );
+      return renderSessionWorkbenchStory({
+        mainContent: <Story />,
+        primaryBottomPanel: createStorySessionBottomPanel(context.args),
+      });
     },
   ],
 } satisfies Meta<typeof SessionConversationMainContent>;

@@ -1,6 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ChatComposer } from "./chat-composer.js";
+import {
+  noop,
+  noopComposerTextChange,
+  noopModelChange,
+  noopPendingImageFilesAdded,
+  noopReasoningEffortChange,
+  noopRemovePendingAttachment,
+} from "./chat-story-support.js";
 
 const meta = {
   title: "Dashboard/Chat/ChatComposer",
@@ -22,14 +30,18 @@ const meta = {
     isStartingTurn: false,
     isSteeringTurn: false,
     isInterruptingTurn: false,
+    isUploadingAttachments: false,
     isUpdatingComposerConfig: false,
     canInterruptTurn: false,
     canSteerTurn: false,
     completedErrorMessage: null,
-    onComposerTextChange: function onComposerTextChange() {},
-    onModelChange: function onModelChange() {},
-    onReasoningEffortChange: function onReasoningEffortChange() {},
-    onSubmit: function onSubmit() {},
+    onComposerTextChange: noopComposerTextChange,
+    onModelChange: noopModelChange,
+    onPendingImageFilesAdded: noopPendingImageFilesAdded,
+    onReasoningEffortChange: noopReasoningEffortChange,
+    onRemovePendingAttachment: noopRemovePendingAttachment,
+    onSubmit: noop,
+    pendingAttachments: [],
   },
 } satisfies Meta<typeof ChatComposer>;
 

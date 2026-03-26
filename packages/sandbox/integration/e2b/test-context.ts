@@ -71,7 +71,6 @@ export const it = vitestIt.extend<{ fixture: E2BAdapterIntegrationFixture }>({
           ...(settings.domain === undefined ? {} : { domain: settings.domain }),
         },
       });
-
       await use({
         adapter,
         baseImage: createBaseImageHandle(),

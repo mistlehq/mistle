@@ -3,6 +3,11 @@ export type ChatUserEntry = {
   turnId: string;
   kind: "user-message";
   text: string;
+  attachments?: readonly {
+    kind: "image";
+    path: string;
+    name: string;
+  }[];
   status: "completed";
 };
 

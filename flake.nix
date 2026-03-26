@@ -11,36 +11,26 @@
       let
         pkgs = import nixpkgs { inherit system; };
         nodejs = if pkgs ? nodejs_25 then pkgs.nodejs_25 else pkgs.nodejs;
-        python = if pkgs ? python313 then pkgs.python313 else pkgs.python3;
       in
       {
         devShells.default = pkgs.mkShell {
           packages = [
             nodejs
-            python
-            python.pkgs.pip
-            pkgs.pipx
+            pkgs.codespell
             pkgs.pnpm
             pkgs.rustc
             pkgs.cargo
             pkgs.rustfmt
             pkgs.clippy
-            pkgs.go_1_26
             pkgs.cloudflared
             pkgs.docker
             pkgs.git
+            pkgs.git-cliff
             pkgs.jq
           ];
 
           shellHook = ''
             export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-            export GOTOOLCHAIN=auto
-            export PIPX_DEFAULT_PYTHON=${python}/bin/python3
-            REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-            export PIPX_HOME="$REPO_ROOT/.pipx/home"
-            export PIPX_BIN_DIR="$REPO_ROOT/.pipx/bin"
-            mkdir -p "$PIPX_HOME" "$PIPX_BIN_DIR"
-            export PATH="$PIPX_BIN_DIR:$PATH"
           '';
         };
       });

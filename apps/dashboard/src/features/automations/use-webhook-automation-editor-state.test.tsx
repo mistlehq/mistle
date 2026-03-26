@@ -12,6 +12,7 @@ import {
   resolveSelectedProfileTriggerState,
   useLoadedWebhookAutomationEditorState,
 } from "./use-webhook-automation-editor-state.js";
+import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 
 function createDirectoryData(input?: {
@@ -84,7 +85,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
             name: "Your automation",
             sandboxProfileId: "",
             enabled: true,
-            instructions: "",
+            inputTemplate: DefaultWebhookAutomationInputTemplate,
             conversationKeyTemplate: "",
             triggerIds: [],
             triggerParameterValues: {},
@@ -107,7 +108,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       name: "Your automation",
       sandboxProfileId: "",
       enabled: true,
-      instructions: "",
+      inputTemplate: DefaultWebhookAutomationInputTemplate,
       conversationKeyTemplate: "",
       triggerIds: [],
       triggerParameterValues: {},

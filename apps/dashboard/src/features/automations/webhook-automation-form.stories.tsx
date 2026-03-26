@@ -12,6 +12,7 @@ import {
   type WebhookAutomationFormValues,
   type WebhookAutomationFormValueKey,
 } from "./webhook-automation-form.js";
+import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 
 const GitHubConnectionId = "conn_github_prod";
@@ -290,7 +291,7 @@ const EmptyCreateValues: WebhookAutomationFormValues = {
   name: "",
   sandboxProfileId: "",
   enabled: true,
-  instructions: "",
+  inputTemplate: DefaultWebhookAutomationInputTemplate,
   conversationKeyTemplate: "",
   triggerIds: [],
   triggerParameterValues: {},
@@ -300,7 +301,13 @@ const ExistingAutomationValues: WebhookAutomationFormValues = {
   name: "GitHub pushes to repo triage",
   sandboxProfileId: "sbp_repo_maintainer",
   enabled: true,
-  instructions: "Please review the changes made.",
+  inputTemplate: [
+    "Please review the changes made.",
+    "",
+    "Event type: {{webhookEvent.eventType}}",
+    "Payload:",
+    "{{payload}}",
+  ].join("\n"),
   conversationKeyTemplate: "{{payload.repository.full_name}}:{{payload.ref}}",
   triggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
   triggerParameterValues: {
@@ -411,7 +418,7 @@ export const ValidationErrors: Story = {
       triggerIds: "Select at least one trigger.",
       name: "Required field.",
       sandboxProfileId: "Required field.",
-      instructions: "Required field.",
+      inputTemplate: "Required field.",
     },
     values: {
       ...EmptyCreateValues,

@@ -19,6 +19,7 @@ describe("ChatThread", () => {
             turnId: "turn_1",
             kind: "user-message",
             text: "overwrite the file",
+            attachments: [],
             status: "completed",
           },
           {
@@ -79,6 +80,7 @@ describe("ChatThread", () => {
             turnId: "turn_1",
             kind: "user-message",
             text: "write the file",
+            attachments: [],
             status: "completed",
           },
           {
@@ -114,6 +116,7 @@ describe("ChatThread", () => {
             turnId: "turn_1",
             kind: "user-message",
             text: "Inspect the codebase",
+            attachments: [],
             status: "completed",
           },
           {
@@ -182,6 +185,7 @@ describe("ChatThread", () => {
             turnId: "turn_1",
             kind: "user-message",
             text: "Run a couple of checks",
+            attachments: [],
             status: "completed",
           },
           {
@@ -250,6 +254,7 @@ describe("ChatThread", () => {
             turnId: "turn_1",
             kind: "user-message",
             text: "Show the fallback activity",
+            attachments: [],
             status: "completed",
           },
           {
@@ -287,5 +292,33 @@ describe("ChatThread", () => {
       screen.getByText("Compacted the current session context before continuing."),
     ).toBeTruthy();
     expect(screen.getByText(/drop-superseded-read-output/)).toBeTruthy();
+  });
+
+  it("renders user image attachments as attachment rows", () => {
+    render(
+      <ChatThread
+        entries={[
+          {
+            id: "user_1",
+            turnId: "turn_1",
+            kind: "user-message",
+            text: "Check this screenshot",
+            attachments: [
+              {
+                kind: "image",
+                path: "/tmp/attachments/thread_1/screenshot.png",
+                name: "screenshot.png",
+              },
+            ],
+            status: "completed",
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
+
+    expect(screen.getByText("Image attached: screenshot.png")).toBeTruthy();
   });
 });

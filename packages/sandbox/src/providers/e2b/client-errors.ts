@@ -43,6 +43,14 @@ export const E2BClientOperationIds = {
    */
   KILL_SANDBOX: "kill_sandbox",
   /**
+   * `sandbox.commands.run(...)` and `CommandHandle.wait()` for `/usr/bin/tini -- /usr/local/bin/sandboxd serve`,
+   * plus readiness probes executed through `sandbox.commands.run(...)`.
+   * Sources:
+   * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/commands/index.ts#L411-L469
+   * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/commands/commandHandle.ts#L193-L203
+   */
+  ENSURE_SUPERVISOR_READY: "ensure_supervisor_ready",
+  /**
    * `sandbox.commands.run(...)`, `sendStdin(...)`, `closeStdin(...)`, and `handle.wait()`.
    * Sources:
    * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/commands/index.ts#L411-L469

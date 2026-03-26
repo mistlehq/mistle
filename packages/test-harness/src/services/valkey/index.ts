@@ -2,6 +2,7 @@ import { systemClock, systemSleeper } from "@mistle/time";
 import { GenericContainer, type StartedNetwork, type StartedTestContainer } from "testcontainers";
 
 import { registerProcessCleanupTask } from "../../cleanup/index.js";
+import { stopContainerIgnoringMissing } from "../../docker/cleanup.js";
 
 const VALKEY_IMAGE = "valkey/valkey:9.0-alpine";
 const VALKEY_PORT = 6379;
@@ -76,7 +77,7 @@ export async function startValkey(input: StartValkeyInput = {}): Promise<ValkeyS
       throw new Error("Valkey container was not started.");
     }
 
-    await container.stop({
+    await stopContainerIgnoringMissing(container, {
       remove: true,
       removeVolumes: true,
       timeout: 0,

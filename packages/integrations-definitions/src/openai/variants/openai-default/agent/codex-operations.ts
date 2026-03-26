@@ -162,6 +162,42 @@ export type CodexExternalAgentMigrationItem = {
   cwd: string | null;
 };
 
+export type CodexTurnInputTextItem = {
+  type: "text";
+  text: string;
+};
+
+export type CodexTurnInputLocalImageItem = {
+  type: "localImage";
+  path: string;
+};
+
+export type CodexTurnInputItem = CodexTurnInputLocalImageItem | CodexTurnInputTextItem;
+
+export function buildCodexTurnInputItems(input: {
+  text: string;
+  attachments: readonly CodexTurnInputLocalImageItem[];
+}): readonly CodexTurnInputItem[] {
+  const trimmedText = input.text.trim();
+  const items: CodexTurnInputItem[] = [
+    ...(trimmedText.length === 0
+      ? []
+      : [
+          {
+            type: "text" as const,
+            text: trimmedText,
+          },
+        ]),
+    ...input.attachments,
+  ];
+
+  if (items.length === 0) {
+    throw new Error("Provide text or at least one attachment before starting a turn.");
+  }
+
+  return items;
+}
+
 export async function startCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
   model?: string;
@@ -190,16 +226,11 @@ export async function startCodexThread(input: {
 export async function startCodexTurn(input: {
   rpcClient: CodexJsonRpcClient;
   threadId: string;
-  text: string;
+  input: readonly CodexTurnInputItem[];
 }): Promise<{ turnId: string; status: string; response: unknown }> {
   const response = await input.rpcClient.call("turn/start", {
     threadId: input.threadId,
-    input: [
-      {
-        type: "text",
-        text: input.text,
-      },
-    ],
+    input: input.input,
   });
 
   const parsedResponse = TurnStartResponseSchema.safeParse(response);
@@ -233,16 +264,11 @@ export async function steerCodexTurn(input: {
   rpcClient: CodexJsonRpcClient;
   threadId: string;
   turnId: string;
-  text: string;
+  input: readonly CodexTurnInputItem[];
 }): Promise<{ turnId: string; response: unknown }> {
   const response = await input.rpcClient.call("turn/steer", {
     threadId: input.threadId,
-    input: [
-      {
-        type: "text",
-        text: input.text,
-      },
-    ],
+    input: input.input,
     expectedTurnId: input.turnId,
   });
 

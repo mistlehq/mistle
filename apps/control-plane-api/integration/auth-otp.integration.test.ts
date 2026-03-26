@@ -5,6 +5,7 @@ import { SendVerificationOTPWorkflowSpec } from "@mistle/workflow-registry/contr
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import { MembershipCapabilitiesSchema } from "../src/organizations/index.js";
 import { readLatestSignInOtp } from "./helpers/sign-in-otp.js";
 import { countControlPlaneWorkflowRuns } from "./helpers/workflow-runs.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
@@ -52,6 +53,29 @@ async function readIssuedOtp(input: {
     email: input.recipient,
     otpLength: input.fixture.config.auth.otpLength,
   });
+}
+
+function extractRequestCookie(signInResponse: Response): string {
+  const setCookie = signInResponse.headers.get("set-cookie");
+  if (typeof setCookie !== "string" || setCookie.length === 0) {
+    throw new Error("Expected sign-in response to include set-cookie.");
+  }
+
+  const [cookiePair] = setCookie.split(";");
+  if (cookiePair === undefined || cookiePair.length === 0) {
+    throw new Error("Expected sign-in response to include a usable cookie value.");
+  }
+
+  return cookiePair;
+}
+
+function readOrganizationIdFromPayload(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null) {
+    return null;
+  }
+
+  const id = Reflect.get(payload, "id");
+  return typeof id === "string" && id.length > 0 ? id : null;
 }
 
 describe("auth otp integration", () => {
@@ -136,6 +160,68 @@ describe("auth otp integration", () => {
       throw new Error("Expected session to exist after OTP sign-in.");
     }
     expect(session.activeOrganizationId).toBeNull();
+  });
+
+  it("uses the issued session cookie against protected organization endpoints after organization creation", async ({
+    fixture,
+  }) => {
+    const recipient = `integration-auth-otp-protected-${randomUUID()}@example.com`;
+
+    const sendResponse = await sendOTPRequest({
+      fixture,
+      recipient,
+    });
+    expect(sendResponse.status).toBe(200);
+
+    const otp = await readIssuedOtp({
+      fixture,
+      recipient,
+    });
+
+    const signInResponse = await signInWithOTP({
+      fixture,
+      recipient,
+      otp,
+    });
+    expect(signInResponse.status).toBe(200);
+
+    const requestCookie = extractRequestCookie(signInResponse);
+
+    const createOrganizationResponse = await fixture.request("/v1/auth/organization/create", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: requestCookie,
+      },
+      body: JSON.stringify({
+        name: "Integration OTP Organization",
+        slug: `integration-otp-${randomUUID()}`,
+      }),
+    });
+    expect(createOrganizationResponse.status).toBe(200);
+
+    const createOrganizationPayload: unknown = await createOrganizationResponse
+      .json()
+      .catch(() => null);
+    const organizationId = readOrganizationIdFromPayload(createOrganizationPayload);
+    expect(organizationId).not.toBeNull();
+    if (organizationId === null) {
+      throw new Error("Expected organization create response to include organization id.");
+    }
+
+    const capabilitiesResponse = await fixture.request(
+      `/v1/organizations/${encodeURIComponent(organizationId)}/membership-capabilities`,
+      {
+        headers: {
+          cookie: requestCookie,
+        },
+      },
+    );
+    expect(capabilitiesResponse.status).toBe(200);
+
+    const capabilities = MembershipCapabilitiesSchema.parse(await capabilitiesResponse.json());
+    expect(capabilities.organizationId).toBe(organizationId);
+    expect(capabilities.actorRole).toBe("owner");
   });
 
   it("does not bootstrap an organization for a newly invited user", async ({ fixture }) => {

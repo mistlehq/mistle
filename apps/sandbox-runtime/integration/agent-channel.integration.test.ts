@@ -545,4 +545,122 @@ describe("handleAgentConnectRequest", () => {
       await closeWebSocketServer(codexServer.server).catch(() => undefined);
     }
   });
+
+  it("forwards localImage turn input to the agent endpoint unchanged", async () => {
+    const signal = new AbortController();
+    const relayResultQueue = new AsyncQueue<ActiveTunnelStreamRelayResult>();
+    const { server, serverSocket, clientSocket, clientMessages } =
+      await createTunnelWebSocketPair();
+    const executionLeases = new ExecutionLeaseEngine();
+    executionLeases.attachTunnelConnection(clientSocket);
+    const codexServer = await createCodexServer([
+      async (socket) => {
+        const messages = new JsonMessageQueue(socket);
+        // This integration test stops at the sandbox-runtime boundary. It proves the
+        // agent channel preserves localImage input when forwarding turn/start payloads.
+        const request = await messages.next();
+        expect(request).toMatchObject({
+          id: "request_local_image",
+          method: "turn/start",
+          params: {
+            threadId: "thr_local_image",
+            input: [
+              {
+                type: "text",
+                text: "Describe this image",
+              },
+              {
+                type: "localImage",
+                path: "/tmp/attachments/thr_local_image/uploaded-image.png",
+              },
+            ],
+          },
+        });
+
+        await writeJsonMessage(socket, {
+          id: request.id,
+          result: {
+            turn: {
+              id: "turn_local_image",
+              status: "inProgress",
+            },
+          },
+        });
+      },
+    ]);
+
+    try {
+      const runtimeClient = createRuntimeClient();
+      runtimeClient.endpoints = [
+        {
+          endpointKey: "app-server",
+          transport: {
+            type: "ws",
+            url: codexServer.url,
+          },
+          connectionMode: "dedicated",
+        },
+      ];
+
+      const relay = await handleAgentConnectRequest({
+        signal: signal.signal,
+        tunnelSocket: serverSocket,
+        streamId: 1,
+        agentRuntimes: [createAgentRuntime()],
+        runtimeClients: [runtimeClient],
+        executionLeases,
+        executionLeasePollIntervalMs: 25,
+        relayResultQueue,
+      });
+
+      expect(relay).toBeDefined();
+      if (relay === undefined) {
+        throw new Error("agent relay is required");
+      }
+
+      await expect(nextBootstrapControlMessage(clientMessages, signal.signal)).resolves.toEqual({
+        type: "stream.open.ok",
+        streamId: 1,
+      });
+
+      relay.messages.push({
+        kind: "binary",
+        payload: encodeDataFrame({
+          streamId: 1,
+          payloadKind: PayloadKindWebSocketText,
+          payload: new TextEncoder().encode(
+            JSON.stringify({
+              id: "request_local_image",
+              method: "turn/start",
+              params: {
+                threadId: "thr_local_image",
+                input: [
+                  {
+                    type: "text",
+                    text: "Describe this image",
+                  },
+                  {
+                    type: "localImage",
+                    path: "/tmp/attachments/thr_local_image/uploaded-image.png",
+                  },
+                ],
+              },
+            }),
+          ),
+        }),
+      });
+
+      const responseFrame = decodeDataFrame(
+        await nextBinaryTunnelMessage(clientMessages, signal.signal),
+      );
+      expect(responseFrame.streamId).toBe(1);
+      expect(new TextDecoder().decode(responseFrame.payload)).toContain("turn_local_image");
+    } finally {
+      signal.abort();
+      await closeWebSocket(clientSocket).catch(() => undefined);
+      await closeWebSocket(serverSocket).catch(() => undefined);
+      await closeWebSocketServer(server).catch(() => undefined);
+      await closeWebSocketServer(codexServer.server).catch(() => undefined);
+    }
+  });
 });

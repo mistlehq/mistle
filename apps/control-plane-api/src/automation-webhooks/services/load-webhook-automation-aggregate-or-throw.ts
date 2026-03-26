@@ -20,7 +20,7 @@ export type AutomationWebhookAggregate = {
   target: {
     id: string;
     sandboxProfileId: string;
-    sandboxProfileVersion: number | null;
+    sandboxProfileVersion: number;
   };
 };
 

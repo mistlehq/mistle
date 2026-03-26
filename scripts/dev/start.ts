@@ -44,8 +44,10 @@ let terminated = false;
 type CloudflaredConfigInput = {
   controlPlaneApiTunnelHostname: string;
   controlPlaneApiLocalPort: number;
-  dataPlaneApiLocalPort: number;
-  dataPlaneTunnelHostname: string;
+  dataPlaneGatewayLocalPort: number;
+  dataPlaneGatewayTunnelHostname: string;
+  tokenizerProxyLocalPort: number;
+  tokenizerProxyTunnelHostname: string;
 };
 
 type RunInput = {
@@ -96,11 +98,19 @@ function readControlPlaneApiLocalPort(configPath: string): number {
   );
 }
 
-function readDataPlaneApiLocalPort(configPath: string): number {
+function readDataPlaneGatewayLocalPort(configPath: string): number {
   return readRequiredIntegerTomlValue(
     configPath,
-    ["apps", "data_plane_api", "server", "port"],
-    "apps.data_plane_api.server.port",
+    ["apps", "data_plane_gateway", "server", "port"],
+    "apps.data_plane_gateway.server.port",
+  );
+}
+
+function readTokenizerProxyLocalPort(configPath: string): number {
+  return readRequiredIntegerTomlValue(
+    configPath,
+    ["apps", "tokenizer_proxy", "server", "port"],
+    "apps.tokenizer_proxy.server.port",
   );
 }
 
@@ -119,8 +129,10 @@ function writeCloudflaredConfig(input: CloudflaredConfigInput): void {
     "ingress:",
     `  - hostname: ${input.controlPlaneApiTunnelHostname}`,
     `    service: http://host.docker.internal:${input.controlPlaneApiLocalPort}`,
-    `  - hostname: ${input.dataPlaneTunnelHostname}`,
-    `    service: http://host.docker.internal:${input.dataPlaneApiLocalPort}`,
+    `  - hostname: ${input.dataPlaneGatewayTunnelHostname}`,
+    `    service: http://host.docker.internal:${input.dataPlaneGatewayLocalPort}`,
+    `  - hostname: ${input.tokenizerProxyTunnelHostname}`,
+    `    service: http://host.docker.internal:${input.tokenizerProxyLocalPort}`,
     "  - service: http_status:404",
     "",
   ].join("\n");
@@ -347,16 +359,20 @@ function start(): void {
     "Starting local infra dependencies (Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM, tokenizer relay, gateway relay)...",
   );
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
-  const dataPlaneApiLocalPort = readDataPlaneApiLocalPort(DEV_CONFIG_PATH);
+  const dataPlaneGatewayLocalPort = readDataPlaneGatewayLocalPort(DEV_CONFIG_PATH);
+  const tokenizerProxyLocalPort = readTokenizerProxyLocalPort(DEV_CONFIG_PATH);
   const cloudflareTunnelToken = readRequiredEnv("CLOUDFLARE_TUNNEL_TOKEN");
   const controlPlaneApiTunnelHostname = readRequiredEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME");
-  const dataPlaneTunnelHostname = readRequiredEnv("DATA_PLANE_API_TUNNEL_HOSTNAME");
+  const dataPlaneGatewayTunnelHostname = readRequiredEnv("DATA_PLANE_API_TUNNEL_HOSTNAME");
+  const tokenizerProxyTunnelHostname = readRequiredEnv("TOKENIZER_PROXY_TUNNEL_HOSTNAME");
 
   writeCloudflaredConfig({
     controlPlaneApiTunnelHostname,
     controlPlaneApiLocalPort,
-    dataPlaneApiLocalPort,
-    dataPlaneTunnelHostname,
+    dataPlaneGatewayLocalPort,
+    dataPlaneGatewayTunnelHostname,
+    tokenizerProxyLocalPort,
+    tokenizerProxyTunnelHostname,
   });
 
   const sharedDevEnv: NodeJS.ProcessEnv = {
@@ -364,7 +380,8 @@ function start(): void {
     CONTROL_PLANE_API_LOCAL_PORT: String(controlPlaneApiLocalPort),
     CLOUDFLARE_TUNNEL_TOKEN: cloudflareTunnelToken,
     CONTROL_PLANE_API_TUNNEL_HOSTNAME: controlPlaneApiTunnelHostname,
-    DATA_PLANE_API_TUNNEL_HOSTNAME: dataPlaneTunnelHostname,
+    DATA_PLANE_API_TUNNEL_HOSTNAME: dataPlaneGatewayTunnelHostname,
+    TOKENIZER_PROXY_TUNNEL_HOSTNAME: tokenizerProxyTunnelHostname,
     CLOUDFLARED_CONFIG_PATH: DEV_CLOUDFLARED_CONFIG_PATH,
   };
   localInfraEnv = sharedDevEnv;
@@ -481,13 +498,15 @@ function start(): void {
   });
 
   const controlPlaneApiPublicUrl = `https://${controlPlaneApiTunnelHostname}`;
-  const dataPlaneApiPublicUrl = `https://${dataPlaneTunnelHostname}`;
+  const dataPlaneGatewayPublicUrl = `https://${dataPlaneGatewayTunnelHostname}`;
+  const tokenizerProxyPublicUrl = `https://${tokenizerProxyTunnelHostname}`;
 
   console.log("");
   console.log("Public tunnel URLs:");
   console.log(`- control-plane-api: ${controlPlaneApiPublicUrl}`);
-  console.log(`- data-plane-api: ${dataPlaneApiPublicUrl}`);
-  console.log(`- data-plane tunnel route: ${dataPlaneApiPublicUrl}/tunnel`);
+  console.log(`- data-plane-gateway: ${dataPlaneGatewayPublicUrl}`);
+  console.log(`- data-plane tunnel route: ${dataPlaneGatewayPublicUrl}/tunnel`);
+  console.log(`- tokenizer-proxy: ${tokenizerProxyPublicUrl}`);
   console.log("- mailpit ui: http://127.0.0.1:8025");
   console.log("- grafana (otel-lgtm): http://127.0.0.1:3000");
   console.log(`- local registry: http://${LOCAL_REGISTRY_HOST}`);

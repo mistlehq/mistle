@@ -42,14 +42,27 @@ function chunkToUtf8String(chunk: unknown): string {
   throw new Error("Docker exec stream yielded a non-text chunk.");
 }
 
-async function readUtf8Stream(stream: NodeJS.ReadableStream): Promise<string> {
+function captureUtf8Stream(stream: NodeJS.ReadableStream): {
+  read: () => string;
+  stop: () => void;
+} {
   let output = "";
 
-  for await (const chunk of stream) {
+  const onData = (chunk: unknown): void => {
     output += chunkToUtf8String(chunk);
-  }
+  };
 
-  return output;
+  stream.on("data", onData);
+
+  return {
+    read: () => output,
+    stop: () => {
+      stream.off("data", onData);
+      if ("destroy" in stream && typeof stream.destroy === "function") {
+        stream.destroy();
+      }
+    },
+  };
 }
 
 async function waitForDockerExecExitCode(exec: DockerClient.Exec): Promise<number> {
@@ -151,20 +164,19 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
       const stdout = new PassThrough();
       const stderr = new PassThrough();
       container.modem.demuxStream(execStream, stdout, stderr);
-
-      const stdoutPromise = readUtf8Stream(stdout);
-      const stderrPromise = readUtf8Stream(stderr);
+      const capturedStdout = captureUtf8Stream(stdout);
+      const capturedStderr = captureUtf8Stream(stderr);
 
       await writePayloadToStream(execStream, input.payload);
       await endWritableStream(execStream);
 
-      const [stdoutText, stderrText, exitCode] = await Promise.all([
-        stdoutPromise,
-        stderrPromise,
-        this.#runDockerOperation(DockerClientOperationIds.APPLY_STARTUP, () =>
-          waitForDockerExecExitCode(exec),
-        ),
-      ]);
+      const exitCode = await this.#runDockerOperation(DockerClientOperationIds.APPLY_STARTUP, () =>
+        waitForDockerExecExitCode(exec),
+      );
+      const stdoutText = capturedStdout.read();
+      const stderrText = capturedStderr.read();
+      capturedStdout.stop();
+      capturedStderr.stop();
 
       if (exitCode !== 0) {
         throw new Error(

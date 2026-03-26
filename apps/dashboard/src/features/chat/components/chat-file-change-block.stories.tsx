@@ -5,6 +5,7 @@ import {
   CodexFixtureFileChangeBlock,
 } from "../../session-agents/codex/fixtures/approval-fixtures.js";
 import { ChatFileChangeBlock } from "./chat-file-change-block.js";
+import { noopRespondToServerRequest } from "./chat-story-support.js";
 
 const meta = {
   title: "Dashboard/Chat/ChatFileChangeBlock",
@@ -17,7 +18,7 @@ const meta = {
     approvalRequest: null,
     block: CodexFixtureFileChangeBlock,
     isRespondingToServerRequest: false,
-    onRespondToServerRequest: function onRespondToServerRequest() {},
+    onRespondToServerRequest: noopRespondToServerRequest,
   },
 } satisfies Meta<typeof ChatFileChangeBlock>;
 

@@ -1,11 +1,14 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { readRepositoryVersion } from "@mistle/config";
 
 import { registerInternalApiRouteModules } from "../../src/app.js";
 import type { AppContextBindings } from "../../src/types.js";
 
+const DataPlaneReleaseVersion = readRepositoryVersion(import.meta.url);
+
 const DataPlaneInternalOpenApiInfo = {
   title: "Mistle Data Plane Internal API",
-  version: "0.0.0",
+  version: DataPlaneReleaseVersion,
 };
 
 export function createDataPlaneInternalOpenApiDocument(): ReturnType<

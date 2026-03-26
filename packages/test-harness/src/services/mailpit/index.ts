@@ -7,6 +7,7 @@ import {
 import { GenericContainer, type StartedNetwork, type StartedTestContainer } from "testcontainers";
 
 import { registerProcessCleanupTask } from "../../cleanup/index.js";
+import { stopContainerIgnoringMissing } from "../../docker/cleanup.js";
 
 const MAILPIT_SMTP_PORT = 1025;
 const MAILPIT_HTTP_PORT = 8025;
@@ -118,7 +119,7 @@ export async function startMailpit(input: StartMailpitInput = {}): Promise<Mailp
       throw new Error("Mailpit container was not started.");
     }
 
-    await container.stop({
+    await stopContainerIgnoringMissing(container, {
       remove: true,
       removeVolumes: true,
       timeout: 0,

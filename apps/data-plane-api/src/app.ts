@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { readRepositoryVersion } from "@mistle/config";
 
 import { createInternalSandboxInstancesRoutes } from "./internal/index.js";
 import type { AppRuntimeResources } from "./resources.js";
@@ -10,10 +11,11 @@ import type {
 } from "./types.js";
 
 const DataPlaneOpenApiPath = "/openapi.json";
+const DataPlaneReleaseVersion = readRepositoryVersion(import.meta.url);
 
 const DataPlaneInternalOpenApiInfo = {
   title: "Mistle Data Plane Internal API",
-  version: "0.0.0",
+  version: DataPlaneReleaseVersion,
 };
 
 export type CreateAppInput = {

@@ -99,14 +99,16 @@ cloudflared tunnel create <tunnel-name>
 
 ```bash
 cloudflared tunnel route dns <tunnel-name> <control-plane-api-hostname>
-cloudflared tunnel route dns <tunnel-name> <data-plane-api-hostname>
+cloudflared tunnel route dns <tunnel-name> <data-plane-gateway-hostname>
+cloudflared tunnel route dns <tunnel-name> <tokenizer-proxy-hostname>
 ```
 
 Example naming:
 
 - `<tunnel-name>`: `mistle-<your-suffix>`
 - `<control-plane-api-hostname>`: `control-plane-api-<your-suffix>.<your-zone>`
-- `<data-plane-api-hostname>`: `data-plane-api-<your-suffix>.<your-zone>`
+- `<data-plane-gateway-hostname>`: `data-plane-gateway-<your-suffix>.<your-zone>`
+- `<tokenizer-proxy-hostname>`: `tokenizer-proxy-<your-suffix>.<your-zone>`
 
 6. Fill required tunnel values in `.env.dev`:
 
@@ -117,7 +119,8 @@ cloudflared tunnel token <tunnel-name>
 ```env
 CLOUDFLARE_TUNNEL_TOKEN=<token-from-command-above>
 CONTROL_PLANE_API_TUNNEL_HOSTNAME=<control-plane-api-hostname>
-DATA_PLANE_API_TUNNEL_HOSTNAME=<data-plane-api-hostname>
+DATA_PLANE_API_TUNNEL_HOSTNAME=<data-plane-gateway-hostname>
+TOKENIZER_PROXY_TUNNEL_HOSTNAME=<tokenizer-proxy-hostname>
 ```
 
 7. Start the stack:
@@ -174,11 +177,16 @@ direnv allow
 
 This repo includes `.envrc` to auto-enter the flake shell and load `.env.dev`.
 
+## Releases
+
+Release process documentation lives in [docs/release-process.md](docs/release-process.md).
+
 ### Validation
 
 ```bash
 pnpm format
 pnpm lint
+pnpm lint:spelling
 pnpm typecheck
 pnpm test
 ```

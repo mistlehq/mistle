@@ -4,7 +4,7 @@ import type { PtySession } from "./pty-session.js";
 
 export type ActiveTunnelStreamRelay = {
   primaryStreamId: number;
-  channelKind: "agent" | "pty";
+  channelKind: "agent" | "fileUpload" | "pty";
   messages: AsyncQueue<TunnelSocketMessage>;
 };
 

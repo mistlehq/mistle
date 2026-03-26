@@ -141,6 +141,70 @@ describe("automation webhooks CRUD integration", () => {
     expect(persistedTarget.sandboxProfileVersion).toBe(3);
   });
 
+  it("persists the latest sandbox profile version when webhook target version is omitted", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-create-latest-version@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await insertIntegrationConnection(fixture, {
+      id: "icn_webhook_create_latest_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertSandboxProfile(fixture, {
+      id: "sbp_webhook_create_latest_001",
+      organizationId: authenticatedSession.organizationId,
+    });
+    await insertSandboxProfileVersion(fixture, {
+      profileId: "sbp_webhook_create_latest_001",
+      version: 2,
+    });
+    await insertSandboxProfileVersion(fixture, {
+      profileId: "sbp_webhook_create_latest_001",
+      version: 5,
+    });
+    await insertSandboxProfileBinding(fixture, {
+      profileId: "sbp_webhook_create_latest_001",
+      version: 5,
+      connectionId: "icn_webhook_create_latest_001",
+    });
+
+    const response = await fixture.request("/v1/automations/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        name: "GitHub Issue Comments Latest",
+        enabled: true,
+        integrationConnectionId: "icn_webhook_create_latest_001",
+        eventTypes: ["issue_comment.created"],
+        inputTemplate: "Handle {{payload.comment.body}}",
+        conversationKeyTemplate: "{{payload.issue.node_id}}",
+        idempotencyKeyTemplate: "{{payload.comment.node_id}}",
+        target: {
+          sandboxProfileId: "sbp_webhook_create_latest_001",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const body = AutomationWebhookSchema.parse(await response.json());
+    expect(body.target.sandboxProfileVersion).toBe(5);
+
+    const persistedTarget = await fixture.db.query.automationTargets.findFirst({
+      where: (table, { eq }) => eq(table.automationId, body.id),
+    });
+    if (persistedTarget === undefined) {
+      throw new Error("Expected automation target row to exist.");
+    }
+    expect(persistedTarget.sandboxProfileVersion).toBe(5);
+  });
+
   it("lists webhook automations with keyset pagination scoped to the active organization", async ({
     fixture,
   }) => {

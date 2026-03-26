@@ -167,6 +167,7 @@ describe("resolveChatComposerAction", () => {
       resolveChatComposerAction({
         composerText: "  hello world  ",
         hasActiveTurn: false,
+        hasPendingAttachments: false,
       }),
     ).toEqual({
       type: "start_turn",
@@ -180,6 +181,7 @@ describe("resolveChatComposerAction", () => {
       resolveChatComposerAction({
         composerText: "   ",
         hasActiveTurn: true,
+        hasPendingAttachments: false,
       }),
     ).toEqual({
       type: "interrupt_turn",
@@ -192,10 +194,39 @@ describe("resolveChatComposerAction", () => {
       resolveChatComposerAction({
         composerText: "  refine this  ",
         hasActiveTurn: true,
+        hasPendingAttachments: false,
       }),
     ).toEqual({
       type: "steer_turn",
       prompt: "refine this",
+      shouldClearComposer: true,
+    });
+  });
+
+  it("starts a turn when attachments are pending even without text", () => {
+    expect(
+      resolveChatComposerAction({
+        composerText: "   ",
+        hasActiveTurn: false,
+        hasPendingAttachments: true,
+      }),
+    ).toEqual({
+      type: "start_turn",
+      prompt: "",
+      shouldClearComposer: true,
+    });
+  });
+
+  it("steers an active turn when attachments are pending even without text", () => {
+    expect(
+      resolveChatComposerAction({
+        composerText: "   ",
+        hasActiveTurn: true,
+        hasPendingAttachments: true,
+      }),
+    ).toEqual({
+      type: "steer_turn",
+      prompt: "",
       shouldClearComposer: true,
     });
   });

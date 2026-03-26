@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { readRepositoryVersion } from "@mistle/config";
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
@@ -27,10 +28,11 @@ import type {
 } from "./types.js";
 
 const ControlPlaneOpenApiPath = "/openapi.json";
+const ControlPlaneReleaseVersion = readRepositoryVersion(import.meta.url);
 
 const ControlPlaneOpenApiInfo = {
   title: "Mistle Control Plane API",
-  version: "0.0.0",
+  version: ControlPlaneReleaseVersion,
 };
 
 export type CreateAppInput = {

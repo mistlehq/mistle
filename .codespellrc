@@ -1,0 +1,4 @@
+[codespell]
+skip = .git*,node_modules,.direnv,.pipx,.turbo,*-lock.yaml,*.lock,*.map,*coverage*,*storybook-static*,*dist-sea*,*dist/*,*target/*
+check-hidden = true
+ignore-words-list = AKS,aks,afterAll,connectionA,sxl,te

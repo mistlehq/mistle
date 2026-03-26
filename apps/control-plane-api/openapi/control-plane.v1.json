@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mistle Control Plane API",
-    "version": "0.0.0"
+    "version": "0.1.0"
   },
   "components": {
     "schemas": {},
@@ -305,7 +305,7 @@
                         "minLength": 1
                       },
                       "sandboxProfileVersion": {
-                        "type": ["integer", "null"],
+                        "type": "integer",
                         "minimum": 1
                       }
                     },
@@ -387,7 +387,7 @@
                           "minLength": 1
                         },
                         "sandboxProfileVersion": {
-                          "type": ["integer", "null"],
+                          "type": "integer",
                           "minimum": 1
                         }
                       },
@@ -593,7 +593,7 @@
                           "minLength": 1
                         },
                         "sandboxProfileVersion": {
-                          "type": ["integer", "null"],
+                          "type": "integer",
                           "minimum": 1
                         }
                       },
@@ -783,7 +783,7 @@
                         "minLength": 1
                       },
                       "sandboxProfileVersion": {
-                        "type": ["integer", "null"],
+                        "type": "integer",
                         "minimum": 1
                       }
                     },
@@ -857,7 +857,7 @@
                           "minLength": 1
                         },
                         "sandboxProfileVersion": {
-                          "type": ["integer", "null"],
+                          "type": "integer",
                           "minimum": 1
                         }
                       },

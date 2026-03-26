@@ -14,6 +14,7 @@ import {
   type CodexExternalAgentMigrationItem,
   type CodexModelSummary,
   type CodexThreadSummary,
+  type CodexTurnInputLocalImageItem,
   createBrowserCodexSessionRuntime,
 } from "@mistle/integrations-definitions/openai/agent/client";
 import { useMutation } from "@tanstack/react-query";
@@ -72,6 +73,7 @@ type CodexSessionLifecycleState = {
   connectSession: (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => void;
   disconnectSession: () => void;
   clearStartErrorMessage: () => void;
+  reportStartErrorMessage: (message: string) => void;
 };
 
 type CodexSessionThreadState = {
@@ -110,9 +112,15 @@ type CodexSessionChatState = {
   isSteeringTurn: boolean;
   canInterruptTurn: boolean;
   canSteerTurn: boolean;
-  startTurn: (prompt: string) => void;
+  startTurn: (input: {
+    prompt: string;
+    attachments?: readonly CodexTurnInputLocalImageItem[];
+  }) => Promise<void>;
   interruptTurn: () => void;
-  steerTurn: (prompt: string) => void;
+  steerTurn: (input: {
+    prompt: string;
+    attachments?: readonly CodexTurnInputLocalImageItem[];
+  }) => Promise<void>;
   reloadChat: () => void;
 };
 
@@ -823,6 +831,10 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     setStartErrorMessage(null);
   }, []);
 
+  const reportStartErrorMessage = useCallback((message: string) => {
+    setStartErrorMessage(message);
+  }, []);
+
   const refreshAvailableThreads = useCallback(() => {
     refreshThreadListMutate();
   }, [refreshThreadListMutate]);
@@ -912,6 +924,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       connectSession,
       disconnectSession,
       clearStartErrorMessage,
+      reportStartErrorMessage,
     };
   }, [
     agentConnectionError,
@@ -921,6 +934,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     isStartingSession,
     connectedSession,
     disconnectSession,
+    reportStartErrorMessage,
     startErrorMessage,
     step,
   ]);

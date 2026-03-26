@@ -1,19 +1,15 @@
-import { Badge } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useMemo, useState } from "react";
 
-import {
-  CodexFixtureSessionComposerProps,
-  CodexFixtureSessionEntriesWithExploringGroup,
-  CodexFixtureSessionServerRequests,
-} from "../session-agents/codex/fixtures/session-fixtures.js";
 import { type UseSandboxPtyStateResult } from "../sessions/use-sandbox-pty-state.js";
 import {
-  SessionConversationBottomPanel,
-  SessionConversationMainContent,
-} from "./session-conversation-pane.js";
+  createStorySessionBottomPanel,
+  createStorySessionMainContent,
+  renderSessionWorkbenchStory,
+  SessionWorkbenchStoryChrome,
+  StorySandboxInstanceId,
+} from "./session-story-support.js";
 import { SessionTerminalPanel } from "./session-terminal-panel.js";
-import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 const textEncoder = new TextEncoder();
 
@@ -50,7 +46,9 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
     return {
       lifecycle: {
         connectedSandboxInstanceId:
-          lifecycleState === "open" || lifecycleState === "connected" ? "sbi_storybook" : null,
+          lifecycleState === "open" || lifecycleState === "connected"
+            ? StorySandboxInstanceId
+            : null,
         errorMessage,
         exitInfo: null,
         resetInfo: null,
@@ -103,54 +101,31 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
   }, [errorMessage, lifecycleState, outputChunks]);
 
   return (
-    <div className="from-background to-muted/20 min-h-screen bg-linear-to-b">
-      <div className="bg-background/80 flex h-12 items-center justify-end gap-2 border-b px-4 backdrop-blur-sm">
-        <Badge className="bg-emerald-600 text-white hover:bg-emerald-600/90" variant="secondary">
-          Connected
-        </Badge>
-      </div>
-      <div className="h-[calc(100vh-3rem)]">
-        <SessionWorkbenchPageView
-          alerts={[]}
-          isSecondaryPanelVisible={isTerminalVisible}
-          mainContent={
-            <SessionConversationMainContent
-              chatEntries={CodexFixtureSessionEntriesWithExploringGroup}
-              composerProps={CodexFixtureSessionComposerProps}
-              isRespondingToServerRequest={false}
-              onRespondToServerRequest={function onRespondToServerRequest() {}}
-              serverRequestPanelEntries={CodexFixtureSessionServerRequests}
-            />
-          }
-          onSecondaryPanelResize={setPanelSize}
-          primaryBottomPanel={
-            <SessionConversationBottomPanel
-              chatEntries={CodexFixtureSessionEntriesWithExploringGroup}
-              composerProps={CodexFixtureSessionComposerProps}
-              isRespondingToServerRequest={false}
-              onRespondToServerRequest={function onRespondToServerRequest() {}}
-              serverRequestPanelEntries={CodexFixtureSessionServerRequests}
-            />
-          }
-          secondaryPanel={
-            <SessionTerminalPanel
-              isConnectionReady={true}
-              isVisible={isTerminalVisible}
-              onHide={() => {
-                setIsTerminalVisible(false);
-              }}
-              onDisconnectTerminal={() => {
-                setIsTerminalVisible(false);
-              }}
-              ptyState={ptyState}
-              sandboxInstanceId="sbi_storybook"
-            />
-          }
-          secondaryPanelSize={panelSize}
-          sandboxInstanceId="sbi_storybook"
-        />
-      </div>
-    </div>
+    <SessionWorkbenchStoryChrome>
+      {renderSessionWorkbenchStory({
+        alerts: [],
+        isSecondaryPanelVisible: isTerminalVisible,
+        mainContent: createStorySessionMainContent(),
+        onSecondaryPanelResize: setPanelSize,
+        primaryBottomPanel: createStorySessionBottomPanel(),
+        secondaryPanel: (
+          <SessionTerminalPanel
+            isConnectionReady={true}
+            isVisible={isTerminalVisible}
+            onHide={() => {
+              setIsTerminalVisible(false);
+            }}
+            onDisconnectTerminal={() => {
+              setIsTerminalVisible(false);
+            }}
+            ptyState={ptyState}
+            sandboxInstanceId={StorySandboxInstanceId}
+          />
+        ),
+        secondaryPanelSize: panelSize,
+        sandboxInstanceId: StorySandboxInstanceId,
+      })}
+    </SessionWorkbenchStoryChrome>
   );
 }
 

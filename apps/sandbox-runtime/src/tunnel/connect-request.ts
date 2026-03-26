@@ -3,6 +3,7 @@ import type {
   StreamOpen,
   StreamSignalMessage,
 } from "@mistle/sandbox-session-protocol";
+import { parseStreamControlMessage } from "@mistle/sandbox-session-protocol";
 
 export type TunnelSocketMessage =
   | {
@@ -156,6 +157,15 @@ export function parsePtyConnectRequest(payload: string): StreamOpen {
       ...(cwd === undefined ? {} : { cwd }),
     },
   };
+}
+
+export function parseFileUploadConnectRequest(payload: string): StreamOpen {
+  const message = parseStreamControlMessage(payload);
+  if (message?.type !== "stream.open" || message.channel.kind !== "fileUpload") {
+    throw new Error("file upload stream.open request must declare a valid fileUpload channel");
+  }
+
+  return message;
 }
 
 export function parsePtyResizeSignal(payload: string): StreamSignalMessage {

@@ -159,6 +159,7 @@ describe("codex session connect", () => {
       sandboxInstanceId: "sandbox_123",
       connectedAtIso: "2026-03-20T00:00:00.000Z",
       expiresAtIso: "2026-03-20T01:00:00.000Z",
+      connectionUrl: "wss://example.test/codex",
       threadId: "thread_123",
     });
   });

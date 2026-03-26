@@ -1,4 +1,5 @@
 import { isRecord } from "../is-record.js";
+import { normalizeCodexLocalImageAttachment } from "./local-image.js";
 import type {
   NormalizedCodexThreadItem,
   NormalizedCommandAction,
@@ -227,12 +228,28 @@ export function normalizeCodexThreadItem(input: {
   const itemType = readRequiredType(item);
 
   if (itemType === "userMessage") {
+    const attachments = Array.isArray(item["content"])
+      ? item["content"].flatMap((contentItem) => {
+          if (!isRecord(contentItem) || contentItem["type"] !== "localImage") {
+            return [];
+          }
+
+          const path = readOptionalString(contentItem, "path");
+          if (path === null || path.length === 0) {
+            return [];
+          }
+
+          return [normalizeCodexLocalImageAttachment({ path })];
+        })
+      : [];
+
     return [
       {
         kind: "user-message",
         id: itemId,
         turnId: input.turnId,
         text: collectText(item["content"]),
+        attachments,
       },
     ];
   }

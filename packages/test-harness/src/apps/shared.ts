@@ -6,15 +6,14 @@ import { promisify } from "node:util";
 
 import {
   GenericContainer,
-  ImageName,
   Network,
   Wait,
-  getContainerRuntimeClient,
   type StartedNetwork,
   type StartedTestContainer,
 } from "testcontainers";
 
 import { registerProcessCleanupTask, runCleanupTasks } from "../cleanup/index.js";
+import { stopContainerIgnoringMissing } from "../docker/cleanup.js";
 
 export type WorkspaceAppReadiness =
   | {
@@ -66,6 +65,7 @@ export type StartDockerTargetAppInput = {
 };
 
 export type StartedWorkspaceApp = {
+  containerId: string;
   host: string;
   mappedPort: number;
   hostBaseUrl: string;
@@ -91,6 +91,34 @@ const HostGatewayExtraHosts = [
     ipAddress: "host-gateway",
   },
 ];
+
+export function createDockerBuildCommandArgs(input: {
+  dockerfileRelativePath: string;
+  dockerTarget: string;
+  imageName: string;
+  buildArgs: Record<string, string> | undefined;
+}): string[] {
+  const args = ["build", "--pull=false"];
+  const entries = Object.entries(input.buildArgs ?? {}).sort(([left], [right]) =>
+    left.localeCompare(right),
+  );
+
+  for (const [key, value] of entries) {
+    args.push("--build-arg", `${key}=${value}`);
+  }
+
+  args.push(
+    "--target",
+    input.dockerTarget,
+    "-f",
+    input.dockerfileRelativePath,
+    "-t",
+    input.imageName,
+    ".",
+  );
+
+  return args;
+}
 
 function traceTestHarness(message: string): void {
   if (!TRACE_TEST_HARNESS) {
@@ -211,7 +239,7 @@ async function cleanupResources(input: {
   const tasks = [
     async () => {
       if (input.container !== undefined) {
-        await input.container.stop({
+        await stopContainerIgnoringMissing(input.container, {
           remove: true,
           removeVolumes: true,
           timeout: 0,
@@ -292,6 +320,7 @@ function createStartedWorkspaceApp(input: {
   const mappedPort = input.container.getMappedPort(input.containerPort);
 
   return {
+    containerId: input.container.getId(),
     host,
     mappedPort,
     hostBaseUrl: `http://${host}:${String(mappedPort)}`,
@@ -307,14 +336,6 @@ function createStartedWorkspaceApp(input: {
       unregisterProcessCleanupTask();
     },
   };
-}
-
-function toBuildArgsRecord(buildArgs: Record<string, string> | undefined): Record<string, string> {
-  if (buildArgs === undefined) {
-    return {};
-  }
-
-  return buildArgs;
 }
 
 function stringifyBuildArgs(buildArgs: Record<string, string> | undefined): string {
@@ -345,6 +366,36 @@ async function removeDockerImage(imageName: string): Promise<void> {
   } catch (error) {
     const normalizedError = normalizeError(error);
     throw new Error(`Failed to remove Docker image ${imageName}: ${normalizedError.message}`);
+  }
+}
+
+async function buildDockerTargetImage(input: {
+  buildContextHostPath: string;
+  dockerfileRelativePath: string;
+  dockerTarget: string;
+  imageName: string;
+  buildArgs: Record<string, string> | undefined;
+}): Promise<void> {
+  const args = createDockerBuildCommandArgs({
+    dockerfileRelativePath: input.dockerfileRelativePath,
+    dockerTarget: input.dockerTarget,
+    imageName: input.imageName,
+    buildArgs: input.buildArgs,
+  });
+
+  try {
+    await execFileAsync("docker", args, {
+      cwd: input.buildContextHostPath,
+      env: {
+        ...process.env,
+        DOCKER_BUILDKIT: process.env.DOCKER_BUILDKIT ?? "1",
+      },
+    });
+  } catch (error) {
+    const normalizedError = normalizeError(error);
+    throw new Error(
+      `Failed to build Docker target image ${input.imageName} (${input.dockerTarget}): ${normalizedError.message}`,
+    );
   }
 }
 
@@ -427,29 +478,19 @@ async function resolveDockerTargetImageName(input: {
 
   const buildPromise = (async () => {
     const imageName = createDockerTargetImageName(cacheKey);
-    const containerRuntimeClient = await getContainerRuntimeClient();
-    const imageExists = await containerRuntimeClient.image.exists(ImageName.fromString(imageName));
-
-    if (!imageExists) {
-      const imageBuildStartedAt = Date.now();
-      traceTestHarness(`building Docker target image ${imageName} (${input.dockerTarget})`);
-      await GenericContainer.fromDockerfile(
-        input.buildContextHostPath,
-        input.dockerfileRelativePath,
-      )
-        .withBuildArgs(toBuildArgsRecord(input.buildArgs))
-        .withTarget(input.dockerTarget)
-        .withBuildkit()
-        .build(imageName, {
-          deleteOnExit: true,
-        });
-      DockerTargetManagedImages.add(imageName);
-      traceTestHarness(
-        `built Docker target image ${imageName} in ${String(Date.now() - imageBuildStartedAt)}ms`,
-      );
-    } else {
-      traceTestHarness(`found existing Docker target image ${imageName}`);
-    }
+    const imageBuildStartedAt = Date.now();
+    traceTestHarness(`building Docker target image ${imageName} (${input.dockerTarget})`);
+    await buildDockerTargetImage({
+      buildContextHostPath: input.buildContextHostPath,
+      dockerfileRelativePath: input.dockerfileRelativePath,
+      dockerTarget: input.dockerTarget,
+      imageName,
+      buildArgs: input.buildArgs,
+    });
+    DockerTargetManagedImages.add(imageName);
+    traceTestHarness(
+      `built Docker target image ${imageName} in ${String(Date.now() - imageBuildStartedAt)}ms`,
+    );
 
     DockerTargetImageCache.set(cacheKey, imageName);
     return imageName;
