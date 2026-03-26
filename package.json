@@ -55,7 +55,6 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@typescript/native-preview": "latest",
-    "codespell": "^1.1.7",
     "jscpd": "^4.0.8",
     "knip": "^5.88.0",
     "lefthook": "^2.1.4",
