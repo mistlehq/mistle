@@ -138,21 +138,12 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
-      '@mistle/gateway-tunnel-auth':
-        specifier: workspace:*
-        version: link:../../packages/gateway-tunnel-auth
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
-      ws:
-        specifier: ^8.20.0
-        version: 8.20.0
 
   apps/control-plane-worker:
     dependencies:
@@ -490,9 +481,6 @@ importers:
       '@mistle/gateway-tunnel-auth':
         specifier: workspace:*
         version: link:../../packages/gateway-tunnel-auth
-      '@mistle/integrations-core':
-        specifier: workspace:*
-        version: link:../../packages/integrations-core
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging

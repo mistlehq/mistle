@@ -116,15 +116,47 @@ jobs:
       - name: Run static checks in Nix shell
         run: nix develop --command bash -lc "pnpm format:check && pnpm lint && pnpm typecheck"
 
-      - name: Run knip in Nix shell
-        run: nix develop --command pnpm lint:knip
-
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-turbo-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
+
+  knip:
+    name: Knip
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 30
+    env:
+      CI: true
+      TURBO_TELEMETRY_DISABLED: "1"
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Restore pnpm store cache
+        id: knip-pnpm-store-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies in Nix shell
+        run: nix develop --command pnpm install --frozen-lockfile
+
+      - name: Generate CI config
+        run: nix develop --command pnpm run config:init:ci
+
+      - name: Run knip in Nix shell
+        run: nix develop --command pnpm lint:knip
 
   test:
     name: Test

@@ -17,7 +17,6 @@
     "@mistle/config": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/gateway-tunnel-auth": "workspace:*",
-    "@mistle/integrations-core": "workspace:*",
     "@mistle/logging": "workspace:*",
     "@mistle/sandbox": "workspace:*",
     "@mistle/telemetry": "workspace:*",
