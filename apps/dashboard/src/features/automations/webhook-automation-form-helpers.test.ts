@@ -106,7 +106,7 @@ const SampleAutomation: WebhookAutomation = {
   target: {
     id: "target_123",
     sandboxProfileId: "sbp_repo",
-    sandboxProfileVersion: null,
+    sandboxProfileVersion: 3,
   },
   createdAt: "2026-03-11T10:00:00.000Z",
   updatedAt: "2026-03-11T10:05:00.000Z",

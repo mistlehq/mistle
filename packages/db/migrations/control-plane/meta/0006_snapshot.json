@@ -430,7 +430,7 @@
           "name": "sandbox_profile_version",
           "type": "bigint",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",

@@ -19,7 +19,7 @@ export const CreateAutomationWebhookBodySchema = z
     target: z
       .object({
         sandboxProfileId: z.string().min(1),
-        sandboxProfileVersion: z.number().int().min(1).nullable().optional(),
+        sandboxProfileVersion: z.number().int().min(1).optional(),
       })
       .strict(),
   })
