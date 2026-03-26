@@ -16,6 +16,7 @@ import {
   listSandboxProfileVersions,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import {
   toCreateWebhookAutomationPayload,
   toUpdateWebhookAutomationPayload,
@@ -26,7 +27,6 @@ import type {
   WebhookAutomationEventOption,
   WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
-import { resolveConversationKeyFieldOptions } from "./webhook-automation-form.js";
 import {
   buildWebhookAutomationEventOptions,
   createWebhookAutomationTriggerId,

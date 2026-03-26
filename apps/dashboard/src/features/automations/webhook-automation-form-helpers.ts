@@ -3,7 +3,7 @@ import type {
   WebhookAutomationFormValueKey,
   WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
-import { buildDefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
+import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   extractWebhookAutomationTriggerParameterValues,
@@ -78,7 +78,7 @@ export function toWebhookAutomationFormValues(
       name: "",
       sandboxProfileId: "",
       enabled: true,
-      inputTemplate: buildDefaultWebhookAutomationInputTemplate(),
+      inputTemplate: DefaultWebhookAutomationInputTemplate,
       conversationKeyTemplate: "",
       triggerIds: [],
       triggerParameterValues: {},

@@ -12,7 +12,7 @@ import {
   type WebhookAutomationFormValues,
   type WebhookAutomationFormValueKey,
 } from "./webhook-automation-form.js";
-import { buildDefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
+import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 
 const GitHubConnectionId = "conn_github_prod";
@@ -291,7 +291,7 @@ const EmptyCreateValues: WebhookAutomationFormValues = {
   name: "",
   sandboxProfileId: "",
   enabled: true,
-  inputTemplate: buildDefaultWebhookAutomationInputTemplate(),
+  inputTemplate: DefaultWebhookAutomationInputTemplate,
   conversationKeyTemplate: "",
   triggerIds: [],
   triggerParameterValues: {},

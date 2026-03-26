@@ -4,13 +4,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import {
   WebhookAutomationForm,
-  resolveConversationKeyFieldOptions,
   type WebhookAutomationFormOption,
   type WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
-import { buildDefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
+import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
@@ -199,7 +199,7 @@ describe("WebhookAutomationForm", () => {
       mode: "create",
       values: {
         ...FormValues,
-        inputTemplate: buildDefaultWebhookAutomationInputTemplate(),
+        inputTemplate: DefaultWebhookAutomationInputTemplate,
       },
     });
 
@@ -254,7 +254,7 @@ describe("WebhookAutomationForm", () => {
     }
 
     fireEvent.click(resetButton);
-    expect(nextInputTemplate).toBe(buildDefaultWebhookAutomationInputTemplate());
+    expect(nextInputTemplate).toBe(DefaultWebhookAutomationInputTemplate);
   });
 
   it("renders a fixed create title and a separate automation name field", () => {

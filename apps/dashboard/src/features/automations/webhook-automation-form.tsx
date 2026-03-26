@@ -20,14 +20,13 @@ import {
 import { TrashIcon } from "@phosphor-icons/react";
 
 import { FormPageFooter, FormPageHeader, FormPageSection } from "../shared/form-page.js";
-import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
-import { buildDefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
+import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
+import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
 import type {
-  WebhookAutomationConversationKeyOption,
   WebhookAutomationEventOption,
   WebhookAutomationTriggerParameterValueMap,
 } from "./webhook-automation-trigger-types.js";
@@ -125,29 +124,6 @@ function SelectField(input: {
   );
 }
 
-export function resolveConversationKeyFieldOptions(input: {
-  selectedEventOptions: readonly WebhookAutomationEventOption[];
-  currentTemplate: string;
-}): {
-  options: readonly WebhookAutomationConversationKeyOption[];
-  selectedTemplate: string;
-  hasUnsupportedCurrentTemplate: boolean;
-} {
-  const options = resolveCommonWebhookAutomationConversationKeyOptions({
-    selectedEventOptions: input.selectedEventOptions,
-  });
-  const isCurrentTemplateSupported =
-    input.currentTemplate.trim().length > 0 &&
-    options.some((option) => option.template === input.currentTemplate);
-
-  return {
-    options,
-    selectedTemplate: isCurrentTemplateSupported ? input.currentTemplate : "",
-    hasUnsupportedCurrentTemplate:
-      input.currentTemplate.trim().length > 0 && !isCurrentTemplateSupported,
-  };
-}
-
 export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.JSX.Element {
   const submitLabel = input.mode === "create" ? "Create automation" : "Save changes";
   const selectedTriggerOptions = resolveSelectedWebhookAutomationEventOptions({
@@ -172,8 +148,8 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
     selectedConversationGroupingOption === undefined
       ? undefined
       : selectedConversationGroupingOption.label;
-  const defaultInputTemplate = buildDefaultWebhookAutomationInputTemplate();
-  const isInputTemplateDefault = input.values.inputTemplate === defaultInputTemplate;
+  const isInputTemplateDefault =
+    input.values.inputTemplate === DefaultWebhookAutomationInputTemplate;
 
   return (
     <div className="flex flex-col gap-6">
@@ -370,7 +346,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                 <Button
                   disabled={input.isDeleting || input.isSaving || isInputTemplateDefault}
                   onClick={() => {
-                    input.onValueChange("inputTemplate", defaultInputTemplate);
+                    input.onValueChange("inputTemplate", DefaultWebhookAutomationInputTemplate);
                   }}
                   type="button"
                   variant="outline"
