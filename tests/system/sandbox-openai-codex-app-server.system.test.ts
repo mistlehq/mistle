@@ -16,7 +16,7 @@ import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
-import { it } from "./system-test-context.js";
+import { it, type SystemTestFixture } from "./system-test-context.js";
 
 const OPENAI_TARGET_KEY = "openai-default";
 const GITHUB_TARGET_KEY = "github-cloud";
@@ -207,6 +207,8 @@ type UploadedSandboxImage = {
   path: string;
 };
 
+type AuthenticatedFixtureSession = Awaited<ReturnType<SystemTestFixture["authSession"]>>;
+
 type StepTraceEntry = {
   name: string;
   startedAtEpochMs: number;
@@ -239,6 +241,12 @@ type PendingWebSocketJsonMessageWaiter = {
 type WebSocketJsonMessagePump = {
   queue: QueuedWebSocketJsonMessage[];
   waiters: PendingWebSocketJsonMessageWaiter[];
+};
+
+type AgentSocketSession = {
+  websocket: WebSocket;
+  detachWebSocketTrace: () => void;
+  handshakeStreamId: number;
 };
 
 const WebSocketJsonMessagePumps = new WeakMap<WebSocket, WebSocketJsonMessagePump>();
@@ -937,14 +945,15 @@ async function collectDockerContainerLogsDiagnostics(input: {
 }
 
 async function collectAppContainerDiagnostics(input: {
-  fixture: {
-    controlPlaneApiContainerId: string;
-    controlPlaneWorkerContainerId: string;
-    dataPlaneApiContainerId: string;
-    dataPlaneWorkerContainerId: string;
-    dataPlaneGatewayContainerId: string;
-    tokenizerProxyContainerId: string;
-  };
+  fixture: Pick<
+    SystemTestFixture,
+    | "controlPlaneApiContainerId"
+    | "controlPlaneWorkerContainerId"
+    | "dataPlaneApiContainerId"
+    | "dataPlaneWorkerContainerId"
+    | "dataPlaneGatewayContainerId"
+    | "tokenizerProxyContainerId"
+  >;
 }): Promise<string> {
   const sections = await Promise.all([
     collectDockerContainerLogsDiagnostics({
@@ -974,6 +983,32 @@ async function collectAppContainerDiagnostics(input: {
   ]);
 
   return sections.join("\n\n");
+}
+
+async function buildFailureDiagnostics(input: {
+  websocketTraceEntries: WebSocketTraceEntry[];
+  fixture?: Pick<
+    SystemTestFixture,
+    | "controlPlaneApiContainerId"
+    | "controlPlaneWorkerContainerId"
+    | "dataPlaneApiContainerId"
+    | "dataPlaneWorkerContainerId"
+    | "dataPlaneGatewayContainerId"
+    | "tokenizerProxyContainerId"
+  >;
+}): Promise<string> {
+  let diagnostics = `Websocket trace (tail):\n${formatWebSocketTrace(input.websocketTraceEntries)}`;
+  const sandboxListDiagnostics = await collectSandboxContainerListDiagnostics();
+  diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\nproviderRuntimeId unavailable\n\nKnown sandbox containers:\n${sandboxListDiagnostics}`;
+
+  if (input.fixture !== undefined) {
+    const appContainerDiagnostics = await collectAppContainerDiagnostics({
+      fixture: input.fixture,
+    });
+    diagnostics = `${diagnostics}\n\nApp container diagnostics:\n${appContainerDiagnostics}`;
+  }
+
+  return diagnostics;
 }
 
 async function waitForCondition<T>(input: {
@@ -1449,6 +1484,345 @@ async function mintSandboxWebSocketUrl(input: {
   });
 }
 
+async function createOpenAiConnection(input: {
+  fixture: Pick<SystemTestFixture, "request">;
+  authenticatedSession: AuthenticatedFixtureSession;
+  openAiApiKey: string;
+  displayName: string;
+  stepTrace: StepTraceEntry[];
+}): Promise<string> {
+  const createConnectionResponse = await runStep({
+    stepTrace: input.stepTrace,
+    stepName: "create OpenAI connection",
+    action: async () => {
+      return await requestWithTimeout({
+        request: input.fixture.request,
+        path: `/v1/integration/connections/${encodeURIComponent(OPENAI_TARGET_KEY)}/api-key`,
+        timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
+        description: "OpenAI API-key connection creation",
+        init: {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: input.authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            displayName: input.displayName,
+            apiKey: input.openAiApiKey,
+          }),
+        },
+      });
+    },
+  });
+  const createConnectionPayload = await expectStatusJson({
+    response: createConnectionResponse,
+    status: 201,
+    description: "OpenAI API-key connection creation",
+  });
+  if (!isRecord(createConnectionPayload)) {
+    throw new Error("Expected OpenAI API-key connection response to be an object.");
+  }
+
+  return readNonEmptyStringField(createConnectionPayload, "id");
+}
+
+async function createSandboxProfile(input: {
+  fixture: Pick<SystemTestFixture, "request">;
+  authenticatedSession: AuthenticatedFixtureSession;
+  displayName: string;
+  stepTrace: StepTraceEntry[];
+}): Promise<string> {
+  const createProfileResponse = await runStep({
+    stepTrace: input.stepTrace,
+    stepName: "create sandbox profile",
+    action: async () => {
+      return await requestWithTimeout({
+        request: input.fixture.request,
+        path: "/v1/sandbox/profiles",
+        timeoutMs: CREATE_PROFILE_TIMEOUT_MS,
+        description: "sandbox profile creation",
+        init: {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: input.authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            displayName: input.displayName,
+          }),
+        },
+      });
+    },
+  });
+  const createProfilePayload = await expectStatusJson({
+    response: createProfileResponse,
+    status: 201,
+    description: "sandbox profile creation",
+  });
+  if (!isRecord(createProfilePayload)) {
+    throw new Error("Expected sandbox profile creation response to be an object.");
+  }
+
+  return readNonEmptyStringField(createProfilePayload, "id");
+}
+
+async function updateSandboxBindings(input: {
+  fixture: Pick<SystemTestFixture, "request">;
+  authenticatedSession: AuthenticatedFixtureSession;
+  profileId: string;
+  bindings: unknown[];
+  stepTrace: StepTraceEntry[];
+  stepName: string;
+}): Promise<void> {
+  const putBindingsResponse = await runStep({
+    stepTrace: input.stepTrace,
+    stepName: input.stepName,
+    action: async () => {
+      return await requestWithTimeout({
+        request: input.fixture.request,
+        path: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/1/integration-bindings`,
+        timeoutMs: PUT_BINDINGS_TIMEOUT_MS,
+        description: "sandbox profile integration binding update",
+        init: {
+          method: "PUT",
+          headers: {
+            "content-type": "application/json",
+            cookie: input.authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            bindings: input.bindings,
+          }),
+        },
+      });
+    },
+  });
+  await expectStatusJson({
+    response: putBindingsResponse,
+    status: 200,
+    description: "sandbox profile integration binding update",
+  });
+}
+
+async function startSandboxInstance(input: {
+  fixture: Pick<SystemTestFixture, "request">;
+  authenticatedSession: AuthenticatedFixtureSession;
+  profileId: string;
+  stepTrace: StepTraceEntry[];
+}): Promise<string> {
+  const startInstanceResponse = await runStep({
+    stepTrace: input.stepTrace,
+    stepName: "start sandbox instance",
+    action: async () => {
+      return await requestWithTimeout({
+        request: input.fixture.request,
+        path: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/1/instances`,
+        timeoutMs: START_INSTANCE_TIMEOUT_MS,
+        description: "sandbox profile start instance",
+        init: {
+          method: "POST",
+          headers: {
+            cookie: input.authenticatedSession.cookie,
+          },
+        },
+      });
+    },
+  });
+  const startInstancePayload = await expectStatusJson({
+    response: startInstanceResponse,
+    status: 201,
+    description: "sandbox profile start instance",
+  });
+  const parsedStartInstancePayload =
+    StartSandboxInstanceResponseSchema.safeParse(startInstancePayload);
+  if (!parsedStartInstancePayload.success) {
+    throw new Error("Expected sandbox instance start response to match the API schema.");
+  }
+
+  return parsedStartInstancePayload.data.sandboxInstanceId;
+}
+
+async function waitForSandboxInstanceRunningStep(input: {
+  fixture: Pick<SystemTestFixture, "request">;
+  authenticatedSession: AuthenticatedFixtureSession;
+  sandboxInstanceId: string;
+  stepTrace: StepTraceEntry[];
+}): Promise<void> {
+  await runStep({
+    stepTrace: input.stepTrace,
+    stepName: "wait for sandbox instance to reach running",
+    action: async () => {
+      await waitForSandboxInstanceRunning({
+        request: input.fixture.request,
+        cookie: input.authenticatedSession.cookie,
+        sandboxInstanceId: input.sandboxInstanceId,
+        timeoutMs: START_INSTANCE_TIMEOUT_MS,
+      });
+    },
+  });
+}
+
+async function connectInitializedAgentSession(input: {
+  fixture: Pick<SystemTestFixture, "request">;
+  authenticatedSession: AuthenticatedFixtureSession;
+  sandboxInstanceId: string;
+  dataPlaneGatewayBaseUrl: string;
+  stepTrace: StepTraceEntry[];
+  websocketTraceEntries: WebSocketTraceEntry[];
+  connectStepName?: string;
+  initializeStepName?: string;
+}): Promise<AgentSocketSession> {
+  const websocketUrl = await runStep({
+    stepTrace: input.stepTrace,
+    stepName: "mint websocket url for agent session",
+    action: async () => {
+      return await mintSandboxWebSocketUrl({
+        request: input.fixture.request,
+        cookie: input.authenticatedSession.cookie,
+        sandboxInstanceId: input.sandboxInstanceId,
+        dataPlaneGatewayBaseUrl: input.dataPlaneGatewayBaseUrl,
+      });
+    },
+  });
+
+  const websocket = await runStep({
+    stepTrace: input.stepTrace,
+    stepName: input.connectStepName ?? "connect websocket tunnel",
+    action: async () => {
+      return await connectWebSocket(websocketUrl, WEBSOCKET_CONNECT_TIMEOUT_MS);
+    },
+  });
+  const detachWebSocketTrace = attachWebSocketTrace({
+    socket: websocket,
+    sink: input.websocketTraceEntries,
+  });
+
+  const handshakeStreamId = 1;
+  await runStep({
+    stepTrace: input.stepTrace,
+    stepName: input.initializeStepName ?? "connect and initialize Codex app-server",
+    action: async () => {
+      sendJson(websocket, {
+        type: "stream.open",
+        streamId: handshakeStreamId,
+        channel: {
+          kind: "agent",
+        },
+      });
+      await waitForTunnelHandshakeAck({
+        socket: websocket,
+        streamId: handshakeStreamId,
+        timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+      });
+
+      sendAgentJson(websocket, handshakeStreamId, {
+        method: "initialize",
+        id: 0,
+        params: {
+          clientInfo: {
+            name: "mistle_system_test",
+            title: "Mistle System Test",
+            version: "0.1.0",
+          },
+        },
+      });
+      await waitForJsonRpcResult({
+        socket: websocket,
+        requestId: 0,
+        timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+      });
+
+      sendAgentJson(websocket, handshakeStreamId, {
+        method: "initialized",
+        params: {},
+      });
+    },
+  });
+
+  return {
+    websocket,
+    detachWebSocketTrace,
+    handshakeStreamId,
+  };
+}
+
+async function startThread(input: {
+  websocket: WebSocket;
+  handshakeStreamId: number;
+  model: string;
+  stepTrace: StepTraceEntry[];
+}): Promise<string> {
+  return runStep({
+    stepTrace: input.stepTrace,
+    stepName: "json-rpc thread/start",
+    action: async () => {
+      sendAgentJson(input.websocket, input.handshakeStreamId, {
+        method: "thread/start",
+        id: 1,
+        params: {
+          model: input.model,
+        },
+      });
+      const threadStartResult = await waitForJsonRpcResult({
+        socket: input.websocket,
+        requestId: 1,
+        timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+      });
+      const parsedThreadStartResult = ThreadStartResultSchema.safeParse(threadStartResult);
+      if (!parsedThreadStartResult.success) {
+        throw new Error(
+          `thread/start result did not contain thread.id: ${formatJsonForError(threadStartResult)}`,
+        );
+      }
+
+      return parsedThreadStartResult.data.thread.id;
+    },
+  });
+}
+
+async function startTurn(input: {
+  websocket: WebSocket;
+  handshakeStreamId: number;
+  threadId: string;
+  requestId: JsonRpcId;
+  turnInput: unknown[];
+  stepTrace: StepTraceEntry[];
+  stepName: string;
+  notificationSink?: JsonRpcNotification[];
+}): Promise<string> {
+  return runStep({
+    stepTrace: input.stepTrace,
+    stepName: input.stepName,
+    action: async () => {
+      sendAgentJson(input.websocket, input.handshakeStreamId, {
+        method: "turn/start",
+        id: input.requestId,
+        params: {
+          threadId: input.threadId,
+          input: input.turnInput,
+        },
+      });
+      const turnStartResult = await waitForJsonRpcResult({
+        socket: input.websocket,
+        requestId: input.requestId,
+        timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+        ...(input.notificationSink === undefined
+          ? {}
+          : {
+              notificationSink: input.notificationSink,
+            }),
+      });
+      const parsedTurnStartResult = TurnStartResultSchema.safeParse(turnStartResult);
+      if (!parsedTurnStartResult.success) {
+        throw new Error(
+          `turn/start result did not contain turn.id: ${formatJsonForError(turnStartResult)}`,
+        );
+      }
+
+      return parsedTurnStartResult.data.turn.id;
+    },
+  });
+}
+
 async function uploadImageOverTunnel(input: {
   websocketUrl: string;
   threadId: string;
@@ -1606,313 +1980,87 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
           },
         });
 
-        const createConnectionResponse = await runStep({
+        const connectionId = await createOpenAiConnection({
+          fixture,
+          authenticatedSession,
+          openAiApiKey,
+          displayName: connectionDisplayName,
           stepTrace,
-          stepName: "create OpenAI connection",
-          action: async () => {
-            return await requestWithTimeout({
-              request: fixture.request,
-              path: `/v1/integration/connections/${encodeURIComponent(OPENAI_TARGET_KEY)}/api-key`,
-              timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
-              description: "OpenAI API-key connection creation",
-              init: {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json",
-                  cookie: authenticatedSession.cookie,
-                },
-                body: JSON.stringify({
-                  displayName: connectionDisplayName,
-                  apiKey: openAiApiKey,
-                }),
-              },
-            });
-          },
         });
-        const createConnectionPayload = await expectStatusJson({
-          response: createConnectionResponse,
-          status: 201,
-          description: "OpenAI API-key connection creation",
-        });
-        if (!isRecord(createConnectionPayload)) {
-          throw new Error("Expected OpenAI API-key connection response to be an object.");
-        }
-        const connectionId = readNonEmptyStringField(createConnectionPayload, "id");
-
-        const profileDisplayName = `System OpenAI App-Server ${randomUUID()}`;
-        const createProfileResponse = await runStep({
+        const profileId = await createSandboxProfile({
+          fixture,
+          authenticatedSession,
+          displayName: `System OpenAI App-Server ${randomUUID()}`,
           stepTrace,
-          stepName: "create sandbox profile",
-          action: async () => {
-            return await requestWithTimeout({
-              request: fixture.request,
-              path: "/v1/sandbox/profiles",
-              timeoutMs: CREATE_PROFILE_TIMEOUT_MS,
-              description: "sandbox profile creation",
-              init: {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json",
-                  cookie: authenticatedSession.cookie,
-                },
-                body: JSON.stringify({
-                  displayName: profileDisplayName,
-                }),
-              },
-            });
-          },
         });
-        const createProfilePayload = await expectStatusJson({
-          response: createProfileResponse,
-          status: 201,
-          description: "sandbox profile creation",
-        });
-        if (!isRecord(createProfilePayload)) {
-          throw new Error("Expected sandbox profile creation response to be an object.");
-        }
-        const profileId = readNonEmptyStringField(createProfilePayload, "id");
-
-        const putBindingsResponse = await runStep({
+        await updateSandboxBindings({
+          fixture,
+          authenticatedSession,
+          profileId,
           stepTrace,
           stepName: "bind OpenAI agent integration",
-          action: async () => {
-            return await requestWithTimeout({
-              request: fixture.request,
-              path: `/v1/sandbox/profiles/${encodeURIComponent(profileId)}/versions/1/integration-bindings`,
-              timeoutMs: PUT_BINDINGS_TIMEOUT_MS,
-              description: "sandbox profile integration binding update",
-              init: {
-                method: "PUT",
-                headers: {
-                  "content-type": "application/json",
-                  cookie: authenticatedSession.cookie,
-                },
-                body: JSON.stringify({
-                  bindings: [
-                    {
-                      connectionId,
-                      kind: "agent",
-                      config: {
-                        runtime: "codex-cli",
-                        defaultModel: "gpt-5.3-codex",
-                        reasoningEffort: "medium",
-                      },
-                    },
-                  ],
-                }),
+          bindings: [
+            {
+              connectionId,
+              kind: "agent",
+              config: {
+                runtime: "codex-cli",
+                defaultModel: "gpt-5.3-codex",
+                reasoningEffort: "medium",
               },
-            });
-          },
+            },
+          ],
         });
-        await expectStatusJson({
-          response: putBindingsResponse,
-          status: 200,
-          description: "sandbox profile integration binding update",
+        const sandboxInstanceId = await startSandboxInstance({
+          fixture,
+          authenticatedSession,
+          profileId,
+          stepTrace,
+        });
+        await waitForSandboxInstanceRunningStep({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+          stepTrace,
         });
 
-        const startInstanceResponse = await runStep({
+        const agentSession = await connectInitializedAgentSession({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+          dataPlaneGatewayBaseUrl,
           stepTrace,
-          stepName: "start sandbox instance",
-          action: async () => {
-            return await requestWithTimeout({
-              request: fixture.request,
-              path: `/v1/sandbox/profiles/${encodeURIComponent(profileId)}/versions/1/instances`,
-              timeoutMs: START_INSTANCE_TIMEOUT_MS,
-              description: "sandbox profile start instance",
-              init: {
-                method: "POST",
-                headers: {
-                  cookie: authenticatedSession.cookie,
-                },
-              },
-            });
-          },
+          websocketTraceEntries,
+          initializeStepName: "connect and initialize Codex app-server",
         });
-        const startInstancePayload = await expectStatusJson({
-          response: startInstanceResponse,
-          status: 201,
-          description: "sandbox profile start instance",
-        });
-        const parsedStartInstancePayload =
-          StartSandboxInstanceResponseSchema.safeParse(startInstancePayload);
-        if (!parsedStartInstancePayload.success) {
-          throw new Error("Expected sandbox instance start response to match the API schema.");
-        }
-        const sandboxInstanceId = parsedStartInstancePayload.data.sandboxInstanceId;
-
-        await runStep({
-          stepTrace,
-          stepName: "wait for sandbox instance to reach running",
-          action: async () => {
-            await waitForSandboxInstanceRunning({
-              request: fixture.request,
-              cookie: authenticatedSession.cookie,
-              sandboxInstanceId,
-              timeoutMs: START_INSTANCE_TIMEOUT_MS,
-            });
-          },
-        });
-
-        const mintConnectionTokenResponse = await runStep({
-          stepTrace,
-          stepName: "mint sandbox connection token",
-          action: async () => {
-            return await requestWithTimeout({
-              request: fixture.request,
-              path: `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}/connection-tokens`,
-              timeoutMs: MINT_CONNECTION_TOKEN_TIMEOUT_MS,
-              description: "sandbox connection token minting",
-              init: {
-                method: "POST",
-                headers: {
-                  cookie: authenticatedSession.cookie,
-                },
-              },
-            });
-          },
-        });
-        const mintConnectionTokenPayload = await expectStatusJson({
-          response: mintConnectionTokenResponse,
-          status: 201,
-          description: "sandbox connection token minting",
-        });
-        if (!isRecord(mintConnectionTokenPayload)) {
-          throw new Error("Expected sandbox connection token response to be an object.");
-        }
-        const mintedUrl = readNonEmptyStringField(mintConnectionTokenPayload, "url");
-        const websocketUrl = resolveGatewayWebSocketUrl({
-          mintedUrl,
-          gatewayBaseUrl: dataPlaneGatewayBaseUrl,
-        });
-
-        const websocket = await runStep({
-          stepTrace,
-          stepName: "connect websocket tunnel",
-          action: async () => {
-            return await connectWebSocket(websocketUrl, WEBSOCKET_CONNECT_TIMEOUT_MS);
-          },
-        });
+        const websocket = agentSession.websocket;
         websocketForCleanup = websocket;
-        detachWebSocketTrace = attachWebSocketTrace({
-          socket: websocket,
-          sink: websocketTraceEntries,
-        });
+        detachWebSocketTrace = agentSession.detachWebSocketTrace;
+        const handshakeStreamId = agentSession.handshakeStreamId;
 
-        const handshakeStreamId = 1;
-        await runStep({
+        const threadId = await startThread({
+          websocket,
+          handshakeStreamId,
+          model: "gpt-5.3-codex",
           stepTrace,
-          stepName: "tunnel stream.open handshake",
-          action: async () => {
-            sendJson(websocket, {
-              type: "stream.open",
-              streamId: handshakeStreamId,
-              channel: {
-                kind: "agent",
-              },
-            });
-            await waitForTunnelHandshakeAck({
-              socket: websocket,
-              streamId: handshakeStreamId,
-              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
-            });
-          },
-        });
-
-        await runStep({
-          stepTrace,
-          stepName: "json-rpc initialize",
-          action: async () => {
-            sendAgentJson(websocket, handshakeStreamId, {
-              method: "initialize",
-              id: 0,
-              params: {
-                clientInfo: {
-                  name: "mistle_system_test",
-                  title: "Mistle System Test",
-                  version: "0.1.0",
-                },
-              },
-            });
-            await waitForJsonRpcResult({
-              socket: websocket,
-              requestId: 0,
-              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
-            });
-          },
-        });
-
-        await runStep({
-          stepTrace,
-          stepName: "json-rpc initialized notification",
-          action: async () => {
-            sendAgentJson(websocket, handshakeStreamId, {
-              method: "initialized",
-              params: {},
-            });
-          },
-        });
-
-        const threadId = await runStep({
-          stepTrace,
-          stepName: "json-rpc thread/start",
-          action: async () => {
-            sendAgentJson(websocket, handshakeStreamId, {
-              method: "thread/start",
-              id: 1,
-              params: {
-                model: "gpt-5.3-codex",
-              },
-            });
-            const threadStartResult = await waitForJsonRpcResult({
-              socket: websocket,
-              requestId: 1,
-              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
-            });
-            const parsedThreadStartResult = ThreadStartResultSchema.safeParse(threadStartResult);
-            if (!parsedThreadStartResult.success) {
-              throw new Error(
-                `thread/start result did not contain thread.id: ${formatJsonForError(threadStartResult)}`,
-              );
-            }
-
-            return parsedThreadStartResult.data.thread.id;
-          },
         });
 
         const notificationsWhileStartingTurn: JsonRpcNotification[] = [];
         const observedCommandExecutions: CommandExecutionItem[] = [];
-        const turnId = await runStep({
+        const turnId = await startTurn({
+          websocket,
+          handshakeStreamId,
+          threadId,
+          requestId: 2,
           stepTrace,
           stepName: "json-rpc turn/start",
-          action: async () => {
-            sendAgentJson(websocket, handshakeStreamId, {
-              method: "turn/start",
-              id: 2,
-              params: {
-                threadId,
-                input: [
-                  {
-                    type: "text",
-                    text: `Reply with exactly ${TEST_RESPONSE_MARKER} and nothing else.`,
-                  },
-                ],
-              },
-            });
-            const turnStartResult = await waitForJsonRpcResult({
-              socket: websocket,
-              requestId: 2,
-              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
-              notificationSink: notificationsWhileStartingTurn,
-            });
-            const parsedTurnStartResult = TurnStartResultSchema.safeParse(turnStartResult);
-            if (!parsedTurnStartResult.success) {
-              throw new Error(
-                `turn/start result did not contain turn.id: ${formatJsonForError(turnStartResult)}`,
-              );
-            }
-
-            return parsedTurnStartResult.data.turn.id;
-          },
+          notificationSink: notificationsWhileStartingTurn,
+          turnInput: [
+            {
+              type: "text",
+              text: `Reply with exactly ${TEST_RESPONSE_MARKER} and nothing else.`,
+            },
+          ],
         });
 
         const agentTextParts: string[] = [];
@@ -1957,11 +2105,10 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
         expect(combinedAgentText.length).toBeGreaterThan(0);
         expect(combinedAgentText).toContain(TEST_RESPONSE_MARKER);
       } catch (error) {
-        let diagnostics = `Websocket trace (tail):\n${formatWebSocketTrace(websocketTraceEntries)}`;
-        const sandboxListDiagnostics = await collectSandboxContainerListDiagnostics();
-        diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\nproviderRuntimeId unavailable\n\nKnown sandbox containers:\n${sandboxListDiagnostics}`;
-        const appContainerDiagnostics = await collectAppContainerDiagnostics({ fixture });
-        diagnostics = `${diagnostics}\n\nApp container diagnostics:\n${appContainerDiagnostics}`;
+        const diagnostics = await buildFailureDiagnostics({
+          websocketTraceEntries,
+          fixture,
+        });
 
         throw new Error(
           `System test failed. Step trace: ${formatStepTrace(stepTrace)}. Cause: ${describeUnknownError(error)}\n\nDiagnostics:\n${diagnostics}`,
@@ -1996,246 +2143,68 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
           },
         });
 
-        const createConnectionResponse = await runStep({
+        const connectionId = await createOpenAiConnection({
+          fixture,
+          authenticatedSession,
+          openAiApiKey,
+          displayName: connectionDisplayName,
           stepTrace,
-          stepName: "create OpenAI connection",
-          action: async () => {
-            return await requestWithTimeout({
-              request: fixture.request,
-              path: `/v1/integration/connections/${encodeURIComponent(OPENAI_TARGET_KEY)}/api-key`,
-              timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
-              description: "OpenAI API-key connection creation",
-              init: {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json",
-                  cookie: authenticatedSession.cookie,
-                },
-                body: JSON.stringify({
-                  displayName: connectionDisplayName,
-                  apiKey: openAiApiKey,
-                }),
-              },
-            });
-          },
         });
-        const createConnectionPayload = await expectStatusJson({
-          response: createConnectionResponse,
-          status: 201,
-          description: "OpenAI API-key connection creation",
-        });
-        if (!isRecord(createConnectionPayload)) {
-          throw new Error("Expected OpenAI API-key connection response to be an object.");
-        }
-        const connectionId = readNonEmptyStringField(createConnectionPayload, "id");
-
-        const profileDisplayName = `System OpenAI Image App-Server ${randomUUID()}`;
-        const createProfileResponse = await runStep({
+        const profileId = await createSandboxProfile({
+          fixture,
+          authenticatedSession,
+          displayName: `System OpenAI Image App-Server ${randomUUID()}`,
           stepTrace,
-          stepName: "create sandbox profile",
-          action: async () => {
-            return await requestWithTimeout({
-              request: fixture.request,
-              path: "/v1/sandbox/profiles",
-              timeoutMs: CREATE_PROFILE_TIMEOUT_MS,
-              description: "sandbox profile creation",
-              init: {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json",
-                  cookie: authenticatedSession.cookie,
-                },
-                body: JSON.stringify({
-                  displayName: profileDisplayName,
-                }),
-              },
-            });
-          },
         });
-        const createProfilePayload = await expectStatusJson({
-          response: createProfileResponse,
-          status: 201,
-          description: "sandbox profile creation",
-        });
-        if (!isRecord(createProfilePayload)) {
-          throw new Error("Expected sandbox profile creation response to be an object.");
-        }
-        const profileId = readNonEmptyStringField(createProfilePayload, "id");
-
-        const putBindingsResponse = await runStep({
+        await updateSandboxBindings({
+          fixture,
+          authenticatedSession,
+          profileId,
           stepTrace,
           stepName: "bind OpenAI agent integration",
-          action: async () => {
-            return await requestWithTimeout({
-              request: fixture.request,
-              path: `/v1/sandbox/profiles/${encodeURIComponent(profileId)}/versions/1/integration-bindings`,
-              timeoutMs: PUT_BINDINGS_TIMEOUT_MS,
-              description: "sandbox profile integration binding update",
-              init: {
-                method: "PUT",
-                headers: {
-                  "content-type": "application/json",
-                  cookie: authenticatedSession.cookie,
-                },
-                body: JSON.stringify({
-                  bindings: [
-                    {
-                      connectionId,
-                      kind: "agent",
-                      config: {
-                        runtime: "codex-cli",
-                        defaultModel: "gpt-5.3-codex",
-                        reasoningEffort: "medium",
-                      },
-                    },
-                  ],
-                }),
+          bindings: [
+            {
+              connectionId,
+              kind: "agent",
+              config: {
+                runtime: "codex-cli",
+                defaultModel: "gpt-5.3-codex",
+                reasoningEffort: "medium",
               },
-            });
-          },
+            },
+          ],
         });
-        await expectStatusJson({
-          response: putBindingsResponse,
-          status: 200,
-          description: "sandbox profile integration binding update",
+        const sandboxInstanceId = await startSandboxInstance({
+          fixture,
+          authenticatedSession,
+          profileId,
+          stepTrace,
+        });
+        await waitForSandboxInstanceRunningStep({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+          stepTrace,
         });
 
-        const startInstanceResponse = await runStep({
+        const agentSession = await connectInitializedAgentSession({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+          dataPlaneGatewayBaseUrl,
           stepTrace,
-          stepName: "start sandbox instance",
-          action: async () => {
-            return await requestWithTimeout({
-              request: fixture.request,
-              path: `/v1/sandbox/profiles/${encodeURIComponent(profileId)}/versions/1/instances`,
-              timeoutMs: START_INSTANCE_TIMEOUT_MS,
-              description: "sandbox profile start instance",
-              init: {
-                method: "POST",
-                headers: {
-                  cookie: authenticatedSession.cookie,
-                },
-              },
-            });
-          },
+          websocketTraceEntries,
         });
-        const startInstancePayload = await expectStatusJson({
-          response: startInstanceResponse,
-          status: 201,
-          description: "sandbox profile start instance",
-        });
-        const parsedStartInstancePayload =
-          StartSandboxInstanceResponseSchema.safeParse(startInstancePayload);
-        if (!parsedStartInstancePayload.success) {
-          throw new Error("Expected sandbox instance start response to match the API schema.");
-        }
-        const sandboxInstanceId = parsedStartInstancePayload.data.sandboxInstanceId;
-
-        await runStep({
-          stepTrace,
-          stepName: "wait for sandbox instance to reach running",
-          action: async () => {
-            await waitForSandboxInstanceRunning({
-              request: fixture.request,
-              cookie: authenticatedSession.cookie,
-              sandboxInstanceId,
-              timeoutMs: START_INSTANCE_TIMEOUT_MS,
-            });
-          },
-        });
-
-        const agentWebsocketUrl = await runStep({
-          stepTrace,
-          stepName: "mint websocket url for agent session",
-          action: async () => {
-            return await mintSandboxWebSocketUrl({
-              request: fixture.request,
-              cookie: authenticatedSession.cookie,
-              sandboxInstanceId,
-              dataPlaneGatewayBaseUrl,
-            });
-          },
-        });
-
-        const websocket = await runStep({
-          stepTrace,
-          stepName: "connect websocket tunnel",
-          action: async () => {
-            return await connectWebSocket(agentWebsocketUrl, WEBSOCKET_CONNECT_TIMEOUT_MS);
-          },
-        });
+        const websocket = agentSession.websocket;
         websocketForCleanup = websocket;
-        detachWebSocketTrace = attachWebSocketTrace({
-          socket: websocket,
-          sink: websocketTraceEntries,
-        });
+        detachWebSocketTrace = agentSession.detachWebSocketTrace;
+        const handshakeStreamId = agentSession.handshakeStreamId;
 
-        const handshakeStreamId = 1;
-        await runStep({
+        const threadId = await startThread({
+          websocket,
+          handshakeStreamId,
+          model: "gpt-5.3-codex",
           stepTrace,
-          stepName: "connect and initialize Codex app-server",
-          action: async () => {
-            sendJson(websocket, {
-              type: "stream.open",
-              streamId: handshakeStreamId,
-              channel: {
-                kind: "agent",
-              },
-            });
-            await waitForTunnelHandshakeAck({
-              socket: websocket,
-              streamId: handshakeStreamId,
-              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
-            });
-
-            sendAgentJson(websocket, handshakeStreamId, {
-              method: "initialize",
-              id: 0,
-              params: {
-                clientInfo: {
-                  name: "mistle_system_test",
-                  title: "Mistle System Test",
-                  version: "0.1.0",
-                },
-              },
-            });
-            await waitForJsonRpcResult({
-              socket: websocket,
-              requestId: 0,
-              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
-            });
-
-            sendAgentJson(websocket, handshakeStreamId, {
-              method: "initialized",
-              params: {},
-            });
-          },
-        });
-
-        const threadId = await runStep({
-          stepTrace,
-          stepName: "json-rpc thread/start",
-          action: async () => {
-            sendAgentJson(websocket, handshakeStreamId, {
-              method: "thread/start",
-              id: 1,
-              params: {
-                model: "gpt-5.3-codex",
-              },
-            });
-            const threadStartResult = await waitForJsonRpcResult({
-              socket: websocket,
-              requestId: 1,
-              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
-            });
-            const parsedThreadStartResult = ThreadStartResultSchema.safeParse(threadStartResult);
-            if (!parsedThreadStartResult.success) {
-              throw new Error(
-                `thread/start result did not contain thread.id: ${formatJsonForError(threadStartResult)}`,
-              );
-            }
-
-            return parsedThreadStartResult.data.thread.id;
-          },
         });
 
         const uploadedImage = await runStep({
@@ -2258,42 +2227,24 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
         });
 
         const notificationsWhileStartingTurn: JsonRpcNotification[] = [];
-        const turnId = await runStep({
+        const turnId = await startTurn({
+          websocket,
+          handshakeStreamId,
+          threadId,
+          requestId: 2,
           stepTrace,
           stepName: "json-rpc turn/start with localImage input",
-          action: async () => {
-            sendAgentJson(websocket, handshakeStreamId, {
-              method: "turn/start",
-              id: 2,
-              params: {
-                threadId,
-                input: [
-                  {
-                    type: "text",
-                    text: "Reply with exactly IMAGE_INPUT_OK and nothing else.",
-                  },
-                  {
-                    type: "localImage",
-                    path: uploadedImage.path,
-                  },
-                ],
-              },
-            });
-            const turnStartResult = await waitForJsonRpcResult({
-              socket: websocket,
-              requestId: 2,
-              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
-              notificationSink: notificationsWhileStartingTurn,
-            });
-            const parsedTurnStartResult = TurnStartResultSchema.safeParse(turnStartResult);
-            if (!parsedTurnStartResult.success) {
-              throw new Error(
-                `turn/start result did not contain turn.id: ${formatJsonForError(turnStartResult)}`,
-              );
-            }
-
-            return parsedTurnStartResult.data.turn.id;
-          },
+          notificationSink: notificationsWhileStartingTurn,
+          turnInput: [
+            {
+              type: "text",
+              text: "Reply with exactly IMAGE_INPUT_OK and nothing else.",
+            },
+            {
+              type: "localImage",
+              path: uploadedImage.path,
+            },
+          ],
         });
 
         await runStep({
@@ -2311,9 +2262,10 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
           },
         });
       } catch (error) {
-        let diagnostics = `Websocket trace (tail):\n${formatWebSocketTrace(websocketTraceEntries)}`;
-        const sandboxListDiagnostics = await collectSandboxContainerListDiagnostics();
-        diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\nproviderRuntimeId unavailable\n\nKnown sandbox containers:\n${sandboxListDiagnostics}`;
+        const diagnostics = await buildFailureDiagnostics({
+          websocketTraceEntries,
+          fixture,
+        });
 
         throw new Error(
           `System test failed. Step trace: ${formatStepTrace(stepTrace)}. Cause: ${describeUnknownError(error)}\n\nDiagnostics:\n${diagnostics}`,
@@ -2353,38 +2305,12 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
           },
         });
 
-        const openAiConnectionId = await runStep({
+        const openAiConnectionId = await createOpenAiConnection({
+          fixture,
+          authenticatedSession,
+          openAiApiKey,
+          displayName: `System OpenAI Connection ${randomUUID()}`,
           stepTrace,
-          stepName: "create OpenAI connection",
-          action: async () => {
-            const response = await requestWithTimeout({
-              request: fixture.request,
-              path: `/v1/integration/connections/${encodeURIComponent(OPENAI_TARGET_KEY)}/api-key`,
-              timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
-              description: "OpenAI API-key connection creation",
-              init: {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json",
-                  cookie: authenticatedSession.cookie,
-                },
-                body: JSON.stringify({
-                  displayName: `System OpenAI Connection ${randomUUID()}`,
-                  apiKey: openAiApiKey,
-                }),
-              },
-            });
-            const payload = await expectStatusJson({
-              response,
-              status: 201,
-              description: "OpenAI API-key connection creation",
-            });
-            if (!isRecord(payload)) {
-              throw new Error("Expected OpenAI API-key connection response to be an object.");
-            }
-
-            return readNonEmptyStringField(payload, "id");
-          },
         });
 
         const githubConnectionId = await runStep({
@@ -2551,274 +2477,94 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
           },
         });
 
-        const profileId = await runStep({
+        const profileId = await createSandboxProfile({
+          fixture,
+          authenticatedSession,
+          displayName: `System OpenAI App-Server GitHub ${randomUUID()}`,
           stepTrace,
-          stepName: "create sandbox profile",
-          action: async () => {
-            const response = await requestWithTimeout({
-              request: fixture.request,
-              path: "/v1/sandbox/profiles",
-              timeoutMs: CREATE_PROFILE_TIMEOUT_MS,
-              description: "sandbox profile creation",
-              init: {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json",
-                  cookie: authenticatedSession.cookie,
-                },
-                body: JSON.stringify({
-                  displayName: `System OpenAI App-Server GitHub ${randomUUID()}`,
-                }),
-              },
-            });
-            const payload = await expectStatusJson({
-              response,
-              status: 201,
-              description: "sandbox profile creation",
-            });
-            if (!isRecord(payload)) {
-              throw new Error("Expected sandbox profile creation response to be an object.");
-            }
-
-            return readNonEmptyStringField(payload, "id");
-          },
         });
 
-        await runStep({
+        await updateSandboxBindings({
+          fixture,
+          authenticatedSession,
+          profileId,
           stepTrace,
           stepName: "bind OpenAI and GitHub integrations",
-          action: async () => {
-            const response = await requestWithTimeout({
-              request: fixture.request,
-              path: `/v1/sandbox/profiles/${encodeURIComponent(profileId)}/versions/1/integration-bindings`,
-              timeoutMs: PUT_BINDINGS_TIMEOUT_MS,
-              description: "sandbox profile integration binding update",
-              init: {
-                method: "PUT",
-                headers: {
-                  "content-type": "application/json",
-                  cookie: authenticatedSession.cookie,
-                },
-                body: JSON.stringify({
-                  bindings: [
-                    {
-                      connectionId: openAiConnectionId,
-                      kind: "agent",
-                      config: {
-                        runtime: "codex-cli",
-                        defaultModel: "gpt-5.3-codex",
-                        reasoningEffort: "medium",
-                      },
-                    },
-                    {
-                      connectionId: githubConnectionId,
-                      kind: "git",
-                      config: {
-                        repositories: [`${repository.owner}/${repository.repo}`],
-                      },
-                    },
-                  ],
-                }),
+          bindings: [
+            {
+              connectionId: openAiConnectionId,
+              kind: "agent",
+              config: {
+                runtime: "codex-cli",
+                defaultModel: "gpt-5.3-codex",
+                reasoningEffort: "medium",
               },
-            });
-            await expectStatusJson({
-              response,
-              status: 200,
-              description: "sandbox profile integration binding update",
-            });
-          },
-        });
-
-        const sandboxInstanceId = await runStep({
-          stepTrace,
-          stepName: "start sandbox instance",
-          action: async () => {
-            const response = await requestWithTimeout({
-              request: fixture.request,
-              path: `/v1/sandbox/profiles/${encodeURIComponent(profileId)}/versions/1/instances`,
-              timeoutMs: START_INSTANCE_TIMEOUT_MS,
-              description: "sandbox profile start instance",
-              init: {
-                method: "POST",
-                headers: {
-                  cookie: authenticatedSession.cookie,
-                },
+            },
+            {
+              connectionId: githubConnectionId,
+              kind: "git",
+              config: {
+                repositories: [`${repository.owner}/${repository.repo}`],
               },
-            });
-            const payload = await expectStatusJson({
-              response,
-              status: 201,
-              description: "sandbox profile start instance",
-            });
-            const parsedPayload = StartSandboxInstanceResponseSchema.safeParse(payload);
-            if (!parsedPayload.success) {
-              throw new Error("Expected sandbox instance start response to match the API schema.");
-            }
-
-            return parsedPayload.data.sandboxInstanceId;
-          },
+            },
+          ],
         });
 
-        await runStep({
+        const sandboxInstanceId = await startSandboxInstance({
+          fixture,
+          authenticatedSession,
+          profileId,
           stepTrace,
-          stepName: "wait for sandbox instance to reach running",
-          action: async () => {
-            await waitForSandboxInstanceRunning({
-              request: fixture.request,
-              cookie: authenticatedSession.cookie,
-              sandboxInstanceId,
-              timeoutMs: START_INSTANCE_TIMEOUT_MS,
-            });
-          },
         });
 
-        const websocket = await runStep({
+        await waitForSandboxInstanceRunningStep({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
           stepTrace,
-          stepName: "connect websocket tunnel",
-          action: async () => {
-            const mintConnectionTokenResponse = await requestWithTimeout({
-              request: fixture.request,
-              path: `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}/connection-tokens`,
-              timeoutMs: MINT_CONNECTION_TOKEN_TIMEOUT_MS,
-              description: "sandbox connection token minting",
-              init: {
-                method: "POST",
-                headers: {
-                  cookie: authenticatedSession.cookie,
-                },
-              },
-            });
-            const mintConnectionTokenPayload = await expectStatusJson({
-              response: mintConnectionTokenResponse,
-              status: 201,
-              description: "sandbox connection token minting",
-            });
-            if (!isRecord(mintConnectionTokenPayload)) {
-              throw new Error("Expected sandbox connection token response to be an object.");
-            }
-            const mintedUrl = readNonEmptyStringField(mintConnectionTokenPayload, "url");
-            const websocketUrl = resolveGatewayWebSocketUrl({
-              mintedUrl,
-              gatewayBaseUrl: dataPlaneGatewayBaseUrl,
-            });
-
-            return await connectWebSocket(websocketUrl, WEBSOCKET_CONNECT_TIMEOUT_MS);
-          },
         });
+
+        const agentSession = await connectInitializedAgentSession({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+          dataPlaneGatewayBaseUrl,
+          stepTrace,
+          websocketTraceEntries,
+        });
+        const websocket = agentSession.websocket;
         websocketForCleanup = websocket;
-        detachWebSocketTrace = attachWebSocketTrace({
-          socket: websocket,
-          sink: websocketTraceEntries,
-        });
+        detachWebSocketTrace = agentSession.detachWebSocketTrace;
+        const handshakeStreamId = agentSession.handshakeStreamId;
 
-        const handshakeStreamId = 1;
-        await runStep({
+        const threadId = await startThread({
+          websocket,
+          handshakeStreamId,
+          model: "gpt-5.3-codex",
           stepTrace,
-          stepName: "connect and initialize Codex app-server",
-          action: async () => {
-            sendJson(websocket, {
-              type: "stream.open",
-              streamId: handshakeStreamId,
-              channel: {
-                kind: "agent",
-              },
-            });
-            await waitForTunnelHandshakeAck({
-              socket: websocket,
-              streamId: handshakeStreamId,
-              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
-            });
-
-            sendAgentJson(websocket, handshakeStreamId, {
-              method: "initialize",
-              id: 0,
-              params: {
-                clientInfo: {
-                  name: "mistle_system_test",
-                  title: "Mistle System Test",
-                  version: "0.1.0",
-                },
-              },
-            });
-            await waitForJsonRpcResult({
-              socket: websocket,
-              requestId: 0,
-              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
-            });
-
-            sendAgentJson(websocket, handshakeStreamId, {
-              method: "initialized",
-              params: {},
-            });
-          },
-        });
-
-        const threadId = await runStep({
-          stepTrace,
-          stepName: "json-rpc thread/start",
-          action: async () => {
-            sendAgentJson(websocket, handshakeStreamId, {
-              method: "thread/start",
-              id: 1,
-              params: {
-                model: "gpt-5.3-codex",
-              },
-            });
-            const threadStartResult = await waitForJsonRpcResult({
-              socket: websocket,
-              requestId: 1,
-              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
-            });
-            const parsedThreadStartResult = ThreadStartResultSchema.safeParse(threadStartResult);
-            if (!parsedThreadStartResult.success) {
-              throw new Error(
-                `thread/start result did not contain thread.id: ${formatJsonForError(threadStartResult)}`,
-              );
-            }
-
-            return parsedThreadStartResult.data.thread.id;
-          },
         });
 
         const notificationsWhileStartingTurn: JsonRpcNotification[] = [];
         const observedCommandExecutions: CommandExecutionItem[] = [];
-        const turnId = await runStep({
+        const turnId = await startTurn({
+          websocket,
+          handshakeStreamId,
+          threadId,
+          requestId: 2,
           stepTrace,
           stepName: "json-rpc turn/start",
-          action: async () => {
-            sendAgentJson(websocket, handshakeStreamId, {
-              method: "turn/start",
-              id: 2,
-              params: {
-                threadId,
-                input: [
-                  {
-                    type: "text",
-                    text: [
-                      "Use the shell tool to run exactly `command -v gh`.",
-                      `If it prints exactly ${GITHUB_BINARY_PATH}, reply with exactly ${GITHUB_TEST_RESPONSE_MARKER}.`,
-                      "If it does not, reply with exactly GH_MISSING.",
-                      "Do not use any other tool and do not add extra text.",
-                    ].join(" "),
-                  },
-                ],
-              },
-            });
-            const turnStartResult = await waitForJsonRpcResult({
-              socket: websocket,
-              requestId: 2,
-              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
-              notificationSink: notificationsWhileStartingTurn,
-            });
-            const parsedTurnStartResult = TurnStartResultSchema.safeParse(turnStartResult);
-            if (!parsedTurnStartResult.success) {
-              throw new Error(
-                `turn/start result did not contain turn.id: ${formatJsonForError(turnStartResult)}`,
-              );
-            }
-
-            return parsedTurnStartResult.data.turn.id;
-          },
+          notificationSink: notificationsWhileStartingTurn,
+          turnInput: [
+            {
+              type: "text",
+              text: [
+                "Use the shell tool to run exactly `command -v gh`.",
+                `If it prints exactly ${GITHUB_BINARY_PATH}, reply with exactly ${GITHUB_TEST_RESPONSE_MARKER}.`,
+                "If it does not, reply with exactly GH_MISSING.",
+                "Do not use any other tool and do not add extra text.",
+              ].join(" "),
+            },
+          ],
         });
 
         const agentTextParts: string[] = [];
@@ -2904,9 +2650,10 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
         expect(ghDetectionCommand.aggregatedOutput).not.toBeNull();
         expect(ghDetectionCommand.aggregatedOutput?.trim()).toBe(GITHUB_BINARY_PATH);
       } catch (error) {
-        let diagnostics = `Websocket trace (tail):\n${formatWebSocketTrace(websocketTraceEntries)}`;
-        const sandboxListDiagnostics = await collectSandboxContainerListDiagnostics();
-        diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\nproviderRuntimeId unavailable\n\nKnown sandbox containers:\n${sandboxListDiagnostics}`;
+        const diagnostics = await buildFailureDiagnostics({
+          websocketTraceEntries,
+          fixture,
+        });
 
         throw new Error(
           `System test failed. Step trace: ${formatStepTrace(stepTrace)}. Cause: ${describeUnknownError(error)}\n\nDiagnostics:\n${diagnostics}`,
