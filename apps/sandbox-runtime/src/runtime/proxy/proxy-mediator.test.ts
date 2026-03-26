@@ -47,6 +47,9 @@ describe("createProxyMediator", () => {
     const mediator = createProxyMediator({
       runtimePlan: createRuntimePlan(),
       tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5000/tokenizer-proxy/egress",
+      egressGrantByRuleId: {
+        egress_rule_openai: "grant_openai",
+      },
     });
 
     expect(
@@ -71,6 +74,9 @@ describe("createProxyMediator", () => {
     const mediator = createProxyMediator({
       runtimePlan: createRuntimePlan(),
       tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5000/tokenizer-proxy/egress",
+      egressGrantByRuleId: {
+        egress_rule_openai: "grant_openai",
+      },
     });
 
     const decision = mediator.resolve(
@@ -97,5 +103,6 @@ describe("createProxyMediator", () => {
     expect(decision.match.request.url.toString()).toBe(
       "http://127.0.0.1:5000/tokenizer-proxy/egress/v1/responses?stream=true",
     );
+    expect(decision.match.request.headers["x-mistle-egress-grant"]).toBe("grant_openai");
   });
 });

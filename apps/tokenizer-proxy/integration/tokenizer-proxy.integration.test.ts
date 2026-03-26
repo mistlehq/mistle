@@ -10,6 +10,7 @@ import {
 } from "node:http";
 import { gzipSync } from "node:zlib";
 
+import { mintEgressGrant } from "@mistle/sandbox-egress-auth";
 import { reserveAvailablePort, startHttpEcho } from "@mistle/test-harness";
 import { describe, expect } from "vitest";
 
@@ -24,6 +25,51 @@ type StartedControlPlaneCredentialServer = {
   requests: ReadonlyArray<unknown>;
   stop: () => Promise<void>;
 };
+
+const IntegrationEgressGrantConfig = {
+  tokenSecret: "integration-egress-grant-secret",
+  tokenIssuer: "mistle-tokenizer-proxy-integration",
+  tokenAudience: "tokenizer-proxy",
+} as const;
+
+async function mintIntegrationEgressGrant(input: {
+  egressRuleId: string;
+  upstreamBaseUrl: string;
+  bindingId: string;
+  authInjectionType: "bearer" | "basic" | "header" | "query";
+  authInjectionTarget: string;
+  authInjectionUsername?: string;
+  connectionId: string;
+  secretType: string;
+  purpose?: string;
+  resolverKey?: string;
+  allowedMethods?: ReadonlyArray<string>;
+  allowedPathPrefixes?: ReadonlyArray<string>;
+}): Promise<string> {
+  return await mintEgressGrant({
+    config: IntegrationEgressGrantConfig,
+    claims: {
+      sub: "sandbox_123",
+      jti: input.egressRuleId,
+      bindingId: input.bindingId,
+      connectionId: input.connectionId,
+      secretType: input.secretType,
+      upstreamBaseUrl: input.upstreamBaseUrl,
+      authInjectionType: input.authInjectionType,
+      authInjectionTarget: input.authInjectionTarget,
+      ...(input.authInjectionUsername === undefined
+        ? {}
+        : { authInjectionUsername: input.authInjectionUsername }),
+      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+      ...(input.resolverKey === undefined ? {} : { resolverKey: input.resolverKey }),
+      ...(input.allowedMethods === undefined ? {} : { allowedMethods: input.allowedMethods }),
+      ...(input.allowedPathPrefixes === undefined
+        ? {}
+        : { allowedPathPrefixes: input.allowedPathPrefixes }),
+    },
+    ttlSeconds: 60,
+  });
+}
 
 function readHeaderValue(headers: unknown, headerName: string): string | undefined {
   if (typeof headers !== "object" || headers === null) {
@@ -298,6 +344,19 @@ describe("tokenizer proxy integration", () => {
     expect(body).toEqual({ ok: true });
   });
 
+  it("returns 401 when egress grant is missing", async ({ fixture }) => {
+    const response = await fetch(`${fixture.baseUrl}/tokenizer-proxy/egress/v1/responses`, {
+      method: "POST",
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body).toEqual({
+      code: "INVALID_EGRESS_GRANT",
+      message: "Egress grant token is required.",
+    });
+  });
+
   it("returns 502 when control-plane credential resolution fails", async () => {
     const controlPlaneServer = await startControlPlaneCredentialServer({
       host: "127.0.0.1",
@@ -312,6 +371,17 @@ describe("tokenizer proxy integration", () => {
 
     const host = "127.0.0.1";
     const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_123",
+      upstreamBaseUrl: "https://api.example.com",
+      bindingId: "ibd_missing",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      connectionId: "icn_missing",
+      secretType: "api_key",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/v1"],
+    });
     const runtime = createTokenizerProxyRuntime({
       app: {
         server: {
@@ -323,6 +393,7 @@ describe("tokenizer proxy integration", () => {
         },
       },
       internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
     });
     await runtime.start();
 
@@ -332,13 +403,7 @@ describe("tokenizer proxy integration", () => {
         {
           method: "POST",
           headers: {
-            [EgressRequestHeaders.EGRESS_RULE_ID]: "egress_rule_123",
-            [EgressRequestHeaders.UPSTREAM_BASE_URL]: "https://api.example.com",
-            [EgressRequestHeaders.BINDING_ID]: "ibd_missing",
-            [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "bearer",
-            [EgressRequestHeaders.AUTH_INJECTION_TARGET]: "authorization",
-            [EgressRequestHeaders.CONNECTION_ID]: "icn_missing",
-            [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "api_key",
+            [EgressRequestHeaders.GRANT]: egressGrant,
           },
         },
       );
@@ -364,6 +429,19 @@ describe("tokenizer proxy integration", () => {
 
     const host = "127.0.0.1";
     const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_git",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_github",
+      authInjectionType: "basic",
+      authInjectionTarget: "authorization",
+      authInjectionUsername: "x-access-token",
+      connectionId: "icn_github",
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+      allowedMethods: ["GET"],
+      allowedPathPrefixes: ["/mistlehq/mistle.git"],
+    });
     const runtime = createTokenizerProxyRuntime({
       app: {
         server: {
@@ -375,6 +453,7 @@ describe("tokenizer proxy integration", () => {
         },
       },
       internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
     });
     await runtime.start();
 
@@ -384,15 +463,9 @@ describe("tokenizer proxy integration", () => {
         {
           method: "GET",
           headers: {
-            [EgressRequestHeaders.EGRESS_RULE_ID]: "egress_rule_git",
-            [EgressRequestHeaders.UPSTREAM_BASE_URL]: upstreamEchoService.baseUrl,
-            [EgressRequestHeaders.BINDING_ID]: "ibd_github",
-            [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "basic",
-            [EgressRequestHeaders.AUTH_INJECTION_TARGET]: "authorization",
-            [EgressRequestHeaders.AUTH_INJECTION_USERNAME]: "x-access-token",
-            [EgressRequestHeaders.CONNECTION_ID]: "icn_github",
-            [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "github_app_installation_token",
-            [EgressRequestHeaders.CREDENTIAL_RESOLVER_KEY]: "github_app_installation_token",
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "X-Mistle-Egress-Connection-Id": "icn_forged",
+            "X-Mistle-Egress-Upstream-Base-Url": "https://attacker.invalid",
           },
         },
       );
@@ -425,7 +498,7 @@ describe("tokenizer proxy integration", () => {
     }
   }, 15_000);
 
-  it("supports the header-addressed egress endpoint", async () => {
+  it("supports the grant-authorized egress endpoint", async () => {
     const upstreamEchoService = await startHttpEcho();
     const controlPlaneServer = await startControlPlaneCredentialServer({
       host: "127.0.0.1",
@@ -435,6 +508,19 @@ describe("tokenizer proxy integration", () => {
 
     const host = "127.0.0.1";
     const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_git",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_github",
+      authInjectionType: "basic",
+      authInjectionTarget: "authorization",
+      authInjectionUsername: "x-access-token",
+      connectionId: "icn_github",
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+      allowedMethods: ["GET"],
+      allowedPathPrefixes: ["/mistlehq/mistle.git"],
+    });
     const runtime = createTokenizerProxyRuntime({
       app: {
         server: {
@@ -446,6 +532,7 @@ describe("tokenizer proxy integration", () => {
         },
       },
       internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
     });
     await runtime.start();
 
@@ -455,15 +542,7 @@ describe("tokenizer proxy integration", () => {
         {
           method: "GET",
           headers: {
-            [EgressRequestHeaders.EGRESS_RULE_ID]: "egress_rule_git",
-            [EgressRequestHeaders.UPSTREAM_BASE_URL]: upstreamEchoService.baseUrl,
-            [EgressRequestHeaders.BINDING_ID]: "ibd_github",
-            [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "basic",
-            [EgressRequestHeaders.AUTH_INJECTION_TARGET]: "authorization",
-            [EgressRequestHeaders.AUTH_INJECTION_USERNAME]: "x-access-token",
-            [EgressRequestHeaders.CONNECTION_ID]: "icn_github",
-            [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "github_app_installation_token",
-            [EgressRequestHeaders.CREDENTIAL_RESOLVER_KEY]: "github_app_installation_token",
+            [EgressRequestHeaders.GRANT]: egressGrant,
           },
         },
       );
@@ -510,6 +589,18 @@ describe("tokenizer proxy integration", () => {
 
     const host = "127.0.0.1";
     const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_graphql",
+      upstreamBaseUrl: upstreamService.baseUrl,
+      bindingId: "ibd_github",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      connectionId: "icn_github",
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/graphql"],
+    });
     const runtime = createTokenizerProxyRuntime({
       app: {
         server: {
@@ -521,6 +612,7 @@ describe("tokenizer proxy integration", () => {
         },
       },
       internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
     });
     await runtime.start();
 
@@ -530,14 +622,7 @@ describe("tokenizer proxy integration", () => {
         {
           method: "POST",
           headers: {
-            [EgressRequestHeaders.EGRESS_RULE_ID]: "egress_rule_graphql",
-            [EgressRequestHeaders.UPSTREAM_BASE_URL]: upstreamService.baseUrl,
-            [EgressRequestHeaders.BINDING_ID]: "ibd_github",
-            [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "bearer",
-            [EgressRequestHeaders.AUTH_INJECTION_TARGET]: "authorization",
-            [EgressRequestHeaders.CONNECTION_ID]: "icn_github",
-            [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "github_app_installation_token",
-            [EgressRequestHeaders.CREDENTIAL_RESOLVER_KEY]: "github_app_installation_token",
+            [EgressRequestHeaders.GRANT]: egressGrant,
           },
           body: JSON.stringify({ query: "{ viewer { login } }" }),
         },
@@ -571,6 +656,18 @@ describe("tokenizer proxy integration", () => {
 
     const host = "127.0.0.1";
     const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_openai",
+      upstreamBaseUrl: upstreamService.baseUrl,
+      bindingId: "ibd_openai",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      connectionId: "icn_openai",
+      secretType: "api_key",
+      resolverKey: "default",
+      allowedMethods: ["GET"],
+      allowedPathPrefixes: ["/v1"],
+    });
     const runtime = createTokenizerProxyRuntime({
       app: {
         server: {
@@ -582,6 +679,7 @@ describe("tokenizer proxy integration", () => {
         },
       },
       internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
     });
     await runtime.start();
 
@@ -590,14 +688,7 @@ describe("tokenizer proxy integration", () => {
         baseUrl: `http://${host}:${String(port)}`,
         path: "/tokenizer-proxy/egress/v1/responses?stream=true",
         headers: {
-          [EgressRequestHeaders.EGRESS_RULE_ID]: "egress_rule_openai",
-          [EgressRequestHeaders.UPSTREAM_BASE_URL]: upstreamService.baseUrl,
-          [EgressRequestHeaders.BINDING_ID]: "ibd_openai",
-          [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "bearer",
-          [EgressRequestHeaders.AUTH_INJECTION_TARGET]: "authorization",
-          [EgressRequestHeaders.CONNECTION_ID]: "icn_openai",
-          [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "api_key",
-          [EgressRequestHeaders.CREDENTIAL_RESOLVER_KEY]: "default",
+          [EgressRequestHeaders.GRANT]: egressGrant,
         },
       });
 

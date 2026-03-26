@@ -369,12 +369,14 @@ function sendUpgradeRequest(
 export function createProxyServer(input: {
   runtimePlan: CompiledRuntimePlan;
   tokenizerProxyEgressBaseUrl: string;
+  egressGrantByRuleId: Record<string, string>;
   certificateAuthority?: CertificateAuthority;
   trustedCaCertificatesPem?: string[];
 }): ProxyServer {
   const proxyMediator = createProxyMediator({
     runtimePlan: input.runtimePlan,
     tokenizerProxyEgressBaseUrl: input.tokenizerProxyEgressBaseUrl,
+    egressGrantByRuleId: input.egressGrantByRuleId,
   });
   const trustedCaBundle =
     input.trustedCaCertificatesPem === undefined || input.trustedCaCertificatesPem.length === 0

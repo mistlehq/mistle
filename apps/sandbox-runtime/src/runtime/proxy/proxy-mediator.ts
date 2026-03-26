@@ -39,6 +39,7 @@ export type ProxyMediator = {
 export function createProxyMediator(input: {
   runtimePlan: CompiledRuntimePlan;
   tokenizerProxyEgressBaseUrl: string;
+  egressGrantByRuleId: Record<string, string>;
 }): ProxyMediator {
   return {
     resolve(classification, request) {
@@ -55,14 +56,18 @@ export function createProxyMediator(input: {
         };
       }
 
+      const egressGrant = input.egressGrantByRuleId[route.egressRuleId];
+      if (egressGrant === undefined) {
+        throw new Error(`missing egress grant for route ${route.egressRuleId}`);
+      }
+
       return {
         kind: "mediated",
         match: {
           route,
           request: buildTokenizerProxyRequest({
             tokenizerProxyEgressBaseUrl: input.tokenizerProxyEgressBaseUrl,
-            runtimePlan: input.runtimePlan,
-            route,
+            egressGrant,
             targetPath: classification.path,
             rawQuery: request.rawQuery,
             method: classification.method,

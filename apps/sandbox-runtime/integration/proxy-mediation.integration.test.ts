@@ -100,7 +100,15 @@ async function startProxyServer(input: {
   certificateAuthority?: CertificateAuthority;
   trustedCaCertificatesPem?: string[];
 }): Promise<StartedServer> {
-  const proxyServer = createProxyServer(input);
+  const proxyServer = createProxyServer({
+    ...input,
+    egressGrantByRuleId: Object.fromEntries(
+      input.runtimePlan.egressRoutes.map((route) => [
+        route.egressRuleId,
+        `grant_for_${route.egressRuleId}`,
+      ]),
+    ),
+  });
   const server: HttpServer = createRuntimeHttpServer({
     state: {
       startupReady: true,
@@ -436,16 +444,19 @@ describe("proxy mediation", () => {
   it("mediates matching plain http traffic through tokenizer proxy", async () => {
     let capturedPath = "";
     let capturedQuery = "";
-    let capturedBindingId = "";
+    let capturedGrant = "";
+    let capturedLegacyBindingIdHeader: string | undefined;
     const tokenizerProxyServer = await startHttpServer((request, response) => {
       const tokenizerProxyUrl = new URL(`http://tokenizer-proxy.internal${request.url ?? "/"}`);
       capturedPath = tokenizerProxyUrl.pathname;
       capturedQuery = tokenizerProxyUrl.search.startsWith("?")
         ? tokenizerProxyUrl.search.slice(1)
         : tokenizerProxyUrl.search;
+      const grantHeader = request.headers["x-mistle-egress-grant"];
+      capturedGrant = typeof grantHeader === "string" ? grantHeader : (grantHeader?.[0] ?? "");
       const bindingIdHeader = request.headers["x-mistle-egress-binding-id"];
-      capturedBindingId =
-        typeof bindingIdHeader === "string" ? bindingIdHeader : (bindingIdHeader?.[0] ?? "");
+      capturedLegacyBindingIdHeader =
+        typeof bindingIdHeader === "string" ? bindingIdHeader : bindingIdHeader?.[0];
       response.writeHead(201, { "content-type": "application/json" });
       response.end(`{"tokenized":true}`);
     });
@@ -469,20 +480,24 @@ describe("proxy mediation", () => {
     expect(response.body).toBe(`{"tokenized":true}`);
     expect(capturedPath).toBe("/tokenizer-proxy/egress/v1/responses");
     expect(capturedQuery).toBe("stream=true");
-    expect(capturedBindingId).toBe("ibd_openai");
+    expect(capturedGrant).toBe("grant_for_egress_rule_openai");
+    expect(capturedLegacyBindingIdHeader).toBeUndefined();
   });
 
   it("mediates matching intercepted https traffic through tokenizer proxy", async () => {
     let capturedPath = "";
-    let capturedUpstreamBaseUrl = "";
+    let capturedGrant = "";
+    let capturedLegacyUpstreamBaseUrlHeader: string | undefined;
     const tokenizerProxyServer = await startHttpServer((request, response) => {
       const tokenizerProxyUrl = new URL(`http://tokenizer-proxy.internal${request.url ?? "/"}`);
       capturedPath = tokenizerProxyUrl.pathname;
+      const grantHeader = request.headers["x-mistle-egress-grant"];
+      capturedGrant = typeof grantHeader === "string" ? grantHeader : (grantHeader?.[0] ?? "");
       const upstreamBaseUrlHeader = request.headers["x-mistle-egress-upstream-base-url"];
-      capturedUpstreamBaseUrl =
+      capturedLegacyUpstreamBaseUrlHeader =
         typeof upstreamBaseUrlHeader === "string"
           ? upstreamBaseUrlHeader
-          : (upstreamBaseUrlHeader?.[0] ?? "");
+          : upstreamBaseUrlHeader?.[0];
       response.writeHead(202, { "content-type": "application/json" });
       response.end(`{"intercepted":true}`);
     });
@@ -511,12 +526,14 @@ describe("proxy mediation", () => {
     expect(response.statusCode).toBe(202);
     expect(response.body).toBe(`{"intercepted":true}`);
     expect(capturedPath).toBe("/tokenizer-proxy/egress/v1/responses");
-    expect(capturedUpstreamBaseUrl).toBe("https://api.openai.com/v1");
+    expect(capturedGrant).toBe("grant_for_egress_rule_openai");
+    expect(capturedLegacyUpstreamBaseUrlHeader).toBeUndefined();
   });
 
   it("mediates matching intercepted https upgrades through tokenizer proxy", async () => {
     let capturedPath = "";
-    let capturedUpstreamBaseUrl = "";
+    let capturedGrant = "";
+    let capturedLegacyUpstreamBaseUrlHeader: string | undefined;
 
     const upgradeCapableServer = createHttpServer((_request, response) => {
       response.writeHead(426);
@@ -525,11 +542,13 @@ describe("proxy mediation", () => {
     upgradeCapableServer.on("upgrade", (request, socket) => {
       const tokenizerProxyUrl = new URL(`http://tokenizer-proxy.internal${request.url ?? "/"}`);
       capturedPath = tokenizerProxyUrl.pathname;
+      const grantHeader = request.headers["x-mistle-egress-grant"];
+      capturedGrant = typeof grantHeader === "string" ? grantHeader : (grantHeader?.[0] ?? "");
       const upstreamBaseUrlHeader = request.headers["x-mistle-egress-upstream-base-url"];
-      capturedUpstreamBaseUrl =
+      capturedLegacyUpstreamBaseUrlHeader =
         typeof upstreamBaseUrlHeader === "string"
           ? upstreamBaseUrlHeader
-          : (upstreamBaseUrlHeader?.[0] ?? "");
+          : upstreamBaseUrlHeader?.[0];
 
       socket.write(
         "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
@@ -575,7 +594,8 @@ describe("proxy mediation", () => {
     ).resolves.toBe("pong\n");
 
     expect(capturedPath).toBe("/tokenizer-proxy/egress/v1/responses");
-    expect(capturedUpstreamBaseUrl).toBe("https://api.openai.com/v1");
+    expect(capturedGrant).toBe("grant_for_egress_rule_openai");
+    expect(capturedLegacyUpstreamBaseUrlHeader).toBeUndefined();
   });
 
   it("re-originates unmatched plain http traffic without mediation", async () => {
