@@ -3,6 +3,11 @@ import type { SessionConversationComposerProps } from "../../../pages/session-co
 import type { CodexApprovalRequestEntry } from "../approvals/codex-approval-requests-state.js";
 import { CodexFixtureExploringGroupEntry } from "./chat-fixtures.js";
 
+export const CodexFixtureSessionModelOptions = [
+  { value: "gpt-5.4", label: "GPT-5.4" },
+  { value: "gpt-5.3-codex-spark", label: "GPT-5.3 Codex Spark" },
+] as const;
+
 export const CodexFixtureSessionEntries: readonly ChatEntry[] = [
   {
     id: "user-1",
@@ -50,11 +55,8 @@ export const CodexFixtureSessionServerRequests: readonly CodexApprovalRequestEnt
 
 export const CodexFixtureSessionComposerProps: SessionConversationComposerProps = {
   composerText: "Focus on dashboard asset ownership next.",
-  modelOptions: [
-    { value: "gpt-5", label: "GPT-5" },
-    { value: "gpt-5-mini", label: "GPT-5 Mini" },
-  ],
-  selectedModel: "gpt-5",
+  modelOptions: CodexFixtureSessionModelOptions,
+  selectedModel: "gpt-5.4",
   selectedReasoningEffort: "medium",
   isConnected: true,
   isStartingTurn: false,
@@ -73,3 +75,31 @@ export const CodexFixtureSessionComposerProps: SessionConversationComposerProps 
   onSubmit: function onSubmit() {},
   pendingAttachments: [],
 };
+
+export const CodexFixtureSessionComposerPropsWithPendingImageAttachments: SessionConversationComposerProps =
+  {
+    ...CodexFixtureSessionComposerProps,
+    composerText: "Compare the attached screenshots and summarize the UI differences.",
+    pendingAttachments: [
+      { id: "attachment-1", name: "session-workbench-overview.png" },
+      { id: "attachment-2", name: "terminal-panel-empty-state.webp" },
+    ],
+  };
+
+export const CodexFixtureSessionComposerPropsUploadingImageAttachments: SessionConversationComposerProps =
+  {
+    ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+    isUploadingAttachments: true,
+  };
+
+export const CodexFixtureSessionComposerPropsForNonImageCapableModel: SessionConversationComposerProps =
+  {
+    ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+    selectedModel: "gpt-5.3-codex-spark",
+  };
+
+export const CodexFixtureSessionComposerPropsForUnavailableModel: SessionConversationComposerProps =
+  {
+    ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+    selectedModel: "gpt-legacy-preview",
+  };

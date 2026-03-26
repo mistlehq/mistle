@@ -1,5 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import {
+  CodexFixtureSessionComposerProps,
+  CodexFixtureSessionComposerPropsForUnavailableModel,
+  CodexFixtureSessionComposerPropsForNonImageCapableModel,
+  CodexFixtureSessionComposerPropsUploadingImageAttachments,
+  CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+  CodexFixtureSessionModelOptions,
+} from "../../session-agents/codex/fixtures/session-fixtures.js";
 import { ChatComposer } from "./chat-composer.js";
 import {
   noop,
@@ -18,30 +26,14 @@ const meta = {
     layout: "padded",
   },
   args: {
-    composerText: "",
-    modelOptions: [
-      { value: "gpt-5", label: "GPT-5" },
-      { value: "gpt-5-mini", label: "GPT-5 Mini" },
-      { value: "gpt-4.1", label: "GPT-4.1" },
-    ],
-    selectedModel: "gpt-5",
-    selectedReasoningEffort: "medium",
-    isConnected: true,
-    isStartingTurn: false,
-    isSteeringTurn: false,
-    isInterruptingTurn: false,
-    isUploadingAttachments: false,
-    isUpdatingComposerConfig: false,
-    canInterruptTurn: false,
-    canSteerTurn: false,
-    completedErrorMessage: null,
+    ...CodexFixtureSessionComposerProps,
+    modelOptions: CodexFixtureSessionModelOptions,
     onComposerTextChange: noopComposerTextChange,
     onModelChange: noopModelChange,
     onPendingImageFilesAdded: noopPendingImageFilesAdded,
     onReasoningEffortChange: noopReasoningEffortChange,
     onRemovePendingAttachment: noopRemovePendingAttachment,
     onSubmit: noop,
-    pendingAttachments: [],
   },
 } satisfies Meta<typeof ChatComposer>;
 
@@ -75,5 +67,29 @@ export const DisconnectedWithError: Story = {
   args: {
     isConnected: false,
     completedErrorMessage: "The session disconnected before the turn could be submitted.",
+  },
+};
+
+export const WithPendingImageAttachments: Story = {
+  args: {
+    ...CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+  },
+};
+
+export const UploadingImageAttachments: Story = {
+  args: {
+    ...CodexFixtureSessionComposerPropsUploadingImageAttachments,
+  },
+};
+
+export const NonImageCapableModelWithAttachments: Story = {
+  args: {
+    ...CodexFixtureSessionComposerPropsForNonImageCapableModel,
+  },
+};
+
+export const UnavailableSelectedModelWithAttachments: Story = {
+  args: {
+    ...CodexFixtureSessionComposerPropsForUnavailableModel,
   },
 };

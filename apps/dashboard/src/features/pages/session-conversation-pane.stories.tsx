@@ -5,6 +5,9 @@ import {
   CodexFixtureChatThreadEntriesWithThinkingGroup,
 } from "../session-agents/codex/fixtures/chat-fixtures.js";
 import {
+  CodexFixtureSessionComposerPropsForNonImageCapableModel,
+  CodexFixtureSessionComposerPropsUploadingImageAttachments,
+  CodexFixtureSessionComposerPropsWithPendingImageAttachments,
   CodexFixtureSessionComposerProps,
   CodexFixtureSessionEntries,
   CodexFixtureSessionEntriesWithExploringGroup,
@@ -63,5 +66,23 @@ export const WithThinkingGroup: Story = {
 export const WithStructuredPlan: Story = {
   args: {
     chatEntries: CodexFixtureChatThreadEntriesWithStructuredPlan,
+  },
+};
+
+export const WithPendingImageAttachments: Story = {
+  args: {
+    composerProps: CodexFixtureSessionComposerPropsWithPendingImageAttachments,
+  },
+};
+
+export const UploadingImageAttachments: Story = {
+  args: {
+    composerProps: CodexFixtureSessionComposerPropsUploadingImageAttachments,
+  },
+};
+
+export const NonImageCapableModelWithAttachments: Story = {
+  args: {
+    composerProps: CodexFixtureSessionComposerPropsForNonImageCapableModel,
   },
 };

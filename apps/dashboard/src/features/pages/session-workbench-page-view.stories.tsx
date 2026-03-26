@@ -2,6 +2,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { noop } from "../chat/components/chat-story-support.js";
 import {
+  CodexFixtureSessionComposerPropsForNonImageCapableModel,
+  CodexFixtureSessionComposerPropsForUnavailableModel,
+} from "../session-agents/codex/fixtures/session-fixtures.js";
+import {
   createStorySessionBottomPanel,
   createStorySessionMainContent,
   SessionWorkbenchStoryChrome,
@@ -61,6 +65,36 @@ export const WithAlerts: Story = {
 export const WithSecondaryPane: Story = {
   args: {
     isSecondaryPanelVisible: true,
+  },
+};
+
+export const WithNonImageCapableModelWarning: Story = {
+  args: {
+    alerts: [
+      {
+        title: "Session connection error",
+        description:
+          "Model GPT-5.3 Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
+      },
+    ],
+    primaryBottomPanel: createStorySessionBottomPanel({
+      composerProps: CodexFixtureSessionComposerPropsForNonImageCapableModel,
+    }),
+  },
+};
+
+export const WithUnavailableModelAlert: Story = {
+  args: {
+    alerts: [
+      {
+        title: "Session connection error",
+        description:
+          "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
+      },
+    ],
+    primaryBottomPanel: createStorySessionBottomPanel({
+      composerProps: CodexFixtureSessionComposerPropsForUnavailableModel,
+    }),
   },
 };
 
