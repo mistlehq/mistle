@@ -65,7 +65,7 @@ The base image:
 - Startup apply command: `/usr/local/bin/sandboxd apply-startup`
 - Internal bootstrap command: `/usr/local/bin/sandbox-bootstrap runtime-internal`
 - Runtime executable: `/usr/local/bin/sandboxd runtime-internal`
-- Providers must supply `SANDBOX_RUNTIME_LISTEN_ADDR`, currently `:8090`
+- Providers must supply `SANDBOX_RUNTIME_LISTEN_ADDR`, currently `127.0.0.1:8090`
 - Control directory env: `SANDBOX_RUNTIME_CONTROL_DIR` defaults to `/run/mistle`
 - Providers must supply `SANDBOX_USER=sandbox`
 - Tokenizer proxy egress base URL env: `SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL`

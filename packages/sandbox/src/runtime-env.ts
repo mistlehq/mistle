@@ -6,7 +6,7 @@ export const SandboxRuntimeEnv = {
 } as const;
 
 export const SandboxRuntimeEnvDefaults = {
-  LISTEN_ADDR: ":8090",
+  LISTEN_ADDR: "127.0.0.1:8090",
   USER: "sandbox",
 } as const;
 
