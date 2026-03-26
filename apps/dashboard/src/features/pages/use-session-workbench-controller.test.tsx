@@ -6,10 +6,14 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
+  buildAttachedImagePathsText,
+  buildNonImageCapableModelWarningMessage,
+  buildPromptWithAttachedImagePaths,
   getSandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   isActiveResumeRequest,
+  resolveActiveComposerModel,
   resolveSessionEntryPhase,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForEntryPhase,
@@ -17,6 +21,7 @@ import {
   shouldPollStoppedSandboxStatus,
   shouldShowResumeInFlightState,
   shouldWaitForAutomationSessionThread,
+  supportsImageInspection,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
 
@@ -64,6 +69,129 @@ function renderSessionWorkbenchController(input: {
 }
 
 describe("useSessionWorkbenchController", () => {
+  it("resolves the selected composer model before falling back to the default model", () => {
+    expect(
+      resolveActiveComposerModel({
+        availableModels: [
+          {
+            id: "model_default",
+            model: "gpt-5.4",
+            displayName: "GPT-5.4",
+            hidden: false,
+            defaultReasoningEffort: null,
+            inputModalities: ["text", "image"],
+            supportsPersonality: false,
+            isDefault: true,
+          },
+          {
+            id: "model_fast",
+            model: "codex-spark",
+            displayName: "Codex Spark",
+            hidden: false,
+            defaultReasoningEffort: null,
+            inputModalities: ["text"],
+            supportsPersonality: false,
+            isDefault: false,
+          },
+        ],
+        selectedModel: "codex-spark",
+      }),
+    )?.toMatchObject({
+      model: "codex-spark",
+      displayName: "Codex Spark",
+    });
+
+    expect(
+      resolveActiveComposerModel({
+        availableModels: [
+          {
+            id: "model_default",
+            model: "gpt-5.4",
+            displayName: "GPT-5.4",
+            hidden: false,
+            defaultReasoningEffort: null,
+            inputModalities: ["text", "image"],
+            supportsPersonality: false,
+            isDefault: true,
+          },
+        ],
+        selectedModel: null,
+      }),
+    )?.toMatchObject({
+      model: "gpt-5.4",
+    });
+  });
+
+  it("recognizes whether the active model supports image inspection", () => {
+    expect(
+      supportsImageInspection({
+        id: "image_model",
+        model: "gpt-5.4",
+        displayName: "GPT-5.4",
+        hidden: false,
+        defaultReasoningEffort: null,
+        inputModalities: ["text", "image"],
+        supportsPersonality: false,
+        isDefault: true,
+      }),
+    ).toBe(true);
+
+    expect(
+      supportsImageInspection({
+        id: "text_model",
+        model: "codex-spark",
+        displayName: "Codex Spark",
+        hidden: false,
+        defaultReasoningEffort: null,
+        inputModalities: ["text"],
+        supportsPersonality: false,
+        isDefault: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("formats uploaded attachment paths into prompt text", () => {
+    expect(
+      buildAttachedImagePathsText([
+        "/tmp/attachments/thread_123/image-1.png",
+        "/tmp/attachments/thread_123/image-2.webp",
+      ]),
+    ).toBe(
+      [
+        "Attached images:",
+        "- /tmp/attachments/thread_123/image-1.png",
+        "- /tmp/attachments/thread_123/image-2.webp",
+      ].join("\n"),
+    );
+
+    expect(
+      buildPromptWithAttachedImagePaths({
+        prompt: "  Please review these screenshots.  ",
+        attachmentPaths: ["/tmp/attachments/thread_123/image-1.png"],
+      }),
+    ).toBe(
+      [
+        "Please review these screenshots.",
+        "",
+        "Attached images:",
+        "- /tmp/attachments/thread_123/image-1.png",
+      ].join("\n"),
+    );
+
+    expect(
+      buildPromptWithAttachedImagePaths({
+        prompt: "   ",
+        attachmentPaths: ["/tmp/attachments/thread_123/image-1.png"],
+      }),
+    ).toBe(["Attached images:", "- /tmp/attachments/thread_123/image-1.png"].join("\n"));
+  });
+
+  it("builds the non-image-capable warning copy", () => {
+    expect(buildNonImageCapableModelWarningMessage("Codex Spark")).toBe(
+      "Model Codex Spark is not image-capable. Images can remain attached, but the model will not inspect them.",
+    );
+  });
+
   it("returns separate workbench and conversation pane state for a missing session id", () => {
     const queryClient = createControllerQueryClient();
     const { result } = renderSessionWorkbenchController({

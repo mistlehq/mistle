@@ -1,4 +1,7 @@
-import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/openai/agent/client";
+import type {
+  CodexModelSummary,
+  CodexTurnInputLocalImageItem,
+} from "@mistle/integrations-definitions/openai/agent/client";
 import {
   FileUploadRejectedError,
   FileUploadResetCodes,
@@ -41,6 +44,9 @@ type PendingComposerAttachment = {
   file: File;
   name: string;
 };
+
+const NonImageCapableModelWarningMessageSuffix =
+  " is not image-capable. Images can remain attached, but the model will not inspect them.";
 
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
 const AutomationSessionPreparationTimeoutMs = 30_000;
@@ -107,6 +113,51 @@ function resolveUploadErrorMessage(error: unknown): string {
   }
 
   return error instanceof Error ? error.message : "Could not upload attached image.";
+}
+
+export function resolveActiveComposerModel(input: {
+  availableModels: readonly CodexModelSummary[];
+  selectedModel: string | null;
+}): CodexModelSummary | null {
+  if (input.selectedModel !== null) {
+    return input.availableModels.find((model) => model.model === input.selectedModel) ?? null;
+  }
+
+  return input.availableModels.find((model) => model.isDefault) ?? null;
+}
+
+export function supportsImageInspection(model: CodexModelSummary | null): boolean {
+  return model?.inputModalities.includes("image") ?? true;
+}
+
+export function buildNonImageCapableModelWarningMessage(modelName: string): string {
+  return `Model ${modelName}${NonImageCapableModelWarningMessageSuffix}`;
+}
+
+export function buildAttachedImagePathsText(paths: readonly string[]): string {
+  if (paths.length === 0) {
+    return "";
+  }
+
+  return `Attached images:\n${paths.map((path) => `- ${path}`).join("\n")}`;
+}
+
+export function buildPromptWithAttachedImagePaths(input: {
+  prompt: string;
+  attachmentPaths: readonly string[];
+}): string {
+  const trimmedPrompt = input.prompt.trim();
+  const attachedImagePathsText = buildAttachedImagePathsText(input.attachmentPaths);
+
+  if (attachedImagePathsText.length === 0) {
+    return trimmedPrompt;
+  }
+
+  if (trimmedPrompt.length === 0) {
+    return attachedImagePathsText;
+  }
+
+  return `${trimmedPrompt}\n\n${attachedImagePathsText}`;
 }
 
 export function shouldWaitForAutomationSessionThread(input: {
@@ -738,6 +789,11 @@ export function useSessionWorkbenchController(input: {
     value: model.model,
     label: model.displayName,
   }));
+  const activeComposerModel = resolveActiveComposerModel({
+    availableModels: admin.availableModels,
+    selectedModel: activeComposerConfig.model,
+  });
+  const activeComposerModelSupportsImages = supportsImageInspection(activeComposerModel);
 
   const addPendingComposerFiles = useCallback((files: readonly File[]): void => {
     const nextAttachments = files.flatMap((file) => {
@@ -770,6 +826,33 @@ export function useSessionWorkbenchController(input: {
     );
   }, []);
 
+  useEffect(() => {
+    if (
+      pendingComposerAttachments.length > 0 &&
+      !activeComposerModelSupportsImages &&
+      activeComposerModel !== null
+    ) {
+      reportStartErrorMessage(
+        buildNonImageCapableModelWarningMessage(activeComposerModel.displayName),
+      );
+      return;
+    }
+
+    if (
+      startErrorMessage !== null &&
+      startErrorMessage.endsWith(NonImageCapableModelWarningMessageSuffix)
+    ) {
+      clearStartErrorMessage();
+    }
+  }, [
+    activeComposerModel,
+    activeComposerModelSupportsImages,
+    clearStartErrorMessage,
+    pendingComposerAttachments.length,
+    reportStartErrorMessage,
+    startErrorMessage,
+  ]);
+
   const submitComposer = useCallback((): void => {
     void (async () => {
       const action = resolveChatComposerAction({
@@ -784,6 +867,7 @@ export function useSessionWorkbenchController(input: {
       }
 
       let uploadedAttachments: readonly CodexTurnInputLocalImageItem[] = [];
+      let uploadedAttachmentPaths: readonly string[] = [];
       if (pendingComposerAttachments.length > 0) {
         if (
           input.sandboxInstanceId === null ||
@@ -811,6 +895,7 @@ export function useSessionWorkbenchController(input: {
               }),
             );
           }
+          uploadedAttachmentPaths = uploadedImages.map((image) => image.path);
           uploadedAttachments = uploadedImages.map((image) => ({
             type: "localImage",
             path: image.path,
@@ -823,16 +908,22 @@ export function useSessionWorkbenchController(input: {
         }
       }
 
+      const promptWithAttachedImages = buildPromptWithAttachedImagePaths({
+        prompt: action.prompt,
+        attachmentPaths: uploadedAttachmentPaths,
+      });
+      const turnAttachments = activeComposerModelSupportsImages ? uploadedAttachments : [];
+
       try {
         if (action.type === "steer_turn") {
           await steerTurn({
-            prompt: action.prompt,
-            attachments: uploadedAttachments,
+            prompt: promptWithAttachedImages,
+            attachments: turnAttachments,
           });
         } else {
           await startTurn({
-            prompt: action.prompt,
-            attachments: uploadedAttachments,
+            prompt: promptWithAttachedImages,
+            attachments: turnAttachments,
           });
         }
       } catch (error) {
@@ -853,6 +944,7 @@ export function useSessionWorkbenchController(input: {
     input.sandboxInstanceId,
     hasActiveTurn,
     interruptTurn,
+    activeComposerModelSupportsImages,
     pendingComposerAttachments,
     reportStartErrorMessage,
     startTurn,
