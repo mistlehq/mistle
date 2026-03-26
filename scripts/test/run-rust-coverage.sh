@@ -8,24 +8,34 @@ if [[ -z "${llvm_version}" ]]; then
 fi
 
 shopt -s nullglob
-llvm_cov_candidates=(/nix/store/*llvm-"${llvm_version}"/bin/llvm-cov)
-llvm_profdata_candidates=(/nix/store/*llvm-"${llvm_version}"/bin/llvm-profdata)
+llvm_cov_candidates=(/nix/store/*/bin/llvm-cov)
+llvm_profdata_candidates=(/nix/store/*/bin/llvm-profdata)
 shopt -u nullglob
 
-if [[ ${#llvm_cov_candidates[@]} -eq 0 ]]; then
-  echo "failed to locate llvm-cov for LLVM ${llvm_version} under /nix/store" >&2
-  exit 1
-fi
+resolve_matching_llvm_tool() {
+  local tool_name="$1"
+  shift
+  local candidates=("$@")
+  local candidate
 
-if [[ ${#llvm_profdata_candidates[@]} -eq 0 ]]; then
-  echo "failed to locate llvm-profdata for LLVM ${llvm_version} under /nix/store" >&2
-  exit 1
-fi
+  for candidate in "${candidates[@]}"; do
+    if "$candidate" --version 2>/dev/null | grep -Fq "LLVM version ${llvm_version}"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  echo "failed to locate ${tool_name} for LLVM ${llvm_version} under /nix/store" >&2
+  return 1
+}
+
+llvm_cov_path="$(resolve_matching_llvm_tool llvm-cov "${llvm_cov_candidates[@]}")"
+llvm_profdata_path="$(resolve_matching_llvm_tool llvm-profdata "${llvm_profdata_candidates[@]}")"
 
 mkdir -p packages/sandbox-rs-napi/coverage
 
-LLVM_COV="${llvm_cov_candidates[0]}" \
-LLVM_PROFDATA="${llvm_profdata_candidates[0]}" \
+LLVM_COV="${llvm_cov_path}" \
+LLVM_PROFDATA="${llvm_profdata_path}" \
   cargo llvm-cov \
     --manifest-path packages/sandbox-rs-napi/Cargo.toml \
     --locked \
