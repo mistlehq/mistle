@@ -312,7 +312,10 @@ describe("WebhookAutomationForm", () => {
 
     const currentForm = within(container);
     const automationNameInput = currentForm.getByDisplayValue("Repo triage");
-    const inputTemplateTextarea = currentForm.getByDisplayValue(FormValues.inputTemplate);
+    const inputTemplateTextarea = container.querySelector('textarea[data-slot="textarea"]');
+    if (inputTemplateTextarea === null) {
+      throw new Error("Expected input template textarea.");
+    }
 
     expect(automationNameInput.getAttribute("aria-invalid")).toBe("true");
     expect(inputTemplateTextarea.getAttribute("aria-invalid")).toBe("true");

@@ -182,7 +182,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
             name: "Linear automation",
             sandboxProfileId: "",
             enabled: true,
-            instructions: "Watch for new Linear issues.",
+            inputTemplate: "Watch for new Linear issues.",
             conversationKeyTemplate: "{{payload.team.id}}",
             triggerIds: [triggerId],
             triggerParameterValues: {
@@ -242,7 +242,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
             name: "",
             sandboxProfileId: "",
             enabled: true,
-            instructions: "",
+            inputTemplate: "",
             conversationKeyTemplate: "",
             triggerIds: [],
             triggerParameterValues: {},
@@ -272,7 +272,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     expect(result.current.fieldErrors).toMatchObject({
       name: "Automation name is required.",
       sandboxProfileId: "Select a sandbox profile.",
-      instructions: "Instructions are required.",
+      inputTemplate: "Input template is required.",
       triggerIds: "Select at least one trigger.",
     });
   });

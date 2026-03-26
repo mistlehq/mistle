@@ -73,7 +73,7 @@ function hasRequiredFieldErrors(
   return (
     fieldErrors.name !== undefined ||
     fieldErrors.sandboxProfileId !== undefined ||
-    fieldErrors.instructions !== undefined
+    fieldErrors.inputTemplate !== undefined
   );
 }
 
