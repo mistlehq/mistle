@@ -86,6 +86,7 @@ git -C "$repo_root" worktree add -b "$branch_name" "$worktree_path" "$base_ref"
 cleanup_worktree_on_error="yes"
 
 copy_optional_local_bootstrap_file ".env.dev"
+copy_optional_local_bootstrap_file ".env.test"
 copy_optional_local_bootstrap_file "integration-targets.provision.json"
 
 (
