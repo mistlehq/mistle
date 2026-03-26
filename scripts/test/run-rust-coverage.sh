@@ -7,30 +7,30 @@ if [[ -z "${llvm_version}" ]]; then
   exit 1
 fi
 
-shopt -s nullglob
-llvm_cov_candidates=(/nix/store/*/bin/llvm-cov)
-llvm_profdata_candidates=(/nix/store/*/bin/llvm-profdata)
-shopt -u nullglob
+llvm_cov_path="$(command -v llvm-cov || true)"
+if [[ -z "${llvm_cov_path}" ]]; then
+  echo "failed to locate llvm-cov on PATH" >&2
+  exit 1
+fi
 
-resolve_matching_llvm_tool() {
+llvm_profdata_path="$(command -v llvm-profdata || true)"
+if [[ -z "${llvm_profdata_path}" ]]; then
+  echo "failed to locate llvm-profdata on PATH" >&2
+  exit 1
+fi
+
+assert_matching_llvm_version() {
   local tool_name="$1"
-  shift
-  local candidates=("$@")
-  local candidate
+  local tool_path="$2"
 
-  for candidate in "${candidates[@]}"; do
-    if "$candidate" --version 2>/dev/null | grep -Fq "LLVM version ${llvm_version}"; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-
-  echo "failed to locate ${tool_name} for LLVM ${llvm_version} under /nix/store" >&2
-  return 1
+  if ! "$tool_path" --version 2>/dev/null | grep -Fq "LLVM version ${llvm_version}"; then
+    echo "${tool_name} at ${tool_path} does not match rustc LLVM ${llvm_version}" >&2
+    return 1
+  fi
 }
 
-llvm_cov_path="$(resolve_matching_llvm_tool llvm-cov "${llvm_cov_candidates[@]}")"
-llvm_profdata_path="$(resolve_matching_llvm_tool llvm-profdata "${llvm_profdata_candidates[@]}")"
+assert_matching_llvm_version llvm-cov "${llvm_cov_path}"
+assert_matching_llvm_version llvm-profdata "${llvm_profdata_path}"
 
 mkdir -p packages/sandbox-rs-napi/coverage
 
