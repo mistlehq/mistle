@@ -807,6 +807,12 @@ importers:
         specifier: ^11.13.0
         version: 11.13.0
 
+  packages/sandbox-egress-auth:
+    dependencies:
+      jose:
+        specifier: ^6.2.1
+        version: 6.2.1
+
   packages/sandbox-rs-napi:
     devDependencies:
       '@napi-rs/cli':

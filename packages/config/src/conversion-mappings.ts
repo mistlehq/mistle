@@ -99,6 +99,21 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE",
   },
   {
+    configPath: ["global", "sandbox", "egress", "tokenSecret"],
+    tomlPath: ["global", "sandbox", "egress", "token_secret"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_SECRET",
+  },
+  {
+    configPath: ["global", "sandbox", "egress", "tokenIssuer"],
+    tomlPath: ["global", "sandbox", "egress", "token_issuer"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_ISSUER",
+  },
+  {
+    configPath: ["global", "sandbox", "egress", "tokenAudience"],
+    tomlPath: ["global", "sandbox", "egress", "token_audience"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE",
+  },
+  {
     configPath: ["apps", "control_plane_api", "server", "host"],
     tomlPath: ["apps", "control_plane_api", "server", "host"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_HOST",

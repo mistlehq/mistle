@@ -255,6 +255,11 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
                 tokenIssuer: IntegrationTokenIssuer,
                 tokenAudience: IntegrationTokenAudience,
               },
+              egress: {
+                tokenSecret: "integration-egress-token-secret",
+                tokenIssuer: "integration-data-plane-worker",
+                tokenAudience: "integration-tokenizer-proxy",
+              },
             },
           };
 

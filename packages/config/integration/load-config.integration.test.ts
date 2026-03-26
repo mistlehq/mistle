@@ -17,6 +17,9 @@ const sandboxConnectTokenAudience = "data-plane-gateway";
 const sandboxBootstrapTokenSecret = "fixture-bootstrap-token-secret";
 const sandboxBootstrapTokenIssuer = "data-plane-worker";
 const sandboxBootstrapTokenAudience = "data-plane-gateway";
+const sandboxEgressTokenSecret = "fixture-egress-token-secret";
+const sandboxEgressTokenIssuer = "data-plane-worker";
+const sandboxEgressTokenAudience = "tokenizer-proxy";
 
 const globalDevelopmentConfig = {
   env: "development",
@@ -51,6 +54,11 @@ const globalDevelopmentConfig = {
       tokenSecret: sandboxBootstrapTokenSecret,
       tokenIssuer: sandboxBootstrapTokenIssuer,
       tokenAudience: sandboxBootstrapTokenAudience,
+    },
+    egress: {
+      tokenSecret: sandboxEgressTokenSecret,
+      tokenIssuer: sandboxEgressTokenIssuer,
+      tokenAudience: sandboxEgressTokenAudience,
     },
   },
 } as const;
@@ -88,6 +96,11 @@ const globalProductionConfig = {
       tokenSecret: sandboxBootstrapTokenSecret,
       tokenIssuer: sandboxBootstrapTokenIssuer,
       tokenAudience: sandboxBootstrapTokenAudience,
+    },
+    egress: {
+      tokenSecret: sandboxEgressTokenSecret,
+      tokenIssuer: sandboxEgressTokenIssuer,
+      tokenAudience: sandboxEgressTokenAudience,
     },
   },
 } as const;
