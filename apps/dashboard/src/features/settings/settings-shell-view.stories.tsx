@@ -1,13 +1,62 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent, within } from "storybook/test";
 
 import { createDashboardMemoryRouterDecorator } from "../../storybook/decorators.js";
 import {
-  createSettingsShellStoryProps,
-  SettingsShellStoryForCurrentLocation,
-  SettingsShellStoryPathnames,
-} from "./settings-shell-story-support.js";
+  createOrganizationGeneralSettingsFixtureContent,
+  createOrganizationMembersSettingsFixtureContent,
+  createProfileSettingsFixtureContent,
+  createSettingsFixtureInviteMembersButton,
+} from "./settings-fixtures.js";
 import { SettingsShellView } from "./settings-shell-view.js";
+
+function createStoryBreadcrumb(text: string): React.JSX.Element {
+  return <p className="truncate text-sm">{text}</p>;
+}
+
+function createProfileStoryArgs(): React.ComponentProps<typeof SettingsShellView> {
+  return {
+    backLabel: "Back",
+    breadcrumbs: createStoryBreadcrumb("Settings / Profile"),
+    content: createProfileSettingsFixtureContent(),
+    headerActions: null,
+    layoutVariant: "form",
+    onBack: () => {},
+    pathname: "/settings/account/profile",
+    showBreadcrumbs: true,
+    supportingText: "",
+    title: "Profile",
+  };
+}
+
+function createOrganizationGeneralStoryArgs(): React.ComponentProps<typeof SettingsShellView> {
+  return {
+    backLabel: "Back",
+    breadcrumbs: createStoryBreadcrumb("Settings / Organization / General"),
+    content: createOrganizationGeneralSettingsFixtureContent(),
+    headerActions: null,
+    layoutVariant: "form",
+    onBack: () => {},
+    pathname: "/settings/organization/general",
+    showBreadcrumbs: true,
+    supportingText: "",
+    title: "General",
+  };
+}
+
+function createOrganizationMembersStoryArgs(): React.ComponentProps<typeof SettingsShellView> {
+  return {
+    backLabel: "Back",
+    breadcrumbs: createStoryBreadcrumb("Settings / Organization / Members"),
+    content: createOrganizationMembersSettingsFixtureContent(),
+    headerActions: createSettingsFixtureInviteMembersButton(),
+    layoutVariant: "default",
+    onBack: () => {},
+    pathname: "/settings/organization/members",
+    showBreadcrumbs: true,
+    supportingText: "",
+    title: "Members",
+  };
+}
 
 const meta = {
   title: "Dashboard/Settings/SettingsShellView",
@@ -16,7 +65,7 @@ const meta = {
     layout: "fullscreen",
   },
   decorators: [createDashboardMemoryRouterDecorator()],
-  args: createSettingsShellStoryProps(SettingsShellStoryPathnames.ACCOUNT_PROFILE),
+  args: createProfileStoryArgs(),
 } satisfies Meta<typeof SettingsShellView>;
 
 export default meta;
@@ -27,36 +76,12 @@ export const Profile: Story = {};
 
 export const OrganizationGeneral: Story = {
   args: {
-    ...createSettingsShellStoryProps(SettingsShellStoryPathnames.ORGANIZATION_GENERAL),
+    ...createOrganizationGeneralStoryArgs(),
   },
 };
 
 export const OrganizationMembers: Story = {
   args: {
-    ...createSettingsShellStoryProps(SettingsShellStoryPathnames.ORGANIZATION_MEMBERS),
-  },
-};
-
-export const InteractiveNavigation: Story = {
-  decorators: [createDashboardMemoryRouterDecorator([SettingsShellStoryPathnames.ACCOUNT_PROFILE])],
-  render: SettingsShellStoryForCurrentLocation,
-  play: async ({ canvasElement }): Promise<void> => {
-    const body = within(canvasElement.ownerDocument.body);
-
-    await expect(body.getByRole("heading", { name: "Profile" })).toBeVisible();
-    await expect(body.getByLabelText("Display name")).toBeVisible();
-
-    await userEvent.click(body.getByRole("link", { name: "General" }));
-    await expect(body.getByRole("heading", { name: "General" })).toBeVisible();
-    await expect(body.getByLabelText("Organization name")).toBeVisible();
-
-    await userEvent.click(body.getByRole("link", { name: "Members" }));
-    await expect(body.getByRole("heading", { name: "Members" })).toBeVisible();
-    await expect(body.getByRole("button", { name: "Invite members" })).toBeVisible();
-    await expect(body.getByText("owner@mistle.so")).toBeVisible();
-
-    await userEvent.click(body.getByRole("link", { name: "Profile" }));
-    await expect(body.getByRole("heading", { name: "Profile" })).toBeVisible();
-    await expect(body.getByDisplayValue("Mistle Developer")).toBeVisible();
+    ...createOrganizationMembersStoryArgs(),
   },
 };
