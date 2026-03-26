@@ -8,6 +8,12 @@ describe("reduceCodexChatState", () => {
       type: "start_turn_requested",
       clientTurnId: "pending:turn_123",
       prompt: "Reply with exactly PHASE_2_OK.",
+      attachments: [
+        {
+          type: "localImage",
+          path: "/tmp/attachments/thread_123/screenshot.png",
+        },
+      ],
     });
 
     expect(state.activeTurnId).toBe("pending:turn_123");
@@ -19,6 +25,13 @@ describe("reduceCodexChatState", () => {
         turnId: "pending:turn_123",
         kind: "user-message",
         text: "Reply with exactly PHASE_2_OK.",
+        attachments: [
+          {
+            kind: "image",
+            path: "/tmp/attachments/thread_123/screenshot.png",
+            name: "screenshot.png",
+          },
+        ],
         status: "completed",
       },
     ]);
@@ -29,6 +42,12 @@ describe("reduceCodexChatState", () => {
       type: "start_turn_requested",
       clientTurnId: "pending:turn_123",
       prompt: "Reply with exactly PHASE_2_OK.",
+      attachments: [
+        {
+          type: "localImage",
+          path: "/tmp/attachments/thread_123/screenshot.png",
+        },
+      ],
     });
 
     const state = reduceCodexChatState(requested, {
@@ -47,6 +66,13 @@ describe("reduceCodexChatState", () => {
         turnId: "turn_123",
         kind: "user-message",
         text: "Reply with exactly PHASE_2_OK.",
+        attachments: [
+          {
+            kind: "image",
+            path: "/tmp/attachments/thread_123/screenshot.png",
+            name: "screenshot.png",
+          },
+        ],
         status: "completed",
       },
     ]);

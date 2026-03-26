@@ -5,6 +5,7 @@ import {
   buildCodexTurnTimeline,
   buildCodexTurnTimelineFromNormalized,
   classifyCodexThreadItemSemantics,
+  normalizeCodexLocalImageAttachment,
   normalizeCodexThreadItem,
 } from "./index.js";
 
@@ -18,6 +19,18 @@ function normalizeSingleItem(input: { turnId: string; item: unknown }) {
 }
 
 describe("openai thread item semantics", () => {
+  it("normalizes local image attachment display metadata from a sandbox path", () => {
+    expect(
+      normalizeCodexLocalImageAttachment({
+        path: "/tmp/attachments/thread_123/screenshot.png",
+      }),
+    ).toEqual({
+      kind: "image",
+      path: "/tmp/attachments/thread_123/screenshot.png",
+      name: "screenshot.png",
+    });
+  });
+
   it("normalizes user messages, assistant messages, and plans", () => {
     expect(
       normalizeCodexThreadItem({

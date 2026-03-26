@@ -28,6 +28,27 @@ function createPendingTurnId(): string {
   return `pending:${crypto.randomUUID()}`;
 }
 
+function buildTurnRequest(input: {
+  prompt: string;
+  attachments?: readonly CodexTurnInputLocalImageItem[];
+}): {
+  trimmedPrompt: string;
+  attachments: readonly CodexTurnInputLocalImageItem[];
+  items: ReturnType<typeof buildCodexTurnInputItems>;
+} {
+  const trimmedPrompt = input.prompt.trim();
+  const attachments = input.attachments ?? [];
+
+  return {
+    trimmedPrompt,
+    attachments,
+    items: buildCodexTurnInputItems({
+      text: trimmedPrompt,
+      attachments,
+    }),
+  };
+}
+
 export function useCodexChatController(input: {
   rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
   threadIdRef: MutableRefObject<string | null>;
@@ -112,24 +133,21 @@ export function useCodexChatController(input: {
         throw new Error("Choose a thread before starting a turn.");
       }
 
-      const trimmedPrompt = turnInput.prompt.trim();
-      const turnItems = buildCodexTurnInputItems({
-        text: trimmedPrompt,
-        attachments: turnInput.attachments ?? [],
-      });
+      const turnRequest = buildTurnRequest(turnInput);
 
       const clientTurnId = createPendingTurnId();
       dispatchChatAction({
         type: "start_turn_requested",
         clientTurnId,
-        prompt: trimmedPrompt,
+        prompt: turnRequest.trimmedPrompt,
+        attachments: turnRequest.attachments,
       });
 
       try {
         const startedTurn = await startCodexTurn({
           rpcClient,
           threadId,
-          input: turnItems,
+          input: turnRequest.items,
         });
         dispatchChatAction({
           type: "turn_started_response",
@@ -198,17 +216,13 @@ export function useCodexChatController(input: {
         throw new Error("No active turn is available to steer.");
       }
 
-      const trimmedPrompt = turnInput.prompt.trim();
-      const turnItems = buildCodexTurnInputItems({
-        text: trimmedPrompt,
-        attachments: turnInput.attachments ?? [],
-      });
+      const turnRequest = buildTurnRequest(turnInput);
 
       const steeredTurn = await steerCodexTurn({
         rpcClient,
         threadId,
         turnId,
-        input: turnItems,
+        input: turnRequest.items,
       });
 
       input.recordRecentResponse(steeredTurn.response);

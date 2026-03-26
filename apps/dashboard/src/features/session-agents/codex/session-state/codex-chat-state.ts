@@ -1,9 +1,11 @@
 import type {
+  CodexTurnInputLocalImageItem,
   CodexJsonRpcNotification,
   CodexThreadReadTurn,
 } from "@mistle/integrations-definitions/openai/agent/client";
 import {
   buildCodexTurnTimelineFromNormalized,
+  normalizeCodexLocalImageAttachment,
   normalizeCodexThreadItem,
   type CodexTimelineEntry,
   type NormalizedCodexThreadItem,
@@ -109,6 +111,7 @@ export type CodexChatAction =
       type: "start_turn_requested";
       clientTurnId: string;
       prompt: string;
+      attachments?: readonly CodexTurnInputLocalImageItem[];
     }
   | {
       type: "start_turn_failed";
@@ -721,6 +724,12 @@ function buildUserEntry(
   };
 }
 
+function buildChatUserAttachments(
+  attachments: readonly CodexTurnInputLocalImageItem[] | undefined,
+): NonNullable<ChatUserEntry["attachments"]> {
+  return (attachments ?? []).map((attachment) => normalizeCodexLocalImageAttachment(attachment));
+}
+
 function mergeRawItem(existing: unknown, incoming: unknown): unknown {
   if (!isRecord(existing) || !isRecord(incoming)) {
     return incoming;
@@ -857,13 +866,7 @@ function hydrateTurns(turns: readonly CodexThreadReadTurn[]): CodexChatState {
             const pathSegments = contentItem.path.split("/");
             const basename = pathSegments[pathSegments.length - 1] ?? contentItem.path;
 
-            return [
-              {
-                kind: "image" as const,
-                path: contentItem.path,
-                name: basename,
-              },
-            ];
+            return [normalizeCodexLocalImageAttachment({ path: contentItem.path })];
           }),
           parsedUserMessage.data.id,
         );
@@ -930,7 +933,11 @@ export function reduceCodexChatState(
           completedStatus: null,
           completedErrorMessage: null,
           planSnapshot: null,
-          userEntry: buildUserEntry(action.clientTurnId, action.prompt),
+          userEntry: buildUserEntry(
+            action.clientTurnId,
+            action.prompt,
+            buildChatUserAttachments(action.attachments),
+          ),
           itemOrder: [],
           rawItemsById: {},
         },

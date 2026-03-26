@@ -1,15 +1,10 @@
 import { isRecord } from "../is-record.js";
+import { normalizeCodexLocalImageAttachment } from "./local-image.js";
 import type {
   NormalizedCodexThreadItem,
   NormalizedCommandAction,
   NormalizedFileChange,
 } from "./types.js";
-
-function readPathBasename(path: string): string {
-  const segments = path.split("/");
-  const basename = segments[segments.length - 1];
-  return basename === undefined || basename.length === 0 ? path : basename;
-}
 
 function readOptionalString(record: Record<string, unknown>, key: string): string | null {
   const value = record[key];
@@ -244,13 +239,7 @@ export function normalizeCodexThreadItem(input: {
             return [];
           }
 
-          return [
-            {
-              kind: "image" as const,
-              path,
-              name: readPathBasename(path),
-            },
-          ];
+          return [normalizeCodexLocalImageAttachment({ path })];
         })
       : [];
 
