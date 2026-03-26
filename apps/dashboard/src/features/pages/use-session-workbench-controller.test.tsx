@@ -323,6 +323,7 @@ describe("useSessionWorkbenchController", () => {
           supportsPersonality: false,
           isDefault: true,
         },
+        resolvedModel: null,
         isModelListLoaded: true,
       }),
     ).toEqual({
@@ -343,17 +344,20 @@ describe("useSessionWorkbenchController", () => {
       resolveComposerSubmitReadiness({
         selectedModel: null,
         activeModel: null,
+        resolvedModel: null,
         isModelListLoaded: false,
       }),
     ).toEqual({
-      status: "missing-model",
-      message: "Choose a model before sending a message.",
+      status: "loading-model",
+      selectedModel: "__default__",
+      message: "Wait for the selected model to finish loading before sending a message.",
     });
 
     expect(
       resolveComposerSubmitReadiness({
         selectedModel: "gpt-5.4",
         activeModel: null,
+        resolvedModel: null,
         isModelListLoaded: false,
       }),
     ).toEqual({
@@ -366,6 +370,7 @@ describe("useSessionWorkbenchController", () => {
       resolveComposerSubmitReadiness({
         selectedModel: "gpt-legacy-preview",
         activeModel: null,
+        resolvedModel: null,
         isModelListLoaded: true,
       }),
     ).toEqual({
@@ -373,6 +378,48 @@ describe("useSessionWorkbenchController", () => {
       selectedModel: "gpt-legacy-preview",
       message:
         "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
+    });
+
+    expect(
+      resolveComposerSubmitReadiness({
+        selectedModel: "gpt-5.4",
+        activeModel: null,
+        resolvedModel: {
+          id: "model_ready",
+          model: "gpt-5.4",
+          displayName: "GPT-5.4",
+          hidden: false,
+          defaultReasoningEffort: null,
+          inputModalities: ["text", "image"],
+          supportsPersonality: false,
+          isDefault: true,
+        },
+        isModelListLoaded: false,
+      }),
+    ).toEqual({
+      status: "ready",
+      activeModel: {
+        id: "model_ready",
+        model: "gpt-5.4",
+        displayName: "GPT-5.4",
+        hidden: false,
+        defaultReasoningEffort: null,
+        inputModalities: ["text", "image"],
+        supportsPersonality: false,
+        isDefault: true,
+      },
+    });
+
+    expect(
+      resolveComposerSubmitReadiness({
+        selectedModel: null,
+        activeModel: null,
+        resolvedModel: null,
+        isModelListLoaded: true,
+      }),
+    ).toEqual({
+      status: "missing-model",
+      message: "Choose a model before sending a message.",
     });
   });
 

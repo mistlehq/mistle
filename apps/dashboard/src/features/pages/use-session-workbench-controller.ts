@@ -151,6 +151,15 @@ export function buildModelSelectionLoadingMessage(): string {
   return ModelSelectionLoadingMessage;
 }
 
+type ResolvedComposerModelContext = {
+  model: CodexModelSummary;
+  selectionKey: string;
+};
+
+function getComposerSelectionKey(selectedModel: string | null): string {
+  return selectedModel ?? "__default__";
+}
+
 export type ComposerSubmitReadiness =
   | {
       status: "ready";
@@ -239,10 +248,18 @@ export function resolveTurnRepresentation(input: {
 }
 
 export function resolveComposerSubmitReadiness(input: {
+  resolvedModel: CodexModelSummary | null;
   isModelListLoaded: boolean;
   selectedModel: string | null;
   activeModel: CodexModelSummary | null;
 }): ComposerSubmitReadiness {
+  if (input.resolvedModel !== null) {
+    return {
+      status: "ready",
+      activeModel: input.resolvedModel,
+    };
+  }
+
   if (input.activeModel !== null) {
     return {
       status: "ready",
@@ -250,18 +267,18 @@ export function resolveComposerSubmitReadiness(input: {
     };
   }
 
+  if (!input.isModelListLoaded) {
+    return {
+      status: "loading-model",
+      selectedModel: input.selectedModel ?? "__default__",
+      message: buildModelSelectionLoadingMessage(),
+    };
+  }
+
   if (input.selectedModel === null) {
     return {
       status: "missing-model",
       message: buildModelSelectionRequiredMessage(),
-    };
-  }
-
-  if (!input.isModelListLoaded) {
-    return {
-      status: "loading-model",
-      selectedModel: input.selectedModel,
-      message: buildModelSelectionLoadingMessage(),
     };
   }
 
@@ -613,6 +630,8 @@ export function useSessionWorkbenchController(input: {
   const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(false);
   const [resumeActionErrorMessage, setResumeActionErrorMessage] = useState<string | null>(null);
   const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
+  const [resolvedComposerModelContext, setResolvedComposerModelContext] =
+    useState<ResolvedComposerModelContext | null>(null);
   const activeResumeRequestRef = useRef<ResumeRequestGuard | null>(null);
   const resumeIdempotencyKeyRef = useRef<string | null>(null);
   const nextResumeRequestIdRef = useRef(0);
@@ -760,6 +779,7 @@ export function useSessionWorkbenchController(input: {
     setComposerErrorMessage(null);
     setPendingComposerAttachments([]);
     setIsUploadingAttachments(false);
+    setResolvedComposerModelContext(null);
   }, [input.sandboxInstanceId]);
 
   // Syncs a browser timer with the external automation-thread preparation window.
@@ -946,14 +966,48 @@ export function useSessionWorkbenchController(input: {
     value: model.model,
     label: model.displayName,
   }));
+  const composerSelectionKey = getComposerSelectionKey(activeComposerConfig.model);
   const activeComposerModel = resolveActiveComposerModel({
     availableModels: admin.availableModels,
     selectedModel: activeComposerConfig.model,
   });
   const isComposerModelListLoaded = admin.hasLoadedModels;
+
+  useEffect(() => {
+    if (connectedSession === null) {
+      setResolvedComposerModelContext(null);
+      return;
+    }
+
+    setResolvedComposerModelContext((currentContext) => {
+      if (currentContext !== null && currentContext.selectionKey !== composerSelectionKey) {
+        return null;
+      }
+
+      if (activeComposerModel === null) {
+        return currentContext;
+      }
+
+      if (
+        currentContext !== null &&
+        currentContext.selectionKey === composerSelectionKey &&
+        currentContext.model.model === activeComposerModel.model &&
+        currentContext.model.displayName === activeComposerModel.displayName
+      ) {
+        return currentContext;
+      }
+
+      return {
+        selectionKey: composerSelectionKey,
+        model: activeComposerModel,
+      };
+    });
+  }, [activeComposerModel, composerSelectionKey, connectedSession]);
+
   const composerSubmitReadiness = resolveComposerSubmitReadiness({
     selectedModel: activeComposerConfig.model,
     activeModel: activeComposerModel,
+    resolvedModel: resolvedComposerModelContext?.model ?? null,
     isModelListLoaded: isComposerModelListLoaded,
   });
   const composerStatusMessage = resolveComposerStatusMessage({
