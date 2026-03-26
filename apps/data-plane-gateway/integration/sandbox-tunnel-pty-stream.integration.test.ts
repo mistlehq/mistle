@@ -8,6 +8,9 @@ import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import {
+  decodeDataFrame,
+  encodeDataFrame,
+  PayloadKindRawBytes,
   parseStreamControlMessage,
   type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
@@ -41,6 +44,19 @@ function parseStreamMessage(data: string | Buffer): StreamControlMessage {
   return parsedPayload;
 }
 
+function parseRawBytesFrame(data: string | Buffer): Uint8Array {
+  if (typeof data === "string") {
+    throw new Error("Expected websocket message data to be binary.");
+  }
+
+  const dataFrame = decodeDataFrame(new Uint8Array(data));
+  if (dataFrame.payloadKind !== PayloadKindRawBytes) {
+    throw new Error("Expected websocket message payload to be a raw-bytes data frame.");
+  }
+
+  return dataFrame.payload;
+}
+
 async function insertSandboxInstanceRow(input: {
   fixture: DataPlaneGatewayIntegrationFixture;
   sandboxInstanceId: string;
@@ -71,6 +87,183 @@ async function closeWebSocketIfOpen(socket: WebSocket | undefined): Promise<void
 }
 
 describe("sandbox tunnel pty stream integration", () => {
+  it(
+    "routes fileUpload streams through gateway bindings and forwards raw bytes plus completion events",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const clientStreamId = 52;
+        const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: clientStreamId,
+            channel: {
+              kind: "fileUpload",
+              threadId: "thread_gateway_it",
+              mimeType: "image/png",
+              originalFilename: "gateway.png",
+              sizeBytes: 3,
+            },
+          }),
+        );
+        const forwardedOpen = await forwardedOpenPromise;
+
+        expect(forwardedOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedOpen.data)).toEqual({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "fileUpload",
+            threadId: "thread_gateway_it",
+            mimeType: "image/png",
+            originalFilename: "gateway.png",
+            sizeBytes: 3,
+          },
+        });
+
+        const forwardedOpenOkPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        const forwardedOpenOk = await forwardedOpenOkPromise;
+        expect(forwardedOpenOk.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedOpenOk.data)).toEqual({
+          type: "stream.open.ok",
+          streamId: clientStreamId,
+        });
+
+        const forwardedDataPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          Buffer.from(
+            encodeDataFrame({
+              streamId: clientStreamId,
+              payloadKind: PayloadKindRawBytes,
+              payload: new Uint8Array([1, 2, 3]),
+            }),
+          ),
+        );
+        const forwardedData = await forwardedDataPromise;
+        expect(forwardedData.isBinary).toBe(true);
+        expect(Array.from(parseRawBytesFrame(forwardedData.data))).toEqual([1, 2, 3]);
+
+        const forwardedWindowPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.window",
+            streamId: 1,
+            bytes: 3,
+          }),
+        );
+        const forwardedWindow = await forwardedWindowPromise;
+        expect(forwardedWindow.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedWindow.data)).toEqual({
+          type: "stream.window",
+          streamId: clientStreamId,
+          bytes: 3,
+        });
+
+        const forwardedClosePromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.close",
+            streamId: clientStreamId,
+          }),
+        );
+        const forwardedClose = await forwardedClosePromise;
+        expect(forwardedClose.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedClose.data)).toEqual({
+          type: "stream.close",
+          streamId: 1,
+        });
+
+        const forwardedCompletionPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.event",
+            streamId: 1,
+            event: {
+              type: "fileUpload.completed",
+              attachmentId: "att_gateway_it",
+              threadId: "thread_gateway_it",
+              originalFilename: "gateway.png",
+              mimeType: "image/png",
+              sizeBytes: 3,
+              path: "/tmp/attachments/thread_gateway_it/gateway.png",
+            },
+          }),
+        );
+        const forwardedCompletion = await forwardedCompletionPromise;
+        expect(forwardedCompletion.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedCompletion.data)).toEqual({
+          type: "stream.event",
+          streamId: clientStreamId,
+          event: {
+            type: "fileUpload.completed",
+            attachmentId: "att_gateway_it",
+            threadId: "thread_gateway_it",
+            originalFilename: "gateway.png",
+            mimeType: "image/png",
+            sizeBytes: 3,
+            path: "/tmp/attachments/thread_gateway_it/gateway.png",
+          },
+        });
+
+        await waitForNoWebSocketMessage(bootstrapSocket);
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
   it(
     "routes PTY control messages through gateway stream bindings and closes PTY streams on connection detach",
     async ({ fixture }) => {

@@ -8,6 +8,12 @@ describe("reduceCodexChatState", () => {
       type: "start_turn_requested",
       clientTurnId: "pending:turn_123",
       prompt: "Reply with exactly PHASE_2_OK.",
+      attachments: [
+        {
+          type: "localImage",
+          path: "/tmp/attachments/thread_123/screenshot.png",
+        },
+      ],
     });
 
     expect(state.activeTurnId).toBe("pending:turn_123");
@@ -19,6 +25,13 @@ describe("reduceCodexChatState", () => {
         turnId: "pending:turn_123",
         kind: "user-message",
         text: "Reply with exactly PHASE_2_OK.",
+        attachments: [
+          {
+            kind: "image",
+            path: "/tmp/attachments/thread_123/screenshot.png",
+            name: "screenshot.png",
+          },
+        ],
         status: "completed",
       },
     ]);
@@ -29,6 +42,12 @@ describe("reduceCodexChatState", () => {
       type: "start_turn_requested",
       clientTurnId: "pending:turn_123",
       prompt: "Reply with exactly PHASE_2_OK.",
+      attachments: [
+        {
+          type: "localImage",
+          path: "/tmp/attachments/thread_123/screenshot.png",
+        },
+      ],
     });
 
     const state = reduceCodexChatState(requested, {
@@ -47,6 +66,13 @@ describe("reduceCodexChatState", () => {
         turnId: "turn_123",
         kind: "user-message",
         text: "Reply with exactly PHASE_2_OK.",
+        attachments: [
+          {
+            kind: "image",
+            path: "/tmp/attachments/thread_123/screenshot.png",
+            name: "screenshot.png",
+          },
+        ],
         status: "completed",
       },
     ]);
@@ -68,6 +94,51 @@ describe("reduceCodexChatState", () => {
     expect(failed.pendingTurnId).toBeNull();
     expect(failed.status).toBeNull();
     expect(failed.entries).toEqual([]);
+  });
+
+  it("hydrates user image attachments from thread/read items", () => {
+    const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_123",
+          status: "completed",
+          items: [
+            {
+              type: "userMessage",
+              id: "user_123",
+              content: [
+                {
+                  type: "text",
+                  text: "Review this image",
+                },
+                {
+                  type: "localImage",
+                  path: "/tmp/attachments/thread_123/screenshot.png",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(hydrated.entries).toEqual([
+      {
+        id: "user_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Review this image",
+        attachments: [
+          {
+            kind: "image",
+            path: "/tmp/attachments/thread_123/screenshot.png",
+            name: "screenshot.png",
+          },
+        ],
+        status: "completed",
+      },
+    ]);
   });
 
   it("accumulates assistant deltas for the active turn", () => {

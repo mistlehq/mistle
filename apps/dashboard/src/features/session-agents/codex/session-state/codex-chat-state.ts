@@ -1,9 +1,11 @@
 import type {
+  CodexTurnInputLocalImageItem,
   CodexJsonRpcNotification,
   CodexThreadReadTurn,
 } from "@mistle/integrations-definitions/openai/agent/client";
 import {
   buildCodexTurnTimelineFromNormalized,
+  normalizeCodexLocalImageAttachment,
   normalizeCodexThreadItem,
   type CodexTimelineEntry,
   type NormalizedCodexThreadItem,
@@ -74,6 +76,7 @@ const ThreadReadUserMessageItemSchema = z.object({
     z.looseObject({
       type: z.string().optional(),
       text: z.string().optional(),
+      path: z.string().optional(),
     }),
   ),
 });
@@ -108,6 +111,7 @@ export type CodexChatAction =
       type: "start_turn_requested";
       clientTurnId: string;
       prompt: string;
+      attachments?: readonly CodexTurnInputLocalImageItem[];
     }
   | {
       type: "start_turn_failed";
@@ -704,14 +708,26 @@ function buildState(input: {
   };
 }
 
-function buildUserEntry(turnId: string, text: string, id?: string): ChatUserEntry {
+function buildUserEntry(
+  turnId: string,
+  text: string,
+  attachments: NonNullable<ChatUserEntry["attachments"]> = [],
+  id?: string,
+): ChatUserEntry {
   return {
     id: id ?? `user:${turnId}`,
     turnId,
     kind: "user-message",
     text,
+    ...(attachments.length === 0 ? {} : { attachments }),
     status: "completed",
   };
+}
+
+function buildChatUserAttachments(
+  attachments: readonly CodexTurnInputLocalImageItem[] | undefined,
+): NonNullable<ChatUserEntry["attachments"]> {
+  return (attachments ?? []).map((attachment) => normalizeCodexLocalImageAttachment(attachment));
 }
 
 function mergeRawItem(existing: unknown, incoming: unknown): unknown {
@@ -842,6 +858,13 @@ function hydrateTurns(turns: readonly CodexThreadReadTurn[]): CodexChatState {
         userEntry = buildUserEntry(
           turn.id,
           parsedUserMessage.data.content.map((contentItem) => contentItem.text ?? "").join(""),
+          parsedUserMessage.data.content.flatMap((contentItem) => {
+            if (contentItem.type !== "localImage" || contentItem.path === undefined) {
+              return [];
+            }
+
+            return [normalizeCodexLocalImageAttachment({ path: contentItem.path })];
+          }),
           parsedUserMessage.data.id,
         );
         continue;
@@ -907,7 +930,11 @@ export function reduceCodexChatState(
           completedStatus: null,
           completedErrorMessage: null,
           planSnapshot: null,
-          userEntry: buildUserEntry(action.clientTurnId, action.prompt),
+          userEntry: buildUserEntry(
+            action.clientTurnId,
+            action.prompt,
+            buildChatUserAttachments(action.attachments),
+          ),
           itemOrder: [],
           rawItemsById: {},
         },

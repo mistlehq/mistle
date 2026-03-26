@@ -8,6 +8,7 @@ import { systemClock, systemSleeper } from "@mistle/time";
 import { getContainerRuntimeClient } from "testcontainers";
 
 import { runCleanupTasks } from "../cleanup/index.js";
+import { isIgnorableContainerStopError } from "../docker/cleanup.js";
 import { createMailpitInbox, startMailpit, type MailpitService } from "./mailpit/index.js";
 import {
   startPostgresWithPgBouncer,
@@ -590,18 +591,6 @@ function isNotFoundError(error: unknown): boolean {
   return typeof message === "string" && message.includes("No such");
 }
 
-function isAlreadyStoppedContainerError(error: unknown): boolean {
-  if (!isRecord(error)) {
-    return false;
-  }
-  const statusCode = error["statusCode"];
-  if (typeof statusCode === "number" && statusCode === 304) {
-    return true;
-  }
-  const message = error["message"];
-  return typeof message === "string" && message.includes("is not running");
-}
-
 async function stopContainerById(containerId: string): Promise<void> {
   const runtimeClient = await getContainerRuntimeClient();
   const container = runtimeClient.container.getById(containerId);
@@ -609,7 +598,7 @@ async function stopContainerById(containerId: string): Promise<void> {
   try {
     await runtimeClient.container.stop(container, { timeout: 0 });
   } catch (error) {
-    if (!isNotFoundError(error) && !isAlreadyStoppedContainerError(error)) {
+    if (!isNotFoundError(error) && !isIgnorableContainerStopError(error)) {
       throw error;
     }
   }

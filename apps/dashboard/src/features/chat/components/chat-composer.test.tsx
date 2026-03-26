@@ -5,35 +5,38 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { ChatComposer } from "./chat-composer.js";
 
+function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
+  return {
+    canInterruptTurn: false,
+    canSteerTurn: false,
+    completedErrorMessage: null,
+    composerText: "Ship it",
+    isConnected: true,
+    isInterruptingTurn: false,
+    isStartingTurn: false,
+    isSteeringTurn: false,
+    isUpdatingComposerConfig: false,
+    isUploadingAttachments: false,
+    modelOptions: [{ value: "gpt-5.4-codex", label: "GPT-5.4" }],
+    onComposerTextChange: () => {},
+    onModelChange: () => {},
+    onPendingImageFilesAdded: () => {},
+    onReasoningEffortChange: () => {},
+    onRemovePendingAttachment: () => {},
+    onSubmit: () => {},
+    pendingAttachments: [],
+    selectedModel: "gpt-5.4-codex",
+    selectedReasoningEffort: "medium",
+  };
+}
+
 describe("ChatComposer", () => {
   afterEach(() => {
     cleanup();
   });
 
   it("renders a Send action button when there is no active turn", () => {
-    render(
-      <ChatComposer
-        canInterruptTurn={false}
-        canSteerTurn={false}
-        completedErrorMessage={null}
-        composerText="Ship it"
-        isConnected={true}
-        isInterruptingTurn={false}
-        isStartingTurn={false}
-        isSteeringTurn={false}
-        isUpdatingComposerConfig={false}
-        modelOptions={[
-          { value: "gpt-5.4-codex", label: "GPT-5.4" },
-          { value: "gpt-5.3-codex", label: "GPT-5.3" },
-        ]}
-        onComposerTextChange={() => {}}
-        onModelChange={() => {}}
-        onReasoningEffortChange={() => {}}
-        onSubmit={() => {}}
-        selectedModel="gpt-5.4-codex"
-        selectedReasoningEffort="medium"
-      />,
-    );
+    render(<ChatComposer {...createBaseComposerProps()} />);
 
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
   });
@@ -41,22 +44,10 @@ describe("ChatComposer", () => {
   it("renders a Stop action button when an active turn has no steering text", () => {
     render(
       <ChatComposer
+        {...createBaseComposerProps()}
         canInterruptTurn={true}
         canSteerTurn={true}
-        completedErrorMessage={null}
         composerText="   "
-        isConnected={true}
-        isInterruptingTurn={false}
-        isStartingTurn={false}
-        isSteeringTurn={false}
-        isUpdatingComposerConfig={false}
-        modelOptions={[{ value: "gpt-5.4-codex", label: "GPT-5.4" }]}
-        onComposerTextChange={() => {}}
-        onModelChange={() => {}}
-        onReasoningEffortChange={() => {}}
-        onSubmit={() => {}}
-        selectedModel="gpt-5.4-codex"
-        selectedReasoningEffort="medium"
       />,
     );
 
@@ -66,22 +57,10 @@ describe("ChatComposer", () => {
   it("renders a Steer action button when an active turn has steering text", () => {
     render(
       <ChatComposer
+        {...createBaseComposerProps()}
         canInterruptTurn={true}
         canSteerTurn={true}
-        completedErrorMessage={null}
         composerText="Focus on the failing test."
-        isConnected={true}
-        isInterruptingTurn={false}
-        isStartingTurn={false}
-        isSteeringTurn={false}
-        isUpdatingComposerConfig={false}
-        modelOptions={[{ value: "gpt-5.4-codex", label: "GPT-5.4" }]}
-        onComposerTextChange={() => {}}
-        onModelChange={() => {}}
-        onReasoningEffortChange={() => {}}
-        onSubmit={() => {}}
-        selectedModel="gpt-5.4-codex"
-        selectedReasoningEffort="medium"
       />,
     );
 
@@ -91,25 +70,11 @@ describe("ChatComposer", () => {
   it("renders model and reasoning switchers in the footer", () => {
     render(
       <ChatComposer
-        canInterruptTurn={false}
-        canSteerTurn={false}
-        completedErrorMessage={null}
-        composerText="Ship it"
-        isConnected={true}
-        isInterruptingTurn={false}
-        isStartingTurn={false}
-        isSteeringTurn={false}
-        isUpdatingComposerConfig={false}
+        {...createBaseComposerProps()}
         modelOptions={[
           { value: "gpt-5.4-codex", label: "GPT-5.4" },
           { value: "gpt-5.3-codex", label: "GPT-5.3" },
         ]}
-        onComposerTextChange={() => {}}
-        onModelChange={() => {}}
-        onReasoningEffortChange={() => {}}
-        onSubmit={() => {}}
-        selectedModel="gpt-5.4-codex"
-        selectedReasoningEffort="medium"
       />,
     );
 
@@ -122,20 +87,7 @@ describe("ChatComposer", () => {
   it("renders safely when model and reasoning selections are unset", () => {
     render(
       <ChatComposer
-        canInterruptTurn={false}
-        canSteerTurn={false}
-        completedErrorMessage={null}
-        composerText="Ship it"
-        isConnected={true}
-        isInterruptingTurn={false}
-        isStartingTurn={false}
-        isSteeringTurn={false}
-        isUpdatingComposerConfig={false}
-        modelOptions={[{ value: "gpt-5.4-codex", label: "GPT-5.4" }]}
-        onComposerTextChange={() => {}}
-        onModelChange={() => {}}
-        onReasoningEffortChange={() => {}}
-        onSubmit={() => {}}
+        {...createBaseComposerProps()}
         selectedModel={null}
         selectedReasoningEffort={null}
       />,
@@ -146,27 +98,26 @@ describe("ChatComposer", () => {
   });
 
   it("renders safely when the selected model is no longer in the available options", () => {
+    render(<ChatComposer {...createBaseComposerProps()} selectedModel="gpt-5.3-codex" />);
+
+    expect(screen.getByRole("combobox", { name: "Model switcher" })).toBeTruthy();
+  });
+
+  it("renders pending image attachments and upload progress", () => {
     render(
       <ChatComposer
-        canInterruptTurn={false}
-        canSteerTurn={false}
-        completedErrorMessage={null}
-        composerText="Ship it"
-        isConnected={true}
-        isInterruptingTurn={false}
-        isStartingTurn={false}
-        isSteeringTurn={false}
-        isUpdatingComposerConfig={false}
-        modelOptions={[{ value: "gpt-5.4-codex", label: "GPT-5.4" }]}
-        onComposerTextChange={() => {}}
-        onModelChange={() => {}}
-        onReasoningEffortChange={() => {}}
-        onSubmit={() => {}}
-        selectedModel="gpt-5.3-codex"
-        selectedReasoningEffort="medium"
+        {...createBaseComposerProps()}
+        isUploadingAttachments={true}
+        pendingAttachments={[
+          {
+            id: "att_1",
+            name: "design.png",
+          },
+        ]}
       />,
     );
 
-    expect(screen.getByRole("combobox", { name: "Model switcher" })).toBeTruthy();
+    expect(screen.getByText("design.png")).toBeTruthy();
+    expect(screen.getByText("Uploading attachments...")).toBeTruthy();
   });
 });

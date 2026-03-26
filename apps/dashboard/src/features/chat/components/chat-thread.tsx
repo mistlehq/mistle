@@ -31,7 +31,14 @@ export function ChatThread({
     <div className="flex flex-col gap-10 pt-2">
       {chatTurnGroups.map((group) => (
         <div className="flex flex-col gap-4" key={group.turnId}>
-          {group.userEntry === null ? null : <ChatUserMessage text={group.userEntry.text} />}
+          {group.userEntry === null ? null : (
+            <ChatUserMessage
+              {...(group.userEntry.attachments === undefined
+                ? {}
+                : { attachments: group.userEntry.attachments })}
+              text={group.userEntry.text}
+            />
+          )}
           {group.assistantBlocks.length === 0 ? null : (
             <div className="max-w-[72ch] space-y-4">
               {group.assistantBlocks.map((block) => {

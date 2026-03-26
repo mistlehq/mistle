@@ -15,9 +15,18 @@ const PTYStreamChannelSchema = z.object({
   cwd: NonEmptyStringSchema.optional(),
 });
 
+const FileUploadStreamChannelSchema = z.object({
+  kind: z.literal("fileUpload"),
+  threadId: NonEmptyStringSchema,
+  mimeType: NonEmptyStringSchema,
+  originalFilename: NonEmptyStringSchema,
+  sizeBytes: PositiveIntegerSchema,
+});
+
 const StreamChannelSchema = z.discriminatedUnion("kind", [
   AgentStreamChannelSchema,
   PTYStreamChannelSchema,
+  FileUploadStreamChannelSchema,
 ]);
 
 const PTYResizeSignalSchema = z.object({
@@ -33,7 +42,20 @@ const PTYExitEventSchema = z.object({
   exitCode: z.int(),
 });
 
-const StreamEventSchema = z.discriminatedUnion("type", [PTYExitEventSchema]);
+const FileUploadCompletedEventSchema = z.object({
+  type: z.literal("fileUpload.completed"),
+  attachmentId: NonEmptyStringSchema,
+  threadId: NonEmptyStringSchema,
+  originalFilename: NonEmptyStringSchema,
+  mimeType: NonEmptyStringSchema,
+  sizeBytes: PositiveIntegerSchema,
+  path: NonEmptyStringSchema,
+});
+
+const StreamEventSchema = z.discriminatedUnion("type", [
+  PTYExitEventSchema,
+  FileUploadCompletedEventSchema,
+]);
 
 const StreamOpenSchema = z.object({
   type: z.literal("stream.open"),
@@ -131,12 +153,14 @@ const BootstrapControlMessageSchema = z.discriminatedUnion("type", [
 
 export type AgentStreamChannel = z.infer<typeof AgentStreamChannelSchema>;
 export type PTYStreamChannel = z.infer<typeof PTYStreamChannelSchema>;
+export type FileUploadStreamChannel = z.infer<typeof FileUploadStreamChannelSchema>;
 export type StreamChannel = z.infer<typeof StreamChannelSchema>;
 
 export type PTYResizeSignal = z.infer<typeof PTYResizeSignalSchema>;
 export type StreamSignal = z.infer<typeof StreamSignalSchema>;
 
 export type PTYExitEvent = z.infer<typeof PTYExitEventSchema>;
+export type FileUploadCompletedEvent = z.infer<typeof FileUploadCompletedEventSchema>;
 export type StreamEvent = z.infer<typeof StreamEventSchema>;
 
 export type StreamOpen = z.infer<typeof StreamOpenSchema>;

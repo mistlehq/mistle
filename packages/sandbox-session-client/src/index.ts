@@ -1,4 +1,5 @@
 export * from "./client.js";
+export * from "./file-upload-client.js";
 export * from "./pty-client.js";
 export * from "./pty-types.js";
 export * from "./types.js";

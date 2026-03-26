@@ -4,6 +4,7 @@ export type ConnectedCodexSession = {
   sandboxInstanceId: string;
   connectedAtIso: string;
   expiresAtIso: string;
+  connectionUrl: string;
   threadId: string | null;
 };
 

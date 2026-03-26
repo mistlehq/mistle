@@ -52,6 +52,53 @@ describe("stream control message parser", () => {
     ).toBeUndefined();
   });
 
+  it("parses file upload stream opens", () => {
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
+          type: "stream.open",
+          streamId: 23,
+          channel: {
+            kind: "fileUpload",
+            threadId: "thread_123",
+            mimeType: "image/png",
+            originalFilename: "screenshot.png",
+            sizeBytes: 1024,
+            ignored: true,
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "stream.open",
+      streamId: 23,
+      channel: {
+        kind: "fileUpload",
+        threadId: "thread_123",
+        mimeType: "image/png",
+        originalFilename: "screenshot.png",
+        sizeBytes: 1024,
+      },
+    });
+  });
+
+  it("rejects malformed file upload stream opens", () => {
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
+          type: "stream.open",
+          streamId: 23,
+          channel: {
+            kind: "fileUpload",
+            threadId: "thread_123",
+            mimeType: "image/png",
+            originalFilename: "screenshot.png",
+            sizeBytes: "1024",
+          },
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
   it("parses stream events and resets", () => {
     expect(
       parseStreamControlMessage(
@@ -87,6 +134,36 @@ describe("stream control message parser", () => {
       streamId: 8,
       code: "target_closed",
       message: "target closed stream",
+    });
+
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
+          type: "stream.event",
+          streamId: 9,
+          event: {
+            type: "fileUpload.completed",
+            attachmentId: "att_123",
+            threadId: "thread_123",
+            originalFilename: "screenshot.png",
+            mimeType: "image/png",
+            sizeBytes: 1024,
+            path: "/tmp/attachments/thread_123/upload.png",
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "stream.event",
+      streamId: 9,
+      event: {
+        type: "fileUpload.completed",
+        attachmentId: "att_123",
+        threadId: "thread_123",
+        originalFilename: "screenshot.png",
+        mimeType: "image/png",
+        sizeBytes: 1024,
+        path: "/tmp/attachments/thread_123/upload.png",
+      },
     });
   });
 

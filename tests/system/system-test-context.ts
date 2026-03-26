@@ -27,11 +27,17 @@ export type AuthenticatedSession = {
 
 export type SystemTestFixture = {
   controlPlaneApiBaseUrl: string;
+  controlPlaneApiContainerId: string;
   controlPlaneWorkerBaseUrl: string;
+  controlPlaneWorkerContainerId: string;
   dataPlaneApiBaseUrl: string;
+  dataPlaneApiContainerId: string;
   dataPlaneWorkerBaseUrl: string;
+  dataPlaneWorkerContainerId: string;
   dataPlaneGatewayBaseUrl: string;
+  dataPlaneGatewayContainerId: string;
   tokenizerProxyBaseUrl: string;
+  tokenizerProxyContainerId: string;
   controlPlaneApiClient: ControlPlaneApiClient;
   db: ControlPlaneDatabase;
   request: (path: string, init?: RequestInit) => Promise<Response>;
@@ -52,11 +58,17 @@ const execFileAsync = promisify(execFile);
 export const SystemTestContextSchema = z
   .object({
     controlPlaneApiBaseUrl: z.url(),
+    controlPlaneApiContainerId: z.string().min(1),
     controlPlaneWorkerBaseUrl: z.url(),
+    controlPlaneWorkerContainerId: z.string().min(1),
     dataPlaneApiBaseUrl: z.url(),
+    dataPlaneApiContainerId: z.string().min(1),
     dataPlaneWorkerBaseUrl: z.url(),
+    dataPlaneWorkerContainerId: z.string().min(1),
     dataPlaneGatewayBaseUrl: z.url(),
+    dataPlaneGatewayContainerId: z.string().min(1),
     tokenizerProxyBaseUrl: z.url(),
+    tokenizerProxyContainerId: z.string().min(1),
     mailpitHttpBaseUrl: z.url(),
     controlPlaneDatabaseUrl: z.string().min(1),
     sandboxNetworkName: z.string().min(1),
@@ -239,11 +251,17 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
       try {
         await use({
           controlPlaneApiBaseUrl: systemTestContext.controlPlaneApiBaseUrl,
+          controlPlaneApiContainerId: systemTestContext.controlPlaneApiContainerId,
           controlPlaneWorkerBaseUrl: systemTestContext.controlPlaneWorkerBaseUrl,
+          controlPlaneWorkerContainerId: systemTestContext.controlPlaneWorkerContainerId,
           dataPlaneApiBaseUrl: systemTestContext.dataPlaneApiBaseUrl,
+          dataPlaneApiContainerId: systemTestContext.dataPlaneApiContainerId,
           dataPlaneWorkerBaseUrl: systemTestContext.dataPlaneWorkerBaseUrl,
+          dataPlaneWorkerContainerId: systemTestContext.dataPlaneWorkerContainerId,
           dataPlaneGatewayBaseUrl: systemTestContext.dataPlaneGatewayBaseUrl,
+          dataPlaneGatewayContainerId: systemTestContext.dataPlaneGatewayContainerId,
           tokenizerProxyBaseUrl: systemTestContext.tokenizerProxyBaseUrl,
+          tokenizerProxyContainerId: systemTestContext.tokenizerProxyContainerId,
           controlPlaneApiClient,
           db,
           request,

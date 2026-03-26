@@ -10,8 +10,13 @@ import {
 } from "./active-relay.js";
 import { handleAgentConnectRequest } from "./agent-channel.js";
 import { AsyncQueue } from "./async-queue.js";
-import { parseConnectRequestMessage, parsePtyConnectRequest } from "./connect-request.js";
+import {
+  parseConnectRequestMessage,
+  parsePtyConnectRequest,
+  type TunnelSocketMessage,
+} from "./connect-request.js";
 import { ExecutionLeaseEngine } from "./execution-lease-engine.js";
+import { handleFileUploadConnectRequest } from "./file-upload-channel.js";
 import {
   CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
   CONNECT_ERROR_CODE_UNSUPPORTED_CHANNEL,
@@ -32,7 +37,9 @@ import {
   runTunnelTokenExchangeLoop,
 } from "./token-exchange.js";
 import { parseTunnelMessageRouting } from "./tunnel-message.js";
-import { closeWebSocket, connectWebSocket, createWebSocketMessageQueue } from "./websocket.js";
+import { closeWebSocket, connectWebSocketWithMessageQueue } from "./websocket.js";
+
+const FileUploadAttachmentRootPath = "/tmp/attachments";
 
 export type TunnelCompletion =
   | {
@@ -128,11 +135,11 @@ async function waitForReconnect(signal: AbortSignal, delayMs: number): Promise<v
 async function handleTunnelConnection(input: {
   signal: AbortSignal;
   tunnelSocket: WebSocket;
+  tunnelMessages: AsyncQueue<TunnelSocketMessage>;
   executionLeases: ExecutionLeaseEngine;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
 }): Promise<void> {
-  const tunnelMessages = createWebSocketMessageQueue(input.tunnelSocket);
   const relayResultQueue = new AsyncQueue<ActiveTunnelStreamRelayResult>();
   const activeRelaysByStreamId = new Map<number, ActiveTunnelStreamRelay>();
   let activePtyRelay: ActiveTunnelStreamRelay | undefined;
@@ -142,7 +149,7 @@ async function handleTunnelConnection(input: {
     const nextTunnelMessageAbortController = new AbortController();
     const nextRelayResultAbortController = new AbortController();
     const nextTunnelMessage = ignorePromiseRejectionAfterAbort(
-      tunnelMessages
+      input.tunnelMessages
         .next(AbortSignal.any([input.signal, nextTunnelMessageAbortController.signal]))
         .then((message) => ({
           source: "tunnel" as const,
@@ -159,7 +166,6 @@ async function handleTunnelConnection(input: {
         })),
       nextRelayResultAbortController.signal,
     );
-
     const nextEvent = await Promise.race([nextTunnelMessage, nextRelayResult]);
     nextTunnelMessageAbortController.abort();
     nextRelayResultAbortController.abort();
@@ -251,6 +257,20 @@ async function handleTunnelConnection(input: {
           }
           continue;
         }
+        case "fileUpload": {
+          const relay = await handleFileUploadConnectRequest({
+            signal: input.signal,
+            tunnelSocket: input.tunnelSocket,
+            rawPayload: connectRequest.rawPayload,
+            streamId: connectRequest.streamId,
+            relayResultQueue,
+            attachmentRootPath: FileUploadAttachmentRootPath,
+          });
+          if (relay !== undefined) {
+            activeRelaysByStreamId.set(connectRequest.streamId, relay);
+          }
+          continue;
+        }
         default:
           await writeStreamOpenError(input.tunnelSocket, {
             type: "stream.open.error",
@@ -315,6 +335,7 @@ async function runTunnelClientLoop(input: {
     }
 
     let tunnelSocket: WebSocket;
+    let tunnelMessages: AsyncQueue<TunnelSocketMessage>;
     try {
       logSandboxRuntimeEvent({
         level: "info",
@@ -325,7 +346,12 @@ async function runTunnelClientLoop(input: {
       });
       const parsedUrl = parseGatewayUrl(input.gatewayWsUrl);
       parsedUrl.searchParams.set("bootstrap_token", input.tokens.currentBootstrapToken());
-      tunnelSocket = await connectWebSocket(parsedUrl.toString(), input.signal);
+      const connectedTunnel = await connectWebSocketWithMessageQueue({
+        url: parsedUrl.toString(),
+        signal: input.signal,
+      });
+      tunnelSocket = connectedTunnel.socket;
+      tunnelMessages = connectedTunnel.messages;
       logSandboxRuntimeEvent({
         level: "info",
         event: "sandbox_tunnel_connect_attempt_succeeded",
@@ -354,6 +380,7 @@ async function runTunnelClientLoop(input: {
       await handleTunnelConnection({
         signal: input.signal,
         tunnelSocket,
+        tunnelMessages,
         executionLeases,
         agentRuntimes: input.agentRuntimes,
         runtimeClients: input.runtimeClients,

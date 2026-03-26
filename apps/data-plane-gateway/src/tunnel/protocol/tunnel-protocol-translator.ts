@@ -77,12 +77,48 @@ function parseAgentStreamOpen(payload: string) {
   return message;
 }
 
+function parseFileUploadStreamOpen(payload: string) {
+  const message = parseStreamControlMessage(payload);
+  if (message?.type !== "stream.open" || message.channel.kind !== "fileUpload") {
+    return undefined;
+  }
+
+  return message;
+}
+
 function hasPTYExitEvent(message: StreamControlMessage): boolean {
   return message.type === "stream.event" && message.event.type === "pty.exit";
 }
 
+function hasFileUploadCompletedEvent(message: StreamControlMessage): boolean {
+  return message.type === "stream.event" && message.event.type === "fileUpload.completed";
+}
+
 function hasPTYResizeSignal(message: StreamControlMessage): boolean {
   return message.type === "stream.signal" && message.signal.type === "pty.resize";
+}
+
+function shouldReleaseStreamOnConnectionClose(binding: ClientStreamBinding): boolean {
+  return binding.channelKind !== "fileUpload";
+}
+
+function shouldReleaseStreamOnBootstrapMessage(input: {
+  binding: ClientStreamBinding;
+  message: Extract<StreamControlMessage, BootstrapControlMessage>;
+}): boolean {
+  if (input.message.type === "stream.open.error" || input.message.type === "stream.reset") {
+    return true;
+  }
+
+  if (input.binding.channelKind === "pty") {
+    return hasPTYExitEvent(input.message);
+  }
+
+  if (input.binding.channelKind === "fileUpload") {
+    return hasFileUploadCompletedEvent(input.message);
+  }
+
+  return false;
 }
 
 function createStreamOpenErrorPayload(input: {
@@ -134,7 +170,9 @@ function createInvalidStreamDataResetPayload(input: {
   const message =
     input.channelKind === "pty"
       ? "PTY streams only accept raw-bytes data frames."
-      : "Agent streams only accept websocket text or websocket binary data frames.";
+      : input.channelKind === "fileUpload"
+        ? "File upload streams only accept raw-bytes data frames."
+        : "Agent streams only accept websocket text or websocket binary data frames.";
 
   return createStreamResetPayload({
     code: "invalid_stream_data",
@@ -228,7 +266,7 @@ function isPayloadKindAllowedForChannel(input: {
   channelKind: ClientStreamBinding["channelKind"];
   payloadKind: number;
 }): boolean {
-  if (input.channelKind === "pty") {
+  if (input.channelKind === "pty" || input.channelKind === "fileUpload") {
     return input.payloadKind === PayloadKindRawBytes;
   }
 
@@ -372,6 +410,16 @@ export class TunnelProtocolTranslator {
       });
     }
 
+    const fileUploadStreamOpen = parseFileUploadStreamOpen(input.payload);
+    if (fileUploadStreamOpen !== undefined) {
+      return this.translateConnectionStreamOpen({
+        channelKind: "fileUpload",
+        clientSessionId: input.clientSessionId,
+        message: fileUploadStreamOpen,
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+    }
+
     const controlMessage = parseStreamControlMessage(input.payload);
     if (controlMessage === undefined) {
       throw new TunnelProtocolViolationError(
@@ -411,7 +459,8 @@ export class TunnelProtocolTranslator {
         }),
       }),
       releaseInteractiveStream:
-        controlMessage.type === "stream.close"
+        controlMessage.type === "stream.close" &&
+        shouldReleaseStreamOnConnectionClose(route.binding)
           ? toReleaseInteractiveStream(route.binding)
           : undefined,
     });
@@ -500,12 +549,12 @@ export class TunnelProtocolTranslator {
         }),
         targetConnectionSessionId: route.binding.clientSessionId,
       }),
-      releaseInteractiveStream:
-        controlMessage.type === "stream.open.error" ||
-        controlMessage.type === "stream.reset" ||
-        (route.binding.channelKind === "pty" && hasPTYExitEvent(controlMessage))
-          ? toReleaseInteractiveStream(route.binding)
-          : undefined,
+      releaseInteractiveStream: shouldReleaseStreamOnBootstrapMessage({
+        binding: route.binding,
+        message: controlMessage,
+      })
+        ? toReleaseInteractiveStream(route.binding)
+        : undefined,
     });
   }
 

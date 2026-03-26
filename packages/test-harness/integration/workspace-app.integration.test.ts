@@ -45,6 +45,7 @@ describe("workspace app launcher integration", () => {
         expect(response.status).toBe(200);
         await expect(response.text()).resolves.toBe("ok");
         expect(service.containerBaseUrl).toBe("http://workspace-http-app:38080");
+        expect(service.containerId).toMatch(/^[0-9a-f]{12,}$/);
       } finally {
         await service.stop();
       }
@@ -136,6 +137,7 @@ describe("workspace app launcher integration", () => {
 
         try {
           expect(service.containerBaseUrl).toBe("http://docker-target-app:38082");
+          expect(service.containerId).toMatch(/^[0-9a-f]{12,}$/);
         } finally {
           await service.stop();
         }

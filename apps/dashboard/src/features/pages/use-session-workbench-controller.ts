@@ -1,3 +1,6 @@
+import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/openai/agent/client";
+import { uploadSandboxImage } from "@mistle/sandbox-session-client";
+import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
 import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -7,7 +10,11 @@ import {
   resolveSessionConnectionReadiness,
   shouldAutoConnectSession,
 } from "../sessions/session-connect-policy.js";
-import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
+import {
+  getSandboxInstanceStatus,
+  mintSandboxInstanceConnectionToken,
+  resumeSandboxInstance,
+} from "../sessions/sessions-service.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   hasSessionTopAlert,
@@ -23,6 +30,12 @@ type ComposerConfigSnapshot = {
 
 type ComposerConfigDraft = ComposerConfigSnapshot & {
   baseConfigJson: string | null;
+};
+
+type PendingComposerAttachment = {
+  id: string;
+  file: File;
+  name: string;
 };
 
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
@@ -157,6 +170,7 @@ type SessionConversationPaneState = {
     isInterruptingTurn: boolean;
     isStartingTurn: boolean;
     isSteeringTurn: boolean;
+    isUploadingAttachments: boolean;
     isUpdatingComposerConfig: boolean;
     modelOptions: Array<{
       value: string;
@@ -164,8 +178,14 @@ type SessionConversationPaneState = {
     }>;
     onComposerTextChange: (nextText: string) => void;
     onModelChange: (nextModel: string) => void;
+    onPendingImageFilesAdded: (files: readonly File[]) => void;
     onReasoningEffortChange: (nextReasoningEffort: string) => void;
+    onRemovePendingAttachment: (attachmentId: string) => void;
     onSubmit: () => void;
+    pendingAttachments: readonly {
+      id: string;
+      name: string;
+    }[];
     selectedModel: string | null;
     selectedReasoningEffort: string | null;
   };
@@ -357,6 +377,10 @@ export function useSessionWorkbenchController(input: {
   sandboxInstanceId: string | null;
 }): UseSessionWorkbenchControllerResult {
   const [composerText, setComposerText] = useState("");
+  const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
+    readonly PendingComposerAttachment[]
+  >([]);
+  const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [hasAttemptedAutoConnect, setHasAttemptedAutoConnect] = useState(false);
   const [automationPendingSinceMs, setAutomationPendingSinceMs] = useState<number | null>(null);
   const [automationPendingErrorMessage, setAutomationPendingErrorMessage] = useState<string | null>(
@@ -388,6 +412,7 @@ export function useSessionWorkbenchController(input: {
     connectedSession,
     disconnectSession,
     isStartingSession,
+    reportStartErrorMessage,
     startErrorMessage,
     step,
   } = lifecycle;
@@ -507,6 +532,12 @@ export function useSessionWorkbenchController(input: {
       void disconnectPty();
     };
   }, [clearStartErrorMessage, disconnectPty, disconnectSession]);
+
+  useEffect(() => {
+    setComposerText("");
+    setPendingComposerAttachments([]);
+    setIsUploadingAttachments(false);
+  }, [input.sandboxInstanceId]);
 
   // Syncs a browser timer with the external automation-thread preparation window.
   useEffect(() => {
@@ -686,27 +717,127 @@ export function useSessionWorkbenchController(input: {
     label: model.displayName,
   }));
 
-  const submitComposer = useCallback((): void => {
-    const action = resolveChatComposerAction({
-      composerText,
-      hasActiveTurn,
+  const addPendingComposerFiles = useCallback((files: readonly File[]): void => {
+    const nextAttachments = files.flatMap((file) => {
+      if (!file.type.startsWith("image/")) {
+        return [];
+      }
+
+      return [
+        {
+          id: crypto.randomUUID(),
+          file,
+          name: file.name,
+        },
+      ];
     });
 
-    if (action.type === "interrupt_turn") {
-      interruptTurn();
+    if (nextAttachments.length === 0) {
       return;
     }
 
-    if (action.type === "steer_turn") {
-      steerTurn(action.prompt);
-    } else {
-      startTurn(action.prompt);
-    }
+    setPendingComposerAttachments((currentAttachments) => [
+      ...currentAttachments,
+      ...nextAttachments,
+    ]);
+  }, []);
 
-    if (action.shouldClearComposer) {
-      setComposerText("");
-    }
-  }, [composerText, hasActiveTurn, interruptTurn, startTurn, steerTurn]);
+  const removePendingComposerAttachment = useCallback((attachmentId: string): void => {
+    setPendingComposerAttachments((currentAttachments) =>
+      currentAttachments.filter((attachment) => attachment.id !== attachmentId),
+    );
+  }, []);
+
+  const submitComposer = useCallback((): void => {
+    void (async () => {
+      const action = resolveChatComposerAction({
+        composerText,
+        hasActiveTurn,
+        hasPendingAttachments: pendingComposerAttachments.length > 0,
+      });
+
+      if (action.type === "interrupt_turn") {
+        interruptTurn();
+        return;
+      }
+
+      let uploadedAttachments: readonly CodexTurnInputLocalImageItem[] = [];
+      if (pendingComposerAttachments.length > 0) {
+        if (
+          input.sandboxInstanceId === null ||
+          connectedSession === null ||
+          connectedSession.threadId === null
+        ) {
+          reportStartErrorMessage("Connect to a sandbox session before uploading images.");
+          return;
+        }
+
+        setIsUploadingAttachments(true);
+        try {
+          const runtime = createBrowserSandboxSessionRuntime();
+          const uploadedImages = [];
+          for (const attachment of pendingComposerAttachments) {
+            const mintedConnection = await mintSandboxInstanceConnectionToken({
+              instanceId: input.sandboxInstanceId,
+            });
+            uploadedImages.push(
+              await uploadSandboxImage({
+                connectionUrl: mintedConnection.connectionUrl,
+                file: attachment.file,
+                runtime,
+                threadId: connectedSession.threadId,
+              }),
+            );
+          }
+          uploadedAttachments = uploadedImages.map((image) => ({
+            type: "localImage",
+            path: image.path,
+          }));
+        } catch (error) {
+          reportStartErrorMessage(
+            error instanceof Error ? error.message : "Could not upload attached image.",
+          );
+          return;
+        } finally {
+          setIsUploadingAttachments(false);
+        }
+      }
+
+      try {
+        if (action.type === "steer_turn") {
+          await steerTurn({
+            prompt: action.prompt,
+            attachments: uploadedAttachments,
+          });
+        } else {
+          await startTurn({
+            prompt: action.prompt,
+            attachments: uploadedAttachments,
+          });
+        }
+      } catch (error) {
+        reportStartErrorMessage(
+          error instanceof Error ? error.message : "Could not submit chat message.",
+        );
+        return;
+      }
+
+      if (action.shouldClearComposer) {
+        setComposerText("");
+      }
+      setPendingComposerAttachments([]);
+    })();
+  }, [
+    composerText,
+    connectedSession,
+    input.sandboxInstanceId,
+    hasActiveTurn,
+    interruptTurn,
+    pendingComposerAttachments,
+    reportStartErrorMessage,
+    startTurn,
+    steerTurn,
+  ]);
 
   const requestStoppedSandboxResume = useCallback(async (): Promise<void> => {
     if (
@@ -817,6 +948,7 @@ export function useSessionWorkbenchController(input: {
         isInterruptingTurn: chat.isInterruptingTurn,
         isStartingTurn: chat.isStartingTurn,
         isSteeringTurn: chat.isSteeringTurn,
+        isUploadingAttachments,
         isUpdatingComposerConfig:
           admin.isBatchWritingConfig ||
           admin.isLoadingModels ||
@@ -825,8 +957,14 @@ export function useSessionWorkbenchController(input: {
         modelOptions: composerModelOptions,
         onComposerTextChange: setComposerText,
         onModelChange: setComposerModel,
+        onPendingImageFilesAdded: addPendingComposerFiles,
         onReasoningEffortChange: setComposerReasoningEffort,
+        onRemovePendingAttachment: removePendingComposerAttachment,
         onSubmit: submitComposer,
+        pendingAttachments: pendingComposerAttachments.map((attachment) => ({
+          id: attachment.id,
+          name: attachment.name,
+        })),
         selectedModel: activeComposerConfig.model,
         selectedReasoningEffort: activeComposerConfig.modelReasoningEffort,
       },

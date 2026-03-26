@@ -2,6 +2,7 @@ import { systemClock, systemSleeper } from "@mistle/time";
 import { GenericContainer, type StartedTestContainer } from "testcontainers";
 
 import { registerProcessCleanupTask } from "../../cleanup/index.js";
+import { stopContainerIgnoringMissing } from "../../docker/cleanup.js";
 
 const HTTP_ECHO_IMAGE = "mendhak/http-https-echo:38";
 const HTTP_ECHO_PORT = 8080;
@@ -60,7 +61,7 @@ export async function startHttpEcho(input: StartHttpEchoInput = {}): Promise<Htt
       throw new Error("HTTP echo container was not started.");
     }
 
-    await container.stop({
+    await stopContainerIgnoringMissing(container, {
       remove: true,
       removeVolumes: true,
       timeout: 0,

@@ -166,6 +166,7 @@ export function createConnectedCodexSession(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     connectedAtIso: input.connectedAtIso,
     expiresAtIso: input.mintedConnection.connectionExpiresAt,
+    connectionUrl: input.mintedConnection.connectionUrl,
     threadId: input.threadId,
   };
 }

@@ -1,5 +1,11 @@
 export type CodexItemStatus = "streaming" | "completed";
 
+export type NormalizedLocalImageAttachment = {
+  kind: "image";
+  path: string;
+  name: string;
+};
+
 export type NormalizedFileChange = {
   path: string;
   kind: string | null;
@@ -18,6 +24,7 @@ export type NormalizedCodexThreadItem =
       id: string;
       turnId: string;
       text: string;
+      attachments: readonly NormalizedLocalImageAttachment[];
     }
   | {
       kind: "assistant-message";
