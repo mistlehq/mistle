@@ -1813,6 +1813,8 @@ export interface paths {
                         resourceKind: string;
                       }
                     | {
+                        /** @enum {string} */
+                        controlVariant?: "explicit-invocation";
                         defaultEnabled?: boolean;
                         defaultValue?: string;
                         id: string;
@@ -1824,8 +1826,6 @@ export interface paths {
                         payloadPath: string[];
                         placeholder?: string;
                         prefix?: string;
-                        /** @enum {string} */
-                        uiHint?: "explicit-invocation";
                       }
                     | {
                         id: string;

@@ -25,10 +25,10 @@ function createDirectoryData(input?: {
       label: string;
       kind: "string";
       payloadPath: string[];
-      matchMode?: "eq" | "contains";
+      matchMode?: "eq" | "contains" | "contains_token";
       defaultValue?: string;
       defaultEnabled?: boolean;
-      uiHint?: "explicit-invocation";
+      controlVariant?: "explicit-invocation";
     }>;
   }[];
 }) {
@@ -287,10 +287,10 @@ describe("useLoadedWebhookAutomationEditorState", () => {
                     label: "explicit mention",
                     kind: "string",
                     payloadPath: ["comment", "body"],
-                    matchMode: "contains",
+                    matchMode: "contains_token",
                     defaultValue: "@mistlebot",
                     defaultEnabled: true,
-                    uiHint: "explicit-invocation",
+                    controlVariant: "explicit-invocation",
                   },
                 ],
               },

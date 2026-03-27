@@ -9,7 +9,7 @@ type PayloadFilterNode =
       filters: PayloadFilterNode[];
     }
   | {
-      op: "eq" | "contains";
+      op: "eq" | "contains" | "contains_token";
       path: string[];
       value: string;
     }
@@ -75,6 +75,18 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
     };
   }
 
+  if (value["op"] === "contains_token") {
+    if (!isStringArray(value["path"]) || typeof value["value"] !== "string") {
+      return null;
+    }
+
+    return {
+      op: "contains_token",
+      path: value["path"],
+      value: value["value"],
+    };
+  }
+
   if (value["op"] === "exists" || value["op"] === "not_exists") {
     if (!isStringArray(value["path"])) {
       return null;
@@ -100,6 +112,14 @@ function buildEqNode(input: { path: string[]; value: string }): PayloadFilterNod
 function buildContainsNode(input: { path: string[]; value: string }): PayloadFilterNode {
   return {
     op: "contains",
+    path: input.path,
+    value: input.value,
+  };
+}
+
+function buildContainsTokenNode(input: { path: string[]; value: string }): PayloadFilterNode {
+  return {
+    op: "contains_token",
     path: input.path,
     value: input.value,
   };
@@ -151,6 +171,16 @@ function buildPayloadFilterNodeFromTriggerParameters(input: {
       if (parameter.kind === "string" && parameter.matchMode === "contains") {
         filters.push(
           buildContainsNode({
+            path: [...parameter.payloadPath],
+            value: configuredValue,
+          }),
+        );
+        continue;
+      }
+
+      if (parameter.kind === "string" && parameter.matchMode === "contains_token") {
+        filters.push(
+          buildContainsTokenNode({
             path: [...parameter.payloadPath],
             value: configuredValue,
           }),
@@ -237,6 +267,7 @@ export function extractWebhookAutomationTriggerParameterValues(input: {
     if (
       filter.op !== "eq" &&
       filter.op !== "contains" &&
+      filter.op !== "contains_token" &&
       filter.op !== "exists" &&
       filter.op !== "not_exists"
     ) {
@@ -268,8 +299,11 @@ export function extractWebhookAutomationTriggerParameterValues(input: {
             break;
           }
 
-          if (parameter.kind === "string" && parameter.matchMode === "contains") {
-            if (filter.op === "contains") {
+          if (
+            parameter.kind === "string" &&
+            (parameter.matchMode === "contains" || parameter.matchMode === "contains_token")
+          ) {
+            if (filter.op === parameter.matchMode) {
               triggerParameterValues[triggerId] = {
                 ...(triggerParameterValues[triggerId] ?? {}),
                 [parameter.id]: filter.value,

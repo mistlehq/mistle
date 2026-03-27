@@ -33,10 +33,10 @@ type ResolvedWebhookEventParameter =
       label: string;
       kind: "string";
       payloadPath: string[];
-      matchMode?: "eq" | "contains";
+      matchMode?: "eq" | "contains" | "contains_token";
       defaultValue?: string;
       defaultEnabled?: boolean;
-      uiHint?: "explicit-invocation";
+      controlVariant?: "explicit-invocation";
       prefix?: string;
       placeholder?: string;
     }
@@ -136,7 +136,7 @@ function cloneWebhookEventParameter(
     ...(parameter.matchMode === undefined ? {} : { matchMode: parameter.matchMode }),
     ...(parameter.defaultValue === undefined ? {} : { defaultValue: parameter.defaultValue }),
     ...(parameter.defaultEnabled === undefined ? {} : { defaultEnabled: parameter.defaultEnabled }),
-    ...(parameter.uiHint === undefined ? {} : { uiHint: parameter.uiHint }),
+    ...(parameter.controlVariant === undefined ? {} : { controlVariant: parameter.controlVariant }),
     ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
     ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
   };

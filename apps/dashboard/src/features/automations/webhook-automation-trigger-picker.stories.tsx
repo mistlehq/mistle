@@ -44,10 +44,10 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
         label: "explicit mention",
         kind: "string",
         payloadPath: ["comment", "body"],
-        matchMode: "contains",
+        matchMode: "contains_token",
         defaultValue: "@mistlebot",
         defaultEnabled: true,
-        uiHint: "explicit-invocation",
+        controlVariant: "explicit-invocation",
         placeholder: 'Require "@mistlebot"',
       },
       {
@@ -99,6 +99,19 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
     label: "Issue opened",
     category: "GitHub Engineering / Issues",
     logoKey: "github",
+    parameters: [
+      {
+        id: "explicitInvocation",
+        label: "explicit mention",
+        kind: "string",
+        payloadPath: ["issue", "body"],
+        matchMode: "contains_token",
+        defaultValue: "@mistlebot",
+        defaultEnabled: true,
+        controlVariant: "explicit-invocation",
+        placeholder: 'Require "@mistlebot"',
+      },
+    ],
   },
   {
     id: PullRequestOpenedTriggerId,
@@ -109,6 +122,17 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
     category: "GitHub Engineering / Pull requests",
     logoKey: "github",
     parameters: [
+      {
+        id: "explicitInvocation",
+        label: "explicit mention",
+        kind: "string",
+        payloadPath: ["pull_request", "body"],
+        matchMode: "contains_token",
+        defaultValue: "@mistlebot",
+        defaultEnabled: true,
+        controlVariant: "explicit-invocation",
+        placeholder: 'Require "@mistlebot"',
+      },
       {
         id: "repository",
         label: "repository",
@@ -145,6 +169,19 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
     label: "Pull request review comment created",
     category: "GitHub Engineering / Pull requests",
     logoKey: "github",
+    parameters: [
+      {
+        id: "explicitInvocation",
+        label: "explicit mention",
+        kind: "string",
+        payloadPath: ["comment", "body"],
+        matchMode: "contains_token",
+        defaultValue: "@mistlebot",
+        defaultEnabled: true,
+        controlVariant: "explicit-invocation",
+        placeholder: 'Require "@mistlebot"',
+      },
+    ],
   },
 ];
 

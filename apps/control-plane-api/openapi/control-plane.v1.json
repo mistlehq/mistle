@@ -3602,7 +3602,7 @@
                                           },
                                           "matchMode": {
                                             "type": "string",
-                                            "enum": ["eq", "contains"]
+                                            "enum": ["eq", "contains", "contains_token"]
                                           },
                                           "defaultValue": {
                                             "type": "string",
@@ -3611,7 +3611,7 @@
                                           "defaultEnabled": {
                                             "type": "boolean"
                                           },
-                                          "uiHint": {
+                                          "controlVariant": {
                                             "type": "string",
                                             "enum": ["explicit-invocation"]
                                           },

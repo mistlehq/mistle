@@ -212,14 +212,14 @@ describe("toWebhookAutomationFormValues", () => {
     });
   });
 
-  it("hydrates explicit invocation trigger parameters out of contains filters", () => {
+  it("hydrates explicit invocation trigger parameters out of contains_token filters", () => {
     expect(
       toWebhookAutomationFormValues(
         {
           ...SampleAutomation,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: {
-            op: "contains",
+            op: "contains_token",
             path: ["comment", "body"],
             value: "@mistlebot",
           },
@@ -458,7 +458,7 @@ describe("automation payload transforms", () => {
     });
   });
 
-  it("builds explicit invocation trigger parameters into contains payload filters", () => {
+  it("builds explicit invocation trigger parameters into contains_token payload filters", () => {
     expect(
       toCreateWebhookAutomationPayload(
         {
@@ -481,7 +481,7 @@ describe("automation payload transforms", () => {
       idempotencyKeyTemplate: null,
       eventTypes: ["github.issue_comment.created"],
       payloadFilter: {
-        op: "contains",
+        op: "contains_token",
         path: ["comment", "body"],
         value: "@mistlebot",
       },

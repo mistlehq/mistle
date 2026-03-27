@@ -46,10 +46,10 @@ export const IntegrationWebhookEventDefinitionSchema = z
               label: z.string().min(1),
               kind: z.literal("string"),
               payloadPath: z.array(z.string().min(1)).min(1),
-              matchMode: z.enum(["eq", "contains"]).optional(),
+              matchMode: z.enum(["eq", "contains", "contains_token"]).optional(),
               defaultValue: z.string().min(1).optional(),
               defaultEnabled: z.boolean().optional(),
-              uiHint: z.enum(["explicit-invocation"]).optional(),
+              controlVariant: z.enum(["explicit-invocation"]).optional(),
               prefix: z.string().min(1).optional(),
               placeholder: z.string().min(1).optional(),
             })

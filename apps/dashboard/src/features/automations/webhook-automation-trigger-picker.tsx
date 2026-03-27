@@ -406,7 +406,7 @@ function TriggerParameterField(input: {
   });
 
   if (input.parameter.kind === "string") {
-    if (input.parameter.uiHint === "explicit-invocation") {
+    if (input.parameter.controlVariant === "explicit-invocation") {
       const switchId = `${input.eventType}:${input.parameter.id}`;
       const explicitInvocationValue = input.parameter.defaultValue ?? "@mistlebot";
       const checked = input.value.trim().length > 0;

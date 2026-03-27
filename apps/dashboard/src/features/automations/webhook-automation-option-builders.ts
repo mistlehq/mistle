@@ -250,7 +250,9 @@ function buildSelectableWebhookAutomationEventOptions(input: {
                         ...(parameter.defaultEnabled === undefined
                           ? {}
                           : { defaultEnabled: parameter.defaultEnabled }),
-                        ...(parameter.uiHint === undefined ? {} : { uiHint: parameter.uiHint }),
+                        ...(parameter.controlVariant === undefined
+                          ? {}
+                          : { controlVariant: parameter.controlVariant }),
                         ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
                         ...(parameter.placeholder === undefined
                           ? {}

@@ -166,10 +166,10 @@ export function createGithubIssueCommentCreatedEventOption(
         label: "explicit mention",
         kind: "string",
         payloadPath: ["comment", "body"],
-        matchMode: "contains",
+        matchMode: "contains_token",
         defaultValue: "@mistlebot",
         defaultEnabled: true,
-        uiHint: "explicit-invocation",
+        controlVariant: "explicit-invocation",
         placeholder: 'Require "@mistlebot"',
       },
       {
@@ -225,6 +225,17 @@ export function createGithubPullRequestOpenedEventOption(
       },
     ],
     parameters: [
+      {
+        id: "explicitInvocation",
+        label: "explicit mention",
+        kind: "string",
+        payloadPath: ["pull_request", "body"],
+        matchMode: "contains_token",
+        defaultValue: "@mistlebot",
+        defaultEnabled: true,
+        controlVariant: "explicit-invocation",
+        placeholder: 'Require "@mistlebot"',
+      },
       {
         id: "author",
         label: "author",

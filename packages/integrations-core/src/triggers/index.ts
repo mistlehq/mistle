@@ -58,6 +58,13 @@ export const TriggerFilterSchema: z.ZodType<TriggerFilter> = z.lazy(() =>
       .strict(),
     z
       .object({
+        op: z.literal("containsToken"),
+        path: z.string().min(1),
+        value: z.string(),
+      })
+      .strict(),
+    z
+      .object({
         op: z.literal("startsWith"),
         path: z.string().min(1),
         value: z.string(),
@@ -111,6 +118,38 @@ function getValueAtPath(input: { payload: unknown; path: string }): unknown {
   }
 
   return cursor;
+}
+
+function isTokenBoundaryCharacter(value: string): boolean {
+  return !/[A-Za-z0-9_]/.test(value);
+}
+
+function containsToken(input: { value: string; token: string }): boolean {
+  if (input.token.length === 0) {
+    return false;
+  }
+
+  let searchStartIndex = 0;
+
+  while (true) {
+    const matchedIndex = input.value.indexOf(input.token, searchStartIndex);
+    if (matchedIndex === -1) {
+      return false;
+    }
+
+    const precedingCharacter = matchedIndex === 0 ? null : (input.value[matchedIndex - 1] ?? null);
+    const followingCharacter = input.value[matchedIndex + input.token.length] ?? null;
+    const hasLeadingBoundary =
+      precedingCharacter === null || isTokenBoundaryCharacter(precedingCharacter);
+    const hasTrailingBoundary =
+      followingCharacter === null || isTokenBoundaryCharacter(followingCharacter);
+
+    if (hasLeadingBoundary && hasTrailingBoundary) {
+      return true;
+    }
+
+    searchStartIndex = matchedIndex + 1;
+  }
 }
 
 export function evaluateTriggerFilter(input: { filter: TriggerFilter; payload: unknown }): boolean {
@@ -173,6 +212,17 @@ export function evaluateTriggerFilter(input: { filter: TriggerFilter; payload: u
     }
 
     return resolvedValue.includes(filter.value);
+  }
+
+  if (filter.op === "containsToken") {
+    if (typeof resolvedValue !== "string") {
+      return false;
+    }
+
+    return containsToken({
+      value: resolvedValue,
+      token: filter.value,
+    });
   }
 
   if (filter.op === "startsWith") {
