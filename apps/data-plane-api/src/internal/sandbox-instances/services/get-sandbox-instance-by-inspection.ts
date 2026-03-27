@@ -72,18 +72,7 @@ async function inspectStartingSandboxInstance(
     };
   }
 
-  let inspection: Awaited<ReturnType<SandboxAdapter["inspect"]>> | null;
-  try {
-    inspection = await ctx.sandboxAdapter.inspect({
-      id: sandboxInstance.providerSandboxId,
-    });
-  } catch (error) {
-    if (!isSandboxResourceNotFoundError(error)) {
-      throw error;
-    }
-
-    inspection = null;
-  }
+  const inspection = await inspectSandboxInstanceOrNull(ctx, sandboxInstance.providerSandboxId);
 
   if (inspection === null) {
     return {
@@ -126,23 +115,11 @@ async function inspectRunningSandboxInstance(
     );
   }
 
-  let inspection: Awaited<ReturnType<SandboxAdapter["inspect"]>> | null;
-  try {
-    inspection = await ctx.sandboxAdapter.inspect({
-      id: sandboxInstance.providerSandboxId,
-    });
-  } catch (error) {
-    if (!isSandboxResourceNotFoundError(error)) {
-      throw error;
-    }
-
+  const inspection = await inspectSandboxInstanceOrNull(ctx, sandboxInstance.providerSandboxId);
+  if (inspection === null) {
     await markRunningSandboxInstanceStopped(ctx, {
       sandboxInstanceId: sandboxInstance.id,
     });
-    inspection = null;
-  }
-
-  if (inspection === null) {
     return {
       id: sandboxInstance.id,
       status: SandboxInstanceStatuses.STOPPED,
@@ -170,6 +147,23 @@ async function inspectRunningSandboxInstance(
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
   };
+}
+
+async function inspectSandboxInstanceOrNull(
+  ctx: Pick<GetSandboxInstanceByInspectionContext, "sandboxAdapter">,
+  providerSandboxId: string,
+) {
+  try {
+    return await ctx.sandboxAdapter.inspect({
+      id: providerSandboxId,
+    });
+  } catch (error) {
+    if (!isSandboxResourceNotFoundError(error)) {
+      throw error;
+    }
+
+    return null;
+  }
 }
 
 export async function getSandboxInstanceByInspection(
