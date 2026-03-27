@@ -2,7 +2,13 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect } from "vitest";
 
-import { SandboxProvider, SandboxRuntimeEnv, SandboxRuntimeEnvDefaults } from "../../src/index.js";
+import {
+  SandboxProvider,
+  SandboxResourceNotFoundError,
+  SandboxRuntimeEnv,
+  SandboxRuntimeEnvDefaults,
+} from "../../src/index.js";
+import { createE2BTemplateAlias } from "../../src/providers/e2b/template-registry.js";
 import { e2bAdapterIntegrationEnabled, it } from "./test-context.js";
 
 const describeE2BAdapterIntegration = e2bAdapterIntegrationEnabled ? describe : describe.skip;
@@ -21,6 +27,7 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
 
   it("starts a sandbox from the shared base image and injects env", async ({ fixture }) => {
     const injectedEnvValue = `mistle-e2b-env-${randomUUID()}`;
+    const expectedTemplateAlias = createE2BTemplateAlias(fixture.baseImage.imageId);
     let id: string | undefined;
 
     try {
@@ -34,6 +41,18 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
 
       expect(sandbox.provider).toBe(SandboxProvider.E2B);
       expect(sandbox.id).not.toBe("");
+
+      const inspection = await fixture.adapter.inspect({ id: sandbox.id });
+      expect(inspection.provider).toBe(SandboxProvider.E2B);
+      if (inspection.provider !== SandboxProvider.E2B) {
+        throw new Error("Expected E2B sandbox inspection result.");
+      }
+      expect(inspection.id).toBe(sandbox.id);
+      expect(inspection.state).toBe("running");
+      expect(inspection.raw.templateId).not.toBe("");
+      expect(inspection.raw.metadata.mistle_template_alias).toBe(expectedTemplateAlias);
+      expect(inspection.raw.cpuCount).toBeGreaterThan(0);
+      expect(inspection.raw.memoryMB).toBeGreaterThan(0);
 
       const connectedSandbox = await fixture.connectSandbox(sandbox.id);
       const result = await connectedSandbox.commands.run(
@@ -58,6 +77,7 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
     fixture,
   }) => {
     const marker = `mistle-e2b-state-${randomUUID()}`;
+    const expectedTemplateAlias = createE2BTemplateAlias(fixture.baseImage.imageId);
     let id: string | undefined;
 
     try {
@@ -70,6 +90,13 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
       await startedSandbox.files.write(SANDBOX_STATE_FILE_PATH, marker);
 
       await fixture.adapter.stop({ id: sandbox.id });
+
+      const stoppedInspection = await fixture.adapter.inspect({ id: sandbox.id });
+      if (stoppedInspection.provider !== SandboxProvider.E2B) {
+        throw new Error("Expected E2B sandbox inspection result after stop.");
+      }
+      expect(stoppedInspection.state).toBe("stopped");
+      expect(stoppedInspection.raw.metadata.mistle_template_alias).toBe(expectedTemplateAlias);
 
       const resumedSandbox = await fixture.adapter.resume({
         id: sandbox.id,
@@ -85,5 +112,26 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
         await fixture.adapter.destroy({ id });
       }
     }
+  }, 300_000);
+
+  it("surfaces sandbox not found after destroy", async ({ fixture }) => {
+    const sandbox = await fixture.adapter.start({
+      image: fixture.baseImage,
+    });
+
+    await fixture.adapter.destroy({ id: sandbox.id });
+
+    await expect(fixture.adapter.inspect({ id: sandbox.id })).rejects.toBeInstanceOf(
+      SandboxResourceNotFoundError,
+    );
+    await expect(fixture.adapter.resume({ id: sandbox.id })).rejects.toBeInstanceOf(
+      SandboxResourceNotFoundError,
+    );
+    await expect(fixture.adapter.stop({ id: sandbox.id })).rejects.toBeInstanceOf(
+      SandboxResourceNotFoundError,
+    );
+    await expect(fixture.adapter.destroy({ id: sandbox.id })).rejects.toBeInstanceOf(
+      SandboxResourceNotFoundError,
+    );
   }, 300_000);
 });

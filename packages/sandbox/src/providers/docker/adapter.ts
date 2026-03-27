@@ -9,12 +9,14 @@ import {
   type SandboxAdapter,
   type SandboxDestroyRequest,
   type SandboxHandle,
+  type SandboxInspectRequest,
   type SandboxResumeRequestV1,
   type SandboxStartRequest,
   type SandboxStopRequest,
 } from "../../types.js";
 import { DockerClientError, DockerClientErrorCodes } from "./client-errors.js";
 import type { DockerClient } from "./client.js";
+import type { DockerSandboxInspectResult } from "./types.js";
 
 export class DockerSandboxAdapter implements SandboxAdapter {
   readonly #client: DockerClient;
@@ -38,6 +40,28 @@ export class DockerSandboxAdapter implements SandboxAdapter {
       provider: SandboxProvider.DOCKER,
       id,
     };
+  }
+
+  async inspect(request: SandboxInspectRequest): Promise<DockerSandboxInspectResult> {
+    if (request.id.trim().length === 0) {
+      throw new SandboxConfigurationError("Runtime id is required.");
+    }
+
+    try {
+      return await this.#client.inspectSandbox({
+        runtimeId: request.id,
+      });
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw new SandboxResourceNotFoundError({
+          resourceType: "sandbox",
+          resourceId: request.id,
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
   }
 
   async resume(request: SandboxResumeRequestV1): Promise<SandboxHandle> {
@@ -97,7 +121,7 @@ export class DockerSandboxAdapter implements SandboxAdapter {
   }
 }
 
-export function createDockerSandboxAdapter(input: { client: DockerClient }): SandboxAdapter {
+export function createDockerSandboxAdapter(input: { client: DockerClient }): DockerSandboxAdapter {
   if (input.client === undefined) {
     throw new SandboxProviderNotImplementedError("Docker client is required to construct adapter.");
   }

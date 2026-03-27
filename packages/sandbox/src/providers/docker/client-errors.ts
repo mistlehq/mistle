@@ -34,6 +34,12 @@ export const DockerClientOperationIds = {
    * Source:
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L47-L76
    */
+  INSPECT_CONTAINER: "inspect_container",
+  /**
+   * `container.inspect(...)`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L47-L76
+   */
   RESOLVE_CONTAINER: "resolve_container",
   /**
    * `container.remove(...)`.

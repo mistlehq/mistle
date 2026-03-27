@@ -3,8 +3,18 @@ import { randomUUID } from "node:crypto";
 import type Docker from "dockerode";
 import { describe, expect } from "vitest";
 
-import { SandboxProvider, SandboxRuntimeEnv, SandboxRuntimeEnvDefaults } from "../../src/index.js";
-import { dockerAdapterIntegrationEnabled, it } from "./test-context.js";
+import {
+  SandboxProvider,
+  SandboxResourceNotFoundError,
+  SandboxRuntimeEnv,
+  SandboxRuntimeEnvDefaults,
+} from "../../src/index.js";
+import { createDockerAdapter } from "../../src/providers/docker/index.js";
+import {
+  dockerAdapterIntegrationEnabled,
+  dockerAdapterIntegrationSettings,
+  it,
+} from "./test-context.js";
 
 const describeDockerAdapterIntegration = dockerAdapterIntegrationEnabled ? describe : describe.skip;
 const START_MARKER_FILE_PATH = "/tmp/mistle-start-marker.txt";
@@ -126,6 +136,18 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       expect(sandbox.provider).toBe(SandboxProvider.DOCKER);
       expect(sandbox.id).not.toBe("");
 
+      const inspection = await fixture.adapter.inspect({ id: sandbox.id });
+      expect(inspection.provider).toBe(SandboxProvider.DOCKER);
+      if (inspection.provider !== SandboxProvider.DOCKER) {
+        throw new Error("Expected Docker sandbox inspection result.");
+      }
+      expect(inspection.id).toBe(sandbox.id);
+      expect(inspection.state).toBe("running");
+      expect(inspection.raw.Config.Image).toBe(fixture.baseImage.imageId);
+      expect(inspection.raw.Config.Labels["mistle.sandbox.provider"]).toBe("docker");
+      expect(inspection.raw.State.Running).toBe(true);
+      expect(inspection.startedAt).not.toBeNull();
+
       await writeSandboxFile({
         dockerClient: fixture.dockerClient,
         id: sandbox.id,
@@ -184,6 +206,37 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
     }
   }, 300_000);
 
+  it("removes a created container if docker start fails", async ({ fixture }) => {
+    if (!dockerAdapterIntegrationSettings.enabled) {
+      throw new Error("Docker integration settings are required for the start failure test.");
+    }
+
+    const failingAdapter = createDockerAdapter({
+      socketPath: dockerAdapterIntegrationSettings.socketPath,
+      networkName: `missing-network-${randomUUID()}`,
+    });
+    const listOptions = {
+      all: true,
+      filters: {
+        label: ["mistle.sandbox.provider=docker"],
+      },
+    };
+    const beforeIds = new Set(
+      (await fixture.dockerClient.listContainers(listOptions)).map((container) => container.Id),
+    );
+
+    await expect(
+      failingAdapter.start({
+        image: fixture.baseImage,
+      }),
+    ).rejects.toBeInstanceOf(Error);
+
+    const afterIds = new Set(
+      (await fixture.dockerClient.listContainers(listOptions)).map((container) => container.Id),
+    );
+    expect(afterIds).toEqual(beforeIds);
+  }, 300_000);
+
   it("stops and resumes a docker runtime with the same runtime id and filesystem state", async ({
     fixture,
   }) => {
@@ -203,6 +256,14 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
 
       await fixture.adapter.stop({ id: sandbox.id });
 
+      const stoppedInspection = await fixture.adapter.inspect({ id: sandbox.id });
+      if (stoppedInspection.provider !== SandboxProvider.DOCKER) {
+        throw new Error("Expected Docker sandbox inspection result after stop.");
+      }
+      expect(stoppedInspection.state).toBe("stopped");
+      expect(stoppedInspection.raw.State.Running).toBe(false);
+      expect(stoppedInspection.raw.State.ExitCode).not.toBeNull();
+
       const resumedSandbox = await fixture.adapter.resume({
         id: sandbox.id,
       });
@@ -221,5 +282,24 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
         await fixture.adapter.destroy({ id });
       }
     }
+  }, 300_000);
+
+  it("surfaces sandbox not found after destroy", async ({ fixture }) => {
+    const sandbox = await fixture.adapter.start({ image: fixture.baseImage });
+
+    await fixture.adapter.destroy({ id: sandbox.id });
+
+    await expect(fixture.adapter.inspect({ id: sandbox.id })).rejects.toBeInstanceOf(
+      SandboxResourceNotFoundError,
+    );
+    await expect(fixture.adapter.resume({ id: sandbox.id })).rejects.toBeInstanceOf(
+      SandboxResourceNotFoundError,
+    );
+    await expect(fixture.adapter.stop({ id: sandbox.id })).rejects.toBeInstanceOf(
+      SandboxResourceNotFoundError,
+    );
+    await expect(fixture.adapter.destroy({ id: sandbox.id })).rejects.toBeInstanceOf(
+      SandboxResourceNotFoundError,
+    );
   }, 300_000);
 });

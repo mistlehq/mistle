@@ -2,6 +2,7 @@ import { systemSleeper } from "@mistle/time";
 import { CommandExitError, Sandbox, type ConnectionOpts } from "e2b";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
+import { SandboxInspectStates } from "../../types.js";
 import {
   E2BClientError,
   E2BClientErrorCodes,
@@ -12,16 +13,19 @@ import type { E2BSandboxConfig } from "./config.js";
 import {
   E2BApplyStartupRequestSchema,
   E2BDestroySandboxRequestSchema,
+  E2BInspectSandboxRequestSchema,
   E2BResumeSandboxRequestSchema,
   E2BStartSandboxRequestSchema,
   E2BStopSandboxRequestSchema,
   type E2BApplyStartupRequest,
   type E2BDestroySandboxRequest,
+  type E2BInspectSandboxRequest,
   type E2BResumeSandboxRequest,
   type E2BStartSandboxRequest,
   type E2BStopSandboxRequest,
 } from "./schemas.js";
 import { E2BApiTemplateRegistry, type E2BTemplateRegistry } from "./template-registry.js";
+import type { E2BSandboxInspectResult } from "./types.js";
 
 const ApplyStartupCommand = "/usr/local/bin/sandboxd apply-startup";
 const StartSupervisorCommand = "/usr/bin/tini -s -- /usr/local/bin/sandboxd serve";
@@ -29,6 +33,7 @@ const SupervisorSocketPath = "/run/mistle/startup-config.sock";
 const SupervisorTokenPath = "/run/mistle/startup-config.token";
 const SupervisorReadinessPollIntervalMs = 100;
 const SupervisorReadinessPollAttempts = 100;
+const E2BTemplateAliasMetadataKey = "mistle_template_alias";
 
 export type E2BStartSandboxResponse = {
   sandboxId: string;
@@ -36,6 +41,7 @@ export type E2BStartSandboxResponse = {
 
 export interface E2BClient {
   startSandbox(request: E2BStartSandboxRequest): Promise<E2BStartSandboxResponse>;
+  inspectSandbox(request: E2BInspectSandboxRequest): Promise<E2BSandboxInspectResult>;
   resumeSandbox(request: E2BResumeSandboxRequest): Promise<E2BStartSandboxResponse>;
   stopSandbox(request: E2BStopSandboxRequest): Promise<void>;
   destroySandbox(request: E2BDestroySandboxRequest): Promise<void>;
@@ -102,6 +108,15 @@ async function sleep(ms: number): Promise<void> {
   await systemSleeper.sleep(ms);
 }
 
+function normalizeE2BInspectState(state: "running" | "paused"): E2BSandboxInspectResult["state"] {
+  switch (state) {
+    case "running":
+      return SandboxInspectStates.RUNNING;
+    case "paused":
+      return SandboxInspectStates.STOPPED;
+  }
+}
+
 export class E2BApiClient implements E2BClient {
   readonly #connectionOptions: ConnectionOpts;
   readonly #templateRegistry: E2BTemplateRegistry;
@@ -122,6 +137,9 @@ export class E2BApiClient implements E2BClient {
         lifecycle: {
           onTimeout: "pause",
         },
+        metadata: {
+          [E2BTemplateAliasMetadataKey]: templateAlias,
+        },
         envs: withRequiredSandboxRuntimeEnv(parsedRequest.env),
       });
 
@@ -130,6 +148,26 @@ export class E2BApiClient implements E2BClient {
       };
     } catch (error) {
       throw mapE2BClientError(E2BClientOperationIds.CREATE_SANDBOX, error);
+    }
+  }
+
+  async inspectSandbox(request: E2BInspectSandboxRequest): Promise<E2BSandboxInspectResult> {
+    const parsedRequest = E2BInspectSandboxRequestSchema.parse(request);
+
+    try {
+      const sandbox = await Sandbox.getInfo(parsedRequest.sandboxId, this.#connectionOptions);
+
+      return {
+        provider: "e2b",
+        id: sandbox.sandboxId,
+        state: normalizeE2BInspectState(sandbox.state),
+        createdAt: sandbox.startedAt.toISOString(),
+        startedAt: sandbox.startedAt.toISOString(),
+        endedAt: sandbox.endAt.toISOString(),
+        raw: sandbox,
+      };
+    } catch (error) {
+      throw mapE2BClientError(E2BClientOperationIds.GET_SANDBOX_INFO, error);
     }
   }
 
