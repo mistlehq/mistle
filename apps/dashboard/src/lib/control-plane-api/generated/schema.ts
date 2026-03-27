@@ -1822,7 +1822,7 @@ export interface paths {
                         kind: "string";
                         label: string;
                         /** @enum {string} */
-                        matchMode?: "eq" | "contains";
+                        matchMode?: "eq" | "contains" | "contains_token";
                         payloadPath: string[];
                         placeholder?: string;
                         prefix?: string;
