@@ -1,7 +1,7 @@
 import Docker from "dockerode";
 import { z } from "zod";
 
-import { SandboxInspectStates, type DockerSandboxInspectResult } from "../../types.js";
+import { SandboxInspectStates } from "../../types.js";
 import {
   DockerClientOperationIds,
   mapDockerClientError,
@@ -20,6 +20,7 @@ import {
   type DockerStartSandboxRequest,
   type DockerStopSandboxRequest,
 } from "./schemas.js";
+import type { DockerSandboxInspectResult } from "./types.js";
 
 export type DockerStartSandboxResponse = {
   runtimeId: string;

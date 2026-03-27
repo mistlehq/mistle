@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto";
 import type Docker from "dockerode";
 import { describe, expect } from "vitest";
 
-import { createSandboxAdapter } from "../../src/factory.js";
 import { SandboxProvider, SandboxRuntimeEnv, SandboxRuntimeEnvDefaults } from "../../src/index.js";
+import { createDockerAdapter } from "../../src/providers/docker/index.js";
 import {
   dockerAdapterIntegrationEnabled,
   dockerAdapterIntegrationSettings,
@@ -206,12 +206,9 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       throw new Error("Docker integration settings are required for the start failure test.");
     }
 
-    const failingAdapter = createSandboxAdapter({
-      provider: SandboxProvider.DOCKER,
-      docker: {
-        socketPath: dockerAdapterIntegrationSettings.socketPath,
-        networkName: `missing-network-${randomUUID()}`,
-      },
+    const failingAdapter = createDockerAdapter({
+      socketPath: dockerAdapterIntegrationSettings.socketPath,
+      networkName: `missing-network-${randomUUID()}`,
     });
     const listOptions = {
       all: true,

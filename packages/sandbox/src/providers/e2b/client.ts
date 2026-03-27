@@ -2,7 +2,6 @@ import { systemSleeper } from "@mistle/time";
 import { CommandExitError, Sandbox, type ConnectionOpts } from "e2b";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
-import { type E2BSandboxInspectResult } from "../../types.js";
 import {
   E2BClientError,
   E2BClientErrorCodes,
@@ -25,6 +24,7 @@ import {
   type E2BStopSandboxRequest,
 } from "./schemas.js";
 import { E2BApiTemplateRegistry, type E2BTemplateRegistry } from "./template-registry.js";
+import type { E2BSandboxInspectResult } from "./types.js";
 
 const ApplyStartupCommand = "/usr/local/bin/sandboxd apply-startup";
 const StartSupervisorCommand = "/usr/bin/tini -s -- /usr/local/bin/sandboxd serve";

@@ -10,13 +10,13 @@ import {
   type SandboxDestroyRequest,
   type SandboxHandle,
   type SandboxInspectRequest,
-  type SandboxInspectResult,
   type SandboxResumeRequestV1,
   type SandboxStartRequest,
   type SandboxStopRequest,
 } from "../../types.js";
 import { DockerClientError, DockerClientErrorCodes } from "./client-errors.js";
 import type { DockerClient } from "./client.js";
+import type { DockerSandboxInspectResult } from "./types.js";
 
 export class DockerSandboxAdapter implements SandboxAdapter {
   readonly #client: DockerClient;
@@ -42,7 +42,7 @@ export class DockerSandboxAdapter implements SandboxAdapter {
     };
   }
 
-  async inspect(request: SandboxInspectRequest): Promise<SandboxInspectResult> {
+  async inspect(request: SandboxInspectRequest): Promise<DockerSandboxInspectResult> {
     if (request.id.trim().length === 0) {
       throw new SandboxConfigurationError("Runtime id is required.");
     }
@@ -121,7 +121,7 @@ export class DockerSandboxAdapter implements SandboxAdapter {
   }
 }
 
-export function createDockerSandboxAdapter(input: { client: DockerClient }): SandboxAdapter {
+export function createDockerSandboxAdapter(input: { client: DockerClient }): DockerSandboxAdapter {
   if (input.client === undefined) {
     throw new SandboxProviderNotImplementedError("Docker client is required to construct adapter.");
   }
