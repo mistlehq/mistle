@@ -6,10 +6,10 @@ import {
   type CodexThreadSummary,
 } from "@mistle/integrations-definitions/openai/agent/client";
 
-import type { MintSandboxConnectionTokenResult } from "../../../sessions/sessions-service.js";
+import type { MintSandboxConnectionTokenResult } from "../../../../sessions/sessions-service.js";
+import type { ConnectedCodexSession } from "../codex-session-types.js";
 import { describeCodexSessionStepError } from "./codex-session-errors.js";
 import { selectCodexConnectionThreadStrategy } from "./codex-session-lifecycle-policy.js";
-import type { ConnectedCodexSession } from "./codex-session-types.js";
 
 const DefaultCodexModel = "gpt-5.3-codex";
 

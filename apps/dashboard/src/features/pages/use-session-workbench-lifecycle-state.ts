@@ -228,12 +228,12 @@ export function useSessionWorkbenchLifecycleState(input: {
   lifecycle: Pick<
     ReturnType<typeof useCodexSessionState>["lifecycle"],
     | "agentConnectionState"
-    | "clearStartErrorMessage"
+    | "clearLifecycleErrorMessage"
     | "connectSession"
     | "connectedSession"
     | "disconnectSession"
     | "isStartingSession"
-    | "startErrorMessage"
+    | "lifecycleErrorMessage"
     | "step"
   >;
   ptyState: ReturnType<typeof useSandboxPtyState>;
@@ -254,12 +254,12 @@ export function useSessionWorkbenchLifecycleState(input: {
 
   const {
     agentConnectionState,
-    clearStartErrorMessage,
+    clearLifecycleErrorMessage,
     connectSession,
     connectedSession,
     disconnectSession,
     isStartingSession,
-    startErrorMessage,
+    lifecycleErrorMessage,
     step,
   } = input.lifecycle;
   const { disconnectPty } = input.ptyState.actions;
@@ -353,11 +353,11 @@ export function useSessionWorkbenchLifecycleState(input: {
 
   useEffect(() => {
     return () => {
-      clearStartErrorMessage();
+      clearLifecycleErrorMessage();
       disconnectSession();
       void disconnectPty();
     };
-  }, [clearStartErrorMessage, disconnectPty, disconnectSession]);
+  }, [clearLifecycleErrorMessage, disconnectPty, disconnectSession]);
 
   useEffect(() => {
     setHasAttemptedAutoConnect(false);
@@ -410,7 +410,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     };
   }, [automationPendingSinceMs, isWaitingForAutomationThread]);
 
-  const resolvedStartErrorMessage = startErrorMessage ?? automationPendingErrorMessage;
+  const resolvedLifecycleErrorMessage = lifecycleErrorMessage ?? automationPendingErrorMessage;
 
   useEffect(() => {
     if (input.sandboxInstanceId === null) {
@@ -424,7 +424,7 @@ export function useSessionWorkbenchLifecycleState(input: {
         connected: connectedSession !== null,
         isStartingSession,
         hasAttemptedAutoConnect,
-        hasStartError: resolvedStartErrorMessage !== null,
+        hasStartError: resolvedLifecycleErrorMessage !== null,
       })
     ) {
       return;
@@ -448,7 +448,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     input.sandboxInstanceId,
     isStartingSession,
     isWaitingForAutomationThread,
-    resolvedStartErrorMessage,
+    resolvedLifecycleErrorMessage,
   ]);
 
   useEffect(() => {
@@ -474,12 +474,12 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxStatus: sandboxStatusLabel.toLowerCase(),
     agentConnectionState,
     step,
-    hasConnectionError: resolvedStartErrorMessage !== null,
+    hasConnectionError: resolvedLifecycleErrorMessage !== null,
   });
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: sandboxStatusQuery.isError,
-    startErrorMessage: resolvedStartErrorMessage,
+    lifecycleErrorMessage: resolvedLifecycleErrorMessage,
     sandboxFailureMessage,
     stoppedSessionMessage: stoppedSessionState.message,
   });
@@ -504,7 +504,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     setHasAttemptedInitialStoppedResume(true);
     setResumeActionErrorMessage(null);
 
-    clearStartErrorMessage();
+    clearLifecycleErrorMessage();
     setIsResumingStoppedSandbox(true);
     try {
       const resumedSandboxStatus = await resumeSandboxInstance({
@@ -528,7 +528,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       if (resumedSandboxStatus.status !== "stopped") {
         resumeIdempotencyKeyRef.current = null;
       }
-      clearStartErrorMessage();
+      clearLifecycleErrorMessage();
       setHasAttemptedAutoConnect(false);
 
       void sandboxStatusQuery.refetch().catch(() => {});
@@ -559,7 +559,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       }
     }
   }, [
-    clearStartErrorMessage,
+    clearLifecycleErrorMessage,
     input.queryClient,
     input.sandboxInstanceId,
     isResumingStoppedSandbox,
@@ -577,7 +577,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxStatusQuery,
     sessionHeaderStatusUi,
     shouldAutoResumeOnEntry: shouldAttemptInitialStoppedResume,
-    startErrorMessage: resolvedStartErrorMessage,
+    lifecycleErrorMessage: resolvedLifecycleErrorMessage,
     stoppedSessionState,
   };
 }

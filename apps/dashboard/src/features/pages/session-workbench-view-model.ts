@@ -91,13 +91,13 @@ export function resolveSessionHeaderStatusUi(input: {
 
 export function hasSessionTopAlert(input: {
   hasSandboxStatusError: boolean;
-  startErrorMessage: string | null;
+  lifecycleErrorMessage: string | null;
   sandboxFailureMessage: string | null;
   stoppedSessionMessage: string | null;
 }): boolean {
   return (
     input.hasSandboxStatusError ||
-    input.startErrorMessage !== null ||
+    input.lifecycleErrorMessage !== null ||
     input.sandboxFailureMessage !== null ||
     input.stoppedSessionMessage !== null
   );

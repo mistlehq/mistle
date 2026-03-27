@@ -147,10 +147,10 @@ function SessionWorkbenchPageContent(input: {
           : "Could not load sandbox status.",
     });
   }
-  if (workbench.startErrorMessage !== null) {
+  if (workbench.lifecycleErrorMessage !== null) {
     alerts.push({
       title: "Session connection error",
-      description: workbench.startErrorMessage,
+      description: workbench.lifecycleErrorMessage,
     });
   }
   if (workbench.stoppedSessionState.message !== null) {
@@ -177,6 +177,7 @@ function SessionWorkbenchPageContent(input: {
             composerProps={createEmptyComposerProps()}
             isRespondingToServerRequest={false}
             onRespondToServerRequest={function onRespondToServerRequest() {}}
+            sessionStatusMessage={null}
             serverRequestPanelEntries={[]}
           />
         }
@@ -185,7 +186,6 @@ function SessionWorkbenchPageContent(input: {
         mainContent={
           <SessionConversationMainContent
             chatEntries={[]}
-            composerProps={createEmptyComposerProps()}
             isRespondingToServerRequest={false}
             onRespondToServerRequest={function onRespondToServerRequest() {}}
             serverRequestPanelEntries={[]}
@@ -203,7 +203,6 @@ function SessionWorkbenchPageContent(input: {
       mainContent={
         <SessionConversationMainContent
           chatEntries={conversationPane.chatState.entries}
-          composerProps={conversationPane.composerProps}
           isRespondingToServerRequest={
             conversationPane.serverRequestsState.isRespondingToServerRequest
           }
@@ -226,6 +225,7 @@ function SessionWorkbenchPageContent(input: {
               conversationPane.serverRequestsState.isRespondingToServerRequest
             }
             onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
+            sessionStatusMessage={conversationPane.sessionStatusMessage}
             serverRequestPanelEntries={unmatchedServerRequests}
           />
         </>
@@ -277,7 +277,6 @@ function createEmptyComposerProps(): SessionConversationComposerProps {
       isConnected: false,
       isUpdatingConfig: false,
       isUploadingAttachments: false,
-      statusMessage: null,
     },
     modelOptions: [],
     onComposerTextChange: function onComposerTextChange() {},

@@ -14,7 +14,8 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState, type MutableRefObject } from "react";
 
-import { mintSandboxInstanceConnectionToken } from "../../../sessions/sessions-service.js";
+import { mintSandboxInstanceConnectionToken } from "../../../../sessions/sessions-service.js";
+import type { ConnectedCodexSession, StartSessionStep } from "../codex-session-types.js";
 import {
   createConnectedCodexSession,
   establishInitialCodexThread,
@@ -23,21 +24,7 @@ import {
   describeCodexSessionStepError,
   StaleConnectionAttemptError,
 } from "./codex-session-errors.js";
-import {
-  parseThreadLifecycleEvent,
-  parseThreadTokenUsageSnapshot,
-  parseTurnDiffSnapshot,
-  parseTurnPlanSnapshot,
-} from "./codex-session-events.js";
 import { resolveCodexConnectionStateTransition } from "./codex-session-lifecycle-policy.js";
-import type {
-  ConnectedCodexSession,
-  CodexThreadLifecycleEvent,
-  CodexThreadTokenUsageSnapshot,
-  CodexTurnDiffSnapshot,
-  CodexTurnPlanSnapshot,
-  StartSessionStep,
-} from "./codex-session-types.js";
 
 type CodexThreadCollectionsRefreshResult = {
   availableThreads: readonly CodexThreadSummary[];
@@ -47,15 +34,15 @@ type CodexThreadCollectionsRefreshResult = {
 
 export type CodexSessionConnectionLifecycleState = {
   step: StartSessionStep;
-  startErrorMessage: string | null;
+  lifecycleErrorMessage: string | null;
   connectedSession: ConnectedCodexSession | null;
   agentConnectionState: CodexSessionConnectionState;
   agentConnectionError: string | null;
   isStartingSession: boolean;
   connectSession: (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => void;
   disconnectSession: () => void;
-  clearStartErrorMessage: () => void;
-  reportStartErrorMessage: (message: string) => void;
+  clearLifecycleErrorMessage: () => void;
+  reportLifecycleErrorMessage: (message: string) => void;
 };
 
 export type CodexSessionConnectionStateResult = {
@@ -69,14 +56,6 @@ export function useCodexSessionConnection(input: {
   handleChatNotificationReceived: (notification: CodexJsonRpcNotification) => void;
   onServerRequestNotification: (notification: CodexJsonRpcNotification) => void;
   onServerRequestReceived: (request: CodexJsonRpcServerRequest) => void;
-  recordRecentNotification: (payload: unknown) => void;
-  recordRecentResponse: (payload: unknown) => void;
-  recordRecentServerRequest: (payload: unknown) => void;
-  recordRecentUnhandledMessage: (payload: unknown) => void;
-  recordThreadLifecycleEvent: (payload: CodexThreadLifecycleEvent) => void;
-  recordThreadTokenUsageSnapshot: (payload: CodexThreadTokenUsageSnapshot) => void;
-  recordTurnDiffSnapshot: (payload: CodexTurnDiffSnapshot) => void;
-  recordTurnPlanSnapshot: (payload: CodexTurnPlanSnapshot) => void;
   refreshThreadCollections: (input?: {
     rpcClient?: CodexJsonRpcClient;
     generation?: number;
@@ -86,8 +65,8 @@ export function useCodexSessionConnection(input: {
   rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
   sessionClientRef: MutableRefObject<CodexSessionClient | null>;
   sessionEventUnsubscribersRef: MutableRefObject<(() => void)[]>;
-  startErrorMessage: string | null;
-  setStartErrorMessage: (message: string | null) => void;
+  lifecycleErrorMessage: string | null;
+  setLifecycleErrorMessage: (message: string | null) => void;
   threadIdRef: MutableRefObject<string | null>;
 }): CodexSessionConnectionStateResult {
   const [step, setStep] = useState<StartSessionStep>("idle");
@@ -133,13 +112,13 @@ export function useCodexSessionConnection(input: {
     input.resetSessionData();
     setConnectedSession(null);
     setStep("idle");
-    input.setStartErrorMessage(null);
+    input.setLifecycleErrorMessage(null);
     setAgentConnectionState("idle");
     setAgentConnectionError(null);
   }, [
     input.connectionGenerationRef,
     input.resetSessionData,
-    input.setStartErrorMessage,
+    input.setLifecycleErrorMessage,
     teardownConnection,
   ]);
 
@@ -179,61 +158,31 @@ export function useCodexSessionConnection(input: {
               setStep("idle");
               setAgentConnectionState("idle");
               setAgentConnectionError(null);
-              input.setStartErrorMessage(connectionStateTransition.startErrorMessage);
+              input.setLifecycleErrorMessage(connectionStateTransition.lifecycleErrorMessage);
             }
-            return;
-          }
-
-          if (event.type === "response") {
-            input.recordRecentResponse(event.response);
             return;
           }
 
           if (event.type === "notification") {
-            const threadLifecycleEvent = parseThreadLifecycleEvent(event.notification);
-            if (threadLifecycleEvent !== null) {
-              input.recordThreadLifecycleEvent(threadLifecycleEvent);
-            }
-
-            const turnDiffSnapshot = parseTurnDiffSnapshot(event.notification);
-            if (turnDiffSnapshot !== null) {
-              input.recordTurnDiffSnapshot(turnDiffSnapshot);
-            }
-
-            const turnPlanSnapshot = parseTurnPlanSnapshot(event.notification);
-            if (turnPlanSnapshot !== null) {
-              input.recordTurnPlanSnapshot(turnPlanSnapshot);
-            }
-
-            const threadTokenUsageSnapshot = parseThreadTokenUsageSnapshot(event.notification);
-            if (threadTokenUsageSnapshot !== null) {
-              input.recordThreadTokenUsageSnapshot(threadTokenUsageSnapshot);
-            }
-
             input.onServerRequestNotification(event.notification);
             input.handleChatNotificationReceived(event.notification);
             if (event.notification.method === "turn/completed") {
               void input
                 .refreshThreadCollections({ generation: listenerInput.generation })
                 .catch((error: unknown) => {
-                  input.setStartErrorMessage(
+                  input.setLifecycleErrorMessage(
                     error instanceof Error
                       ? error.message
                       : "Could not refresh thread collections.",
                   );
                 });
             }
-            input.recordRecentNotification(event.notification);
             return;
           }
 
           if (event.type === "server_request") {
             input.onServerRequestReceived(event.request);
-            input.recordRecentServerRequest(event.request);
-            return;
           }
-
-          input.recordRecentUnhandledMessage(event.payload);
         }),
       ];
     },
@@ -242,14 +191,6 @@ export function useCodexSessionConnection(input: {
       input.handleChatNotificationReceived,
       input.onServerRequestNotification,
       input.onServerRequestReceived,
-      input.recordRecentNotification,
-      input.recordRecentResponse,
-      input.recordRecentServerRequest,
-      input.recordRecentUnhandledMessage,
-      input.recordThreadLifecycleEvent,
-      input.recordThreadTokenUsageSnapshot,
-      input.recordTurnDiffSnapshot,
-      input.recordTurnPlanSnapshot,
       input.refreshThreadCollections,
       input.resetSessionData,
       input.rpcClientRef,
@@ -269,7 +210,7 @@ export function useCodexSessionConnection(input: {
       teardownConnection("Superseded by a new Codex session.");
       input.resetSessionData();
       setConnectedSession(null);
-      input.setStartErrorMessage(null);
+      input.setLifecycleErrorMessage(null);
       setStep("securing");
 
       let mintedConnection;
@@ -343,7 +284,7 @@ export function useCodexSessionConnection(input: {
       setAgentConnectionState("ready");
       setAgentConnectionError(null);
       setStep("connected");
-      input.setStartErrorMessage(null);
+      input.setLifecycleErrorMessage(null);
     },
     onError: (error) => {
       if (error instanceof StaleConnectionAttemptError) {
@@ -352,7 +293,7 @@ export function useCodexSessionConnection(input: {
 
       disconnectSession();
       setStep("idle");
-      input.setStartErrorMessage(
+      input.setLifecycleErrorMessage(
         error instanceof Error ? error.message : "Could not establish sandbox session.",
       );
     },
@@ -365,40 +306,40 @@ export function useCodexSessionConnection(input: {
     [connectSessionMutation],
   );
 
-  const clearStartErrorMessage = useCallback(() => {
-    input.setStartErrorMessage(null);
-  }, [input.setStartErrorMessage]);
+  const clearLifecycleErrorMessage = useCallback(() => {
+    input.setLifecycleErrorMessage(null);
+  }, [input.setLifecycleErrorMessage]);
 
-  const reportStartErrorMessage = useCallback(
+  const reportLifecycleErrorMessage = useCallback(
     (message: string) => {
-      input.setStartErrorMessage(message);
+      input.setLifecycleErrorMessage(message);
     },
-    [input.setStartErrorMessage],
+    [input.setLifecycleErrorMessage],
   );
 
   const lifecycle = useMemo<CodexSessionConnectionLifecycleState>(
     () => ({
       step,
-      startErrorMessage: input.startErrorMessage,
+      lifecycleErrorMessage: input.lifecycleErrorMessage,
       connectedSession,
       agentConnectionState,
       agentConnectionError,
       isStartingSession: connectSessionMutation.isPending,
       connectSession,
       disconnectSession,
-      clearStartErrorMessage,
-      reportStartErrorMessage,
+      clearLifecycleErrorMessage,
+      reportLifecycleErrorMessage,
     }),
     [
       agentConnectionError,
       agentConnectionState,
-      clearStartErrorMessage,
+      clearLifecycleErrorMessage,
       connectSession,
       connectSessionMutation.isPending,
       connectedSession,
       disconnectSession,
-      reportStartErrorMessage,
-      input.startErrorMessage,
+      reportLifecycleErrorMessage,
+      input.lifecycleErrorMessage,
       step,
     ],
   );

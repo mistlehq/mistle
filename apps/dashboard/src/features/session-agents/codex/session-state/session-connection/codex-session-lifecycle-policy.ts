@@ -3,7 +3,7 @@ import type {
   CodexThreadSummary,
 } from "@mistle/integrations-definitions/openai/agent/client";
 
-import { selectPreferredThreadId } from "../../../sessions/thread-selection.js";
+import { selectPreferredThreadId } from "../../../../sessions/thread-selection.js";
 
 export type CodexConnectionThreadStrategy =
   | {
@@ -19,18 +19,18 @@ export function resolveCodexConnectionStateTransition(input: {
   errorMessage: string | null;
 }): {
   shouldResetSession: boolean;
-  startErrorMessage: string | null;
+  lifecycleErrorMessage: string | null;
 } {
   if (input.state === "closed" || input.state === "error") {
     return {
       shouldResetSession: true,
-      startErrorMessage: input.errorMessage ?? "The Codex session connection closed.",
+      lifecycleErrorMessage: input.errorMessage ?? "The Codex session connection closed.",
     };
   }
 
   return {
     shouldResetSession: false,
-    startErrorMessage: null,
+    lifecycleErrorMessage: null,
   };
 }
 

@@ -1,6 +1,4 @@
 import {
-  Alert,
-  AlertDescription,
   Button,
   Select,
   SelectContent,
@@ -22,7 +20,6 @@ export type ChatComposerStatusMessage = {
 };
 
 export type ChatComposerUiState = {
-  statusMessage: ChatComposerStatusMessage | null;
   completedErrorMessage: string | null;
   isConnected: boolean;
   isUpdatingConfig: boolean;
@@ -139,14 +136,6 @@ export function ChatComposer({
         addPendingFiles(Array.from(event.dataTransfer.files));
       }}
     >
-      {composerUi.statusMessage === null ? null : (
-        <Alert
-          className="mx-1 mt-1"
-          variant={composerUi.statusMessage.tone === "error" ? "destructive" : "default"}
-        >
-          <AlertDescription>{composerUi.statusMessage.message}</AlertDescription>
-        </Alert>
-      )}
       <input
         accept="image/*"
         className="hidden"

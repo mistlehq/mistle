@@ -21,7 +21,6 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
       isConnected: true,
       isUpdatingConfig: false,
       isUploadingAttachments: false,
-      statusMessage: null,
     },
     modelOptions: [{ value: "gpt-5.4-codex", label: "GPT-5.4" }],
     onComposerTextChange: () => {},
@@ -63,29 +62,6 @@ describe("ChatComposer", () => {
     );
 
     expect(screen.getByRole("button", { name: "Send" }).getAttribute("disabled")).not.toBeNull();
-  });
-
-  it("renders composer-local status messages above the composer", () => {
-    const baseProps = createBaseComposerProps();
-    render(
-      <ChatComposer
-        {...baseProps}
-        composerUi={{
-          ...baseProps.composerUi,
-          statusMessage: {
-            message:
-              "Model GPT-5.3 Codex Spark cannot inspect images. Images will only be sent as file path references.",
-            tone: "warning",
-          },
-        }}
-      />,
-    );
-
-    expect(
-      screen.getByText(
-        "Model GPT-5.3 Codex Spark cannot inspect images. Images will only be sent as file path references.",
-      ),
-    ).toBeTruthy();
   });
 
   it("renders a Stop action button when an active turn has no steering text", () => {

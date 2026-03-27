@@ -7,13 +7,13 @@ import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import {
   readComposerConfigSnapshot,
   type ComposerConfigSnapshot,
-} from "../../../pages/session-composer-config.js";
+} from "../../../../pages/session-composer/session-composer-config.js";
 import {
   buildModelSelectionRequiredMessage,
   buildUnavailableModelErrorMessage,
   resolveActiveComposerModel,
-} from "../../../pages/session-composer-model-readiness.js";
-import type { ConnectedCodexSession } from "./codex-session-types.js";
+} from "../../../../pages/session-composer/session-composer-model-readiness.js";
+import type { ConnectedCodexSession } from "../codex-session-types.js";
 
 export type SessionBootstrapState =
   | { status: "disconnected" }
@@ -21,7 +21,7 @@ export type SessionBootstrapState =
   | { status: "ready" }
   | { status: "failed"; message: string };
 
-export type CodexSessionBootstrapState = {
+export type SessionBootstrapResult = {
   availableModels: readonly CodexModelSummary[];
   configSnapshot: ComposerConfigSnapshot;
   state: SessionBootstrapState;
@@ -32,7 +32,7 @@ const EmptyComposerConfig: ComposerConfigSnapshot = {
   modelReasoningEffort: null,
 };
 
-export function useCodexSessionBootstrap(input: {
+export function useSessionBootstrap(input: {
   connectedSession: ConnectedCodexSession | null;
   ensureCurrentGeneration: (generation: number) => void;
   hydrateInitialThread: (input?: {
@@ -147,5 +147,5 @@ export function useCodexSessionBootstrap(input: {
     availableModels,
     configSnapshot,
     state,
-  } satisfies CodexSessionBootstrapState;
+  } satisfies SessionBootstrapResult;
 }

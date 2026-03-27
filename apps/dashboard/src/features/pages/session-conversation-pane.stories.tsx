@@ -7,6 +7,8 @@ import {
 import {
   SessionComposerFixturePropsForLoadingModel,
   SessionComposerFixturePropsForNonImageCapableModel,
+  SessionComposerFixtureStatusMessageForLoadingModel,
+  SessionComposerFixtureStatusMessageForNonImageCapableModel,
   SessionComposerFixturePropsUploadingImageAttachments,
   SessionComposerFixturePropsWithPendingImageAttachments,
   SessionComposerFixtureProps,
@@ -85,11 +87,13 @@ export const UploadingImageAttachments: Story = {
 export const NonImageCapableModelWithAttachments: Story = {
   args: {
     composerProps: SessionComposerFixturePropsForNonImageCapableModel,
+    sessionStatusMessage: SessionComposerFixtureStatusMessageForNonImageCapableModel,
   },
 };
 
 export const LoadingSelectedModelWithAttachments: Story = {
   args: {
     composerProps: SessionComposerFixturePropsForLoadingModel,
+    sessionStatusMessage: SessionComposerFixtureStatusMessageForLoadingModel,
   },
 };

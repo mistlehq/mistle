@@ -25,40 +25,25 @@ import {
   reduceCodexApprovalRequestsState,
   type CodexApprovalRequestEntry,
 } from "../approvals/codex-approval-requests-state.js";
-import { StaleConnectionAttemptError } from "./codex-session-errors.js";
-import {
-  type CodexThreadLifecycleEvent,
-  type CodexThreadTokenUsageSnapshot,
-  type CodexTurnDiffSnapshot,
-  type CodexTurnPlanSnapshot,
-  type ConnectedCodexSession,
-  type StartSessionStep,
-} from "./codex-session-types.js";
-import { useCodexChatController, type CodexChatState } from "./use-codex-chat-controller.js";
+import { type ConnectedCodexSession, type StartSessionStep } from "./codex-session-types.js";
 import {
   useCodexSessionBootstrapData,
-  type CodexConfigStatus,
-  type CodexModelCatalogStatus,
-} from "./use-codex-session-bootstrap-data.js";
+  useSessionBootstrap,
+  type SessionBootstrapResult,
+} from "./session-bootstrap/index.js";
+import type {
+  CodexConfigStatus,
+  CodexModelCatalogStatus,
+} from "./session-bootstrap/use-codex-session-bootstrap-data.js";
 import {
-  useCodexSessionBootstrap,
-  type CodexSessionBootstrapState,
-} from "./use-codex-session-bootstrap.js";
-import {
+  StaleConnectionAttemptError,
   useCodexSessionConnection,
   type CodexSessionConnectionLifecycleState,
-} from "./use-codex-session-connection.js";
-import { useCodexSessionDebugState } from "./use-codex-session-debug-state.js";
+} from "./session-connection/index.js";
+import { useCodexChatController, type CodexChatState } from "./use-codex-chat-controller.js";
 import { useCodexThreadCollections } from "./use-codex-thread-collections.js";
 
-export type {
-  ConnectedCodexSession,
-  CodexThreadLifecycleEvent,
-  CodexThreadTokenUsageSnapshot,
-  CodexTurnDiffSnapshot,
-  CodexTurnPlanSnapshot,
-  StartSessionStep,
-};
+export type { ConnectedCodexSession, StartSessionStep };
 
 type CodexSessionThreadState = {
   availableThreads: readonly CodexThreadSummary[];
@@ -151,17 +136,6 @@ type CodexSessionBootstrapDataState = {
   importExternalAgentConfig: (items: readonly CodexExternalAgentMigrationItem[]) => void;
 };
 
-type CodexSessionDebugState = {
-  threadLifecycleEvents: readonly CodexThreadLifecycleEvent[];
-  turnDiffSnapshots: readonly CodexTurnDiffSnapshot[];
-  turnPlanSnapshots: readonly CodexTurnPlanSnapshot[];
-  threadTokenUsageSnapshots: readonly CodexThreadTokenUsageSnapshot[];
-  recentNotifications: readonly string[];
-  recentResponses: readonly string[];
-  recentServerRequests: readonly string[];
-  recentUnhandledMessages: readonly string[];
-};
-
 type CodexSessionServerRequestState = {
   pendingServerRequests: readonly CodexApprovalRequestEntry[];
   isRespondingToServerRequest: boolean;
@@ -172,9 +146,8 @@ export type UseCodexSessionStateResult = {
   lifecycle: CodexSessionConnectionLifecycleState;
   threads: CodexSessionThreadState;
   chat: CodexSessionChatState;
-  bootstrap: CodexSessionBootstrapState;
-  bootstrapData: CodexSessionBootstrapDataState;
-  debug: CodexSessionDebugState;
+  bootstrap: SessionBootstrapResult;
+  codexBootstrapData: CodexSessionBootstrapDataState;
   serverRequests: CodexSessionServerRequestState;
 };
 
@@ -184,7 +157,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
   const threadIdRef = useRef<string | null>(null);
   const connectionGenerationRef = useRef(0);
-  const [startErrorMessage, setStartErrorMessage] = useState<string | null>(null);
+  const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
 
   const [serverRequestsState, dispatchServerRequestsAction] = useReducer(
     reduceCodexApprovalRequestsState,
@@ -196,18 +169,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       throw new StaleConnectionAttemptError();
     }
   }, []);
-  const debugState = useCodexSessionDebugState();
-  const {
-    recordRecentNotification,
-    recordRecentResponse,
-    recordRecentServerRequest,
-    recordRecentUnhandledMessage,
-    recordThreadLifecycleEvent,
-    recordTurnDiffSnapshot,
-    recordTurnPlanSnapshot,
-    recordThreadTokenUsageSnapshot,
-    resetDebugState,
-  } = debugState;
 
   const {
     availableThreads,
@@ -221,7 +182,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   } = useCodexThreadCollections({
     rpcClientRef,
     ensureCurrentGeneration,
-    recordRecentResponse,
   });
 
   const {
@@ -243,14 +203,12 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   } = useCodexChatController({
     rpcClientRef,
     threadIdRef,
-    recordRecentResponse,
-    setStartErrorMessage,
+    setStartErrorMessage: setLifecycleErrorMessage,
   });
 
   const bootstrapDataState = useCodexSessionBootstrapData({
     rpcClientRef,
-    recordRecentResponse,
-    setStartErrorMessage,
+    setStartErrorMessage: setLifecycleErrorMessage,
   });
   const {
     availableModels,
@@ -284,10 +242,9 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     threadIdRef.current = null;
     resetThreadCollections();
     resetBootstrapData();
-    resetDebugState();
     dispatchServerRequestsAction({ type: "reset" });
     resetChat();
-  }, [resetBootstrapData, resetDebugState, resetThreadCollections, resetChat]);
+  }, [resetBootstrapData, resetThreadCollections, resetChat]);
 
   const handleServerRequestNotification = useCallback((notification: CodexJsonRpcNotification) => {
     dispatchServerRequestsAction({
@@ -309,27 +266,19 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     handleChatNotificationReceived: handleNotificationReceived,
     onServerRequestNotification: handleServerRequestNotification,
     onServerRequestReceived: handleServerRequestReceived,
-    recordRecentNotification,
-    recordRecentResponse,
-    recordRecentServerRequest,
-    recordRecentUnhandledMessage,
-    recordThreadLifecycleEvent,
-    recordThreadTokenUsageSnapshot,
-    recordTurnDiffSnapshot,
-    recordTurnPlanSnapshot,
     refreshThreadCollections,
     resetSessionData,
     resetChat,
     rpcClientRef,
     sessionClientRef,
     sessionEventUnsubscribersRef,
-    startErrorMessage,
-    setStartErrorMessage,
+    lifecycleErrorMessage,
+    setLifecycleErrorMessage,
     threadIdRef,
   });
   const { connectedSession } = lifecycle;
 
-  const bootstrap = useCodexSessionBootstrap({
+  const bootstrap = useSessionBootstrap({
     connectedSession,
     ensureCurrentGeneration,
     hydrateInitialThread,
@@ -340,14 +289,14 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
 
   const handleThreadMutationFailure = useCallback(
     (fallbackMessage: string, error: unknown): void => {
-      setStartErrorMessage(error instanceof Error ? error.message : fallbackMessage);
+      setLifecycleErrorMessage(error instanceof Error ? error.message : fallbackMessage);
     },
     [],
   );
 
   const refreshThreadCollectionsWithErrorHandling = useCallback((): void => {
     void refreshThreadCollections().catch((error: unknown) => {
-      setStartErrorMessage(
+      setLifecycleErrorMessage(
         error instanceof Error ? error.message : "Could not refresh thread collections.",
       );
     });
@@ -355,7 +304,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
 
   const refreshLoadedThreadListWithErrorHandling = useCallback((): void => {
     void refreshLoadedThreadList().catch((error: unknown) => {
-      setStartErrorMessage(
+      setLifecycleErrorMessage(
         error instanceof Error ? error.message : "Could not refresh loaded thread list.",
       );
     });
@@ -366,7 +315,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       await refreshThreadList();
     },
     onError: (error) => {
-      setStartErrorMessage(
+      setLifecycleErrorMessage(
         error instanceof Error ? error.message : "Could not refresh thread list.",
       );
     },
@@ -377,7 +326,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       await refreshArchivedThreadList();
     },
     onError: (error) => {
-      setStartErrorMessage(
+      setLifecycleErrorMessage(
         error instanceof Error ? error.message : "Could not refresh archived thread list.",
       );
     },
@@ -388,7 +337,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       await refreshLoadedThreadList();
     },
     onError: (error) => {
-      setStartErrorMessage(
+      setLifecycleErrorMessage(
         error instanceof Error ? error.message : "Could not refresh loaded thread list.",
       );
     },
@@ -410,8 +359,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     onSuccess: (threadStart) => {
       updateActiveThread(threadStart.threadId);
       resetChat();
-      setStartErrorMessage(null);
-      recordRecentResponse(threadStart.response);
+      setLifecycleErrorMessage(null);
       refreshThreadCollectionsWithErrorHandling();
     },
     onError: (error) => {
@@ -434,8 +382,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     onSuccess: (result) => {
       updateActiveThread(result.threadId);
       resetChat();
-      setStartErrorMessage(null);
-      recordRecentResponse(result.response);
+      setLifecycleErrorMessage(null);
       void hydrateChatFromThread();
       refreshThreadCollectionsWithErrorHandling();
     },
@@ -469,7 +416,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       }
     },
     onError: (error) => {
-      setStartErrorMessage(
+      setLifecycleErrorMessage(
         error instanceof Error ? error.message : "Could not respond to the pending server request.",
       );
     },
@@ -490,7 +437,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     onSuccess: (result) => {
       updateActiveThread(result.threadId);
       resetChat();
-      recordRecentResponse(result.response);
       void hydrateChatFromThread();
       refreshThreadCollectionsWithErrorHandling();
     },
@@ -511,8 +457,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
         threadId,
       });
     },
-    onSuccess: (result, threadId) => {
-      recordRecentResponse(result.response);
+    onSuccess: (_result, threadId) => {
       if (threadIdRef.current === threadId) {
         resetChat();
       }
@@ -538,7 +483,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     onSuccess: (result) => {
       updateActiveThread(result.threadId);
       resetChat();
-      recordRecentResponse(result.response);
       void hydrateChatFromThread();
       refreshThreadCollectionsWithErrorHandling();
     },
@@ -559,8 +503,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
         threadId,
       });
     },
-    onSuccess: (result) => {
-      recordRecentResponse(result.response);
+    onSuccess: () => {
       refreshLoadedThreadListWithErrorHandling();
     },
     onError: (error) => {
@@ -580,9 +523,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
         threadId,
       });
     },
-    onSuccess: (result) => {
-      recordRecentResponse(result.response);
-    },
+    onSuccess: () => {},
     onError: (error) => {
       handleThreadMutationFailure("Could not compact thread.", error);
     },
@@ -604,7 +545,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     onSuccess: (result) => {
       updateActiveThread(result.threadId);
       resetChat();
-      recordRecentResponse(result.response);
       void hydrateChatFromThread();
       refreshThreadCollectionsWithErrorHandling();
     },
@@ -795,7 +735,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     chatState,
   ]);
 
-  const bootstrapData = useMemo<CodexSessionBootstrapDataState>(() => {
+  const codexBootstrapData = useMemo<CodexSessionBootstrapDataState>(() => {
     return {
       availableModels,
       modelCatalogStatus,
@@ -851,28 +791,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     writeConfigValue,
   ]);
 
-  const debug = useMemo<CodexSessionDebugState>(() => {
-    return {
-      threadLifecycleEvents: debugState.threadLifecycleEvents,
-      turnDiffSnapshots: debugState.turnDiffSnapshots,
-      turnPlanSnapshots: debugState.turnPlanSnapshots,
-      threadTokenUsageSnapshots: debugState.threadTokenUsageSnapshots,
-      recentNotifications: debugState.recentNotifications,
-      recentResponses: debugState.recentResponses,
-      recentServerRequests: debugState.recentServerRequests,
-      recentUnhandledMessages: debugState.recentUnhandledMessages,
-    };
-  }, [
-    debugState.recentNotifications,
-    debugState.recentResponses,
-    debugState.recentServerRequests,
-    debugState.recentUnhandledMessages,
-    debugState.threadLifecycleEvents,
-    debugState.threadTokenUsageSnapshots,
-    debugState.turnDiffSnapshots,
-    debugState.turnPlanSnapshots,
-  ]);
-
   const serverRequests = useMemo<CodexSessionServerRequestState>(() => {
     return {
       pendingServerRequests: serverRequestsState.entries,
@@ -886,8 +804,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     threads,
     chat,
     bootstrap,
-    bootstrapData,
-    debug,
+    codexBootstrapData,
     serverRequests,
   };
 }

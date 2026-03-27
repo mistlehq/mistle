@@ -2,9 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
   SessionComposerFixtureProps,
-  SessionComposerFixturePropsForLoadingModel,
-  SessionComposerFixturePropsForUnavailableModel,
-  SessionComposerFixturePropsForNonImageCapableModel,
   SessionComposerFixturePropsUploadingImageAttachments,
   SessionComposerFixturePropsWithPendingImageAttachments,
   CodexFixtureSessionModelOptions,
@@ -95,23 +92,5 @@ export const WithPendingImageAttachments: Story = {
 export const UploadingImageAttachments: Story = {
   args: {
     ...SessionComposerFixturePropsUploadingImageAttachments,
-  },
-};
-
-export const NonImageCapableModelWithAttachments: Story = {
-  args: {
-    ...SessionComposerFixturePropsForNonImageCapableModel,
-  },
-};
-
-export const UnavailableSelectedModelWithAttachments: Story = {
-  args: {
-    ...SessionComposerFixturePropsForUnavailableModel,
-  },
-};
-
-export const LoadingSelectedModelWithAttachments: Story = {
-  args: {
-    ...SessionComposerFixturePropsForLoadingModel,
   },
 };

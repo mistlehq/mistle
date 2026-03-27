@@ -5,6 +5,9 @@ import {
   SessionComposerFixturePropsForLoadingModel,
   SessionComposerFixturePropsForNonImageCapableModel,
   SessionComposerFixturePropsForUnavailableModel,
+  SessionComposerFixtureStatusMessageForLoadingModel,
+  SessionComposerFixtureStatusMessageForNonImageCapableModel,
+  SessionComposerFixtureStatusMessageForUnavailableModel,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
 import {
   createStorySessionBottomPanel,
@@ -73,6 +76,7 @@ export const WithNonImageCapableModelWarning: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
       composerProps: SessionComposerFixturePropsForNonImageCapableModel,
+      sessionStatusMessage: SessionComposerFixtureStatusMessageForNonImageCapableModel,
     }),
   },
 };
@@ -81,6 +85,7 @@ export const WithUnavailableModelAlert: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
       composerProps: SessionComposerFixturePropsForUnavailableModel,
+      sessionStatusMessage: SessionComposerFixtureStatusMessageForUnavailableModel,
     }),
   },
 };
@@ -89,6 +94,7 @@ export const WithLoadingSelectedModelAlert: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
       composerProps: SessionComposerFixturePropsForLoadingModel,
+      sessionStatusMessage: SessionComposerFixtureStatusMessageForLoadingModel,
     }),
   },
 };

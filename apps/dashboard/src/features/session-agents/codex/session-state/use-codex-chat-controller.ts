@@ -60,7 +60,6 @@ function buildTurnRequest(input: {
 export function useCodexChatController(input: {
   rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
   threadIdRef: MutableRefObject<string | null>;
-  recordRecentResponse: (payload: unknown) => void;
   setStartErrorMessage: (message: string | null) => void;
 }) {
   const [chatState, dispatchChatAction] = useReducer(
@@ -113,7 +112,6 @@ export function useCodexChatController(input: {
           type: "hydrate_from_thread_read",
           turns: thread.turns,
         });
-        input.recordRecentResponse(thread.response);
         return "hydrated";
       } catch (error) {
         if (isThreadNotMaterializedError(error)) {
@@ -180,7 +178,6 @@ export function useCodexChatController(input: {
           turnId: startedTurn.turnId,
           status: startedTurn.status,
         });
-        input.recordRecentResponse(startedTurn.response);
       } catch (error) {
         dispatchChatAction({
           type: "start_turn_failed",
@@ -210,13 +207,11 @@ export function useCodexChatController(input: {
         throw new Error("No active turn is available to interrupt.");
       }
 
-      const interruptedTurn = await interruptCodexTurn({
+      await interruptCodexTurn({
         rpcClient,
         threadId,
         turnId,
       });
-
-      input.recordRecentResponse(interruptedTurn.response);
     },
     onError: (error) => {
       input.setStartErrorMessage(
@@ -242,14 +237,12 @@ export function useCodexChatController(input: {
 
       const turnRequest = buildTurnRequest(turnInput);
 
-      const steeredTurn = await steerCodexTurn({
+      await steerCodexTurn({
         rpcClient,
         threadId,
         turnId,
         input: turnRequest.items,
       });
-
-      input.recordRecentResponse(steeredTurn.response);
     },
   });
 

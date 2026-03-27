@@ -14,7 +14,6 @@ type RefreshInput = {
 export function useCodexThreadCollections(input: {
   rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
   ensureCurrentGeneration: (generation: number) => void;
-  recordRecentResponse: (payload: unknown) => void;
 }) {
   const [availableThreads, setAvailableThreads] = useState<readonly CodexThreadSummary[]>([]);
   const [archivedThreads, setArchivedThreads] = useState<readonly CodexThreadSummary[]>([]);
@@ -36,7 +35,6 @@ export function useCodexThreadCollections(input: {
       }
 
       setAvailableThreads(threadList.threads);
-      input.recordRecentResponse(threadList.response);
       return threadList.threads;
     },
     [input],
@@ -59,7 +57,6 @@ export function useCodexThreadCollections(input: {
       }
 
       setArchivedThreads(threadList.threads);
-      input.recordRecentResponse(threadList.response);
       return threadList.threads;
     },
     [input],
@@ -80,7 +77,6 @@ export function useCodexThreadCollections(input: {
       }
 
       setLoadedThreadIds(loadedThreads.threadIds);
-      input.recordRecentResponse(loadedThreads.response);
       return loadedThreads.threadIds;
     },
     [input],

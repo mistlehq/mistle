@@ -14,7 +14,7 @@ describe("codex session lifecycle policy", () => {
       }),
     ).toEqual({
       shouldResetSession: true,
-      startErrorMessage: "The Codex session connection closed.",
+      lifecycleErrorMessage: "The Codex session connection closed.",
     });
 
     expect(
@@ -24,7 +24,7 @@ describe("codex session lifecycle policy", () => {
       }),
     ).toEqual({
       shouldResetSession: true,
-      startErrorMessage: "Socket failed.",
+      lifecycleErrorMessage: "Socket failed.",
     });
   });
 
@@ -36,7 +36,7 @@ describe("codex session lifecycle policy", () => {
       }),
     ).toEqual({
       shouldResetSession: false,
-      startErrorMessage: null,
+      lifecycleErrorMessage: null,
     });
   });
 

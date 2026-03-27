@@ -35,7 +35,6 @@ export type CodexConfigStatus = "idle" | "loading" | "loaded" | "error";
 
 export function useCodexSessionBootstrapData(input: {
   rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
-  recordRecentResponse: (payload: unknown) => void;
   setStartErrorMessage: (message: string | null) => void;
 }) {
   const [availableModels, setAvailableModels] = useState<readonly CodexModelSummary[]>([]);
@@ -77,7 +76,6 @@ export function useCodexSessionBootstrapData(input: {
     onSuccess: (result) => {
       setAvailableModels(result.models);
       setModelCatalogStatus("loaded");
-      input.recordRecentResponse(result.response);
     },
     onError: (error) => {
       setModelCatalogStatus("error");
@@ -99,7 +97,6 @@ export function useCodexSessionBootstrapData(input: {
     },
     onSuccess: (result) => {
       setExperimentalFeatures(result.features);
-      input.recordRecentResponse(result.response);
     },
     onError: (error) => {
       input.setStartErrorMessage(
@@ -124,7 +121,6 @@ export function useCodexSessionBootstrapData(input: {
     onSuccess: (result) => {
       setConfigJson(JSON.stringify(result.config, null, 2));
       setConfigStatus("loaded");
-      input.recordRecentResponse(result.response);
     },
     onError: (error) => {
       setConfigStatus("error");
@@ -147,7 +143,6 @@ export function useCodexSessionBootstrapData(input: {
       setConfigRequirementsJson(
         result.requirements === null ? "null" : JSON.stringify(result.requirements, null, 2),
       );
-      input.recordRecentResponse(result.response);
     },
     onError: (error) => {
       input.setStartErrorMessage(
@@ -170,9 +165,7 @@ export function useCodexSessionBootstrapData(input: {
         mergeStrategy: edit.mergeStrategy,
       });
     },
-    onSuccess: (result) => {
-      input.recordRecentResponse(result.response);
-    },
+    onSuccess: () => {},
     onError: (error) => {
       input.setStartErrorMessage(
         error instanceof Error ? error.message : "Could not write config value.",
@@ -192,9 +185,7 @@ export function useCodexSessionBootstrapData(input: {
         edits: inputValue.edits,
       });
     },
-    onSuccess: (result) => {
-      input.recordRecentResponse(result.response);
-    },
+    onSuccess: () => {},
     onError: (error) => {
       input.setStartErrorMessage(
         error instanceof Error ? error.message : "Could not batch write config.",
@@ -217,7 +208,6 @@ export function useCodexSessionBootstrapData(input: {
     },
     onSuccess: (result) => {
       setDetectedExternalAgentMigrationItems(result.items);
-      input.recordRecentResponse(result.response);
     },
     onError: (error) => {
       input.setStartErrorMessage(
@@ -238,9 +228,7 @@ export function useCodexSessionBootstrapData(input: {
         migrationItems: items,
       });
     },
-    onSuccess: (result) => {
-      input.recordRecentResponse(result.response);
-    },
+    onSuccess: () => {},
     onError: (error) => {
       input.setStartErrorMessage(
         error instanceof Error ? error.message : "Could not import external agent config.",
@@ -298,7 +286,6 @@ export function useCodexSessionBootstrapData(input: {
         });
         setAvailableModels(result.models);
         setModelCatalogStatus("loaded");
-        input.recordRecentResponse(result.response);
         return result;
       } catch (error) {
         setModelCatalogStatus("error");
@@ -329,14 +316,13 @@ export function useCodexSessionBootstrapData(input: {
           });
           setConfigJson(JSON.stringify(result.config, null, 2));
           setConfigStatus("loaded");
-          input.recordRecentResponse(result.response);
           return result;
         } catch (error) {
           setConfigStatus("error");
           throw error;
         }
       },
-      [input],
+      [input.rpcClientRef],
     ),
     readConfigRequirements: useCallback(() => {
       readConfigRequirementsMutate();

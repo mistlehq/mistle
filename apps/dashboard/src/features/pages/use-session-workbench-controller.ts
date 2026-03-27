@@ -1,9 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 
+import type { ChatComposerStatusMessage } from "../chat/components/chat-composer.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
+import { useSessionComposerState } from "./session-composer/index.js";
 import type { SessionConversationComposerProps } from "./session-conversation-pane.tsx";
-import { useSessionConversationComposerState } from "./use-session-conversation-composer-state.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 import {
   getSandboxInstanceStatusQueryKey,
@@ -47,7 +48,7 @@ type SessionWorkbenchState = {
   sessionHeaderStatusUi: ReturnType<
     typeof useSessionWorkbenchLifecycleState
   >["sessionHeaderStatusUi"];
-  startErrorMessage: string | null;
+  lifecycleErrorMessage: string | null;
   terminalPanelState: {
     closePanel: () => void;
     isVisible: boolean;
@@ -61,6 +62,7 @@ type SessionWorkbenchState = {
 type SessionConversationPaneState = {
   chatState: ReturnType<typeof useCodexSessionState>["chat"]["chatState"];
   composerProps: SessionConversationComposerProps;
+  sessionStatusMessage: ChatComposerStatusMessage | null;
   serverRequestsState: {
     isRespondingToServerRequest: boolean;
     pendingServerRequests: ReturnType<
@@ -105,7 +107,7 @@ export function useSessionWorkbenchController(input: {
   });
   const lifecycle = sessionState.lifecycle;
   const chat = sessionState.chat;
-  const bootstrapData = sessionState.bootstrapData;
+  const codexBootstrapData = sessionState.codexBootstrapData;
   const serverRequests = sessionState.serverRequests;
   const hasActiveTurn = chat.canInterruptTurn || chat.canSteerTurn;
 
@@ -116,9 +118,9 @@ export function useSessionWorkbenchController(input: {
     queryClient,
   });
 
-  const composerProps = useSessionConversationComposerState({
+  const composerState = useSessionComposerState({
     bootstrap: sessionState.bootstrap,
-    bootstrapData,
+    codexBootstrapData,
     chat: {
       canInterruptTurn: chat.canInterruptTurn,
       canSteerTurn: chat.canSteerTurn,
@@ -147,12 +149,13 @@ export function useSessionWorkbenchController(input: {
       sandboxFailureMessage: workbenchLifecycleState.sandboxFailureMessage,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,
       sessionHeaderStatusUi: workbenchLifecycleState.sessionHeaderStatusUi,
-      startErrorMessage: workbenchLifecycleState.startErrorMessage,
+      lifecycleErrorMessage: workbenchLifecycleState.lifecycleErrorMessage,
       terminalPanelState,
     },
     conversationPane: {
       chatState: chat.chatState,
-      composerProps,
+      composerProps: composerState.composerProps,
+      sessionStatusMessage: composerState.sessionStatusMessage,
       serverRequestsState: {
         isRespondingToServerRequest: serverRequests.isRespondingToServerRequest,
         pendingServerRequests: serverRequests.pendingServerRequests,

@@ -1,4 +1,5 @@
 import type { ChatEntry } from "../../../chat/chat-types.js";
+import type { ChatComposerStatusMessage } from "../../../chat/components/chat-composer.js";
 import type { SessionConversationComposerProps } from "../../../pages/session-conversation-pane.js";
 import type { CodexApprovalRequestEntry } from "../approvals/codex-approval-requests-state.js";
 import { CodexFixtureExploringGroupEntry } from "./chat-fixtures.js";
@@ -68,7 +69,6 @@ export const SessionComposerFixtureProps: SessionConversationComposerProps = {
     isConnected: true,
     isUpdatingConfig: false,
     isUploadingAttachments: false,
-    statusMessage: null,
   },
   modelOptions: CodexFixtureSessionModelOptions,
   selectedModel: "gpt-5.4",
@@ -104,28 +104,24 @@ export const SessionComposerFixturePropsUploadingImageAttachments: SessionConver
 export const SessionComposerFixturePropsForNonImageCapableModel: SessionConversationComposerProps =
   {
     ...SessionComposerFixturePropsWithPendingImageAttachments,
-    composerUi: {
-      ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi,
-      statusMessage: {
-        message:
-          "Model GPT-5.3 Codex Spark cannot inspect images. Images will only be sent as file path references.",
-        tone: "warning",
-      },
-    },
     selectedModel: "gpt-5.3-codex-spark",
+  };
+
+export const SessionComposerFixtureStatusMessageForNonImageCapableModel: ChatComposerStatusMessage =
+  {
+    message:
+      "Model GPT-5.3 Codex Spark cannot inspect images. Images will only be sent as file path references.",
+    tone: "warning",
   };
 
 export const SessionComposerFixturePropsForUnavailableModel: SessionConversationComposerProps = {
   ...SessionComposerFixturePropsWithPendingImageAttachments,
-  composerUi: {
-    ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi,
-    statusMessage: {
-      message:
-        "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
-      tone: "error",
-    },
-  },
   selectedModel: "gpt-legacy-preview",
+};
+
+export const SessionComposerFixtureStatusMessageForUnavailableModel: ChatComposerStatusMessage = {
+  message: "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
+  tone: "error",
 };
 
 export const SessionComposerFixturePropsForLoadingModel: SessionConversationComposerProps = {
@@ -136,10 +132,11 @@ export const SessionComposerFixturePropsForLoadingModel: SessionConversationComp
       ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi.action,
       canSubmitTurns: false,
     },
-    statusMessage: {
-      message: "Wait for the selected model to finish loading before sending a message.",
-      tone: "error",
-    },
   },
   selectedModel: "gpt-5.4",
+};
+
+export const SessionComposerFixtureStatusMessageForLoadingModel: ChatComposerStatusMessage = {
+  message: "Wait for the selected model to finish loading before sending a message.",
+  tone: "error",
 };

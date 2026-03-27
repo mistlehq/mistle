@@ -89,7 +89,7 @@ describe("hasSessionTopAlert", () => {
       description: "returns false when there are no visible alerts",
       input: {
         hasSandboxStatusError: false,
-        startErrorMessage: null,
+        lifecycleErrorMessage: null,
         sandboxFailureMessage: null,
         stoppedSessionMessage: null,
       },
@@ -99,7 +99,7 @@ describe("hasSessionTopAlert", () => {
       description: "returns true for a connection error",
       input: {
         hasSandboxStatusError: false,
-        startErrorMessage: "Could not connect.",
+        lifecycleErrorMessage: "Could not connect.",
         sandboxFailureMessage: null,
         stoppedSessionMessage: null,
       },
@@ -109,7 +109,7 @@ describe("hasSessionTopAlert", () => {
       description: "returns true for a stopped-session alert",
       input: {
         hasSandboxStatusError: false,
-        startErrorMessage: null,
+        lifecycleErrorMessage: null,
         sandboxFailureMessage: null,
         stoppedSessionMessage: "This sandbox is stopped.",
       },

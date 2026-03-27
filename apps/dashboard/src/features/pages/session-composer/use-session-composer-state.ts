@@ -3,9 +3,12 @@ import { uploadSandboxImage } from "@mistle/sandbox-session-client";
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { resolveTurnRepresentation } from "../session-agents/codex/session-state/codex-attachment-presentation.js";
-import type { CodexSessionBootstrapState } from "../session-agents/codex/session-state/use-codex-session-bootstrap.js";
-import { mintSandboxInstanceConnectionToken } from "../sessions/sessions-service.js";
+import type { ChatComposerStatusMessage } from "../../chat/components/chat-composer.js";
+import { resolveTurnRepresentation } from "../../session-agents/codex/session-state/codex-attachment-presentation.js";
+import type { SessionBootstrapResult } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
+import { mintSandboxInstanceConnectionToken } from "../../sessions/sessions-service.js";
+import type { SessionConversationComposerProps } from "../session-conversation-pane.tsx";
+import { resolveChatComposerAction } from "../session-workbench-view-model.js";
 import { type ComposerConfigSnapshot } from "./session-composer-config.js";
 import {
   buildModelSelectionRequiredMessage,
@@ -13,10 +16,8 @@ import {
   resolveActiveComposerModel,
   supportsImageInspection,
 } from "./session-composer-model-readiness.js";
+import { resolveComposerStatusMessage } from "./session-composer-status.js";
 import { resolveUploadErrorMessage } from "./session-composer-upload-errors.js";
-import { resolveComposerStatusMessage } from "./session-conversation-composer-status.js";
-import type { SessionConversationComposerProps } from "./session-conversation-pane.tsx";
-import { resolveChatComposerAction } from "./session-workbench-view-model.js";
 
 type PendingComposerAttachment = {
   id: string;
@@ -28,7 +29,7 @@ type ComposerConnectedSession = {
   threadId: string | null;
 } | null;
 
-type ComposerBootstrapDataState = {
+type CodexBootstrapDataState = {
   isBatchWritingConfig: boolean;
   isWritingConfigValue: boolean;
   batchWriteConfig: (input: {
@@ -67,16 +68,21 @@ type ComposerChatState = {
   }) => Promise<void>;
 };
 
-export function useSessionConversationComposerState(input: {
-  bootstrap: CodexSessionBootstrapState;
-  bootstrapData: ComposerBootstrapDataState;
+export type SessionComposerState = {
+  composerProps: SessionConversationComposerProps;
+  sessionStatusMessage: ChatComposerStatusMessage | null;
+};
+
+export function useSessionComposerState(input: {
+  bootstrap: SessionBootstrapResult;
+  codexBootstrapData: CodexBootstrapDataState;
   chat: ComposerChatState;
   connectedSession: ComposerConnectedSession;
   hasActiveTurn: boolean;
   sandboxInstanceId: string | null;
-}): SessionConversationComposerProps {
+}): SessionComposerState {
   const { batchWriteConfig, isBatchWritingConfig, isWritingConfigValue, writeConfigValue } =
-    input.bootstrapData;
+    input.codexBootstrapData;
   const [composerText, setComposerText] = useState("");
   const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null);
   const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
@@ -320,40 +326,42 @@ export function useSessionConversationComposerState(input: {
   ]);
 
   return {
-    composerText,
-    composerUi: {
-      action: {
-        canInterruptTurn: input.chat.canInterruptTurn,
-        canSteerTurn: input.chat.canSteerTurn,
-        canSubmitTurns: input.bootstrap.state.status === "ready" && activeComposerModel !== null,
-        isInterruptingTurn: input.chat.isInterruptingTurn,
-        isStartingTurn: input.chat.isStartingTurn,
-        isSteeringTurn: input.chat.isSteeringTurn,
+    composerProps: {
+      composerText,
+      composerUi: {
+        action: {
+          canInterruptTurn: input.chat.canInterruptTurn,
+          canSteerTurn: input.chat.canSteerTurn,
+          canSubmitTurns: input.bootstrap.state.status === "ready" && activeComposerModel !== null,
+          isInterruptingTurn: input.chat.isInterruptingTurn,
+          isStartingTurn: input.chat.isStartingTurn,
+          isSteeringTurn: input.chat.isSteeringTurn,
+        },
+        completedErrorMessage: input.chat.completedErrorMessage,
+        isConnected: input.connectedSession !== null,
+        isUpdatingConfig:
+          input.bootstrap.state.status === "bootstrapping" ||
+          isBatchWritingConfig ||
+          isWritingConfigValue,
+        isUploadingAttachments,
       },
-      completedErrorMessage: input.chat.completedErrorMessage,
-      isConnected: input.connectedSession !== null,
-      isUpdatingConfig:
-        input.bootstrap.state.status === "bootstrapping" ||
-        isBatchWritingConfig ||
-        isWritingConfigValue,
-      isUploadingAttachments,
-      statusMessage: composerStatusMessage,
+      modelOptions: input.bootstrap.availableModels.map((model) => ({
+        value: model.model,
+        label: model.displayName,
+      })),
+      onComposerTextChange: handleComposerTextChange,
+      onModelChange: setComposerModel,
+      onPendingImageFilesAdded: addPendingComposerFiles,
+      onReasoningEffortChange: setComposerReasoningEffort,
+      onRemovePendingAttachment: removePendingComposerAttachment,
+      onSubmit: submitComposer,
+      pendingAttachments: pendingComposerAttachments.map((attachment) => ({
+        id: attachment.id,
+        name: attachment.name,
+      })),
+      selectedModel: composerConfig.model,
+      selectedReasoningEffort: composerConfig.modelReasoningEffort,
     },
-    modelOptions: input.bootstrap.availableModels.map((model) => ({
-      value: model.model,
-      label: model.displayName,
-    })),
-    onComposerTextChange: handleComposerTextChange,
-    onModelChange: setComposerModel,
-    onPendingImageFilesAdded: addPendingComposerFiles,
-    onReasoningEffortChange: setComposerReasoningEffort,
-    onRemovePendingAttachment: removePendingComposerAttachment,
-    onSubmit: submitComposer,
-    pendingAttachments: pendingComposerAttachments.map((attachment) => ({
-      id: attachment.id,
-      name: attachment.name,
-    })),
-    selectedModel: composerConfig.model,
-    selectedReasoningEffort: composerConfig.modelReasoningEffort,
+    sessionStatusMessage: composerStatusMessage,
   };
 }
