@@ -54,10 +54,6 @@ function createRuntimePlan(input: { sandboxProfileId: string; version: number })
   };
 }
 
-function createRouteUrl(baseUrl: string, path: string): URL {
-  return new URL(path, baseUrl);
-}
-
 async function waitForWorkflowRun(input: {
   fixture: DataPlaneApiIntegrationFixture;
   workflowName: string;
@@ -96,7 +92,7 @@ async function waitForWorkflowRun(input: {
 describe("internal sandbox conventional routes integration", () => {
   it("starts a sandbox instance from POST /internal/sandbox/instances", async ({ fixture }) => {
     const response = await fetch(
-      createRouteUrl(fixture.baseUrl, `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances`),
+      new URL(`${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances`, fixture.baseUrl),
       {
         method: "POST",
         headers: {
@@ -185,9 +181,9 @@ describe("internal sandbox conventional routes integration", () => {
     ]);
 
     const response = await fetch(
-      createRouteUrl(
-        fixture.baseUrl,
+      new URL(
         `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances?organizationId=org_dp_api_conventional_list&limit=2`,
+        fixture.baseUrl,
       ),
       {
         headers: {
@@ -239,9 +235,9 @@ describe("internal sandbox conventional routes integration", () => {
     });
 
     const resumeResponse = await fetch(
-      createRouteUrl(
-        fixture.baseUrl,
+      new URL(
         `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/${sandboxInstanceId}/resume`,
+        fixture.baseUrl,
       ),
       {
         method: "POST",
@@ -284,9 +280,9 @@ describe("internal sandbox conventional routes integration", () => {
       .where(eq(sandboxInstances.id, sandboxInstanceId));
 
     const stopResponse = await fetch(
-      createRouteUrl(
-        fixture.baseUrl,
+      new URL(
         `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/${sandboxInstanceId}/stop`,
+        fixture.baseUrl,
       ),
       {
         method: "POST",
@@ -328,9 +324,9 @@ describe("internal sandbox conventional routes integration", () => {
 
   it("rejects unauthorized requests on the new route base", async ({ fixture }) => {
     const response = await fetch(
-      createRouteUrl(
-        fixture.baseUrl,
+      new URL(
         `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances?organizationId=org_dp_api_conventional_unauthorized`,
+        fixture.baseUrl,
       ),
     );
 

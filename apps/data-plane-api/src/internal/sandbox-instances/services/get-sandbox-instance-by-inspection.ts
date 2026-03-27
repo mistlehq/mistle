@@ -23,27 +23,160 @@ type GetSandboxInstanceByInspectionContext = {
   sandboxProvider: SandboxProvider;
 };
 
-type SandboxInstanceRecord = NonNullable<Awaited<ReturnType<typeof readSandboxInstanceRecord>>>;
+async function markRunningSandboxInstanceStopped(
+  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
+  input: {
+    sandboxInstanceId: string;
+  },
+): Promise<void> {
+  const updatedRows = await ctx.db
+    .update(sandboxInstances)
+    .set({
+      status: sql`${SandboxInstanceStatuses.STOPPED}`,
+      stoppedAt: sql`now()`,
+      stopReason: sql`${SandboxStopReasons.SYSTEM}`,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(sandboxInstances.id, input.sandboxInstanceId),
+        eq(sandboxInstances.status, SandboxInstanceStatuses.RUNNING),
+      ),
+    )
+    .returning({
+      status: sandboxInstances.status,
+    });
 
-function toResponse(input: {
-  id: string;
-  status: NonNullable<GetSandboxInstanceResponse>["status"];
-  failureCode: string | null;
-  failureMessage: string | null;
-}): NonNullable<GetSandboxInstanceResponse> {
+  if (updatedRows[0]?.status === SandboxInstanceStatuses.STOPPED) {
+    return;
+  }
+
+  throw new Error("Failed to transition sandbox instance status from running to stopped.");
+}
+
+async function inspectStartingSandboxInstance(
+  ctx: GetSandboxInstanceByInspectionContext,
+  sandboxInstance: {
+    id: string;
+    providerSandboxId: string | null;
+    failureCode: string | null;
+    failureMessage: string | null;
+  },
+): Promise<NonNullable<GetSandboxInstanceResponse>> {
+  if (sandboxInstance.providerSandboxId === null) {
+    return {
+      id: sandboxInstance.id,
+      status: SandboxInstanceStatuses.STARTING,
+      failureCode: sandboxInstance.failureCode,
+      failureMessage: sandboxInstance.failureMessage,
+    };
+  }
+
+  let inspection: Awaited<ReturnType<SandboxAdapter["inspect"]>> | null;
+  try {
+    inspection = await ctx.sandboxAdapter.inspect({
+      id: sandboxInstance.providerSandboxId,
+    });
+  } catch (error) {
+    if (!isSandboxResourceNotFoundError(error)) {
+      throw error;
+    }
+
+    inspection = null;
+  }
+
+  if (inspection === null) {
+    return {
+      id: sandboxInstance.id,
+      status: SandboxInstanceStatuses.STARTING,
+      failureCode: sandboxInstance.failureCode,
+      failureMessage: sandboxInstance.failureMessage,
+    };
+  }
+
+  if (inspection.state === SandboxInspectStates.RUNNING) {
+    return {
+      id: sandboxInstance.id,
+      status: SandboxInstanceStatuses.RUNNING,
+      failureCode: sandboxInstance.failureCode,
+      failureMessage: sandboxInstance.failureMessage,
+    };
+  }
+
   return {
-    id: input.id,
-    status: input.status,
-    failureCode: input.failureCode,
-    failureMessage: input.failureMessage,
+    id: sandboxInstance.id,
+    status: SandboxInstanceStatuses.STARTING,
+    failureCode: sandboxInstance.failureCode,
+    failureMessage: sandboxInstance.failureMessage,
   };
 }
 
-async function readSandboxInstanceRecord(
-  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
+async function inspectRunningSandboxInstance(
+  ctx: GetSandboxInstanceByInspectionContext,
+  sandboxInstance: {
+    id: string;
+    providerSandboxId: string | null;
+    failureCode: string | null;
+    failureMessage: string | null;
+  },
+): Promise<NonNullable<GetSandboxInstanceResponse>> {
+  if (sandboxInstance.providerSandboxId === null) {
+    throw new Error(
+      `Expected running sandbox instance '${sandboxInstance.id}' to have a providerSandboxId.`,
+    );
+  }
+
+  let inspection: Awaited<ReturnType<SandboxAdapter["inspect"]>> | null;
+  try {
+    inspection = await ctx.sandboxAdapter.inspect({
+      id: sandboxInstance.providerSandboxId,
+    });
+  } catch (error) {
+    if (!isSandboxResourceNotFoundError(error)) {
+      throw error;
+    }
+
+    await markRunningSandboxInstanceStopped(ctx, {
+      sandboxInstanceId: sandboxInstance.id,
+    });
+    inspection = null;
+  }
+
+  if (inspection === null) {
+    return {
+      id: sandboxInstance.id,
+      status: SandboxInstanceStatuses.STOPPED,
+      failureCode: sandboxInstance.failureCode,
+      failureMessage: sandboxInstance.failureMessage,
+    };
+  }
+
+  if (inspection.state === SandboxInspectStates.RUNNING) {
+    return {
+      id: sandboxInstance.id,
+      status: SandboxInstanceStatuses.RUNNING,
+      failureCode: sandboxInstance.failureCode,
+      failureMessage: sandboxInstance.failureMessage,
+    };
+  }
+
+  await markRunningSandboxInstanceStopped(ctx, {
+    sandboxInstanceId: sandboxInstance.id,
+  });
+
+  return {
+    id: sandboxInstance.id,
+    status: SandboxInstanceStatuses.STOPPED,
+    failureCode: sandboxInstance.failureCode,
+    failureMessage: sandboxInstance.failureMessage,
+  };
+}
+
+export async function getSandboxInstanceByInspection(
+  ctx: GetSandboxInstanceByInspectionContext,
   input: GetSandboxInstanceInput,
-) {
-  return ctx.db.query.sandboxInstances.findFirst({
+): Promise<GetSandboxInstanceResponse> {
+  const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
     columns: {
       id: true,
       runtimeProvider: true,
@@ -55,161 +188,6 @@ async function readSandboxInstanceRecord(
     where: (table, { and: whereAnd, eq: whereEq }) =>
       whereAnd(eq(table.id, input.instanceId), whereEq(table.organizationId, input.organizationId)),
   });
-}
-
-async function markRunningSandboxInstanceStopped(
-  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
-  input: {
-    sandboxInstanceId: string;
-  },
-): Promise<void> {
-  const updatedRows = await ctx.db
-    .update(sandboxInstances)
-    .set({
-      status: SandboxInstanceStatuses.STOPPED,
-      stoppedAt: sql`now()`,
-      stopReason: SandboxStopReasons.SYSTEM,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(sandboxInstances.id, input.sandboxInstanceId),
-        eq(sandboxInstances.status, SandboxInstanceStatuses.RUNNING),
-      ),
-    )
-    .returning({
-      id: sandboxInstances.id,
-    });
-
-  if (updatedRows[0] !== undefined) {
-    return;
-  }
-
-  const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
-    columns: {
-      status: true,
-    },
-    where: (table, { eq: whereEq }) => whereEq(table.id, input.sandboxInstanceId),
-  });
-  if (sandboxInstance?.status === SandboxInstanceStatuses.STOPPED) {
-    return;
-  }
-
-  throw new Error("Failed to transition sandbox instance status from running to stopped.");
-}
-
-async function inspectStartingSandboxInstance(
-  ctx: GetSandboxInstanceByInspectionContext,
-  sandboxInstance: SandboxInstanceRecord,
-): Promise<NonNullable<GetSandboxInstanceResponse>> {
-  if (sandboxInstance.providerSandboxId === null) {
-    return toResponse({
-      id: sandboxInstance.id,
-      status: SandboxInstanceStatuses.STARTING,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-    });
-  }
-
-  const inspection = await ctx.sandboxAdapter
-    .inspect({
-      id: sandboxInstance.providerSandboxId,
-    })
-    .catch((error: unknown) => {
-      if (isSandboxResourceNotFoundError(error)) {
-        return null;
-      }
-
-      throw error;
-    });
-
-  if (inspection === null) {
-    return toResponse({
-      id: sandboxInstance.id,
-      status: SandboxInstanceStatuses.STARTING,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-    });
-  }
-
-  if (inspection.state === SandboxInspectStates.RUNNING) {
-    return toResponse({
-      id: sandboxInstance.id,
-      status: SandboxInstanceStatuses.RUNNING,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-    });
-  }
-
-  return toResponse({
-    id: sandboxInstance.id,
-    status: SandboxInstanceStatuses.STARTING,
-    failureCode: sandboxInstance.failureCode,
-    failureMessage: sandboxInstance.failureMessage,
-  });
-}
-
-async function inspectRunningSandboxInstance(
-  ctx: GetSandboxInstanceByInspectionContext,
-  sandboxInstance: SandboxInstanceRecord,
-): Promise<NonNullable<GetSandboxInstanceResponse>> {
-  if (sandboxInstance.providerSandboxId === null) {
-    throw new Error(
-      `Expected running sandbox instance '${sandboxInstance.id}' to have a providerSandboxId.`,
-    );
-  }
-
-  const inspection = await ctx.sandboxAdapter
-    .inspect({
-      id: sandboxInstance.providerSandboxId,
-    })
-    .catch(async (error: unknown) => {
-      if (!isSandboxResourceNotFoundError(error)) {
-        throw error;
-      }
-
-      await markRunningSandboxInstanceStopped(ctx, {
-        sandboxInstanceId: sandboxInstance.id,
-      });
-
-      return null;
-    });
-
-  if (inspection === null) {
-    return toResponse({
-      id: sandboxInstance.id,
-      status: SandboxInstanceStatuses.STOPPED,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-    });
-  }
-
-  if (inspection.state === SandboxInspectStates.RUNNING) {
-    return toResponse({
-      id: sandboxInstance.id,
-      status: SandboxInstanceStatuses.RUNNING,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-    });
-  }
-
-  await markRunningSandboxInstanceStopped(ctx, {
-    sandboxInstanceId: sandboxInstance.id,
-  });
-
-  return toResponse({
-    id: sandboxInstance.id,
-    status: SandboxInstanceStatuses.STOPPED,
-    failureCode: sandboxInstance.failureCode,
-    failureMessage: sandboxInstance.failureMessage,
-  });
-}
-
-export async function getSandboxInstanceByInspection(
-  ctx: GetSandboxInstanceByInspectionContext,
-  input: GetSandboxInstanceInput,
-): Promise<GetSandboxInstanceResponse> {
-  const sandboxInstance = await readSandboxInstanceRecord(ctx, input);
   if (sandboxInstance === undefined) {
     return null;
   }
@@ -220,31 +198,28 @@ export async function getSandboxInstanceByInspection(
     );
   }
 
-  if (sandboxInstance.status === SandboxInstanceStatuses.FAILED) {
-    return toResponse({
-      id: sandboxInstance.id,
-      status: SandboxInstanceStatuses.FAILED,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-    });
+  switch (sandboxInstance.status) {
+    case SandboxInstanceStatuses.FAILED:
+      return {
+        id: sandboxInstance.id,
+        status: SandboxInstanceStatuses.FAILED,
+        failureCode: sandboxInstance.failureCode,
+        failureMessage: sandboxInstance.failureMessage,
+      };
+    case SandboxInstanceStatuses.STOPPED:
+      return {
+        id: sandboxInstance.id,
+        status: SandboxInstanceStatuses.STOPPED,
+        failureCode: sandboxInstance.failureCode,
+        failureMessage: sandboxInstance.failureMessage,
+      };
+    case SandboxInstanceStatuses.STARTING: {
+      return inspectStartingSandboxInstance(ctx, sandboxInstance);
+    }
+    case SandboxInstanceStatuses.RUNNING: {
+      return inspectRunningSandboxInstance(ctx, sandboxInstance);
+    }
+    default:
+      throw new Error("Unsupported sandbox instance status.");
   }
-
-  if (sandboxInstance.status === SandboxInstanceStatuses.STOPPED) {
-    return toResponse({
-      id: sandboxInstance.id,
-      status: SandboxInstanceStatuses.STOPPED,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-    });
-  }
-
-  if (sandboxInstance.status === SandboxInstanceStatuses.STARTING) {
-    return inspectStartingSandboxInstance(ctx, sandboxInstance);
-  }
-
-  if (sandboxInstance.status === SandboxInstanceStatuses.RUNNING) {
-    return inspectRunningSandboxInstance(ctx, sandboxInstance);
-  }
-
-  throw new Error("Unsupported sandbox instance status.");
 }

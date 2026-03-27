@@ -4,23 +4,11 @@ import {
   SandboxInstanceStatuses,
   SandboxStopReasons,
 } from "@mistle/db/data-plane";
-import { SandboxProvider, createSandboxAdapter, type SandboxImageHandle } from "@mistle/sandbox";
+import { SandboxProvider, createSandboxAdapter } from "@mistle/sandbox";
 import { describe, expect } from "vitest";
 
 import { INTERNAL_SANDBOX_ROUTE_BASE_PATH } from "../src/internal/index.js";
 import { it } from "./test-context.js";
-
-function createRouteUrl(baseUrl: string, path: string): URL {
-  return new URL(path, baseUrl);
-}
-
-function createDockerBaseImageHandle(imageId: string): SandboxImageHandle {
-  return {
-    provider: SandboxProvider.DOCKER,
-    imageId,
-    createdAt: "2026-03-27T00:00:00.000Z",
-  };
-}
 
 describe("internal sandbox conventional get integration", () => {
   it("returns running from provider inspection for a running sandbox", async ({ fixture }) => {
@@ -31,7 +19,11 @@ describe("internal sandbox conventional get integration", () => {
       },
     });
     const sandbox = await adapter.start({
-      image: createDockerBaseImageHandle("registry:3"),
+      image: {
+        provider: SandboxProvider.DOCKER,
+        imageId: "registry:3",
+        createdAt: "2026-03-27T00:00:00.000Z",
+      },
     });
 
     try {
@@ -49,9 +41,9 @@ describe("internal sandbox conventional get integration", () => {
       });
 
       const response = await fetch(
-        createRouteUrl(
-          fixture.baseUrl,
+        new URL(
           `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_conventional_get_running?organizationId=org_dp_api_conventional_get`,
+          fixture.baseUrl,
         ),
         {
           headers: {
@@ -82,7 +74,11 @@ describe("internal sandbox conventional get integration", () => {
       },
     });
     const sandbox = await adapter.start({
-      image: createDockerBaseImageHandle("registry:3"),
+      image: {
+        provider: SandboxProvider.DOCKER,
+        imageId: "registry:3",
+        createdAt: "2026-03-27T00:00:00.000Z",
+      },
     });
 
     try {
@@ -100,9 +96,9 @@ describe("internal sandbox conventional get integration", () => {
       });
 
       const response = await fetch(
-        createRouteUrl(
-          fixture.baseUrl,
+        new URL(
           `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_conventional_get_starting?organizationId=org_dp_api_conventional_get`,
+          fixture.baseUrl,
         ),
         {
           headers: {
@@ -141,7 +137,11 @@ describe("internal sandbox conventional get integration", () => {
       },
     });
     const sandbox = await adapter.start({
-      image: createDockerBaseImageHandle("registry:3"),
+      image: {
+        provider: SandboxProvider.DOCKER,
+        imageId: "registry:3",
+        createdAt: "2026-03-27T00:00:00.000Z",
+      },
     });
 
     await fixture.db.insert(sandboxInstances).values({
@@ -160,9 +160,9 @@ describe("internal sandbox conventional get integration", () => {
     await adapter.destroy({ id: sandbox.id });
 
     const response = await fetch(
-      createRouteUrl(
-        fixture.baseUrl,
+      new URL(
         `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_conventional_get_missing?organizationId=org_dp_api_conventional_get`,
+        fixture.baseUrl,
       ),
       {
         headers: {
