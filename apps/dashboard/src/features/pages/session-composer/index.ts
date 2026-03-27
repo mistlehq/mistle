@@ -1,4 +1,7 @@
-export { useSessionComposerState } from "./use-session-composer-state.js";
+export {
+  useSessionComposerState,
+  type SessionComposerStateInput,
+} from "./use-session-composer-state.js";
 export { resolveComposerStatusMessage } from "./session-composer-status.js";
 export { readComposerConfigSnapshot } from "./session-composer-config.js";
 export {

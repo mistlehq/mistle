@@ -5,6 +5,10 @@ import { ChatComposer, type ChatComposerStatusMessage } from "../chat/components
 import { ChatThread } from "../chat/components/chat-thread.js";
 import { CodexApprovalRequestsPanel } from "../session-agents/codex/approvals/index.js";
 import type { CodexApprovalRequestEntry } from "../session-agents/codex/approvals/index.js";
+import {
+  useSessionComposerState,
+  type SessionComposerStateInput,
+} from "./session-composer/index.js";
 
 export type SessionConversationComposerProps = React.ComponentProps<typeof ChatComposer>;
 
@@ -18,6 +22,10 @@ type SessionConversationMainContentProps = {
 type SessionConversationBottomPanelProps = SessionConversationMainContentProps & {
   sessionStatusMessage: ChatComposerStatusMessage | null;
   composerProps: SessionConversationComposerProps;
+};
+
+type SessionConversationBottomPanelControllerProps = SessionConversationMainContentProps & {
+  composerStateInput: SessionComposerStateInput;
 };
 
 export function SessionConversationMainContent({
@@ -60,5 +68,20 @@ export function SessionConversationBottomPanel({
       )}
       <ChatComposer {...composerProps} />
     </>
+  );
+}
+
+export function SessionConversationBottomPanelController({
+  composerStateInput,
+  ...bottomPanelProps
+}: SessionConversationBottomPanelControllerProps): React.JSX.Element {
+  const composerState = useSessionComposerState(composerStateInput);
+
+  return (
+    <SessionConversationBottomPanel
+      {...bottomPanelProps}
+      composerProps={composerState.composerProps}
+      sessionStatusMessage={composerState.sessionStatusMessage}
+    />
   );
 }

@@ -6,6 +6,7 @@ import { useLocation, useParams } from "react-router";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import {
   SessionConversationBottomPanel,
+  SessionConversationBottomPanelController,
   SessionConversationMainContent,
   type SessionConversationComposerProps,
 } from "./session-conversation-pane.js";
@@ -218,14 +219,14 @@ function SessionWorkbenchPageContent(input: {
               requestStoppedSandboxResume={workbench.requestStoppedSandboxResume}
             />
           ) : null}
-          <SessionConversationBottomPanel
+          <SessionConversationBottomPanelController
             chatEntries={conversationPane.chatState.entries}
-            composerProps={conversationPane.composerProps}
+            composerStateInput={conversationPane.composerStateInput}
             isRespondingToServerRequest={
               conversationPane.serverRequestsState.isRespondingToServerRequest
             }
             onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
-            sessionStatusMessage={conversationPane.sessionStatusMessage}
+            key={input.sandboxInstanceId ?? "missing-session"}
             serverRequestPanelEntries={unmatchedServerRequests}
           />
         </>

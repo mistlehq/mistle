@@ -99,6 +99,12 @@ type CodexSessionServerRequestState = {
   respondToServerRequest: (requestId: string | number, result: unknown) => void;
 };
 
+type CodexSessionMessageState = {
+  clearSessionErrorMessage: () => void;
+  reportSessionErrorMessage: (message: string) => void;
+  sessionErrorMessage: string | null;
+};
+
 export type UseCodexSessionStateResult = {
   lifecycle: CodexSessionConnectionLifecycleState;
   threads: CodexSessionThreadState;
@@ -107,6 +113,7 @@ export type UseCodexSessionStateResult = {
   codexBootstrapData: CodexSessionBootstrapDataState;
   codexConfig: CodexSessionConfigState;
   serverRequests: CodexSessionServerRequestState;
+  sessionMessage: CodexSessionMessageState;
 };
 
 export function useCodexSessionState(): UseCodexSessionStateResult {
@@ -116,6 +123,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   const threadIdRef = useRef<string | null>(null);
   const connectionGenerationRef = useRef(0);
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
+  const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
 
   const [serverRequestsState, dispatchServerRequestsAction] = useReducer(
     reduceCodexApprovalRequestsState,
@@ -160,7 +168,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   } = useCodexChatController({
     rpcClientRef,
     threadIdRef,
-    setStartErrorMessage: setLifecycleErrorMessage,
+    setSessionErrorMessage,
   });
 
   const bootstrapDataState = useCodexSessionBootstrapData({
@@ -708,6 +716,18 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     };
   }, [isRespondingToServerRequest, respondToServerRequest, serverRequestsState.entries]);
 
+  const sessionMessage = useMemo<CodexSessionMessageState>(() => {
+    return {
+      sessionErrorMessage,
+      clearSessionErrorMessage: () => {
+        setSessionErrorMessage(null);
+      },
+      reportSessionErrorMessage: (message: string) => {
+        setSessionErrorMessage(message);
+      },
+    };
+  }, [sessionErrorMessage]);
+
   return {
     lifecycle,
     threads,
@@ -716,5 +736,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     codexBootstrapData,
     codexConfig,
     serverRequests,
+    sessionMessage,
   };
 }

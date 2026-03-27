@@ -4,6 +4,7 @@ import type { SessionBootstrapState } from "../../session-agents/codex/session-s
 import {
   buildModelSelectionRequiredMessage,
   buildNonImageCapableModelWarningMessage,
+  buildUnavailableModelErrorMessage,
   supportsImageInspection,
 } from "./session-composer-model-readiness.js";
 
@@ -15,6 +16,7 @@ export type ComposerStatusMessage = {
 export function resolveComposerBootstrapMessage(input: {
   activeComposerModel: CodexModelSummary | null;
   bootstrapState: SessionBootstrapState;
+  selectedModel: string | null;
 }): string | null {
   if (input.bootstrapState.status === "failed") {
     return input.bootstrapState.message;
@@ -28,7 +30,9 @@ export function resolveComposerBootstrapMessage(input: {
     return null;
   }
 
-  return buildModelSelectionRequiredMessage();
+  return input.selectedModel === null
+    ? buildModelSelectionRequiredMessage()
+    : buildUnavailableModelErrorMessage(input.selectedModel);
 }
 
 export function resolveComposerStatusMessage(input: {
@@ -36,6 +40,8 @@ export function resolveComposerStatusMessage(input: {
   bootstrapState: SessionBootstrapState;
   composerErrorMessage: string | null;
   hasPendingAttachments: boolean;
+  sessionErrorMessage: string | null;
+  selectedModel: string | null;
 }): ComposerStatusMessage | null {
   if (input.composerErrorMessage !== null) {
     return {
@@ -44,9 +50,17 @@ export function resolveComposerStatusMessage(input: {
     };
   }
 
+  if (input.sessionErrorMessage !== null) {
+    return {
+      message: input.sessionErrorMessage,
+      tone: "error",
+    };
+  }
+
   const bootstrapMessage = resolveComposerBootstrapMessage({
     activeComposerModel: input.activeComposerModel,
     bootstrapState: input.bootstrapState,
+    selectedModel: input.selectedModel,
   });
   if (bootstrapMessage !== null) {
     return {

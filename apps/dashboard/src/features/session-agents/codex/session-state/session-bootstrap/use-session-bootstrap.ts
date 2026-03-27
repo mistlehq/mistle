@@ -8,11 +8,6 @@ import {
   readComposerConfigSnapshot,
   type ComposerConfigSnapshot,
 } from "../../../../pages/session-composer/session-composer-config.js";
-import {
-  buildModelSelectionRequiredMessage,
-  buildUnavailableModelErrorMessage,
-  resolveActiveComposerModel,
-} from "../../../../pages/session-composer/session-composer-model-readiness.js";
 import type { ConnectedCodexSession } from "../codex-session-types.js";
 import { resolveSessionBootstrapStrategy } from "./session-bootstrap-strategy.js";
 
@@ -50,6 +45,7 @@ export function useSessionBootstrap(input: {
   const [configSnapshot, setConfigSnapshot] = useState<ComposerConfigSnapshot>(EmptyComposerConfig);
   const [availableModels, setAvailableModels] = useState<readonly CodexModelSummary[]>([]);
   const [hasEstablishedBaseline, setHasEstablishedBaseline] = useState(false);
+  const [establishedConnectionAtIso, setEstablishedConnectionAtIso] = useState<string | null>(null);
   const [establishedSandboxInstanceId, setEstablishedSandboxInstanceId] = useState<string | null>(
     null,
   );
@@ -58,6 +54,7 @@ export function useSessionBootstrap(input: {
   useEffect(() => {
     const bootstrapStrategy = resolveSessionBootstrapStrategy({
       connectedSession: input.connectedSession,
+      establishedConnectionAtIso,
       establishedSandboxInstanceId,
       hasEstablishedBaseline,
     });
@@ -157,30 +154,16 @@ export function useSessionBootstrap(input: {
           ? readComposerConfigSnapshot(JSON.stringify(configResult.value.config))
           : EmptyComposerConfig;
 
-      const resolvedComposerModel = resolveActiveComposerModel({
-        availableModels: modelsResult.value.models,
-        selectedModel: nextConfigSnapshot.model,
-      });
-
       setAvailableModels(modelsResult.value.models);
       setConfigSnapshot(nextConfigSnapshot);
 
-      if (resolvedComposerModel === null) {
-        setState({
-          status: "failed",
-          message:
-            nextConfigSnapshot.model === null
-              ? buildModelSelectionRequiredMessage()
-              : buildUnavailableModelErrorMessage(nextConfigSnapshot.model),
-        });
-        return;
-      }
-
       setHasEstablishedBaseline(true);
+      setEstablishedConnectionAtIso(connectedSession.connectedAtIso);
       setEstablishedSandboxInstanceId(connectedSession.sandboxInstanceId);
       setState({ status: "ready" });
     })();
   }, [
+    establishedConnectionAtIso,
     establishedSandboxInstanceId,
     hasEstablishedBaseline,
     input.connectedSession,

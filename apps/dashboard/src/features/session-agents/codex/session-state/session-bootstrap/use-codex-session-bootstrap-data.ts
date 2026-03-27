@@ -186,7 +186,7 @@ export function useCodexSessionBootstrapData(input: {
         setModelCatalogStatus("error");
         throw error;
       }
-    }, [input]),
+    }, [input.rpcClientRef]),
     readConfigAsync: useCallback(
       async (includeLayers: boolean) => {
         setConfigStatus("loading");

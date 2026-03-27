@@ -1,7 +1,7 @@
 import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/openai/agent/client";
 import { uploadSandboxImage } from "@mistle/sandbox-session-client";
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import type { ChatComposerStatusMessage } from "../../chat/components/chat-composer.js";
 import { resolveTurnRepresentation } from "../../session-agents/codex/session-state/codex-attachment-presentation.js";
@@ -59,45 +59,45 @@ export type SessionComposerState = {
   sessionStatusMessage: ChatComposerStatusMessage | null;
 };
 
-export function useSessionComposerState(input: {
+export type SessionComposerStateInput = {
   bootstrap: SessionBootstrapResult;
+  clearSessionErrorMessage: () => void;
   codexConfig: CodexSessionConfigState;
   chat: ComposerChatState;
   connectedSession: ComposerConnectedSession;
   hasActiveTurn: boolean;
   sandboxInstanceId: string | null;
-}): SessionComposerState {
+  sessionErrorMessage: string | null;
+};
+
+export function useSessionComposerState(input: SessionComposerStateInput): SessionComposerState {
   const { batchWriteConfig, isBatchWritingConfig, isWritingConfigValue, writeConfigValue } =
     input.codexConfig;
+  const { clearSessionErrorMessage, sessionErrorMessage } = input;
   const [composerText, setComposerText] = useState("");
   const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null);
   const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
     readonly PendingComposerAttachment[]
   >([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
-  const [composerConfig, setComposerConfig] = useState<ComposerConfigSnapshot>({
+  const [composerConfigOverrides, setComposerConfigOverrides] = useState<ComposerConfigSnapshot>({
     model: null,
     modelReasoningEffort: null,
   });
 
-  useEffect(() => {
-    setComposerText("");
-    setComposerErrorMessage(null);
-    setPendingComposerAttachments([]);
-    setIsUploadingAttachments(false);
-    setComposerConfig({
-      model: null,
-      modelReasoningEffort: null,
-    });
-  }, [input.sandboxInstanceId]);
-
-  useEffect(() => {
-    if (input.bootstrap.state.status !== "ready") {
-      return;
-    }
-
-    setComposerConfig(input.bootstrap.configSnapshot);
-  }, [input.bootstrap.configSnapshot, input.bootstrap.state.status]);
+  const composerConfig = useMemo<ComposerConfigSnapshot>(() => {
+    return {
+      model: composerConfigOverrides.model ?? input.bootstrap.configSnapshot.model,
+      modelReasoningEffort:
+        composerConfigOverrides.modelReasoningEffort ??
+        input.bootstrap.configSnapshot.modelReasoningEffort,
+    };
+  }, [
+    composerConfigOverrides.model,
+    composerConfigOverrides.modelReasoningEffort,
+    input.bootstrap.configSnapshot.model,
+    input.bootstrap.configSnapshot.modelReasoningEffort,
+  ]);
 
   const activeComposerModel = useMemo(
     () =>
@@ -113,17 +113,24 @@ export function useSessionComposerState(input: {
     bootstrapState: input.bootstrap.state,
     composerErrorMessage,
     hasPendingAttachments: pendingComposerAttachments.length > 0,
+    sessionErrorMessage,
+    selectedModel: composerConfig.model,
   });
 
-  const handleComposerTextChange = useCallback((nextText: string): void => {
-    setComposerErrorMessage(null);
-    setComposerText(nextText);
-  }, []);
+  const handleComposerTextChange = useCallback(
+    (nextText: string): void => {
+      clearSessionErrorMessage();
+      setComposerErrorMessage(null);
+      setComposerText(nextText);
+    },
+    [clearSessionErrorMessage],
+  );
 
   const setComposerModel = useCallback(
     (nextModel: string): void => {
+      clearSessionErrorMessage();
       setComposerErrorMessage(null);
-      setComposerConfig((currentConfig) => ({
+      setComposerConfigOverrides((currentConfig) => ({
         model: nextModel,
         modelReasoningEffort: currentConfig.modelReasoningEffort,
       }));
@@ -137,13 +144,14 @@ export function useSessionComposerState(input: {
         ],
       });
     },
-    [batchWriteConfig],
+    [batchWriteConfig, clearSessionErrorMessage],
   );
 
   const setComposerReasoningEffort = useCallback(
     (nextReasoningEffort: string): void => {
+      clearSessionErrorMessage();
       setComposerErrorMessage(null);
-      setComposerConfig((currentConfig) => ({
+      setComposerConfigOverrides((currentConfig) => ({
         model: currentConfig.model,
         modelReasoningEffort: nextReasoningEffort,
       }));
@@ -153,44 +161,53 @@ export function useSessionComposerState(input: {
         mergeStrategy: "replace",
       });
     },
-    [writeConfigValue],
+    [clearSessionErrorMessage, writeConfigValue],
   );
 
-  const addPendingComposerFiles = useCallback((files: readonly File[]): void => {
-    const nextAttachments = files.flatMap((file) => {
-      if (!file.type.startsWith("image/")) {
-        return [];
+  const addPendingComposerFiles = useCallback(
+    (files: readonly File[]): void => {
+      const nextAttachments = files.flatMap((file) => {
+        if (!file.type.startsWith("image/")) {
+          return [];
+        }
+
+        return [
+          {
+            id: crypto.randomUUID(),
+            file,
+            name: file.name,
+          },
+        ];
+      });
+
+      if (nextAttachments.length === 0) {
+        return;
       }
 
-      return [
-        {
-          id: crypto.randomUUID(),
-          file,
-          name: file.name,
-        },
-      ];
-    });
+      clearSessionErrorMessage();
+      setComposerErrorMessage(null);
+      setPendingComposerAttachments((currentAttachments) => [
+        ...currentAttachments,
+        ...nextAttachments,
+      ]);
+    },
+    [clearSessionErrorMessage],
+  );
 
-    if (nextAttachments.length === 0) {
-      return;
-    }
-
-    setComposerErrorMessage(null);
-    setPendingComposerAttachments((currentAttachments) => [
-      ...currentAttachments,
-      ...nextAttachments,
-    ]);
-  }, []);
-
-  const removePendingComposerAttachment = useCallback((attachmentId: string): void => {
-    setComposerErrorMessage(null);
-    setPendingComposerAttachments((currentAttachments) =>
-      currentAttachments.filter((attachment) => attachment.id !== attachmentId),
-    );
-  }, []);
+  const removePendingComposerAttachment = useCallback(
+    (attachmentId: string): void => {
+      clearSessionErrorMessage();
+      setComposerErrorMessage(null);
+      setPendingComposerAttachments((currentAttachments) =>
+        currentAttachments.filter((attachment) => attachment.id !== attachmentId),
+      );
+    },
+    [clearSessionErrorMessage],
+  );
 
   const submitComposer = useCallback((): void => {
     void (async () => {
+      clearSessionErrorMessage();
       setComposerErrorMessage(null);
       const action = resolveChatComposerAction({
         composerText,
@@ -303,6 +320,7 @@ export function useSessionComposerState(input: {
     activeComposerModel,
     composerConfig.model,
     composerText,
+    clearSessionErrorMessage,
     input.bootstrap.state,
     input.chat,
     input.connectedSession,

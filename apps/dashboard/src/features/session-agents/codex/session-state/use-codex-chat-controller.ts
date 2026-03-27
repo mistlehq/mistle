@@ -60,7 +60,7 @@ function buildTurnRequest(input: {
 export function useCodexChatController(input: {
   rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
   threadIdRef: MutableRefObject<string | null>;
-  setStartErrorMessage: (message: string | null) => void;
+  setSessionErrorMessage: (message: string | null) => void;
 }) {
   const [chatState, dispatchChatAction] = useReducer(
     reduceCodexChatState,
@@ -116,14 +116,14 @@ export function useCodexChatController(input: {
       } catch (error) {
         if (isThreadNotMaterializedError(error)) {
           dispatchChatAction({ type: "reset" });
-          input.setStartErrorMessage(null);
+          input.setSessionErrorMessage(null);
           return "empty";
         }
 
         throw error;
       }
     },
-    [input],
+    [input.rpcClientRef, input.setSessionErrorMessage, input.threadIdRef],
   );
 
   const hydrateInitialThread = useCallback(
@@ -193,7 +193,9 @@ export function useCodexChatController(input: {
       await hydrateChatFromThread();
     },
     onError: (error) => {
-      input.setStartErrorMessage(error instanceof Error ? error.message : "Could not reload chat.");
+      input.setSessionErrorMessage(
+        error instanceof Error ? error.message : "Could not reload chat.",
+      );
     },
   });
 
@@ -214,7 +216,7 @@ export function useCodexChatController(input: {
       });
     },
     onError: (error) => {
-      input.setStartErrorMessage(
+      input.setSessionErrorMessage(
         error instanceof Error ? error.message : "Could not interrupt turn.",
       );
     },

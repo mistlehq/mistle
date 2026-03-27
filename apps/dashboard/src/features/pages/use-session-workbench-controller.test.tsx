@@ -89,8 +89,10 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.lifecycleErrorMessage).toBeNull();
     expect(result.current.workbench.sandboxFailureMessage).toBeNull();
     expect(result.current.conversationPane.chatState.entries).toEqual([]);
-    expect(result.current.conversationPane.composerProps.composerUi.isConnected).toBe(false);
-    expect(result.current.conversationPane.composerProps.modelOptions).toEqual([]);
+    expect(result.current.conversationPane.composerStateInput.connectedSession).toBeNull();
+    expect(result.current.conversationPane.composerStateInput.bootstrap.availableModels).toEqual(
+      [],
+    );
     expect(result.current.conversationPane.serverRequestsState.pendingServerRequests).toEqual([]);
   });
 
