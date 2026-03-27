@@ -52,6 +52,8 @@ The package root exports:
 - `SandboxHandle`
 - `SandboxRuntimeControl`
 - `SandboxStartRequest`
+- `SandboxInspectRequest`
+- `SandboxInspectResult`
 - `SandboxResumeRequestV1`
 - `SandboxStopRequest`
 - `SandboxDestroyRequest`
@@ -87,6 +89,9 @@ const baseImage: SandboxImageHandle = {
 const sandbox = await adapter.start({
   image: baseImage,
 });
+const inspection = await adapter.inspect({
+  id: sandbox.id,
+});
 
 await runtimeControl.applyStartup({
   id: sandbox.id,
@@ -104,6 +109,7 @@ await runtimeControl.close();
 ## Usage Notes
 
 - Sandbox image handles describe the provider image passed to `start({ image })`.
+- `SandboxAdapter.inspect({ id })` returns provider-backed sandbox metadata without attaching to the runtime.
 - `SandboxResumeRequestV1` resumes provider compute against existing sandbox state using a previous sandbox `id`.
 - `SandboxRuntimeControl.applyStartup({ id, payload })` delivers runtime startup bytes to an already-running sandbox using provider-native control paths.
 - `SandboxRuntimeControl.close()` releases provider client resources held by runtime control.

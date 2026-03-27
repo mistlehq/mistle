@@ -35,6 +35,17 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
       expect(sandbox.provider).toBe(SandboxProvider.E2B);
       expect(sandbox.id).not.toBe("");
 
+      const inspection = await fixture.adapter.inspect({ id: sandbox.id });
+      expect(inspection.provider).toBe(SandboxProvider.E2B);
+      if (inspection.provider !== SandboxProvider.E2B) {
+        throw new Error("Expected E2B sandbox inspection result.");
+      }
+      expect(inspection.id).toBe(sandbox.id);
+      expect(inspection.state).toBe("running");
+      expect(inspection.templateId).not.toBe("");
+      expect(inspection.cpuCount).toBeGreaterThan(0);
+      expect(inspection.memoryMB).toBeGreaterThan(0);
+
       const connectedSandbox = await fixture.connectSandbox(sandbox.id);
       const result = await connectedSandbox.commands.run(
         `printf '%s\\n%s\\n%s' "$${INJECTED_ENV_KEY}" "$${SandboxRuntimeEnv.LISTEN_ADDR}" "$${SandboxRuntimeEnv.USER}"`,
@@ -70,6 +81,12 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
       await startedSandbox.files.write(SANDBOX_STATE_FILE_PATH, marker);
 
       await fixture.adapter.stop({ id: sandbox.id });
+
+      const stoppedInspection = await fixture.adapter.inspect({ id: sandbox.id });
+      if (stoppedInspection.provider !== SandboxProvider.E2B) {
+        throw new Error("Expected E2B sandbox inspection result after stop.");
+      }
+      expect(stoppedInspection.state).toBe("paused");
 
       const resumedSandbox = await fixture.adapter.resume({
         id: sandbox.id,

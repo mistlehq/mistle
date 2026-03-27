@@ -9,6 +9,8 @@ import {
   type SandboxAdapter,
   type SandboxDestroyRequest,
   type SandboxHandle,
+  type SandboxInspectRequest,
+  type SandboxInspectResult,
   type SandboxResumeRequestV1,
   type SandboxStartRequest,
   type SandboxStopRequest,
@@ -38,6 +40,28 @@ export class DockerSandboxAdapter implements SandboxAdapter {
       provider: SandboxProvider.DOCKER,
       id,
     };
+  }
+
+  async inspect(request: SandboxInspectRequest): Promise<SandboxInspectResult> {
+    if (request.id.trim().length === 0) {
+      throw new SandboxConfigurationError("Runtime id is required.");
+    }
+
+    try {
+      return await this.#client.inspectSandbox({
+        runtimeId: request.id,
+      });
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw new SandboxResourceNotFoundError({
+          resourceType: "sandbox",
+          resourceId: request.id,
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
   }
 
   async resume(request: SandboxResumeRequestV1): Promise<SandboxHandle> {

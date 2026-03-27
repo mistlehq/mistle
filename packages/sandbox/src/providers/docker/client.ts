@@ -1,6 +1,7 @@
 import Docker from "dockerode";
 import { z } from "zod";
 
+import { SandboxInspectStates, type DockerSandboxInspectResult } from "../../types.js";
 import {
   DockerClientOperationIds,
   mapDockerClientError,
@@ -8,10 +9,12 @@ import {
 } from "./client-errors.js";
 import {
   DockerDestroySandboxRequestSchema,
+  DockerInspectSandboxRequestSchema,
   DockerResumeSandboxRequestSchema,
   DockerStartSandboxRequestSchema,
   DockerStopSandboxRequestSchema,
   type DockerDestroySandboxRequest,
+  type DockerInspectSandboxRequest,
   type DockerResumeSandboxRequest,
   type DockerSandboxConfig,
   type DockerStartSandboxRequest,
@@ -24,6 +27,7 @@ export type DockerStartSandboxResponse = {
 
 export interface DockerClient {
   startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse>;
+  inspectSandbox(request: DockerInspectSandboxRequest): Promise<DockerSandboxInspectResult>;
   resumeSandbox(request: DockerResumeSandboxRequest): Promise<DockerStartSandboxResponse>;
   stopSandbox(request: DockerStopSandboxRequest): Promise<void>;
   destroySandbox(request: DockerDestroySandboxRequest): Promise<void>;
@@ -102,6 +106,29 @@ function toDockerEnv(env: Record<string, string> | undefined): string[] | undefi
   return entries.map(([key, value]) => `${key}=${value}`);
 }
 
+function normalizeDockerInspectState(state: string): DockerSandboxInspectResult["state"] {
+  switch (state) {
+    case SandboxInspectStates.CREATED:
+    case SandboxInspectStates.RUNNING:
+    case SandboxInspectStates.PAUSED:
+    case SandboxInspectStates.RESTARTING:
+    case SandboxInspectStates.REMOVING:
+    case SandboxInspectStates.EXITED:
+    case SandboxInspectStates.DEAD:
+      return state;
+    default:
+      return SandboxInspectStates.UNKNOWN;
+  }
+}
+
+function normalizeDockerTimestamp(value: string): string | null {
+  if (value.length === 0 || value.startsWith("0001-01-01")) {
+    return null;
+  }
+
+  return value;
+}
+
 export class DockerApiClient implements DockerClient {
   readonly #config: DockerSandboxConfig;
   readonly #docker: Docker;
@@ -141,6 +168,32 @@ export class DockerApiClient implements DockerClient {
 
     return {
       runtimeId: container.id,
+    };
+  }
+
+  async inspectSandbox(request: DockerInspectSandboxRequest): Promise<DockerSandboxInspectResult> {
+    const parsedRequest = DockerInspectSandboxRequestSchema.parse(request);
+    const container = this.#docker.getContainer(parsedRequest.runtimeId);
+    const inspect = await this.#runDockerClientOperation(
+      DockerClientOperationIds.INSPECT_CONTAINER,
+      () => container.inspect(),
+    );
+
+    return {
+      provider: "docker",
+      id: inspect.Id,
+      state: normalizeDockerInspectState(inspect.State.Status),
+      createdAt: inspect.Created,
+      startedAt: normalizeDockerTimestamp(inspect.State.StartedAt),
+      finishedAt: normalizeDockerTimestamp(inspect.State.FinishedAt),
+      name: inspect.Name,
+      imageRef: inspect.Config.Image,
+      labels: inspect.Config.Labels,
+      exitCode: inspect.State.ExitCode,
+      running: inspect.State.Running,
+      paused: inspect.State.Paused,
+      restarting: inspect.State.Restarting,
+      dead: inspect.State.Dead,
     };
   }
 

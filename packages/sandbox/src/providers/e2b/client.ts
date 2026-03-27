@@ -2,6 +2,7 @@ import { systemSleeper } from "@mistle/time";
 import { CommandExitError, Sandbox, type ConnectionOpts } from "e2b";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
+import { type E2BSandboxInspectResult } from "../../types.js";
 import {
   E2BClientError,
   E2BClientErrorCodes,
@@ -12,11 +13,13 @@ import type { E2BSandboxConfig } from "./config.js";
 import {
   E2BApplyStartupRequestSchema,
   E2BDestroySandboxRequestSchema,
+  E2BInspectSandboxRequestSchema,
   E2BResumeSandboxRequestSchema,
   E2BStartSandboxRequestSchema,
   E2BStopSandboxRequestSchema,
   type E2BApplyStartupRequest,
   type E2BDestroySandboxRequest,
+  type E2BInspectSandboxRequest,
   type E2BResumeSandboxRequest,
   type E2BStartSandboxRequest,
   type E2BStopSandboxRequest,
@@ -36,6 +39,7 @@ export type E2BStartSandboxResponse = {
 
 export interface E2BClient {
   startSandbox(request: E2BStartSandboxRequest): Promise<E2BStartSandboxResponse>;
+  inspectSandbox(request: E2BInspectSandboxRequest): Promise<E2BSandboxInspectResult>;
   resumeSandbox(request: E2BResumeSandboxRequest): Promise<E2BStartSandboxResponse>;
   stopSandbox(request: E2BStopSandboxRequest): Promise<void>;
   destroySandbox(request: E2BDestroySandboxRequest): Promise<void>;
@@ -130,6 +134,30 @@ export class E2BApiClient implements E2BClient {
       };
     } catch (error) {
       throw mapE2BClientError(E2BClientOperationIds.CREATE_SANDBOX, error);
+    }
+  }
+
+  async inspectSandbox(request: E2BInspectSandboxRequest): Promise<E2BSandboxInspectResult> {
+    const parsedRequest = E2BInspectSandboxRequestSchema.parse(request);
+
+    try {
+      const sandbox = await Sandbox.getInfo(parsedRequest.sandboxId, this.#connectionOptions);
+
+      return {
+        provider: "e2b",
+        id: sandbox.sandboxId,
+        state: sandbox.state,
+        createdAt: sandbox.startedAt.toISOString(),
+        startedAt: sandbox.startedAt.toISOString(),
+        endAt: sandbox.endAt.toISOString(),
+        templateId: sandbox.templateId,
+        name: sandbox.name ?? null,
+        metadata: sandbox.metadata,
+        cpuCount: sandbox.cpuCount,
+        memoryMB: sandbox.memoryMB,
+      };
+    } catch (error) {
+      throw mapE2BClientError(E2BClientOperationIds.GET_SANDBOX_INFO, error);
     }
   }
 

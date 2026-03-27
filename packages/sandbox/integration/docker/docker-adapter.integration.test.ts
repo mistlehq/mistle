@@ -126,6 +126,18 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       expect(sandbox.provider).toBe(SandboxProvider.DOCKER);
       expect(sandbox.id).not.toBe("");
 
+      const inspection = await fixture.adapter.inspect({ id: sandbox.id });
+      expect(inspection.provider).toBe(SandboxProvider.DOCKER);
+      if (inspection.provider !== SandboxProvider.DOCKER) {
+        throw new Error("Expected Docker sandbox inspection result.");
+      }
+      expect(inspection.id).toBe(sandbox.id);
+      expect(inspection.state).toBe("running");
+      expect(inspection.imageRef).toBe(fixture.baseImage.imageId);
+      expect(inspection.labels["mistle.sandbox.provider"]).toBe("docker");
+      expect(inspection.running).toBe(true);
+      expect(inspection.startedAt).not.toBeNull();
+
       await writeSandboxFile({
         dockerClient: fixture.dockerClient,
         id: sandbox.id,
@@ -202,6 +214,14 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       });
 
       await fixture.adapter.stop({ id: sandbox.id });
+
+      const stoppedInspection = await fixture.adapter.inspect({ id: sandbox.id });
+      if (stoppedInspection.provider !== SandboxProvider.DOCKER) {
+        throw new Error("Expected Docker sandbox inspection result after stop.");
+      }
+      expect(stoppedInspection.state).toBe("exited");
+      expect(stoppedInspection.running).toBe(false);
+      expect(stoppedInspection.exitCode).not.toBeNull();
 
       const resumedSandbox = await fixture.adapter.resume({
         id: sandbox.id,

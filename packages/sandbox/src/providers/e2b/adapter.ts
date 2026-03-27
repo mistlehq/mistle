@@ -8,6 +8,8 @@ import {
   type SandboxAdapter,
   type SandboxDestroyRequest,
   type SandboxHandle,
+  type SandboxInspectRequest,
+  type SandboxInspectResult,
   type SandboxResumeRequestV1,
   type SandboxStartRequest,
   type SandboxStopRequest,
@@ -54,6 +56,20 @@ export class E2BSandboxAdapter implements SandboxAdapter {
     });
 
     return createSandboxHandle(response.sandboxId);
+  }
+
+  async inspect(request: SandboxInspectRequest): Promise<SandboxInspectResult> {
+    requireSandboxId(request.id);
+
+    try {
+      return await this.#client.inspectSandbox({ sandboxId: request.id });
+    } catch (error) {
+      if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
+        throw toSandboxNotFoundError(request.id, error);
+      }
+
+      throw error;
+    }
   }
 
   async resume(request: SandboxResumeRequestV1): Promise<SandboxHandle> {
