@@ -219,7 +219,7 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       if (stoppedInspection.provider !== SandboxProvider.DOCKER) {
         throw new Error("Expected Docker sandbox inspection result after stop.");
       }
-      expect(stoppedInspection.state).toBe("exited");
+      expect(stoppedInspection.state).toBe("stopped");
       expect(stoppedInspection.running).toBe(false);
       expect(stoppedInspection.exitCode).not.toBeNull();
 

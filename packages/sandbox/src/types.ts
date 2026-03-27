@@ -18,13 +18,9 @@ export interface SandboxHandle {
 }
 
 export const SandboxInspectStates = {
-  CREATED: "created",
   RUNNING: "running",
   PAUSED: "paused",
-  RESTARTING: "restarting",
-  REMOVING: "removing",
-  EXITED: "exited",
-  DEAD: "dead",
+  STOPPED: "stopped",
   UNKNOWN: "unknown",
 } as const;
 export type SandboxInspectState = (typeof SandboxInspectStates)[keyof typeof SandboxInspectStates];
