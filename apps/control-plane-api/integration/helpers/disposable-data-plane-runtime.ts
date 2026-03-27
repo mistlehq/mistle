@@ -210,6 +210,11 @@ export async function createDisposableDataPlaneRuntime(input: {
       runtimeState: {
         gatewayBaseUrl: `http://${host}:${String(gatewayPort)}`,
       },
+      sandbox: {
+        docker: {
+          socketPath: "/var/run/docker.sock",
+        },
+      },
     };
 
     runtime = await createDataPlaneApiRuntime({

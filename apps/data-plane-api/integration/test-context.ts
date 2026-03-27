@@ -208,6 +208,11 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
               await reserveAvailablePort({ host: "127.0.0.1" }),
             )}`,
           },
+          sandbox: {
+            docker: {
+              socketPath: "/var/run/docker.sock",
+            },
+          },
         };
 
         const runtime = await createDataPlaneApiRuntime({
