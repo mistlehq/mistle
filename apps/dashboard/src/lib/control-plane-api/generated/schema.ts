@@ -1813,13 +1813,19 @@ export interface paths {
                         resourceKind: string;
                       }
                     | {
+                        defaultEnabled?: boolean;
+                        defaultValue?: string;
                         id: string;
                         /** @enum {string} */
                         kind: "string";
                         label: string;
+                        /** @enum {string} */
+                        matchMode?: "eq" | "contains";
                         payloadPath: string[];
                         placeholder?: string;
                         prefix?: string;
+                        /** @enum {string} */
+                        uiHint?: "explicit-invocation";
                       }
                     | {
                         id: string;
