@@ -32,13 +32,7 @@ export interface SandboxInspectRequest {
   readonly id: string;
 }
 
-export interface DockerSandboxInspectResult {
-  readonly provider: typeof SandboxProvider.DOCKER;
-  readonly id: string;
-  readonly state: SandboxInspectState;
-  readonly createdAt: string;
-  readonly startedAt: string | null;
-  readonly finishedAt: string | null;
+export interface DockerSandboxInspectInfo {
   readonly name: string;
   readonly imageRef: string;
   readonly labels: Readonly<Record<string, string>>;
@@ -49,19 +43,39 @@ export interface DockerSandboxInspectResult {
   readonly dead: boolean;
 }
 
-export interface E2BSandboxInspectResult {
-  readonly provider: typeof SandboxProvider.E2B;
-  readonly id: string;
-  readonly state: E2BSandboxInspectState;
-  readonly createdAt: string;
-  readonly startedAt: string;
-  readonly endAt: string;
+export interface E2BSandboxInspectInfo {
   readonly templateId: string;
   readonly templateAlias: string;
   readonly name: string | null;
   readonly metadata: Readonly<Record<string, string>>;
   readonly cpuCount: number;
   readonly memoryMB: number;
+}
+
+interface SandboxInspectResultBase<
+  TProvider extends SandboxProvider,
+  TState extends SandboxInspectState,
+> {
+  readonly provider: TProvider;
+  readonly id: string;
+  readonly state: TState;
+  readonly createdAt: string | null;
+  readonly startedAt: string | null;
+  readonly endedAt: string | null;
+}
+
+export interface DockerSandboxInspectResult extends SandboxInspectResultBase<
+  typeof SandboxProvider.DOCKER,
+  SandboxInspectState
+> {
+  readonly providerInfo: DockerSandboxInspectInfo;
+}
+
+export interface E2BSandboxInspectResult extends SandboxInspectResultBase<
+  typeof SandboxProvider.E2B,
+  E2BSandboxInspectState
+> {
+  readonly providerInfo: E2BSandboxInspectInfo;
 }
 
 export type SandboxInspectResult = DockerSandboxInspectResult | E2BSandboxInspectResult;

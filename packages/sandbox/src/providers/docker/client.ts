@@ -187,15 +187,17 @@ export class DockerApiClient implements DockerClient {
       state: normalizeDockerInspectState(inspect.State.Status),
       createdAt: inspect.Created,
       startedAt: normalizeDockerTimestamp(inspect.State.StartedAt),
-      finishedAt: normalizeDockerTimestamp(inspect.State.FinishedAt),
-      name: inspect.Name,
-      imageRef: inspect.Config.Image,
-      labels: inspect.Config.Labels,
-      exitCode: inspect.State.ExitCode,
-      running: inspect.State.Running,
-      paused: inspect.State.Paused,
-      restarting: inspect.State.Restarting,
-      dead: inspect.State.Dead,
+      endedAt: normalizeDockerTimestamp(inspect.State.FinishedAt),
+      providerInfo: {
+        name: inspect.Name,
+        imageRef: inspect.Config.Image,
+        labels: inspect.Config.Labels,
+        exitCode: inspect.State.ExitCode,
+        running: inspect.State.Running,
+        paused: inspect.State.Paused,
+        restarting: inspect.State.Restarting,
+        dead: inspect.State.Dead,
+      },
     };
   }
 

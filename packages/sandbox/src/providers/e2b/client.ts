@@ -153,13 +153,15 @@ export class E2BApiClient implements E2BClient {
         state: sandbox.state,
         createdAt: sandbox.startedAt.toISOString(),
         startedAt: sandbox.startedAt.toISOString(),
-        endAt: sandbox.endAt.toISOString(),
-        templateId: sandbox.templateId,
-        templateAlias: this.#getTemplateAliasFromMetadata(sandbox.metadata),
-        name: sandbox.name ?? null,
-        metadata: sandbox.metadata,
-        cpuCount: sandbox.cpuCount,
-        memoryMB: sandbox.memoryMB,
+        endedAt: sandbox.endAt.toISOString(),
+        providerInfo: {
+          templateId: sandbox.templateId,
+          templateAlias: this.#getTemplateAliasFromMetadata(sandbox.metadata),
+          name: sandbox.name ?? null,
+          metadata: sandbox.metadata,
+          cpuCount: sandbox.cpuCount,
+          memoryMB: sandbox.memoryMB,
+        },
       };
     } catch (error) {
       throw mapE2BClientError(E2BClientOperationIds.GET_SANDBOX_INFO, error);
