@@ -229,12 +229,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubPullRequestConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
     ],
-    parameters: [
-      createGitHubExplicitInvocationParameter(["review", "body"]),
-      GitHubRepositoryParameter,
-      GitHubAuthorParameter,
-      GitHubBaseBranchParameter,
-    ],
+    parameters: [GitHubRepositoryParameter, GitHubAuthorParameter, GitHubBaseBranchParameter],
   }),
   createGitHubWebhookEventDefinition({
     eventType: "github.pull_request.reopened",
