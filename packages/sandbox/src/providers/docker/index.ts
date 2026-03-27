@@ -5,7 +5,7 @@ import { validateDockerSandboxConfig, type DockerSandboxConfig } from "./config.
 import { createDockerSandboxRuntimeControl } from "./runtime-control.js";
 
 export type { DockerSandboxConfig } from "./config.js";
-export type { DockerSandboxInspectInfo, DockerSandboxInspectResult } from "./types.js";
+export type { DockerSandboxInspectResult } from "./types.js";
 export { DockerSandboxAdapter } from "./adapter.js";
 
 export function createDockerAdapter(config: DockerSandboxConfig): DockerSandboxAdapter {

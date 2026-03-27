@@ -30,7 +30,7 @@ export interface SandboxInspectRequest {
 export interface SandboxInspectResult<
   TProvider extends SandboxProvider = SandboxProvider,
   TState extends SandboxInspectState = SandboxInspectState,
-  TProviderInfo = unknown,
+  TRaw = unknown,
 > {
   readonly provider: TProvider;
   readonly id: string;
@@ -38,7 +38,7 @@ export interface SandboxInspectResult<
   readonly createdAt: string | null;
   readonly startedAt: string | null;
   readonly endedAt: string | null;
-  readonly providerInfo: TProviderInfo;
+  readonly raw: TRaw;
 }
 
 export interface SandboxRuntimeControl {

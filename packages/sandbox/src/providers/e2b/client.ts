@@ -164,14 +164,7 @@ export class E2BApiClient implements E2BClient {
         createdAt: sandbox.startedAt.toISOString(),
         startedAt: sandbox.startedAt.toISOString(),
         endedAt: sandbox.endAt.toISOString(),
-        providerInfo: {
-          templateId: sandbox.templateId,
-          templateAlias: this.#getTemplateAliasFromMetadata(sandbox.metadata),
-          name: sandbox.name ?? null,
-          metadata: sandbox.metadata,
-          cpuCount: sandbox.cpuCount,
-          memoryMB: sandbox.memoryMB,
-        },
+        raw: sandbox,
       };
     } catch (error) {
       throw mapE2BClientError(E2BClientOperationIds.GET_SANDBOX_INFO, error);
@@ -310,21 +303,6 @@ export class E2BApiClient implements E2BClient {
     } catch (error) {
       throw mapE2BClientError(E2BClientOperationIds.ENSURE_SUPERVISOR_READY, error);
     }
-  }
-
-  #getTemplateAliasFromMetadata(metadata: Readonly<Record<string, string>>): string {
-    const templateAlias = metadata[E2BTemplateAliasMetadataKey];
-    if (templateAlias === undefined || templateAlias.length === 0) {
-      throw new E2BClientError({
-        code: E2BClientErrorCodes.TEMPLATE_ERROR,
-        operation: E2BClientOperationIds.GET_SANDBOX_INFO,
-        retryable: false,
-        message: `E2B operation \`${E2BClientOperationIds.GET_SANDBOX_INFO}\` failed: sandbox metadata is missing the stable template alias.`,
-        cause: metadata,
-      });
-    }
-
-    return templateAlias;
   }
 
   async #checkSupervisorReady(sandbox: Sandbox): Promise<boolean> {

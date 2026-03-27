@@ -44,10 +44,10 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
       }
       expect(inspection.id).toBe(sandbox.id);
       expect(inspection.state).toBe("running");
-      expect(inspection.providerInfo.templateId).not.toBe("");
-      expect(inspection.providerInfo.templateAlias).toBe(expectedTemplateAlias);
-      expect(inspection.providerInfo.cpuCount).toBeGreaterThan(0);
-      expect(inspection.providerInfo.memoryMB).toBeGreaterThan(0);
+      expect(inspection.raw.templateId).not.toBe("");
+      expect(inspection.raw.metadata.mistle_template_alias).toBe(expectedTemplateAlias);
+      expect(inspection.raw.cpuCount).toBeGreaterThan(0);
+      expect(inspection.raw.memoryMB).toBeGreaterThan(0);
 
       const connectedSandbox = await fixture.connectSandbox(sandbox.id);
       const result = await connectedSandbox.commands.run(
@@ -91,7 +91,7 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
         throw new Error("Expected E2B sandbox inspection result after stop.");
       }
       expect(stoppedInspection.state).toBe("stopped");
-      expect(stoppedInspection.providerInfo.templateAlias).toBe(expectedTemplateAlias);
+      expect(stoppedInspection.raw.metadata.mistle_template_alias).toBe(expectedTemplateAlias);
 
       const resumedSandbox = await fixture.adapter.resume({
         id: sandbox.id,

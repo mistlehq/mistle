@@ -5,7 +5,7 @@ import { validateE2BSandboxConfig, type E2BSandboxConfig } from "./config.js";
 import { createE2BSandboxRuntimeControl } from "./runtime-control.js";
 
 export type { E2BSandboxConfig } from "./config.js";
-export type { E2BSandboxInspectInfo, E2BSandboxInspectResult } from "./types.js";
+export type { E2BSandboxInspectResult } from "./types.js";
 export { E2BSandboxAdapter } from "./adapter.js";
 
 export function createE2BAdapter(config: E2BSandboxConfig): E2BSandboxAdapter {
