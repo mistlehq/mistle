@@ -107,7 +107,7 @@ export function useSessionWorkbenchController(input: {
   });
   const lifecycle = sessionState.lifecycle;
   const chat = sessionState.chat;
-  const codexBootstrapData = sessionState.codexBootstrapData;
+  const codexConfig = sessionState.codexConfig;
   const serverRequests = sessionState.serverRequests;
   const hasActiveTurn = chat.canInterruptTurn || chat.canSteerTurn;
 
@@ -120,7 +120,7 @@ export function useSessionWorkbenchController(input: {
 
   const composerState = useSessionComposerState({
     bootstrap: sessionState.bootstrap,
-    codexBootstrapData,
+    codexConfig,
     chat: {
       canInterruptTurn: chat.canInterruptTurn,
       canSteerTurn: chat.canSteerTurn,

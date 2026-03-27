@@ -18,18 +18,18 @@ export function resolveCodexConnectionStateTransition(input: {
   state: CodexSessionConnectionState;
   errorMessage: string | null;
 }): {
-  shouldResetSession: boolean;
+  shouldDisconnectSession: boolean;
   lifecycleErrorMessage: string | null;
 } {
   if (input.state === "closed" || input.state === "error") {
     return {
-      shouldResetSession: true,
+      shouldDisconnectSession: true,
       lifecycleErrorMessage: input.errorMessage ?? "The Codex session connection closed.",
     };
   }
 
   return {
-    shouldResetSession: false,
+    shouldDisconnectSession: false,
     lifecycleErrorMessage: null,
   };
 }

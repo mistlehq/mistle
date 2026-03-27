@@ -7,12 +7,9 @@ import {
   startCodexThread,
   unarchiveCodexThread,
   unsubscribeCodexThread,
-  type CodexExperimentalFeatureSummary,
-  type CodexExternalAgentMigrationItem,
   type CodexJsonRpcClient,
   type CodexJsonRpcNotification,
   type CodexJsonRpcServerRequest,
-  type CodexModelSummary,
   type CodexSessionClient,
   type CodexThreadSummary,
   type CodexTurnInputLocalImageItem,
@@ -29,12 +26,10 @@ import { type ConnectedCodexSession, type StartSessionStep } from "./codex-sessi
 import {
   useCodexSessionBootstrapData,
   useSessionBootstrap,
+  type CodexSessionBootstrapDataState,
+  type CodexSessionConfigState,
   type SessionBootstrapResult,
 } from "./session-bootstrap/index.js";
-import type {
-  CodexConfigStatus,
-  CodexModelCatalogStatus,
-} from "./session-bootstrap/use-codex-session-bootstrap-data.js";
 import {
   StaleConnectionAttemptError,
   useCodexSessionConnection,
@@ -98,44 +93,6 @@ type CodexSessionChatState = {
   reloadChat: () => void;
 };
 
-type CodexSessionBootstrapDataState = {
-  availableModels: readonly CodexModelSummary[];
-  modelCatalogStatus: CodexModelCatalogStatus;
-  configStatus: CodexConfigStatus;
-  experimentalFeatures: readonly CodexExperimentalFeatureSummary[];
-  configJson: string | null;
-  configRequirementsJson: string | null;
-  detectedExternalAgentMigrationItems: readonly CodexExternalAgentMigrationItem[];
-  isLoadingModels: boolean;
-  isLoadingExperimentalFeatures: boolean;
-  isReadingConfig: boolean;
-  isReadingConfigRequirements: boolean;
-  isWritingConfigValue: boolean;
-  isBatchWritingConfig: boolean;
-  isDetectingExternalAgentConfig: boolean;
-  isImportingExternalAgentConfig: boolean;
-  loadModels: () => void;
-  loadModelsAsync: () => Promise<{ models: readonly CodexModelSummary[]; response: unknown }>;
-  loadExperimentalFeatures: () => void;
-  readConfig: (includeLayers: boolean) => void;
-  readConfigAsync: (includeLayers: boolean) => Promise<{ config: unknown; response: unknown }>;
-  readConfigRequirements: () => void;
-  writeConfigValue: (input: {
-    keyPath: string;
-    value: unknown;
-    mergeStrategy: "replace" | "upsert";
-  }) => void;
-  batchWriteConfig: (input: {
-    edits: readonly {
-      keyPath: string;
-      value: unknown;
-      mergeStrategy: "replace" | "upsert";
-    }[];
-  }) => void;
-  detectExternalAgentConfig: (input: { includeHome: boolean; cwds: readonly string[] }) => void;
-  importExternalAgentConfig: (items: readonly CodexExternalAgentMigrationItem[]) => void;
-};
-
 type CodexSessionServerRequestState = {
   pendingServerRequests: readonly CodexApprovalRequestEntry[];
   isRespondingToServerRequest: boolean;
@@ -148,6 +105,7 @@ export type UseCodexSessionStateResult = {
   chat: CodexSessionChatState;
   bootstrap: SessionBootstrapResult;
   codexBootstrapData: CodexSessionBootstrapDataState;
+  codexConfig: CodexSessionConfigState;
   serverRequests: CodexSessionServerRequestState;
 };
 
@@ -178,7 +136,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     refreshArchivedThreadList,
     refreshLoadedThreadList,
     refreshThreadCollections,
-    resetThreadCollections,
   } = useCodexThreadCollections({
     rpcClientRef,
     ensureCurrentGeneration,
@@ -208,43 +165,22 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
 
   const bootstrapDataState = useCodexSessionBootstrapData({
     rpcClientRef,
-    setStartErrorMessage: setLifecycleErrorMessage,
+    setLifecycleErrorMessage,
   });
   const {
     availableModels,
     modelCatalogStatus,
     configStatus,
-    experimentalFeatures,
     configJson,
-    configRequirementsJson,
-    detectedExternalAgentMigrationItems,
     isLoadingModels,
-    isLoadingExperimentalFeatures,
     isReadingConfig,
-    isReadingConfigRequirements,
     isWritingConfigValue,
     isBatchWritingConfig,
-    isDetectingExternalAgentConfig,
-    isImportingExternalAgentConfig,
-    loadModels,
     loadModelsAsync,
-    loadExperimentalFeatures,
-    readConfig,
     readConfigAsync,
-    readConfigRequirements,
     writeConfigValue,
     batchWriteConfig,
-    detectExternalAgentConfig,
-    importExternalAgentConfig,
-    resetBootstrapData,
   } = bootstrapDataState;
-  const resetSessionData = useCallback((): void => {
-    threadIdRef.current = null;
-    resetThreadCollections();
-    resetBootstrapData();
-    dispatchServerRequestsAction({ type: "reset" });
-    resetChat();
-  }, [resetBootstrapData, resetThreadCollections, resetChat]);
 
   const handleServerRequestNotification = useCallback((notification: CodexJsonRpcNotification) => {
     dispatchServerRequestsAction({
@@ -267,8 +203,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     onServerRequestNotification: handleServerRequestNotification,
     onServerRequestReceived: handleServerRequestReceived,
     refreshThreadCollections,
-    resetSessionData,
-    resetChat,
     rpcClientRef,
     sessionClientRef,
     sessionEventUnsubscribersRef,
@@ -739,57 +673,32 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     return {
       availableModels,
       modelCatalogStatus,
-      configStatus,
-      experimentalFeatures,
       configJson,
-      configRequirementsJson,
-      detectedExternalAgentMigrationItems,
+      configStatus,
       isLoadingModels,
-      isLoadingExperimentalFeatures,
       isReadingConfig,
-      isReadingConfigRequirements,
-      isWritingConfigValue,
-      isBatchWritingConfig,
-      isDetectingExternalAgentConfig,
-      isImportingExternalAgentConfig,
-      loadModels,
       loadModelsAsync,
-      loadExperimentalFeatures,
-      readConfig,
       readConfigAsync,
-      readConfigRequirements,
-      writeConfigValue,
-      batchWriteConfig,
-      detectExternalAgentConfig,
-      importExternalAgentConfig,
     };
   }, [
     availableModels,
-    batchWriteConfig,
     configJson,
     configStatus,
-    configRequirementsJson,
-    detectExternalAgentConfig,
-    detectedExternalAgentMigrationItems,
-    experimentalFeatures,
-    modelCatalogStatus,
-    importExternalAgentConfig,
-    isBatchWritingConfig,
-    isDetectingExternalAgentConfig,
-    isImportingExternalAgentConfig,
-    isLoadingExperimentalFeatures,
     isLoadingModels,
     isReadingConfig,
-    isReadingConfigRequirements,
-    isWritingConfigValue,
-    loadExperimentalFeatures,
-    loadModels,
     loadModelsAsync,
-    readConfig,
     readConfigAsync,
-    readConfigRequirements,
-    writeConfigValue,
+    modelCatalogStatus,
   ]);
+
+  const codexConfig = useMemo<CodexSessionConfigState>(() => {
+    return {
+      isWritingConfigValue,
+      isBatchWritingConfig,
+      writeConfigValue,
+      batchWriteConfig,
+    };
+  }, [batchWriteConfig, isBatchWritingConfig, isWritingConfigValue, writeConfigValue]);
 
   const serverRequests = useMemo<CodexSessionServerRequestState>(() => {
     return {
@@ -805,6 +714,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     chat,
     bootstrap,
     codexBootstrapData,
+    codexConfig,
     serverRequests,
   };
 }

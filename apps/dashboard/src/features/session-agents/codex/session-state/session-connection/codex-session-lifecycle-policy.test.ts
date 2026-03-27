@@ -6,14 +6,14 @@ import {
 } from "./codex-session-lifecycle-policy.js";
 
 describe("codex session lifecycle policy", () => {
-  it("resets session state when the transport closes or errors", () => {
+  it("disconnects the transport when the connection closes or errors", () => {
     expect(
       resolveCodexConnectionStateTransition({
         state: "closed",
         errorMessage: null,
       }),
     ).toEqual({
-      shouldResetSession: true,
+      shouldDisconnectSession: true,
       lifecycleErrorMessage: "The Codex session connection closed.",
     });
 
@@ -23,19 +23,19 @@ describe("codex session lifecycle policy", () => {
         errorMessage: "Socket failed.",
       }),
     ).toEqual({
-      shouldResetSession: true,
+      shouldDisconnectSession: true,
       lifecycleErrorMessage: "Socket failed.",
     });
   });
 
-  it("does not reset session state for non-terminal transport states", () => {
+  it("does not disconnect the transport for non-terminal transport states", () => {
     expect(
       resolveCodexConnectionStateTransition({
         state: "ready",
         errorMessage: null,
       }),
     ).toEqual({
-      shouldResetSession: false,
+      shouldDisconnectSession: false,
       lifecycleErrorMessage: null,
     });
   });

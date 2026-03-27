@@ -1,14 +1,8 @@
 import {
   batchWriteCodexConfig,
-  detectExternalAgentConfig,
-  importExternalAgentConfig,
-  listCodexExperimentalFeatures,
   listCodexModels,
   readCodexConfig,
-  readCodexConfigRequirements,
   writeCodexConfigValue,
-  type CodexExperimentalFeatureSummary,
-  type CodexExternalAgentMigrationItem,
   type CodexJsonRpcClient,
   type CodexModelSummary,
 } from "@mistle/integrations-definitions/openai/agent/client";
@@ -25,39 +19,43 @@ type CodexConfigValueBatch = {
   edits: readonly CodexConfigValueEdit[];
 };
 
-type CodexExternalAgentConfigQuery = {
-  includeHome: boolean;
-  cwds: readonly string[];
-};
-
 export type CodexModelCatalogStatus = "idle" | "loading" | "loaded" | "error";
 export type CodexConfigStatus = "idle" | "loading" | "loaded" | "error";
+export type CodexSessionBootstrapDataState = {
+  availableModels: readonly CodexModelSummary[];
+  modelCatalogStatus: CodexModelCatalogStatus;
+  configJson: string | null;
+  configStatus: CodexConfigStatus;
+  isLoadingModels: boolean;
+  isReadingConfig: boolean;
+  loadModelsAsync: () => Promise<{ models: readonly CodexModelSummary[]; response: unknown }>;
+  readConfigAsync: (includeLayers: boolean) => Promise<{ config: unknown; response: unknown }>;
+};
+export type CodexSessionConfigState = {
+  isWritingConfigValue: boolean;
+  isBatchWritingConfig: boolean;
+  writeConfigValue: (input: {
+    keyPath: string;
+    value: unknown;
+    mergeStrategy: "replace" | "upsert";
+  }) => void;
+  batchWriteConfig: (input: {
+    edits: readonly {
+      keyPath: string;
+      value: unknown;
+      mergeStrategy: "replace" | "upsert";
+    }[];
+  }) => void;
+};
 
 export function useCodexSessionBootstrapData(input: {
   rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
-  setStartErrorMessage: (message: string | null) => void;
-}) {
+  setLifecycleErrorMessage: (message: string | null) => void;
+}): CodexSessionBootstrapDataState & CodexSessionConfigState {
   const [availableModels, setAvailableModels] = useState<readonly CodexModelSummary[]>([]);
   const [modelCatalogStatus, setModelCatalogStatus] = useState<CodexModelCatalogStatus>("idle");
-  const [experimentalFeatures, setExperimentalFeatures] = useState<
-    readonly CodexExperimentalFeatureSummary[]
-  >([]);
   const [configJson, setConfigJson] = useState<string | null>(null);
   const [configStatus, setConfigStatus] = useState<CodexConfigStatus>("idle");
-  const [configRequirementsJson, setConfigRequirementsJson] = useState<string | null>(null);
-  const [detectedExternalAgentMigrationItems, setDetectedExternalAgentMigrationItems] = useState<
-    readonly CodexExternalAgentMigrationItem[]
-  >([]);
-
-  const resetBootstrapData = useCallback((): void => {
-    setAvailableModels([]);
-    setModelCatalogStatus("idle");
-    setExperimentalFeatures([]);
-    setConfigJson(null);
-    setConfigStatus("idle");
-    setConfigRequirementsJson(null);
-    setDetectedExternalAgentMigrationItems([]);
-  }, []);
 
   const loadModelsMutation = useMutation({
     mutationFn: async () => {
@@ -79,28 +77,8 @@ export function useCodexSessionBootstrapData(input: {
     },
     onError: (error) => {
       setModelCatalogStatus("error");
-      input.setStartErrorMessage(error instanceof Error ? error.message : "Could not load models.");
-    },
-  });
-
-  const loadExperimentalFeaturesMutation = useMutation({
-    mutationFn: async () => {
-      const rpcClient = input.rpcClientRef.current;
-      if (rpcClient === null) {
-        throw new Error("Connect to a sandbox session before listing experimental features.");
-      }
-
-      return listCodexExperimentalFeatures({
-        rpcClient,
-        limit: 50,
-      });
-    },
-    onSuccess: (result) => {
-      setExperimentalFeatures(result.features);
-    },
-    onError: (error) => {
-      input.setStartErrorMessage(
-        error instanceof Error ? error.message : "Could not load experimental features.",
+      input.setLifecycleErrorMessage(
+        error instanceof Error ? error.message : "Could not load models.",
       );
     },
   });
@@ -124,29 +102,8 @@ export function useCodexSessionBootstrapData(input: {
     },
     onError: (error) => {
       setConfigStatus("error");
-      input.setStartErrorMessage(error instanceof Error ? error.message : "Could not read config.");
-    },
-  });
-
-  const readConfigRequirementsMutation = useMutation({
-    mutationFn: async () => {
-      const rpcClient = input.rpcClientRef.current;
-      if (rpcClient === null) {
-        throw new Error("Connect to a sandbox session before reading config requirements.");
-      }
-
-      return readCodexConfigRequirements({
-        rpcClient,
-      });
-    },
-    onSuccess: (result) => {
-      setConfigRequirementsJson(
-        result.requirements === null ? "null" : JSON.stringify(result.requirements, null, 2),
-      );
-    },
-    onError: (error) => {
-      input.setStartErrorMessage(
-        error instanceof Error ? error.message : "Could not read config requirements.",
+      input.setLifecycleErrorMessage(
+        error instanceof Error ? error.message : "Could not read config.",
       );
     },
   });
@@ -167,7 +124,7 @@ export function useCodexSessionBootstrapData(input: {
     },
     onSuccess: () => {},
     onError: (error) => {
-      input.setStartErrorMessage(
+      input.setLifecycleErrorMessage(
         error instanceof Error ? error.message : "Could not write config value.",
       );
     },
@@ -187,90 +144,28 @@ export function useCodexSessionBootstrapData(input: {
     },
     onSuccess: () => {},
     onError: (error) => {
-      input.setStartErrorMessage(
+      input.setLifecycleErrorMessage(
         error instanceof Error ? error.message : "Could not batch write config.",
       );
     },
   });
 
-  const detectExternalAgentConfigMutation = useMutation({
-    mutationFn: async (query: CodexExternalAgentConfigQuery) => {
-      const rpcClient = input.rpcClientRef.current;
-      if (rpcClient === null) {
-        throw new Error("Connect to a sandbox session before detecting external agent config.");
-      }
-
-      return detectExternalAgentConfig({
-        rpcClient,
-        includeHome: query.includeHome,
-        cwds: query.cwds,
-      });
-    },
-    onSuccess: (result) => {
-      setDetectedExternalAgentMigrationItems(result.items);
-    },
-    onError: (error) => {
-      input.setStartErrorMessage(
-        error instanceof Error ? error.message : "Could not detect external agent config.",
-      );
-    },
-  });
-
-  const importExternalAgentConfigMutation = useMutation({
-    mutationFn: async (items: readonly CodexExternalAgentMigrationItem[]) => {
-      const rpcClient = input.rpcClientRef.current;
-      if (rpcClient === null) {
-        throw new Error("Connect to a sandbox session before importing external agent config.");
-      }
-
-      return importExternalAgentConfig({
-        rpcClient,
-        migrationItems: items,
-      });
-    },
-    onSuccess: () => {},
-    onError: (error) => {
-      input.setStartErrorMessage(
-        error instanceof Error ? error.message : "Could not import external agent config.",
-      );
-    },
-  });
-
-  const { mutate: loadModelsMutate, isPending: isLoadingModels } = loadModelsMutation;
-  const { mutate: loadExperimentalFeaturesMutate, isPending: isLoadingExperimentalFeatures } =
-    loadExperimentalFeaturesMutation;
-  const { mutate: readConfigMutate, isPending: isReadingConfig } = readConfigMutation;
-  const { mutate: readConfigRequirementsMutate, isPending: isReadingConfigRequirements } =
-    readConfigRequirementsMutation;
+  const { isPending: isLoadingModels } = loadModelsMutation;
+  const { isPending: isReadingConfig } = readConfigMutation;
   const { mutate: writeConfigValueMutate, isPending: isWritingConfigValue } =
     writeConfigValueMutation;
   const { mutate: batchWriteConfigMutate, isPending: isBatchWritingConfig } =
     batchWriteConfigMutation;
-  const { mutate: detectExternalAgentConfigMutate, isPending: isDetectingExternalAgentConfig } =
-    detectExternalAgentConfigMutation;
-  const { mutate: importExternalAgentConfigMutate, isPending: isImportingExternalAgentConfig } =
-    importExternalAgentConfigMutation;
 
   return {
     availableModels,
     modelCatalogStatus,
-    experimentalFeatures,
     configJson,
     configStatus,
-    configRequirementsJson,
-    detectedExternalAgentMigrationItems,
     isLoadingModels,
-    isLoadingExperimentalFeatures,
     isReadingConfig,
-    isReadingConfigRequirements,
     isWritingConfigValue,
     isBatchWritingConfig,
-    isDetectingExternalAgentConfig,
-    isImportingExternalAgentConfig,
-    resetBootstrapData,
-    loadModels: useCallback(() => {
-      loadModelsMutate();
-    }, [loadModelsMutate]),
     loadModelsAsync: useCallback(async () => {
       setModelCatalogStatus("loading");
       const rpcClient = input.rpcClientRef.current;
@@ -292,15 +187,6 @@ export function useCodexSessionBootstrapData(input: {
         throw error;
       }
     }, [input]),
-    loadExperimentalFeatures: useCallback(() => {
-      loadExperimentalFeaturesMutate();
-    }, [loadExperimentalFeaturesMutate]),
-    readConfig: useCallback(
-      (includeLayers: boolean) => {
-        readConfigMutate(includeLayers);
-      },
-      [readConfigMutate],
-    ),
     readConfigAsync: useCallback(
       async (includeLayers: boolean) => {
         setConfigStatus("loading");
@@ -324,9 +210,6 @@ export function useCodexSessionBootstrapData(input: {
       },
       [input.rpcClientRef],
     ),
-    readConfigRequirements: useCallback(() => {
-      readConfigRequirementsMutate();
-    }, [readConfigRequirementsMutate]),
     writeConfigValue: useCallback(
       (edit: CodexConfigValueEdit) => {
         writeConfigValueMutate(edit);
@@ -338,18 +221,6 @@ export function useCodexSessionBootstrapData(input: {
         batchWriteConfigMutate(batch);
       },
       [batchWriteConfigMutate],
-    ),
-    detectExternalAgentConfig: useCallback(
-      (query: CodexExternalAgentConfigQuery) => {
-        detectExternalAgentConfigMutate(query);
-      },
-      [detectExternalAgentConfigMutate],
-    ),
-    importExternalAgentConfig: useCallback(
-      (items: readonly CodexExternalAgentMigrationItem[]) => {
-        importExternalAgentConfigMutate(items);
-      },
-      [importExternalAgentConfigMutate],
     ),
   };
 }

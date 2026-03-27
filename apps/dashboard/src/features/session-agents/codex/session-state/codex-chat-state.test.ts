@@ -1087,6 +1087,201 @@ describe("reduceCodexChatState", () => {
     expect(hydrated.completedStatus).toBe("completed");
   });
 
+  it("reconciles thread/read by updating existing item ids and appending new server items in server order", () => {
+    const initialHydrated = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_001",
+          status: "inProgress",
+          items: [
+            {
+              type: "userMessage",
+              id: "user_1",
+              content: [
+                {
+                  type: "text",
+                  text: "First prompt",
+                },
+              ],
+            },
+            {
+              type: "agentMessage",
+              id: "assistant_1",
+              text: "Draft answer",
+              phase: "final_answer",
+              status: "inProgress",
+            },
+          ],
+        },
+      ],
+    });
+
+    const reconciled = reduceCodexChatState(initialHydrated, {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_001",
+          status: "completed",
+          items: [
+            {
+              type: "userMessage",
+              id: "user_1",
+              content: [
+                {
+                  type: "text",
+                  text: "First prompt",
+                },
+              ],
+            },
+            {
+              type: "agentMessage",
+              id: "assistant_1",
+              text: "Final answer",
+              phase: "final_answer",
+              status: "completed",
+            },
+            {
+              type: "commandExecution",
+              id: "cmd_1",
+              command: "pwd",
+              aggregatedOutput: "/home/sandbox",
+              cwd: "/home/sandbox",
+              exitCode: 0,
+              status: "completed",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(reconciled.entries).toEqual([
+      {
+        id: "user_1",
+        turnId: "turn_001",
+        kind: "user-message",
+        text: "First prompt",
+        status: "completed",
+      },
+      {
+        id: "assistant_1",
+        turnId: "turn_001",
+        kind: "assistant-message",
+        text: "Final answer",
+        phase: "final_answer",
+        status: "completed",
+      },
+      {
+        id: "turn_001:running-commands:cmd_1",
+        turnId: "turn_001",
+        kind: "semantic-group",
+        semanticKind: "running-commands",
+        status: "completed",
+        displayKeys: {
+          active: "running-commands.active",
+          completed: "running-commands.done",
+        },
+        counts: null,
+        items: [
+          {
+            id: "cmd_1",
+            sourceKind: "command-execution",
+            label: "Command",
+            detail: "pwd",
+            detailKind: "code",
+            command: "pwd",
+            output: "/home/sandbox",
+            status: "completed",
+          },
+        ],
+      },
+    ]);
+    expect(reconciled.completedStatus).toBe("completed");
+  });
+
+  it("preserves local-only optimistic items after server-ordered thread/read items", () => {
+    const withOptimisticDelta = reduceCodexChatState(
+      reduceCodexChatState(createInitialCodexChatState(), {
+        type: "notification_received",
+        notification: {
+          method: "turn/started",
+          params: {
+            turn: {
+              id: "turn_123",
+              status: "inProgress",
+            },
+          },
+        },
+      }),
+      {
+        type: "notification_received",
+        notification: {
+          method: "item/agentMessage/delta",
+          params: {
+            turnId: "turn_123",
+            itemId: "assistant_local_only",
+            delta: "Local streamed text",
+          },
+        },
+      },
+    );
+
+    const reconciled = reduceCodexChatState(withOptimisticDelta, {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_123",
+          status: "completed",
+          items: [
+            {
+              type: "userMessage",
+              id: "user_123",
+              content: [
+                {
+                  type: "text",
+                  text: "Prompt",
+                },
+              ],
+            },
+            {
+              type: "agentMessage",
+              id: "assistant_server",
+              text: "Server answer",
+              phase: "final_answer",
+              status: "completed",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(reconciled.entries).toEqual([
+      {
+        id: "user_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Prompt",
+        status: "completed",
+      },
+      {
+        id: "assistant_server",
+        turnId: "turn_123",
+        kind: "assistant-message",
+        text: "Server answer",
+        phase: "final_answer",
+        status: "completed",
+      },
+      {
+        id: "assistant_local_only",
+        turnId: "turn_123",
+        kind: "assistant-message",
+        text: "Local streamed text",
+        phase: null,
+        status: "streaming",
+      },
+    ]);
+  });
+
   it("streams reasoning summaries, reasoning text, and plans", () => {
     const started = reduceCodexChatState(createInitialCodexChatState(), {
       type: "notification_received",

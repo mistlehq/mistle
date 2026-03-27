@@ -14,6 +14,7 @@ import {
   resolveActiveComposerModel,
 } from "../../../../pages/session-composer/session-composer-model-readiness.js";
 import type { ConnectedCodexSession } from "../codex-session-types.js";
+import { resolveSessionBootstrapStrategy } from "./session-bootstrap-strategy.js";
 
 export type SessionBootstrapState =
   | { status: "disconnected" }
@@ -48,26 +49,69 @@ export function useSessionBootstrap(input: {
   const [state, setState] = useState<SessionBootstrapState>({ status: "disconnected" });
   const [configSnapshot, setConfigSnapshot] = useState<ComposerConfigSnapshot>(EmptyComposerConfig);
   const [availableModels, setAvailableModels] = useState<readonly CodexModelSummary[]>([]);
+  const [hasEstablishedBaseline, setHasEstablishedBaseline] = useState(false);
+  const [establishedSandboxInstanceId, setEstablishedSandboxInstanceId] = useState<string | null>(
+    null,
+  );
   const bootstrapGenerationRef = useRef(0);
 
   useEffect(() => {
-    if (input.connectedSession === null || input.connectedSession.threadId === null) {
+    const bootstrapStrategy = resolveSessionBootstrapStrategy({
+      connectedSession: input.connectedSession,
+      establishedSandboxInstanceId,
+      hasEstablishedBaseline,
+    });
+
+    if (bootstrapStrategy === "disconnected") {
       bootstrapGenerationRef.current += 1;
-      setState((currentState) =>
-        currentState.status === "disconnected" ? currentState : { status: "disconnected" },
-      );
-      setConfigSnapshot((currentConfig) =>
-        currentConfig.model === null && currentConfig.modelReasoningEffort === null
-          ? currentConfig
-          : EmptyComposerConfig,
-      );
-      setAvailableModels((currentModels) => (currentModels.length === 0 ? currentModels : []));
+      if (!hasEstablishedBaseline) {
+        setState((currentState) =>
+          currentState.status === "disconnected" ? currentState : { status: "disconnected" },
+        );
+      }
       return;
     }
 
-    const connectedThreadId = input.connectedSession.threadId;
+    const connectedSession = input.connectedSession;
+    if (connectedSession === null || connectedSession.threadId === null) {
+      return;
+    }
+
+    const connectedThreadId = connectedSession.threadId;
     const currentBootstrapGeneration = bootstrapGenerationRef.current + 1;
     bootstrapGenerationRef.current = currentBootstrapGeneration;
+    if (bootstrapStrategy === "thread_sync") {
+      void (async () => {
+        try {
+          await input.hydrateInitialThread({
+            generation: currentBootstrapGeneration,
+            ensureCurrentGeneration: input.ensureCurrentGeneration,
+            ...(input.rpcClientRef.current === null
+              ? {}
+              : { rpcClient: input.rpcClientRef.current }),
+            threadId: connectedThreadId,
+          });
+        } catch (error) {
+          if (bootstrapGenerationRef.current !== currentBootstrapGeneration) {
+            return;
+          }
+
+          setState({
+            status: "failed",
+            message: error instanceof Error ? error.message : "Could not read thread.",
+          });
+          return;
+        }
+
+        if (bootstrapGenerationRef.current !== currentBootstrapGeneration) {
+          return;
+        }
+
+        setState({ status: "ready" });
+      })();
+      return;
+    }
+
     setState({ status: "bootstrapping" });
 
     void (async () => {
@@ -132,9 +176,13 @@ export function useSessionBootstrap(input: {
         return;
       }
 
+      setHasEstablishedBaseline(true);
+      setEstablishedSandboxInstanceId(connectedSession.sandboxInstanceId);
       setState({ status: "ready" });
     })();
   }, [
+    establishedSandboxInstanceId,
+    hasEstablishedBaseline,
     input.connectedSession,
     input.ensureCurrentGeneration,
     input.hydrateInitialThread,

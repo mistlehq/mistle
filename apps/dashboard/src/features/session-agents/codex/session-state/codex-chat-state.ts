@@ -842,20 +842,27 @@ function upsertLifecycleItem(
   });
 }
 
-function hydrateTurns(turns: readonly CodexThreadReadTurn[]): CodexChatState {
-  const turnsById: Record<string, CodexRawTurnState> = {};
-  const turnOrder: string[] = [];
+function reconcileHydratedTurns(
+  state: CodexChatState,
+  turns: readonly CodexThreadReadTurn[],
+): CodexChatState {
+  const nextTurnsById: Record<string, CodexRawTurnState> = {};
+  const nextTurnOrder: string[] = [];
+  const serverTurnIds = new Set<string>();
 
   for (const turn of turns) {
-    turnOrder.push(turn.id);
-    let userEntry: ChatUserEntry | null = null;
-    const itemOrder: string[] = [];
-    const rawItemsById: Record<string, unknown> = {};
+    serverTurnIds.add(turn.id);
+    nextTurnOrder.push(turn.id);
+
+    const existingTurn = state.turnsById[turn.id] ?? null;
+    let serverUserEntry: ChatUserEntry | null = null;
+    const serverItemOrder: string[] = [];
+    const serverRawItemsById: Record<string, unknown> = {};
 
     for (const item of turn.items) {
       const parsedUserMessage = ThreadReadUserMessageItemSchema.safeParse(item);
       if (parsedUserMessage.success) {
-        userEntry = buildUserEntry(
+        serverUserEntry = buildUserEntry(
           turn.id,
           parsedUserMessage.data.content.map((contentItem) => contentItem.text ?? "").join(""),
           parsedUserMessage.data.content.flatMap((contentItem) => {
@@ -881,26 +888,58 @@ function hydrateTurns(turns: readonly CodexThreadReadTurn[]): CodexChatState {
         continue;
       }
 
-      itemOrder.push(itemId);
-      rawItemsById[itemId] = item;
+      serverItemOrder.push(itemId);
+      serverRawItemsById[itemId] = item;
     }
 
-    turnsById[turn.id] = {
+    const existingItemOrder = existingTurn?.itemOrder ?? [];
+    const localOnlyItemOrder = existingItemOrder.filter(
+      (itemId) => serverRawItemsById[itemId] === undefined,
+    );
+    const nextItemOrder = [...serverItemOrder, ...localOnlyItemOrder];
+    const nextRawItemsById: Record<string, unknown> = {};
+
+    for (const itemId of localOnlyItemOrder) {
+      const existingRawItem = existingTurn?.rawItemsById[itemId];
+      if (existingRawItem !== undefined) {
+        nextRawItemsById[itemId] = existingRawItem;
+      }
+    }
+
+    for (const itemId of serverItemOrder) {
+      nextRawItemsById[itemId] = serverRawItemsById[itemId];
+    }
+
+    nextTurnsById[turn.id] = {
       id: turn.id,
       status: turn.status,
       completedStatus: isTerminalTurnStatus(turn.status) ? turn.status : null,
-      completedErrorMessage: null,
-      planSnapshot: null,
-      userEntry,
-      itemOrder,
-      rawItemsById,
+      completedErrorMessage: existingTurn?.completedErrorMessage ?? null,
+      planSnapshot: existingTurn?.planSnapshot ?? null,
+      userEntry: serverUserEntry ?? existingTurn?.userEntry ?? null,
+      itemOrder: nextItemOrder,
+      rawItemsById: nextRawItemsById,
     };
   }
 
+  for (const turnId of state.turnOrder) {
+    if (serverTurnIds.has(turnId)) {
+      continue;
+    }
+
+    const existingTurn = state.turnsById[turnId];
+    if (existingTurn === undefined) {
+      continue;
+    }
+
+    nextTurnOrder.push(turnId);
+    nextTurnsById[turnId] = existingTurn;
+  }
+
   return buildState({
-    pendingTurnId: null,
-    turnOrder,
-    turnsById,
+    pendingTurnId: state.pendingTurnId,
+    turnOrder: nextTurnOrder,
+    turnsById: nextTurnsById,
   });
 }
 
@@ -1004,7 +1043,7 @@ export function reduceCodexChatState(
   }
 
   if (action.type === "hydrate_from_thread_read") {
-    return hydrateTurns(action.turns);
+    return reconcileHydratedTurns(state, action.turns);
   }
 
   const turnStartedNotification = TurnStartedNotificationSchema.safeParse(action.notification);

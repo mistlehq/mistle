@@ -60,8 +60,6 @@ export function useCodexSessionConnection(input: {
     rpcClient?: CodexJsonRpcClient;
     generation?: number;
   }) => Promise<CodexThreadCollectionsRefreshResult>;
-  resetSessionData: () => void;
-  resetChat: () => void;
   rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
   sessionClientRef: MutableRefObject<CodexSessionClient | null>;
   sessionEventUnsubscribersRef: MutableRefObject<(() => void)[]>;
@@ -109,18 +107,12 @@ export function useCodexSessionConnection(input: {
   const disconnectSession = useCallback((): void => {
     input.connectionGenerationRef.current += 1;
     teardownConnection("Disconnected from sessions page.");
-    input.resetSessionData();
     setConnectedSession(null);
     setStep("idle");
     input.setLifecycleErrorMessage(null);
     setAgentConnectionState("idle");
     setAgentConnectionError(null);
-  }, [
-    input.connectionGenerationRef,
-    input.resetSessionData,
-    input.setLifecycleErrorMessage,
-    teardownConnection,
-  ]);
+  }, [input.connectionGenerationRef, input.setLifecycleErrorMessage, teardownConnection]);
 
   useEffect(() => {
     return () => {
@@ -150,10 +142,9 @@ export function useCodexSessionConnection(input: {
               state: event.state,
               errorMessage: event.errorMessage ?? null,
             });
-            if (connectionStateTransition.shouldResetSession) {
+            if (connectionStateTransition.shouldDisconnectSession) {
               input.connectionGenerationRef.current += 1;
               teardownConnection("Disconnected from Codex session.");
-              input.resetSessionData();
               setConnectedSession(null);
               setStep("idle");
               setAgentConnectionState("idle");
@@ -192,7 +183,6 @@ export function useCodexSessionConnection(input: {
       input.onServerRequestNotification,
       input.onServerRequestReceived,
       input.refreshThreadCollections,
-      input.resetSessionData,
       input.rpcClientRef,
       input.sessionClientRef,
       input.sessionEventUnsubscribersRef,
@@ -208,7 +198,6 @@ export function useCodexSessionConnection(input: {
       const generation = input.connectionGenerationRef.current + 1;
       input.connectionGenerationRef.current = generation;
       teardownConnection("Superseded by a new Codex session.");
-      input.resetSessionData();
       setConnectedSession(null);
       input.setLifecycleErrorMessage(null);
       setStep("securing");
@@ -272,7 +261,6 @@ export function useCodexSessionConnection(input: {
       }
 
       updateActiveThread(result.threadId);
-      input.resetChat();
       setConnectedSession(
         createConnectedCodexSession({
           sandboxInstanceId: result.sandboxInstanceId,

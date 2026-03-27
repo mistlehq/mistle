@@ -5,7 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ChatComposerStatusMessage } from "../../chat/components/chat-composer.js";
 import { resolveTurnRepresentation } from "../../session-agents/codex/session-state/codex-attachment-presentation.js";
-import type { SessionBootstrapResult } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
+import type {
+  CodexSessionConfigState,
+  SessionBootstrapResult,
+} from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import { mintSandboxInstanceConnectionToken } from "../../sessions/sessions-service.js";
 import type { SessionConversationComposerProps } from "../session-conversation-pane.tsx";
 import { resolveChatComposerAction } from "../session-workbench-view-model.js";
@@ -28,23 +31,6 @@ type PendingComposerAttachment = {
 type ComposerConnectedSession = {
   threadId: string | null;
 } | null;
-
-type CodexBootstrapDataState = {
-  isBatchWritingConfig: boolean;
-  isWritingConfigValue: boolean;
-  batchWriteConfig: (input: {
-    edits: readonly {
-      keyPath: string;
-      value: unknown;
-      mergeStrategy: "replace" | "upsert";
-    }[];
-  }) => void;
-  writeConfigValue: (input: {
-    keyPath: string;
-    value: unknown;
-    mergeStrategy: "replace" | "upsert";
-  }) => void;
-};
 
 type ComposerChatState = {
   canInterruptTurn: boolean;
@@ -75,14 +61,14 @@ export type SessionComposerState = {
 
 export function useSessionComposerState(input: {
   bootstrap: SessionBootstrapResult;
-  codexBootstrapData: CodexBootstrapDataState;
+  codexConfig: CodexSessionConfigState;
   chat: ComposerChatState;
   connectedSession: ComposerConnectedSession;
   hasActiveTurn: boolean;
   sandboxInstanceId: string | null;
 }): SessionComposerState {
   const { batchWriteConfig, isBatchWritingConfig, isWritingConfigValue, writeConfigValue } =
-    input.codexBootstrapData;
+    input.codexConfig;
   const [composerText, setComposerText] = useState("");
   const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null);
   const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
