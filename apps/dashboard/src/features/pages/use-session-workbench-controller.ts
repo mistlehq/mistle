@@ -118,6 +118,7 @@ export function useSessionWorkbenchController(input: {
 
   const composerProps = useSessionConversationComposerState({
     admin,
+    bootstrap: sessionState.bootstrap,
     chat: {
       canInterruptTurn: chat.canInterruptTurn,
       canSteerTurn: chat.canSteerTurn,

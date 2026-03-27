@@ -249,6 +249,7 @@ export function useCodexSessionAdmin(input: {
   });
 
   const { mutate: loadModelsMutate, isPending: isLoadingModels } = loadModelsMutation;
+  const { mutateAsync: loadModelsMutateAsync } = loadModelsMutation;
   const { mutate: loadExperimentalFeaturesMutate, isPending: isLoadingExperimentalFeatures } =
     loadExperimentalFeaturesMutation;
   const { mutate: readConfigMutate, isPending: isReadingConfig } = readConfigMutation;
@@ -283,6 +284,9 @@ export function useCodexSessionAdmin(input: {
     loadModels: useCallback(() => {
       loadModelsMutate();
     }, [loadModelsMutate]),
+    loadModelsAsync: useCallback(async () => {
+      return await loadModelsMutateAsync();
+    }, [loadModelsMutateAsync]),
     loadExperimentalFeatures: useCallback(() => {
       loadExperimentalFeaturesMutate();
     }, [loadExperimentalFeaturesMutate]),
@@ -291,6 +295,30 @@ export function useCodexSessionAdmin(input: {
         readConfigMutate(includeLayers);
       },
       [readConfigMutate],
+    ),
+    readConfigAsync: useCallback(
+      async (includeLayers: boolean) => {
+        setConfigStatus("loading");
+        const rpcClient = input.rpcClientRef.current;
+        if (rpcClient === null) {
+          throw new Error("Connect to a sandbox session before reading config.");
+        }
+
+        try {
+          const result = await readCodexConfig({
+            rpcClient,
+            includeLayers,
+          });
+          setConfigJson(JSON.stringify(result.config, null, 2));
+          setConfigStatus("loaded");
+          input.recordRecentResponse(result.response);
+          return result;
+        } catch (error) {
+          setConfigStatus("error");
+          throw error;
+        }
+      },
+      [input],
     ),
     readConfigRequirements: useCallback(() => {
       readConfigRequirementsMutate();

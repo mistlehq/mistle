@@ -4,35 +4,22 @@ import type {
 } from "@mistle/integrations-definitions/openai/agent/client";
 import { uploadSandboxImage } from "@mistle/sandbox-session-client";
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { resolveTurnRepresentation } from "../session-agents/codex/session-state/codex-attachment-presentation.js";
-import type {
-  CodexConfigStatus,
-  CodexModelCatalogStatus,
-} from "../session-agents/codex/session-state/use-codex-session-admin.js";
+import type { SessionBootstrapState } from "../session-agents/codex/session-state/use-codex-session-state.js";
 import { mintSandboxInstanceConnectionToken } from "../sessions/sessions-service.js";
+import { type ComposerConfigSnapshot } from "./session-composer-config.js";
 import {
-  readComposerConfigSnapshot,
-  type ComposerConfigSnapshot,
-} from "./session-composer-config.js";
-import {
-  getComposerSelectionKey,
+  buildModelSelectionRequiredMessage,
+  buildNonImageCapableModelWarningMessage,
+  buildUnavailableModelErrorMessage,
   resolveActiveComposerModel,
-  resolveComposerStatusMessage,
-  resolveComposerSubmitReadiness,
   supportsImageInspection,
-  type ComposerStatusMessage,
-  type ComposerSubmitReadiness,
-  type ResolvedComposerModelContext,
 } from "./session-composer-model-readiness.js";
 import { resolveUploadErrorMessage } from "./session-composer-upload-errors.js";
 import type { SessionConversationComposerProps } from "./session-conversation-pane.tsx";
 import { resolveChatComposerAction } from "./session-workbench-view-model.js";
-
-type ComposerConfigDraft = ComposerConfigSnapshot & {
-  baseConfigJson: string | null;
-};
 
 type PendingComposerAttachment = {
   id: string;
@@ -40,15 +27,22 @@ type PendingComposerAttachment = {
   name: string;
 };
 
+type ComposerStatusMessage = {
+  message: string;
+  tone: "error" | "warning";
+};
+
 type ComposerConnectedSession = {
   threadId: string | null;
 } | null;
 
-type ComposerAdminState = {
+type ComposerBootstrapState = {
   availableModels: readonly CodexModelSummary[];
-  modelCatalogStatus: CodexModelCatalogStatus;
-  configJson: string | null;
-  configStatus: CodexConfigStatus;
+  initialComposerConfig: ComposerConfigSnapshot;
+  state: SessionBootstrapState;
+};
+
+type ComposerAdminState = {
   isBatchWritingConfig: boolean;
   isWritingConfigValue: boolean;
   batchWriteConfig: (input: {
@@ -58,8 +52,6 @@ type ComposerAdminState = {
       mergeStrategy: "replace" | "upsert";
     }[];
   }) => void;
-  loadModels: () => void;
-  readConfig: (includeLayers: boolean) => void;
   writeConfigValue: (input: {
     keyPath: string;
     value: unknown;
@@ -89,120 +81,117 @@ type ComposerChatState = {
   }) => Promise<void>;
 };
 
-export type { ComposerStatusMessage, ComposerSubmitReadiness, ResolvedComposerModelContext };
+export type { ComposerStatusMessage };
+
+function resolveComposerBootstrapMessage(input: {
+  activeComposerModel: CodexModelSummary | null;
+  bootstrapState: SessionBootstrapState;
+}): string | null {
+  if (input.bootstrapState.status === "failed") {
+    return input.bootstrapState.message;
+  }
+
+  if (input.bootstrapState.status !== "ready") {
+    return null;
+  }
+
+  if (input.activeComposerModel !== null) {
+    return null;
+  }
+
+  return buildModelSelectionRequiredMessage();
+}
+
+function resolveComposerStatusMessage(input: {
+  activeComposerModel: CodexModelSummary | null;
+  bootstrapState: SessionBootstrapState;
+  composerErrorMessage: string | null;
+  hasPendingAttachments: boolean;
+}): ComposerStatusMessage | null {
+  if (input.composerErrorMessage !== null) {
+    return {
+      message: input.composerErrorMessage,
+      tone: "error",
+    };
+  }
+
+  const bootstrapMessage = resolveComposerBootstrapMessage({
+    activeComposerModel: input.activeComposerModel,
+    bootstrapState: input.bootstrapState,
+  });
+  if (bootstrapMessage !== null) {
+    return {
+      message: bootstrapMessage,
+      tone: "error",
+    };
+  }
+
+  if (input.hasPendingAttachments && input.activeComposerModel !== null) {
+    if (!supportsImageInspection(input.activeComposerModel)) {
+      return {
+        message: buildNonImageCapableModelWarningMessage(input.activeComposerModel.displayName),
+        tone: "warning",
+      };
+    }
+  }
+
+  return null;
+}
 
 export function useSessionConversationComposerState(input: {
   admin: ComposerAdminState;
+  bootstrap: ComposerBootstrapState;
   chat: ComposerChatState;
   connectedSession: ComposerConnectedSession;
   hasActiveTurn: boolean;
   sandboxInstanceId: string | null;
 }): SessionConversationComposerProps {
-  const {
-    availableModels,
-    batchWriteConfig,
-    configJson,
-    configStatus,
-    isBatchWritingConfig,
-    isWritingConfigValue,
-    loadModels,
-    modelCatalogStatus,
-    readConfig,
-    writeConfigValue,
-  } = input.admin;
+  const { batchWriteConfig, isBatchWritingConfig, isWritingConfigValue, writeConfigValue } =
+    input.admin;
   const [composerText, setComposerText] = useState("");
   const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null);
   const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
     readonly PendingComposerAttachment[]
   >([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
-  const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
-  const [resolvedComposerModelContext, setResolvedComposerModelContext] =
-    useState<ResolvedComposerModelContext | null>(null);
-
-  const composerConfigSnapshot =
-    input.connectedSession === null
-      ? {
-          model: null,
-          modelReasoningEffort: null,
-        }
-      : readComposerConfigSnapshot(configJson);
-  const activeComposerConfig =
-    input.connectedSession !== null &&
-    composerConfigDraft !== null &&
-    composerConfigDraft.baseConfigJson === configJson
-      ? {
-          model: composerConfigDraft.model,
-          modelReasoningEffort: composerConfigDraft.modelReasoningEffort,
-        }
-      : composerConfigSnapshot;
+  const [composerConfig, setComposerConfig] = useState<ComposerConfigSnapshot>({
+    model: null,
+    modelReasoningEffort: null,
+  });
 
   useEffect(() => {
     setComposerText("");
     setComposerErrorMessage(null);
     setPendingComposerAttachments([]);
     setIsUploadingAttachments(false);
-    setComposerConfigDraft(null);
-    setResolvedComposerModelContext(null);
+    setComposerConfig({
+      model: null,
+      modelReasoningEffort: null,
+    });
   }, [input.sandboxInstanceId]);
 
   useEffect(() => {
-    if (input.connectedSession === null) {
+    if (input.bootstrap.state.status !== "ready") {
       return;
     }
 
-    loadModels();
-    readConfig(false);
-  }, [input.connectedSession, loadModels, readConfig]);
+    setComposerConfig(input.bootstrap.initialComposerConfig);
+  }, [input.bootstrap.initialComposerConfig, input.bootstrap.state.status]);
 
-  const composerSelectionKey = getComposerSelectionKey(activeComposerConfig.model);
-  const activeComposerModel = resolveActiveComposerModel({
-    availableModels,
-    selectedModel: activeComposerConfig.model,
-  });
+  const activeComposerModel = useMemo(
+    () =>
+      resolveActiveComposerModel({
+        availableModels: input.bootstrap.availableModels,
+        selectedModel: composerConfig.model,
+      }),
+    [composerConfig.model, input.bootstrap.availableModels],
+  );
 
-  useEffect(() => {
-    if (input.connectedSession === null) {
-      setResolvedComposerModelContext(null);
-      return;
-    }
-
-    setResolvedComposerModelContext((currentContext) => {
-      if (currentContext !== null && currentContext.selectionKey !== composerSelectionKey) {
-        return null;
-      }
-
-      if (activeComposerModel === null) {
-        return currentContext;
-      }
-
-      if (
-        currentContext !== null &&
-        currentContext.selectionKey === composerSelectionKey &&
-        currentContext.model.model === activeComposerModel.model &&
-        currentContext.model.displayName === activeComposerModel.displayName
-      ) {
-        return currentContext;
-      }
-
-      return {
-        selectionKey: composerSelectionKey,
-        model: activeComposerModel,
-      };
-    });
-  }, [activeComposerModel, composerSelectionKey, input.connectedSession]);
-
-  const composerSubmitReadiness = resolveComposerSubmitReadiness({
-    activeModel: activeComposerModel,
-    configStatus,
-    modelCatalogStatus,
-    resolvedModel: resolvedComposerModelContext?.model ?? null,
-    selectedModel: activeComposerConfig.model,
-  });
   const composerStatusMessage = resolveComposerStatusMessage({
+    activeComposerModel,
+    bootstrapState: input.bootstrap.state,
     composerErrorMessage,
     hasPendingAttachments: pendingComposerAttachments.length > 0,
-    submitReadiness: composerSubmitReadiness,
   });
 
   const handleComposerTextChange = useCallback((nextText: string): void => {
@@ -213,14 +202,9 @@ export function useSessionConversationComposerState(input: {
   const setComposerModel = useCallback(
     (nextModel: string): void => {
       setComposerErrorMessage(null);
-      setResolvedComposerModelContext(null);
-      setComposerConfigDraft((currentDraft) => ({
-        baseConfigJson: configJson,
+      setComposerConfig((currentConfig) => ({
         model: nextModel,
-        modelReasoningEffort:
-          currentDraft?.baseConfigJson === configJson
-            ? currentDraft.modelReasoningEffort
-            : composerConfigSnapshot.modelReasoningEffort,
+        modelReasoningEffort: currentConfig.modelReasoningEffort,
       }));
       batchWriteConfig({
         edits: [
@@ -232,18 +216,14 @@ export function useSessionConversationComposerState(input: {
         ],
       });
     },
-    [batchWriteConfig, composerConfigSnapshot.modelReasoningEffort, configJson],
+    [batchWriteConfig],
   );
 
   const setComposerReasoningEffort = useCallback(
     (nextReasoningEffort: string): void => {
       setComposerErrorMessage(null);
-      setComposerConfigDraft((currentDraft) => ({
-        baseConfigJson: configJson,
-        model:
-          currentDraft?.baseConfigJson === configJson
-            ? currentDraft.model
-            : composerConfigSnapshot.model,
+      setComposerConfig((currentConfig) => ({
+        model: currentConfig.model,
         modelReasoningEffort: nextReasoningEffort,
       }));
       writeConfigValue({
@@ -252,7 +232,7 @@ export function useSessionConversationComposerState(input: {
         mergeStrategy: "replace",
       });
     },
-    [composerConfigSnapshot.model, configJson, writeConfigValue],
+    [writeConfigValue],
   );
 
   const addPendingComposerFiles = useCallback((files: readonly File[]): void => {
@@ -302,8 +282,19 @@ export function useSessionConversationComposerState(input: {
         return;
       }
 
-      if (composerSubmitReadiness.status !== "ready") {
-        setComposerErrorMessage(composerSubmitReadiness.message);
+      if (input.bootstrap.state.status !== "ready") {
+        if (input.bootstrap.state.status === "failed") {
+          setComposerErrorMessage(input.bootstrap.state.message);
+        }
+        return;
+      }
+
+      if (activeComposerModel === null) {
+        const missingModelMessage =
+          composerConfig.model === null
+            ? buildModelSelectionRequiredMessage()
+            : buildUnavailableModelErrorMessage(composerConfig.model);
+        setComposerErrorMessage(missingModelMessage);
         return;
       }
 
@@ -355,7 +346,7 @@ export function useSessionConversationComposerState(input: {
         prompt: action.prompt,
         attachmentPaths: uploadedAttachmentPaths,
         uploadedAttachments,
-        supportsImageInspection: supportsImageInspection(composerSubmitReadiness.activeModel),
+        supportsImageInspection: supportsImageInspection(activeComposerModel),
       });
 
       try {
@@ -388,8 +379,10 @@ export function useSessionConversationComposerState(input: {
       setPendingComposerAttachments([]);
     })();
   }, [
-    composerSubmitReadiness,
+    activeComposerModel,
+    composerConfig.model,
     composerText,
+    input.bootstrap.state,
     input.chat,
     input.connectedSession,
     input.hasActiveTurn,
@@ -403,18 +396,21 @@ export function useSessionConversationComposerState(input: {
       action: {
         canInterruptTurn: input.chat.canInterruptTurn,
         canSteerTurn: input.chat.canSteerTurn,
-        canSubmitTurns: composerSubmitReadiness.status === "ready",
+        canSubmitTurns: input.bootstrap.state.status === "ready" && activeComposerModel !== null,
         isInterruptingTurn: input.chat.isInterruptingTurn,
         isStartingTurn: input.chat.isStartingTurn,
         isSteeringTurn: input.chat.isSteeringTurn,
       },
       completedErrorMessage: input.chat.completedErrorMessage,
       isConnected: input.connectedSession !== null,
-      isUpdatingConfig: isBatchWritingConfig || isWritingConfigValue,
+      isUpdatingConfig:
+        input.bootstrap.state.status === "bootstrapping" ||
+        isBatchWritingConfig ||
+        isWritingConfigValue,
       isUploadingAttachments,
       statusMessage: composerStatusMessage,
     },
-    modelOptions: availableModels.map((model) => ({
+    modelOptions: input.bootstrap.availableModels.map((model) => ({
       value: model.model,
       label: model.displayName,
     })),
@@ -428,7 +424,7 @@ export function useSessionConversationComposerState(input: {
       id: attachment.id,
       name: attachment.name,
     })),
-    selectedModel: activeComposerConfig.model,
-    selectedReasoningEffort: activeComposerConfig.modelReasoningEffort,
+    selectedModel: composerConfig.model,
+    selectedReasoningEffort: composerConfig.modelReasoningEffort,
   };
 }

@@ -20,6 +20,15 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
+import {
+  readComposerConfigSnapshot,
+  type ComposerConfigSnapshot,
+} from "../../../pages/session-composer-config.js";
+import {
+  buildModelSelectionRequiredMessage,
+  buildUnavailableModelErrorMessage,
+  resolveActiveComposerModel,
+} from "../../../pages/session-composer-model-readiness.js";
 import { mintSandboxInstanceConnectionToken } from "../../../sessions/sessions-service.js";
 import {
   createInitialCodexApprovalRequestsState,
@@ -116,6 +125,12 @@ type CodexSessionChatState = {
   isSteeringTurn: boolean;
   canInterruptTurn: boolean;
   canSteerTurn: boolean;
+  hydrateChatFromThread: (input?: {
+    generation?: number;
+    ensureCurrentGeneration?: (generation: number) => void;
+    rpcClient?: CodexJsonRpcClient;
+    threadId?: string | null;
+  }) => Promise<"empty" | "hydrated">;
   startTurn: (input: {
     submittedPrompt: string;
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
@@ -149,8 +164,10 @@ type CodexSessionAdminState = {
   isDetectingExternalAgentConfig: boolean;
   isImportingExternalAgentConfig: boolean;
   loadModels: () => void;
+  loadModelsAsync: () => Promise<{ models: readonly CodexModelSummary[]; response: unknown }>;
   loadExperimentalFeatures: () => void;
   readConfig: (includeLayers: boolean) => void;
+  readConfigAsync: (includeLayers: boolean) => Promise<{ config: unknown; response: unknown }>;
   readConfigRequirements: () => void;
   writeConfigValue: (input: {
     keyPath: string;
@@ -166,6 +183,23 @@ type CodexSessionAdminState = {
   }) => void;
   detectExternalAgentConfig: (input: { includeHome: boolean; cwds: readonly string[] }) => void;
   importExternalAgentConfig: (items: readonly CodexExternalAgentMigrationItem[]) => void;
+};
+
+export type SessionBootstrapState =
+  | { status: "disconnected" }
+  | { status: "bootstrapping" }
+  | { status: "ready" }
+  | { status: "failed"; message: string };
+
+type CodexSessionBootstrapState = {
+  availableModels: readonly CodexModelSummary[];
+  state: SessionBootstrapState;
+  initialComposerConfig: ComposerConfigSnapshot;
+};
+
+const EmptyComposerConfig: ComposerConfigSnapshot = {
+  model: null,
+  modelReasoningEffort: null,
 };
 
 type CodexSessionDebugState = {
@@ -189,6 +223,7 @@ export type UseCodexSessionStateResult = {
   lifecycle: CodexSessionLifecycleState;
   threads: CodexSessionThreadState;
   chat: CodexSessionChatState;
+  bootstrap: CodexSessionBootstrapState;
   admin: CodexSessionAdminState;
   debug: CodexSessionDebugState;
   serverRequests: CodexSessionServerRequestState;
@@ -212,6 +247,11 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     undefined,
     createInitialCodexApprovalRequestsState,
   );
+  const ensureCurrentGeneration = useCallback((generation: number): void => {
+    if (connectionGenerationRef.current !== generation) {
+      throw new StaleConnectionAttemptError();
+    }
+  }, []);
   const debugState = useCodexSessionDebugState();
   const {
     recordRecentNotification,
@@ -284,8 +324,10 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     isDetectingExternalAgentConfig,
     isImportingExternalAgentConfig,
     loadModels,
+    loadModelsAsync,
     loadExperimentalFeatures,
     readConfig,
+    readConfigAsync,
     readConfigRequirements,
     writeConfigValue,
     batchWriteConfig,
@@ -293,6 +335,12 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     importExternalAgentConfig,
     resetAdminState,
   } = adminState;
+  const [sessionBootstrapState, setSessionBootstrapState] = useState<SessionBootstrapState>({
+    status: "disconnected",
+  });
+  const [initialComposerConfig, setInitialComposerConfig] =
+    useState<ComposerConfigSnapshot>(EmptyComposerConfig);
+  const bootstrapGenerationRef = useRef(0);
 
   const resetSessionState = useCallback((): void => {
     threadIdRef.current = null;
@@ -303,6 +351,8 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     setStartErrorMessage(null);
     setAgentConnectionState("idle");
     setAgentConnectionError(null);
+    setSessionBootstrapState({ status: "disconnected" });
+    setInitialComposerConfig(EmptyComposerConfig);
     resetDebugState();
     dispatchServerRequestsAction({ type: "reset" });
     resetChat();
@@ -331,12 +381,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     };
   }, [disconnectSession]);
 
-  function ensureCurrentGeneration(generation: number): void {
-    if (connectionGenerationRef.current !== generation) {
-      throw new StaleConnectionAttemptError();
-    }
-  }
-
   function updateActiveThread(threadId: string | null): void {
     threadIdRef.current = threadId;
     setConnectedSession((current) => {
@@ -350,6 +394,97 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       };
     });
   }
+
+  useEffect(() => {
+    if (connectedSession === null || connectedSession.threadId === null) {
+      bootstrapGenerationRef.current += 1;
+      setSessionBootstrapState((currentState) =>
+        currentState.status === "disconnected" ? currentState : { status: "disconnected" },
+      );
+      setInitialComposerConfig((currentConfig) =>
+        currentConfig.model === null && currentConfig.modelReasoningEffort === null
+          ? currentConfig
+          : EmptyComposerConfig,
+      );
+      return;
+    }
+
+    const currentBootstrapGeneration = bootstrapGenerationRef.current + 1;
+    bootstrapGenerationRef.current = currentBootstrapGeneration;
+    setSessionBootstrapState({ status: "bootstrapping" });
+
+    void (async () => {
+      const [modelsResult, configResult, threadResult] = await Promise.allSettled([
+        loadModelsAsync(),
+        readConfigAsync(false),
+        hydrateChatFromThread({
+          generation: currentBootstrapGeneration,
+          ensureCurrentGeneration,
+          threadId: connectedSession.threadId,
+        }),
+      ]);
+
+      if (bootstrapGenerationRef.current !== currentBootstrapGeneration) {
+        return;
+      }
+
+      if (modelsResult.status === "rejected") {
+        setSessionBootstrapState({
+          status: "failed",
+          message:
+            modelsResult.reason instanceof Error
+              ? modelsResult.reason.message
+              : "Could not load models.",
+        });
+        return;
+      }
+
+      if (threadResult.status === "rejected") {
+        setSessionBootstrapState({
+          status: "failed",
+          message:
+            threadResult.reason instanceof Error
+              ? threadResult.reason.message
+              : "Could not read thread.",
+        });
+        return;
+      }
+
+      const configSnapshot =
+        configResult.status === "fulfilled"
+          ? readComposerConfigSnapshot(JSON.stringify(configResult.value.config))
+          : {
+              model: null,
+              modelReasoningEffort: null,
+            };
+
+      const resolvedComposerModel = resolveActiveComposerModel({
+        availableModels: modelsResult.value.models,
+        selectedModel: configSnapshot.model,
+      });
+
+      if (resolvedComposerModel === null) {
+        setInitialComposerConfig(configSnapshot);
+        setSessionBootstrapState({
+          status: "failed",
+          message:
+            configSnapshot.model === null
+              ? buildModelSelectionRequiredMessage()
+              : buildUnavailableModelErrorMessage(configSnapshot.model),
+        });
+        return;
+      }
+
+      setInitialComposerConfig(configSnapshot);
+      setSessionBootstrapState({ status: "ready" });
+    })();
+  }, [
+    connectedSession,
+    ensureCurrentGeneration,
+    hydrateChatFromThread,
+    loadModelsAsync,
+    readConfigAsync,
+  ]);
 
   const handleThreadMutationFailure = useCallback(
     (fallbackMessage: string, error: unknown): void => {
@@ -543,10 +678,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       setAgentConnectionError(null);
       setStep("connected");
       setStartErrorMessage(null);
-      void hydrateChatFromThread({
-        threadId: result.threadId,
-        ensureCurrentGeneration,
-      });
     },
     onError: (error) => {
       if (error instanceof StaleConnectionAttemptError) {
@@ -1016,6 +1147,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       isSteeringTurn,
       canInterruptTurn,
       canSteerTurn,
+      hydrateChatFromThread,
       startTurn,
       interruptTurn,
       steerTurn,
@@ -1024,6 +1156,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   }, [
     canInterruptTurn,
     canSteerTurn,
+    hydrateChatFromThread,
     interruptTurn,
     isInterruptingTurn,
     isReloadingChat,
@@ -1053,8 +1186,10 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       isDetectingExternalAgentConfig,
       isImportingExternalAgentConfig,
       loadModels,
+      loadModelsAsync,
       loadExperimentalFeatures,
       readConfig,
+      readConfigAsync,
       readConfigRequirements,
       writeConfigValue,
       batchWriteConfig,
@@ -1082,7 +1217,9 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     isWritingConfigValue,
     loadExperimentalFeatures,
     loadModels,
+    loadModelsAsync,
     readConfig,
+    readConfigAsync,
     readConfigRequirements,
     writeConfigValue,
   ]);
@@ -1121,6 +1258,11 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     lifecycle,
     threads,
     chat,
+    bootstrap: {
+      availableModels,
+      state: sessionBootstrapState,
+      initialComposerConfig,
+    },
     admin,
     debug,
     serverRequests,

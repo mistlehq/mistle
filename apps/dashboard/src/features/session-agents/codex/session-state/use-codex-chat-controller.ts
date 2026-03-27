@@ -89,12 +89,12 @@ export function useCodexChatController(input: {
       threadId?: string | null;
       generation?: number;
       ensureCurrentGeneration?: (generation: number) => void;
-    }): Promise<void> => {
+    }): Promise<"empty" | "hydrated"> => {
       const rpcClient = hydrateInput?.rpcClient ?? input.rpcClientRef.current;
       const threadId = hydrateInput?.threadId ?? input.threadIdRef.current;
 
       if (rpcClient === null || threadId === null) {
-        return;
+        return "empty";
       }
 
       try {
@@ -114,16 +114,15 @@ export function useCodexChatController(input: {
           turns: thread.turns,
         });
         input.recordRecentResponse(thread.response);
+        return "hydrated";
       } catch (error) {
         if (isThreadNotMaterializedError(error)) {
           dispatchChatAction({ type: "reset" });
           input.setStartErrorMessage(null);
-          return;
+          return "empty";
         }
 
-        input.setStartErrorMessage(
-          error instanceof Error ? error.message : "Could not read thread.",
-        );
+        throw error;
       }
     },
     [input],
