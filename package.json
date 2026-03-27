@@ -8,6 +8,7 @@
     "dev:workspace": "turbo watch dev --ui=tui --env-mode=loose --filter=!@mistle/docs --filter=!@mistle/sandbox-runtime",
     "storybook": "pnpm --filter @mistle/storybook storybook",
     "storybook:build": "pnpm --filter @mistle/storybook build-storybook",
+    "emails:preview": "pnpm --filter @mistle/emails preview",
     "dev:down": "tsx ./scripts/dev/down.ts",
     "dev:reset": "tsx ./scripts/dev/down.ts --volumes",
     "dev:reset:hard": "tsx ./scripts/dev/down.ts --volumes --rmi-local",

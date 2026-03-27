@@ -11,15 +11,24 @@ describe("emails organization invitation", () => {
       invitationUrl: "https://example.com/accept?x=<tag>&y='quoted'",
     });
 
-    expect(template.subject).toBe("You're invited to join Acme <Platform>");
+    expect(template.subject).toBe("Join Acme <Platform> on Mistle");
+    expect(template.metadata).toEqual({
+      preview: "Jane & John invited you to join Acme <Platform> as admin<script>.",
+      subject: "Join Acme <Platform> on Mistle",
+      templateName: "Organization Invitation",
+    });
     expect(template.html).toContain("Jane &#x26; John invited you to join Acme &#x3C;Platform>");
     expect(template.html).toContain("as admin&#x3C;script>.");
     expect(template.html).toContain("href=\"https://example.com/accept?x=<tag>&#x26;y='quoted'\"");
+    expect(template.html).toContain("If the button does not work, use this link:");
     expect(template.text).toContain(
       "Jane & John invited you to join Acme <Platform> as admin<script>.",
     );
     expect(template.text).toContain(
       "Accept invitation https://example.com/accept?x=<tag>&y='quoted'",
+    );
+    expect(template.html).toContain(
+      "Jane &#x26; John invited you to join Acme &#x3C;Platform> as admin&#x3C;script>.",
     );
   });
 

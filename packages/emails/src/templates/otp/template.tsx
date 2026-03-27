@@ -1,32 +1,14 @@
-import { Body, Container, Head, Html, Preview, Section, Text } from "jsx-email";
+import { Section, Text } from "jsx-email";
 import type { CSSProperties, ReactElement } from "react";
 
+import { BrandedEmailShell } from "../shared/branded-email-shell.js";
+
 export type EmailOTPTemplateProps = {
+  bodyMessage: string;
   otp: string;
   expiresInSeconds: number;
+  preview: string;
   title: string;
-};
-
-const bodyStyle: CSSProperties = {
-  backgroundColor: "#f6f7fb",
-  fontFamily: "Helvetica, Arial, sans-serif",
-  margin: 0,
-  padding: "32px 0",
-};
-
-const containerStyle: CSSProperties = {
-  backgroundColor: "#ffffff",
-  borderRadius: "12px",
-  margin: "0 auto",
-  maxWidth: "520px",
-  padding: "28px",
-};
-
-const headingStyle: CSSProperties = {
-  color: "#111827",
-  fontSize: "24px",
-  fontWeight: 700,
-  margin: "0 0 18px",
 };
 
 const paragraphStyle: CSSProperties = {
@@ -34,6 +16,7 @@ const paragraphStyle: CSSProperties = {
   fontSize: "15px",
   lineHeight: "22px",
   margin: "0 0 16px",
+  textAlign: "center",
 };
 
 const otpCodeStyle: CSSProperties = {
@@ -58,7 +41,8 @@ const footerStyle: CSSProperties = {
   color: "#6b7280",
   fontSize: "13px",
   lineHeight: "20px",
-  marginTop: "20px",
+  margin: 0,
+  textAlign: "center",
 };
 
 function toDisplayMinutes(expiresInSeconds: number): number {
@@ -66,31 +50,24 @@ function toDisplayMinutes(expiresInSeconds: number): number {
 }
 
 export function EmailOTPTemplate({
+  bodyMessage,
   otp,
   expiresInSeconds,
+  preview,
   title,
 }: EmailOTPTemplateProps): ReactElement {
   const expiryMinutes = toDisplayMinutes(expiresInSeconds);
 
   return (
-    <Html>
-      <Head />
-      <Preview>{title}</Preview>
-      <Body style={bodyStyle}>
-        <Container style={containerStyle}>
-          <Text style={headingStyle}>{title}</Text>
-          <Text style={paragraphStyle}>Use this one-time passcode to continue:</Text>
-          <Section style={otpCodeContainerStyle}>
-            <Text style={otpCodeStyle}>{otp}</Text>
-          </Section>
-          <Text style={paragraphStyle}>
-            {`This code expires in ${expiryMinutes} minute${expiryMinutes === 1 ? "" : "s"}.`}
-          </Text>
-          <Text style={footerStyle}>
-            If you did not request this code, you can safely ignore this email.
-          </Text>
-        </Container>
-      </Body>
-    </Html>
+    <BrandedEmailShell preview={preview} title={title}>
+      <Text style={paragraphStyle}>{bodyMessage}</Text>
+      <Section style={otpCodeContainerStyle}>
+        <Text style={otpCodeStyle}>{otp}</Text>
+      </Section>
+      <Text style={paragraphStyle}>
+        {`This code expires in ${expiryMinutes} minute${expiryMinutes === 1 ? "" : "s"}.`}
+      </Text>
+      <Text style={footerStyle}>If you did not request this code, you can ignore this email.</Text>
+    </BrandedEmailShell>
   );
 }
