@@ -25,6 +25,7 @@
     "@mistle/http": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/logging": "workspace:*",
+    "@mistle/sandbox": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/workflow-registry": "workspace:*",

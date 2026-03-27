@@ -3,6 +3,8 @@ import {
   type PartialDataPlaneApiConfigInput,
   DataPlaneApiDatabaseConfigSchema,
   DataPlaneApiRuntimeStateConfigSchema,
+  DataPlaneApiSandboxDockerConfigSchema,
+  DataPlaneApiSandboxE2BConfigSchema,
   DataPlaneApiServerConfigSchema,
   DataPlaneApiWorkflowConfigSchema,
   PartialDataPlaneApiConfigSchema,
@@ -49,6 +51,24 @@ const loadRuntimeStateEnv = createEnvLoader<typeof DataPlaneApiRuntimeStateConfi
   },
 ]);
 
+const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneApiSandboxDockerConfigSchema>([
+  {
+    key: "socketPath",
+    envVar: "MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH",
+  },
+]);
+
+const loadSandboxE2BEnv = createEnvLoader<typeof DataPlaneApiSandboxE2BConfigSchema>([
+  {
+    key: "apiKey",
+    envVar: "MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY",
+  },
+  {
+    key: "domain",
+    envVar: "MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_DOMAIN",
+  },
+]);
+
 export function loadDataPlaneApiFromEnv(env: NodeJS.ProcessEnv): PartialDataPlaneApiConfigInput {
   const partialConfig: PartialDataPlaneApiConfigInput = {};
 
@@ -70,6 +90,15 @@ export function loadDataPlaneApiFromEnv(env: NodeJS.ProcessEnv): PartialDataPlan
   const runtimeState = loadRuntimeStateEnv(env);
   if (hasEntries(runtimeState)) {
     partialConfig.runtimeState = runtimeState;
+  }
+
+  const sandboxDocker = loadSandboxDockerEnv(env);
+  const sandboxE2B = loadSandboxE2BEnv(env);
+  if (hasEntries(sandboxDocker) || hasEntries(sandboxE2B)) {
+    partialConfig.sandbox = {
+      ...(hasEntries(sandboxDocker) ? { docker: sandboxDocker } : {}),
+      ...(hasEntries(sandboxE2B) ? { e2b: sandboxE2B } : {}),
+    };
   }
 
   return PartialDataPlaneApiConfigSchema.parse(partialConfig);

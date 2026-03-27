@@ -9,6 +9,1376 @@
     "parameters": {}
   },
   "paths": {
+    "/internal/sandbox/instances": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sandboxProfileId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sandboxProfileVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "runtimePlan": {
+                    "type": "object",
+                    "properties": {
+                      "sandboxProfileId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "version": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "image": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string",
+                                "enum": ["profile-base"]
+                              },
+                              "imageRef": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "sandboxProfileId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "version": {
+                                "type": "integer",
+                                "minimum": 1
+                              }
+                            },
+                            "required": ["source", "imageRef", "sandboxProfileId", "version"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string",
+                                "enum": ["base"]
+                              },
+                              "imageRef": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["source", "imageRef"],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "egressRoutes": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "egressRuleId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "bindingId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "match": {
+                              "type": "object",
+                              "properties": {
+                                "hosts": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "pathPrefixes": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "methods": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                }
+                              },
+                              "required": ["hosts"],
+                              "additionalProperties": false
+                            },
+                            "upstream": {
+                              "type": "object",
+                              "properties": {
+                                "baseUrl": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["baseUrl"],
+                              "additionalProperties": false
+                            },
+                            "authInjection": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": ["bearer", "basic", "header", "query"]
+                                },
+                                "target": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "username": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["type", "target"],
+                              "additionalProperties": false
+                            },
+                            "credentialResolver": {
+                              "type": "object",
+                              "properties": {
+                                "connectionId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "secretType": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "purpose": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "resolverKey": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["connectionId", "secretType"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "egressRuleId",
+                            "bindingId",
+                            "match",
+                            "upstream",
+                            "authInjection",
+                            "credentialResolver"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "artifacts": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "artifactKey": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "env": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
+                            "lifecycle": {
+                              "type": "object",
+                              "properties": {
+                                "install": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "env": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "cwd": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "timeoutMs": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0
+                                      }
+                                    },
+                                    "required": ["args"],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "update": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "env": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "cwd": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "timeoutMs": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0
+                                      }
+                                    },
+                                    "required": ["args"],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "remove": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "env": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "cwd": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "timeoutMs": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0
+                                      }
+                                    },
+                                    "required": ["args"],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": ["install", "remove"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": ["artifactKey", "name", "lifecycle"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "workspaceSources": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "sourceKind": {
+                                  "type": "string",
+                                  "enum": ["git-clone"]
+                                },
+                                "resourceKind": {
+                                  "type": "string",
+                                  "enum": ["repository"]
+                                },
+                                "path": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "originUrl": {
+                                  "type": "string",
+                                  "format": "uri"
+                                }
+                              },
+                              "required": ["sourceKind", "resourceKind", "path", "originUrl"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "runtimeClients": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "clientId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "setup": {
+                              "type": "object",
+                              "properties": {
+                                "env": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "string"
+                                  }
+                                },
+                                "files": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "fileId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "path": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "mode": {
+                                        "type": "integer",
+                                        "minimum": 0
+                                      },
+                                      "content": {
+                                        "type": "string"
+                                      },
+                                      "writeMode": {
+                                        "type": "string",
+                                        "enum": ["overwrite", "if-absent"]
+                                      }
+                                    },
+                                    "required": ["fileId", "path", "mode", "content"],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "launchArgs": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "required": ["env", "files"],
+                              "additionalProperties": false
+                            },
+                            "processes": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "processKey": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "command": {
+                                    "type": "object",
+                                    "properties": {
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "env": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "cwd": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "timeoutMs": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0
+                                      }
+                                    },
+                                    "required": ["args"],
+                                    "additionalProperties": false
+                                  },
+                                  "readiness": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["none"]
+                                          }
+                                        },
+                                        "required": ["type"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["tcp"]
+                                          },
+                                          "host": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "port": {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 65535
+                                          },
+                                          "timeoutMs": {
+                                            "type": "integer",
+                                            "exclusiveMinimum": 0
+                                          }
+                                        },
+                                        "required": ["type", "host", "port", "timeoutMs"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["http"]
+                                          },
+                                          "url": {
+                                            "type": "string",
+                                            "format": "uri"
+                                          },
+                                          "expectedStatus": {
+                                            "type": "integer",
+                                            "minimum": 100,
+                                            "maximum": 599
+                                          },
+                                          "timeoutMs": {
+                                            "type": "integer",
+                                            "exclusiveMinimum": 0
+                                          }
+                                        },
+                                        "required": ["type", "url", "expectedStatus", "timeoutMs"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["ws"]
+                                          },
+                                          "url": {
+                                            "type": "string",
+                                            "format": "uri"
+                                          },
+                                          "timeoutMs": {
+                                            "type": "integer",
+                                            "exclusiveMinimum": 0
+                                          }
+                                        },
+                                        "required": ["type", "url", "timeoutMs"],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "stop": {
+                                    "type": "object",
+                                    "properties": {
+                                      "signal": {
+                                        "type": "string",
+                                        "enum": ["sigterm", "sigkill"]
+                                      },
+                                      "timeoutMs": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0
+                                      },
+                                      "gracePeriodMs": {
+                                        "type": "integer",
+                                        "minimum": 0
+                                      }
+                                    },
+                                    "required": ["signal", "timeoutMs"],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["processKey", "command", "readiness", "stop"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "endpoints": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "endpointKey": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "processKey": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "transport": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["ws"]
+                                          },
+                                          "url": {
+                                            "type": "string",
+                                            "format": "uri"
+                                          }
+                                        },
+                                        "required": ["type", "url"],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "connectionMode": {
+                                    "type": "string",
+                                    "enum": ["dedicated", "shared"]
+                                  }
+                                },
+                                "required": ["endpointKey", "transport", "connectionMode"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": ["clientId", "setup", "processes", "endpoints"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "agentRuntimes": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "bindingId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "runtimeKey": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "clientId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "endpointKey": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "adapterKey": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "bindingId",
+                            "runtimeKey",
+                            "clientId",
+                            "endpointKey",
+                            "adapterKey"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "sandboxProfileId",
+                      "version",
+                      "image",
+                      "egressRoutes",
+                      "artifacts",
+                      "workspaceSources",
+                      "runtimeClients",
+                      "agentRuntimes"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "startedBy": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": ["user", "system"]
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["kind", "id"],
+                    "additionalProperties": false
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": ["dashboard", "webhook"]
+                  },
+                  "image": {
+                    "type": "object",
+                    "properties": {
+                      "imageId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["imageId", "createdAt"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "organizationId",
+                  "sandboxProfileId",
+                  "sandboxProfileVersion",
+                  "runtimePlan",
+                  "startedBy",
+                  "source",
+                  "image"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Queue sandbox instance startup for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["accepted"]
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "workflowRunId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["status", "sandboxInstanceId", "workflowRunId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "organizationId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "after",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "before",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List sandbox instances for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalResults": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sandboxProfileId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sandboxProfileVersion": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["starting", "running", "stopped", "failed"]
+                          },
+                          "startedBy": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["user", "system"]
+                              },
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["kind", "id"],
+                            "additionalProperties": false
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": ["dashboard", "webhook"]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "failureCode": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
+                          "failureMessage": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "sandboxProfileId",
+                          "sandboxProfileVersion",
+                          "status",
+                          "startedBy",
+                          "source",
+                          "createdAt",
+                          "updatedAt",
+                          "failureCode",
+                          "failureMessage"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextPage": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "after": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        }
+                      },
+                      "required": ["after", "limit"],
+                      "additionalProperties": false
+                    },
+                    "previousPage": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "before": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        }
+                      },
+                      "required": ["before", "limit"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["totalResults", "items", "nextPage", "previousPage"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request query.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_LIST_INPUT", "INVALID_PAGINATION_CURSOR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox/instances/:id": {
+      "get": {
+        "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "organizationId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get sandbox instance status for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": ["object", "null"],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["starting", "running", "stopped", "failed"]
+                    },
+                    "failureCode": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "failureMessage": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["id", "status", "failureCode", "failureMessage"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox/instances/:id/resume": {
+      "post": {
+        "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "required": ["organizationId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Queue sandbox instance resume for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["accepted"]
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "workflowRunId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["status", "sandboxInstanceId", "workflowRunId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox/instances/:id/stop": {
+      "post": {
+        "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "stopReason": {
+                    "type": "string",
+                    "enum": ["idle", "disconnected"]
+                  },
+                  "expectedOwnerLeaseId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "required": ["stopReason", "expectedOwnerLeaseId", "idempotencyKey"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Queue sandbox instance stop for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["accepted"]
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "workflowRunId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["status", "sandboxInstanceId", "workflowRunId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/sandbox-instances/start": {
       "post": {
         "tags": ["Internal"],
