@@ -12,16 +12,25 @@ import {
 } from "@mistle/sandbox";
 import { and, eq, sql } from "drizzle-orm";
 
-import type {
-  GetSandboxInstanceInput,
-  GetSandboxInstanceResponse,
-} from "../get-sandbox-instance/schema.js";
+import type { GetSandboxInstanceInput } from "../get-sandbox-instance/schema.js";
 
 type GetSandboxInstanceByInspectionContext = {
   db: DataPlaneDatabase;
   sandboxAdapter: SandboxAdapter;
   sandboxProvider: SandboxProvider;
 };
+
+type GetSandboxInstanceByInspectionResponse = {
+  id: string;
+  providerSandboxId: string | null;
+  status:
+    | typeof SandboxInstanceStatuses.STARTING
+    | typeof SandboxInstanceStatuses.RUNNING
+    | typeof SandboxInstanceStatuses.STOPPED
+    | typeof SandboxInstanceStatuses.FAILED;
+  failureCode: string | null;
+  failureMessage: string | null;
+} | null;
 
 async function markRunningSandboxInstanceStopped(
   ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
@@ -62,10 +71,11 @@ async function inspectStartingSandboxInstance(
     failureCode: string | null;
     failureMessage: string | null;
   },
-): Promise<NonNullable<GetSandboxInstanceResponse>> {
+): Promise<NonNullable<GetSandboxInstanceByInspectionResponse>> {
   if (sandboxInstance.providerSandboxId === null) {
     return {
       id: sandboxInstance.id,
+      providerSandboxId: null,
       status: SandboxInstanceStatuses.STARTING,
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
@@ -88,6 +98,7 @@ async function inspectStartingSandboxInstance(
   if (inspection === null) {
     return {
       id: sandboxInstance.id,
+      providerSandboxId: sandboxInstance.providerSandboxId,
       status: SandboxInstanceStatuses.STARTING,
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
@@ -97,6 +108,7 @@ async function inspectStartingSandboxInstance(
   if (inspection.state === SandboxInspectStates.RUNNING) {
     return {
       id: sandboxInstance.id,
+      providerSandboxId: sandboxInstance.providerSandboxId,
       status: SandboxInstanceStatuses.RUNNING,
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
@@ -105,6 +117,7 @@ async function inspectStartingSandboxInstance(
 
   return {
     id: sandboxInstance.id,
+    providerSandboxId: sandboxInstance.providerSandboxId,
     status: SandboxInstanceStatuses.STARTING,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
@@ -119,7 +132,7 @@ async function inspectRunningSandboxInstance(
     failureCode: string | null;
     failureMessage: string | null;
   },
-): Promise<NonNullable<GetSandboxInstanceResponse>> {
+): Promise<NonNullable<GetSandboxInstanceByInspectionResponse>> {
   if (sandboxInstance.providerSandboxId === null) {
     throw new Error(
       `Expected running sandbox instance '${sandboxInstance.id}' to have a providerSandboxId.`,
@@ -145,6 +158,7 @@ async function inspectRunningSandboxInstance(
   if (inspection === null) {
     return {
       id: sandboxInstance.id,
+      providerSandboxId: sandboxInstance.providerSandboxId,
       status: SandboxInstanceStatuses.STOPPED,
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
@@ -154,6 +168,7 @@ async function inspectRunningSandboxInstance(
   if (inspection.state === SandboxInspectStates.RUNNING) {
     return {
       id: sandboxInstance.id,
+      providerSandboxId: sandboxInstance.providerSandboxId,
       status: SandboxInstanceStatuses.RUNNING,
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
@@ -166,6 +181,7 @@ async function inspectRunningSandboxInstance(
 
   return {
     id: sandboxInstance.id,
+    providerSandboxId: sandboxInstance.providerSandboxId,
     status: SandboxInstanceStatuses.STOPPED,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
@@ -175,7 +191,7 @@ async function inspectRunningSandboxInstance(
 export async function getSandboxInstanceByInspection(
   ctx: GetSandboxInstanceByInspectionContext,
   input: GetSandboxInstanceInput,
-): Promise<GetSandboxInstanceResponse> {
+): Promise<GetSandboxInstanceByInspectionResponse> {
   const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
     columns: {
       id: true,
@@ -202,6 +218,7 @@ export async function getSandboxInstanceByInspection(
     case SandboxInstanceStatuses.FAILED:
       return {
         id: sandboxInstance.id,
+        providerSandboxId: sandboxInstance.providerSandboxId,
         status: SandboxInstanceStatuses.FAILED,
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,
@@ -209,6 +226,7 @@ export async function getSandboxInstanceByInspection(
     case SandboxInstanceStatuses.STOPPED:
       return {
         id: sandboxInstance.id,
+        providerSandboxId: sandboxInstance.providerSandboxId,
         status: SandboxInstanceStatuses.STOPPED,
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,

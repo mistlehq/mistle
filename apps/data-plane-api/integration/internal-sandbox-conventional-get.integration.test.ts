@@ -11,6 +11,43 @@ import { INTERNAL_SANDBOX_ROUTE_BASE_PATH } from "../src/internal/index.js";
 import { it } from "./test-context.js";
 
 describe("internal sandbox conventional get integration", () => {
+  it("surfaces pending for starting sandboxes before provider provisioning metadata exists", async ({
+    fixture,
+  }) => {
+    await fixture.db.insert(sandboxInstances).values({
+      id: "sbi_conventional_get_pending",
+      organizationId: "org_dp_api_conventional_get",
+      sandboxProfileId: "sbp_conventional_get",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: null,
+      status: SandboxInstanceStatuses.STARTING,
+      startedByKind: "user",
+      startedById: "usr_conventional_get",
+      source: "dashboard",
+    });
+
+    const response = await fetch(
+      new URL(
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_conventional_get_pending?organizationId=org_dp_api_conventional_get`,
+        fixture.baseUrl,
+      ),
+      {
+        headers: {
+          [DATA_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      id: "sbi_conventional_get_pending",
+      status: "pending",
+      failureCode: null,
+      failureMessage: null,
+    });
+  }, 60_000);
+
   it("returns running from provider inspection for a running sandbox", async ({ fixture }) => {
     const adapter = createSandboxAdapter({
       provider: SandboxProvider.DOCKER,
