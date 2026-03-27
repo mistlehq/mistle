@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect } from "vitest";
 
-import { SandboxProvider, SandboxRuntimeEnv, SandboxRuntimeEnvDefaults } from "../../src/index.js";
+import {
+  SandboxProvider,
+  SandboxResourceNotFoundError,
+  SandboxRuntimeEnv,
+  SandboxRuntimeEnvDefaults,
+} from "../../src/index.js";
 import { createE2BTemplateAlias } from "../../src/providers/e2b/template-registry.js";
 import { e2bAdapterIntegrationEnabled, it } from "./test-context.js";
 
@@ -107,5 +112,26 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
         await fixture.adapter.destroy({ id });
       }
     }
+  }, 300_000);
+
+  it("surfaces sandbox not found after destroy", async ({ fixture }) => {
+    const sandbox = await fixture.adapter.start({
+      image: fixture.baseImage,
+    });
+
+    await fixture.adapter.destroy({ id: sandbox.id });
+
+    await expect(fixture.adapter.inspect({ id: sandbox.id })).rejects.toBeInstanceOf(
+      SandboxResourceNotFoundError,
+    );
+    await expect(fixture.adapter.resume({ id: sandbox.id })).rejects.toBeInstanceOf(
+      SandboxResourceNotFoundError,
+    );
+    await expect(fixture.adapter.stop({ id: sandbox.id })).rejects.toBeInstanceOf(
+      SandboxResourceNotFoundError,
+    );
+    await expect(fixture.adapter.destroy({ id: sandbox.id })).rejects.toBeInstanceOf(
+      SandboxResourceNotFoundError,
+    );
   }, 300_000);
 });
