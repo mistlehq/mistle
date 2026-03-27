@@ -33,7 +33,7 @@ type CodexExternalAgentConfigQuery = {
 export type CodexModelCatalogStatus = "idle" | "loading" | "loaded" | "error";
 export type CodexConfigStatus = "idle" | "loading" | "loaded" | "error";
 
-export function useCodexSessionAdmin(input: {
+export function useCodexSessionBootstrapData(input: {
   rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
   recordRecentResponse: (payload: unknown) => void;
   setStartErrorMessage: (message: string | null) => void;
@@ -50,7 +50,7 @@ export function useCodexSessionAdmin(input: {
     readonly CodexExternalAgentMigrationItem[]
   >([]);
 
-  const resetAdminState = useCallback((): void => {
+  const resetBootstrapData = useCallback((): void => {
     setAvailableModels([]);
     setModelCatalogStatus("idle");
     setExperimentalFeatures([]);
@@ -249,7 +249,6 @@ export function useCodexSessionAdmin(input: {
   });
 
   const { mutate: loadModelsMutate, isPending: isLoadingModels } = loadModelsMutation;
-  const { mutateAsync: loadModelsMutateAsync } = loadModelsMutation;
   const { mutate: loadExperimentalFeaturesMutate, isPending: isLoadingExperimentalFeatures } =
     loadExperimentalFeaturesMutation;
   const { mutate: readConfigMutate, isPending: isReadingConfig } = readConfigMutation;
@@ -280,13 +279,32 @@ export function useCodexSessionAdmin(input: {
     isBatchWritingConfig,
     isDetectingExternalAgentConfig,
     isImportingExternalAgentConfig,
-    resetAdminState,
+    resetBootstrapData,
     loadModels: useCallback(() => {
       loadModelsMutate();
     }, [loadModelsMutate]),
     loadModelsAsync: useCallback(async () => {
-      return await loadModelsMutateAsync();
-    }, [loadModelsMutateAsync]),
+      setModelCatalogStatus("loading");
+      const rpcClient = input.rpcClientRef.current;
+      if (rpcClient === null) {
+        throw new Error("Connect to a sandbox session before listing models.");
+      }
+
+      try {
+        const result = await listCodexModels({
+          rpcClient,
+          limit: 50,
+          includeHidden: true,
+        });
+        setAvailableModels(result.models);
+        setModelCatalogStatus("loaded");
+        input.recordRecentResponse(result.response);
+        return result;
+      } catch (error) {
+        setModelCatalogStatus("error");
+        throw error;
+      }
+    }, [input]),
     loadExperimentalFeatures: useCallback(() => {
       loadExperimentalFeaturesMutate();
     }, [loadExperimentalFeaturesMutate]),

@@ -1,23 +1,20 @@
-import type {
-  CodexModelSummary,
-  CodexTurnInputLocalImageItem,
-} from "@mistle/integrations-definitions/openai/agent/client";
+import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/openai/agent/client";
 import { uploadSandboxImage } from "@mistle/sandbox-session-client";
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { resolveTurnRepresentation } from "../session-agents/codex/session-state/codex-attachment-presentation.js";
-import type { SessionBootstrapState } from "../session-agents/codex/session-state/use-codex-session-state.js";
+import type { CodexSessionBootstrapState } from "../session-agents/codex/session-state/use-codex-session-bootstrap.js";
 import { mintSandboxInstanceConnectionToken } from "../sessions/sessions-service.js";
 import { type ComposerConfigSnapshot } from "./session-composer-config.js";
 import {
   buildModelSelectionRequiredMessage,
-  buildNonImageCapableModelWarningMessage,
   buildUnavailableModelErrorMessage,
   resolveActiveComposerModel,
   supportsImageInspection,
 } from "./session-composer-model-readiness.js";
 import { resolveUploadErrorMessage } from "./session-composer-upload-errors.js";
+import { resolveComposerStatusMessage } from "./session-conversation-composer-status.js";
 import type { SessionConversationComposerProps } from "./session-conversation-pane.tsx";
 import { resolveChatComposerAction } from "./session-workbench-view-model.js";
 
@@ -27,22 +24,11 @@ type PendingComposerAttachment = {
   name: string;
 };
 
-type ComposerStatusMessage = {
-  message: string;
-  tone: "error" | "warning";
-};
-
 type ComposerConnectedSession = {
   threadId: string | null;
 } | null;
 
-type ComposerBootstrapState = {
-  availableModels: readonly CodexModelSummary[];
-  initialComposerConfig: ComposerConfigSnapshot;
-  state: SessionBootstrapState;
-};
-
-type ComposerAdminState = {
+type ComposerBootstrapDataState = {
   isBatchWritingConfig: boolean;
   isWritingConfigValue: boolean;
   batchWriteConfig: (input: {
@@ -81,73 +67,16 @@ type ComposerChatState = {
   }) => Promise<void>;
 };
 
-export type { ComposerStatusMessage };
-
-function resolveComposerBootstrapMessage(input: {
-  activeComposerModel: CodexModelSummary | null;
-  bootstrapState: SessionBootstrapState;
-}): string | null {
-  if (input.bootstrapState.status === "failed") {
-    return input.bootstrapState.message;
-  }
-
-  if (input.bootstrapState.status !== "ready") {
-    return null;
-  }
-
-  if (input.activeComposerModel !== null) {
-    return null;
-  }
-
-  return buildModelSelectionRequiredMessage();
-}
-
-function resolveComposerStatusMessage(input: {
-  activeComposerModel: CodexModelSummary | null;
-  bootstrapState: SessionBootstrapState;
-  composerErrorMessage: string | null;
-  hasPendingAttachments: boolean;
-}): ComposerStatusMessage | null {
-  if (input.composerErrorMessage !== null) {
-    return {
-      message: input.composerErrorMessage,
-      tone: "error",
-    };
-  }
-
-  const bootstrapMessage = resolveComposerBootstrapMessage({
-    activeComposerModel: input.activeComposerModel,
-    bootstrapState: input.bootstrapState,
-  });
-  if (bootstrapMessage !== null) {
-    return {
-      message: bootstrapMessage,
-      tone: "error",
-    };
-  }
-
-  if (input.hasPendingAttachments && input.activeComposerModel !== null) {
-    if (!supportsImageInspection(input.activeComposerModel)) {
-      return {
-        message: buildNonImageCapableModelWarningMessage(input.activeComposerModel.displayName),
-        tone: "warning",
-      };
-    }
-  }
-
-  return null;
-}
-
 export function useSessionConversationComposerState(input: {
-  admin: ComposerAdminState;
-  bootstrap: ComposerBootstrapState;
+  bootstrap: CodexSessionBootstrapState;
+  bootstrapData: ComposerBootstrapDataState;
   chat: ComposerChatState;
   connectedSession: ComposerConnectedSession;
   hasActiveTurn: boolean;
   sandboxInstanceId: string | null;
 }): SessionConversationComposerProps {
   const { batchWriteConfig, isBatchWritingConfig, isWritingConfigValue, writeConfigValue } =
-    input.admin;
+    input.bootstrapData;
   const [composerText, setComposerText] = useState("");
   const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null);
   const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
@@ -175,8 +104,8 @@ export function useSessionConversationComposerState(input: {
       return;
     }
 
-    setComposerConfig(input.bootstrap.initialComposerConfig);
-  }, [input.bootstrap.initialComposerConfig, input.bootstrap.state.status]);
+    setComposerConfig(input.bootstrap.configSnapshot);
+  }, [input.bootstrap.configSnapshot, input.bootstrap.state.status]);
 
   const activeComposerModel = useMemo(
     () =>

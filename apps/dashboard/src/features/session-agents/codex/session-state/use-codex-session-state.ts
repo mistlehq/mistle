@@ -1,7 +1,5 @@
 import {
   archiveCodexThread,
-  CodexJsonRpcClient,
-  CodexSessionClient,
   compactCodexThread,
   forkCodexThread,
   rollbackCodexThread,
@@ -9,47 +7,25 @@ import {
   startCodexThread,
   unarchiveCodexThread,
   unsubscribeCodexThread,
-  type CodexSessionConnectionState,
   type CodexExperimentalFeatureSummary,
   type CodexExternalAgentMigrationItem,
+  type CodexJsonRpcClient,
+  type CodexJsonRpcNotification,
+  type CodexJsonRpcServerRequest,
   type CodexModelSummary,
+  type CodexSessionClient,
   type CodexThreadSummary,
   type CodexTurnInputLocalImageItem,
-  createBrowserCodexSessionRuntime,
 } from "@mistle/integrations-definitions/openai/agent/client";
 import { useMutation } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 
-import {
-  readComposerConfigSnapshot,
-  type ComposerConfigSnapshot,
-} from "../../../pages/session-composer-config.js";
-import {
-  buildModelSelectionRequiredMessage,
-  buildUnavailableModelErrorMessage,
-  resolveActiveComposerModel,
-} from "../../../pages/session-composer-model-readiness.js";
-import { mintSandboxInstanceConnectionToken } from "../../../sessions/sessions-service.js";
 import {
   createInitialCodexApprovalRequestsState,
   reduceCodexApprovalRequestsState,
   type CodexApprovalRequestEntry,
 } from "../approvals/codex-approval-requests-state.js";
-import {
-  createConnectedCodexSession,
-  establishInitialCodexThread,
-} from "./codex-session-connect.js";
-import {
-  describeCodexSessionStepError,
-  StaleConnectionAttemptError,
-} from "./codex-session-errors.js";
-import {
-  parseThreadLifecycleEvent,
-  parseThreadTokenUsageSnapshot,
-  parseTurnDiffSnapshot,
-  parseTurnPlanSnapshot,
-} from "./codex-session-events.js";
-import { resolveCodexConnectionStateTransition } from "./codex-session-lifecycle-policy.js";
+import { StaleConnectionAttemptError } from "./codex-session-errors.js";
 import {
   type CodexThreadLifecycleEvent,
   type CodexThreadTokenUsageSnapshot,
@@ -60,10 +36,18 @@ import {
 } from "./codex-session-types.js";
 import { useCodexChatController, type CodexChatState } from "./use-codex-chat-controller.js";
 import {
-  useCodexSessionAdmin,
+  useCodexSessionBootstrapData,
   type CodexConfigStatus,
   type CodexModelCatalogStatus,
-} from "./use-codex-session-admin.js";
+} from "./use-codex-session-bootstrap-data.js";
+import {
+  useCodexSessionBootstrap,
+  type CodexSessionBootstrapState,
+} from "./use-codex-session-bootstrap.js";
+import {
+  useCodexSessionConnection,
+  type CodexSessionConnectionLifecycleState,
+} from "./use-codex-session-connection.js";
 import { useCodexSessionDebugState } from "./use-codex-session-debug-state.js";
 import { useCodexThreadCollections } from "./use-codex-thread-collections.js";
 
@@ -74,19 +58,6 @@ export type {
   CodexTurnDiffSnapshot,
   CodexTurnPlanSnapshot,
   StartSessionStep,
-};
-
-type CodexSessionLifecycleState = {
-  step: StartSessionStep;
-  startErrorMessage: string | null;
-  connectedSession: ConnectedCodexSession | null;
-  agentConnectionState: CodexSessionConnectionState;
-  agentConnectionError: string | null;
-  isStartingSession: boolean;
-  connectSession: (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => void;
-  disconnectSession: () => void;
-  clearStartErrorMessage: () => void;
-  reportStartErrorMessage: (message: string) => void;
 };
 
 type CodexSessionThreadState = {
@@ -125,12 +96,7 @@ type CodexSessionChatState = {
   isSteeringTurn: boolean;
   canInterruptTurn: boolean;
   canSteerTurn: boolean;
-  hydrateChatFromThread: (input?: {
-    generation?: number;
-    ensureCurrentGeneration?: (generation: number) => void;
-    rpcClient?: CodexJsonRpcClient;
-    threadId?: string | null;
-  }) => Promise<"empty" | "hydrated">;
+  hydrateChatFromThread: () => Promise<void>;
   startTurn: (input: {
     submittedPrompt: string;
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
@@ -147,7 +113,7 @@ type CodexSessionChatState = {
   reloadChat: () => void;
 };
 
-type CodexSessionAdminState = {
+type CodexSessionBootstrapDataState = {
   availableModels: readonly CodexModelSummary[];
   modelCatalogStatus: CodexModelCatalogStatus;
   configStatus: CodexConfigStatus;
@@ -185,23 +151,6 @@ type CodexSessionAdminState = {
   importExternalAgentConfig: (items: readonly CodexExternalAgentMigrationItem[]) => void;
 };
 
-export type SessionBootstrapState =
-  | { status: "disconnected" }
-  | { status: "bootstrapping" }
-  | { status: "ready" }
-  | { status: "failed"; message: string };
-
-type CodexSessionBootstrapState = {
-  availableModels: readonly CodexModelSummary[];
-  state: SessionBootstrapState;
-  initialComposerConfig: ComposerConfigSnapshot;
-};
-
-const EmptyComposerConfig: ComposerConfigSnapshot = {
-  model: null,
-  modelReasoningEffort: null,
-};
-
 type CodexSessionDebugState = {
   threadLifecycleEvents: readonly CodexThreadLifecycleEvent[];
   turnDiffSnapshots: readonly CodexTurnDiffSnapshot[];
@@ -220,11 +169,11 @@ type CodexSessionServerRequestState = {
 };
 
 export type UseCodexSessionStateResult = {
-  lifecycle: CodexSessionLifecycleState;
+  lifecycle: CodexSessionConnectionLifecycleState;
   threads: CodexSessionThreadState;
   chat: CodexSessionChatState;
   bootstrap: CodexSessionBootstrapState;
-  admin: CodexSessionAdminState;
+  bootstrapData: CodexSessionBootstrapDataState;
   debug: CodexSessionDebugState;
   serverRequests: CodexSessionServerRequestState;
 };
@@ -235,13 +184,8 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
   const threadIdRef = useRef<string | null>(null);
   const connectionGenerationRef = useRef(0);
-
-  const [step, setStep] = useState<StartSessionStep>("idle");
   const [startErrorMessage, setStartErrorMessage] = useState<string | null>(null);
-  const [connectedSession, setConnectedSession] = useState<ConnectedCodexSession | null>(null);
-  const [agentConnectionState, setAgentConnectionState] =
-    useState<CodexSessionConnectionState>("idle");
-  const [agentConnectionError, setAgentConnectionError] = useState<string | null>(null);
+
   const [serverRequestsState, dispatchServerRequestsAction] = useReducer(
     reduceCodexApprovalRequestsState,
     undefined,
@@ -284,6 +228,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     chatState,
     resetChat,
     handleNotificationReceived,
+    hydrateInitialThread,
     hydrateChatFromThread,
     isStartingTurn,
     isReloadingChat,
@@ -302,7 +247,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     setStartErrorMessage,
   });
 
-  const adminState = useCodexSessionAdmin({
+  const bootstrapDataState = useCodexSessionBootstrapData({
     rpcClientRef,
     recordRecentResponse,
     setStartErrorMessage,
@@ -333,158 +278,65 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     batchWriteConfig,
     detectExternalAgentConfig,
     importExternalAgentConfig,
-    resetAdminState,
-  } = adminState;
-  const [sessionBootstrapState, setSessionBootstrapState] = useState<SessionBootstrapState>({
-    status: "disconnected",
-  });
-  const [initialComposerConfig, setInitialComposerConfig] =
-    useState<ComposerConfigSnapshot>(EmptyComposerConfig);
-  const bootstrapGenerationRef = useRef(0);
-
-  const resetSessionState = useCallback((): void => {
+    resetBootstrapData,
+  } = bootstrapDataState;
+  const resetSessionData = useCallback((): void => {
     threadIdRef.current = null;
-    setConnectedSession(null);
     resetThreadCollections();
-    resetAdminState();
-    setStep("idle");
-    setStartErrorMessage(null);
-    setAgentConnectionState("idle");
-    setAgentConnectionError(null);
-    setSessionBootstrapState({ status: "disconnected" });
-    setInitialComposerConfig(EmptyComposerConfig);
+    resetBootstrapData();
     resetDebugState();
     dispatchServerRequestsAction({ type: "reset" });
     resetChat();
-  }, [resetAdminState, resetDebugState, resetThreadCollections, resetChat]);
+  }, [resetBootstrapData, resetDebugState, resetThreadCollections, resetChat]);
 
-  const teardownConnection = useCallback((reason: string): void => {
-    for (const unsubscribe of sessionEventUnsubscribersRef.current) {
-      unsubscribe();
-    }
-    sessionEventUnsubscribersRef.current = [];
-    rpcClientRef.current?.dispose();
-    rpcClientRef.current = null;
-    sessionClientRef.current?.disconnect(1000, reason);
-    sessionClientRef.current = null;
+  const handleServerRequestNotification = useCallback((notification: CodexJsonRpcNotification) => {
+    dispatchServerRequestsAction({
+      type: "notification_received",
+      notification,
+    });
   }, []);
 
-  const disconnectSession = useCallback((): void => {
-    connectionGenerationRef.current += 1;
-    teardownConnection("Disconnected from sessions page.");
-    resetSessionState();
-  }, [resetSessionState, teardownConnection]);
-
-  useEffect(() => {
-    return () => {
-      disconnectSession();
-    };
-  }, [disconnectSession]);
-
-  function updateActiveThread(threadId: string | null): void {
-    threadIdRef.current = threadId;
-    setConnectedSession((current) => {
-      if (current === null) {
-        return current;
-      }
-
-      return {
-        ...current,
-        threadId,
-      };
+  const handleServerRequestReceived = useCallback((request: CodexJsonRpcServerRequest) => {
+    dispatchServerRequestsAction({
+      type: "server_request_received",
+      request,
     });
-  }
+  }, []);
 
-  useEffect(() => {
-    if (connectedSession === null || connectedSession.threadId === null) {
-      bootstrapGenerationRef.current += 1;
-      setSessionBootstrapState((currentState) =>
-        currentState.status === "disconnected" ? currentState : { status: "disconnected" },
-      );
-      setInitialComposerConfig((currentConfig) =>
-        currentConfig.model === null && currentConfig.modelReasoningEffort === null
-          ? currentConfig
-          : EmptyComposerConfig,
-      );
-      return;
-    }
+  const { lifecycle, updateActiveThread } = useCodexSessionConnection({
+    connectionGenerationRef,
+    ensureCurrentGeneration,
+    handleChatNotificationReceived: handleNotificationReceived,
+    onServerRequestNotification: handleServerRequestNotification,
+    onServerRequestReceived: handleServerRequestReceived,
+    recordRecentNotification,
+    recordRecentResponse,
+    recordRecentServerRequest,
+    recordRecentUnhandledMessage,
+    recordThreadLifecycleEvent,
+    recordThreadTokenUsageSnapshot,
+    recordTurnDiffSnapshot,
+    recordTurnPlanSnapshot,
+    refreshThreadCollections,
+    resetSessionData,
+    resetChat,
+    rpcClientRef,
+    sessionClientRef,
+    sessionEventUnsubscribersRef,
+    startErrorMessage,
+    setStartErrorMessage,
+    threadIdRef,
+  });
+  const { connectedSession } = lifecycle;
 
-    const currentBootstrapGeneration = bootstrapGenerationRef.current + 1;
-    bootstrapGenerationRef.current = currentBootstrapGeneration;
-    setSessionBootstrapState({ status: "bootstrapping" });
-
-    void (async () => {
-      const [modelsResult, configResult, threadResult] = await Promise.allSettled([
-        loadModelsAsync(),
-        readConfigAsync(false),
-        hydrateChatFromThread({
-          generation: currentBootstrapGeneration,
-          ensureCurrentGeneration,
-          threadId: connectedSession.threadId,
-        }),
-      ]);
-
-      if (bootstrapGenerationRef.current !== currentBootstrapGeneration) {
-        return;
-      }
-
-      if (modelsResult.status === "rejected") {
-        setSessionBootstrapState({
-          status: "failed",
-          message:
-            modelsResult.reason instanceof Error
-              ? modelsResult.reason.message
-              : "Could not load models.",
-        });
-        return;
-      }
-
-      if (threadResult.status === "rejected") {
-        setSessionBootstrapState({
-          status: "failed",
-          message:
-            threadResult.reason instanceof Error
-              ? threadResult.reason.message
-              : "Could not read thread.",
-        });
-        return;
-      }
-
-      const configSnapshot =
-        configResult.status === "fulfilled"
-          ? readComposerConfigSnapshot(JSON.stringify(configResult.value.config))
-          : {
-              model: null,
-              modelReasoningEffort: null,
-            };
-
-      const resolvedComposerModel = resolveActiveComposerModel({
-        availableModels: modelsResult.value.models,
-        selectedModel: configSnapshot.model,
-      });
-
-      if (resolvedComposerModel === null) {
-        setInitialComposerConfig(configSnapshot);
-        setSessionBootstrapState({
-          status: "failed",
-          message:
-            configSnapshot.model === null
-              ? buildModelSelectionRequiredMessage()
-              : buildUnavailableModelErrorMessage(configSnapshot.model),
-        });
-        return;
-      }
-
-      setInitialComposerConfig(configSnapshot);
-      setSessionBootstrapState({ status: "ready" });
-    })();
-  }, [
+  const bootstrap = useCodexSessionBootstrap({
     connectedSession,
     ensureCurrentGeneration,
-    hydrateChatFromThread,
+    hydrateInitialThread,
     loadModelsAsync,
     readConfigAsync,
-  ]);
+    rpcClientRef,
+  });
 
   const handleThreadMutationFailure = useCallback(
     (fallbackMessage: string, error: unknown): void => {
@@ -508,189 +360,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       );
     });
   }, [refreshLoadedThreadList]);
-
-  function attachProtocolListeners(input: {
-    sessionClient: CodexSessionClient;
-    rpcClient: CodexJsonRpcClient;
-    generation: number;
-  }): void {
-    sessionClientRef.current = input.sessionClient;
-    rpcClientRef.current = input.rpcClient;
-
-    sessionEventUnsubscribersRef.current = [
-      input.sessionClient.onEvent((event) => {
-        if (connectionGenerationRef.current !== input.generation) {
-          return;
-        }
-
-        if (event.type === "connection_state_changed") {
-          setAgentConnectionState(event.state);
-          setAgentConnectionError(event.errorMessage);
-          const connectionStateTransition = resolveCodexConnectionStateTransition({
-            state: event.state,
-            errorMessage: event.errorMessage ?? null,
-          });
-          if (connectionStateTransition.shouldResetSession) {
-            connectionGenerationRef.current += 1;
-            teardownConnection("Disconnected from Codex session.");
-            resetSessionState();
-            setStartErrorMessage(connectionStateTransition.startErrorMessage);
-          }
-          return;
-        }
-
-        if (event.type === "response") {
-          recordRecentResponse(event.response);
-          return;
-        }
-
-        if (event.type === "notification") {
-          const threadLifecycleEvent = parseThreadLifecycleEvent(event.notification);
-          if (threadLifecycleEvent !== null) {
-            recordThreadLifecycleEvent(threadLifecycleEvent);
-          }
-
-          const turnDiffSnapshot = parseTurnDiffSnapshot(event.notification);
-          if (turnDiffSnapshot !== null) {
-            recordTurnDiffSnapshot(turnDiffSnapshot);
-          }
-
-          const turnPlanSnapshot = parseTurnPlanSnapshot(event.notification);
-          if (turnPlanSnapshot !== null) {
-            recordTurnPlanSnapshot(turnPlanSnapshot);
-          }
-
-          const threadTokenUsageSnapshot = parseThreadTokenUsageSnapshot(event.notification);
-          if (threadTokenUsageSnapshot !== null) {
-            recordThreadTokenUsageSnapshot(threadTokenUsageSnapshot);
-          }
-
-          dispatchServerRequestsAction({
-            type: "notification_received",
-            notification: event.notification,
-          });
-          handleNotificationReceived(event.notification);
-          if (event.notification.method === "turn/completed") {
-            void refreshThreadCollections({ generation: input.generation }).catch(
-              (error: unknown) => {
-                setStartErrorMessage(
-                  error instanceof Error ? error.message : "Could not refresh thread collections.",
-                );
-              },
-            );
-          }
-          recordRecentNotification(event.notification);
-          return;
-        }
-
-        if (event.type === "server_request") {
-          dispatchServerRequestsAction({
-            type: "server_request_received",
-            request: event.request,
-          });
-          recordRecentServerRequest(event.request);
-          return;
-        }
-
-        recordRecentUnhandledMessage(event.payload);
-      }),
-    ];
-  }
-
-  const connectSessionMutation = useMutation({
-    mutationFn: async (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => {
-      const generation = connectionGenerationRef.current + 1;
-      connectionGenerationRef.current = generation;
-      teardownConnection("Superseded by a new Codex session.");
-      resetSessionState();
-      setStartErrorMessage(null);
-      setStep("securing");
-
-      let mintedConnection;
-      try {
-        mintedConnection = await mintSandboxInstanceConnectionToken({
-          instanceId: input.sandboxInstanceId,
-        });
-        ensureCurrentGeneration(generation);
-      } catch (error) {
-        throw describeCodexSessionStepError("Minting sandbox connection token", error);
-      }
-
-      const sessionClient = new CodexSessionClient({
-        connectionUrl: mintedConnection.connectionUrl,
-        runtime: createBrowserCodexSessionRuntime(),
-      });
-      const rpcClient = new CodexJsonRpcClient(sessionClient);
-      attachProtocolListeners({
-        sessionClient,
-        rpcClient,
-        generation,
-      });
-
-      setStep("connecting");
-      try {
-        await sessionClient.connect();
-        ensureCurrentGeneration(generation);
-      } catch (error) {
-        throw describeCodexSessionStepError("Connecting to sandbox agent channel", error);
-      }
-
-      try {
-        await rpcClient.initialize();
-        ensureCurrentGeneration(generation);
-      } catch (error) {
-        sessionClient.disconnect(1000, "Initialization failed.");
-        throw describeCodexSessionStepError("Initializing Codex app server", error);
-      }
-
-      const threadCollections = await refreshThreadCollections({
-        rpcClient,
-        generation,
-      });
-
-      return await establishInitialCodexThread({
-        rpcClient,
-        preferredThreadId: input.preferredThreadId,
-        availableThreads: threadCollections.availableThreads,
-        loadedThreadIds: threadCollections.loadedThreadIds,
-        generation,
-        sandboxInstanceId: input.sandboxInstanceId,
-        mintedConnection,
-        ensureCurrentGeneration,
-      });
-    },
-    onSuccess: (result) => {
-      if (connectionGenerationRef.current !== result.generation) {
-        return;
-      }
-
-      updateActiveThread(result.threadId);
-      resetChat();
-      setConnectedSession(
-        createConnectedCodexSession({
-          sandboxInstanceId: result.sandboxInstanceId,
-          connectedAtIso: new Date().toISOString(),
-          mintedConnection: result.mintedConnection,
-          threadId: result.threadId,
-        }),
-      );
-      setAgentConnectionState("ready");
-      setAgentConnectionError(null);
-      setStep("connected");
-      setStartErrorMessage(null);
-    },
-    onError: (error) => {
-      if (error instanceof StaleConnectionAttemptError) {
-        return;
-      }
-
-      disconnectSession();
-      setStep("idle");
-      setStartErrorMessage(
-        error instanceof Error ? error.message : "Could not establish sandbox session.",
-      );
-    },
-  });
 
   const refreshThreadListMutation = useMutation({
     mutationFn: async () => {
@@ -944,7 +613,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     },
   });
 
-  const { mutate: connectSessionMutate, isPending: isStartingSession } = connectSessionMutation;
   const { mutate: refreshThreadListMutate, isPending: isRefreshingThreads } =
     refreshThreadListMutation;
   const { mutate: refreshLoadedThreadListMutate, isPending: isRefreshingLoadedThreads } =
@@ -962,21 +630,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   const { mutate: rollbackThreadMutate, isPending: isRollingBackThread } = rollbackThreadMutation;
   const { mutate: respondToServerRequestMutate, isPending: isRespondingToServerRequest } =
     respondToServerRequestMutation;
-
-  const connectSession = useCallback(
-    (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => {
-      connectSessionMutate(input);
-    },
-    [connectSessionMutate],
-  );
-
-  const clearStartErrorMessage = useCallback(() => {
-    setStartErrorMessage(null);
-  }, []);
-
-  const reportStartErrorMessage = useCallback((message: string) => {
-    setStartErrorMessage(message);
-  }, []);
 
   const refreshAvailableThreads = useCallback(() => {
     refreshThreadListMutate();
@@ -1055,32 +708,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     },
     [respondToServerRequestMutate],
   );
-
-  const lifecycle = useMemo<CodexSessionLifecycleState>(() => {
-    return {
-      step,
-      startErrorMessage,
-      connectedSession,
-      agentConnectionState,
-      agentConnectionError,
-      isStartingSession,
-      connectSession,
-      disconnectSession,
-      clearStartErrorMessage,
-      reportStartErrorMessage,
-    };
-  }, [
-    agentConnectionError,
-    agentConnectionState,
-    clearStartErrorMessage,
-    connectSession,
-    isStartingSession,
-    connectedSession,
-    disconnectSession,
-    reportStartErrorMessage,
-    startErrorMessage,
-    step,
-  ]);
 
   const threads = useMemo<CodexSessionThreadState>(() => {
     return {
@@ -1168,7 +795,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     chatState,
   ]);
 
-  const admin = useMemo<CodexSessionAdminState>(() => {
+  const bootstrapData = useMemo<CodexSessionBootstrapDataState>(() => {
     return {
       availableModels,
       modelCatalogStatus,
@@ -1258,12 +885,8 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     lifecycle,
     threads,
     chat,
-    bootstrap: {
-      availableModels,
-      state: sessionBootstrapState,
-      initialComposerConfig,
-    },
-    admin,
+    bootstrap,
+    bootstrapData,
     debug,
     serverRequests,
   };

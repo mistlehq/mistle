@@ -83,7 +83,7 @@ export function useCodexChatController(input: {
     [],
   );
 
-  const hydrateChatFromThread = useCallback(
+  const hydrateThreadStateFromRead = useCallback(
     async (hydrateInput?: {
       rpcClient?: CodexJsonRpcClient;
       threadId?: string | null;
@@ -127,6 +127,22 @@ export function useCodexChatController(input: {
     },
     [input],
   );
+
+  const hydrateInitialThread = useCallback(
+    async (hydrateInput?: {
+      rpcClient?: CodexJsonRpcClient;
+      threadId?: string | null;
+      generation?: number;
+      ensureCurrentGeneration?: (generation: number) => void;
+    }): Promise<"empty" | "hydrated"> => {
+      return await hydrateThreadStateFromRead(hydrateInput);
+    },
+    [hydrateThreadStateFromRead],
+  );
+
+  const hydrateChatFromThread = useCallback(async (): Promise<void> => {
+    await hydrateThreadStateFromRead();
+  }, [hydrateThreadStateFromRead]);
 
   const startTurnMutation = useMutation({
     mutationFn: async (turnInput: {
@@ -253,6 +269,7 @@ export function useCodexChatController(input: {
     chatState,
     resetChat,
     handleNotificationReceived,
+    hydrateInitialThread,
     hydrateChatFromThread,
     isStartingTurn: startTurnMutation.isPending,
     isReloadingChat: reloadChatMutation.isPending,
