@@ -660,8 +660,8 @@ describe("automation webhooks CRUD integration", () => {
     });
     expect(item.events).toEqual([
       {
-        label: "Issue comment created",
-        logoKey: "github",
+        label: "issue_comment.created",
+        unavailable: true,
       },
     ]);
   });
