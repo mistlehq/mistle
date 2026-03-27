@@ -31,6 +31,7 @@ type CodexExternalAgentConfigQuery = {
 };
 
 export type CodexModelCatalogStatus = "idle" | "loading" | "loaded" | "error";
+export type CodexConfigStatus = "idle" | "loading" | "loaded" | "error";
 
 export function useCodexSessionAdmin(input: {
   rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
@@ -43,6 +44,7 @@ export function useCodexSessionAdmin(input: {
     readonly CodexExperimentalFeatureSummary[]
   >([]);
   const [configJson, setConfigJson] = useState<string | null>(null);
+  const [configStatus, setConfigStatus] = useState<CodexConfigStatus>("idle");
   const [configRequirementsJson, setConfigRequirementsJson] = useState<string | null>(null);
   const [detectedExternalAgentMigrationItems, setDetectedExternalAgentMigrationItems] = useState<
     readonly CodexExternalAgentMigrationItem[]
@@ -53,6 +55,7 @@ export function useCodexSessionAdmin(input: {
     setModelCatalogStatus("idle");
     setExperimentalFeatures([]);
     setConfigJson(null);
+    setConfigStatus("idle");
     setConfigRequirementsJson(null);
     setDetectedExternalAgentMigrationItems([]);
   }, []);
@@ -107,6 +110,7 @@ export function useCodexSessionAdmin(input: {
 
   const readConfigMutation = useMutation({
     mutationFn: async (includeLayers: boolean) => {
+      setConfigStatus("loading");
       const rpcClient = input.rpcClientRef.current;
       if (rpcClient === null) {
         throw new Error("Connect to a sandbox session before reading config.");
@@ -119,9 +123,11 @@ export function useCodexSessionAdmin(input: {
     },
     onSuccess: (result) => {
       setConfigJson(JSON.stringify(result.config, null, 2));
+      setConfigStatus("loaded");
       input.recordRecentResponse(result.response);
     },
     onError: (error) => {
+      setConfigStatus("error");
       input.setStartErrorMessage(error instanceof Error ? error.message : "Could not read config.");
     },
   });
@@ -262,6 +268,7 @@ export function useCodexSessionAdmin(input: {
     modelCatalogStatus,
     experimentalFeatures,
     configJson,
+    configStatus,
     configRequirementsJson,
     detectedExternalAgentMigrationItems,
     isLoadingModels,

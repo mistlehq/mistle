@@ -1,6 +1,9 @@
 import type { CodexModelSummary } from "@mistle/integrations-definitions/openai/agent/client";
 
-import type { CodexModelCatalogStatus } from "../session-agents/codex/session-state/use-codex-session-admin.js";
+import type {
+  CodexConfigStatus,
+  CodexModelCatalogStatus,
+} from "../session-agents/codex/session-state/use-codex-session-admin.js";
 
 const NonImageCapableModelWarningMessageSuffix =
   " cannot inspect images. Images will only be sent as file path references.";
@@ -77,6 +80,7 @@ export function getComposerSelectionKey(selectedModel: string | null): string {
 
 export function resolveComposerSubmitReadiness(input: {
   activeModel: CodexModelSummary | null;
+  configStatus: CodexConfigStatus;
   modelCatalogStatus: CodexModelCatalogStatus;
   resolvedModel: CodexModelSummary | null;
   selectedModel: string | null;
@@ -85,6 +89,14 @@ export function resolveComposerSubmitReadiness(input: {
     return {
       status: "ready",
       activeModel: input.resolvedModel,
+    };
+  }
+
+  if (input.configStatus === "idle" || input.configStatus === "loading") {
+    return {
+      status: "loading-model",
+      selectedModel: input.selectedModel ?? "__default__",
+      message: buildModelSelectionLoadingMessage(),
     };
   }
 

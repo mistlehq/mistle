@@ -7,7 +7,10 @@ import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-clie
 import { useCallback, useEffect, useState } from "react";
 
 import { resolveTurnRepresentation } from "../session-agents/codex/session-state/codex-attachment-presentation.js";
-import type { CodexModelCatalogStatus } from "../session-agents/codex/session-state/use-codex-session-admin.js";
+import type {
+  CodexConfigStatus,
+  CodexModelCatalogStatus,
+} from "../session-agents/codex/session-state/use-codex-session-admin.js";
 import { mintSandboxInstanceConnectionToken } from "../sessions/sessions-service.js";
 import {
   readComposerConfigSnapshot,
@@ -45,6 +48,7 @@ type ComposerAdminState = {
   availableModels: readonly CodexModelSummary[];
   modelCatalogStatus: CodexModelCatalogStatus;
   configJson: string | null;
+  configStatus: CodexConfigStatus;
   isBatchWritingConfig: boolean;
   isWritingConfigValue: boolean;
   batchWriteConfig: (input: {
@@ -98,6 +102,7 @@ export function useSessionConversationComposerState(input: {
     availableModels,
     batchWriteConfig,
     configJson,
+    configStatus,
     isBatchWritingConfig,
     isWritingConfigValue,
     loadModels,
@@ -189,6 +194,7 @@ export function useSessionConversationComposerState(input: {
 
   const composerSubmitReadiness = resolveComposerSubmitReadiness({
     activeModel: activeComposerModel,
+    configStatus,
     modelCatalogStatus,
     resolvedModel: resolvedComposerModelContext?.model ?? null,
     selectedModel: activeComposerConfig.model,

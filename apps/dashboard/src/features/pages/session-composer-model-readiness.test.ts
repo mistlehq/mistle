@@ -112,6 +112,7 @@ describe("session-composer-model-readiness", () => {
           supportsPersonality: false,
           isDefault: true,
         },
+        configStatus: "loaded",
         resolvedModel: null,
         modelCatalogStatus: "loaded",
       }),
@@ -123,6 +124,7 @@ describe("session-composer-model-readiness", () => {
       resolveComposerSubmitReadiness({
         selectedModel: null,
         activeModel: null,
+        configStatus: "idle",
         resolvedModel: null,
         modelCatalogStatus: "idle",
       }),
@@ -134,8 +136,32 @@ describe("session-composer-model-readiness", () => {
 
     expect(
       resolveComposerSubmitReadiness({
+        selectedModel: null,
+        activeModel: {
+          id: "model_default",
+          model: "gpt-5.4",
+          displayName: "GPT-5.4",
+          hidden: false,
+          defaultReasoningEffort: null,
+          inputModalities: ["text", "image"],
+          supportsPersonality: false,
+          isDefault: true,
+        },
+        configStatus: "loading",
+        resolvedModel: null,
+        modelCatalogStatus: "loaded",
+      }),
+    ).toEqual({
+      status: "loading-model",
+      selectedModel: "__default__",
+      message: "Wait for the selected model to finish loading before sending a message.",
+    });
+
+    expect(
+      resolveComposerSubmitReadiness({
         selectedModel: "gpt-legacy-preview",
         activeModel: null,
+        configStatus: "loaded",
         resolvedModel: null,
         modelCatalogStatus: "loaded",
       }),
