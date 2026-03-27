@@ -6,7 +6,7 @@ import {
 
 export const templateName = "Organization Invitation";
 const subject = "Join Acme on Mistle";
-const preview = "Jane Doe invited you to join as admin.";
+const preview = "Jane Doe invited you to join Acme as admin.";
 
 export const previewProps: OrganizationInvitationTemplateProps = {
   organizationName: "Acme",

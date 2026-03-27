@@ -13,7 +13,7 @@ describe("emails organization invitation", () => {
 
     expect(template.subject).toBe("Join Acme <Platform> on Mistle");
     expect(template.metadata).toEqual({
-      preview: "Jane & John invited you to join as admin<script>.",
+      preview: "Jane & John invited you to join Acme <Platform> as admin<script>.",
       subject: "Join Acme <Platform> on Mistle",
       templateName: "Organization Invitation",
     });
@@ -27,7 +27,9 @@ describe("emails organization invitation", () => {
     expect(template.text).toContain(
       "Accept invitation https://example.com/accept?x=<tag>&y='quoted'",
     );
-    expect(template.html).toContain("Jane &#x26; John invited you to join as admin&#x3C;script>.");
+    expect(template.html).toContain(
+      "Jane &#x26; John invited you to join Acme &#x3C;Platform> as admin&#x3C;script>.",
+    );
   });
 
   it("matches snapshot for a stable organization invitation template output", async () => {

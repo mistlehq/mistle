@@ -42,7 +42,7 @@ function buildMetadata(options: BuildOrganizationInvitationTemplateOptions): Ema
   return {
     templateName: "Organization Invitation",
     subject,
-    preview: `${options.inviterDisplayName} invited you to join as ${options.role}.`,
+    preview: `${options.inviterDisplayName} invited you to join ${options.organizationName} as ${options.role}.`,
   };
 }
 
