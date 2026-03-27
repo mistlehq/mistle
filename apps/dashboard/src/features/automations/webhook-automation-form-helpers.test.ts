@@ -211,6 +211,30 @@ describe("toWebhookAutomationFormValues", () => {
       },
     });
   });
+
+  it("hydrates explicit invocation trigger parameters out of contains filters", () => {
+    expect(
+      toWebhookAutomationFormValues(
+        {
+          ...SampleAutomation,
+          eventTypes: ["github.issue_comment.created"],
+          payloadFilter: {
+            op: "contains",
+            path: ["comment", "body"],
+            value: "@mistlebot",
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      triggerIds: [IssueCommentCreatedTriggerId],
+      triggerParameterValues: {
+        [IssueCommentCreatedTriggerId]: {
+          explicitInvocation: "@mistlebot",
+        },
+      },
+    });
+  });
 });
 
 describe("validateWebhookAutomationFormValues", () => {
@@ -427,6 +451,39 @@ describe("automation payload transforms", () => {
       payloadFilter: {
         op: "exists",
         path: ["issue", "pull_request"],
+      },
+      target: {
+        sandboxProfileId: "sbp_repo",
+      },
+    });
+  });
+
+  it("builds explicit invocation trigger parameters into contains payload filters", () => {
+    expect(
+      toCreateWebhookAutomationPayload(
+        {
+          ...BaseFormValues,
+          triggerIds: [IssueCommentCreatedTriggerId],
+          triggerParameterValues: {
+            [IssueCommentCreatedTriggerId]: {
+              explicitInvocation: "@mistlebot",
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toEqual({
+      name: "Pull request routing",
+      enabled: true,
+      integrationConnectionId: GitHubConnectionId,
+      inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
+      conversationKeyTemplate: "{{event.id}}",
+      idempotencyKeyTemplate: null,
+      eventTypes: ["github.issue_comment.created"],
+      payloadFilter: {
+        op: "contains",
+        path: ["comment", "body"],
+        value: "@mistlebot",
       },
       target: {
         sandboxProfileId: "sbp_repo",

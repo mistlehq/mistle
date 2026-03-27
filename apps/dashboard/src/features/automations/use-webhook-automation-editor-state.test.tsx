@@ -20,6 +20,16 @@ function createDirectoryData(input?: {
     eventType: string;
     providerEventType: string;
     displayName: string;
+    parameters?: Array<{
+      id: string;
+      label: string;
+      kind: "string";
+      payloadPath: string[];
+      matchMode?: "eq" | "contains";
+      defaultValue?: string;
+      defaultEnabled?: boolean;
+      uiHint?: "explicit-invocation";
+    }>;
   }[];
 }) {
   return {
@@ -218,6 +228,89 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     expect(result.current.values.triggerParameterValues).toEqual({
       [triggerId]: {
         team: "eng",
+      },
+    });
+  });
+
+  it("applies explicit invocation defaults when a trigger is selected", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+    const triggerId = createWebhookAutomationTriggerId({
+      connectionId: "conn_linear",
+      eventType: "linear.issue_comment.created",
+    });
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_123"), {
+      versions: [{ sandboxProfileId: "sbp_123", version: 1 }],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionIntegrationBindingsQueryKey({
+        profileId: "sbp_123",
+        version: 1,
+      }),
+      {
+        bindings: [createBinding()],
+      },
+    );
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "create",
+          automationId: undefined,
+          navigate: async () => {},
+          initialValues: {
+            name: "Linear automation",
+            sandboxProfileId: "sbp_123",
+            enabled: true,
+            inputTemplate: DefaultWebhookAutomationInputTemplate,
+            conversationKeyTemplate: "",
+            triggerIds: [],
+            triggerParameterValues: {},
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          directoryData: createDirectoryData({
+            supportedWebhookEvents: [
+              {
+                eventType: "linear.issue_comment.created",
+                providerEventType: "IssueComment",
+                displayName: "Issue comment created",
+                parameters: [
+                  {
+                    id: "explicitInvocation",
+                    label: "explicit mention",
+                    kind: "string",
+                    payloadPath: ["comment", "body"],
+                    matchMode: "contains",
+                    defaultValue: "@mistlebot",
+                    defaultEnabled: true,
+                    uiHint: "explicit-invocation",
+                  },
+                ],
+              },
+            ],
+          }),
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => {
+      result.current.onValueChange("triggerIds", [triggerId]);
+    });
+
+    expect(result.current.values.triggerParameterValues).toEqual({
+      [triggerId]: {
+        explicitInvocation: "@mistlebot",
       },
     });
   });

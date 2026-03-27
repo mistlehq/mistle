@@ -13,9 +13,13 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Switch,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   useComboboxAnchor,
 } from "@mistle/ui";
-import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
@@ -192,7 +196,7 @@ export function WebhookAutomationTriggerPicker(input: {
               }
               key={option.id}
             >
-              <div className="min-w-0 self-start md:col-start-1 md:row-start-1">
+              <div className="min-w-0 self-start md:col-start-1 md:row-start-1 md:self-center">
                 <div className="flex min-w-0 items-center gap-2.5">
                   {option.logoKey === undefined ? null : (
                     <img
@@ -402,6 +406,47 @@ function TriggerParameterField(input: {
   });
 
   if (input.parameter.kind === "string") {
+    if (input.parameter.uiHint === "explicit-invocation") {
+      const switchId = `${input.eventType}:${input.parameter.id}`;
+      const explicitInvocationValue = input.parameter.defaultValue ?? "@mistlebot";
+      const checked = input.value.trim().length > 0;
+      const tooltipMessage = `Enable this to respond only when ${explicitInvocationValue} is mentioned. Disable it to respond to every event.`;
+
+      return (
+        <div className="inline-flex items-center gap-3 rounded-md border px-3 py-2">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="block text-sm">
+              Only respond to <span className="font-medium">{explicitInvocationValue}</span>
+            </span>
+            <Tooltip>
+              <TooltipTrigger
+                aria-label="Explain explicit mention requirement"
+                render={
+                  <button
+                    className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded-sm"
+                    type="button"
+                  />
+                }
+              >
+                <InfoIcon aria-hidden className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-64 text-left" side="top">
+                {tooltipMessage}
+              </TooltipContent>
+            </Tooltip>
+          </span>
+          <Switch
+            aria-label={`Only respond to ${explicitInvocationValue}`}
+            checked={checked}
+            id={switchId}
+            onCheckedChange={(nextChecked) => {
+              input.onValueChange(nextChecked ? explicitInvocationValue : "");
+            }}
+          />
+        </div>
+      );
+    }
+
     return (
       <span className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
         <span className="text-muted-foreground shrink-0 text-sm whitespace-nowrap">

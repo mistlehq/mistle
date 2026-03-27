@@ -32,6 +32,7 @@ import {
   createWebhookAutomationTriggerId,
   resolveEligibleProfileAutomationConnectionIds,
 } from "./webhook-automation-option-builders.js";
+import { applyWebhookAutomationTriggerParameterDefaults } from "./webhook-automation-trigger-parameters.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
 import { AUTOMATIONS_QUERY_KEY_PREFIX } from "./webhook-automations-query-keys.js";
 import {
@@ -238,6 +239,11 @@ function applyWebhookAutomationValueChange(input: {
   };
 
   if (input.key === "triggerIds") {
+    nextValues.triggerParameterValues = applyWebhookAutomationTriggerParameterDefaults({
+      eventOptions: input.eventOptions,
+      selectedTriggerIds: nextValues.triggerIds,
+      triggerParameterValues: nextValues.triggerParameterValues,
+    });
     nextValues.conversationKeyTemplate = resolveNormalizedConversationKeyTemplate({
       values: nextValues,
       eventOptions: input.eventOptions,

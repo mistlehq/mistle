@@ -330,6 +330,38 @@ describe("WebhookAutomationTriggerPicker", () => {
     expect(screen.getAllByText("pull request").length).toBeGreaterThan(0);
   });
 
+  it("renders explicit invocation parameters as an enabled switch", () => {
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedTriggerIds: [
+        createWebhookAutomationTriggerId({
+          connectionId: GitHubConnectionId,
+          eventType: "github.issue_comment.created",
+        }),
+      ],
+      triggerParameterValues: {
+        [createWebhookAutomationTriggerId({
+          connectionId: GitHubConnectionId,
+          eventType: "github.issue_comment.created",
+        })]: {
+          explicitInvocation: "@mistlebot",
+        },
+      },
+    });
+
+    const toggle = screen
+      .getAllByRole("switch", {
+        name: /Only respond to @mistlebot/,
+      })
+      .find((element) => element.getAttribute("aria-checked") === "true");
+    if (toggle === undefined) {
+      throw new Error("Expected explicit invocation switch to be enabled.");
+    }
+
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+  });
+
   it("renders unset enum-backed trigger parameters as placeholders", () => {
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,

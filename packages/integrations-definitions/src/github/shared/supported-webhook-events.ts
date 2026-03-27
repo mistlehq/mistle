@@ -80,6 +80,18 @@ const GitHubIssueCommentTargetParameter: IntegrationWebhookEventParameterDefinit
   placeholder: "Any comment target",
 };
 
+const GitHubExplicitInvocationParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "explicitInvocation",
+  label: "explicit mention",
+  kind: "string",
+  payloadPath: ["comment", "body"],
+  matchMode: "contains",
+  defaultValue: "@mistlebot",
+  defaultEnabled: true,
+  uiHint: "explicit-invocation",
+  placeholder: 'Require "@mistlebot"',
+};
+
 const GitHubBaseBranchParameter: IntegrationWebhookEventParameterDefinition = {
   id: "baseBranch",
   label: "base branch",
@@ -178,6 +190,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubRepositoryConversationKeyOption,
     ],
     parameters: [
+      GitHubExplicitInvocationParameter,
       GitHubIssueCommentTargetParameter,
       GitHubRepositoryParameter,
       GitHubCommenterParameter,

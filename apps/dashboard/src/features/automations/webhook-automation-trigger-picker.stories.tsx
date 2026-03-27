@@ -40,6 +40,17 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
     logoKey: "github",
     parameters: [
       {
+        id: "explicitInvocation",
+        label: "explicit mention",
+        kind: "string",
+        payloadPath: ["comment", "body"],
+        matchMode: "contains",
+        defaultValue: "@mistlebot",
+        defaultEnabled: true,
+        uiHint: "explicit-invocation",
+        placeholder: 'Require "@mistlebot"',
+      },
+      {
         id: "target",
         label: "comment target",
         kind: "enum-select",
@@ -319,6 +330,7 @@ export const Default: Story = {
         repository: "mistlehq/platform",
       },
       [IssueCommentCreatedTriggerId]: {
+        explicitInvocation: "@mistlebot",
         target: "exists",
         commenter: "hubot",
       },

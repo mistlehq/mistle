@@ -972,6 +972,10 @@ export type IntegrationWebhookEventParameterDefinition =
       label: string;
       kind: "string";
       payloadPath: ReadonlyArray<string>;
+      matchMode?: "eq" | "contains" | undefined;
+      defaultValue?: string | undefined;
+      defaultEnabled?: boolean | undefined;
+      uiHint?: "explicit-invocation" | undefined;
       prefix?: string | undefined;
       placeholder?: string | undefined;
     }
