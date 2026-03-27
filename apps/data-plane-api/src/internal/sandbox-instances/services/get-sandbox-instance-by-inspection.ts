@@ -54,6 +54,45 @@ async function markRunningSandboxInstanceStopped(
   throw new Error("Failed to transition sandbox instance status from running to stopped.");
 }
 
+const InspectionFailureCodes = {
+  PROVIDER_RUNTIME_MISSING: "provider_runtime_missing",
+} as const;
+
+async function markRunningSandboxInstanceFailed(
+  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
+  input: {
+    sandboxInstanceId: string;
+    failureCode: string;
+    failureMessage: string;
+  },
+): Promise<void> {
+  const updatedRows = await ctx.db
+    .update(sandboxInstances)
+    .set({
+      status: SandboxInstanceStatuses.FAILED,
+      stopReason: SandboxStopReasons.FAILED,
+      failedAt: sql`now()`,
+      failureCode: input.failureCode,
+      failureMessage: input.failureMessage,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(sandboxInstances.id, input.sandboxInstanceId),
+        eq(sandboxInstances.status, SandboxInstanceStatuses.RUNNING),
+      ),
+    )
+    .returning({
+      status: sandboxInstances.status,
+    });
+
+  if (updatedRows[0]?.status === SandboxInstanceStatuses.FAILED) {
+    return;
+  }
+
+  throw new Error("Failed to transition sandbox instance status from running to failed.");
+}
+
 async function inspectStartingSandboxInstance(
   ctx: GetSandboxInstanceByInspectionContext,
   sandboxInstance: {
@@ -117,14 +156,16 @@ async function inspectRunningSandboxInstance(
 
   const inspection = await inspectSandboxInstanceOrNull(ctx, sandboxInstance.providerSandboxId);
   if (inspection === null) {
-    await markRunningSandboxInstanceStopped(ctx, {
+    await markRunningSandboxInstanceFailed(ctx, {
       sandboxInstanceId: sandboxInstance.id,
+      failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
+      failureMessage: "Sandbox runtime was not found at the provider during inspection.",
     });
     return {
       id: sandboxInstance.id,
-      status: SandboxInstanceStatuses.STOPPED,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
+      status: SandboxInstanceStatuses.FAILED,
+      failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
+      failureMessage: "Sandbox runtime was not found at the provider during inspection.",
     };
   }
 

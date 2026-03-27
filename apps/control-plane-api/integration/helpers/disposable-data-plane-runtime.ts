@@ -185,6 +185,9 @@ export async function createDisposableDataPlaneRuntime(input: {
     dbPool = new Pool({
       connectionString: databaseUrl,
     });
+    // The fixture forcibly drops the disposable database during teardown, which can
+    // terminate any last idle client while pools are unwinding.
+    dbPool.on("error", () => undefined);
 
     const configuredBaseUrl = new URL(input.baseUrl);
     const host = configuredBaseUrl.hostname;

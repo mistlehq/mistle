@@ -127,7 +127,7 @@ describe("internal sandbox conventional get integration", () => {
     }
   }, 60_000);
 
-  it("marks running sandboxes stopped when provider inspection reports the runtime missing", async ({
+  it("marks running sandboxes failed when provider inspection reports the runtime missing", async ({
     fixture,
   }) => {
     const adapter = createSandboxAdapter({
@@ -174,21 +174,25 @@ describe("internal sandbox conventional get integration", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       id: "sbi_conventional_get_missing",
-      status: "stopped",
-      failureCode: null,
-      failureMessage: null,
+      status: "failed",
+      failureCode: "provider_runtime_missing",
+      failureMessage: "Sandbox runtime was not found at the provider during inspection.",
     });
 
     const persistedRow = await fixture.db.query.sandboxInstances.findFirst({
       columns: {
         status: true,
         stopReason: true,
+        failureCode: true,
+        failureMessage: true,
       },
       where: (table, { eq }) => eq(table.id, "sbi_conventional_get_missing"),
     });
     expect(persistedRow).toEqual({
-      status: SandboxInstanceStatuses.STOPPED,
-      stopReason: SandboxStopReasons.SYSTEM,
+      status: SandboxInstanceStatuses.FAILED,
+      stopReason: SandboxStopReasons.FAILED,
+      failureCode: "provider_runtime_missing",
+      failureMessage: "Sandbox runtime was not found at the provider during inspection.",
     });
   }, 60_000);
 });
