@@ -205,6 +205,36 @@ describe("webhook filter evaluator", () => {
         },
       }),
     ).toBe(false);
+
+    expect(
+      evaluateWebhookPayloadFilter({
+        filter: {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+        payload: {
+          comment: {
+            body: "@mistlebot𐐀 please review",
+          },
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      evaluateWebhookPayloadFilter({
+        filter: {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+        payload: {
+          comment: {
+            body: "@mistlebot𝟘 please review",
+          },
+        },
+      }),
+    ).toBe(false);
   });
 
   it("supports or and not composition", () => {

@@ -232,6 +232,7 @@ function applyWebhookAutomationValueChange(input: {
   key: keyof WebhookAutomationFormValues;
   value: string | boolean | string[] | WebhookAutomationFormValues["triggerParameterValues"];
   eventOptions: readonly WebhookAutomationEventOption[];
+  applyTriggerParameterDefaults: boolean;
 }): WebhookAutomationFormValues {
   const nextValues: WebhookAutomationFormValues = {
     ...input.values,
@@ -239,11 +240,18 @@ function applyWebhookAutomationValueChange(input: {
   };
 
   if (input.key === "triggerIds") {
-    nextValues.triggerParameterValues = applyWebhookAutomationTriggerParameterDefaults({
-      eventOptions: input.eventOptions,
-      selectedTriggerIds: nextValues.triggerIds,
-      triggerParameterValues: nextValues.triggerParameterValues,
-    });
+    nextValues.triggerParameterValues = input.applyTriggerParameterDefaults
+      ? applyWebhookAutomationTriggerParameterDefaults({
+          eventOptions: input.eventOptions,
+          selectedTriggerIds: nextValues.triggerIds,
+          triggerParameterValues: nextValues.triggerParameterValues,
+        })
+      : Object.fromEntries(
+          nextValues.triggerIds.map((triggerId) => [
+            triggerId,
+            nextValues.triggerParameterValues[triggerId] ?? {},
+          ]),
+        );
     nextValues.conversationKeyTemplate = resolveNormalizedConversationKeyTemplate({
       values: nextValues,
       eventOptions: input.eventOptions,
@@ -477,6 +485,7 @@ export function useLoadedWebhookAutomationEditorState(
       key,
       value,
       eventOptions: webhookEventOptions,
+      applyTriggerParameterDefaults: input.mode === "create",
     });
 
     setFormValues(nextValues);

@@ -121,6 +121,36 @@ describe("trigger rules", () => {
         },
       }),
     ).toBe(false);
+
+    expect(
+      evaluateTriggerFilter({
+        filter: {
+          op: "containsToken",
+          path: "comment.body",
+          value: "@mistle",
+        },
+        payload: {
+          comment: {
+            body: "@mistle𐐀 please help",
+          },
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      evaluateTriggerFilter({
+        filter: {
+          op: "containsToken",
+          path: "comment.body",
+          value: "@mistle",
+        },
+        payload: {
+          comment: {
+            body: "@mistle𝟘 please help",
+          },
+        },
+      }),
+    ).toBe(false);
   });
 
   it("supports missing-path semantics with not + exists", () => {

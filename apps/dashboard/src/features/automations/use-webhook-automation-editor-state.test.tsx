@@ -421,6 +421,111 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     });
   });
 
+  it("does not auto-enable explicit invocation when editing an existing automation", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
+    const firstTriggerId = createWebhookAutomationTriggerId({
+      connectionId: "conn_linear",
+      eventType: "linear.issue_comment.created",
+    });
+    const secondTriggerId = createWebhookAutomationTriggerId({
+      connectionId: "conn_linear",
+      eventType: "linear.issue.opened",
+    });
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_123"), {
+      versions: [{ sandboxProfileId: "sbp_123", version: 1 }],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionIntegrationBindingsQueryKey({
+        profileId: "sbp_123",
+        version: 1,
+      }),
+      {
+        bindings: [createBinding()],
+      },
+    );
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "edit",
+          automationId: "atm_123",
+          navigate: async () => {},
+          initialValues: {
+            name: "Existing automation",
+            sandboxProfileId: "sbp_123",
+            enabled: true,
+            inputTemplate: DefaultWebhookAutomationInputTemplate,
+            conversationKeyTemplate: "",
+            triggerIds: [firstTriggerId],
+            triggerParameterValues: {
+              [firstTriggerId]: {},
+            },
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          directoryData: createDirectoryData({
+            supportedWebhookEvents: [
+              {
+                eventType: "linear.issue_comment.created",
+                providerEventType: "IssueComment",
+                displayName: "Issue comment created",
+                parameters: [
+                  {
+                    id: "explicitInvocation",
+                    label: "explicit mention",
+                    kind: "string",
+                    payloadPath: ["comment", "body"],
+                    matchMode: "contains_token",
+                    defaultValue: "@mistlebot",
+                    defaultEnabled: true,
+                    controlVariant: "explicit-invocation",
+                  },
+                ],
+              },
+              {
+                eventType: "linear.issue.opened",
+                providerEventType: "Issue",
+                displayName: "Issue opened",
+                parameters: [
+                  {
+                    id: "explicitInvocation",
+                    label: "explicit mention",
+                    kind: "string",
+                    payloadPath: ["issue", "body"],
+                    matchMode: "contains_token",
+                    defaultValue: "@mistlebot",
+                    defaultEnabled: true,
+                    controlVariant: "explicit-invocation",
+                  },
+                ],
+              },
+            ],
+          }),
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => {
+      result.current.onValueChange("triggerIds", [firstTriggerId, secondTriggerId]);
+    });
+
+    expect(result.current.values.triggerParameterValues).toEqual({
+      [firstTriggerId]: {},
+      [secondTriggerId]: {},
+    });
+  });
+
   it("shows a required-fields summary on submit when basic required fields are missing", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
