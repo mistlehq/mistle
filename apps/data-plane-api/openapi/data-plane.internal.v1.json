@@ -1056,7 +1056,7 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["pending", "starting", "running", "stopped", "failed"]
+                      "enum": ["starting", "running", "stopped", "failed"]
                     },
                     "failureCode": {
                       "type": ["string", "null"],

@@ -1,11 +1,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { UnauthorizedResponseSchema, ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 
-import {
-  GetSandboxInstanceParamsSchema,
-  GetSandboxInstanceQuerySchema,
-  GetSandboxInstanceResponseSchema,
-} from "./schema.js";
+import { GetSandboxInstanceResponseSchema } from "../../../sandbox-instances/schemas.js";
+import { GetSandboxInstanceParamsSchema, GetSandboxInstanceQuerySchema } from "./schema.js";
 
 export const route = createRoute({
   method: "get",
