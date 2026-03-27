@@ -14,6 +14,11 @@ import {
   createDisposableDataPlaneRuntime,
   type DisposableDataPlaneRuntime,
 } from "./helpers/disposable-data-plane-runtime.js";
+import {
+  destroyDockerSandboxContainer,
+  startDockerSandboxContainer,
+  stopDockerSandboxContainer,
+} from "./helpers/docker-sandbox-runtime.js";
 import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
 type WorkflowRunRow = {
@@ -35,6 +40,7 @@ const WorkflowQueuePollIntervalMs = 100;
 const WorkflowQueueWaitTimeoutMs = 10_000;
 
 const startedDataPlaneFixtures: DisposableDataPlaneRuntime[] = [];
+const startedSandboxContainerIds: string[] = [];
 
 function createRuntimePlan() {
   return {
@@ -57,6 +63,13 @@ afterEach(async () => {
     const fixture = startedDataPlaneFixtures.pop();
     if (fixture !== undefined) {
       await fixture.stop();
+    }
+  }
+
+  while (startedSandboxContainerIds.length > 0) {
+    const containerId = startedSandboxContainerIds.pop();
+    if (containerId !== undefined) {
+      await destroyDockerSandboxContainer(containerId);
     }
   }
 });
@@ -92,6 +105,7 @@ async function insertResumableSandboxInstance(input: {
   organizationId: string;
   sandboxInstanceId: string;
   status: "stopped" | "failed" | "running";
+  providerSandboxId: string;
 }) {
   await input.dataPlaneFixture.db.insert(sandboxInstances).values({
     id: input.sandboxInstanceId,
@@ -99,7 +113,7 @@ async function insertResumableSandboxInstance(input: {
     sandboxProfileId: "sbp_resume_integration",
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
-    providerSandboxId: "provider-runtime-resume-integration",
+    providerSandboxId: input.providerSandboxId,
     status: input.status,
     startedByKind: "user",
     startedById: "usr_resume_integration",
@@ -193,11 +207,15 @@ describe("sandbox instance resume integration", () => {
       });
 
       const sandboxInstanceId = "sbi_cp_resume_stopped_001";
+      const providerSandboxId = await startDockerSandboxContainer();
+      startedSandboxContainerIds.push(providerSandboxId);
+      await stopDockerSandboxContainer(providerSandboxId);
       await insertResumableSandboxInstance({
         dataPlaneFixture,
         organizationId: authSession.organizationId,
         sandboxInstanceId,
         status: "stopped",
+        providerSandboxId,
       });
 
       const response = await controlPlaneRuntime.request(
@@ -273,11 +291,15 @@ describe("sandbox instance resume integration", () => {
       });
 
       const sandboxInstanceId = "sbi_cp_resume_failed_001";
+      const providerSandboxId = await startDockerSandboxContainer();
+      startedSandboxContainerIds.push(providerSandboxId);
+      await stopDockerSandboxContainer(providerSandboxId);
       await insertResumableSandboxInstance({
         dataPlaneFixture,
         organizationId: authSession.organizationId,
         sandboxInstanceId,
         status: "failed",
+        providerSandboxId,
       });
 
       const response = await controlPlaneRuntime.request(
@@ -353,14 +375,14 @@ describe("sandbox instance resume integration", () => {
       });
 
       const sandboxInstanceId = "sbi_cp_resume_running_001";
+      const providerSandboxId = await startDockerSandboxContainer();
+      startedSandboxContainerIds.push(providerSandboxId);
       await insertResumableSandboxInstance({
         dataPlaneFixture,
         organizationId: authSession.organizationId,
         sandboxInstanceId,
         status: "running",
-      });
-      await dataPlaneFixture.attachSandboxRuntime({
-        sandboxInstanceId,
+        providerSandboxId,
       });
 
       const response = await controlPlaneRuntime.request(

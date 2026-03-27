@@ -15,15 +15,27 @@ import {
   createDisposableDataPlaneRuntime,
   type DisposableDataPlaneRuntime,
 } from "./helpers/disposable-data-plane-runtime.js";
+import {
+  destroyDockerSandboxContainer,
+  startDockerSandboxContainer,
+} from "./helpers/docker-sandbox-runtime.js";
 import { it } from "./test-context.js";
 
 const startedDataPlaneFixtures: DisposableDataPlaneRuntime[] = [];
+const startedSandboxContainerIds: string[] = [];
 
 afterEach(async () => {
   while (startedDataPlaneFixtures.length > 0) {
     const fixture = startedDataPlaneFixtures.pop();
     if (fixture !== undefined) {
       await fixture.stop();
+    }
+  }
+
+  while (startedSandboxContainerIds.length > 0) {
+    const containerId = startedSandboxContainerIds.pop();
+    if (containerId !== undefined) {
+      await destroyDockerSandboxContainer(containerId);
     }
   }
 });
@@ -44,6 +56,8 @@ describe("sandbox instances get integration", () => {
     const session = await fixture.authSession({
       email: "integration-sandbox-instances-get@example.com",
     });
+    const providerSandboxId = await startDockerSandboxContainer();
+    startedSandboxContainerIds.push(providerSandboxId);
 
     await dataPlaneFixture.db.insert(sandboxInstances).values({
       id: "sbi_cp_get_001",
@@ -51,7 +65,7 @@ describe("sandbox instances get integration", () => {
       sandboxProfileId: "sbp_dp_get_001",
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
-      providerSandboxId: "provider-cp-get-001",
+      providerSandboxId,
       status: SandboxInstanceStatuses.RUNNING,
       startedByKind: "user",
       startedById: session.userId,
@@ -132,6 +146,8 @@ describe("sandbox instances get integration", () => {
     const session = await fixture.authSession({
       email: "integration-sandbox-instances-get-pending@example.com",
     });
+    const providerSandboxId = await startDockerSandboxContainer();
+    startedSandboxContainerIds.push(providerSandboxId);
 
     await dataPlaneFixture.db.insert(sandboxInstances).values({
       id: "sbi_cp_get_pending_001",
@@ -139,7 +155,7 @@ describe("sandbox instances get integration", () => {
       sandboxProfileId: "sbp_dp_get_pending_001",
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
-      providerSandboxId: "provider-cp-get-pending-001",
+      providerSandboxId,
       status: SandboxInstanceStatuses.RUNNING,
       startedByKind: "user",
       startedById: session.userId,
@@ -263,6 +279,8 @@ describe("sandbox instances get integration", () => {
     const session = await fixture.authSession({
       email: "integration-sandbox-instances-get-ambiguous@example.com",
     });
+    const providerSandboxId = await startDockerSandboxContainer();
+    startedSandboxContainerIds.push(providerSandboxId);
 
     await dataPlaneFixture.db.insert(sandboxInstances).values({
       id: "sbi_cp_get_003",
@@ -270,7 +288,7 @@ describe("sandbox instances get integration", () => {
       sandboxProfileId: "sbp_dp_get_003",
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
-      providerSandboxId: "provider-cp-get-003",
+      providerSandboxId,
       status: SandboxInstanceStatuses.RUNNING,
       startedByKind: "user",
       startedById: session.userId,
@@ -382,6 +400,8 @@ describe("sandbox instances get integration", () => {
     const session = await fixture.authSession({
       email: "integration-sandbox-instances-get-pending-newest@example.com",
     });
+    const providerSandboxId = await startDockerSandboxContainer();
+    startedSandboxContainerIds.push(providerSandboxId);
 
     await dataPlaneFixture.db.insert(sandboxInstances).values({
       id: "sbi_cp_get_004",
@@ -389,7 +409,7 @@ describe("sandbox instances get integration", () => {
       sandboxProfileId: "sbp_dp_get_004",
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
-      providerSandboxId: "provider-cp-get-004",
+      providerSandboxId,
       status: SandboxInstanceStatuses.RUNNING,
       startedByKind: "user",
       startedById: session.userId,

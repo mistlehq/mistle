@@ -38,23 +38,32 @@ export type StartSandboxInstanceInput = {
   idempotencyKey?: string;
 };
 export type StartSandboxInstanceAcceptedResponse =
-  paths["/internal/sandbox-instances/start"]["post"]["responses"]["200"]["content"]["application/json"];
-export type ResumeSandboxInstanceInput =
-  paths["/internal/sandbox-instances/resume"]["post"]["requestBody"]["content"]["application/json"];
+  paths["/internal/sandbox/instances"]["post"]["responses"]["200"]["content"]["application/json"];
+export type ResumeSandboxInstanceInput = {
+  organizationId: string;
+  instanceId: string;
+  idempotencyKey?: string;
+};
 export type ResumeSandboxInstanceAcceptedResponse =
-  paths["/internal/sandbox-instances/resume"]["post"]["responses"]["200"]["content"]["application/json"];
-export type StopSandboxInstanceInput =
-  paths["/internal/sandbox-instances/stop"]["post"]["requestBody"]["content"]["application/json"];
+  paths["/internal/sandbox/instances/:id/resume"]["post"]["responses"]["200"]["content"]["application/json"];
+export type StopSandboxInstanceInput = {
+  sandboxInstanceId: string;
+  stopReason: "idle" | "disconnected";
+  expectedOwnerLeaseId: string;
+  idempotencyKey: string;
+};
 export type StopSandboxInstanceAcceptedResponse =
-  paths["/internal/sandbox-instances/stop"]["post"]["responses"]["200"]["content"]["application/json"];
-export type GetSandboxInstanceInput =
-  paths["/internal/sandbox-instances/get"]["post"]["requestBody"]["content"]["application/json"];
+  paths["/internal/sandbox/instances/:id/stop"]["post"]["responses"]["200"]["content"]["application/json"];
+export type GetSandboxInstanceInput = {
+  organizationId: string;
+  instanceId: string;
+};
 export type GetSandboxInstanceResponse =
-  paths["/internal/sandbox-instances/get"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/internal/sandbox/instances/:id"]["get"]["responses"]["200"]["content"]["application/json"];
 export type ListSandboxInstancesInput =
-  paths["/internal/sandbox-instances/list"]["post"]["requestBody"]["content"]["application/json"];
+  paths["/internal/sandbox/instances"]["get"]["parameters"]["query"];
 export type ListSandboxInstancesResponse =
-  paths["/internal/sandbox-instances/list"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/internal/sandbox/instances"]["get"]["responses"]["200"]["content"]["application/json"];
 
 type InternalErrorBody = z.infer<typeof InternalErrorSchema>;
 
@@ -146,6 +155,31 @@ function createInternalClient(input: CreateDataPlaneSandboxInstancesClientInput)
   };
 }
 
+function createAuthedJsonHeaders(serviceToken: string): Record<string, string> {
+  return {
+    "content-type": "application/json",
+    [DATA_PLANE_INTERNAL_AUTH_HEADER]: serviceToken,
+  };
+}
+
+function createSandboxInstanceMemberUrl(input: {
+  baseUrl: string;
+  instanceId: string;
+  suffix?: string;
+  query?: Record<string, string>;
+}): URL {
+  const url = new URL(
+    `/internal/sandbox/instances/${encodeURIComponent(input.instanceId)}${input.suffix ?? ""}`,
+    input.baseUrl,
+  );
+
+  for (const [key, value] of Object.entries(input.query ?? {})) {
+    url.searchParams.set(key, value);
+  }
+
+  return url;
+}
+
 async function readResponseBody(response: Response): Promise<unknown> {
   const responseText = await response.text();
 
@@ -168,18 +202,12 @@ export function createDataPlaneSandboxInstancesClient(
 
   return {
     async startSandboxInstance(startInput) {
-      const response = await fetch(
-        new URL("/internal/sandbox-instances/start", internalClient.baseUrl),
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            [DATA_PLANE_INTERNAL_AUTH_HEADER]: internalClient.serviceToken,
-          },
-          body: JSON.stringify(startInput),
-          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
-        },
-      );
+      const response = await fetch(new URL("/internal/sandbox/instances", internalClient.baseUrl), {
+        method: "POST",
+        headers: createAuthedJsonHeaders(internalClient.serviceToken),
+        body: JSON.stringify(startInput),
+        signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+      });
 
       if (response.status === 200) {
         const responseBody: StartSandboxInstanceAcceptedResponse = await response.json();
@@ -197,59 +225,111 @@ export function createDataPlaneSandboxInstancesClient(
     },
 
     async resumeSandboxInstance(resumeInput) {
-      const result = await internalClient.client.POST("/internal/sandbox-instances/resume", {
-        body: resumeInput,
-        signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
-      });
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: resumeInput.instanceId,
+          suffix: "/resume",
+        }),
+        {
+          method: "POST",
+          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          body: JSON.stringify({
+            organizationId: resumeInput.organizationId,
+            ...(resumeInput.idempotencyKey === undefined
+              ? {}
+              : { idempotencyKey: resumeInput.idempotencyKey }),
+          }),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
 
-      if (result.response.status === 200 && result.data !== undefined) {
-        return result.data;
+      if (response.status === 200) {
+        const responseBody: ResumeSandboxInstanceAcceptedResponse = await response.json();
+
+        return responseBody;
       }
 
+      const errorBody = await readResponseBody(response);
+
       throw createClientError({
-        status: result.response.status,
-        error: result.error,
+        status: response.status,
+        error: errorBody,
         operation: "resume",
       });
     },
 
     async stopSandboxInstance(stopInput) {
-      const result = await internalClient.client.POST("/internal/sandbox-instances/stop", {
-        body: stopInput,
-        signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
-      });
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: stopInput.sandboxInstanceId,
+          suffix: "/stop",
+        }),
+        {
+          method: "POST",
+          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          body: JSON.stringify({
+            stopReason: stopInput.stopReason,
+            expectedOwnerLeaseId: stopInput.expectedOwnerLeaseId,
+            idempotencyKey: stopInput.idempotencyKey,
+          }),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
 
-      if (result.response.status === 200 && result.data !== undefined) {
-        return result.data;
+      if (response.status === 200) {
+        const responseBody: StopSandboxInstanceAcceptedResponse = await response.json();
+
+        return responseBody;
       }
 
+      const errorBody = await readResponseBody(response);
+
       throw createClientError({
-        status: result.response.status,
-        error: result.error,
+        status: response.status,
+        error: errorBody,
         operation: "stop",
       });
     },
 
     async getSandboxInstance(getInput) {
-      const result = await internalClient.client.POST("/internal/sandbox-instances/get", {
-        body: getInput,
-        signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
-      });
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: getInput.instanceId,
+          query: {
+            organizationId: getInput.organizationId,
+          },
+        }),
+        {
+          headers: {
+            [DATA_PLANE_INTERNAL_AUTH_HEADER]: internalClient.serviceToken,
+          },
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
 
-      if (result.response.status === 200 && result.data !== undefined) {
-        return result.data;
+      if (response.status === 200) {
+        const responseBody: GetSandboxInstanceResponse = await response.json();
+
+        return responseBody;
       }
 
+      const errorBody = await readResponseBody(response);
+
       throw createClientError({
-        status: result.response.status,
-        error: result.error,
+        status: response.status,
+        error: errorBody,
         operation: "read",
       });
     },
 
     async listSandboxInstances(listInput): Promise<ListSandboxInstancesResponse> {
-      const result = await internalClient.client.POST("/internal/sandbox-instances/list", {
-        body: listInput,
+      const result = await internalClient.client.GET("/internal/sandbox/instances", {
+        params: {
+          query: listInput,
+        },
         signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
       });
 
