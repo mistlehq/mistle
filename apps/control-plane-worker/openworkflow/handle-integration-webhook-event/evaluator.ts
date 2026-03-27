@@ -27,7 +27,7 @@ function readOwnPropertyValue(target: object, key: string): unknown {
 }
 
 function isTokenBoundaryCharacter(value: string): boolean {
-  return !/[A-Za-z0-9_]/.test(value);
+  return !/[\p{L}\p{N}\p{M}_]/u.test(value);
 }
 
 function containsToken(input: { value: string; token: string }): boolean {

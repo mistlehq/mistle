@@ -362,6 +362,33 @@ describe("WebhookAutomationTriggerPicker", () => {
     expect(toggle.getAttribute("aria-checked")).toBe("true");
   });
 
+  it("renders the saved explicit invocation value instead of the default", () => {
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedTriggerIds: [
+        createWebhookAutomationTriggerId({
+          connectionId: GitHubConnectionId,
+          eventType: "github.issue_comment.created",
+        }),
+      ],
+      triggerParameterValues: {
+        [createWebhookAutomationTriggerId({
+          connectionId: GitHubConnectionId,
+          eventType: "github.issue_comment.created",
+        })]: {
+          explicitInvocation: "@review-bot",
+        },
+      },
+    });
+
+    expect(
+      screen.getByRole("switch", {
+        name: /Only respond to @review-bot/,
+      }),
+    ).toBeDefined();
+  });
+
   it("renders unset enum-backed trigger parameters as placeholders", () => {
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,

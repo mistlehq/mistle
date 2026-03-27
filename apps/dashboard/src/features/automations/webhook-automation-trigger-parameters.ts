@@ -376,8 +376,7 @@ export function applyWebhookAutomationTriggerParameterDefaults(input: {
         continue;
       }
 
-      const configuredValue = nextTriggerValues[parameter.id]?.trim() ?? "";
-      if (configuredValue.length > 0) {
+      if (Object.hasOwn(nextTriggerValues, parameter.id)) {
         continue;
       }
 

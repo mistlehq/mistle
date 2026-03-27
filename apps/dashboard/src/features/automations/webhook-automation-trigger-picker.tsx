@@ -21,7 +21,7 @@ import {
 } from "@mistle/ui";
 import { InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
@@ -378,6 +378,17 @@ function TriggerParameterField(input: {
   value: string;
   onValueChange: (value: string) => void;
 }): React.JSX.Element | null {
+  const [lastNonEmptyStringValue, setLastNonEmptyStringValue] = useState(() => input.value.trim());
+
+  useEffect(() => {
+    const nextValue = input.value.trim();
+    if (nextValue.length === 0) {
+      return;
+    }
+
+    setLastNonEmptyStringValue(nextValue);
+  }, [input.value]);
+
   const resourceQuery = useQuery({
     queryKey: [
       "automation-trigger-parameters",
@@ -408,7 +419,14 @@ function TriggerParameterField(input: {
   if (input.parameter.kind === "string") {
     if (input.parameter.controlVariant === "explicit-invocation") {
       const switchId = `${input.eventType}:${input.parameter.id}`;
-      const explicitInvocationValue = input.parameter.defaultValue ?? "@mistlebot";
+      const defaultExplicitInvocationValue = input.parameter.defaultValue ?? "@mistlebot";
+      const savedExplicitInvocationValue = input.value.trim();
+      const explicitInvocationValue =
+        savedExplicitInvocationValue.length > 0
+          ? savedExplicitInvocationValue
+          : lastNonEmptyStringValue.length > 0
+            ? lastNonEmptyStringValue
+            : defaultExplicitInvocationValue;
       const checked = input.value.trim().length > 0;
       const tooltipMessage = `Enable this to respond only when ${explicitInvocationValue} is mentioned. Disable it to respond to every event.`;
 
