@@ -108,10 +108,9 @@ function toDockerEnv(env: Record<string, string> | undefined): string[] | undefi
 
 function normalizeDockerInspectState(state: string): DockerSandboxInspectResult["state"] {
   switch (state) {
-    case SandboxInspectStates.RUNNING:
-      return SandboxInspectStates.RUNNING;
-    case SandboxInspectStates.PAUSED:
-      return SandboxInspectStates.PAUSED;
+    case "running":
+    case "paused":
+      return state;
     case "created":
     case "restarting":
     case "removing":
