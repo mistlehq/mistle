@@ -25,6 +25,10 @@ const PullRequestOpenedTriggerId = createWebhookAutomationTriggerId({
   connectionId: GitHubConnectionId,
   eventType: "github.pull_request.opened",
 });
+const PullRequestReviewSubmittedTriggerId = createWebhookAutomationTriggerId({
+  connectionId: GitHubConnectionId,
+  eventType: "github.pull_request_review.submitted",
+});
 const PushDeletedTriggerId = createWebhookAutomationTriggerId({
   connectionId: GitHubConnectionId,
   eventType: "github.push.deleted",
@@ -238,9 +242,9 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
   {
     id: createWebhookAutomationTriggerId({
       connectionId: GitHubConnectionId,
-      eventType: "github.issue.opened",
+      eventType: "github.issues.opened",
     }),
-    eventType: "github.issue.opened",
+    eventType: "github.issues.opened",
     connectionId: GitHubConnectionId,
     connectionLabel: "GitHub Engineering",
     label: "Issue opened",
@@ -274,6 +278,54 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
         label: "explicit mention",
         kind: "string",
         payloadPath: ["pull_request", "body"],
+        matchMode: "contains_token",
+        defaultValue: "@mistlebot",
+        defaultEnabled: true,
+        controlVariant: "explicit-invocation",
+        placeholder: 'Require "@mistlebot"',
+      },
+      {
+        id: "repository",
+        label: "repository",
+        kind: "resource-select",
+        resourceKind: "repository",
+        payloadPath: ["repository", "full_name"],
+        prefix: "in",
+      },
+      {
+        id: "author",
+        label: "author",
+        kind: "resource-select",
+        resourceKind: "user",
+        payloadPath: ["sender", "login"],
+        prefix: "by",
+        placeholder: "Any author",
+      },
+      {
+        id: "baseBranch",
+        label: "base branch",
+        kind: "resource-select",
+        resourceKind: "branch",
+        payloadPath: ["pull_request", "base", "ref"],
+        prefix: "to",
+        placeholder: "Any base branch",
+      },
+    ],
+  },
+  {
+    id: PullRequestReviewSubmittedTriggerId,
+    eventType: "github.pull_request_review.submitted",
+    connectionId: GitHubConnectionId,
+    connectionLabel: "GitHub Engineering",
+    label: "Pull request review submitted",
+    category: "GitHub Engineering / Pull requests",
+    logoKey: "github",
+    parameters: [
+      {
+        id: "explicitInvocation",
+        label: "explicit mention",
+        kind: "string",
+        payloadPath: ["review", "body"],
         matchMode: "contains_token",
         defaultValue: "@mistlebot",
         defaultEnabled: true,
