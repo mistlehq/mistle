@@ -1,8 +1,8 @@
-import { SandboxInspectStates, SandboxProvider, type SandboxInspectResult } from "../../types.js";
-
-export type E2BSandboxInspectState =
-  | typeof SandboxInspectStates.RUNNING
-  | typeof SandboxInspectStates.PAUSED;
+import {
+  SandboxProvider,
+  type SandboxInspectResult,
+  type SandboxInspectState,
+} from "../../types.js";
 
 export interface E2BSandboxInspectInfo {
   readonly templateId: string;
@@ -15,6 +15,6 @@ export interface E2BSandboxInspectInfo {
 
 export type E2BSandboxInspectResult = SandboxInspectResult<
   typeof SandboxProvider.E2B,
-  E2BSandboxInspectState,
+  SandboxInspectState,
   E2BSandboxInspectInfo
 >;

@@ -110,16 +110,16 @@ function toDockerEnv(env: Record<string, string> | undefined): string[] | undefi
 function normalizeDockerInspectState(state: string): DockerSandboxInspectResult["state"] {
   switch (state) {
     case "running":
-    case "paused":
-      return state;
+      return SandboxInspectStates.RUNNING;
     case "created":
+    case "paused":
     case "restarting":
     case "removing":
     case "exited":
     case "dead":
       return SandboxInspectStates.STOPPED;
     default:
-      return SandboxInspectStates.UNKNOWN;
+      throw new Error(`Unsupported Docker container state: ${state}`);
   }
 }
 

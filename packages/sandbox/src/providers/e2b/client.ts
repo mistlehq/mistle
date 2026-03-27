@@ -2,6 +2,7 @@ import { systemSleeper } from "@mistle/time";
 import { CommandExitError, Sandbox, type ConnectionOpts } from "e2b";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
+import { SandboxInspectStates } from "../../types.js";
 import {
   E2BClientError,
   E2BClientErrorCodes,
@@ -107,6 +108,15 @@ async function sleep(ms: number): Promise<void> {
   await systemSleeper.sleep(ms);
 }
 
+function normalizeE2BInspectState(state: "running" | "paused"): E2BSandboxInspectResult["state"] {
+  switch (state) {
+    case "running":
+      return SandboxInspectStates.RUNNING;
+    case "paused":
+      return SandboxInspectStates.STOPPED;
+  }
+}
+
 export class E2BApiClient implements E2BClient {
   readonly #connectionOptions: ConnectionOpts;
   readonly #templateRegistry: E2BTemplateRegistry;
@@ -150,7 +160,7 @@ export class E2BApiClient implements E2BClient {
       return {
         provider: "e2b",
         id: sandbox.sandboxId,
-        state: sandbox.state,
+        state: normalizeE2BInspectState(sandbox.state),
         createdAt: sandbox.startedAt.toISOString(),
         startedAt: sandbox.startedAt.toISOString(),
         endedAt: sandbox.endAt.toISOString(),

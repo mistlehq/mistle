@@ -90,7 +90,7 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
       if (stoppedInspection.provider !== SandboxProvider.E2B) {
         throw new Error("Expected E2B sandbox inspection result after stop.");
       }
-      expect(stoppedInspection.state).toBe("paused");
+      expect(stoppedInspection.state).toBe("stopped");
       expect(stoppedInspection.providerInfo.templateAlias).toBe(expectedTemplateAlias);
 
       const resumedSandbox = await fixture.adapter.resume({
