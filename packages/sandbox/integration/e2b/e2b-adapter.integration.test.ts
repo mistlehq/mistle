@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect } from "vitest";
 
 import { SandboxProvider, SandboxRuntimeEnv, SandboxRuntimeEnvDefaults } from "../../src/index.js";
+import { createE2BTemplateAlias } from "../../src/providers/e2b/template-registry.js";
 import { e2bAdapterIntegrationEnabled, it } from "./test-context.js";
 
 const describeE2BAdapterIntegration = e2bAdapterIntegrationEnabled ? describe : describe.skip;
@@ -21,6 +22,7 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
 
   it("starts a sandbox from the shared base image and injects env", async ({ fixture }) => {
     const injectedEnvValue = `mistle-e2b-env-${randomUUID()}`;
+    const expectedTemplateAlias = createE2BTemplateAlias(fixture.baseImage.imageId);
     let id: string | undefined;
 
     try {
@@ -43,6 +45,7 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
       expect(inspection.id).toBe(sandbox.id);
       expect(inspection.state).toBe("running");
       expect(inspection.templateId).not.toBe("");
+      expect(inspection.templateAlias).toBe(expectedTemplateAlias);
       expect(inspection.cpuCount).toBeGreaterThan(0);
       expect(inspection.memoryMB).toBeGreaterThan(0);
 
@@ -69,6 +72,7 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
     fixture,
   }) => {
     const marker = `mistle-e2b-state-${randomUUID()}`;
+    const expectedTemplateAlias = createE2BTemplateAlias(fixture.baseImage.imageId);
     let id: string | undefined;
 
     try {
@@ -87,6 +91,7 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
         throw new Error("Expected E2B sandbox inspection result after stop.");
       }
       expect(stoppedInspection.state).toBe("paused");
+      expect(stoppedInspection.templateAlias).toBe(expectedTemplateAlias);
 
       const resumedSandbox = await fixture.adapter.resume({
         id: sandbox.id,

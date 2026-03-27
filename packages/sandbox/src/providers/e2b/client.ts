@@ -32,6 +32,7 @@ const SupervisorSocketPath = "/run/mistle/startup-config.sock";
 const SupervisorTokenPath = "/run/mistle/startup-config.token";
 const SupervisorReadinessPollIntervalMs = 100;
 const SupervisorReadinessPollAttempts = 100;
+const E2BTemplateAliasMetadataKey = "mistle_template_alias";
 
 export type E2BStartSandboxResponse = {
   sandboxId: string;
@@ -126,6 +127,9 @@ export class E2BApiClient implements E2BClient {
         lifecycle: {
           onTimeout: "pause",
         },
+        metadata: {
+          [E2BTemplateAliasMetadataKey]: templateAlias,
+        },
         envs: withRequiredSandboxRuntimeEnv(parsedRequest.env),
       });
 
@@ -151,6 +155,7 @@ export class E2BApiClient implements E2BClient {
         startedAt: sandbox.startedAt.toISOString(),
         endAt: sandbox.endAt.toISOString(),
         templateId: sandbox.templateId,
+        templateAlias: this.#getTemplateAliasFromMetadata(sandbox.metadata),
         name: sandbox.name ?? null,
         metadata: sandbox.metadata,
         cpuCount: sandbox.cpuCount,
@@ -293,6 +298,21 @@ export class E2BApiClient implements E2BClient {
     } catch (error) {
       throw mapE2BClientError(E2BClientOperationIds.ENSURE_SUPERVISOR_READY, error);
     }
+  }
+
+  #getTemplateAliasFromMetadata(metadata: Readonly<Record<string, string>>): string {
+    const templateAlias = metadata[E2BTemplateAliasMetadataKey];
+    if (templateAlias === undefined || templateAlias.length === 0) {
+      throw new E2BClientError({
+        code: E2BClientErrorCodes.TEMPLATE_ERROR,
+        operation: E2BClientOperationIds.GET_SANDBOX_INFO,
+        retryable: false,
+        message: `E2B operation \`${E2BClientOperationIds.GET_SANDBOX_INFO}\` failed: sandbox metadata is missing the stable template alias.`,
+        cause: metadata,
+      });
+    }
+
+    return templateAlias;
   }
 
   async #checkSupervisorReady(sandbox: Sandbox): Promise<boolean> {

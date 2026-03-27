@@ -61,6 +61,7 @@ export interface E2BSandboxInspectResult {
   readonly startedAt: string;
   readonly endAt: string;
   readonly templateId: string;
+  readonly templateAlias: string;
   readonly name: string | null;
   readonly metadata: Readonly<Record<string, string>>;
   readonly cpuCount: number;

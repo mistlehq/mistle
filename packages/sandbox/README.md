@@ -110,6 +110,7 @@ await runtimeControl.close();
 
 - Sandbox image handles describe the provider image passed to `start({ image })`.
 - `SandboxAdapter.inspect({ id })` returns provider-backed sandbox metadata without attaching to the runtime.
+- E2B inspection includes both the provider-managed `templateId` and the stable template alias resolved for the sandbox template lineage.
 - `SandboxResumeRequestV1` resumes provider compute against existing sandbox state using a previous sandbox `id`.
 - `SandboxRuntimeControl.applyStartup({ id, payload })` delivers runtime startup bytes to an already-running sandbox using provider-native control paths.
 - `SandboxRuntimeControl.close()` releases provider client resources held by runtime control.
