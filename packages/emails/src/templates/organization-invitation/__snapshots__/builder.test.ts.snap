@@ -16,24 +16,49 @@ exports[`emails organization invitation > matches snapshot for a stable organiza
   </head>
 
   <body style="background-color:#f6f7fb;font-family:Helvetica, Arial, sans-serif;margin:0;padding:32px 0">
-    <div data-skip="true" style="display:none;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">You're invited to join Acme<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div>
+    <div data-skip="true" style="display:none;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">Jane Doe invited you to join as admin.<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div>
     </div>
     <div style="table-layout:fixed;width:100%">
       <div style="margin:0 auto;max-width:600px"><span><!--[if mso]><table align="center" width="600" style="border-spacing: 0; width:600px;" role="presentation"><tr><td><![endif]--></span>
-        <table align="center" width="100%" role="presentation" cellspacing="0" cellpadding="0" border="0" style="max-width:520px;background-color:#ffffff;border-radius:12px;margin:0 auto;padding:28px">
+        <table align="center" width="100%" role="presentation" cellspacing="0" cellpadding="0" border="0" style="max-width:520px;background-color:#ffffff;border-radius:16px;margin:0 auto;overflow:hidden">
           <tbody>
             <tr style="width:100%">
               <td align="center">
-                <p style="font-size:24px;line-height:24px;margin:0 0 18px;color:#111827;font-weight:700">You're invited to join Acme</p>
-                <p style="font-size:15px;line-height:22px;margin:0 0 16px;color:#374151">Jane Doe invited you to join Acme as admin.</p>
-                <table align="center" width="100%" style="margin:20px 0 22px" border="0" cellpadding="0" cellspacing="0" role="presentation">
+                <table align="center" width="100%" style="background-color:#111827;height:8px" border="0" cellpadding="0" cellspacing="0" role="presentation">
                   <tbody>
                     <tr>
-                      <td><a href="https://example.com/accept?invitationId=inv_123" style="background-color:#111827;border-radius:10px;color:#ffffff;display:inline-block;font-size:15px;font-weight:700;padding:14px 22px;text-decoration:none">Accept invitation</a></td>
+                      <td></td>
                     </tr>
                   </tbody>
                 </table>
-                <p style="font-size:13px;line-height:20px;margin:16px 0;color:#6b7280;margin-top:20px">If you did not expect this invitation, you can ignore this email.</p>
+                <table align="center" width="100%" style="padding:28px;text-align:center" border="0" cellpadding="0" cellspacing="0" role="presentation">
+                  <tbody>
+                    <tr>
+                      <td>
+                        <table align="center" width="100%" style="margin-bottom:22px;text-align:center" border="0" cellpadding="0" cellspacing="0" role="presentation">
+                          <tbody>
+                            <tr>
+                              <td><img alt="Mistle logo" src="https://mistle.dev/mistle-logo-email.png" style="display:block;height:42px;margin:0 auto;max-width:100%;width:180px"></td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <p style="font-size:24px;line-height:32px;margin:0 0 18px;color:#111827;font-weight:700;text-align:center">Join Acme on Mistle</p>
+                        <p style="font-size:15px;line-height:22px;margin:0 0 18px;color:#374151;text-align:center">Jane Doe invited you to join Acme as admin.</p>
+                        <table align="center" width="100%" style="margin:20px 0 28px;text-align:center" border="0" cellpadding="0" cellspacing="0" role="presentation">
+                          <tbody>
+                            <tr>
+                              <td><a href="https://example.com/accept?invitationId=inv_123" style="background-color:#111827;border-radius:10px;color:#ffffff;display:inline-block;font-size:15px;font-weight:700;padding:14px 22px;text-decoration:none">Accept invitation</a></td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <p style="font-size:13px;line-height:20px;margin:0 0 4px;color:#6b7280;text-align:center">If the button does not work, use this link:</p>
+                        <p style="font-size:13px;line-height:20px;margin:0 0 18px;color:#111827;text-align:center;word-break:break-all">https://example.com/accept?invitationId=inv_123</p>
+                        <p style="font-size:13px;line-height:20px;margin:0;color:#6b7280;text-align:center">If you did not expect this invitation, you can ignore this email.</p>
+                        <p style="font-size:13px;line-height:20px;margin:16px 0;border-top:1px solid #e5e7eb;color:#6b7280;margin-top:24px;padding-top:18px;text-align:center">This email was sent by Mistle. Learn more at <a href="https://mistle.dev" style="color:#111827;text-decoration:none">mistle.dev</a>.</p>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </td>
             </tr>
           </tbody>
@@ -43,13 +68,24 @@ exports[`emails organization invitation > matches snapshot for a stable organiza
   </body>
 
 </html>",
-  "subject": "You're invited to join Acme",
-  "text": "You're invited to join Acme
+  "metadata": {
+    "preview": "Jane Doe invited you to join as admin.",
+    "subject": "Join Acme on Mistle",
+    "templateName": "Organization Invitation",
+  },
+  "subject": "Join Acme on Mistle",
+  "text": "Join Acme on Mistle
 
 Jane Doe invited you to join Acme as admin.
 
 Accept invitation https://example.com/accept?invitationId=inv_123
 
-If you did not expect this invitation, you can ignore this email.",
+If the button does not work, use this link:
+
+https://example.com/accept?invitationId=inv_123
+
+If you did not expect this invitation, you can ignore this email.
+
+This email was sent by Mistle. Learn more at mistle.dev https://mistle.dev.",
 }
 `;

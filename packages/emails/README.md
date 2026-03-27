@@ -96,5 +96,23 @@ To add a new template:
 - `pnpm --filter @mistle/emails test`
 - `pnpm --filter @mistle/emails test:integration`
 - `pnpm --filter @mistle/emails test:all`
+- `pnpm --filter @mistle/emails preview`
+- `pnpm --filter @mistle/emails preview:build`
 - `pnpm --filter @mistle/emails format`
 - `pnpm --filter @mistle/emails format:check`
+
+## Previewing Templates
+
+`jsx-email`'s preview CLI expects template entry files that export `Template`,
+`templateName`, and `previewProps`. This package keeps runtime template builders
+under `src/templates`, so preview-only entry files live under `preview/`.
+
+This repo currently runs on Node 25, while `jsx-email` still calls the removed
+recursive `rmdir` API in its preview CLI. The preview scripts use a local
+compatibility wrapper under `scripts/jsx-email-cli-compat.mjs` so previewing
+works without patching `node_modules`.
+
+Use either of these commands from the repo root:
+
+- `pnpm emails:preview`
+- `pnpm emails:preview:build`
