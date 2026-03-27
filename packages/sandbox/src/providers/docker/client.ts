@@ -163,9 +163,19 @@ export class DockerApiClient implements DockerClient {
       DockerClientOperationIds.CREATE_CONTAINER,
       () => this.#docker.createContainer(createContainerOptions),
     );
-    await this.#runDockerClientOperation(DockerClientOperationIds.START_CONTAINER, () =>
-      container.start(),
-    );
+
+    try {
+      await this.#runDockerClientOperation(DockerClientOperationIds.START_CONTAINER, () =>
+        container.start(),
+      );
+    } catch (error) {
+      await this.#runDockerClientOperation(DockerClientOperationIds.REMOVE_CONTAINER, () =>
+        container.remove({
+          force: true,
+        }),
+      );
+      throw error;
+    }
 
     return {
       runtimeId: container.id,

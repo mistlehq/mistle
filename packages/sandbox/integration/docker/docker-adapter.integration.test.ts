@@ -3,8 +3,13 @@ import { randomUUID } from "node:crypto";
 import type Docker from "dockerode";
 import { describe, expect } from "vitest";
 
+import { createSandboxAdapter } from "../../src/factory.js";
 import { SandboxProvider, SandboxRuntimeEnv, SandboxRuntimeEnvDefaults } from "../../src/index.js";
-import { dockerAdapterIntegrationEnabled, it } from "./test-context.js";
+import {
+  dockerAdapterIntegrationEnabled,
+  dockerAdapterIntegrationSettings,
+  it,
+} from "./test-context.js";
 
 const describeDockerAdapterIntegration = dockerAdapterIntegrationEnabled ? describe : describe.skip;
 const START_MARKER_FILE_PATH = "/tmp/mistle-start-marker.txt";
@@ -194,6 +199,40 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
         await fixture.adapter.destroy({ id });
       }
     }
+  }, 300_000);
+
+  it("removes a created container if docker start fails", async ({ fixture }) => {
+    if (!dockerAdapterIntegrationSettings.enabled) {
+      throw new Error("Docker integration settings are required for the start failure test.");
+    }
+
+    const failingAdapter = createSandboxAdapter({
+      provider: SandboxProvider.DOCKER,
+      docker: {
+        socketPath: dockerAdapterIntegrationSettings.socketPath,
+        networkName: `missing-network-${randomUUID()}`,
+      },
+    });
+    const listOptions = {
+      all: true,
+      filters: {
+        label: ["mistle.sandbox.provider=docker"],
+      },
+    };
+    const beforeIds = new Set(
+      (await fixture.dockerClient.listContainers(listOptions)).map((container) => container.Id),
+    );
+
+    await expect(
+      failingAdapter.start({
+        image: fixture.baseImage,
+      }),
+    ).rejects.toBeInstanceOf(Error);
+
+    const afterIds = new Set(
+      (await fixture.dockerClient.listContainers(listOptions)).map((container) => container.Id),
+    );
+    expect(afterIds).toEqual(beforeIds);
   }, 300_000);
 
   it("stops and resumes a docker runtime with the same runtime id and filesystem state", async ({
