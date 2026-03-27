@@ -30,7 +30,6 @@
     "test:integration": "vitest run -c vitest.integration.config.ts",
     "test:all": "pnpm test && pnpm test:integration",
     "preview": "node ./scripts/jsx-email-cli-compat.mjs preview ./preview",
-    "preview:build": "node ./scripts/jsx-email-cli-compat.mjs preview ./preview --no-open --build-path ./.email-preview-build",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },

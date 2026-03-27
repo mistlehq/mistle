@@ -97,7 +97,6 @@ To add a new template:
 - `pnpm --filter @mistle/emails test:integration`
 - `pnpm --filter @mistle/emails test:all`
 - `pnpm --filter @mistle/emails preview`
-- `pnpm --filter @mistle/emails preview:build`
 - `pnpm --filter @mistle/emails format`
 - `pnpm --filter @mistle/emails format:check`
 
@@ -112,7 +111,6 @@ recursive `rmdir` API in its preview CLI. The preview scripts use a local
 compatibility wrapper under `scripts/jsx-email-cli-compat.mjs` so previewing
 works without patching `node_modules`.
 
-Use either of these commands from the repo root:
+Use this command from the repo root:
 
 - `pnpm emails:preview`
-- `pnpm emails:preview:build`
