@@ -357,6 +357,9 @@ describe("SessionsPage integration", () => {
 
     try {
       const profileSelect = await screen.findByRole("combobox", { name: "Sandbox profile" });
+      await waitFor(() => {
+        expect(profileSelect).toHaveProperty("disabled", false);
+      });
       fireEvent.click(profileSelect);
 
       const listbox = await screen.findByRole("listbox");
