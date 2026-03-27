@@ -38,6 +38,7 @@ const DATA_PLANE_GATEWAY_CONTAINER_BASE_URL = "http://data-plane-gateway:5202";
 const TOKENIZER_PROXY_CONTAINER_BASE_URL = "http://tokenizer-proxy:5205";
 const TOKENIZER_PROXY_EGRESS_CONTAINER_BASE_URL = `${TOKENIZER_PROXY_CONTAINER_BASE_URL}/tokenizer-proxy/egress`;
 const DATA_PLANE_GATEWAY_TUNNEL_WS_URL = "ws://data-plane-gateway:5202/tunnel/sandbox";
+const DockerSocketPath = "/var/run/docker.sock";
 const REGISTRY_IMAGE_REFERENCE = "registry:3";
 const REGISTRY_INTERNAL_PORT = 5000;
 const REGISTRY_NETWORK_ALIAS = "registry";
@@ -347,6 +348,13 @@ export async function startFullSystemEnvironment(
             cacheBustKey: input.cacheBustKey,
           }),
       network,
+      bindMounts: [
+        {
+          source: DockerSocketPath,
+          target: DockerSocketPath,
+          mode: "rw",
+        },
+      ],
       environment: {
         ...input.dataPlaneApiEnvironment,
         MISTLE_APPS_DATA_PLANE_API_DATABASE_URL: containerDatabaseUrl,
@@ -355,6 +363,7 @@ export async function startFullSystemEnvironment(
         MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
         MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL:
           DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
+        MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
       },
     });
     cleanupTasks.unshift(async () => {

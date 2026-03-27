@@ -55,6 +55,19 @@ const IntegrationVitestProjects = [
 
 type IntegrationVitestProject = (typeof IntegrationVitestProjects)[number];
 
+const AdditionalBuildPackagesByProjectName: Partial<
+  Record<IntegrationVitestProject["projectName"], readonly string[]>
+> = {
+  "@mistle/test-harness": [
+    "@mistle/control-plane-api",
+    "@mistle/control-plane-worker",
+    "@mistle/data-plane-api",
+    "@mistle/data-plane-gateway",
+    "@mistle/data-plane-worker",
+    "@mistle/tokenizer-proxy",
+  ],
+};
+
 function normalizeCliArgs(rawArgs: ReadonlyArray<string>): string[] {
   if (rawArgs[0] === "--") {
     return rawArgs.slice(1);
@@ -149,6 +162,18 @@ async function main(): Promise<void> {
   const cliArgs = normalizeCliArgs(process.argv.slice(2));
   const projectFilters = parseProjectFilters(cliArgs);
   const selectedProjects = resolveSelectedProjects(projectFilters);
+  const selectedBuildPackages = new Set<string>();
+
+  for (const project of selectedProjects) {
+    selectedBuildPackages.add(project.packageName);
+
+    const additionalBuildPackages = AdditionalBuildPackagesByProjectName[project.projectName];
+    if (additionalBuildPackages !== undefined) {
+      for (const packageName of additionalBuildPackages) {
+        selectedBuildPackages.add(packageName);
+      }
+    }
+  }
 
   console.info(`Using integration run id ${integrationRunId}.`);
 
@@ -156,7 +181,10 @@ async function main(): Promise<void> {
     "turbo",
     "run",
     "build",
-    ...selectedProjects.flatMap((project) => ["--filter", `${project.packageName}...`]),
+    ...Array.from(selectedBuildPackages).flatMap((packageName) => [
+      "--filter",
+      `${packageName}...`,
+    ]),
   ]);
 
   await runCommand("pnpm", [
