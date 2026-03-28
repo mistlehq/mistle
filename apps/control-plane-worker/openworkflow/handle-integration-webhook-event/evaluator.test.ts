@@ -108,6 +108,11 @@ describe("webhook filter evaluator", () => {
             value: "@mistlebot",
           },
           {
+            op: "contains_token",
+            path: ["comment", "body"],
+            value: "@mistlebot",
+          },
+          {
             op: "starts_with",
             path: ["comment", "body"],
             value: "hello",
@@ -123,6 +128,113 @@ describe("webhook filter evaluator", () => {
     });
 
     expect(matches).toBe(true);
+  });
+
+  it("matches token boundaries for contains_token", () => {
+    expect(
+      evaluateWebhookPayloadFilter({
+        filter: {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+        payload: {
+          comment: {
+            body: "@mistlebot, please review",
+          },
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      evaluateWebhookPayloadFilter({
+        filter: {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+        payload: {
+          comment: {
+            body: "@mistlebot- please review",
+          },
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      evaluateWebhookPayloadFilter({
+        filter: {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+        payload: {
+          comment: {
+            body: "@mistlebota please review",
+          },
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      evaluateWebhookPayloadFilter({
+        filter: {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+        payload: {
+          comment: {
+            body: "@mistleboté please review",
+          },
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      evaluateWebhookPayloadFilter({
+        filter: {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+        payload: {
+          comment: {
+            body: "@mistlebot前 please review",
+          },
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      evaluateWebhookPayloadFilter({
+        filter: {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+        payload: {
+          comment: {
+            body: "@mistlebot𐐀 please review",
+          },
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      evaluateWebhookPayloadFilter({
+        filter: {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+        payload: {
+          comment: {
+            body: "@mistlebot𝟘 please review",
+          },
+        },
+      }),
+    ).toBe(false);
   });
 
   it("supports or and not composition", () => {

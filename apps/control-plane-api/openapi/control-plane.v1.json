@@ -3600,6 +3600,21 @@
                                             },
                                             "minItems": 1
                                           },
+                                          "matchMode": {
+                                            "type": "string",
+                                            "enum": ["eq", "contains", "contains_token"]
+                                          },
+                                          "defaultValue": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "defaultEnabled": {
+                                            "type": "boolean"
+                                          },
+                                          "controlVariant": {
+                                            "type": "string",
+                                            "enum": ["explicit-invocation"]
+                                          },
                                           "prefix": {
                                             "type": "string",
                                             "minLength": 1

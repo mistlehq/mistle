@@ -439,7 +439,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
           integrationConnectionId: connectionId,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: {
-            op: "contains",
+            op: "contains_token",
             path: ["comment", "body"],
             value: "@mistlebot",
           },

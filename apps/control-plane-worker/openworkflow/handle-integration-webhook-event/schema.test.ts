@@ -13,7 +13,7 @@ describe("webhook filter schema", () => {
           value: "created",
         },
         {
-          op: "contains",
+          op: "contains_token",
           path: ["comment", "body"],
           value: "@mistlebot",
         },

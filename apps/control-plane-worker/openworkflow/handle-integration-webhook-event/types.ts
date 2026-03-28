@@ -38,6 +38,11 @@ export type WebhookPayloadFilter =
       value: string;
     }
   | {
+      op: "contains_token";
+      path: WebhookPayloadFilterPath;
+      value: string;
+    }
+  | {
       op: "starts_with";
       path: WebhookPayloadFilterPath;
       value: string;

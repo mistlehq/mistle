@@ -972,6 +972,10 @@ export type IntegrationWebhookEventParameterDefinition =
       label: string;
       kind: "string";
       payloadPath: ReadonlyArray<string>;
+      matchMode?: "eq" | "contains" | "contains_token" | undefined;
+      defaultValue?: string | undefined;
+      defaultEnabled?: boolean | undefined;
+      controlVariant?: "explicit-invocation" | undefined;
       prefix?: string | undefined;
       placeholder?: string | undefined;
     }
@@ -1128,6 +1132,7 @@ export type TriggerFilter =
   | { op: "eq"; path: string; value: string | number | boolean }
   | { op: "in"; path: string; values: ReadonlyArray<string | number> }
   | { op: "contains"; path: string; value: string }
+  | { op: "containsToken"; path: string; value: string }
   | { op: "startsWith"; path: string; value: string }
   | { op: "exists"; path: string };
 

@@ -241,6 +241,18 @@ function buildSelectableWebhookAutomationEventOptions(input: {
                         label: parameter.label,
                         kind: parameter.kind,
                         payloadPath: [...parameter.payloadPath],
+                        ...(parameter.matchMode === undefined
+                          ? {}
+                          : { matchMode: parameter.matchMode }),
+                        ...(parameter.defaultValue === undefined
+                          ? {}
+                          : { defaultValue: parameter.defaultValue }),
+                        ...(parameter.defaultEnabled === undefined
+                          ? {}
+                          : { defaultEnabled: parameter.defaultEnabled }),
+                        ...(parameter.controlVariant === undefined
+                          ? {}
+                          : { controlVariant: parameter.controlVariant }),
                         ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
                         ...(parameter.placeholder === undefined
                           ? {}

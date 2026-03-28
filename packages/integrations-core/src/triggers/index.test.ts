@@ -76,6 +76,83 @@ describe("trigger rules", () => {
     expect(matches).toBe(true);
   });
 
+  it("treats non-ASCII letters as part of a token for containsToken", () => {
+    expect(
+      evaluateTriggerFilter({
+        filter: {
+          op: "containsToken",
+          path: "comment.body",
+          value: "@mistle",
+        },
+        payload: {
+          comment: {
+            body: "@mistle, please help",
+          },
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      evaluateTriggerFilter({
+        filter: {
+          op: "containsToken",
+          path: "comment.body",
+          value: "@mistle",
+        },
+        payload: {
+          comment: {
+            body: "@mistleé please help",
+          },
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      evaluateTriggerFilter({
+        filter: {
+          op: "containsToken",
+          path: "comment.body",
+          value: "@mistle",
+        },
+        payload: {
+          comment: {
+            body: "@mistle前 please help",
+          },
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      evaluateTriggerFilter({
+        filter: {
+          op: "containsToken",
+          path: "comment.body",
+          value: "@mistle",
+        },
+        payload: {
+          comment: {
+            body: "@mistle𐐀 please help",
+          },
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      evaluateTriggerFilter({
+        filter: {
+          op: "containsToken",
+          path: "comment.body",
+          value: "@mistle",
+        },
+        payload: {
+          comment: {
+            body: "@mistle𝟘 please help",
+          },
+        },
+      }),
+    ).toBe(false);
+  });
+
   it("supports missing-path semantics with not + exists", () => {
     const matches = evaluateTriggerFilter({
       filter: {

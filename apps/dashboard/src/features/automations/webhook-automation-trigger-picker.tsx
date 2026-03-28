@@ -7,17 +7,27 @@ import {
   ComboboxItem,
   ComboboxLabel,
   ComboboxList,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Switch,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   useComboboxAnchor,
 } from "@mistle/ui";
-import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
@@ -192,7 +202,7 @@ export function WebhookAutomationTriggerPicker(input: {
               }
               key={option.id}
             >
-              <div className="min-w-0 self-start md:col-start-1 md:row-start-1">
+              <div className="min-w-0 self-start md:col-start-1 md:row-start-1 md:self-center">
                 <div className="flex min-w-0 items-center gap-2.5">
                   {option.logoKey === undefined ? null : (
                     <img
@@ -277,6 +287,7 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
     ...(input.disabledReason === undefined ? {} : { disabledReason: input.disabledReason }),
   });
   const [isOpen, setIsOpen] = useState(false);
+  const [isSingleTriggerDialogOpen, setIsSingleTriggerDialogOpen] = useState(false);
   const anchorRef = useComboboxAnchor();
   const triggerPickerId = useId();
 
@@ -287,6 +298,20 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
       multiple
       onOpenChange={setIsOpen}
       onValueChange={(value) => {
+        const nextTriggerId = value.find(
+          (candidate) => !input.selectedTriggerIds.includes(candidate),
+        );
+
+        if (
+          input.selectedTriggerIds.length > 0 &&
+          nextTriggerId !== undefined &&
+          !input.selectedTriggerIds.includes(nextTriggerId)
+        ) {
+          setIsOpen(false);
+          setIsSingleTriggerDialogOpen(true);
+          return;
+        }
+
         input.onValueChange(value);
         setIsOpen(false);
       }}
@@ -363,6 +388,29 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
           ))}
         </ComboboxList>
       </ComboboxContent>
+
+      <Dialog onOpenChange={setIsSingleTriggerDialogOpen} open={isSingleTriggerDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader variant="sectioned">
+            <DialogTitle>Only one trigger is supported</DialogTitle>
+            <DialogDescription>
+              Automations currently support only one trigger. Remove the existing trigger before
+              adding a different one.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                setIsSingleTriggerDialogOpen(false);
+              }}
+              type="button"
+              variant="outline"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Combobox>
   );
 }
@@ -374,6 +422,17 @@ function TriggerParameterField(input: {
   value: string;
   onValueChange: (value: string) => void;
 }): React.JSX.Element | null {
+  const [lastNonEmptyStringValue, setLastNonEmptyStringValue] = useState(() => input.value.trim());
+
+  useEffect(() => {
+    const nextValue = input.value.trim();
+    if (nextValue.length === 0) {
+      return;
+    }
+
+    setLastNonEmptyStringValue(nextValue);
+  }, [input.value]);
+
   const resourceQuery = useQuery({
     queryKey: [
       "automation-trigger-parameters",
@@ -402,6 +461,54 @@ function TriggerParameterField(input: {
   });
 
   if (input.parameter.kind === "string") {
+    if (input.parameter.controlVariant === "explicit-invocation") {
+      const switchId = `${input.eventType}:${input.parameter.id}`;
+      const defaultExplicitInvocationValue = input.parameter.defaultValue ?? "@mistlebot";
+      const savedExplicitInvocationValue = input.value.trim();
+      const explicitInvocationValue =
+        savedExplicitInvocationValue.length > 0
+          ? savedExplicitInvocationValue
+          : lastNonEmptyStringValue.length > 0
+            ? lastNonEmptyStringValue
+            : defaultExplicitInvocationValue;
+      const checked = input.value.trim().length > 0;
+      const tooltipMessage = `Enable this to respond only when ${explicitInvocationValue} is mentioned. Disable it to respond to every event.`;
+
+      return (
+        <div className="inline-flex items-center gap-3 rounded-md border px-3 py-2">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="block text-sm">
+              Only respond to <span className="font-medium">{explicitInvocationValue}</span>
+            </span>
+            <Tooltip>
+              <TooltipTrigger
+                aria-label="Explain explicit mention requirement"
+                render={
+                  <button
+                    className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded-sm"
+                    type="button"
+                  />
+                }
+              >
+                <InfoIcon aria-hidden className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-64 text-left" side="top">
+                {tooltipMessage}
+              </TooltipContent>
+            </Tooltip>
+          </span>
+          <Switch
+            aria-label={`Only respond to ${explicitInvocationValue}`}
+            checked={checked}
+            id={switchId}
+            onCheckedChange={(nextChecked) => {
+              input.onValueChange(nextChecked ? explicitInvocationValue : "");
+            }}
+          />
+        </div>
+      );
+    }
+
     return (
       <span className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
         <span className="text-muted-foreground shrink-0 text-sm whitespace-nowrap">

@@ -9,7 +9,7 @@ type PayloadFilterNode =
       filters: PayloadFilterNode[];
     }
   | {
-      op: "eq";
+      op: "eq" | "contains" | "contains_token";
       path: string[];
       value: string;
     }
@@ -63,6 +63,30 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
     };
   }
 
+  if (value["op"] === "contains") {
+    if (!isStringArray(value["path"]) || typeof value["value"] !== "string") {
+      return null;
+    }
+
+    return {
+      op: "contains",
+      path: value["path"],
+      value: value["value"],
+    };
+  }
+
+  if (value["op"] === "contains_token") {
+    if (!isStringArray(value["path"]) || typeof value["value"] !== "string") {
+      return null;
+    }
+
+    return {
+      op: "contains_token",
+      path: value["path"],
+      value: value["value"],
+    };
+  }
+
   if (value["op"] === "exists" || value["op"] === "not_exists") {
     if (!isStringArray(value["path"])) {
       return null;
@@ -80,6 +104,22 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
 function buildEqNode(input: { path: string[]; value: string }): PayloadFilterNode {
   return {
     op: "eq",
+    path: input.path,
+    value: input.value,
+  };
+}
+
+function buildContainsNode(input: { path: string[]; value: string }): PayloadFilterNode {
+  return {
+    op: "contains",
+    path: input.path,
+    value: input.value,
+  };
+}
+
+function buildContainsTokenNode(input: { path: string[]; value: string }): PayloadFilterNode {
+  return {
+    op: "contains_token",
     path: input.path,
     value: input.value,
   };
@@ -123,6 +163,26 @@ function buildPayloadFilterNodeFromTriggerParameters(input: {
           buildExistsNode({
             path: [...parameter.payloadPath],
             operator: configuredValue,
+          }),
+        );
+        continue;
+      }
+
+      if (parameter.kind === "string" && parameter.matchMode === "contains") {
+        filters.push(
+          buildContainsNode({
+            path: [...parameter.payloadPath],
+            value: configuredValue,
+          }),
+        );
+        continue;
+      }
+
+      if (parameter.kind === "string" && parameter.matchMode === "contains_token") {
+        filters.push(
+          buildContainsTokenNode({
+            path: [...parameter.payloadPath],
+            value: configuredValue,
           }),
         );
         continue;
@@ -204,7 +264,13 @@ export function extractWebhookAutomationTriggerParameterValues(input: {
   const remainingFilters: PayloadFilterNode[] = [];
 
   for (const filter of rootFilters) {
-    if (filter.op !== "eq" && filter.op !== "exists" && filter.op !== "not_exists") {
+    if (
+      filter.op !== "eq" &&
+      filter.op !== "contains" &&
+      filter.op !== "contains_token" &&
+      filter.op !== "exists" &&
+      filter.op !== "not_exists"
+    ) {
       remainingFilters.push(filter);
       continue;
     }
@@ -227,6 +293,20 @@ export function extractWebhookAutomationTriggerParameterValues(input: {
               triggerParameterValues[triggerId] = {
                 ...(triggerParameterValues[triggerId] ?? {}),
                 [parameter.id]: filter.op,
+              };
+              extracted = true;
+            }
+            break;
+          }
+
+          if (
+            parameter.kind === "string" &&
+            (parameter.matchMode === "contains" || parameter.matchMode === "contains_token")
+          ) {
+            if (filter.op === parameter.matchMode) {
+              triggerParameterValues[triggerId] = {
+                ...(triggerParameterValues[triggerId] ?? {}),
+                [parameter.id]: filter.value,
               };
               extracted = true;
             }
@@ -277,4 +357,39 @@ export function extractWebhookAutomationTriggerParameterValues(input: {
       filters: remainingFilters,
     },
   };
+}
+
+export function applyWebhookAutomationTriggerParameterDefaults(input: {
+  eventOptions: readonly WebhookAutomationEventOption[];
+  selectedTriggerIds: readonly string[];
+  triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
+}): WebhookAutomationTriggerParameterValueMap {
+  const nextValues: WebhookAutomationTriggerParameterValueMap = {};
+
+  for (const triggerId of input.selectedTriggerIds) {
+    const existingValues = input.triggerParameterValues[triggerId] ?? {};
+    const nextTriggerValues: Record<string, string> = { ...existingValues };
+    const eventOption = input.eventOptions.find((option) => option.id === triggerId);
+
+    for (const parameter of eventOption?.parameters ?? []) {
+      if (parameter.kind !== "string" || parameter.defaultEnabled !== true) {
+        continue;
+      }
+
+      if (Object.hasOwn(nextTriggerValues, parameter.id)) {
+        continue;
+      }
+
+      const defaultValue = parameter.defaultValue?.trim() ?? "";
+      if (defaultValue.length === 0) {
+        continue;
+      }
+
+      nextTriggerValues[parameter.id] = defaultValue;
+    }
+
+    nextValues[triggerId] = nextTriggerValues;
+  }
+
+  return nextValues;
 }

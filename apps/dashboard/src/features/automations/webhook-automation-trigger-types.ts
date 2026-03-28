@@ -22,6 +22,10 @@ export type WebhookAutomationEventParameterOption =
       label: string;
       kind: "string";
       payloadPath: string[];
+      matchMode?: "eq" | "contains" | "contains_token";
+      defaultValue?: string;
+      defaultEnabled?: boolean;
+      controlVariant?: "explicit-invocation";
       prefix?: string;
       placeholder?: string;
     }

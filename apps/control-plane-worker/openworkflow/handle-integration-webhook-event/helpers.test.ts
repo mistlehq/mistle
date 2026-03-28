@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   and,
   contains,
+  containsToken,
   endsWith,
   eq,
   exists,
@@ -20,6 +21,7 @@ describe("webhook filter helpers", () => {
     const filter = and([
       eq(path("action"), "created"),
       contains(path("comment.body"), "@mistlebot"),
+      containsToken(path("comment.body"), "@mistlebot"),
       neq(path(["sender", "login"]), "dependabot[bot]"),
       inList(path("action"), ["created", "edited"]),
       startsWith(path("comment.body"), "hello"),
@@ -39,6 +41,11 @@ describe("webhook filter helpers", () => {
         },
         {
           op: "contains",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+        {
+          op: "contains_token",
           path: ["comment", "body"],
           value: "@mistlebot",
         },

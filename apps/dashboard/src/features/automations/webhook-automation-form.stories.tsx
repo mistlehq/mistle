@@ -25,6 +25,10 @@ const PullRequestOpenedTriggerId = createWebhookAutomationTriggerId({
   connectionId: GitHubConnectionId,
   eventType: "github.pull_request.opened",
 });
+const PullRequestReviewSubmittedTriggerId = createWebhookAutomationTriggerId({
+  connectionId: GitHubConnectionId,
+  eventType: "github.pull_request_review.submitted",
+});
 const PushDeletedTriggerId = createWebhookAutomationTriggerId({
   connectionId: GitHubConnectionId,
   eventType: "github.push.deleted",
@@ -187,6 +191,17 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
     logoKey: "github",
     parameters: [
       {
+        id: "explicitInvocation",
+        label: "explicit mention",
+        kind: "string",
+        payloadPath: ["comment", "body"],
+        matchMode: "contains_token",
+        defaultValue: "@mistlebot",
+        defaultEnabled: true,
+        controlVariant: "explicit-invocation",
+        placeholder: 'Require "@mistlebot"',
+      },
+      {
         id: "target",
         label: "comment target",
         kind: "enum-select",
@@ -227,14 +242,27 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
   {
     id: createWebhookAutomationTriggerId({
       connectionId: GitHubConnectionId,
-      eventType: "github.issue.opened",
+      eventType: "github.issues.opened",
     }),
-    eventType: "github.issue.opened",
+    eventType: "github.issues.opened",
     connectionId: GitHubConnectionId,
     connectionLabel: "GitHub Engineering",
     label: "Issue opened",
     category: "GitHub Engineering / Issues",
     logoKey: "github",
+    parameters: [
+      {
+        id: "explicitInvocation",
+        label: "explicit mention",
+        kind: "string",
+        payloadPath: ["issue", "body"],
+        matchMode: "contains_token",
+        defaultValue: "@mistlebot",
+        defaultEnabled: true,
+        controlVariant: "explicit-invocation",
+        placeholder: 'Require "@mistlebot"',
+      },
+    ],
   },
   {
     id: PullRequestOpenedTriggerId,
@@ -245,6 +273,65 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
     category: "GitHub Engineering / Pull requests",
     logoKey: "github",
     parameters: [
+      {
+        id: "explicitInvocation",
+        label: "explicit mention",
+        kind: "string",
+        payloadPath: ["pull_request", "body"],
+        matchMode: "contains_token",
+        defaultValue: "@mistlebot",
+        defaultEnabled: true,
+        controlVariant: "explicit-invocation",
+        placeholder: 'Require "@mistlebot"',
+      },
+      {
+        id: "repository",
+        label: "repository",
+        kind: "resource-select",
+        resourceKind: "repository",
+        payloadPath: ["repository", "full_name"],
+        prefix: "in",
+      },
+      {
+        id: "author",
+        label: "author",
+        kind: "resource-select",
+        resourceKind: "user",
+        payloadPath: ["sender", "login"],
+        prefix: "by",
+        placeholder: "Any author",
+      },
+      {
+        id: "baseBranch",
+        label: "base branch",
+        kind: "resource-select",
+        resourceKind: "branch",
+        payloadPath: ["pull_request", "base", "ref"],
+        prefix: "to",
+        placeholder: "Any base branch",
+      },
+    ],
+  },
+  {
+    id: PullRequestReviewSubmittedTriggerId,
+    eventType: "github.pull_request_review.submitted",
+    connectionId: GitHubConnectionId,
+    connectionLabel: "GitHub Engineering",
+    label: "Pull request review submitted",
+    category: "GitHub Engineering / Pull requests",
+    logoKey: "github",
+    parameters: [
+      {
+        id: "explicitInvocation",
+        label: "explicit mention",
+        kind: "string",
+        payloadPath: ["review", "body"],
+        matchMode: "contains_token",
+        defaultValue: "@mistlebot",
+        defaultEnabled: true,
+        controlVariant: "explicit-invocation",
+        placeholder: 'Require "@mistlebot"',
+      },
       {
         id: "repository",
         label: "repository",
@@ -284,6 +371,19 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
     label: "Pull request review comment created",
     category: "GitHub Engineering / Pull requests",
     logoKey: "github",
+    parameters: [
+      {
+        id: "explicitInvocation",
+        label: "explicit mention",
+        kind: "string",
+        payloadPath: ["comment", "body"],
+        matchMode: "contains_token",
+        defaultValue: "@mistlebot",
+        defaultEnabled: true,
+        controlVariant: "explicit-invocation",
+        placeholder: 'Require "@mistlebot"',
+      },
+    ],
   },
 ];
 
@@ -309,16 +409,12 @@ const ExistingAutomationValues: WebhookAutomationFormValues = {
     "{{payload}}",
   ].join("\n"),
   conversationKeyTemplate: "{{payload.repository.full_name}}:{{payload.ref}}",
-  triggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+  triggerIds: [PullRequestOpenedTriggerId],
   triggerParameterValues: {
     [PullRequestOpenedTriggerId]: {
       repository: "mistlehq/platform",
       author: "octocat",
       baseBranch: "main",
-    },
-    [IssueCommentCreatedTriggerId]: {
-      target: "exists",
-      commenter: "hubot",
     },
   },
 };
@@ -485,7 +581,7 @@ export const UnavailableSavedEvent: Story = {
     onDelete: function onDelete() {},
     values: {
       ...ExistingAutomationValues,
-      triggerIds: [IssueCommentCreatedTriggerId, PushDeletedTriggerId],
+      triggerIds: [PushDeletedTriggerId],
       triggerParameterValues: {},
     },
     webhookEventOptions: [
@@ -515,14 +611,8 @@ export const WrongProfileSavedEvent: Story = {
     values: {
       ...ExistingAutomationValues,
       sandboxProfileId: "sbp_finance_investigator",
-      triggerIds: [IssueCommentCreatedTriggerId, PullRequestOpenedTriggerId],
-      triggerParameterValues: {
-        [PullRequestOpenedTriggerId]: {
-          repository: "mistlehq/platform",
-          author: "octocat",
-          baseBranch: "main",
-        },
-      },
+      triggerIds: [IssueCommentCreatedTriggerId],
+      triggerParameterValues: {},
     },
     webhookEventOptions: [
       {
@@ -530,7 +620,6 @@ export const WrongProfileSavedEvent: Story = {
         availability: "wrong_profile",
         description: "Trigger is unavailable for the selected sandbox profile.",
       },
-      GitHubWebhookEventOptions[2]!,
     ],
   },
 };

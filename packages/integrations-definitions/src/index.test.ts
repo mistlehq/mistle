@@ -58,6 +58,17 @@ describe("integrations-definitions index", () => {
           providerEventType: "issue_comment",
           displayName: "Issue comment created",
           category: "Issues",
+          parameters: expect.arrayContaining([
+            expect.objectContaining({
+              id: "explicitInvocation",
+              kind: "string",
+              payloadPath: ["comment", "body"],
+              matchMode: "contains_token",
+              defaultValue: "@mistlebot",
+              defaultEnabled: true,
+              controlVariant: "explicit-invocation",
+            }),
+          ]),
         }),
       ]),
     );

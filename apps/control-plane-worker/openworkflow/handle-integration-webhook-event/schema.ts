@@ -89,6 +89,13 @@ export const WebhookPayloadFilterSchema: z.ZodType<WebhookPayloadFilter> = z.laz
       .strict(),
     z
       .object({
+        op: z.literal("contains_token"),
+        path: WebhookPayloadFilterPathSchema,
+        value: z.string(),
+      })
+      .strict(),
+    z
+      .object({
         op: z.literal("starts_with"),
         path: WebhookPayloadFilterPathSchema,
         value: z.string(),

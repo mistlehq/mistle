@@ -1813,10 +1813,16 @@ export interface paths {
                         resourceKind: string;
                       }
                     | {
+                        /** @enum {string} */
+                        controlVariant?: "explicit-invocation";
+                        defaultEnabled?: boolean;
+                        defaultValue?: string;
                         id: string;
                         /** @enum {string} */
                         kind: "string";
                         label: string;
+                        /** @enum {string} */
+                        matchMode?: "eq" | "contains" | "contains_token";
                         payloadPath: string[];
                         placeholder?: string;
                         prefix?: string;

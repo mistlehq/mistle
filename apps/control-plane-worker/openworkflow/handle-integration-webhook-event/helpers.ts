@@ -12,6 +12,7 @@ type EqWebhookPayloadFilter = Extract<WebhookPayloadFilter, { op: "eq" }>;
 type NeqWebhookPayloadFilter = Extract<WebhookPayloadFilter, { op: "neq" }>;
 type InWebhookPayloadFilter = Extract<WebhookPayloadFilter, { op: "in" }>;
 type ContainsWebhookPayloadFilter = Extract<WebhookPayloadFilter, { op: "contains" }>;
+type ContainsTokenWebhookPayloadFilter = Extract<WebhookPayloadFilter, { op: "contains_token" }>;
 type StartsWithWebhookPayloadFilter = Extract<WebhookPayloadFilter, { op: "starts_with" }>;
 type EndsWithWebhookPayloadFilter = Extract<WebhookPayloadFilter, { op: "ends_with" }>;
 type ExistsWebhookPayloadFilter = Extract<WebhookPayloadFilter, { op: "exists" }>;
@@ -97,6 +98,17 @@ export function contains(
 ): ContainsWebhookPayloadFilter {
   return {
     op: "contains",
+    path: path(filterPath),
+    value,
+  };
+}
+
+export function containsToken(
+  filterPath: WebhookPayloadFilterPath,
+  value: string,
+): ContainsTokenWebhookPayloadFilter {
+  return {
+    op: "contains_token",
     path: path(filterPath),
     value,
   };
