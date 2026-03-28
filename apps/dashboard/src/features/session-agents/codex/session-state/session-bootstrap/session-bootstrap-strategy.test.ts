@@ -1,22 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveSessionBootstrapStrategy } from "./session-bootstrap-strategy.js";
+import { resolveSessionBootstrapPlan } from "./session-bootstrap-strategy.js";
 
-describe("session bootstrap strategy", () => {
-  it("returns disconnected when no connected session exists", () => {
+describe("session bootstrap plan", () => {
+  it("returns no active plan when no connected session exists", () => {
     expect(
-      resolveSessionBootstrapStrategy({
+      resolveSessionBootstrapPlan({
         connectedSession: null,
-        establishedConnectionAtIso: null,
-        establishedSandboxInstanceId: null,
-        hasEstablishedBaseline: false,
+        establishedConnectionKey: null,
       }),
-    ).toBe("disconnected");
+    ).toEqual({
+      connectionKey: null,
+      shouldLoadBootstrapData: false,
+      threadSyncKey: null,
+    });
   });
 
-  it("returns disconnected when the connected session has no thread yet", () => {
+  it("returns no active plan when the connected session has no thread yet", () => {
     expect(
-      resolveSessionBootstrapStrategy({
+      resolveSessionBootstrapPlan({
         connectedSession: {
           sandboxInstanceId: "sandbox_123",
           connectedAtIso: "2026-03-27T00:00:00.000Z",
@@ -24,16 +26,18 @@ describe("session bootstrap strategy", () => {
           connectionUrl: "wss://example.invalid",
           threadId: null,
         },
-        establishedConnectionAtIso: null,
-        establishedSandboxInstanceId: null,
-        hasEstablishedBaseline: false,
+        establishedConnectionKey: null,
       }),
-    ).toBe("disconnected");
+    ).toEqual({
+      connectionKey: null,
+      shouldLoadBootstrapData: false,
+      threadSyncKey: null,
+    });
   });
 
-  it("runs a full bootstrap before a baseline has been established", () => {
+  it("loads bootstrap data before a baseline has been established", () => {
     expect(
-      resolveSessionBootstrapStrategy({
+      resolveSessionBootstrapPlan({
         connectedSession: {
           sandboxInstanceId: "sandbox_123",
           connectedAtIso: "2026-03-27T00:00:00.000Z",
@@ -41,16 +45,18 @@ describe("session bootstrap strategy", () => {
           connectionUrl: "wss://example.invalid",
           threadId: "thread_123",
         },
-        establishedConnectionAtIso: null,
-        establishedSandboxInstanceId: null,
-        hasEstablishedBaseline: false,
+        establishedConnectionKey: null,
       }),
-    ).toBe("full");
+    ).toEqual({
+      connectionKey: "sandbox_123:2026-03-27T00:00:00.000Z",
+      shouldLoadBootstrapData: true,
+      threadSyncKey: "sandbox_123:2026-03-27T00:00:00.000Z:thread_123",
+    });
   });
 
-  it("refreshes bootstrap data when reconnecting to the same sandbox instance", () => {
+  it("reloads bootstrap data when reconnecting to the same sandbox instance", () => {
     expect(
-      resolveSessionBootstrapStrategy({
+      resolveSessionBootstrapPlan({
         connectedSession: {
           sandboxInstanceId: "sandbox_123",
           connectedAtIso: "2026-03-27T00:05:00.000Z",
@@ -58,16 +64,18 @@ describe("session bootstrap strategy", () => {
           connectionUrl: "wss://example.invalid",
           threadId: "thread_123",
         },
-        establishedConnectionAtIso: "2026-03-27T00:00:00.000Z",
-        establishedSandboxInstanceId: "sandbox_123",
-        hasEstablishedBaseline: true,
+        establishedConnectionKey: "sandbox_123:2026-03-27T00:00:00.000Z",
       }),
-    ).toBe("refresh");
+    ).toEqual({
+      connectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
+      shouldLoadBootstrapData: true,
+      threadSyncKey: "sandbox_123:2026-03-27T00:05:00.000Z:thread_123",
+    });
   });
 
-  it("runs a thread-only sync when the same connection changes thread state", () => {
+  it("runs thread sync without reloading bootstrap data for the same connection", () => {
     expect(
-      resolveSessionBootstrapStrategy({
+      resolveSessionBootstrapPlan({
         connectedSession: {
           sandboxInstanceId: "sandbox_123",
           connectedAtIso: "2026-03-27T00:05:00.000Z",
@@ -75,27 +83,31 @@ describe("session bootstrap strategy", () => {
           connectionUrl: "wss://example.invalid",
           threadId: "thread_123",
         },
-        establishedConnectionAtIso: "2026-03-27T00:05:00.000Z",
-        establishedSandboxInstanceId: "sandbox_123",
-        hasEstablishedBaseline: true,
+        establishedConnectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
       }),
-    ).toBe("thread_sync");
+    ).toEqual({
+      connectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
+      shouldLoadBootstrapData: false,
+      threadSyncKey: "sandbox_123:2026-03-27T00:05:00.000Z:thread_123",
+    });
   });
 
-  it("runs a full bootstrap when the sandbox instance changes", () => {
+  it("keeps bootstrap data cached when only the thread changes on the same connection", () => {
     expect(
-      resolveSessionBootstrapStrategy({
+      resolveSessionBootstrapPlan({
         connectedSession: {
-          sandboxInstanceId: "sandbox_456",
-          connectedAtIso: "2026-03-27T00:00:00.000Z",
+          sandboxInstanceId: "sandbox_123",
+          connectedAtIso: "2026-03-27T00:05:00.000Z",
           expiresAtIso: "2026-03-27T01:00:00.000Z",
           connectionUrl: "wss://example.invalid",
           threadId: "thread_456",
         },
-        establishedConnectionAtIso: "2026-03-27T00:00:00.000Z",
-        establishedSandboxInstanceId: "sandbox_123",
-        hasEstablishedBaseline: true,
+        establishedConnectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
       }),
-    ).toBe("full");
+    ).toEqual({
+      connectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
+      shouldLoadBootstrapData: false,
+      threadSyncKey: "sandbox_123:2026-03-27T00:05:00.000Z:thread_456",
+    });
   });
 });
