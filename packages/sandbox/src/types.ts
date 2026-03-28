@@ -44,10 +44,26 @@ export interface SandboxInspectResult<
   readonly provider: TProvider;
   readonly id: string;
   readonly state: TState;
+  /**
+   * Provider-neutral lifecycle meaning for policy decisions.
+   *
+   * `state` intentionally stays coarse (`running` | `stopped`) so it can be shared
+   * across providers. `disposition` carries the stronger semantic distinction that
+   * data-plane lifecycle code actually needs:
+   * - `active`: runtime still exists and is actively running
+   * - `resumable_stopped`: runtime still exists and may be resumed
+   * - `terminal_stopped`: runtime still exists but is terminal/dead
+   */
   readonly disposition: TDisposition;
   readonly createdAt: string | null;
   readonly startedAt: string | null;
   readonly endedAt: string | null;
+  /**
+   * Raw upstream provider payload for observability and provider-specific debugging.
+   *
+   * Application lifecycle code should prefer `state` and `disposition` over
+   * branching on provider-specific raw fields.
+   */
   readonly raw: TRaw;
 }
 

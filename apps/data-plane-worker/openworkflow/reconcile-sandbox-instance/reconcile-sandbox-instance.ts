@@ -28,6 +28,13 @@ type ActiveSandboxInstance = {
   status: "starting" | "running";
 };
 
+/**
+ * Disconnect reconciliation is fenced the same way the old disconnected-stop
+ * path was fenced:
+ * - if the bootstrap reattached, do nothing
+ * - if ownership changed, do nothing
+ * - only reconcile when the sandbox is still unattached for the same owner
+ */
 export function shouldExecuteSandboxDisconnectReconciliation(input: {
   expectedOwnerLeaseId: string;
   snapshot: SandboxRuntimeStateSnapshot;
@@ -53,6 +60,11 @@ export function shouldExecuteSandboxDisconnectReconciliation(input: {
   );
 }
 
+/**
+ * Disconnect reconciliation only handles sandboxes that already crossed the
+ * provider boundary. `pending` is therefore an invariant violation here, while
+ * `stopped` / `failed` are terminal no-ops.
+ */
 async function resolveActiveSandboxInstance(input: {
   db: DataPlaneDatabase;
   sandboxInstanceId: string;
@@ -98,6 +110,10 @@ async function resolveActiveSandboxInstance(input: {
   }
 }
 
+/**
+ * Provider absence is a first-class outcome for reconciliation and is modeled
+ * separately from provider-disposition states.
+ */
 async function inspectProviderStateOrMissing(ctx: {
   sandboxAdapter: SandboxAdapter;
   providerSandboxId: string;
@@ -117,6 +133,11 @@ async function inspectProviderStateOrMissing(ctx: {
   }
 }
 
+/**
+ * A runtime can disappear between the initial inspect and the explicit stop.
+ * In that race, we treat the sandbox as failed rather than silently converting
+ * it into a normal stopped state.
+ */
 async function stopProviderSandboxOrMarkMissing(ctx: {
   config: DataPlaneWorkerRuntimeConfig;
   sandboxAdapter: SandboxAdapter;
@@ -158,6 +179,15 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
   return "stopped";
 }
 
+/**
+ * Reconciles durable sandbox state after disconnect grace elapses.
+ *
+ * The workflow sequence is:
+ * 1. fence on current gateway/runtime attachment state
+ * 2. load the durable sandbox row
+ * 3. inspect provider-backed runtime truth
+ * 4. apply the status/disposition policy matrix
+ */
 export async function reconcileSandboxInstance(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;

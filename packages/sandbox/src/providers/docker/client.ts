@@ -126,6 +126,9 @@ function normalizeDockerInspectState(state: string): DockerSandboxInspectResult[
 function normalizeDockerInspectDisposition(
   state: string,
 ): DockerSandboxInspectResult["disposition"] {
+  // Docker exposes more lifecycle detail than the shared inspect contract.
+  // This mapping preserves the distinction the data plane cares about without
+  // leaking Docker-specific status handling into higher layers.
   switch (state) {
     case "running":
     case "restarting":

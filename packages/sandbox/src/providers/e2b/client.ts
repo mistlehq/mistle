@@ -120,6 +120,8 @@ function normalizeE2BInspectState(state: "running" | "paused"): E2BSandboxInspec
 function normalizeE2BInspectDisposition(
   state: "running" | "paused",
 ): E2BSandboxInspectResult["disposition"] {
+  // E2B paused sandboxes remain resumable, so the shared disposition carries
+  // stronger meaning than the coarse shared `stopped` state alone.
   switch (state) {
     case "running":
       return SandboxInspectDispositions.ACTIVE;

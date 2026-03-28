@@ -14,6 +14,14 @@ export type DisconnectReconciliationAction =
       kind: "stop_then_mark_stopped";
     };
 
+/**
+ * Maps durable sandbox status plus provider-backed runtime disposition into the
+ * exact action the disconnect reconciliation workflow should take.
+ *
+ * This is intentionally provider-agnostic. Provider-specific interpretation
+ * belongs in `@mistle/sandbox`, which reduces raw provider payloads into the
+ * shared `SandboxInspectDisposition`.
+ */
 export function determineDisconnectReconciliationAction(input: {
   sandboxStatus: string;
   providerState: SandboxInspectDisposition | "missing";
