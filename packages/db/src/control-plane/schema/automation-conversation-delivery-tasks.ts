@@ -1,4 +1,4 @@
-import { index, integer, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { bigint, index, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
 import { automationConversations } from "./automation-conversations.js";
@@ -34,12 +34,12 @@ export const automationConversationDeliveryTasks = controlPlaneSchema.table(
       .notNull()
       .references(() => integrationWebhookEvents.id, { onDelete: "cascade" }),
     sourceOrderKey: text("source_order_key").notNull(),
-    processorGeneration: integer("processor_generation"),
+    processorGeneration: bigint("processor_generation", { mode: "number" }),
     status: text("status")
       .notNull()
       .$type<AutomationConversationDeliveryTaskStatus>()
       .default(AutomationConversationDeliveryTaskStatuses.QUEUED),
-    attemptCount: integer("attempt_count").notNull().default(0),
+    attemptCount: bigint("attempt_count", { mode: "number" }).notNull().default(0),
     failureCode: text("failure_code"),
     failureMessage: text("failure_message"),
     claimedAt: timestamp("claimed_at", { withTimezone: true, mode: "string" }),
