@@ -10,7 +10,7 @@ import { describe, expect } from "vitest";
 import { INTERNAL_SANDBOX_ROUTE_BASE_PATH } from "../src/internal/index.js";
 import { it } from "./test-context.js";
 
-describe("internal sandbox conventional get integration", () => {
+describe("internal sandbox instances get integration", () => {
   it("returns pending before provider provisioning begins", async ({ fixture }) => {
     await fixture.db.insert(sandboxInstances).values({
       id: "sbi_conventional_get_pending",
