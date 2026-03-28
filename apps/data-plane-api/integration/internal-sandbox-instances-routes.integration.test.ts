@@ -97,7 +97,7 @@ async function waitForWorkflowRun(input: {
   );
 }
 
-describe("internal sandbox conventional routes integration", () => {
+describe("internal sandbox instances routes integration", () => {
   it("starts a sandbox instance from POST /internal/sandbox/instances", async ({ fixture }) => {
     const response = await fetch(
       new URL(`${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances`, fixture.baseUrl),
