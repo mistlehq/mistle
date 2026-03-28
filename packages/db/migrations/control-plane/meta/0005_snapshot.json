@@ -734,7 +734,7 @@
         },
         "processor_generation": {
           "name": "processor_generation",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
           "notNull": false
         },
@@ -747,7 +747,7 @@
         },
         "attempt_count": {
           "name": "attempt_count",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
           "notNull": true,
           "default": "0"

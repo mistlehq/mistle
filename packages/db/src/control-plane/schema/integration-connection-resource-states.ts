@@ -1,4 +1,4 @@
-import { index, integer, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { bigint, index, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 import { integrationConnections } from "./integration-connections.js";
 import { controlPlaneSchema } from "./namespace.js";
@@ -25,7 +25,7 @@ export const integrationConnectionResourceStates = controlPlaneSchema.table(
       .notNull()
       .$type<IntegrationConnectionResourceSyncState>()
       .default(IntegrationConnectionResourceSyncStates.NEVER_SYNCED),
-    totalCount: integer("total_count").notNull().default(0),
+    totalCount: bigint("total_count", { mode: "number" }).notNull().default(0),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true, mode: "string" }),
     lastSyncStartedAt: timestamp("last_sync_started_at", {
       withTimezone: true,
