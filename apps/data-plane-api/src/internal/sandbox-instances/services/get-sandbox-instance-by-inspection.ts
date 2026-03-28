@@ -56,7 +56,43 @@ async function markRunningSandboxInstanceStopped(
 
 const InspectionFailureCodes = {
   PROVIDER_RUNTIME_MISSING: "provider_runtime_missing",
+  PROVIDER_RUNTIME_STOPPED_DURING_STARTUP: "provider_runtime_stopped_during_startup",
 } as const;
+
+async function markStartingSandboxInstanceFailed(
+  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
+  input: {
+    sandboxInstanceId: string;
+    failureCode: string;
+    failureMessage: string;
+  },
+): Promise<void> {
+  const updatedRows = await ctx.db
+    .update(sandboxInstances)
+    .set({
+      status: SandboxInstanceStatuses.FAILED,
+      stopReason: SandboxStopReasons.FAILED,
+      failedAt: sql`now()`,
+      failureCode: input.failureCode,
+      failureMessage: input.failureMessage,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(sandboxInstances.id, input.sandboxInstanceId),
+        eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+      ),
+    )
+    .returning({
+      status: sandboxInstances.status,
+    });
+
+  if (updatedRows[0]?.status === SandboxInstanceStatuses.FAILED) {
+    return;
+  }
+
+  throw new Error("Failed to transition sandbox instance status from starting to failed.");
+}
 
 async function markRunningSandboxInstanceFailed(
   ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
@@ -103,22 +139,24 @@ async function inspectStartingSandboxInstance(
   },
 ): Promise<NonNullable<GetSandboxInstanceResponse>> {
   if (sandboxInstance.providerSandboxId === null) {
-    return {
-      id: sandboxInstance.id,
-      status: SandboxInstanceStatuses.STARTING,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-    };
+    throw new Error(
+      `Expected starting sandbox instance '${sandboxInstance.id}' to have a providerSandboxId.`,
+    );
   }
 
   const inspection = await inspectSandboxInstanceOrNull(ctx, sandboxInstance.providerSandboxId);
 
   if (inspection === null) {
+    await markStartingSandboxInstanceFailed(ctx, {
+      sandboxInstanceId: sandboxInstance.id,
+      failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
+      failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
+    });
     return {
       id: sandboxInstance.id,
-      status: SandboxInstanceStatuses.STARTING,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
+      status: SandboxInstanceStatuses.FAILED,
+      failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
+      failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
     };
   }
 
@@ -131,9 +169,28 @@ async function inspectStartingSandboxInstance(
     };
   }
 
+  await markStartingSandboxInstanceFailed(ctx, {
+    sandboxInstanceId: sandboxInstance.id,
+    failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_STOPPED_DURING_STARTUP,
+    failureMessage: "Sandbox runtime was not running at the provider during startup inspection.",
+  });
+
   return {
     id: sandboxInstance.id,
-    status: SandboxInstanceStatuses.STARTING,
+    status: SandboxInstanceStatuses.FAILED,
+    failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_STOPPED_DURING_STARTUP,
+    failureMessage: "Sandbox runtime was not running at the provider during startup inspection.",
+  };
+}
+
+function readPendingSandboxInstance(sandboxInstance: {
+  id: string;
+  failureCode: string | null;
+  failureMessage: string | null;
+}): NonNullable<GetSandboxInstanceResponse> {
+  return {
+    id: sandboxInstance.id,
+    status: SandboxInstanceStatuses.PENDING,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
   };
@@ -248,6 +305,8 @@ export async function getSandboxInstanceByInspection(
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,
       };
+    case SandboxInstanceStatuses.PENDING:
+      return readPendingSandboxInstance(sandboxInstance);
     case SandboxInstanceStatuses.STARTING: {
       return inspectStartingSandboxInstance(ctx, sandboxInstance);
     }

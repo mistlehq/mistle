@@ -7,7 +7,7 @@ import {
 
 import { SandboxInstancesNotFoundCodes } from "./constants.js";
 
-const sandboxInstanceStatusSchema = z.enum(["starting", "running", "stopped", "failed"]);
+const sandboxInstanceStatusSchema = z.enum(["pending", "starting", "running", "stopped", "failed"]);
 const sandboxInstanceSourceSchema = z.enum(["dashboard", "webhook"]);
 const sandboxInstanceStartedBySchema = z
   .object({

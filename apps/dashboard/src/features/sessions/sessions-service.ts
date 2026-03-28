@@ -17,7 +17,7 @@ const StartSandboxProfileInstanceResponseSchema = z
 const SandboxInstanceStatusResponseSchema = z
   .object({
     id: z.string().min(1),
-    status: z.enum(["starting", "running", "stopped", "failed"]),
+    status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
     automationConversation: z
@@ -46,7 +46,7 @@ export type StartSandboxInstanceResult = {
 
 export type SandboxInstanceStatusResult = {
   id: string;
-  status: "starting" | "running" | "stopped" | "failed";
+  status: "pending" | "starting" | "running" | "stopped" | "failed";
   failureCode: string | null;
   failureMessage: string | null;
   automationConversation: {

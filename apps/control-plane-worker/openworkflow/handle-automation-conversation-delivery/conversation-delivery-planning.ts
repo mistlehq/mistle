@@ -9,7 +9,7 @@ export type ConversationDeliverySandboxAction =
 
 export function resolveAutomationConversationDeliverySandboxAction(input: {
   sandboxInstanceId: string | null;
-  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
+  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed" | null;
 }): ConversationDeliverySandboxAction {
   if (input.sandboxInstanceId === null) {
     return AutomationConversationDeliverySandboxActions.START_NEW;

@@ -10,7 +10,7 @@ export const InternalSandboxRuntimeGetSandboxInstanceRequestSchema = z
 export const InternalSandboxRuntimeGetSandboxInstanceResponseSchema = z
   .object({
     id: z.string().min(1),
-    status: z.enum(["starting", "running", "stopped", "failed"]),
+    status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
   })

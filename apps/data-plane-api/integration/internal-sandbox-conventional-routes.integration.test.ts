@@ -142,7 +142,7 @@ describe("internal sandbox conventional routes integration", () => {
 
     expect(insertedInstance).toEqual({
       id: parsedResponse.sandboxInstanceId,
-      status: SandboxInstanceStatuses.STARTING,
+      status: SandboxInstanceStatuses.PENDING,
     });
   }, 60_000);
 

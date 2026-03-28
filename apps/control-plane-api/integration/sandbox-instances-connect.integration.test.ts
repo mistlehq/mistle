@@ -79,7 +79,7 @@ async function insertSandboxInstance(input: {
   dataPlaneFixture: DisposableDataPlaneRuntime;
   organizationId: string;
   sandboxInstanceId: string;
-  status: "starting" | "running" | "stopped" | "failed";
+  status: "pending" | "starting" | "running" | "stopped" | "failed";
   providerSandboxId?: string | null;
   failureCode?: string | null;
   failureMessage?: string | null;
@@ -291,7 +291,7 @@ describe("sandbox instance connect integration", () => {
     }
   });
 
-  it("waits for starting instances to become running before minting a connection token", async ({
+  it("waits for pending instances to become running before minting a connection token", async ({
     fixture,
   }) => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
@@ -332,7 +332,7 @@ describe("sandbox instance connect integration", () => {
         dataPlaneFixture,
         organizationId: authSession.organizationId,
         sandboxInstanceId: "sbi_cp_connect_starting_001",
-        status: "starting",
+        status: "pending",
         providerSandboxId: null,
       });
 
