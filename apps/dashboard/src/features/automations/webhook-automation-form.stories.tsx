@@ -409,17 +409,12 @@ const ExistingAutomationValues: WebhookAutomationFormValues = {
     "{{payload}}",
   ].join("\n"),
   conversationKeyTemplate: "{{payload.repository.full_name}}:{{payload.ref}}",
-  triggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+  triggerIds: [PullRequestOpenedTriggerId],
   triggerParameterValues: {
     [PullRequestOpenedTriggerId]: {
       repository: "mistlehq/platform",
       author: "octocat",
       baseBranch: "main",
-    },
-    [IssueCommentCreatedTriggerId]: {
-      explicitInvocation: "@mistlebot",
-      target: "exists",
-      commenter: "hubot",
     },
   },
 };
@@ -586,7 +581,7 @@ export const UnavailableSavedEvent: Story = {
     onDelete: function onDelete() {},
     values: {
       ...ExistingAutomationValues,
-      triggerIds: [IssueCommentCreatedTriggerId, PushDeletedTriggerId],
+      triggerIds: [PushDeletedTriggerId],
       triggerParameterValues: {},
     },
     webhookEventOptions: [
@@ -616,14 +611,8 @@ export const WrongProfileSavedEvent: Story = {
     values: {
       ...ExistingAutomationValues,
       sandboxProfileId: "sbp_finance_investigator",
-      triggerIds: [IssueCommentCreatedTriggerId, PullRequestOpenedTriggerId],
-      triggerParameterValues: {
-        [PullRequestOpenedTriggerId]: {
-          repository: "mistlehq/platform",
-          author: "octocat",
-          baseBranch: "main",
-        },
-      },
+      triggerIds: [IssueCommentCreatedTriggerId],
+      triggerParameterValues: {},
     },
     webhookEventOptions: [
       {
@@ -631,7 +620,6 @@ export const WrongProfileSavedEvent: Story = {
         availability: "wrong_profile",
         description: "Trigger is unavailable for the selected sandbox profile.",
       },
-      GitHubWebhookEventOptions[2]!,
     ],
   },
 };

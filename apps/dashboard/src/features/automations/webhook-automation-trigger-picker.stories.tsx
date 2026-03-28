@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { expect, userEvent, within } from "storybook/test";
 
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
@@ -411,17 +412,12 @@ export const Default: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: GitHubConnectionId,
-    selectedTriggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+    selectedTriggerIds: [PullRequestOpenedTriggerId],
     triggerParameterValues: {
       [PullRequestOpenedTriggerId]: {
         author: "octocat",
         baseBranch: "main",
         repository: "mistlehq/platform",
-      },
-      [IssueCommentCreatedTriggerId]: {
-        explicitInvocation: "@mistlebot",
-        target: "exists",
-        commenter: "hubot",
       },
     },
     eventOptions: GitHubEventOptions,
@@ -459,7 +455,7 @@ export const UnavailableSavedTrigger: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: GitHubConnectionId,
-    selectedTriggerIds: [PullRequestOpenedTriggerId, PushDeletedTriggerId],
+    selectedTriggerIds: [PushDeletedTriggerId],
     eventOptions: [
       ...GitHubEventOptions,
       {
@@ -481,7 +477,7 @@ export const WrongProfileSavedTrigger: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: GitHubConnectionId,
-    selectedTriggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+    selectedTriggerIds: [IssueCommentCreatedTriggerId],
     eventOptions: [
       {
         id: IssueCommentCreatedTriggerId,
@@ -494,7 +490,35 @@ export const WrongProfileSavedTrigger: Story = {
         availability: "wrong_profile",
         description: "Trigger is unavailable for the selected sandbox profile.",
       },
-      GitHubEventOptions[2]!,
     ],
+  },
+};
+
+export const SecondTriggerAttemptShowsDialog: Story = {
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: GitHubConnectionId,
+    selectedTriggerIds: [IssueCommentCreatedTriggerId],
+    triggerParameterValues: {
+      [IssueCommentCreatedTriggerId]: {
+        explicitInvocation: "@mistlebot",
+      },
+    },
+    eventOptions: GitHubEventOptions,
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    const page = within(canvasElement.ownerDocument.body);
+    const addTriggerInput = canvas.getByPlaceholderText("Add trigger");
+
+    await userEvent.click(addTriggerInput);
+    await userEvent.click(await canvas.findByRole("option", { name: "Pull request opened" }));
+
+    await expect(page.getByText("Only one trigger is supported")).toBeVisible();
+    await expect(
+      page.getByText(
+        "Automations currently support only one trigger. Remove the existing trigger before adding a different one.",
+      ),
+    ).toBeVisible();
   },
 };

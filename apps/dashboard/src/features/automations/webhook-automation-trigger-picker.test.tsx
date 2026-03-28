@@ -465,6 +465,48 @@ describe("WebhookAutomationTriggerPicker", () => {
     ).toBeDefined();
   });
 
+  it("shows a dialog instead of adding a second trigger", () => {
+    const { container } = renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedTriggerIds: [
+        createWebhookAutomationTriggerId({
+          connectionId: GitHubConnectionId,
+          eventType: "github.issue_comment.created",
+        }),
+      ],
+      triggerParameterValues: {},
+      useStatefulSelection: true,
+    });
+
+    const addTriggerButton = container.querySelector('button[data-slot="input-group-button"]');
+    if (addTriggerButton === null) {
+      throw new Error("Expected add trigger button.");
+    }
+
+    fireEvent.click(addTriggerButton);
+    fireEvent.click(screen.getByRole("option", { name: "Pull request opened" }));
+
+    expect(screen.getByText("Only one trigger is supported")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Automations currently support only one trigger. Remove the existing trigger before adding a different one.",
+      ),
+    ).toBeDefined();
+    expect(
+      within(container).queryByRole("button", {
+        hidden: true,
+        name: "Remove Pull request opened trigger",
+      }),
+    ).toBeNull();
+    expect(
+      within(container).getByRole("button", {
+        hidden: true,
+        name: "Remove Issue comment created trigger",
+      }),
+    ).toBeDefined();
+  });
+
   it("resets unsaved resource query text when the selected value changes", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
