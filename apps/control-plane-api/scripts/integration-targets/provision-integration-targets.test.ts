@@ -1,7 +1,8 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,6 +13,7 @@ import {
   parseIntegrationTargetsProvisionManifest,
   resolveRepositoryRootFromDirectory,
 } from "./provision-integration-targets.js";
+import { SyncIntegrationTargetsForTests } from "./sync-integration-targets.js";
 
 describe("provision-integration-targets", () => {
   it("parses a valid integration target provision manifest", () => {
@@ -214,6 +216,31 @@ describe("provision-integration-targets", () => {
         },
       ],
     });
+  });
+
+  it("keeps the example provision manifest target keys aligned with the integration registry", async () => {
+    const rawExampleManifest = await readFile(
+      new URL("../../../../integration-targets.provision.example.json", import.meta.url),
+      "utf8",
+    );
+    const parsedExampleManifest = parseIntegrationTargetsProvisionManifest(rawExampleManifest, {
+      MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM:
+        "-----BEGIN KEY-----\nexample\n-----END KEY-----",
+      MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET: "whsec_example_cloud",
+      MISTLE_INTEGRATION_TARGET_GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM:
+        "-----BEGIN KEY-----\nexample\n-----END KEY-----",
+      MISTLE_INTEGRATION_TARGET_GITHUB_ENTERPRISE_SERVER_WEBHOOK_SECRET: "whsec_example_enterprise",
+    });
+    const integrationRegistry = createIntegrationRegistry();
+    const expectedTargetKeys = SyncIntegrationTargetsForTests.buildSyncIntegrationTargets(
+      integrationRegistry,
+    )
+      .map((target) => target.targetKey)
+      .sort();
+
+    const actualTargetKeys = parsedExampleManifest.targets.map((target) => target.targetKey).sort();
+
+    expect(actualTargetKeys).toEqual(expectedTargetKeys);
   });
 
   it("rejects provision targets that specify both secrets and secretEnv", () => {
