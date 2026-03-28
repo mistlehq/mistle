@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { ReconcileSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
 
 import type { AppRuntimeResources } from "../../../resources.js";
@@ -11,7 +13,7 @@ type ReconcileSandboxInstanceContext = {
 };
 
 function createReconcileSandboxIdempotencyKey(input: ReconcileSandboxInstanceInput): string {
-  return JSON.stringify({
+  const keyPayload = JSON.stringify({
     version: 1,
     sandboxInstanceId: input.sandboxInstanceId,
     action: "reconcile",
@@ -19,6 +21,8 @@ function createReconcileSandboxIdempotencyKey(input: ReconcileSandboxInstanceInp
     expectedOwnerLeaseId: input.expectedOwnerLeaseId,
     idempotencyKey: input.idempotencyKey,
   });
+
+  return createHash("sha256").update(keyPayload).digest("hex");
 }
 
 export async function reconcileSandboxInstance(

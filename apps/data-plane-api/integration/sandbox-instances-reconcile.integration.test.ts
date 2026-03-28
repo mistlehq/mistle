@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   createDataPlaneSandboxInstancesClient,
   type ReconcileSandboxInstanceInput,
@@ -27,17 +29,6 @@ const WorkflowRunInputSchema = z
   })
   .strict();
 
-const WorkflowRunIdempotencyKeySchema = z
-  .object({
-    version: z.literal(1),
-    sandboxInstanceId: z.string().min(1),
-    action: z.literal("reconcile"),
-    reason: z.literal("disconnect_grace_elapsed"),
-    expectedOwnerLeaseId: z.string().min(1),
-    idempotencyKey: z.string().min(1),
-  })
-  .strict();
-
 const WorkflowName = "data-plane.sandbox-instances.reconcile";
 const WorkflowQueuePollIntervalMs = 100;
 const WorkflowQueueWaitTimeoutMs = 10_000;
@@ -50,6 +41,21 @@ function createSandboxInstancesClient(
     baseUrl,
     serviceToken,
   });
+}
+
+function createExpectedWorkflowIdempotencyKey(input: ReconcileSandboxInstanceInput): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        version: 1,
+        sandboxInstanceId: input.sandboxInstanceId,
+        action: "reconcile",
+        reason: input.reason,
+        expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+        idempotencyKey: input.idempotencyKey,
+      }),
+    )
+    .digest("hex");
 }
 
 async function waitForWorkflowRuns(input: {
@@ -141,16 +147,7 @@ describe("sandboxInstances.reconcile integration", () => {
       reason: workflowInput.reason,
       expectedOwnerLeaseId: workflowInput.expectedOwnerLeaseId,
     });
-    expect(
-      WorkflowRunIdempotencyKeySchema.parse(JSON.parse(queuedRun.idempotency_key ?? "")),
-    ).toEqual({
-      version: 1,
-      sandboxInstanceId,
-      action: "reconcile",
-      reason: workflowInput.reason,
-      expectedOwnerLeaseId: workflowInput.expectedOwnerLeaseId,
-      idempotencyKey: workflowInput.idempotencyKey,
-    });
+    expect(queuedRun.idempotency_key).toBe(createExpectedWorkflowIdempotencyKey(workflowInput));
   }, 60_000);
 
   it("deduplicates duplicate reconcile requests by idempotency key", async ({ fixture }) => {
