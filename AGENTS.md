@@ -110,7 +110,7 @@
 
 - Prefer Drizzle's relational query API (`database.query.<table>.findFirst/findMany`) over raw `database.select(...)` unless you need SQL-level control.
 - In relational queries, prefer clause operator helpers from callback context (for example `where: (table, { eq, and }) => ...`) instead of importing operators directly from `drizzle-orm`.
-- Prefer `typeid` identifiers over UUIDs for application-generated IDs, and use the app's shared ID helper module (for control-plane-api, `src/lib/ids.ts`) instead of calling `typeid-js` directly.
+- Prefer `typeid` identifiers over UUIDs for application-generated IDs.
 - Prefer database-native timestamps for persisted rows: use schema defaults like `.defaultNow()` or SQL primitives like `sql\`now()\``instead of`new Date()` values in insert/update payloads.
 
 ### Pull Requests
