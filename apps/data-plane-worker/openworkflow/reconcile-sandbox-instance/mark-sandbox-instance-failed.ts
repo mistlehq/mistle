@@ -38,6 +38,8 @@ export async function markSandboxInstanceFailed(ctx: {
     return;
   }
 
+  // A concurrent reconciler may have already moved the row to `failed`, which
+  // we treat as idempotent success rather than an invariant violation.
   const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
     columns: {
       status: true,
