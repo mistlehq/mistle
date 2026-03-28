@@ -2,14 +2,16 @@ import type {
   CodexJsonRpcClient,
   CodexModelSummary,
 } from "@mistle/integrations-definitions/openai/agent/client";
-import { useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 
 import {
   readComposerConfigSnapshot,
   type ComposerConfigSnapshot,
 } from "../../../../pages/session-composer/session-composer-config.js";
 import type { ConnectedCodexSession } from "../codex-session-types.js";
-import { resolveSessionBootstrapStrategy } from "./session-bootstrap-strategy.js";
+import { resolveSessionBootstrapState } from "./session-bootstrap-state.js";
+import { resolveSessionBootstrapPlan } from "./session-bootstrap-strategy.js";
 
 export type SessionBootstrapState =
   | { status: "disconnected" }
@@ -28,6 +30,34 @@ const EmptyComposerConfig: ComposerConfigSnapshot = {
   modelReasoningEffort: null,
 };
 
+type LoadModelsResult = {
+  models: readonly CodexModelSummary[];
+  response: unknown;
+};
+
+type ReadConfigResult = {
+  config: unknown;
+  response: unknown;
+};
+
+type ThreadSyncState =
+  | { status: "idle"; threadSyncKey: null }
+  | { status: "syncing"; threadSyncKey: string }
+  | { status: "ready"; threadSyncKey: string }
+  | { status: "failed"; threadSyncKey: string; message: string };
+
+function createModelsQueryKey(
+  connectionKey: string,
+): readonly ["codex-session-bootstrap", "models", string] {
+  return ["codex-session-bootstrap", "models", connectionKey];
+}
+
+function createConfigQueryKey(
+  connectionKey: string,
+): readonly ["codex-session-bootstrap", "config", string] {
+  return ["codex-session-bootstrap", "config", connectionKey];
+}
+
 export function useSessionBootstrap(input: {
   connectedSession: ConnectedCodexSession | null;
   ensureCurrentGeneration: (generation: number) => void;
@@ -41,138 +71,201 @@ export function useSessionBootstrap(input: {
   readConfigAsync: (includeLayers: boolean) => Promise<{ config: unknown; response: unknown }>;
   rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
 }) {
-  const [state, setState] = useState<SessionBootstrapState>({ status: "disconnected" });
-  const [configSnapshot, setConfigSnapshot] = useState<ComposerConfigSnapshot>(EmptyComposerConfig);
-  const [availableModels, setAvailableModels] = useState<readonly CodexModelSummary[]>([]);
-  const [hasEstablishedBaseline, setHasEstablishedBaseline] = useState(false);
-  const [establishedConnectionAtIso, setEstablishedConnectionAtIso] = useState<string | null>(null);
-  const [establishedSandboxInstanceId, setEstablishedSandboxInstanceId] = useState<string | null>(
-    null,
-  );
-  const bootstrapGenerationRef = useRef(0);
+  const queryClient = useQueryClient();
+  const [establishedConnectionKey, setEstablishedConnectionKey] = useState<string | null>(null);
+  const [threadSyncState, setThreadSyncState] = useState<ThreadSyncState>({
+    status: "idle",
+    threadSyncKey: null,
+  });
+  const threadSyncGenerationRef = useRef(0);
+
+  const bootstrapPlan = resolveSessionBootstrapPlan({
+    connectedSession: input.connectedSession,
+    establishedConnectionKey,
+  });
+
+  const activeConnectionKey = bootstrapPlan.connectionKey;
+  const shouldLoadBootstrapData = bootstrapPlan.shouldLoadBootstrapData;
+  const activeThreadSyncKey = bootstrapPlan.threadSyncKey;
+  const activeThreadId = input.connectedSession?.threadId ?? null;
+
+  const modelsQuery = useQuery<LoadModelsResult>({
+    queryKey:
+      activeConnectionKey === null
+        ? ["codex-session-bootstrap", "models", "disconnected"]
+        : createModelsQueryKey(activeConnectionKey),
+    queryFn: async () => {
+      return await input.loadModelsAsync();
+    },
+    enabled: activeConnectionKey !== null && shouldLoadBootstrapData,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+    refetchOnWindowFocus: false,
+  });
+
+  const configQuery = useQuery<ReadConfigResult>({
+    queryKey:
+      activeConnectionKey === null
+        ? ["codex-session-bootstrap", "config", "disconnected"]
+        : createConfigQueryKey(activeConnectionKey),
+    queryFn: async () => {
+      return await input.readConfigAsync(false);
+    },
+    enabled: activeConnectionKey !== null && shouldLoadBootstrapData,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+    refetchOnWindowFocus: false,
+  });
 
   useEffect(() => {
-    const bootstrapStrategy = resolveSessionBootstrapStrategy({
-      connectedSession: input.connectedSession,
-      establishedConnectionAtIso,
-      establishedSandboxInstanceId,
-      hasEstablishedBaseline,
+    if (activeThreadSyncKey === null || activeThreadId === null) {
+      return;
+    }
+
+    const currentThreadSyncGeneration = threadSyncGenerationRef.current + 1;
+    threadSyncGenerationRef.current = currentThreadSyncGeneration;
+    setThreadSyncState({
+      status: "syncing",
+      threadSyncKey: activeThreadSyncKey,
     });
 
-    if (bootstrapStrategy === "disconnected") {
-      bootstrapGenerationRef.current += 1;
-      if (!hasEstablishedBaseline) {
-        setState((currentState) =>
-          currentState.status === "disconnected" ? currentState : { status: "disconnected" },
-        );
-      }
-      return;
-    }
-
-    const connectedSession = input.connectedSession;
-    if (connectedSession === null || connectedSession.threadId === null) {
-      return;
-    }
-
-    const connectedThreadId = connectedSession.threadId;
-    const currentBootstrapGeneration = bootstrapGenerationRef.current + 1;
-    bootstrapGenerationRef.current = currentBootstrapGeneration;
-    if (bootstrapStrategy === "thread_sync") {
-      void (async () => {
-        try {
-          await input.hydrateInitialThread({
-            generation: currentBootstrapGeneration,
-            ensureCurrentGeneration: input.ensureCurrentGeneration,
-            ...(input.rpcClientRef.current === null
-              ? {}
-              : { rpcClient: input.rpcClientRef.current }),
-            threadId: connectedThreadId,
-          });
-        } catch (error) {
-          if (bootstrapGenerationRef.current !== currentBootstrapGeneration) {
-            return;
-          }
-
-          setState({
-            status: "failed",
-            message: error instanceof Error ? error.message : "Could not read thread.",
-          });
-          return;
-        }
-
-        if (bootstrapGenerationRef.current !== currentBootstrapGeneration) {
-          return;
-        }
-
-        setState({ status: "ready" });
-      })();
-      return;
-    }
-
-    setState({ status: "bootstrapping" });
-
     void (async () => {
-      const [modelsResult, configResult, threadResult] = await Promise.allSettled([
-        input.loadModelsAsync(),
-        input.readConfigAsync(false),
-        input.hydrateInitialThread({
-          generation: currentBootstrapGeneration,
+      try {
+        await input.hydrateInitialThread({
+          generation: currentThreadSyncGeneration,
           ensureCurrentGeneration: input.ensureCurrentGeneration,
           ...(input.rpcClientRef.current === null ? {} : { rpcClient: input.rpcClientRef.current }),
-          threadId: connectedThreadId,
-        }),
-      ]);
+          threadId: activeThreadId,
+        });
+      } catch (error) {
+        if (threadSyncGenerationRef.current !== currentThreadSyncGeneration) {
+          return;
+        }
 
-      if (bootstrapGenerationRef.current !== currentBootstrapGeneration) {
-        return;
-      }
-
-      if (modelsResult.status === "rejected") {
-        setState({
+        setThreadSyncState({
           status: "failed",
-          message:
-            modelsResult.reason instanceof Error
-              ? modelsResult.reason.message
-              : "Could not load models.",
+          threadSyncKey: activeThreadSyncKey,
+          message: error instanceof Error ? error.message : "Could not read thread.",
         });
         return;
       }
 
-      if (threadResult.status === "rejected") {
-        setState({
-          status: "failed",
-          message:
-            threadResult.reason instanceof Error
-              ? threadResult.reason.message
-              : "Could not read thread.",
-        });
+      if (threadSyncGenerationRef.current !== currentThreadSyncGeneration) {
         return;
       }
 
-      const nextConfigSnapshot =
-        configResult.status === "fulfilled"
-          ? readComposerConfigSnapshot(JSON.stringify(configResult.value.config))
-          : EmptyComposerConfig;
-
-      setAvailableModels(modelsResult.value.models);
-      setConfigSnapshot(nextConfigSnapshot);
-
-      setHasEstablishedBaseline(true);
-      setEstablishedConnectionAtIso(connectedSession.connectedAtIso);
-      setEstablishedSandboxInstanceId(connectedSession.sandboxInstanceId);
-      setState({ status: "ready" });
+      setThreadSyncState({
+        status: "ready",
+        threadSyncKey: activeThreadSyncKey,
+      });
     })();
   }, [
-    establishedConnectionAtIso,
-    establishedSandboxInstanceId,
-    hasEstablishedBaseline,
-    input.connectedSession,
+    activeThreadId,
+    activeThreadSyncKey,
     input.ensureCurrentGeneration,
     input.hydrateInitialThread,
-    input.loadModelsAsync,
-    input.readConfigAsync,
     input.rpcClientRef,
   ]);
+
+  const establishedModels = useMemo(() => {
+    if (establishedConnectionKey === null) {
+      return [] as readonly CodexModelSummary[];
+    }
+
+    return (
+      queryClient.getQueryData<LoadModelsResult>(createModelsQueryKey(establishedConnectionKey))
+        ?.models ?? []
+    );
+  }, [establishedConnectionKey, queryClient]);
+
+  const establishedConfigSnapshot = useMemo(() => {
+    if (establishedConnectionKey === null) {
+      return EmptyComposerConfig;
+    }
+
+    const cachedConfig = queryClient.getQueryData<ReadConfigResult>(
+      createConfigQueryKey(establishedConnectionKey),
+    );
+    if (cachedConfig === undefined) {
+      return EmptyComposerConfig;
+    }
+
+    return readComposerConfigSnapshot(JSON.stringify(cachedConfig.config));
+  }, [establishedConnectionKey, queryClient]);
+
+  const availableModels = useMemo(() => {
+    if (shouldLoadBootstrapData) {
+      return modelsQuery.data?.models ?? establishedModels;
+    }
+
+    return establishedModels;
+  }, [establishedModels, modelsQuery.data?.models, shouldLoadBootstrapData]);
+
+  const configSnapshot = useMemo(() => {
+    if (!shouldLoadBootstrapData) {
+      return establishedConfigSnapshot;
+    }
+
+    if (configQuery.data !== undefined) {
+      return readComposerConfigSnapshot(JSON.stringify(configQuery.data.config));
+    }
+
+    return establishedConfigSnapshot;
+  }, [configQuery.data, establishedConfigSnapshot, shouldLoadBootstrapData]);
+
+  const threadSyncFailedForCurrentThread =
+    activeThreadSyncKey !== null &&
+    threadSyncState.threadSyncKey === activeThreadSyncKey &&
+    threadSyncState.status === "failed";
+  const threadSyncReadyForCurrentThread =
+    activeThreadSyncKey !== null &&
+    threadSyncState.threadSyncKey === activeThreadSyncKey &&
+    threadSyncState.status === "ready";
+  const isCurrentConnectionBootstrapping =
+    activeConnectionKey !== null &&
+    activeThreadSyncKey !== null &&
+    (!threadSyncReadyForCurrentThread ||
+      (shouldLoadBootstrapData && (modelsQuery.isPending || configQuery.isPending)));
+
+  const state = useMemo(
+    (): SessionBootstrapState =>
+      resolveSessionBootstrapState({
+        activeConnectionKey,
+        activeThreadSyncKey,
+        configError:
+          configQuery.isError && configQuery.error instanceof Error ? configQuery.error : null,
+        isCurrentConnectionBootstrapping,
+        modelsError:
+          modelsQuery.isError && modelsQuery.error instanceof Error ? modelsQuery.error : null,
+        threadSyncFailureMessage:
+          threadSyncFailedForCurrentThread && threadSyncState.status === "failed"
+            ? threadSyncState.message
+            : null,
+      }),
+    [
+      activeConnectionKey,
+      activeThreadSyncKey,
+      configQuery.error,
+      configQuery.isError,
+      isCurrentConnectionBootstrapping,
+      modelsQuery.error,
+      modelsQuery.isError,
+      threadSyncFailedForCurrentThread,
+      threadSyncState,
+    ],
+  );
+
+  useEffect(() => {
+    if (state.status !== "ready" || activeConnectionKey === null) {
+      return;
+    }
+
+    setEstablishedConnectionKey((currentKey) =>
+      currentKey === activeConnectionKey ? currentKey : activeConnectionKey,
+    );
+  }, [activeConnectionKey, state.status]);
 
   return {
     availableModels,
