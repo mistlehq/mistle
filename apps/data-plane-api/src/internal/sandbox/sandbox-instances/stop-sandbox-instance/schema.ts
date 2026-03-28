@@ -10,7 +10,7 @@ export const StopSandboxInstanceParamsSchema = z
 
 export const StopSandboxInstanceBodySchema = z
   .object({
-    stopReason: z.enum(["idle", "disconnected"]),
+    stopReason: z.literal("idle"),
     expectedOwnerLeaseId: z.string().min(1),
     idempotencyKey: z.string().min(1).max(255),
   })

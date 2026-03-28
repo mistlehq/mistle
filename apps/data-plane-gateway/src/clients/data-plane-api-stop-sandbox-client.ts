@@ -25,7 +25,7 @@ export class DataPlaneApiStopSandboxClient implements StopSandboxRequester {
    */
   async requestStop(input: {
     sandboxInstanceId: string;
-    stopReason: "idle" | "disconnected";
+    stopReason: "idle";
     expectedOwnerLeaseId: string;
     idempotencyKey: string;
   }): Promise<void> {

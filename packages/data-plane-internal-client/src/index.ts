@@ -48,7 +48,7 @@ export type ResumeSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/resume"]["post"]["responses"]["200"]["content"]["application/json"];
 export type StopSandboxInstanceInput = {
   sandboxInstanceId: string;
-  stopReason: "idle" | "disconnected";
+  stopReason: "idle";
   expectedOwnerLeaseId: string;
   idempotencyKey: string;
 };

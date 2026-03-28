@@ -1402,7 +1402,7 @@
                 "properties": {
                   "stopReason": {
                     "type": "string",
-                    "enum": ["idle", "disconnected"]
+                    "enum": ["idle"]
                   },
                   "expectedOwnerLeaseId": {
                     "type": "string",

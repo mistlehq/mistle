@@ -12,7 +12,7 @@ export const StopSandboxInstanceWorkflowVersion = "1";
 export const ReconcileSandboxInstanceWorkflowName = "data-plane.sandbox-instances.reconcile";
 export const ReconcileSandboxInstanceWorkflowVersion = "1";
 
-export type SandboxStopReason = "idle" | "disconnected";
+export type SandboxStopReason = "idle";
 export type SandboxReconcileReason = "disconnect_grace_elapsed";
 
 export type StartSandboxInstanceWorkflowImageInput = Pick<

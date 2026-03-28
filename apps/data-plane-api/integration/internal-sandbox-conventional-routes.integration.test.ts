@@ -33,7 +33,7 @@ const ResumeWorkflowInputSchema = z
 const StopWorkflowInputSchema = z
   .object({
     sandboxInstanceId: z.string().min(1),
-    stopReason: z.union([z.literal("idle"), z.literal("disconnected")]),
+    stopReason: z.literal("idle"),
     expectedOwnerLeaseId: z.string().min(1),
   })
   .strict();
