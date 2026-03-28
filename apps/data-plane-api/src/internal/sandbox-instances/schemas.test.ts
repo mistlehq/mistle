@@ -185,7 +185,7 @@ describe("StopSandboxInstanceInputSchema", () => {
   it("requires an explicit idempotency key", () => {
     const result = StopSandboxInstanceInputSchema.safeParse({
       sandboxInstanceId: "sbi_123",
-      stopReason: "disconnected",
+      stopReason: "idle",
       expectedOwnerLeaseId: "sol_123",
     });
 

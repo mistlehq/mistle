@@ -34,47 +34,4 @@ describe("shouldExecuteSandboxStop", () => {
       }),
     ).toBe(false);
   });
-
-  it("rejects a disconnected stop when a replacement owner has taken over", () => {
-    expect(
-      shouldExecuteSandboxStop({
-        stopReason: "disconnected",
-        expectedOwnerLeaseId: "dtl_old",
-        snapshot: {
-          ownerLeaseId: "dtl_new",
-          attachment: {
-            sandboxInstanceId: "sbi_disconnect",
-            ownerLeaseId: "dtl_new",
-            nodeId: "dpg_disconnect",
-            sessionId: "dts_disconnect",
-            attachedAtMs: 1_000,
-          },
-        },
-      }),
-    ).toBe(false);
-  });
-
-  it("allows a disconnected stop only when no current attachment exists and the owner is gone or unchanged", () => {
-    expect(
-      shouldExecuteSandboxStop({
-        stopReason: "disconnected",
-        expectedOwnerLeaseId: "dtl_disconnect",
-        snapshot: {
-          ownerLeaseId: "dtl_disconnect",
-          attachment: null,
-        },
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldExecuteSandboxStop({
-        stopReason: "disconnected",
-        expectedOwnerLeaseId: "dtl_disconnect",
-        snapshot: {
-          ownerLeaseId: null,
-          attachment: null,
-        },
-      }),
-    ).toBe(true);
-  });
 });

@@ -630,7 +630,7 @@ export interface paths {
             expectedOwnerLeaseId: string;
             idempotencyKey: string;
             /** @enum {string} */
-            stopReason: "idle" | "disconnected";
+            stopReason: "idle";
           };
         };
       };

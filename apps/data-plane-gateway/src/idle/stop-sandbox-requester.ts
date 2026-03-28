@@ -1,7 +1,7 @@
 /**
  * A stop reason that can be requested by gateway-owned idle control.
  */
-export type SandboxStopReason = "idle" | "disconnected";
+export type SandboxStopReason = "idle";
 
 /**
  * Requests a sandbox stop through the worker-owned lifecycle boundary.
