@@ -6,6 +6,7 @@ import { typeid } from "typeid-js";
 import type { WebSocketServer } from "ws";
 
 import { createApp, stopApp } from "../app.js";
+import { DataPlaneApiReconcileSandboxClient } from "../clients/data-plane-api-reconcile-sandbox-client.js";
 import { DataPlaneApiStopSandboxClient } from "../clients/data-plane-api-stop-sandbox-client.js";
 import { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { LocalSandboxIdleController } from "../idle/sandbox-idle-controller.js";
@@ -130,6 +131,10 @@ export function createDataPlaneGatewayRuntime(
     baseUrl: config.app.dataPlaneApi.baseUrl,
     serviceToken: config.internalAuth.serviceToken,
   });
+  const reconcileSandboxRequester = new DataPlaneApiReconcileSandboxClient({
+    baseUrl: config.app.dataPlaneApi.baseUrl,
+    serviceToken: config.internalAuth.serviceToken,
+  });
   const sandboxIdleControllerRegistry = new SandboxIdleControllerRegistry((input) => {
     return new LocalSandboxIdleController(
       {
@@ -144,6 +149,7 @@ export function createDataPlaneGatewayRuntime(
         presenceStore: sandboxPresenceStore,
         runtimeAttachmentStore: sandboxRuntimeAttachmentStore,
         stopRequester: stopSandboxRequester,
+        reconcileRequester: reconcileSandboxRequester,
       },
       input.onDisposed,
     );
