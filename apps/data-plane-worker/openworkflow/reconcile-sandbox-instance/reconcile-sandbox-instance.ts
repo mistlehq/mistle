@@ -175,10 +175,6 @@ export async function reconcileSandboxInstance(
     expectedOwnerLeaseId: string;
   },
 ): Promise<void> {
-  if (input.reason !== "disconnect_grace_elapsed") {
-    throw new Error(`Unsupported sandbox reconcile reason '${input.reason}'.`);
-  }
-
   const snapshot = await ctx.runtimeStateReader.readSnapshot({
     sandboxInstanceId: input.sandboxInstanceId,
     nowMs: ctx.clock.nowMs(),
