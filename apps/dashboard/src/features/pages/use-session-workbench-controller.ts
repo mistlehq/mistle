@@ -246,7 +246,7 @@ export function shouldShowResumeInFlightState(input: {
   resumeActionErrorMessage: string | null;
   shouldAttemptInitialStoppedResume: boolean;
   isResumingStoppedSandbox: boolean;
-  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
+  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed" | null;
 }): boolean {
   return (
     input.sandboxStatus === "stopped" &&
@@ -257,7 +257,7 @@ export function shouldShowResumeInFlightState(input: {
 }
 
 export function shouldPollStoppedSandboxStatus(input: {
-  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
+  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed" | null;
   hasAttemptedInitialStoppedResume: boolean;
   isResumingStoppedSandbox: boolean;
   resumeActionErrorMessage: string | null;
@@ -278,7 +278,7 @@ export function resolveSessionEntryPhase(input: {
   connectedSession: boolean;
   hasResumeInFlightState: boolean;
   isStatusPending: boolean;
-  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
+  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed" | null;
 }): SessionEntryPhase {
   if (input.sandboxStatus === "failed") {
     return "sandbox_failed";
@@ -288,7 +288,7 @@ export function resolveSessionEntryPhase(input: {
     return input.connectedSession ? "ready" : "connecting";
   }
 
-  if (input.sandboxStatus === "starting") {
+  if (input.sandboxStatus === "pending" || input.sandboxStatus === "starting") {
     return "sandbox_starting";
   }
 

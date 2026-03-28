@@ -24,12 +24,13 @@ export async function persistSandboxInstanceProvisioning(
       .update(sandboxInstances)
       .set({
         providerSandboxId: input.providerSandboxId,
+        status: SandboxInstanceStatuses.STARTING,
         updatedAt: sql`now()`,
       })
       .where(
         and(
           eq(sandboxInstances.id, input.sandboxInstanceId),
-          eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+          eq(sandboxInstances.status, SandboxInstanceStatuses.PENDING),
         ),
       )
       .returning({
@@ -38,7 +39,7 @@ export async function persistSandboxInstanceProvisioning(
 
     if (updatedRows[0] === undefined) {
       throw new Error(
-        "Failed to persist provider sandbox id while sandbox instance was still starting.",
+        "Failed to persist provider sandbox id while sandbox instance was still pending.",
       );
     }
 

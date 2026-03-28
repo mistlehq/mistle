@@ -132,6 +132,97 @@ describe("internal sandbox instance runtime status integration", () => {
     RuntimeStatusTestTimeoutMs,
   );
 
+  it("returns pending from getSandboxInstance before provider provisioning begins", async ({
+    fixture,
+  }) => {
+    const client = createDataPlaneSandboxInstancesClient({
+      baseUrl: fixture.baseUrl,
+      serviceToken: fixture.internalAuthServiceToken,
+    });
+    const organizationId = `org_${typeid("org").toString()}`;
+    const sandboxInstanceId = typeid("sbi").toString();
+
+    await fixture.db.insert(sandboxInstances).values({
+      id: sandboxInstanceId,
+      organizationId,
+      sandboxProfileId: "sbp_runtime_status",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: null,
+      status: SandboxInstanceStatuses.PENDING,
+      startedByKind: "user",
+      startedById: "usr_runtime_status",
+      source: "dashboard",
+    });
+
+    await expect(
+      client.getSandboxInstance({
+        organizationId,
+        instanceId: sandboxInstanceId,
+      }),
+    ).resolves.toMatchObject({
+      id: sandboxInstanceId,
+      status: "pending",
+      failureCode: null,
+      failureMessage: null,
+    });
+  });
+
+  it(
+    "marks starting sandboxes failed when provider inspection reports the runtime missing",
+    async ({ fixture }) => {
+      const client = createDataPlaneSandboxInstancesClient({
+        baseUrl: fixture.baseUrl,
+        serviceToken: fixture.internalAuthServiceToken,
+      });
+      const adapter = createSandboxAdapter({
+        provider: SandboxProvider.DOCKER,
+        docker: {
+          socketPath: fixture.config.sandbox.docker?.socketPath ?? "/var/run/docker.sock",
+        },
+      });
+      const organizationId = `org_${typeid("org").toString()}`;
+      const sandboxInstanceId = typeid("sbi").toString();
+      const sandbox = await adapter.start({
+        image: {
+          provider: SandboxProvider.DOCKER,
+          imageId: "registry:3",
+          createdAt: "2026-03-27T00:00:00.000Z",
+        },
+      });
+
+      await fixture.db.insert(sandboxInstances).values({
+        id: sandboxInstanceId,
+        organizationId,
+        sandboxProfileId: "sbp_runtime_status",
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: sandbox.id,
+        status: SandboxInstanceStatuses.STARTING,
+        startedByKind: "user",
+        startedById: "usr_runtime_status",
+        source: "dashboard",
+      });
+
+      await adapter.destroy({
+        id: sandbox.id,
+      });
+
+      await expect(
+        client.getSandboxInstance({
+          organizationId,
+          instanceId: sandboxInstanceId,
+        }),
+      ).resolves.toMatchObject({
+        id: sandboxInstanceId,
+        status: "failed",
+        failureCode: "provider_runtime_missing",
+        failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
+      });
+    },
+    RuntimeStatusTestTimeoutMs,
+  );
+
   it(
     "lists effective runtime-composed statuses for attached and unattached sandboxes",
     async ({ fixture }) => {

@@ -200,7 +200,7 @@ describe("sandboxInstances.start integration", () => {
     expect(queuedWorkflowRuns[0]?.id).toBe(firstStartedSandbox.workflowRunId);
   }, 60_000);
 
-  it("creates a starting sandbox instance row immediately after start is accepted", async ({
+  it("creates a pending sandbox instance row immediately after start is accepted", async ({
     fixture,
   }) => {
     const client = createSandboxInstancesClient(fixture.baseUrl, fixture.internalAuthServiceToken);
@@ -244,7 +244,7 @@ describe("sandboxInstances.start integration", () => {
       sandboxProfileId: workflowInput.sandboxProfileId,
       sandboxProfileVersion: workflowInput.sandboxProfileVersion,
       providerSandboxId: null,
-      status: SandboxInstanceStatuses.STARTING,
+      status: SandboxInstanceStatuses.PENDING,
     });
 
     const persistedRuntimePlans = await fixture.db.query.sandboxInstanceRuntimePlans.findMany({

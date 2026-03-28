@@ -2168,7 +2168,7 @@ export interface paths {
                   name: string | null;
                 };
                 /** @enum {string} */
-                status: "starting" | "running" | "stopped" | "failed";
+                status: "pending" | "starting" | "running" | "stopped" | "failed";
                 updatedAt: string;
               }[];
               nextPage: {
@@ -2281,7 +2281,7 @@ export interface paths {
               failureMessage: string | null;
               id: string;
               /** @enum {string} */
-              status: "starting" | "running" | "stopped" | "failed";
+              status: "pending" | "starting" | "running" | "stopped" | "failed";
             };
           };
         };
@@ -2519,7 +2519,7 @@ export interface paths {
               failureMessage: string | null;
               id: string;
               /** @enum {string} */
-              status: "starting" | "running" | "stopped" | "failed";
+              status: "pending" | "starting" | "running" | "stopped" | "failed";
             };
           };
         };
