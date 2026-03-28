@@ -12,14 +12,17 @@ import {
 } from "@mistle/sandbox";
 import { and, eq, sql } from "drizzle-orm";
 
+import type { AppRuntimeResources } from "../../../resources.js";
 import type {
   GetSandboxInstanceInput,
   GetSandboxInstanceResponse,
 } from "../get-sandbox-instance/schema.js";
+import { readEffectiveSandboxStatus } from "./read-effective-sandbox-status.js";
 
 type GetSandboxInstanceByInspectionContext = {
   db: DataPlaneDatabase;
   sandboxAdapter: SandboxAdapter;
+  runtimeStateReader: AppRuntimeResources["runtimeStateReader"];
   sandboxProvider: SandboxProvider;
 };
 
@@ -163,7 +166,15 @@ async function inspectStartingSandboxInstance(
   if (inspection.state === SandboxInspectStates.RUNNING) {
     return {
       id: sandboxInstance.id,
-      status: SandboxInstanceStatuses.RUNNING,
+      status: await readEffectiveSandboxStatus(
+        {
+          runtimeStateReader: ctx.runtimeStateReader,
+        },
+        {
+          sandboxInstanceId: sandboxInstance.id,
+          persistedStatus: SandboxInstanceStatuses.STARTING,
+        },
+      ),
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
     };
@@ -229,7 +240,15 @@ async function inspectRunningSandboxInstance(
   if (inspection.state === SandboxInspectStates.RUNNING) {
     return {
       id: sandboxInstance.id,
-      status: SandboxInstanceStatuses.RUNNING,
+      status: await readEffectiveSandboxStatus(
+        {
+          runtimeStateReader: ctx.runtimeStateReader,
+        },
+        {
+          sandboxInstanceId: sandboxInstance.id,
+          persistedStatus: SandboxInstanceStatuses.RUNNING,
+        },
+      ),
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
     };

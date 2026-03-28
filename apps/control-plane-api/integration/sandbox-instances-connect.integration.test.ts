@@ -201,6 +201,9 @@ describe("sandbox instance connect integration", () => {
         status: "running",
         providerSandboxId,
       });
+      await dataPlaneFixture.attachSandboxRuntime({
+        sandboxInstanceId: "sbi_cp_connect_running_001",
+      });
 
       const response = await controlPlaneRuntime.request(
         "/v1/sandbox/instances/sbi_cp_connect_running_001/connection-tokens",
@@ -355,6 +358,9 @@ describe("sandbox instance connect integration", () => {
         status: "running",
         providerSandboxId,
       });
+      await dataPlaneFixture.attachSandboxRuntime({
+        sandboxInstanceId: "sbi_cp_connect_starting_001",
+      });
 
       const response = await responsePromise;
       expect(response.status).toBe(201);
@@ -435,6 +441,9 @@ describe("sandbox instance connect integration", () => {
         sandboxInstanceId: "sbi_cp_connect_stopped_001",
         status: "running",
         providerSandboxId,
+      });
+      await dataPlaneFixture.attachSandboxRuntime({
+        sandboxInstanceId: "sbi_cp_connect_stopped_001",
       });
 
       const response = await responsePromise;

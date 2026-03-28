@@ -48,6 +48,36 @@ async function waitForListedSandboxStatus(input: {
   );
 }
 
+async function waitForGetSandboxStatus(input: {
+  fixture: DataPlaneApiIntegrationFixture;
+  organizationId: string;
+  sandboxInstanceId: string;
+  expectedStatus: string;
+}): Promise<void> {
+  const client = createDataPlaneSandboxInstancesClient({
+    baseUrl: input.fixture.baseUrl,
+    serviceToken: input.fixture.internalAuthServiceToken,
+  });
+  const deadlineMs = systemClock.nowMs() + StatusPollTimeoutMs;
+
+  while (systemClock.nowMs() < deadlineMs) {
+    const sandboxInstance = await client.getSandboxInstance({
+      organizationId: input.organizationId,
+      instanceId: input.sandboxInstanceId,
+    });
+
+    if (sandboxInstance?.status === input.expectedStatus) {
+      return;
+    }
+
+    await systemSleeper.sleep(StatusPollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for sandbox '${input.sandboxInstanceId}' getSandboxInstance status to reach '${input.expectedStatus}'.`,
+  );
+}
+
 async function startGatewayForFixture(input: { fixture: DataPlaneApiIntegrationFixture }) {
   const gatewayPort = Number(new URL(input.fixture.config.runtimeState.gatewayBaseUrl).port);
   return startGatewayProcess({
@@ -60,11 +90,14 @@ async function startGatewayForFixture(input: { fixture: DataPlaneApiIntegrationF
 
 describe("internal sandbox instance runtime status integration", () => {
   it(
-    "returns provider-inspected state from getSandboxInstance and reconciles missing runtimes",
+    "returns starting before tunnel readiness, then running after attachment, and reconciles missing runtimes",
     async ({ fixture }) => {
       const client = createDataPlaneSandboxInstancesClient({
         baseUrl: fixture.baseUrl,
         serviceToken: fixture.internalAuthServiceToken,
+      });
+      const gateway = await startGatewayForFixture({
+        fixture,
       });
       const adapter = createSandboxAdapter({
         provider: SandboxProvider.DOCKER,
@@ -103,25 +136,56 @@ describe("internal sandbox instance runtime status integration", () => {
           }),
         ).resolves.toMatchObject({
           id: sandboxInstanceId,
-          status: "running",
+          status: "starting",
         });
 
-        await adapter.destroy({
-          id: sandbox.id,
+        const bootstrapToken = await mintValidBootstrapToken({
+          sandboxInstanceId,
+        });
+        const bootstrapSocket = await connectBootstrapSocket({
+          websocketBaseUrl: gateway.websocketBaseUrl,
+          sandboxInstanceId,
+          token: bootstrapToken,
         });
 
-        await expect(
-          client.getSandboxInstance({
+        try {
+          await waitForGetSandboxStatus({
+            fixture,
             organizationId,
-            instanceId: sandboxInstanceId,
-          }),
-        ).resolves.toMatchObject({
-          id: sandboxInstanceId,
-          status: "failed",
-          failureCode: "provider_runtime_missing",
-          failureMessage: "Sandbox runtime was not found at the provider during inspection.",
-        });
+            sandboxInstanceId,
+            expectedStatus: "running",
+          });
+
+          await expect(
+            client.getSandboxInstance({
+              organizationId,
+              instanceId: sandboxInstanceId,
+            }),
+          ).resolves.toMatchObject({
+            id: sandboxInstanceId,
+            status: "running",
+          });
+
+          await adapter.destroy({
+            id: sandbox.id,
+          });
+
+          await expect(
+            client.getSandboxInstance({
+              organizationId,
+              instanceId: sandboxInstanceId,
+            }),
+          ).resolves.toMatchObject({
+            id: sandboxInstanceId,
+            status: "failed",
+            failureCode: "provider_runtime_missing",
+            failureMessage: "Sandbox runtime was not found at the provider during inspection.",
+          });
+        } finally {
+          await closeWebSocket(bootstrapSocket);
+        }
       } finally {
+        await gateway.stop();
         await adapter
           .destroy({
             id: sandbox.id,
