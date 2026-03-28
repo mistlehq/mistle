@@ -1,6 +1,5 @@
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
-
-export type DisconnectProviderState = "active" | "resumable_stopped" | "terminal_stopped";
+import type { SandboxInspectDisposition } from "@mistle/sandbox";
 
 export type DisconnectReconciliationAction =
   | {
@@ -15,40 +14,9 @@ export type DisconnectReconciliationAction =
       kind: "stop_then_mark_stopped";
     };
 
-export function classifyDockerDisconnectProviderState(state: string): DisconnectProviderState {
-  switch (state) {
-    case "running":
-    case "restarting":
-      return "active";
-    case "paused":
-    case "exited":
-      return "resumable_stopped";
-    case "dead":
-    case "removing":
-      return "terminal_stopped";
-    case "created":
-      throw new Error("Docker disconnect reconciliation does not support created containers.");
-    default:
-      throw new Error(
-        `Docker disconnect reconciliation does not support provider state '${state}'.`,
-      );
-  }
-}
-
-export function classifyE2BDisconnectProviderState(state: string): DisconnectProviderState {
-  switch (state) {
-    case "running":
-      return "active";
-    case "paused":
-      return "resumable_stopped";
-    default:
-      throw new Error(`E2B disconnect reconciliation does not support provider state '${state}'.`);
-  }
-}
-
 export function determineDisconnectReconciliationAction(input: {
   sandboxStatus: string;
-  providerState: DisconnectProviderState | "missing";
+  providerState: SandboxInspectDisposition | "missing";
 }): DisconnectReconciliationAction {
   switch (input.sandboxStatus) {
     case SandboxInstanceStatuses.STARTING: {

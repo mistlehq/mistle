@@ -49,6 +49,7 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
       }
       expect(inspection.id).toBe(sandbox.id);
       expect(inspection.state).toBe("running");
+      expect(inspection.disposition).toBe("active");
       expect(inspection.raw.templateId).not.toBe("");
       expect(inspection.raw.metadata.mistle_template_alias).toBe(expectedTemplateAlias);
       expect(inspection.raw.cpuCount).toBeGreaterThan(0);
@@ -96,6 +97,7 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
         throw new Error("Expected E2B sandbox inspection result after stop.");
       }
       expect(stoppedInspection.state).toBe("stopped");
+      expect(stoppedInspection.disposition).toBe("resumable_stopped");
       expect(stoppedInspection.raw.metadata.mistle_template_alias).toBe(expectedTemplateAlias);
 
       const resumedSandbox = await fixture.adapter.resume({

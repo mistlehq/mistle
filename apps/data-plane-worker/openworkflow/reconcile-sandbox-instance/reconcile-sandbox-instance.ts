@@ -4,9 +4,9 @@ import {
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
 import {
-  classifySandboxInspectProviderState,
   isSandboxResourceNotFoundError,
   type SandboxAdapter,
+  type SandboxInspectDisposition,
 } from "@mistle/sandbox";
 import type { Clock } from "@mistle/time";
 import type { SandboxReconcileReason } from "@mistle/workflow-registry/data-plane";
@@ -17,10 +17,7 @@ import type {
 } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
-import {
-  determineDisconnectReconciliationAction,
-  type DisconnectProviderState,
-} from "./disconnect-reconciliation-policy.js";
+import { determineDisconnectReconciliationAction } from "./disconnect-reconciliation-policy.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
 import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 
@@ -104,13 +101,13 @@ async function resolveActiveSandboxInstance(input: {
 async function inspectProviderStateOrMissing(ctx: {
   sandboxAdapter: SandboxAdapter;
   providerSandboxId: string;
-}): Promise<DisconnectProviderState | "missing"> {
+}): Promise<SandboxInspectDisposition | "missing"> {
   try {
     const inspection = await ctx.sandboxAdapter.inspect({
       id: ctx.providerSandboxId,
     });
 
-    return classifySandboxInspectProviderState(inspection);
+    return inspection.disposition;
   } catch (error) {
     if (!isSandboxResourceNotFoundError(error)) {
       throw error;

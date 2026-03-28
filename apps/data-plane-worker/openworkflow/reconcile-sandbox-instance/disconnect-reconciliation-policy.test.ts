@@ -1,32 +1,7 @@
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { describe, expect, it } from "vitest";
 
-import {
-  classifyDockerDisconnectProviderState,
-  classifyE2BDisconnectProviderState,
-  determineDisconnectReconciliationAction,
-} from "./disconnect-reconciliation-policy.js";
-
-describe("disconnect reconciliation provider classification", () => {
-  it("treats running and restarting Docker containers as active", () => {
-    expect(classifyDockerDisconnectProviderState("running")).toBe("active");
-    expect(classifyDockerDisconnectProviderState("restarting")).toBe("active");
-  });
-
-  it("treats paused and exited Docker containers as resumably stopped", () => {
-    expect(classifyDockerDisconnectProviderState("paused")).toBe("resumable_stopped");
-    expect(classifyDockerDisconnectProviderState("exited")).toBe("resumable_stopped");
-  });
-
-  it("treats dead Docker containers as terminal", () => {
-    expect(classifyDockerDisconnectProviderState("dead")).toBe("terminal_stopped");
-  });
-
-  it("treats running E2B sandboxes as active and paused sandboxes as resumably stopped", () => {
-    expect(classifyE2BDisconnectProviderState("running")).toBe("active");
-    expect(classifyE2BDisconnectProviderState("paused")).toBe("resumable_stopped");
-  });
-});
+import { determineDisconnectReconciliationAction } from "./disconnect-reconciliation-policy.js";
 
 describe("determineDisconnectReconciliationAction", () => {
   it("fails starting sandboxes whose provider runtime is missing", () => {

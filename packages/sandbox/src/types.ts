@@ -23,6 +23,14 @@ export const SandboxInspectStates = {
 } as const;
 export type SandboxInspectState = (typeof SandboxInspectStates)[keyof typeof SandboxInspectStates];
 
+export const SandboxInspectDispositions = {
+  ACTIVE: "active",
+  RESUMABLE_STOPPED: "resumable_stopped",
+  TERMINAL_STOPPED: "terminal_stopped",
+} as const;
+export type SandboxInspectDisposition =
+  (typeof SandboxInspectDispositions)[keyof typeof SandboxInspectDispositions];
+
 export interface SandboxInspectRequest {
   readonly id: string;
 }
@@ -30,11 +38,13 @@ export interface SandboxInspectRequest {
 export interface SandboxInspectResult<
   TProvider extends SandboxProvider = SandboxProvider,
   TState extends SandboxInspectState = SandboxInspectState,
+  TDisposition extends SandboxInspectDisposition = SandboxInspectDisposition,
   TRaw = unknown,
 > {
   readonly provider: TProvider;
   readonly id: string;
   readonly state: TState;
+  readonly disposition: TDisposition;
   readonly createdAt: string | null;
   readonly startedAt: string | null;
   readonly endedAt: string | null;
