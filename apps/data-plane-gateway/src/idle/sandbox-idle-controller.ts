@@ -1,3 +1,4 @@
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { Clock, Scheduler, TimerHandle } from "@mistle/time";
 
 import { logger } from "../logger.js";
@@ -5,8 +6,11 @@ import type { SandboxActivityStore } from "../runtime-state/sandbox-activity-sto
 import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
 import type { SandboxOwnerStore } from "../tunnel/ownership/sandbox-owner-store.js";
-import type { ReconcileSandboxRequester } from "./reconcile-sandbox-requester.js";
-import type { StopSandboxRequester } from "./stop-sandbox-requester.js";
+
+type SandboxIdleControllerDataPlaneClient = Pick<
+  DataPlaneSandboxInstancesClient,
+  "stopSandboxInstance" | "reconcileSandboxInstance"
+>;
 
 /**
  * Constructor dependencies for an owner-local idle controller.
@@ -26,8 +30,7 @@ export type SandboxIdleControllerDependencies = {
   activityStore: SandboxActivityStore;
   presenceStore: SandboxPresenceStore;
   runtimeAttachmentStore: SandboxRuntimeAttachmentStore;
-  stopRequester: StopSandboxRequester;
-  reconcileRequester: ReconcileSandboxRequester;
+  dataPlaneClient: SandboxIdleControllerDataPlaneClient;
 };
 
 /**
@@ -290,7 +293,7 @@ export class LocalSandboxIdleController implements SandboxIdleController {
     }
 
     try {
-      await this.dependencies.stopRequester.requestStop({
+      await this.dependencies.dataPlaneClient.stopSandboxInstance({
         sandboxInstanceId: this.sandboxInstanceId,
         stopReason: "idle",
         expectedOwnerLeaseId: this.ownerLeaseId,
@@ -385,7 +388,7 @@ export class LocalSandboxIdleController implements SandboxIdleController {
     }
 
     try {
-      await this.dependencies.reconcileRequester.requestReconcile({
+      await this.dependencies.dataPlaneClient.reconcileSandboxInstance({
         sandboxInstanceId: this.sandboxInstanceId,
         reason: "disconnect_grace_elapsed",
         expectedOwnerLeaseId: this.ownerLeaseId,
