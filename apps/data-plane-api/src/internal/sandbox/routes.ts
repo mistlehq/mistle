@@ -7,6 +7,7 @@ import { INTERNAL_SANDBOX_ROUTE_BASE_PATH } from "./constants.js";
 import * as createSandboxInstance from "./sandbox-instances/create-sandbox-instance/index.js";
 import * as getSandboxInstance from "./sandbox-instances/get-sandbox-instance/index.js";
 import * as listSandboxInstances from "./sandbox-instances/list-sandbox-instances/index.js";
+import * as reconcileSandboxInstance from "./sandbox-instances/reconcile-sandbox-instance/index.js";
 import * as resumeSandboxInstance from "./sandbox-instances/resume-sandbox-instance/index.js";
 import * as stopSandboxInstance from "./sandbox-instances/stop-sandbox-instance/index.js";
 
@@ -26,6 +27,7 @@ export function createInternalSandboxRoutes(): AppRoutes<typeof INTERNAL_SANDBOX
   routes.openapi(createSandboxInstance.route, createSandboxInstance.handler);
   routes.openapi(listSandboxInstances.route, listSandboxInstances.handler);
   routes.openapi(getSandboxInstance.route, getSandboxInstance.handler);
+  routes.openapi(reconcileSandboxInstance.route, reconcileSandboxInstance.handler);
   routes.openapi(resumeSandboxInstance.route, resumeSandboxInstance.handler);
   routes.openapi(stopSandboxInstance.route, stopSandboxInstance.handler);
 

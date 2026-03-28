@@ -54,6 +54,14 @@ export type StopSandboxInstanceInput = {
 };
 export type StopSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/stop"]["post"]["responses"]["200"]["content"]["application/json"];
+export type ReconcileSandboxInstanceInput = {
+  sandboxInstanceId: string;
+  reason: "disconnect_grace_elapsed";
+  expectedOwnerLeaseId: string;
+  idempotencyKey: string;
+};
+export type ReconcileSandboxInstanceAcceptedResponse =
+  paths["/internal/sandbox/instances/:id/reconcile"]["post"]["responses"]["200"]["content"]["application/json"];
 export type GetSandboxInstanceInput = {
   organizationId: string;
   instanceId: string;
@@ -89,6 +97,9 @@ export type DataPlaneSandboxInstancesClient = {
   stopSandboxInstance: (
     input: StopSandboxInstanceInput,
   ) => Promise<StopSandboxInstanceAcceptedResponse>;
+  reconcileSandboxInstance: (
+    input: ReconcileSandboxInstanceInput,
+  ) => Promise<ReconcileSandboxInstanceAcceptedResponse>;
   getSandboxInstance: (input: GetSandboxInstanceInput) => Promise<GetSandboxInstanceResponse>;
   listSandboxInstances: (input: ListSandboxInstancesInput) => Promise<ListSandboxInstancesResponse>;
 };
@@ -119,12 +130,13 @@ function parseInternalErrorBody(input: unknown): InternalErrorBody | undefined {
 function createClientError(input: {
   status: number;
   error: unknown;
-  operation: "start" | "resume" | "stop" | "read" | "list";
+  operation: "start" | "resume" | "stop" | "reconcile" | "read" | "list";
 }): DataPlaneSandboxInstancesClientError {
   const operationLabel = {
     start: "start",
     resume: "resume",
     stop: "stop",
+    reconcile: "reconcile",
     read: "read",
     list: "list",
   } as const;
@@ -290,6 +302,40 @@ export function createDataPlaneSandboxInstancesClient(
         status: response.status,
         error: errorBody,
         operation: "stop",
+      });
+    },
+
+    async reconcileSandboxInstance(reconcileInput) {
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: reconcileInput.sandboxInstanceId,
+          suffix: "/reconcile",
+        }),
+        {
+          method: "POST",
+          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          body: JSON.stringify({
+            reason: reconcileInput.reason,
+            expectedOwnerLeaseId: reconcileInput.expectedOwnerLeaseId,
+            idempotencyKey: reconcileInput.idempotencyKey,
+          }),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 200) {
+        const responseBody: ReconcileSandboxInstanceAcceptedResponse = await response.json();
+
+        return responseBody;
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "reconcile",
       });
     },
 

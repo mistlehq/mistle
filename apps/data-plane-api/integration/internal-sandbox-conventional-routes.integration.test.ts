@@ -38,6 +38,14 @@ const StopWorkflowInputSchema = z
   })
   .strict();
 
+const ReconcileWorkflowInputSchema = z
+  .object({
+    sandboxInstanceId: z.string().min(1),
+    reason: z.literal("disconnect_grace_elapsed"),
+    expectedOwnerLeaseId: z.string().min(1),
+  })
+  .strict();
+
 function createRuntimePlan(input: { sandboxProfileId: string; version: number }) {
   return {
     sandboxProfileId: input.sandboxProfileId,
@@ -319,6 +327,65 @@ describe("internal sandbox conventional routes integration", () => {
       sandboxInstanceId,
       stopReason: "idle",
       expectedOwnerLeaseId: "sol_conventional_stop",
+    });
+  }, 60_000);
+
+  it("queues the reconcile workflow from the new member route", async ({ fixture }) => {
+    const sandboxInstanceId = "sbi_conventional_reconcile";
+
+    await fixture.db.insert(sandboxInstances).values({
+      id: sandboxInstanceId,
+      organizationId: "org_dp_api_conventional_reconcile",
+      sandboxProfileId: "sbp_conventional_reconcile",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: "provider-conventional-reconcile",
+      status: SandboxInstanceStatuses.RUNNING,
+      startedByKind: "user",
+      startedById: "usr_conventional_reconcile",
+      source: "dashboard",
+    });
+
+    const reconcileResponse = await fetch(
+      new URL(
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/${sandboxInstanceId}/reconcile`,
+        fixture.baseUrl,
+      ),
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [DATA_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+        body: JSON.stringify({
+          reason: "disconnect_grace_elapsed",
+          expectedOwnerLeaseId: "sol_conventional_reconcile",
+          idempotencyKey: "gateway-reconcile-conventional",
+        }),
+      },
+    );
+
+    expect(reconcileResponse.status).toBe(200);
+    const parsedReconcileResponse = z
+      .object({
+        status: z.literal("accepted"),
+        sandboxInstanceId: z.string().min(1),
+        workflowRunId: z.string().min(1),
+      })
+      .strict()
+      .parse(await reconcileResponse.json());
+    expect(parsedReconcileResponse.sandboxInstanceId).toBe(sandboxInstanceId);
+
+    const reconcileWorkflowRun = await waitForWorkflowRun({
+      fixture,
+      namespaceId: fixture.config.workflow.namespaceId,
+      workflowName: "data-plane.sandbox-instances.reconcile",
+      sandboxInstanceId,
+    });
+    expect(ReconcileWorkflowInputSchema.parse(reconcileWorkflowRun.input)).toEqual({
+      sandboxInstanceId,
+      reason: "disconnect_grace_elapsed",
+      expectedOwnerLeaseId: "sol_conventional_reconcile",
     });
   }, 60_000);
 
