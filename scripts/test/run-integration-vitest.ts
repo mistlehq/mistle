@@ -187,6 +187,10 @@ async function main(): Promise<void> {
     ]),
   ]);
 
+  if (selectedProjects.some((project) => project.projectName === "@mistle/test-harness")) {
+    await runCommand("pnpm", ["run", "test-harness:prepare-runtime"]);
+  }
+
   await runCommand("pnpm", [
     "exec",
     "vitest",

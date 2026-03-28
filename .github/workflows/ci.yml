@@ -107,12 +107,12 @@ jobs:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
-      - name: Generate CI config
-        run: nix develop --command pnpm run config:init:ci
+      - name: Generate integration config
+        run: nix develop --command bash -lc "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
       - name: Build workspace in Nix shell
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.ci.toml pnpm build"
+        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm build"
 
       - name: Run static checks in Nix shell
         run: nix develop --command bash -lc "pnpm format:check && pnpm lint && pnpm typecheck"
@@ -153,8 +153,8 @@ jobs:
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
 
-      - name: Generate CI config
-        run: nix develop --command pnpm run config:init:ci
+      - name: Generate integration config
+        run: nix develop --command bash -lc "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
       - name: Run knip in Nix shell
         run: nix develop --command pnpm lint:knip
@@ -215,8 +215,8 @@ jobs:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
-      - name: Generate CI config
-        run: nix develop --command pnpm run config:init:ci
+      - name: Generate integration config
+        run: nix develop --command bash -lc "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
       - name: Run tests with coverage in Nix shell
         run: nix develop --command pnpm test:coverage

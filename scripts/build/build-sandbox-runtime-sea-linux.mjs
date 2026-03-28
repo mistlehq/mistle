@@ -31,6 +31,7 @@ function buildCopyCommand() {
     "tar",
     "--exclude=.git",
     "--exclude=.turbo",
+    "--exclude=.local",
     "--exclude=node_modules",
     "--exclude=apps/sandbox-runtime/dist-sea",
     "-cf",

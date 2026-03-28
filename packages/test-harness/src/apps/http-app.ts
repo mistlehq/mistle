@@ -25,6 +25,7 @@ export type StartDockerHttpAppInput = {
   configPathInContainer: string;
   startupTimeoutMs: number;
   cacheBustKey?: string;
+  prebuiltImageName?: string;
   environment: Record<string, string>;
   bindMounts?: StartDockerTargetAppInput["bindMounts"];
   network?: StartedNetwork;
@@ -181,6 +182,11 @@ export async function startDockerHttpApp(
       ? {}
       : {
           cacheBustKey: input.cacheBustKey,
+        }),
+    ...(input.prebuiltImageName === undefined
+      ? {}
+      : {
+          prebuiltImageName: input.prebuiltImageName,
         }),
     ...(input.network === undefined
       ? {}

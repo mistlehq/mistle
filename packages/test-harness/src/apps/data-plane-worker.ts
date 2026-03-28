@@ -23,6 +23,7 @@ export type StartDataPlaneWorkerInput = {
   configPathInContainer: string;
   startupTimeoutMs: number;
   cacheBustKey?: string;
+  prebuiltImageName?: string;
   environment: Record<string, string>;
   bindMounts?: StartDockerTargetAppInput["bindMounts"];
   network?: StartDockerTargetAppInput["network"];
@@ -78,6 +79,11 @@ export async function startDataPlaneWorker(
       ? {}
       : {
           cacheBustKey: input.cacheBustKey,
+        }),
+    ...(input.prebuiltImageName === undefined
+      ? {}
+      : {
+          prebuiltImageName: input.prebuiltImageName,
         }),
     ...(input.network === undefined
       ? {}

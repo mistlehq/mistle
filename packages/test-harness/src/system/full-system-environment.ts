@@ -20,6 +20,10 @@ import { type StartPostgresWithPgBouncerInput } from "../services/postgres/index
 import { acquireSharedPostgresMailpitInfra } from "../services/shared-postgres-mailpit.js";
 import { startValkey, type ValkeyService } from "../services/valkey/index.js";
 import {
+  readPreparedTestHarnessRuntime,
+  SANDBOX_SNAPSHOT_REPOSITORY_PATH,
+} from "./prepared-runtime.js";
+import {
   createControlPlaneIntegrationTargetsSyncCommandInput,
   resolveHostPathFromContainerPath,
 } from "./provision-system-integration-targets.js";
@@ -42,8 +46,7 @@ const DockerSocketPath = "/var/run/docker.sock";
 const REGISTRY_IMAGE_REFERENCE = "registry:3";
 const REGISTRY_INTERNAL_PORT = 5000;
 const REGISTRY_NETWORK_ALIAS = "registry";
-const SANDBOX_SNAPSHOT_REPOSITORY_PATH = "mistle/snapshots";
-const SANDBOX_BASE_IMAGE_DOCKERFILE_PATH = "apps/sandbox-runtime/Dockerfile";
+const TRACE_FULL_SYSTEM = process.env.MISTLE_TEST_HARNESS_TRACE === "1";
 
 const execFileAsync = promisify(execFile);
 
@@ -56,20 +59,6 @@ type SharedPostgresOptions = Omit<
   (typeof OMITTED_POSTGRES_OPTIONS)[number]
 >;
 
-export type SandboxBaseImageBuild = {
-  localReference: string;
-  repositoryPath: string;
-  dockerfilePath: string;
-  dockerTarget: string;
-};
-
-export const DefaultSandboxBaseImageBuild: SandboxBaseImageBuild = {
-  localReference: "mistle/sandbox-base:dev",
-  repositoryPath: "mistle/sandbox-base",
-  dockerfilePath: SANDBOX_BASE_IMAGE_DOCKERFILE_PATH,
-  dockerTarget: "sandbox-base",
-};
-
 export type StartFullSystemEnvironmentInput = {
   buildContextHostPath: string;
   configPathInContainer: string;
@@ -81,7 +70,6 @@ export type StartFullSystemEnvironmentInput = {
   authBaseUrl: string;
   dashboardBaseUrl: string;
   authTrustedOrigins: string;
-  sandboxBaseImageBuild: SandboxBaseImageBuild;
   cacheBustKey?: string;
   controlPlaneApiEnvironment?: Record<string, string>;
   controlPlaneWorkerEnvironment?: Record<string, string>;
@@ -144,6 +132,28 @@ function readErrorString(error: unknown, key: "stdout" | "stderr"): string {
   }
 
   return "";
+}
+
+function traceFullSystem(message: string): void {
+  if (!TRACE_FULL_SYSTEM) {
+    return;
+  }
+
+  console.info(`[test-harness:full-system] ${message}`);
+}
+
+async function withStepTiming<T>(label: string, operation: () => Promise<T>): Promise<T> {
+  const startedAt = Date.now();
+  traceFullSystem(`${label} start`);
+
+  try {
+    const result = await operation();
+    traceFullSystem(`${label} complete durationMs=${String(Date.now() - startedAt)}`);
+    return result;
+  } catch (error) {
+    traceFullSystem(`${label} failed durationMs=${String(Date.now() - startedAt)}`);
+    throw error;
+  }
 }
 
 async function runCommand(input: {
@@ -214,53 +224,27 @@ async function removeDockerSandboxContainersOnNetwork(input: {
   });
 }
 
-async function ensureSandboxBaseImageLocal(input: {
-  buildContextHostPath: string;
-  sandboxBaseImageBuild: SandboxBaseImageBuild;
-}): Promise<void> {
-  await runCommand({
-    command: "pnpm",
-    args: ["build:sandbox-runtime:sea:linux"],
-    cwd: input.buildContextHostPath,
-  });
-
-  await runCommand({
-    command: "docker",
-    args: [
-      "build",
-      "--target",
-      input.sandboxBaseImageBuild.dockerTarget,
-      "-f",
-      input.sandboxBaseImageBuild.dockerfilePath,
-      "-t",
-      input.sandboxBaseImageBuild.localReference,
-      ".",
-    ],
-    cwd: input.buildContextHostPath,
-  });
-}
-
 async function publishSandboxBaseImage(input: {
   buildContextHostPath: string;
   registryAuthority: string;
-  sandboxBaseImageBuild: SandboxBaseImageBuild;
+  localReference: string;
+  repositoryPath: string;
 }): Promise<string> {
-  await ensureSandboxBaseImageLocal({
-    buildContextHostPath: input.buildContextHostPath,
-    sandboxBaseImageBuild: input.sandboxBaseImageBuild,
-  });
+  const registryImageReference = `${input.registryAuthority}/${input.repositoryPath}:dev`;
 
-  const registryImageReference = `${input.registryAuthority}/${input.sandboxBaseImageBuild.repositoryPath}:dev`;
-
-  await runCommand({
-    command: "docker",
-    args: ["tag", input.sandboxBaseImageBuild.localReference, registryImageReference],
-    cwd: input.buildContextHostPath,
+  await withStepTiming("tag sandbox base image", async () => {
+    await runCommand({
+      command: "docker",
+      args: ["tag", input.localReference, registryImageReference],
+      cwd: input.buildContextHostPath,
+    });
   });
-  await runCommand({
-    command: "docker",
-    args: ["push", registryImageReference],
-    cwd: input.buildContextHostPath,
+  await withStepTiming("push sandbox base image", async () => {
+    await runCommand({
+      command: "docker",
+      args: ["push", registryImageReference],
+      cwd: input.buildContextHostPath,
+    });
   });
 
   return registryImageReference;
@@ -273,17 +257,27 @@ export async function startFullSystemEnvironment(
   let stopped = false;
   let network: StartedNetwork | undefined;
   let valkeyService: ValkeyService | undefined;
+  const preparedRuntime = await readPreparedTestHarnessRuntime(input.buildContextHostPath);
 
   try {
-    const sharedInfraLease = await acquireSharedPostgresMailpitInfra({
-      key: input.sharedInfraKey,
-      postgres: input.postgres,
-    });
+    const sharedInfraLease = await withStepTiming(
+      "acquire shared postgres/mailpit infra",
+      async () => {
+        return acquireSharedPostgresMailpitInfra({
+          key: input.sharedInfraKey,
+          postgres: input.postgres,
+        });
+      },
+    );
     cleanupTasks.unshift(async () => {
       await sharedInfraLease.release();
     });
 
-    network = await startDockerNetwork();
+    network = await withStepTiming("start docker network", async () => startDockerNetwork());
+    const activeNetwork = network;
+    if (activeNetwork === undefined) {
+      throw new Error("Failed to start Docker network for full system environment.");
+    }
     cleanupTasks.unshift(async () => {
       if (network !== undefined) {
         await network.stop();
@@ -298,22 +292,26 @@ export async function startFullSystemEnvironment(
       }
     });
 
-    valkeyService = await startValkey({
-      manageProcessCleanup: false,
-      network,
+    valkeyService = await withStepTiming("start valkey", async () => {
+      return startValkey({
+        manageProcessCleanup: false,
+        network: activeNetwork,
+      });
     });
     cleanupTasks.unshift(async () => {
       await valkeyService?.stop();
     });
 
-    const registryContainer = await new GenericContainer(REGISTRY_IMAGE_REFERENCE)
-      .withEnvironment({
-        REGISTRY_STORAGE_DELETE_ENABLED: "true",
-      })
-      .withExposedPorts(REGISTRY_INTERNAL_PORT)
-      .withNetwork(network)
-      .withNetworkAliases(REGISTRY_NETWORK_ALIAS)
-      .start();
+    const registryContainer = await withStepTiming("start registry container", async () => {
+      return new GenericContainer(REGISTRY_IMAGE_REFERENCE)
+        .withEnvironment({
+          REGISTRY_STORAGE_DELETE_ENABLED: "true",
+        })
+        .withExposedPorts(REGISTRY_INTERNAL_PORT)
+        .withNetwork(activeNetwork)
+        .withNetworkAliases(REGISTRY_NETWORK_ALIAS)
+        .start();
+    });
     cleanupTasks.unshift(async () => {
       await stopContainerIgnoringMissing(registryContainer, {
         remove: true,
@@ -322,11 +320,17 @@ export async function startFullSystemEnvironment(
       });
     });
     const registryAuthority = `${registryContainer.getHost()}:${String(registryContainer.getMappedPort(REGISTRY_INTERNAL_PORT))}`;
-    const sandboxBaseImageReference = await publishSandboxBaseImage({
-      buildContextHostPath: input.buildContextHostPath,
-      registryAuthority,
-      sandboxBaseImageBuild: input.sandboxBaseImageBuild,
-    });
+    const sandboxBaseImageReference = await withStepTiming(
+      "publish sandbox base image",
+      async () => {
+        return publishSandboxBaseImage({
+          buildContextHostPath: input.buildContextHostPath,
+          registryAuthority,
+          localReference: preparedRuntime.sandboxBaseImage.localReference,
+          repositoryPath: preparedRuntime.sandboxBaseImage.repositoryPath,
+        });
+      },
+    );
     const sandboxSnapshotRepository = `${registryAuthority}/${SANDBOX_SNAPSHOT_REPOSITORY_PATH}`;
 
     const hostDatabaseUrl = sharedInfraLease.infra.postgres.directUrl;
@@ -338,169 +342,194 @@ export async function startFullSystemEnvironment(
       databaseName: sharedInfraLease.infra.postgres.postgres.databaseName,
     });
 
-    const dataPlaneApi = await startDataPlaneApi({
-      buildContextHostPath: input.buildContextHostPath,
-      configPathInContainer: input.configPathInContainer,
-      startupTimeoutMs: input.startupTimeoutMs,
-      ...(input.cacheBustKey === undefined
-        ? {}
-        : {
-            cacheBustKey: input.cacheBustKey,
-          }),
-      network,
-      bindMounts: [
-        {
-          source: DockerSocketPath,
-          target: DockerSocketPath,
-          mode: "rw",
+    const dataPlaneApi = await withStepTiming("start data-plane-api", async () => {
+      return startDataPlaneApi({
+        buildContextHostPath: input.buildContextHostPath,
+        configPathInContainer: input.configPathInContainer,
+        startupTimeoutMs: input.startupTimeoutMs,
+        ...(input.cacheBustKey === undefined
+          ? {}
+          : {
+              cacheBustKey: input.cacheBustKey,
+            }),
+        prebuiltImageName: preparedRuntime.appImages.dataPlaneApi,
+        network: activeNetwork,
+        bindMounts: [
+          {
+            source: DockerSocketPath,
+            target: DockerSocketPath,
+            mode: "rw",
+          },
+        ],
+        environment: {
+          ...input.dataPlaneApiEnvironment,
+          MISTLE_APPS_DATA_PLANE_API_DATABASE_URL: containerDatabaseUrl,
+          MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
+          MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
+          MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
+          MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL:
+            DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
+          MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
         },
-      ],
-      environment: {
-        ...input.dataPlaneApiEnvironment,
-        MISTLE_APPS_DATA_PLANE_API_DATABASE_URL: containerDatabaseUrl,
-        MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
-        MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
-        MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
-        MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL:
-          DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
-        MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
-      },
+      });
     });
     cleanupTasks.unshift(async () => {
       await dataPlaneApi.stop();
     });
 
-    const dataPlaneGateway = await startDataPlaneGateway({
-      buildContextHostPath: input.buildContextHostPath,
-      configPathInContainer: input.configPathInContainer,
-      startupTimeoutMs: input.startupTimeoutMs,
-      ...(input.cacheBustKey === undefined
-        ? {}
-        : {
-            cacheBustKey: input.cacheBustKey,
-          }),
-      network,
-      environment: {
-        ...input.dataPlaneGatewayEnvironment,
-        MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL: containerDatabaseUrl,
-        MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "valkey",
-        MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL: "redis://valkey:6379",
-      },
+    const dataPlaneGateway = await withStepTiming("start data-plane-gateway", async () => {
+      return startDataPlaneGateway({
+        buildContextHostPath: input.buildContextHostPath,
+        configPathInContainer: input.configPathInContainer,
+        startupTimeoutMs: input.startupTimeoutMs,
+        ...(input.cacheBustKey === undefined
+          ? {}
+          : {
+              cacheBustKey: input.cacheBustKey,
+            }),
+        prebuiltImageName: preparedRuntime.appImages.dataPlaneGateway,
+        network: activeNetwork,
+        environment: {
+          ...input.dataPlaneGatewayEnvironment,
+          MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL: containerDatabaseUrl,
+          MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "valkey",
+          MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL: "redis://valkey:6379",
+        },
+      });
     });
     cleanupTasks.unshift(async () => {
       await dataPlaneGateway.stop();
     });
-    const controlPlaneApi = await startControlPlaneApi({
-      buildContextHostPath: input.buildContextHostPath,
-      configPathInContainer: input.configPathInContainer,
-      startupTimeoutMs: input.startupTimeoutMs,
-      ...(input.cacheBustKey === undefined
-        ? {}
-        : {
-            cacheBustKey: input.cacheBustKey,
-          }),
-      network,
-      environment: {
-        ...input.controlPlaneApiEnvironment,
-        MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL: containerDatabaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: input.controlPlaneWorkflowNamespaceId,
-        MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL: input.authBaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL: input.dashboardBaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: input.authTrustedOrigins,
-        MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
-        MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: sandboxBaseImageReference,
-        MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
-      },
+    const controlPlaneApi = await withStepTiming("start control-plane-api", async () => {
+      return startControlPlaneApi({
+        buildContextHostPath: input.buildContextHostPath,
+        configPathInContainer: input.configPathInContainer,
+        startupTimeoutMs: input.startupTimeoutMs,
+        ...(input.cacheBustKey === undefined
+          ? {}
+          : {
+              cacheBustKey: input.cacheBustKey,
+            }),
+        prebuiltImageName: preparedRuntime.appImages.controlPlaneApi,
+        network: activeNetwork,
+        environment: {
+          ...input.controlPlaneApiEnvironment,
+          MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL: containerDatabaseUrl,
+          MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
+          MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
+          MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID:
+            input.controlPlaneWorkflowNamespaceId,
+          MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL: input.authBaseUrl,
+          MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL: input.dashboardBaseUrl,
+          MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: input.authTrustedOrigins,
+          MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
+          MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: sandboxBaseImageReference,
+          MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
+        },
+      });
     });
     cleanupTasks.unshift(async () => {
       await controlPlaneApi.stop();
     });
-    await runCommand(
-      createControlPlaneIntegrationTargetsSyncCommandInput({
+    await withStepTiming("sync control-plane integration targets", async () => {
+      await runCommand(
+        createControlPlaneIntegrationTargetsSyncCommandInput({
+          buildContextHostPath: input.buildContextHostPath,
+          configPathInContainer: input.configPathInContainer,
+          hostDatabaseUrl,
+        }),
+      );
+    });
+
+    const controlPlaneWorker = await withStepTiming("start control-plane-worker", async () => {
+      return startControlPlaneWorker({
         buildContextHostPath: input.buildContextHostPath,
         configPathInContainer: input.configPathInContainer,
-        hostDatabaseUrl,
-      }),
-    );
-
-    const controlPlaneWorker = await startControlPlaneWorker({
-      buildContextHostPath: input.buildContextHostPath,
-      configPathInContainer: input.configPathInContainer,
-      startupTimeoutMs: input.startupTimeoutMs,
-      ...(input.cacheBustKey === undefined
-        ? {}
-        : {
-            cacheBustKey: input.cacheBustKey,
-          }),
-      network,
-      environment: {
-        ...input.controlPlaneWorkerEnvironment,
-        MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID:
-          input.controlPlaneWorkflowNamespaceId,
-        MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
-        MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_HOST: sharedInfraLease.infra.containerHostGateway,
-        MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT: String(sharedInfraLease.infra.mailpit.smtpPort),
-        MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE: "false",
-        MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
-        MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL:
-          CONTROL_PLANE_API_CONTAINER_BASE_URL,
-      },
+        startupTimeoutMs: input.startupTimeoutMs,
+        ...(input.cacheBustKey === undefined
+          ? {}
+          : {
+              cacheBustKey: input.cacheBustKey,
+            }),
+        prebuiltImageName: preparedRuntime.appImages.controlPlaneWorker,
+        network: activeNetwork,
+        environment: {
+          ...input.controlPlaneWorkerEnvironment,
+          MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
+          MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID:
+            input.controlPlaneWorkflowNamespaceId,
+          MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
+          MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_HOST: sharedInfraLease.infra.containerHostGateway,
+          MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT: String(
+            sharedInfraLease.infra.mailpit.smtpPort,
+          ),
+          MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE: "false",
+          MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL:
+            DATA_PLANE_API_CONTAINER_BASE_URL,
+          MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL:
+            CONTROL_PLANE_API_CONTAINER_BASE_URL,
+        },
+      });
     });
     cleanupTasks.unshift(async () => {
       await controlPlaneWorker.stop();
     });
 
-    const tokenizerProxy = await startTokenizerProxy({
-      buildContextHostPath: input.buildContextHostPath,
-      configPathInContainer: input.configPathInContainer,
-      startupTimeoutMs: input.startupTimeoutMs,
-      ...(input.cacheBustKey === undefined
-        ? {}
-        : {
-            cacheBustKey: input.cacheBustKey,
-          }),
-      network,
-      environment: {
-        ...input.tokenizerProxyEnvironment,
-        MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL:
-          CONTROL_PLANE_API_CONTAINER_BASE_URL,
-      },
+    const tokenizerProxy = await withStepTiming("start tokenizer-proxy", async () => {
+      return startTokenizerProxy({
+        buildContextHostPath: input.buildContextHostPath,
+        configPathInContainer: input.configPathInContainer,
+        startupTimeoutMs: input.startupTimeoutMs,
+        ...(input.cacheBustKey === undefined
+          ? {}
+          : {
+              cacheBustKey: input.cacheBustKey,
+            }),
+        prebuiltImageName: preparedRuntime.appImages.tokenizerProxy,
+        network: activeNetwork,
+        environment: {
+          ...input.tokenizerProxyEnvironment,
+          MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL:
+            CONTROL_PLANE_API_CONTAINER_BASE_URL,
+        },
+      });
     });
     cleanupTasks.unshift(async () => {
-      await tokenizerProxy.stop();
+      await withStepTiming("stop tokenizer-proxy", async () => tokenizerProxy.stop());
     });
-    const dataPlaneWorker = await startDataPlaneWorker({
-      buildContextHostPath: input.buildContextHostPath,
-      configPathInContainer: input.configPathInContainer,
-      startupTimeoutMs: input.startupTimeoutMs,
-      ...(input.cacheBustKey === undefined
-        ? {}
-        : {
-            cacheBustKey: input.cacheBustKey,
-          }),
-      network,
-      environment: {
-        ...input.dataPlaneWorkerEnvironment,
-        MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL: containerDatabaseUrl,
-        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
-        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
-        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
-        MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL:
-          DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY: sandboxSnapshotRepository,
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: network.getName(),
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT:
-          "http://otel-lgtm:4318/v1/traces",
-        MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
-        MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
-        MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
-          TOKENIZER_PROXY_EGRESS_CONTAINER_BASE_URL,
-      },
+    const dataPlaneWorker = await withStepTiming("start data-plane-worker", async () => {
+      return startDataPlaneWorker({
+        buildContextHostPath: input.buildContextHostPath,
+        configPathInContainer: input.configPathInContainer,
+        startupTimeoutMs: input.startupTimeoutMs,
+        ...(input.cacheBustKey === undefined
+          ? {}
+          : {
+              cacheBustKey: input.cacheBustKey,
+            }),
+        prebuiltImageName: preparedRuntime.appImages.dataPlaneWorker,
+        network,
+        environment: {
+          ...input.dataPlaneWorkerEnvironment,
+          MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL: containerDatabaseUrl,
+          MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
+          MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
+          MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
+          MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL:
+            DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY:
+            sandboxSnapshotRepository,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: activeNetwork.getName(),
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT:
+            "http://otel-lgtm:4318/v1/traces",
+          MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
+          MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
+          MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
+            TOKENIZER_PROXY_EGRESS_CONTAINER_BASE_URL,
+        },
+      });
     });
     cleanupTasks.unshift(async () => {
       await dataPlaneWorker.stop();
@@ -530,7 +559,7 @@ export async function startFullSystemEnvironment(
         url: valkeyService.url,
       },
       containerHostGateway: sharedInfraLease.infra.containerHostGateway,
-      sandboxNetworkName: network.getName(),
+      sandboxNetworkName: activeNetwork.getName(),
       stop: async () => {
         if (stopped) {
           throw new Error("Full system environment was already stopped.");
