@@ -384,6 +384,9 @@ describe("sandbox instance resume integration", () => {
         status: "running",
         providerSandboxId,
       });
+      await dataPlaneFixture.attachSandboxRuntime({
+        sandboxInstanceId,
+      });
 
       const response = await controlPlaneRuntime.request(
         `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}/resume`,
