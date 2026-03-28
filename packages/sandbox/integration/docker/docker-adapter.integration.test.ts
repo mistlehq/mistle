@@ -143,6 +143,7 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       }
       expect(inspection.id).toBe(sandbox.id);
       expect(inspection.state).toBe("running");
+      expect(inspection.disposition).toBe("active");
       expect(inspection.raw.Config.Image).toBe(fixture.baseImage.imageId);
       expect(inspection.raw.Config.Labels["mistle.sandbox.provider"]).toBe("docker");
       expect(inspection.raw.State.Running).toBe(true);
@@ -261,6 +262,7 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
         throw new Error("Expected Docker sandbox inspection result after stop.");
       }
       expect(stoppedInspection.state).toBe("stopped");
+      expect(stoppedInspection.disposition).toBe("resumable_stopped");
       expect(stoppedInspection.raw.State.Running).toBe(false);
       expect(stoppedInspection.raw.State.ExitCode).not.toBeNull();
 

@@ -1,7 +1,7 @@
 import Docker from "dockerode";
 import { z } from "zod";
 
-import { SandboxInspectStates } from "../../types.js";
+import { SandboxInspectDispositions, SandboxInspectStates } from "../../types.js";
 import {
   DockerClientOperationIds,
   mapDockerClientError,
@@ -123,6 +123,29 @@ function normalizeDockerInspectState(state: string): DockerSandboxInspectResult[
   }
 }
 
+function normalizeDockerInspectDisposition(
+  state: string,
+): DockerSandboxInspectResult["disposition"] {
+  // Docker exposes more lifecycle detail than the shared inspect contract.
+  // This mapping preserves the distinction the data plane cares about without
+  // leaking Docker-specific status handling into higher layers.
+  switch (state) {
+    case "running":
+    case "restarting":
+      return SandboxInspectDispositions.ACTIVE;
+    case "paused":
+    case "exited":
+      return SandboxInspectDispositions.RESUMABLE_STOPPED;
+    case "dead":
+    case "removing":
+      return SandboxInspectDispositions.TERMINAL_STOPPED;
+    case "created":
+      throw new Error("Sandbox inspect does not support Docker created containers.");
+    default:
+      throw new Error(`Unsupported Docker container disposition state: ${state}`);
+  }
+}
+
 function normalizeDockerTimestamp(value: string): string | null {
   if (value.length === 0 || value.startsWith("0001-01-01")) {
     return null;
@@ -195,6 +218,7 @@ export class DockerApiClient implements DockerClient {
       provider: "docker",
       id: inspect.Id,
       state: normalizeDockerInspectState(inspect.State.Status),
+      disposition: normalizeDockerInspectDisposition(inspect.State.Status),
       createdAt: inspect.Created,
       startedAt: normalizeDockerTimestamp(inspect.State.StartedAt),
       endedAt: normalizeDockerTimestamp(inspect.State.FinishedAt),
