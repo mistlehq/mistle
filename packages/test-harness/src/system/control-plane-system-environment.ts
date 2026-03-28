@@ -6,6 +6,7 @@ import {
 import { runCleanupTasks } from "../cleanup/index.js";
 import { type StartPostgresWithPgBouncerInput } from "../services/postgres/index.js";
 import { acquireSharedPostgresMailpitInfra } from "../services/shared-postgres-mailpit.js";
+import { readPreparedTestHarnessRuntime } from "./prepared-runtime.js";
 
 const OMITTED_POSTGRES_OPTIONS = [
   "network",
@@ -73,6 +74,7 @@ export async function startControlPlaneSystemEnvironment(
 ): Promise<StartedControlPlaneSystemEnvironment> {
   const cleanupTasks: Array<() => Promise<void>> = [];
   let stopped = false;
+  const preparedRuntime = await readPreparedTestHarnessRuntime(input.buildContextHostPath);
 
   try {
     const sharedInfraLease = await acquireSharedPostgresMailpitInfra({
@@ -107,6 +109,7 @@ export async function startControlPlaneSystemEnvironment(
         : {
             cacheBustKey: input.cacheBustKey,
           }),
+      prebuiltImageName: preparedRuntime.appImages.controlPlaneApi,
       environment: {
         ...input.controlPlaneApiEnvironment,
         MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL: containerDatabaseUrl,
@@ -131,6 +134,7 @@ export async function startControlPlaneSystemEnvironment(
         : {
             cacheBustKey: input.cacheBustKey,
           }),
+      prebuiltImageName: preparedRuntime.appImages.controlPlaneWorker,
       environment: {
         ...input.controlPlaneWorkerEnvironment,
         MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
