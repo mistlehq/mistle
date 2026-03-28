@@ -1,6 +1,7 @@
 import { createMutableClock, createManualScheduler } from "@mistle/time/testing";
 import { describe, expect, it } from "vitest";
 
+import { DataPlaneApiReconcileSandboxClient } from "../clients/data-plane-api-reconcile-sandbox-client.js";
 import { DataPlaneApiStopSandboxClient } from "../clients/data-plane-api-stop-sandbox-client.js";
 import { InMemorySandboxActivityStore } from "../runtime-state/adapters/in-memory-sandbox-activity-store.js";
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
@@ -21,6 +22,10 @@ describe("SandboxIdleControllerRegistry", () => {
       baseUrl: "http://127.0.0.1:1",
       serviceToken: "test-service-token",
     });
+    const reconcileRequester = new DataPlaneApiReconcileSandboxClient({
+      baseUrl: "http://127.0.0.1:1",
+      serviceToken: "test-service-token",
+    });
     const registry = new SandboxIdleControllerRegistry((input) => {
       return new LocalSandboxIdleController(
         {
@@ -35,6 +40,7 @@ describe("SandboxIdleControllerRegistry", () => {
           presenceStore,
           runtimeAttachmentStore,
           stopRequester,
+          reconcileRequester,
         },
         input.onDisposed,
       );
@@ -65,6 +71,10 @@ describe("SandboxIdleControllerRegistry", () => {
       baseUrl: "http://127.0.0.1:1",
       serviceToken: "test-service-token",
     });
+    const reconcileRequester = new DataPlaneApiReconcileSandboxClient({
+      baseUrl: "http://127.0.0.1:1",
+      serviceToken: "test-service-token",
+    });
     const registry = new SandboxIdleControllerRegistry((input) => {
       return new LocalSandboxIdleController(
         {
@@ -79,6 +89,7 @@ describe("SandboxIdleControllerRegistry", () => {
           presenceStore,
           runtimeAttachmentStore,
           stopRequester,
+          reconcileRequester,
         },
         input.onDisposed,
       );
@@ -110,6 +121,10 @@ describe("SandboxIdleControllerRegistry", () => {
       baseUrl: "http://127.0.0.1:1",
       serviceToken: "test-service-token",
     });
+    const reconcileRequester = new DataPlaneApiReconcileSandboxClient({
+      baseUrl: "http://127.0.0.1:1",
+      serviceToken: "test-service-token",
+    });
     const registry = new SandboxIdleControllerRegistry((input) => {
       return new LocalSandboxIdleController(
         {
@@ -124,6 +139,7 @@ describe("SandboxIdleControllerRegistry", () => {
           presenceStore,
           runtimeAttachmentStore,
           stopRequester,
+          reconcileRequester,
         },
         input.onDisposed,
       );
