@@ -115,7 +115,7 @@ jobs:
         run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm build"
 
       - name: Run static checks in Nix shell
-        run: nix develop --command bash -lc "pnpm format:check && pnpm lint && pnpm typecheck"
+        run: nix develop --command bash -lc "pnpm format:check && pnpm lint && pnpm lint:sql && pnpm typecheck"
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-turbo-cache.outputs.cache-hit != 'true' }}

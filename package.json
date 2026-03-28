@@ -28,7 +28,6 @@
     "lint:knip:report": "knip --config knip.jsonc --no-progress --reporter compact --no-exit-code",
     "lint:jscpd": "jscpd --config .jscpd.json",
     "lint:sql": "pnpm --filter @mistle/db lint:sql",
-    "lint:repo-health": "pnpm lint:knip && pnpm lint:jscpd && pnpm lint:sql",
     "lint-staged": "lint-staged",
     "config:init:dev": "tsx ./scripts/config/init-development.ts",
     "config:init:integration": "tsx ./scripts/config/init-integration.ts",
@@ -52,7 +51,7 @@
     "release:notes": "tsx ./scripts/release/notes.ts",
     "release:write-notes": "tsx ./scripts/release/write-notes.ts",
     "release:create-tag": "tsx ./scripts/release/create-tag.ts",
-    "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm storybook:build && pnpm test",
+    "ci": "pnpm format:check && pnpm lint && pnpm lint:sql && pnpm typecheck && pnpm storybook:build && pnpm test",
     "ci:nix": "nix develop --command pnpm run ci",
     "prepare": "node -e \"const cp = require('child_process'); if (!(process.env.CI || process.env.LEFTHOOK === '0')) { try { cp.execSync('git rev-parse --is-inside-work-tree', { stdio: 'ignore' }); cp.execSync('lefthook install', { stdio: 'inherit' }); } catch {} }\""
   },
