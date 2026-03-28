@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { setTimeout as sleep } from "node:timers/promises";
 
+import { systemSleeper } from "@mistle/time";
 import { createMutableClock, createManualScheduler } from "@mistle/time/testing";
 import { describe, expect, it } from "vitest";
 
@@ -42,7 +42,7 @@ async function waitForCondition(
       return;
     }
 
-    await sleep(10);
+    await systemSleeper.sleep(10);
   }
 
   throw new Error(failureMessage);
