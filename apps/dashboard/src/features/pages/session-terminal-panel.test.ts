@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 
+import type { TerminalRecoveryState } from "./session-terminal-panel.js";
 import {
+  reduceTerminalRecoveryState,
   resolveTerminalRecoveryMessage,
   shouldAttemptTerminalReconnect,
   shouldAutoOpenTerminal,
   shouldHandleTerminalExit,
   shouldRequestTerminalResume,
 } from "./session-terminal-panel.js";
+
+const ResetInfo = {
+  code: "bootstrap_disconnected",
+  message: "Sandbox bootstrap tunnel disconnected.",
+} as const;
 
 describe("shouldAutoOpenTerminal", () => {
   it("allows auto-open for running sandboxes", () => {
@@ -87,87 +94,212 @@ describe("shouldHandleTerminalExit", () => {
   });
 });
 
-describe("shouldRequestTerminalResume", () => {
-  it("requests resume only while recovering a visible stopped sandbox", () => {
+describe("reduceTerminalRecoveryState", () => {
+  it("starts a fresh recovery cycle when a reset is seen", () => {
     expect(
-      shouldRequestTerminalResume({
-        isRecovering: true,
-        isResumingSandbox: false,
-        isVisible: true,
-        sandboxStatus: "stopped",
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldRequestTerminalResume({
-        isRecovering: true,
-        isResumingSandbox: true,
-        isVisible: true,
-        sandboxStatus: "stopped",
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldRequestTerminalResume({
-        isRecovering: false,
-        isResumingSandbox: false,
-        isVisible: true,
-        sandboxStatus: "stopped",
-      }),
-    ).toBe(false);
+      reduceTerminalRecoveryState(
+        {
+          kind: "idle",
+        },
+        {
+          type: "reset_seen",
+          resetInfo: ResetInfo,
+        },
+      ),
+    ).toEqual({
+      kind: "recovering",
+      attemptCount: 0,
+      command: "none",
+      errorMessage: null,
+      resetInfo: ResetInfo,
+    });
   });
-});
 
-describe("shouldAttemptTerminalReconnect", () => {
-  it("retries only while a recovery-capable running sandbox is visible", () => {
-    expect(
-      shouldAttemptTerminalReconnect({
-        isRecovering: true,
+  it("requests sandbox resume only for a stopped recovery cycle", () => {
+    const recovery = reduceTerminalRecoveryState(
+      {
+        kind: "recovering",
+        attemptCount: 0,
+        command: "none",
+        errorMessage: null,
+        resetInfo: ResetInfo,
+      },
+      {
+        type: "sync_observed",
         isReconnectAttemptInFlight: false,
-        isVisible: true,
+        isResumingSandbox: false,
+        lifecycleState: "closed",
+        sandboxStatus: "stopped",
+      },
+    );
+
+    expect(shouldRequestTerminalResume({ recovery })).toBe(true);
+  });
+
+  it("requests terminal reopen only for a running recovery cycle", () => {
+    const recovery = reduceTerminalRecoveryState(
+      {
+        kind: "recovering",
+        attemptCount: 0,
+        command: "none",
+        errorMessage: null,
+        resetInfo: ResetInfo,
+      },
+      {
+        type: "sync_observed",
+        isReconnectAttemptInFlight: false,
+        isResumingSandbox: false,
         lifecycleState: "connected",
-        reconnectAttemptCount: 0,
         sandboxStatus: "running",
-      }),
-    ).toBe(true);
+      },
+    );
 
-    expect(
-      shouldAttemptTerminalReconnect({
-        isRecovering: true,
-        isReconnectAttemptInFlight: false,
-        isVisible: true,
-        lifecycleState: "open",
-        reconnectAttemptCount: 0,
-        sandboxStatus: "running",
-      }),
-    ).toBe(false);
+    expect(shouldAttemptTerminalReconnect({ recovery })).toBe(true);
+  });
 
+  it("increments reconnect attempts when a reopen starts", () => {
     expect(
-      shouldAttemptTerminalReconnect({
-        isRecovering: true,
-        isReconnectAttemptInFlight: false,
-        isVisible: true,
-        lifecycleState: "connected",
-        reconnectAttemptCount: 3,
-        sandboxStatus: "running",
-      }),
-    ).toBe(false);
+      reduceTerminalRecoveryState(
+        {
+          kind: "recovering",
+          attemptCount: 0,
+          command: "reopen",
+          errorMessage: null,
+          resetInfo: ResetInfo,
+        },
+        {
+          type: "reopen_requested",
+        },
+      ),
+    ).toEqual({
+      kind: "recovering",
+      attemptCount: 1,
+      command: "none",
+      errorMessage: null,
+      resetInfo: ResetInfo,
+    });
+  });
+
+  it("clears recovery once the PTY is open again", () => {
+    expect(
+      reduceTerminalRecoveryState(
+        {
+          kind: "recovering",
+          attemptCount: 1,
+          command: "none",
+          errorMessage: null,
+          resetInfo: ResetInfo,
+        },
+        {
+          type: "sync_observed",
+          isReconnectAttemptInFlight: false,
+          isResumingSandbox: false,
+          lifecycleState: "open",
+          sandboxStatus: "running",
+        },
+      ),
+    ).toEqual({
+      kind: "idle",
+    });
+  });
+
+  it("records an explicit terminal failure when the sandbox fails", () => {
+    expect(
+      reduceTerminalRecoveryState(
+        {
+          kind: "recovering",
+          attemptCount: 0,
+          command: "none",
+          errorMessage: null,
+          resetInfo: ResetInfo,
+        },
+        {
+          type: "sync_observed",
+          isReconnectAttemptInFlight: false,
+          isResumingSandbox: false,
+          lifecycleState: "closed",
+          sandboxStatus: "failed",
+        },
+      ),
+    ).toEqual({
+      kind: "recovering",
+      attemptCount: 0,
+      command: "none",
+      errorMessage: "Terminal disconnected and the sandbox failed.",
+      resetInfo: ResetInfo,
+    });
+  });
+
+  it("fails recovery after the reconnect attempt budget is exhausted", () => {
+    expect(
+      reduceTerminalRecoveryState(
+        {
+          kind: "recovering",
+          attemptCount: 3,
+          command: "none",
+          errorMessage: null,
+          resetInfo: ResetInfo,
+        },
+        {
+          type: "sync_observed",
+          isReconnectAttemptInFlight: false,
+          isResumingSandbox: false,
+          lifecycleState: "closed",
+          sandboxStatus: "running",
+        },
+      ),
+    ).toEqual({
+      kind: "recovering",
+      attemptCount: 3,
+      command: "none",
+      errorMessage: "Could not reconnect terminal after 3 attempts.",
+      resetInfo: ResetInfo,
+    });
+  });
+
+  it("records terminal reopen failures without issuing another command", () => {
+    expect(
+      reduceTerminalRecoveryState(
+        {
+          kind: "recovering",
+          attemptCount: 1,
+          command: "none",
+          errorMessage: null,
+          resetInfo: ResetInfo,
+        },
+        {
+          type: "reopen_failed",
+          message: "Could not reopen sandbox terminal.",
+        },
+      ),
+    ).toEqual({
+      kind: "recovering",
+      attemptCount: 1,
+      command: "none",
+      errorMessage: "Could not reopen sandbox terminal.",
+      resetInfo: ResetInfo,
+    });
   });
 });
 
 describe("resolveTerminalRecoveryMessage", () => {
-  const resetInfo = {
-    code: "bootstrap_disconnected",
-    message: "Sandbox bootstrap tunnel disconnected.",
-  } as const;
+  function createRecoveringState(
+    overrides: Partial<Extract<TerminalRecoveryState, { kind: "recovering" }>> = {},
+  ): TerminalRecoveryState {
+    return {
+      kind: "recovering",
+      attemptCount: 0,
+      command: "none",
+      errorMessage: null,
+      resetInfo: ResetInfo,
+      ...overrides,
+    };
+  }
 
   it("explains resume-based recovery for stopped sandboxes", () => {
     expect(
       resolveTerminalRecoveryMessage({
-        isRecovering: true,
-        recoveryErrorMessage: null,
-        reconnectAttemptCount: 0,
-        resetInfo,
+        recovery: createRecoveringState(),
         sandboxStatus: "stopped",
       }),
     ).toBe(
@@ -178,10 +310,9 @@ describe("resolveTerminalRecoveryMessage", () => {
   it("reports reconnect attempts while the sandbox is running", () => {
     expect(
       resolveTerminalRecoveryMessage({
-        isRecovering: true,
-        recoveryErrorMessage: null,
-        reconnectAttemptCount: 2,
-        resetInfo,
+        recovery: createRecoveringState({
+          attemptCount: 2,
+        }),
         sandboxStatus: "running",
       }),
     ).toBe(
@@ -192,10 +323,10 @@ describe("resolveTerminalRecoveryMessage", () => {
   it("prefers explicit recovery failures over generic reconnect messaging", () => {
     expect(
       resolveTerminalRecoveryMessage({
-        isRecovering: true,
-        recoveryErrorMessage: "Could not reconnect terminal after 3 attempts.",
-        reconnectAttemptCount: 3,
-        resetInfo,
+        recovery: createRecoveringState({
+          attemptCount: 3,
+          errorMessage: "Could not reconnect terminal after 3 attempts.",
+        }),
         sandboxStatus: "running",
       }),
     ).toBe("Could not reconnect terminal after 3 attempts.");
