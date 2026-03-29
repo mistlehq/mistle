@@ -99,7 +99,7 @@ describe("sandbox execution lease integration", () => {
     "persists bootstrap lease create and renew messages",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
-      const leaseId = typeid("sxl").toString(); // codespell:ignore
+      const leaseId = typeid("sxl").toString();
       await insertSandboxInstanceRow({
         fixture,
         sandboxInstanceId,

@@ -12,7 +12,7 @@ import {
 import { startPostgresWithPgBouncer } from "@mistle/test-harness";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 import { Pool } from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"; // codespell:ignore
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
 import { persistSandboxInstanceProvisioning } from "../openworkflow/start-sandbox-instance/persist-sandbox-instance-provisioning.js";
@@ -71,7 +71,7 @@ describe("start sandbox instance provisioning integration", () => {
     });
   }, IntegrationTestTimeoutMs);
 
-  /* codespell:ignore */ afterAll(async () => {
+  afterAll(async () => {
     await dbPool?.end();
     await databaseStack?.stop();
   });

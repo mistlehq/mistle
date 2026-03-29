@@ -1,0 +1,9 @@
+[files]
+extend-exclude = ["deploy/helm/mistle/values-local.yaml"]
+
+[default]
+extend-ignore-re = ["IIFEs", "\\[Ll\\]ocation:"]
+extend-ignore-identifiers-re = ["\\bthr_[A-Za-z0-9_]+\\b"]
+
+[default.extend-words]
+sxl = "sxl"

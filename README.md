@@ -31,7 +31,7 @@ Repo runtime expectation:
 - Docker (Desktop or Engine) with `docker compose`
 - Optional: `direnv` + `nix-direnv` for automatic shell activation
 
-If you are not using the Nix shell, install Node v25, pnpm 10.30.2, and a Rust toolchain with `cargo`, `rustfmt`, and `clippy` locally.
+If you are not using the Nix shell, install Node v25, pnpm 10.30.2, a Rust toolchain with `cargo`, `rustfmt`, and `clippy`, and `typos-cli` locally.
 
 ### Install Nix
 

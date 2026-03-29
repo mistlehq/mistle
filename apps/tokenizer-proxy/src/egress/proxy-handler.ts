@@ -190,7 +190,7 @@ function removeHopByHopHeaders(headers: Headers): void {
     "keep-alive",
     "proxy-authenticate",
     "proxy-authorization",
-    "te", // codespell:ignore
+    "te",
     "trailer",
     "transfer-encoding",
     "upgrade",

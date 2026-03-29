@@ -11,7 +11,7 @@ import {
 } from "@mistle/db/migrator";
 import { startPostgresWithPgBouncer } from "@mistle/test-harness";
 import { Pool } from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"; // codespell:ignore
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { markSandboxInstanceStarting } from "../openworkflow/resume-sandbox-instance/mark-sandbox-instance-starting.js";
 
@@ -53,7 +53,7 @@ describe("resume sandbox instance state integration", () => {
     });
   }, IntegrationTestTimeoutMs);
 
-  /* codespell:ignore */ afterAll(async () => {
+  afterAll(async () => {
     await dbPool?.end();
     await databaseStack?.stop();
   });

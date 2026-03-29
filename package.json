@@ -23,7 +23,7 @@
     "lint:openapi": "pnpm --filter @mistle/control-plane-api openapi:check && pnpm --filter @mistle/data-plane-api openapi:check && pnpm --filter @mistle/control-plane-internal-client openapi:check && pnpm --filter @mistle/data-plane-internal-client openapi:check",
     "lint:docs": "pnpm --filter @mistle/docs lint",
     "lint:rust": "pnpm --filter @mistle/sandbox-rs-napi lint",
-    "lint:spelling": "codespell",
+    "lint:spelling": "typos .",
     "lint:knip": "knip --config knip.jsonc --no-progress --reporter compact",
     "lint:knip:report": "knip --config knip.jsonc --no-progress --reporter compact --no-exit-code",
     "lint:jscpd": "jscpd --config .jscpd.json",
