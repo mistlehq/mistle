@@ -2,6 +2,7 @@ import {
   SandboxSessionClient,
   SandboxSessionSendGuarantees,
   type SandboxSessionSendGuarantee,
+  type SandboxSessionResetInfo,
 } from "@mistle/sandbox-session-client";
 import type {
   JsonRpcErrorResponse as CodexJsonRpcErrorResponse,
@@ -26,6 +27,10 @@ export type CodexJsonRpcCallHandle = {
 
 type NotificationListener = (notification: CodexJsonRpcNotification) => void;
 type ServerRequestListener = (request: CodexJsonRpcServerRequest) => void;
+
+function createStreamResetError(resetInfo: SandboxSessionResetInfo): Error {
+  return new Error(`Sandbox session stream reset (${resetInfo.code}): ${resetInfo.message}`);
+}
 
 function isErrorResponse(
   response: CodexJsonRpcSuccessResponse | CodexJsonRpcErrorResponse,
@@ -211,6 +216,11 @@ export class CodexJsonRpcClient {
       this.#rejectAllPendingRequests(
         new Error(event.errorMessage ?? "Codex session connection ended."),
       );
+      return;
+    }
+
+    if (event.type === "stream_reset") {
+      this.#rejectAllPendingRequests(createStreamResetError(event.resetInfo));
     }
   }
 

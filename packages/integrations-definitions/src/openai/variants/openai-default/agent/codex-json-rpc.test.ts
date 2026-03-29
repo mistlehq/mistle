@@ -24,6 +24,7 @@ type TestServerMode =
   | "close_after_initialized"
   | "close_before_initialized"
   | "error_on_thread_list"
+  | "manual_thread_list"
   | "stay_open";
 
 type TestServer = {
@@ -32,6 +33,7 @@ type TestServer = {
   threadListRequest: Promise<string>;
   socketClosed: Promise<void>;
   closeClientSocket: () => void;
+  sendStreamReset: (input: { code: string; message: string }) => void;
   sendThreadListResult: (result: unknown) => void;
   close: () => Promise<void>;
 };
@@ -127,6 +129,7 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
   let connectedSocket: ConnectedSocket | null = null;
   let didHandleOpen = false;
   let latestThreadListRequestId: string | number | null = null;
+  let activeStreamId: number | null = null;
 
   wsServer.on("connection", (socket: WebSocket) => {
     connectedSocket = socket;
@@ -148,6 +151,7 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
           return;
         }
 
+        activeStreamId = payload.streamId;
         socket.send(
           JSON.stringify({
             type: "stream.open.ok",
@@ -219,6 +223,9 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
         }
 
         threadListRequestDeferred.resolve(JSON.stringify(payload));
+        if (mode === "manual_thread_list") {
+          return;
+        }
         socket.send(
           JSON.stringify({
             id: "id" in payload ? payload.id : 0,
@@ -258,6 +265,23 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
       }
 
       connectedSocket.close(1011, "forced close");
+    },
+    sendStreamReset: (input) => {
+      if (connectedSocket === null) {
+        throw new Error("Expected websocket client to be connected before sending reset.");
+      }
+      if (activeStreamId === null) {
+        throw new Error("Expected stream.open handshake before sending reset.");
+      }
+
+      connectedSocket.send(
+        JSON.stringify({
+          type: "stream.reset",
+          streamId: activeStreamId,
+          code: input.code,
+          message: input.message,
+        }),
+      );
     },
     sendThreadListResult: (result) => {
       if (connectedSocket === null) {
@@ -437,6 +461,31 @@ describe("openai codex json-rpc client", () => {
       items: [],
       nextCursor: null,
     });
+  });
+
+  it("rejects pending requests when the active stream is reset", async () => {
+    const server = await startJsonRpcTestServer("manual_thread_list");
+    openServers.add(server);
+
+    const sessionClient = new CodexSessionClient({
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+    await sessionClient.connect();
+
+    const rpcClient = new CodexJsonRpcClient(sessionClient);
+    const pendingCall = rpcClient.call("thread/list", { limit: 1 });
+
+    await server.threadListRequest;
+    server.sendStreamReset({
+      code: "bootstrap_disconnected",
+      message:
+        "Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.",
+    });
+
+    await expect(pendingCall).rejects.toThrow(
+      "Sandbox session stream reset (bootstrap_disconnected): Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.",
+    );
   });
 
   it("fails browser initialize when the socket closes after initialized but before the ready probe completes", async () => {
