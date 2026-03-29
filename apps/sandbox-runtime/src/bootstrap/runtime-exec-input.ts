@@ -16,7 +16,6 @@ type TargetIdentity = {
 
 export const HomeEnv = "HOME";
 export const LognameEnv = "LOGNAME";
-export const PackagedRuntimeBinaryName = "sandboxd";
 export const UserEnv = "USER";
 
 function normalizePathArgument(argument: string): string {
@@ -65,25 +64,20 @@ function replaceBootstrapRuntimeCommand(runtimeArgs: readonly string[]): string[
   );
 }
 
-export function buildRuntimeExecArgs(processArgv: readonly string[]): string[] {
+export function buildNodeScriptRuntimeArgs(processArgv: readonly string[]): string[] {
   return replaceBootstrapRuntimeCommand(processArgv.slice(1));
 }
 
-export function buildRuntimeExecInput(input: {
+export function buildPackagedRuntimeArgs(processArgv: readonly string[]): string[] {
+  // In SEA entrypoints, user-provided arguments start at process.argv[2].
+  return replaceBootstrapRuntimeCommand(processArgv.slice(2));
+}
+
+function buildRuntimeExecEnvironment(input: {
   processEnv: NodeJS.ProcessEnv;
-  processArgv: readonly string[];
-  runtimeEntrypointPath: string;
   targetIdentity: TargetIdentity;
   additionalEnv: Record<string, string>;
-}): ExecRuntimeInput {
-  const runtimeArgs = buildRuntimeExecArgs(input.processArgv);
-  const runtimeEntrypointIndex = runtimeArgs.findIndex(
-    (argument) => normalizePathArgument(argument) === input.runtimeEntrypointPath,
-  );
-  if (runtimeEntrypointIndex < 0) {
-    throw new Error(`failed to locate runtime entrypoint "${input.runtimeEntrypointPath}" in argv`);
-  }
-
+}): ProcessEnvironmentEntry[] {
   const env = buildProcessEnvironmentEntries(input.processEnv);
   env.push(
     {
@@ -107,12 +101,29 @@ export function buildRuntimeExecInput(input: {
     });
   }
 
+  return env;
+}
+
+export function buildRuntimeExecInput(input: {
+  processEnv: NodeJS.ProcessEnv;
+  processArgv: readonly string[];
+  runtimeEntrypointPath: string;
+  targetIdentity: TargetIdentity;
+  additionalEnv: Record<string, string>;
+}): ExecRuntimeInput {
+  const runtimeArgs = buildNodeScriptRuntimeArgs(input.processArgv);
+  if (
+    !runtimeArgs.some((argument) => normalizePathArgument(argument) === input.runtimeEntrypointPath)
+  ) {
+    throw new Error(`failed to locate runtime entrypoint "${input.runtimeEntrypointPath}" in argv`);
+  }
+
   return {
     uid: input.targetIdentity.uid,
     gid: input.targetIdentity.gid,
     command: process.execPath,
     args: runtimeArgs,
-    env,
+    env: buildRuntimeExecEnvironment(input),
   };
 }
 
@@ -123,35 +134,11 @@ export function buildPackagedRuntimeExecInput(input: {
   targetIdentity: TargetIdentity;
   additionalEnv: Record<string, string>;
 }): ExecRuntimeInput {
-  const env = buildProcessEnvironmentEntries(input.processEnv);
-  env.push(
-    {
-      name: HomeEnv,
-      value: input.targetIdentity.homeDir,
-    },
-    {
-      name: LognameEnv,
-      value: input.targetIdentity.username,
-    },
-    {
-      name: UserEnv,
-      value: input.targetIdentity.username,
-    },
-  );
-
-  for (const [name, value] of Object.entries(input.additionalEnv)) {
-    env.push({
-      name,
-      value,
-    });
-  }
-
   return {
     uid: input.targetIdentity.uid,
     gid: input.targetIdentity.gid,
     command: input.runtimeExecutablePath,
-    // In SEA entrypoints, user-provided arguments start at process.argv[2].
-    args: replaceBootstrapRuntimeCommand(input.processArgv.slice(2)),
-    env,
+    args: buildPackagedRuntimeArgs(input.processArgv),
+    env: buildRuntimeExecEnvironment(input),
   };
 }

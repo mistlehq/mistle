@@ -5,7 +5,7 @@
 import { fc, test as propertyTest } from "@fast-check/vitest";
 import { expect } from "vitest";
 
-import { buildRuntimeExecArgs } from "./runtime-exec-input.js";
+import { buildNodeScriptRuntimeArgs } from "./runtime-exec-input.js";
 
 const NodeExecutablePath = "/usr/local/bin/node";
 const BootstrapRuntimeCommandName = "bootstrap-runtime";
@@ -26,7 +26,7 @@ propertyTest.prop(
       ...suffixArgs,
     ];
 
-    expect(buildRuntimeExecArgs(processArgv)).toEqual([
+    expect(buildNodeScriptRuntimeArgs(processArgv)).toEqual([
       ...prefixArgs,
       RuntimeInternalCommandName,
       ...suffixArgs,
@@ -37,7 +37,7 @@ propertyTest.prop(
 propertyTest.prop([fc.array(ArgTokenArbitrary, { maxLength: 12 })], { numRuns: 100 })(
   "throws when argv does not contain the bootstrap-runtime command",
   (runtimeArgs) => {
-    expect(() => buildRuntimeExecArgs([NodeExecutablePath, ...runtimeArgs])).toThrow(
+    expect(() => buildNodeScriptRuntimeArgs([NodeExecutablePath, ...runtimeArgs])).toThrow(
       `failed to locate bootstrap runtime command "${BootstrapRuntimeCommandName}" in argv`,
     );
   },

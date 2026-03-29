@@ -4,8 +4,6 @@ import { execRuntime } from "./exec-runtime.js";
 import { installProxyCaCertificate, prepareProxyCaRuntimeEnv } from "./proxy-ca.js";
 import { buildPackagedRuntimeExecInput, buildRuntimeExecInput } from "./runtime-exec-input.js";
 
-type LookupEnv = (key: string) => string | undefined;
-
 const RootRuntimeIdentity = {
   username: "root",
   uid: 0,
@@ -14,7 +12,6 @@ const RootRuntimeIdentity = {
 } as const;
 
 type RunBootstrapInput = {
-  lookupEnv: LookupEnv;
   processArgv: readonly string[];
   runtimeExecTarget:
     | {

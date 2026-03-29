@@ -75,7 +75,6 @@ export async function runRuntimeCommand(input: RunRuntimeCommandInput): Promise<
     case "bootstrap-runtime":
       if (input.packagedRuntimeExecutablePath !== undefined) {
         await runBootstrap({
-          lookupEnv: input.lookupEnv,
           processArgv: input.processArgv,
           runtimeExecTarget: {
             kind: "packaged-binary",
@@ -90,7 +89,6 @@ export async function runRuntimeCommand(input: RunRuntimeCommandInput): Promise<
       }
 
       await runBootstrap({
-        lookupEnv: input.lookupEnv,
         processArgv: input.processArgv,
         runtimeExecTarget: {
           kind: "node-script",
