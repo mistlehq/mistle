@@ -24,6 +24,7 @@ import type {
   JsonRpcSuccessResponse,
   SandboxSessionConnectionState,
   SandboxSessionEvent,
+  SandboxSessionResetInfo,
 } from "./types.js";
 
 const DefaultConnectTimeoutMs = 15_000;
@@ -217,6 +218,7 @@ export class SandboxSessionClient {
   #state: SandboxSessionConnectionState = "idle";
   #errorMessage: string | null = null;
   #openError: StreamOpenError | null = null;
+  #resetInfo: SandboxSessionResetInfo | null = null;
   #availableSendWindowBytes = 0;
   #streamId: number | null = null;
 
@@ -236,6 +238,10 @@ export class SandboxSessionClient {
 
   get openError(): StreamOpenError | null {
     return this.#openError;
+  }
+
+  get resetInfo(): SandboxSessionResetInfo | null {
+    return this.#resetInfo;
   }
 
   get socket(): import("./runtime.js").SandboxSessionSocket | null {
@@ -263,6 +269,7 @@ export class SandboxSessionClient {
     }
 
     this.#openError = null;
+    this.#resetInfo = null;
     this.#streamId = null;
     this.#setState("connecting_socket", null);
 
@@ -496,21 +503,10 @@ export class SandboxSessionClient {
     const textPayload = readTextPayload(messagePayload);
     if (textPayload !== null) {
       const controlMessage = parseStreamControlMessage(textPayload);
-      if (
-        controlMessage?.type === "stream.window" &&
-        this.#streamId !== null &&
-        controlMessage.streamId === this.#streamId
-      ) {
-        const nextAvailableSendWindowBytes = this.#availableSendWindowBytes + controlMessage.bytes;
-        if (nextAvailableSendWindowBytes > MaxStreamWindowBytes) {
-          this.#closeConnectedSocketWithError(
-            `Sandbox session stream send window exceeds the configured maximum of ${String(MaxStreamWindowBytes)} bytes.`,
-          );
+      if (controlMessage !== undefined) {
+        if (this.#handleControlMessage(controlMessage)) {
           return;
         }
-
-        this.#availableSendWindowBytes = nextAvailableSendWindowBytes;
-        return;
       }
       this.#emitParsedJsonMessage(textPayload);
       return;
@@ -560,6 +556,46 @@ export class SandboxSessionClient {
       payload: dataFrame,
     });
   };
+
+  #handleControlMessage(controlMessage: ReturnType<typeof parseStreamControlMessage>): boolean {
+    if (controlMessage === undefined || this.#streamId === null) {
+      return false;
+    }
+
+    if (controlMessage.streamId !== this.#streamId) {
+      return false;
+    }
+
+    if (controlMessage.type === "stream.window") {
+      const nextAvailableSendWindowBytes = this.#availableSendWindowBytes + controlMessage.bytes;
+      if (nextAvailableSendWindowBytes > MaxStreamWindowBytes) {
+        this.#closeConnectedSocketWithError(
+          `Sandbox session stream send window exceeds the configured maximum of ${String(MaxStreamWindowBytes)} bytes.`,
+        );
+        return true;
+      }
+
+      this.#availableSendWindowBytes = nextAvailableSendWindowBytes;
+      return true;
+    }
+
+    if (controlMessage.type === "stream.reset") {
+      this.#resetInfo = {
+        code: controlMessage.code,
+        message: controlMessage.message,
+      };
+      this.#availableSendWindowBytes = 0;
+      this.#streamId = null;
+      this.#setState("connected_socket", null);
+      this.#emit({
+        type: "stream_reset",
+        resetInfo: this.#resetInfo,
+      });
+      return true;
+    }
+
+    return false;
+  }
 
   readonly #handleSocketClose = (): void => {
     this.#socket = null;

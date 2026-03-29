@@ -31,6 +31,7 @@ type TestServer = {
   socketClosed: Promise<void>;
   windowUpdate: Promise<{ bytes: number; streamId: number }>;
   sendNotification: (payload: unknown) => void;
+  sendReset: (input: { code: string; message: string }) => void;
   sendWindowUpdate: (bytes: number) => void;
   closeClientSocket: () => void;
   close: () => Promise<void>;
@@ -223,6 +224,23 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
 
       connectedSocket.send(encodeAgentTextDataFrame(activeStreamId, JSON.stringify(payload)));
     },
+    sendReset: (input) => {
+      if (connectedSocket === null) {
+        throw new Error("Expected websocket client to be connected before sending reset.");
+      }
+      if (activeStreamId === null) {
+        throw new Error("Expected stream.open to complete before sending reset.");
+      }
+
+      connectedSocket.send(
+        JSON.stringify({
+          type: "stream.reset",
+          streamId: activeStreamId,
+          code: input.code,
+          message: input.message,
+        }),
+      );
+    },
     sendWindowUpdate: (bytes) => {
       if (connectedSocket === null) {
         throw new Error("Expected websocket client to be connected before sending window update.");
@@ -306,7 +324,12 @@ function createBrowserClient(connectionUrl: string): SandboxSessionClient {
   });
 }
 
-type RecordedEvent = { type: string; state?: string; method?: string };
+type RecordedEvent = {
+  type: string;
+  state?: string;
+  method?: string;
+  resetInfo?: { code: string; message: string };
+};
 
 function recordConnectionAndNotificationEvents(client: SandboxSessionClient): Array<RecordedEvent> {
   const events: Array<RecordedEvent> = [];
@@ -324,6 +347,14 @@ function recordConnectionAndNotificationEvents(client: SandboxSessionClient): Ar
       events.push({
         type: event.type,
         method: event.notification.method,
+      });
+      return;
+    }
+
+    if (event.type === "stream_reset") {
+      events.push({
+        type: event.type,
+        resetInfo: event.resetInfo,
       });
     }
   });
@@ -564,6 +595,48 @@ describe("sandbox session client", () => {
     });
 
     expect(client.errorMessage).toBe("Sandbox websocket connection closed.");
+  });
+
+  it("surfaces active stream reset without closing the websocket", async () => {
+    const server = await createManagedTestServer("accept");
+    const client = createClient(server.url);
+    const events = recordConnectionAndNotificationEvents(client);
+
+    await expectClientToOpenAgentStream({
+      client,
+      server,
+    });
+
+    server.sendReset({
+      code: "bootstrap_disconnected",
+      message:
+        "Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.",
+    });
+
+    await waitForCondition({
+      description: "stream reset event",
+      timeoutMs: 500,
+      evaluate: () => events.some((event) => event.type === "stream_reset"),
+    });
+
+    expect(client.state).toBe("connected_socket");
+    expect(client.streamId).toBeNull();
+    expect(client.resetInfo).toEqual({
+      code: "bootstrap_disconnected",
+      message:
+        "Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.",
+    });
+    expect(events).toContainEqual({
+      type: "stream_reset",
+      resetInfo: {
+        code: "bootstrap_disconnected",
+        message:
+          "Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.",
+      },
+    });
+    await expect(client.sendJson({ method: "after-reset" })).rejects.toThrow(
+      "Sandbox session stream is not open.",
+    );
   });
 
   it("reports queued send guarantees in the browser runtime", async () => {

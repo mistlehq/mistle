@@ -445,6 +445,11 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
           return;
         }
 
+        if (event.type === "stream_reset") {
+          recordRecentUnhandledMessage(event);
+          return;
+        }
+
         recordRecentUnhandledMessage(event.payload);
       }),
     ];
