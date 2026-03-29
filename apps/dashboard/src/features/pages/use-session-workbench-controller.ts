@@ -144,6 +144,7 @@ type SessionWorkbenchState = {
   shouldAutoResumeOnEntry: boolean;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   requestStoppedSandboxResume: () => Promise<void>;
+  sandboxLifecycleStatus: "resuming" | "starting" | "running" | "stopped" | "failed" | null;
   sandboxFailureMessage: string | null;
   sandboxStatusQuery: ReturnType<
     typeof useQuery<Awaited<ReturnType<typeof getSandboxInstanceStatus>>, Error>
@@ -932,6 +933,7 @@ export function useSessionWorkbenchController(input: {
       shouldAutoResumeOnEntry: shouldAttemptInitialStoppedResume,
       ptyState,
       requestStoppedSandboxResume,
+      sandboxLifecycleStatus: effectiveSandboxStatus,
       sandboxFailureMessage,
       sandboxStatusQuery,
       sessionHeaderStatusUi,
