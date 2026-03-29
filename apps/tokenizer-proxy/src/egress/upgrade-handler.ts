@@ -184,7 +184,7 @@ function buildOutgoingRequestHeaders(headers: IncomingHttpHeaders): Headers {
     "proxy-authenticate",
     "proxy-authorization",
     "proxy-connection",
-    "te",
+    "te", // codespell:ignore
     "trailer",
     "transfer-encoding",
     ...Object.values(EgressRequestHeaders).map((headerName) => headerName.toLowerCase()),

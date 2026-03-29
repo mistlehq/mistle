@@ -13,7 +13,7 @@ import {
 } from "@mistle/integrations-definitions/openai/agent/server";
 import { createNodeCodexSessionRuntime } from "@mistle/integrations-definitions/openai/agent/server";
 import { systemSleeper } from "@mistle/time";
-import { afterAll, beforeAll, describe, expect } from "vitest";
+import { afterAll, beforeAll, describe, expect } from "vitest"; // codespell:ignore
 import { z } from "zod";
 
 import {
@@ -326,7 +326,7 @@ describeIf("system GitHub webhook automation", () => {
     });
   }, TunnelStartupTimeoutMs + 30_000);
 
-  afterAll(async () => {
+  /* codespell:ignore */ afterAll(async () => {
     if (tunnel !== null) {
       await tunnel.stop();
     }

@@ -36,7 +36,7 @@ describe("sandbox profile version put integration bindings integration", () => {
       },
     });
 
-    const [connectionA, connectionB] = await fixture.db
+    const [firstConnection, secondConnection] = await fixture.db
       .insert(integrationConnections)
       .values([
         {
@@ -60,7 +60,7 @@ describe("sandbox profile version put integration bindings integration", () => {
       ])
       .returning();
 
-    if (connectionA === undefined || connectionB === undefined) {
+    if (firstConnection === undefined || secondConnection === undefined) {
       throw new Error("Expected integration connections to be inserted.");
     }
 
@@ -79,7 +79,7 @@ describe("sandbox profile version put integration bindings integration", () => {
         id: "ibd_put_bindings_route_existing_001",
         sandboxProfileId: "sbp_put_bindings_route_001",
         sandboxProfileVersion: 1,
-        connectionId: connectionA.id,
+        connectionId: firstConnection.id,
         kind: IntegrationBindingKinds.AGENT,
         config: {
           runtime: "codex-cli",
@@ -91,7 +91,7 @@ describe("sandbox profile version put integration bindings integration", () => {
         id: "ibd_put_bindings_route_existing_002",
         sandboxProfileId: "sbp_put_bindings_route_001",
         sandboxProfileVersion: 1,
-        connectionId: connectionA.id,
+        connectionId: firstConnection.id,
         kind: IntegrationBindingKinds.CONNECTOR,
         config: {
           connector: "legacy",
@@ -111,7 +111,7 @@ describe("sandbox profile version put integration bindings integration", () => {
           bindings: [
             {
               id: "ibd_put_bindings_route_existing_001",
-              connectionId: connectionB.id,
+              connectionId: secondConnection.id,
               kind: IntegrationBindingKinds.AGENT,
               config: {
                 runtime: "codex-cli",
@@ -121,7 +121,7 @@ describe("sandbox profile version put integration bindings integration", () => {
               },
             },
             {
-              connectionId: connectionA.id,
+              connectionId: firstConnection.id,
               kind: IntegrationBindingKinds.AGENT,
               config: {
                 runtime: "codex-cli",
@@ -144,7 +144,7 @@ describe("sandbox profile version put integration bindings integration", () => {
       (binding) => binding.id === "ibd_put_bindings_route_existing_001",
     );
     expect(updatedBinding).toBeDefined();
-    expect(updatedBinding?.connectionId).toBe(connectionB.id);
+    expect(updatedBinding?.connectionId).toBe(secondConnection.id);
     expect(updatedBinding?.kind).toBe(IntegrationBindingKinds.AGENT);
     expect(updatedBinding?.config).toEqual({
       runtime: "codex-cli",

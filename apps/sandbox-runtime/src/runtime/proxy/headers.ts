@@ -101,7 +101,7 @@ function hopByHopHeaderNames(source: HeaderBag, includeHost: boolean): Set<strin
     "proxy-authenticate",
     "proxy-authorization",
     "proxy-connection",
-    "te",
+    "te", // codespell:ignore
     "trailer",
     "transfer-encoding",
     "upgrade",
