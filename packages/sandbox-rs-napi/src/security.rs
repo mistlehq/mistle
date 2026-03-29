@@ -71,9 +71,9 @@ pub fn exec_runtime_impl(input: ExecRuntimeInput) -> Result<(), String> {
 
     set_supplementary_groups(input.gid as u32)?;
     nix::unistd::setgid(nix::unistd::Gid::from_raw(input.gid as u32))
-        .map_err(|error| format!("failed to drop group privileges: {error}"))?;
+        .map_err(|error| format!("failed to switch to runtime gid: {error}"))?;
     nix::unistd::setuid(nix::unistd::Uid::from_raw(input.uid as u32))
-        .map_err(|error| format!("failed to drop user privileges: {error}"))?;
+        .map_err(|error| format!("failed to switch to runtime uid: {error}"))?;
     // Node marks stdio fds as close-on-exec during process startup. We must clear
     // FD_CLOEXEC here so the sandbox runtime inherits the original stdin/stdout/stderr
     // streams across execve(), matching the Go bootstrap/runtime handoff.

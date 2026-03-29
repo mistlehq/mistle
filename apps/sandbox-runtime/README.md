@@ -17,7 +17,7 @@ Rust owns:
 - PTY primitives
 - managed process spawn / signal / process-group behavior
 - proxy CA inherited-FD handoff
-- privilege drop, stdio inheritance, and Linux hardening helpers
+- target identity handoff, stdio inheritance, and Linux hardening helpers
 
 TypeScript owns:
 
@@ -79,6 +79,7 @@ The base image:
 - The supervisor control socket and token live under `/run/mistle` with root-only permissions in the image runtime
 - `GET /__healthz` returns 200 only after startup is ready
 - User home and default working directory are `/root`
+- Repositories clone under `/root/<owner>/<repo>`
 - Runtime-installed executables live under `/usr/local/bin`
 - Runtime-owned mutable state lives under `/var/lib/mistle`
 - The base image does not set the runtime env contract itself; providers inject the required runtime env at sandbox start time
