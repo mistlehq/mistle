@@ -650,43 +650,7 @@ describe("applyRuntimePlan", () => {
     );
   });
 
-  it("reuses an existing git clone when the declared origin already matches", async () => {
-    const repository = await seedBareGitRepository();
-    const runtimeDirectory = await createTemporaryDirectory(
-      "mistle-runtime-plan-existing-git-clone-",
-    );
-    const clonePath = join(runtimeDirectory, "workspace", "repos", "mistlehq", "mistle");
-    const localMarkerPath = join(clonePath, "LOCAL_ONLY.txt");
-
-    const runtimePlan = createRuntimePlan({
-      workspaceSources: [
-        {
-          sourceKind: "git-clone",
-          resourceKind: "repository",
-          path: clonePath,
-          originUrl: repository.bareRepositoryPath,
-        },
-      ],
-    });
-
-    await applyRuntimePlan({
-      runtimePlan,
-    });
-    await writeFile(localMarkerPath, "preserve-local-state\n", "utf8");
-
-    await expect(
-      applyRuntimePlan({
-        runtimePlan,
-      }),
-    ).resolves.toBeUndefined();
-
-    await expect(readFile(localMarkerPath, "utf8")).resolves.toBe("preserve-local-state\n");
-    expect(runGit(clonePath, ["config", "--local", "--get", "remote.origin.url"]).trim()).toBe(
-      repository.bareRepositoryPath,
-    );
-  });
-
-  it("fails when the workspace source target already exists and is not a git clone", async () => {
+  it("fails when the workspace source target already exists", async () => {
     const repository = await seedBareGitRepository();
     const runtimeDirectory = await createTemporaryDirectory(
       "mistle-runtime-plan-existing-worktree-",
@@ -711,48 +675,7 @@ describe("applyRuntimePlan", () => {
           ],
         }),
       }),
-    ).rejects.toThrow(
-      `workspace source path '${clonePath}' already exists and is not a reusable git clone`,
-    );
-  });
-
-  it("fails when an existing git clone has a different origin", async () => {
-    const firstRepository = await seedBareGitRepository();
-    const secondRepository = await seedBareGitRepository();
-    const runtimeDirectory = await createTemporaryDirectory(
-      "mistle-runtime-plan-existing-mismatched-origin-",
-    );
-    const clonePath = join(runtimeDirectory, "workspace", "repos", "mistlehq", "mistle");
-
-    await applyRuntimePlan({
-      runtimePlan: createRuntimePlan({
-        workspaceSources: [
-          {
-            sourceKind: "git-clone",
-            resourceKind: "repository",
-            path: clonePath,
-            originUrl: firstRepository.bareRepositoryPath,
-          },
-        ],
-      }),
-    });
-
-    await expect(
-      applyRuntimePlan({
-        runtimePlan: createRuntimePlan({
-          workspaceSources: [
-            {
-              sourceKind: "git-clone",
-              resourceKind: "repository",
-              path: clonePath,
-              originUrl: secondRepository.bareRepositoryPath,
-            },
-          ],
-        }),
-      }),
-    ).rejects.toThrow(
-      `workspace source path '${clonePath}' already exists with origin '${firstRepository.bareRepositoryPath}', expected '${secondRepository.bareRepositoryPath}'`,
-    );
+    ).rejects.toThrow(`workspace source path '${clonePath}' already exists`);
   });
 
   it("fails when a workspace source parent directory cannot be created", async () => {

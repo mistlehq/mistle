@@ -19,6 +19,7 @@ const ValidRuntimePlanJson = `{
 }`;
 
 const ValidStartupInputJson = `{
+  "startupMode": "new",
   "bootstrapToken": "test-token",
   "tunnelExchangeToken": "test-exchange-token",
   "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -37,6 +38,7 @@ describe("readStartupInput", () => {
       maxBytes: 4096,
     });
 
+    expect(startupInput.startupMode).toBe("new");
     expect(startupInput.bootstrapToken).toBe("test-token");
     expect(startupInput.tunnelExchangeToken).toBe("test-exchange-token");
     expect(startupInput.tunnelGatewayWsUrl).toBe("ws://127.0.0.1:5003/tunnel/sandbox");
@@ -69,6 +71,7 @@ describe("readStartupInput", () => {
     const startupInput = await readStartupInput({
       reader: createReader(`
         {
+          "startupMode": "new",
           "bootstrapToken": "  test-token  ",
           "tunnelExchangeToken": "  test-exchange-token  ",
           "tunnelGatewayWsUrl": "  ws://127.0.0.1:5003/tunnel/sandbox  ",
@@ -133,6 +136,7 @@ describe("readStartupInput", () => {
     await expect(
       readStartupInput({
         reader: createReader(`{
+          "startupMode": "new",
           "tunnelExchangeToken": "test-exchange-token",
           "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
           "runtimePlan": ${ValidRuntimePlanJson},
@@ -147,6 +151,7 @@ describe("readStartupInput", () => {
     await expect(
       readStartupInput({
         reader: createReader(`{
+          "startupMode": "new",
           "bootstrapToken": "test-token",
           "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
           "runtimePlan": ${ValidRuntimePlanJson},
@@ -161,6 +166,7 @@ describe("readStartupInput", () => {
     await expect(
       readStartupInput({
         reader: createReader(`{
+          "startupMode": "new",
           "bootstrapToken": "test-token",
           "tunnelExchangeToken": "test-exchange-token",
           "runtimePlan": ${ValidRuntimePlanJson},
@@ -175,6 +181,7 @@ describe("readStartupInput", () => {
     await expect(
       readStartupInput({
         reader: createReader(`{
+          "startupMode": "new",
           "bootstrapToken": "test-token",
           "tunnelExchangeToken": "test-exchange-token",
           "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox"
@@ -184,10 +191,26 @@ describe("readStartupInput", () => {
     ).rejects.toThrow("startup input runtime plan is required");
   });
 
+  it("fails when startup mode is missing", async () => {
+    await expect(
+      readStartupInput({
+        reader: createReader(`{
+          "bootstrapToken": "test-token",
+          "tunnelExchangeToken": "test-exchange-token",
+          "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+          "runtimePlan": ${ValidRuntimePlanJson},
+          "egressGrantByRuleId": {}
+        }`),
+        maxBytes: 4096,
+      }),
+    ).rejects.toThrow("startup input startupMode is required");
+  });
+
   it("fails when startup input has an unknown field", async () => {
     await expect(
       readStartupInput({
         reader: createReader(`{
+          "startupMode": "new",
           "bootstrapToken": "test-token",
           "tunnelExchangeToken": "test-exchange-token",
           "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -204,6 +227,7 @@ describe("readStartupInput", () => {
     await expect(
       readStartupInput({
         reader: createReader(`{
+          "startupMode": "new",
           "bootstrapToken": "test-token",
           "tunnelExchangeToken": "test-exchange-token",
           "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -218,6 +242,7 @@ describe("readStartupInput", () => {
     await expect(
       readStartupInput({
         reader: createReader(`{
+          "startupMode": "new",
           "bootstrapToken": "test-token",
           "tunnelExchangeToken": "test-exchange-token",
           "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",

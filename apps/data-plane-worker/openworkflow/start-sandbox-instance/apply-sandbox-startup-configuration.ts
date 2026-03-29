@@ -15,6 +15,7 @@ import {
 async function createSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
   sandboxInstanceId: string;
+  startupMode: SandboxStartupInput["startupMode"];
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
 }): Promise<SandboxStartupInput> {
   const bootstrapTokenJti = randomUUID();
@@ -55,6 +56,7 @@ async function createSandboxStartupInput(input: {
   ]);
 
   return {
+    startupMode: input.startupMode,
     bootstrapToken,
     tunnelExchangeToken,
     tunnelGatewayWsUrl,
@@ -71,12 +73,14 @@ export async function applySandboxStartupConfiguration(
   input: {
     sandboxInstanceId: string;
     providerSandboxId: string;
+    startupMode: SandboxStartupInput["startupMode"];
     runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   },
 ): Promise<void> {
   const startupInput = await createSandboxStartupInput({
     config: ctx.config,
     sandboxInstanceId: input.sandboxInstanceId,
+    startupMode: input.startupMode,
     runtimePlan: input.runtimePlan,
   });
 

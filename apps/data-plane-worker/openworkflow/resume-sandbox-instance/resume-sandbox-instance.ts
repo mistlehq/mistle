@@ -9,6 +9,7 @@ import { stopSandbox } from "../shared/stop-sandbox.js";
 import { applySandboxStartupConfiguration } from "../start-sandbox-instance/apply-sandbox-startup-configuration.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "../start-sandbox-instance/mark-sandbox-instance-running.js";
+import { SandboxStartupModes } from "../start-sandbox-instance/sandbox-startup-input.js";
 import { waitForSandboxTunnelReadiness } from "../start-sandbox-instance/wait-for-sandbox-tunnel-readiness.js";
 import { markSandboxInstanceStarting } from "./mark-sandbox-instance-starting.js";
 import { resolveResumableSandboxInstanceState } from "./resolve-resumable-sandbox-instance-state.js";
@@ -148,8 +149,9 @@ export async function resumeSandboxInstance(
 
   try {
     // Resuming the provider runtime is not enough to make the sandbox connectable again.
-    // The runtime process tree is restarted as part of resume, so we must reapply the
-    // persisted startup configuration before waiting for sandboxd to re-establish the tunnel.
+    // The runtime process tree is restarted as part of resume, so we must resend startup
+    // metadata with `startupMode=existing` to relaunch processes/tunnel without mutating
+    // the persisted sandbox filesystem again.
     await applySandboxStartupConfiguration(
       {
         config: ctx.config,
@@ -158,6 +160,7 @@ export async function resumeSandboxInstance(
       {
         sandboxInstanceId: resumedRuntime.sandboxInstanceId,
         providerSandboxId: resumedRuntime.providerSandboxId,
+        startupMode: SandboxStartupModes.EXISTING,
         runtimePlan: resumableSandboxInstance.runtimePlan,
       },
     );

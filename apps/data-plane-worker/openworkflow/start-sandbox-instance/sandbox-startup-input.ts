@@ -2,11 +2,19 @@ import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registr
 
 const Encoder = new TextEncoder();
 
+export const SandboxStartupModes = {
+  NEW: "new",
+  EXISTING: "existing",
+} as const;
+
+export type SandboxStartupMode = (typeof SandboxStartupModes)[keyof typeof SandboxStartupModes];
+
 function trimTrailingSlash(value: string): string {
   return value.endsWith("/") ? value.slice(0, -1) : value;
 }
 
 export type SandboxStartupInput = {
+  startupMode: SandboxStartupMode;
   bootstrapToken: string;
   tunnelExchangeToken: string;
   tunnelGatewayWsUrl: string;

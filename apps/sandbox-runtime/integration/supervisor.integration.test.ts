@@ -24,6 +24,7 @@ const SupervisorHelperPath = fileURLToPath(
 );
 
 const ValidStartupInputJson = JSON.stringify({
+  startupMode: "new",
   bootstrapToken: "test-token",
   tunnelExchangeToken: "test-exchange-token",
   tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -40,6 +41,7 @@ const ValidStartupInputJson = JSON.stringify({
     workspaceSources: [],
     agentRuntimes: [],
   },
+  egressGrantByRuleId: {},
 });
 
 function createLookupEnv(controlDirectoryPath: string): (key: string) => string | undefined {

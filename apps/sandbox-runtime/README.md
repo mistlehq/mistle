@@ -73,10 +73,14 @@ The base image:
   - `SANDBOX_RUNTIME_PROXY_CA_CERT_FD`
   - `SANDBOX_RUNTIME_PROXY_CA_KEY_FD`
 - Startup input must be provided to `sandboxd apply-startup` on process `stdin` with:
+  - `startupMode`
   - `bootstrapToken`
   - `tunnelExchangeToken`
   - `tunnelGatewayWsUrl`
   - `runtimePlan`
+  - `egressGrantByRuleId`
+- `startupMode: "new"` applies the runtime plan before starting processes and the tunnel
+- `startupMode: "existing"` skips runtime-plan filesystem mutation and only relaunches processes and the tunnel
 - The supervisor control socket and token live under `/run/mistle` with root-only permissions in the image runtime
 - `GET /__healthz` returns 200 only after startup is ready
 - User home and default working directory are `/root`
