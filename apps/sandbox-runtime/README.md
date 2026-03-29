@@ -55,6 +55,7 @@ The base image:
 - launches `/usr/local/bin/sandboxd bootstrap-runtime` only after startup is applied
 - trusts a per-sandbox proxy CA before execing the runtime
 - execs `/usr/local/bin/sandboxd runtime-internal` as `root`
+- stays agent-agnostic; agent-specific config directories under `/etc` are created on demand by runtime-plan file application
 - provides `mise` at `/usr/local/bin/mise`
 - includes a small developer tool set: `bash`, `curl`, `git`, `iproute2`, `jq`, `less`, `lsof`, `procps`, `ripgrep`, `strace`, `unzip`, and `vim`
 
@@ -79,6 +80,7 @@ The base image:
 - The supervisor control socket and token live under `/run/mistle` with root-only permissions in the image runtime
 - `GET /__healthz` returns 200 only after startup is ready
 - User home and default working directory are `/root`
+- The integration workspace root is also `/root`, so the shell experience matches a conventional root-owned VM
 - Repositories clone under `/root/<owner>/<repo>`
 - Runtime-installed executables live under `/usr/local/bin`
 - Runtime-owned mutable state lives under `/var/lib/mistle`

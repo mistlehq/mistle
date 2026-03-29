@@ -328,7 +328,12 @@ export type ResolvedIntegrationMcpServer = {
 };
 
 export type SandboxPathRefs = {
+  // The interactive sandbox session runs as root, so home-scoped config and the
+  // default shell cwd both live under /root.
   userHomeDir: string;
+  // Integrations clone repositories and materialize project files under this
+  // workspace root. The current sandbox contract intentionally points this at the
+  // same path as userHomeDir so the session behaves like a conventional root-owned VM.
   workspaceDir: string;
   runtimeDataDir: string;
   runtimeArtifactDir: string;

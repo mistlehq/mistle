@@ -18,6 +18,9 @@ type ResolveBootstrapLaunchTargetInput =
 export function resolveBootstrapLaunchTarget(
   input: ResolveBootstrapLaunchTargetInput,
 ): BootstrapLaunchTarget {
+  // Supervisor always enters through bootstrap-runtime. Bootstrap owns the
+  // root-only setup phase, then execs back into runtime-internal once startup
+  // material and proxy CA state are ready.
   if (input.packagedRuntimeExecutablePath !== undefined) {
     return {
       command: input.packagedRuntimeExecutablePath,

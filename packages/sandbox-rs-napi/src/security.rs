@@ -42,12 +42,13 @@ pub fn exec_runtime_impl(input: ExecRuntimeInput) -> Result<(), String> {
     // This native boundary owns the actual target-identity switch. TS resolves the
     // target runtime identity first, but the syscall-level invariants live here.
     //
-    // This intentionally follows the same broad methodology as a native privilege
-    // drop helper like rust-privdrop: validate that we are still privileged, make
-    // the group state explicit first, drop gid before uid, and only then cross the
-    // exec boundary. We keep the implementation local instead of depending on a
-    // general-purpose crate because this path also needs a repo-specific stdio
-    // inheritance fix around execve() for the packaged Node runtime.
+    // This intentionally follows the same broad methodology as a native exec
+    // handoff helper: validate that bootstrap still owns the privileged setup
+    // phase, make the group state explicit first, switch gid before uid, and only
+    // then cross the exec boundary. We keep the implementation local instead of
+    // depending on a general-purpose crate because this path also needs a
+    // repo-specific stdio inheritance fix around execve() for the packaged Node
+    // runtime.
     //
     // 1. confirm the bootstrap process is still privileged
     // 2. replace supplementary groups with the target gid only

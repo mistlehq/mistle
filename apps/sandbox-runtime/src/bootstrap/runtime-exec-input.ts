@@ -50,6 +50,9 @@ function buildProcessEnvironmentEntries(environment: NodeJS.ProcessEnv): Process
 }
 
 function replaceBootstrapRuntimeCommand(runtimeArgs: readonly string[]): string[] {
+  // Supervisor always launches the bootstrap command first. Bootstrap then execs
+  // back into the same runtime binary/entrypoint with runtime-internal so setup
+  // does not continue in-process.
   const bootstrapCommandIndex = runtimeArgs.findIndex(
     (argument) => argument === BootstrapRuntimeCommandName,
   );
@@ -65,11 +68,13 @@ function replaceBootstrapRuntimeCommand(runtimeArgs: readonly string[]): string[
 }
 
 export function buildNodeScriptRuntimeArgs(processArgv: readonly string[]): string[] {
+  // In node-script mode, process.argv starts at the JS entrypoint path.
   return replaceBootstrapRuntimeCommand(processArgv.slice(1));
 }
 
 export function buildPackagedRuntimeArgs(processArgv: readonly string[]): string[] {
-  // In SEA entrypoints, user-provided arguments start at process.argv[2].
+  // In SEA mode, process.argv[1] is the packaged binary path again, so the runtime
+  // command begins at process.argv[2].
   return replaceBootstrapRuntimeCommand(processArgv.slice(2));
 }
 
