@@ -89,10 +89,9 @@ async function executeCommand(command: RuntimeArtifactCommand): Promise<CommandR
   });
 }
 
-function assertRuntimeArtifactCommandSucceeded(
-  command: RuntimeArtifactCommand,
-  result: CommandResult,
-): void {
+export async function runRuntimeArtifactCommand(command: RuntimeArtifactCommand): Promise<void> {
+  const result = await executeCommand(command);
+
   if (result.timedOut) {
     throw new Error(`artifact command timed out after ${command.timeoutMs}ms`);
   }
@@ -109,17 +108,4 @@ function assertRuntimeArtifactCommandSucceeded(
   }
 
   throw new Error(`${failure} (output=${output})`);
-}
-
-export async function runRuntimeArtifactCommand(command: RuntimeArtifactCommand): Promise<void> {
-  const result = await executeCommand(command);
-  assertRuntimeArtifactCommandSucceeded(command, result);
-}
-
-export async function runRuntimeArtifactCommandWithOutput(
-  command: RuntimeArtifactCommand,
-): Promise<string> {
-  const result = await executeCommand(command);
-  assertRuntimeArtifactCommandSucceeded(command, result);
-  return result.stdout;
 }
