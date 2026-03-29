@@ -54,12 +54,6 @@ function createCompiledBindingResult(input: {
     cwd?: string;
     timeoutMs?: number;
   }>;
-  artifactUpdateCommands?: ReadonlyArray<{
-    args: ReadonlyArray<string>;
-    env?: Record<string, string>;
-    cwd?: string;
-    timeoutMs?: number;
-  }>;
   artifactRemoveCommands?: ReadonlyArray<{
     args: ReadonlyArray<string>;
     env?: Record<string, string>;
@@ -92,9 +86,6 @@ function createCompiledBindingResult(input: {
           install: input.artifactInstallCommands ?? [
             { args: ["echo", "install", input.route.egressRuleId] },
           ],
-          ...(input.artifactUpdateCommands === undefined
-            ? {}
-            : { update: input.artifactUpdateCommands }),
           remove: input.artifactRemoveCommands ?? [
             { args: ["echo", "remove", input.route.egressRuleId] },
           ],

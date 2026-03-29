@@ -153,14 +153,6 @@ export interface paths {
                     };
                     timeoutMs?: number;
                   }[];
-                  update?: {
-                    args: string[];
-                    cwd?: string;
-                    env?: {
-                      [key: string]: string;
-                    };
-                    timeoutMs?: number;
-                  }[];
                 };
                 name: string;
               }[];

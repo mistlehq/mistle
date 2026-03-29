@@ -233,11 +233,6 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
               installPath: refs.artifactBinPath("gh"),
             }),
           ],
-          update: ({ refs }) => [
-            buildGitHubCliLifecycleCommand({
-              installPath: refs.artifactBinPath("gh"),
-            }),
-          ],
           remove: ({ refs }) => [
             refs.command.exec({
               args: ["rm", "-f", refs.artifactBinPath("gh")],

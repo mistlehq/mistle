@@ -251,36 +251,6 @@
                                     "additionalProperties": false
                                   }
                                 },
-                                "update": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "object",
-                                    "properties": {
-                                      "args": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string"
-                                        }
-                                      },
-                                      "env": {
-                                        "type": "object",
-                                        "additionalProperties": {
-                                          "type": "string"
-                                        }
-                                      },
-                                      "cwd": {
-                                        "type": "string",
-                                        "minLength": 1
-                                      },
-                                      "timeoutMs": {
-                                        "type": "integer",
-                                        "exclusiveMinimum": 0
-                                      }
-                                    },
-                                    "required": ["args"],
-                                    "additionalProperties": false
-                                  }
-                                },
                                 "remove": {
                                   "type": "array",
                                   "items": {

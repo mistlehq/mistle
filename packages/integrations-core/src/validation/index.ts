@@ -144,7 +144,7 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
 
     const lifecycleHooks: ReadonlyArray<
       ReadonlyArray<CompiledRuntimeArtifactSpec["lifecycle"]["install"][number]>
-    > = [artifact.lifecycle.install, artifact.lifecycle.update ?? [], artifact.lifecycle.remove];
+    > = [artifact.lifecycle.install, artifact.lifecycle.remove];
 
     for (const hookCommands of lifecycleHooks) {
       for (const command of hookCommands) {
@@ -290,12 +290,8 @@ function artifactLifecycleEquals(
   left: CompiledRuntimeArtifactSpec["lifecycle"],
   right: CompiledRuntimeArtifactSpec["lifecycle"],
 ): boolean {
-  const leftUpdate = left.update ?? [];
-  const rightUpdate = right.update ?? [];
-
   return (
     artifactCommandsEqual(left.install, right.install) &&
-    artifactCommandsEqual(leftUpdate, rightUpdate) &&
     artifactCommandsEqual(left.remove, right.remove)
   );
 }

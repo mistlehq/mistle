@@ -156,9 +156,6 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(installCommands?.[0]?.args[1]).toContain('"installPath":"/usr/local/bin/codex"');
     expect(installCommands?.[0]?.timeoutMs).toBe(120_000);
 
-    const updateCommands = resolveArtifactLifecycleHook(codexArtifact?.lifecycle.update);
-    expect(updateCommands).toEqual(installCommands);
-
     expect(resolveArtifactLifecycleHook(codexArtifact?.lifecycle.remove)).toEqual([
       {
         args: ["rm", "-f", "/usr/local/bin/codex"],

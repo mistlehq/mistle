@@ -158,7 +158,7 @@ type RuntimeArtifactLifecycleHook =
 
 function resolveLifecycleHook(input: {
   artifactKey: string;
-  hookName: "install" | "update" | "remove";
+  hookName: "install" | "remove";
   hook: RuntimeArtifactLifecycleHook | undefined;
   refs: RuntimeArtifactRefs;
 }): ReadonlyArray<RuntimeArtifactCommand> | undefined {
@@ -212,12 +212,6 @@ function resolveRuntimeArtifacts(input: {
       );
     }
 
-    const update = resolveLifecycleHook({
-      artifactKey: artifact.artifactKey,
-      hookName: "update",
-      hook: artifact.lifecycle.update,
-      refs,
-    });
     const remove = resolveLifecycleHook({
       artifactKey: artifact.artifactKey,
       hookName: "remove",
@@ -238,7 +232,6 @@ function resolveRuntimeArtifacts(input: {
       ...(artifact.env === undefined ? {} : { env: { ...artifact.env } }),
       lifecycle: {
         install,
-        ...(update === undefined ? {} : { update }),
         remove,
       },
     };

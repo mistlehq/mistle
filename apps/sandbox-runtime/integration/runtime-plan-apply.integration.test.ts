@@ -407,7 +407,7 @@ describe("applyRuntimePlan", () => {
     );
   });
 
-  it("runs install commands for profile-base sources and does not need update commands", async () => {
+  it("runs install commands for profile-base sources", async () => {
     const tempDirectory = await createTemporaryDirectory("mistle-runtime-plan-profile-base-");
     const installMarkerPath = join(tempDirectory, "install-marker.txt");
 
@@ -431,11 +431,6 @@ describe("applyRuntimePlan", () => {
                     INSTALL_PATH: installMarkerPath,
                     INSTALL_CONTENT: "artifact-install",
                   },
-                },
-              ],
-              update: [
-                {
-                  args: ["sh", "-euc", "exit 91"],
                 },
               ],
               remove: [],

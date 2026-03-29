@@ -103,10 +103,6 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(installCommand?.args.slice(0, 2)).toEqual(["sh", "-euc"]);
     expect(installCommand?.timeoutMs).toBe(120_000);
 
-    const updateCommand = runtimePlan.artifacts[0]?.lifecycle.update?.[0];
-    expect(updateCommand?.args.slice(0, 2)).toEqual(["sh", "-euc"]);
-    expect(updateCommand?.timeoutMs).toBe(120_000);
-
     expect(runtimePlan.artifacts[0]?.lifecycle.remove).toEqual([
       { args: ["rm", "-f", "/usr/local/bin/codex"] },
     ]);

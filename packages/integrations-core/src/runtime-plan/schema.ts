@@ -75,7 +75,6 @@ const CompiledRuntimeArtifactSpecSchema = z
     lifecycle: z
       .object({
         install: z.array(RuntimeArtifactCommandSchema).readonly(),
-        update: z.array(RuntimeArtifactCommandSchema).readonly().optional(),
         remove: z.array(RuntimeArtifactCommandSchema).readonly(),
       })
       .strict(),
@@ -275,11 +274,6 @@ function normalizeArtifact(
     ...(artifact.env === undefined ? {} : { env: sortRecord(artifact.env) }),
     lifecycle: {
       install: artifact.lifecycle.install.map(normalizeRuntimeArtifactCommand),
-      ...(artifact.lifecycle.update === undefined
-        ? {}
-        : {
-            update: artifact.lifecycle.update.map(normalizeRuntimeArtifactCommand),
-          }),
       remove: artifact.lifecycle.remove.map(normalizeRuntimeArtifactCommand),
     },
   };
