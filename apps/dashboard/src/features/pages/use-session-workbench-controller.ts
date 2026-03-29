@@ -230,6 +230,7 @@ type SessionEntryPhase =
   | "sandbox_starting";
 
 const MaxCodexReconnectAttempts = 3;
+const CodexReconnectLimitMessage = `Could not reconnect session after ${String(MaxCodexReconnectAttempts)} attempts.`;
 
 type RecoverableCodexDisconnect = {
   id: number;
@@ -281,10 +282,6 @@ type CodexRecoveryEvent =
       type: "sync_observed";
       observation: CodexRecoveryObservedState;
     };
-
-export function createCodexReconnectLimitMessage(): string {
-  return `Could not reconnect session after ${String(MaxCodexReconnectAttempts)} attempts.`;
-}
 
 function createCodexRecoveryStateFromDisconnect(
   disconnect: RecoverableCodexDisconnect,
@@ -375,7 +372,7 @@ export function reduceCodexRecoveryState(
           if (state.reconnectAttemptCount >= MaxCodexReconnectAttempts) {
             return {
               ...state,
-              errorMessage: createCodexReconnectLimitMessage(),
+              errorMessage: CodexReconnectLimitMessage,
               reconnectCommand: "none",
             };
           }

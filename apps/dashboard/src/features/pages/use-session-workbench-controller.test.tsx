@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
-  createCodexReconnectLimitMessage,
   getSandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
@@ -242,7 +241,7 @@ describe("useSessionWorkbenchController", () => {
       }),
     ).toEqual({
       ...exhaustedRecovery,
-      errorMessage: createCodexReconnectLimitMessage(),
+      errorMessage: "Could not reconnect session after 3 attempts.",
     });
 
     const failedRecovery = {
