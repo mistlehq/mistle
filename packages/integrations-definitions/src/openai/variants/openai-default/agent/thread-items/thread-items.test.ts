@@ -426,7 +426,7 @@ describe("openai thread item semantics", () => {
           type: "commandExecution",
           id: "cmd_1",
           command: "rg token src",
-          cwd: "/home/sandbox",
+          cwd: "/root",
           status: "completed",
           commandActions: [
             {
@@ -447,7 +447,7 @@ describe("openai thread item semantics", () => {
         id: "cmd_1",
         turnId: "turn_1",
         command: "rg token src",
-        cwd: "/home/sandbox",
+        cwd: "/root",
         commandStatus: "completed",
         exitCode: 0,
         output: "src/app.ts",
@@ -474,7 +474,7 @@ describe("openai thread item semantics", () => {
           type: "commandExecution",
           id: "cmd_streaming",
           command: "rg token src",
-          cwd: "/home/sandbox",
+          cwd: "/root",
           status: "inProgress",
           commandActions: [],
           aggregatedOutput: null,
@@ -806,7 +806,7 @@ describe("openai thread item semantics", () => {
               type: "commandExecution",
               id: "cmd_1",
               command: "sed -n '1,120p' app.ts",
-              cwd: "/home/sandbox",
+              cwd: "/root",
               status: "completed",
               commandActions: [
                 {
@@ -824,7 +824,7 @@ describe("openai thread item semantics", () => {
               type: "commandExecution",
               id: "cmd_2",
               command: "rg App src",
-              cwd: "/home/sandbox",
+              cwd: "/root",
               status: "inProgress",
               commandActions: [
                 {
@@ -861,7 +861,7 @@ describe("openai thread item semantics", () => {
             id: "cmd_1",
             turnId: "turn_1",
             command: "sed -n '1,120p' app.ts",
-            cwd: "/home/sandbox",
+            cwd: "/root",
             commandStatus: "completed",
             exitCode: 0,
             output: "export const App = () => null;",
@@ -882,7 +882,7 @@ describe("openai thread item semantics", () => {
             id: "cmd_2",
             turnId: "turn_1",
             command: "rg App src",
-            cwd: "/home/sandbox",
+            cwd: "/root",
             commandStatus: "inProgress",
             exitCode: null,
             output: null,
@@ -987,7 +987,7 @@ describe("openai thread item semantics", () => {
               type: "commandExecution",
               id: "cmd_1",
               command: "rg semantic src",
-              cwd: "/home/sandbox",
+              cwd: "/root",
               status: "completed",
               commandActions: [
                 {
@@ -1011,7 +1011,7 @@ describe("openai thread item semantics", () => {
               type: "commandExecution",
               id: "cmd_2",
               command: "rg grouping docs",
-              cwd: "/home/sandbox",
+              cwd: "/root",
               status: "completed",
               commandActions: [
                 {
@@ -1045,7 +1045,7 @@ describe("openai thread item semantics", () => {
             type: "commandExecution",
             id: "cmd_1",
             command: "sed -n '1,40p' app.ts",
-            cwd: "/home/sandbox",
+            cwd: "/root",
             status: "completed",
             commandActions: [
               {
@@ -1132,7 +1132,7 @@ describe("openai thread item semantics", () => {
           id: "cmd_1",
           turnId: "turn_1",
           command: "sed -n '1,40p' app.ts",
-          cwd: "/home/sandbox",
+          cwd: "/root",
           commandStatus: "completed",
           exitCode: 0,
           output: "export const App = () => null;",
@@ -1161,7 +1161,7 @@ describe("openai thread item semantics", () => {
           id: "cmd_2",
           turnId: "turn_1",
           command: "rg App src",
-          cwd: "/home/sandbox",
+          cwd: "/root",
           commandStatus: "completed",
           exitCode: 0,
           output: "src/app.ts",
