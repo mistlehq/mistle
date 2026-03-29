@@ -141,7 +141,7 @@ describe("validateCompiledBindingResults", () => {
         files: [
           {
             fileId: "codex_config",
-            path: "/home/sandbox/.codex/config.toml",
+            path: "/root/.codex/config.toml",
             mode: 384,
             content: 'model = "gpt-5.3-codex"',
           },
@@ -217,7 +217,7 @@ describe("validateCompiledBindingResults", () => {
         {
           sourceKind: "git-clone",
           resourceKind: "repository",
-          path: "/home/sandbox/projects/mistlehq/mistle",
+          path: "/root/mistlehq/mistle",
           originUrl: "https://github.com/mistlehq/mistle.git",
         },
       ],
@@ -233,7 +233,7 @@ describe("validateCompiledBindingResults", () => {
         {
           sourceKind: "git-clone",
           resourceKind: "repository",
-          path: "/home/sandbox/projects/mistlehq/mistle",
+          path: "/root/mistlehq/mistle",
           originUrl: "https://github.example.com/mistlehq/mistle.git",
         },
       ],
@@ -357,7 +357,7 @@ describe("validateCompiledBindingResults", () => {
         files: [
           {
             fileId: "codex_config",
-            path: "/home/sandbox/.codex/config.toml",
+            path: "/root/.codex/config.toml",
             mode: 384,
             content: 'model = "gpt-5.3-codex"',
           },
@@ -377,7 +377,7 @@ describe("validateCompiledBindingResults", () => {
         files: [
           {
             fileId: "codex_config",
-            path: "/home/sandbox/.codex/override.toml",
+            path: "/root/.codex/override.toml",
             mode: 384,
             content: 'model = "gpt-5.3-codex"',
           },

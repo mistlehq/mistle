@@ -329,7 +329,7 @@ export type ResolvedIntegrationMcpServer = {
 
 export type SandboxPathRefs = {
   userHomeDir: string;
-  userProjectsDir: string;
+  workspaceDir: string;
   runtimeDataDir: string;
   runtimeArtifactDir: string;
   runtimeArtifactBinDir: string;

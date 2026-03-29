@@ -87,10 +87,10 @@ function toRepositoryCloneOriginUrl(input: { webBaseUrl: string; repository: str
 }
 
 function toRepositoryWorkspacePath(input: {
-  projectsDirectory: string;
+  workspaceDirectory: string;
   repository: string;
 }): string {
-  return `${input.projectsDirectory}/${input.repository}`;
+  return `${input.workspaceDirectory}/${input.repository}`;
 }
 
 function resolveGitHubApiPathPrefixes(apiBaseUrl: string): ReadonlyArray<string> {
@@ -251,7 +251,7 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
       sourceKind: "git-clone",
       resourceKind: "repository",
       path: toRepositoryWorkspacePath({
-        projectsDirectory: input.refs.sandboxPaths.userProjectsDir,
+        workspaceDirectory: input.refs.sandboxPaths.workspaceDir,
         repository,
       }),
       originUrl: toRepositoryCloneOriginUrl({

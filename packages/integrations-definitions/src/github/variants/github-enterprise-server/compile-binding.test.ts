@@ -4,15 +4,15 @@ import { describe, expect, it } from "vitest";
 import { compileGitHubEnterpriseServerBinding } from "./compile-binding.js";
 
 function artifactBinPath(name: string): string {
-  return `/var/lib/mistle/bin/${name}`;
+  return `/usr/local/bin/${name}`;
 }
 
 const SandboxPaths = {
-  userHomeDir: "/home/sandbox",
-  userProjectsDir: "/home/sandbox/projects",
+  userHomeDir: "/root",
+  workspaceDir: "/root",
   runtimeDataDir: "/var/lib/mistle",
   runtimeArtifactDir: "/var/lib/mistle/artifacts",
-  runtimeArtifactBinDir: "/var/lib/mistle/bin",
+  runtimeArtifactBinDir: "/usr/local/bin",
 } as const;
 
 function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
@@ -183,7 +183,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
       ],
       remove: [
         {
-          args: ["rm", "-f", "/var/lib/mistle/bin/gh"],
+          args: ["rm", "-f", "/usr/local/bin/gh"],
         },
       ],
     });
@@ -192,7 +192,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
       {
         sourceKind: "git-clone",
         resourceKind: "repository",
-        path: "/home/sandbox/projects/acme/repo",
+        path: "/root/acme/repo",
         originUrl: "https://ghe.example.com/acme/repo.git",
       },
     ]);

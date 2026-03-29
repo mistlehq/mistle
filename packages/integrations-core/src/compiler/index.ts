@@ -30,11 +30,11 @@ import {
 import { validateCompiledBindingResults } from "../validation/index.js";
 
 const SandboxPaths: SandboxPathRefs = {
-  userHomeDir: "/home/sandbox",
-  userProjectsDir: "/home/sandbox/projects",
+  userHomeDir: "/root",
+  workspaceDir: "/root",
   runtimeDataDir: "/var/lib/mistle",
   runtimeArtifactDir: "/var/lib/mistle/artifacts",
-  runtimeArtifactBinDir: "/var/lib/mistle/bin",
+  runtimeArtifactBinDir: "/usr/local/bin",
 };
 
 function artifactBinPath(name: string): string {

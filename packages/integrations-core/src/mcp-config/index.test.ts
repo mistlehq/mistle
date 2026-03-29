@@ -88,7 +88,7 @@ trust_level = "trusted"
         createRuntimeClient({
           clientId: "claude-code",
           fileId: "claude_config",
-          path: "/home/sandbox/.claude/settings.json",
+          path: "/root/.claude/settings.json",
           content: `{
   "theme": "dark"
 }
@@ -138,7 +138,7 @@ trust_level = "trusted"
           createRuntimeClient({
             clientId: "claude-code",
             fileId: "claude_config",
-            path: "/home/sandbox/.claude/settings.json",
+            path: "/root/.claude/settings.json",
             content: '{\n  "theme": "dark"\n}\n',
           }),
         ],

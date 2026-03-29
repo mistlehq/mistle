@@ -28,7 +28,7 @@ function createRuntimePlan() {
               {
                 processKey: "runtime_123",
                 command: {
-                  args: ["/var/lib/mistle/bin/agent", "serve"],
+                  args: ["/usr/local/bin/agent", "serve"],
                 },
                 readiness: {
                   type: "none",
