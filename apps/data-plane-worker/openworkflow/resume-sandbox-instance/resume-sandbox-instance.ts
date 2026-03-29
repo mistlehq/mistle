@@ -1,94 +1,33 @@
-import type { DataPlaneDatabase, SandboxInstanceProvider } from "@mistle/db/data-plane";
-import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
-import { SandboxProvider, type SandboxAdapter } from "@mistle/sandbox";
+import type { DataPlaneDatabase } from "@mistle/db/data-plane";
+import { SandboxProvider, type SandboxAdapter, type SandboxRuntimeControl } from "@mistle/sandbox";
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
 import type { Clock, Sleeper } from "@mistle/time";
 
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
+import { applySandboxStartupConfiguration } from "../start-sandbox-instance/apply-sandbox-startup-configuration.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "../start-sandbox-instance/mark-sandbox-instance-running.js";
 import { waitForSandboxTunnelReadiness } from "../start-sandbox-instance/wait-for-sandbox-tunnel-readiness.js";
 import { markSandboxInstanceStarting } from "./mark-sandbox-instance-starting.js";
+import { resolveResumableSandboxInstanceState } from "./resolve-resumable-sandbox-instance-state.js";
 import { resumeSandbox } from "./resume-sandbox.js";
 
 const ResumeSandboxFailureCodes = {
   RESUME_SANDBOX_FAILED: "resume_sandbox_failed",
+  STARTUP_CONFIGURATION_FAILED: "startup_configuration_failed",
   TUNNEL_CONNECT_ACK_TIMEOUT: "tunnel_connect_ack_timeout",
   TUNNEL_CONNECT_ACK_WAIT_FAILED: "tunnel_connect_ack_wait_failed",
   STATUS_TRANSITION_TO_RUNNING_FAILED: "status_transition_to_running_failed",
 } as const;
-
-type ResumableSandboxInstanceState = {
-  sandboxInstanceId: string;
-  runtimeProvider: SandboxProvider;
-  providerSandboxId: string;
-};
-
-function toSandboxProvider(provider: SandboxInstanceProvider): SandboxProvider {
-  if (provider === "docker") {
-    return SandboxProvider.DOCKER;
-  }
-
-  if (provider === "e2b") {
-    return SandboxProvider.E2B;
-  }
-
-  throw new Error("Unsupported sandbox provider for resume flow.");
-}
-
-async function resolveResumableSandboxInstanceState(input: {
-  db: DataPlaneDatabase;
-  sandboxInstanceId: string;
-}): Promise<ResumableSandboxInstanceState | null> {
-  const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
-    columns: {
-      runtimeProvider: true,
-      providerSandboxId: true,
-      status: true,
-    },
-    where: (table, { eq }) => eq(table.id, input.sandboxInstanceId),
-  });
-
-  if (sandboxInstance === undefined) {
-    throw new Error(`Sandbox instance '${input.sandboxInstanceId}' was not found.`);
-  }
-
-  if (
-    sandboxInstance.status === SandboxInstanceStatuses.RUNNING ||
-    sandboxInstance.status === SandboxInstanceStatuses.STARTING
-  ) {
-    return null;
-  }
-
-  if (
-    sandboxInstance.status !== SandboxInstanceStatuses.STOPPED &&
-    sandboxInstance.status !== SandboxInstanceStatuses.FAILED
-  ) {
-    throw new Error(
-      `Expected sandbox instance '${input.sandboxInstanceId}' to be stopped, failed, starting, or running before resume execution.`,
-    );
-  }
-
-  if (sandboxInstance.providerSandboxId === null) {
-    throw new Error(
-      `Expected resumable sandbox instance '${input.sandboxInstanceId}' to have a provider sandbox id.`,
-    );
-  }
-
-  return {
-    sandboxInstanceId: input.sandboxInstanceId,
-    runtimeProvider: toSandboxProvider(sandboxInstance.runtimeProvider),
-    providerSandboxId: sandboxInstance.providerSandboxId,
-  };
-}
 
 export async function resumeSandboxInstance(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     db: DataPlaneDatabase;
     sandboxAdapter: SandboxAdapter;
+    sandboxRuntimeControl: SandboxRuntimeControl;
     runtimeStateReader: SandboxRuntimeStateReader;
     tunnelReadinessPolicy: {
       timeoutMs: number;
@@ -183,6 +122,7 @@ export async function resumeSandboxInstance(
   }
 
   let resumedRuntime: {
+    sandboxInstanceId: string;
     runtimeProvider: SandboxProvider;
     providerSandboxId: string;
   };
@@ -206,8 +146,36 @@ export async function resumeSandboxInstance(
     throw error;
   }
 
+  try {
+    // Resuming the provider runtime is not enough to make the sandbox connectable again.
+    // The runtime process tree is restarted as part of resume, so we must reapply the
+    // persisted startup configuration before waiting for sandboxd to re-establish the tunnel.
+    await applySandboxStartupConfiguration(
+      {
+        config: ctx.config,
+        sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+      },
+      {
+        sandboxInstanceId: resumedRuntime.sandboxInstanceId,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        runtimePlan: resumableSandboxInstance.runtimePlan,
+      },
+    );
+  } catch (error) {
+    await handleFailedResume({
+      sandboxInstanceId: input.sandboxInstanceId,
+      runtimeProvider: resumedRuntime.runtimeProvider,
+      providerSandboxId: resumedRuntime.providerSandboxId,
+      failureCode: ResumeSandboxFailureCodes.STARTUP_CONFIGURATION_FAILED,
+      failureMessage: "Failed to apply resumed sandbox startup configuration.",
+    });
+    throw error;
+  }
+
   let tunnelReady: boolean;
   try {
+    // Tunnel readiness is only meaningful after startup has been reapplied and the resumed
+    // runtime has had a chance to relaunch its bootstrap process.
     tunnelReady = await waitForSandboxTunnelReadiness(
       {
         runtimeStateReader: ctx.runtimeStateReader,
