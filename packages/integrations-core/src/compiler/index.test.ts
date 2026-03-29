@@ -118,11 +118,6 @@ function createOpenAiDefinition(): IntegrationDefinition<
                 args: ["echo", `binding:${refs.compileContext.bindingId}`],
               }),
             ],
-            remove: ({ refs }) => [
-              refs.command.exec({
-                args: ["rm", "-f", refs.artifactBinPath("codex")],
-              }),
-            ],
           },
         },
       ],
@@ -356,11 +351,6 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
                 },
                 installPath: "/usr/local/bin/codex",
                 timeoutMs: 120_000,
-              }),
-            ],
-            remove: ({ refs }) => [
-              refs.command.exec({
-                args: ["rm", "-f", "/usr/local/bin/codex"],
               }),
             ],
           },

@@ -166,7 +166,6 @@ describe("runRuntime", () => {
                   args: ["sh", "-c", "echo should-not-run >&2; exit 91"],
                 },
               ],
-              remove: [],
             },
           },
         ],

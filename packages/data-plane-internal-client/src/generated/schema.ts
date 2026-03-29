@@ -145,14 +145,6 @@ export interface paths {
                     };
                     timeoutMs?: number;
                   }[];
-                  remove: {
-                    args: string[];
-                    cwd?: string;
-                    env?: {
-                      [key: string]: string;
-                    };
-                    timeoutMs?: number;
-                  }[];
                 };
                 name: string;
               }[];

@@ -107,11 +107,6 @@ export function compileOpenAiApiKeyBinding(
               timeoutMs: ArtifactCommandTimeoutMs,
             }),
           ],
-          remove: ({ refs }) => [
-            refs.command.exec({
-              args: ["rm", "-f", refs.artifactBinPath("codex")],
-            }),
-          ],
         },
       },
     ],

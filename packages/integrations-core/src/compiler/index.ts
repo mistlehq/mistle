@@ -212,19 +212,6 @@ function resolveRuntimeArtifacts(input: {
       );
     }
 
-    const remove = resolveLifecycleHook({
-      artifactKey: artifact.artifactKey,
-      hookName: "remove",
-      hook: artifact.lifecycle.remove,
-      refs,
-    });
-    if (remove === undefined) {
-      throw new IntegrationCompilerError(
-        CompilerErrorCodes.ARTIFACT_CONFLICT,
-        `Artifact '${artifact.artifactKey}' must define remove commands.`,
-      );
-    }
-
     return {
       artifactKey: artifact.artifactKey,
       name: artifact.name,
@@ -232,7 +219,6 @@ function resolveRuntimeArtifacts(input: {
       ...(artifact.env === undefined ? {} : { env: { ...artifact.env } }),
       lifecycle: {
         install,
-        remove,
       },
     };
   });

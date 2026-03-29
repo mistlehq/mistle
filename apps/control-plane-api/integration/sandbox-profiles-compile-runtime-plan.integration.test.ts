@@ -103,10 +103,6 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(installCommand?.args.slice(0, 2)).toEqual(["sh", "-euc"]);
     expect(installCommand?.timeoutMs).toBe(120_000);
 
-    expect(runtimePlan.artifacts[0]?.lifecycle.remove).toEqual([
-      { args: ["rm", "-f", "/usr/local/bin/codex"] },
-    ]);
-
     const installScript = installCommand?.args[2];
     expect(typeof installScript).toBe("string");
     expect(installScript).toContain("repo=openai/codex");

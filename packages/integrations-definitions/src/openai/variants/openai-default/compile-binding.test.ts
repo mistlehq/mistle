@@ -156,12 +156,6 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(installCommands?.[0]?.args[1]).toContain('"installPath":"/usr/local/bin/codex"');
     expect(installCommands?.[0]?.timeoutMs).toBe(120_000);
 
-    expect(resolveArtifactLifecycleHook(codexArtifact?.lifecycle.remove)).toEqual([
-      {
-        args: ["rm", "-f", "/usr/local/bin/codex"],
-      },
-    ]);
-
     expect(compiled.runtimeClients).toHaveLength(1);
     expect(compiled.runtimeClients[0]?.setup.env).toEqual({
       OPENAI_MODEL: "gpt-5.4",

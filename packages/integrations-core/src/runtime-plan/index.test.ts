@@ -108,7 +108,6 @@ describe("assembleCompiledRuntimePlan", () => {
               },
               lifecycle: {
                 install: [{ args: ["mise", "install", "gh@latest"] }],
-                remove: [{ args: ["rm", "-f", "/usr/local/bin/gh"] }],
               },
             },
           ],
@@ -193,7 +192,6 @@ describe("assembleCompiledRuntimePlan", () => {
               name: "Codex CLI",
               lifecycle: {
                 install: [{ args: ["sh", "-euc", "install-codex-latest"] }],
-                remove: [{ args: ["rm", "-f", "/usr/local/bin/codex"] }],
               },
             },
           ],
