@@ -21,7 +21,6 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p \
-    /root \
     /run/mistle \
     /var/lib/mistle/artifacts \
   && chmod 0700 /run/mistle
