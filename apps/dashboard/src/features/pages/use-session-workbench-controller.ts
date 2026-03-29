@@ -141,6 +141,10 @@ type SessionWorkbenchState = {
   };
   hasTopAlert: boolean;
   isResumingStoppedSandbox: boolean;
+  sessionReconnectState: {
+    isRecovering: boolean;
+    message: string | null;
+  };
   shouldAutoResumeOnEntry: boolean;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   requestStoppedSandboxResume: () => Promise<void>;
@@ -225,6 +229,8 @@ type SessionEntryPhase =
   | "resume_pending"
   | "sandbox_starting";
 
+const MaxCodexReconnectAttempts = 3;
+
 export function getSandboxInstanceStatusQueryKey(
   sandboxInstanceId: string | null,
 ): readonly ["sandbox-instance-status", string | null] {
@@ -255,6 +261,63 @@ export function shouldShowResumeInFlightState(input: {
       input.shouldAttemptInitialStoppedResume ||
       (input.hasAttemptedInitialStoppedResume && input.resumeActionErrorMessage === null))
   );
+}
+
+export function shouldAutoRecoverCodexSession(input: {
+  canConnect: boolean;
+  connected: boolean;
+  hasRecoveryError: boolean;
+  isStartingSession: boolean;
+  recoverableDisconnect: {
+    id: number;
+    message: string;
+    preferredThreadId: string | null;
+  } | null;
+  reconnectAttemptCount: number;
+  sandboxInstanceId: string | null;
+}): boolean {
+  return !(
+    input.sandboxInstanceId === null ||
+    !input.canConnect ||
+    input.connected ||
+    input.isStartingSession ||
+    input.hasRecoveryError ||
+    input.recoverableDisconnect === null ||
+    input.reconnectAttemptCount >= MaxCodexReconnectAttempts
+  );
+}
+
+export function resolveCodexReconnectMessage(input: {
+  recoveryBaseMessage: string | null;
+  recoveryErrorMessage: string | null;
+  reconnectAttemptCount: number;
+  sandboxStatus: "resuming" | "starting" | "running" | "stopped" | "failed" | null;
+}): string | null {
+  if (input.recoveryErrorMessage !== null) {
+    return input.recoveryErrorMessage;
+  }
+
+  if (input.recoveryBaseMessage === null) {
+    return null;
+  }
+
+  if (input.sandboxStatus === "stopped") {
+    return `${input.recoveryBaseMessage} Resuming sandbox to restore the session.`;
+  }
+
+  if (
+    input.sandboxStatus === "resuming" ||
+    input.sandboxStatus === "starting" ||
+    input.sandboxStatus === null
+  ) {
+    return `${input.recoveryBaseMessage} Waiting for the sandbox to become ready again.`;
+  }
+
+  if (input.sandboxStatus === "failed") {
+    return `${input.recoveryBaseMessage} The sandbox failed and the session cannot reconnect.`;
+  }
+
+  return `${input.recoveryBaseMessage} Reconnecting session${input.reconnectAttemptCount > 0 ? ` (attempt ${String(input.reconnectAttemptCount)} of ${String(MaxCodexReconnectAttempts)})` : ""}.`;
 }
 
 export function shouldPollStoppedSandboxStatus(input: {
@@ -392,7 +455,11 @@ export function useSessionWorkbenchController(input: {
   const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(false);
   const [resumeActionErrorMessage, setResumeActionErrorMessage] = useState<string | null>(null);
   const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
+  const [codexReconnectAttemptCount, setCodexReconnectAttemptCount] = useState(0);
+  const [codexRecoveryBaseMessage, setCodexRecoveryBaseMessage] = useState<string | null>(null);
+  const [codexRecoveryErrorMessage, setCodexRecoveryErrorMessage] = useState<string | null>(null);
   const activeResumeRequestRef = useRef<ResumeRequestGuard | null>(null);
+  const activeCodexRecoveryIdRef = useRef<number | null>(null);
   const resumeIdempotencyKeyRef = useRef<string | null>(null);
   const nextResumeRequestIdRef = useRef(0);
   const initialSandboxStatusDataUpdatedAtRef = useRef<number | null>(null);
@@ -414,6 +481,7 @@ export function useSessionWorkbenchController(input: {
     connectedSession,
     disconnectSession,
     isStartingSession,
+    recoverableDisconnect,
     reportStartErrorMessage,
     startErrorMessage,
     step,
@@ -485,14 +553,20 @@ export function useSessionWorkbenchController(input: {
     currentDataUpdatedAtMs: sandboxStatusQuery.dataUpdatedAt,
   });
   const sandboxStatus = hasFreshSandboxStatus ? (sandboxStatusQuery.data?.status ?? null) : null;
+  const shouldAttemptRecoverableStoppedResume =
+    input.sandboxInstanceId !== null &&
+    sandboxStatus === "stopped" &&
+    recoverableDisconnect !== null;
   const shouldAttemptInitialStoppedResume =
     input.sandboxInstanceId !== null &&
     sandboxStatus === "stopped" &&
+    recoverableDisconnect === null &&
     !hasAttemptedInitialStoppedResume;
   const isShowingResumeInFlightState = shouldShowResumeInFlightState({
     hasAttemptedInitialStoppedResume,
     resumeActionErrorMessage,
-    shouldAttemptInitialStoppedResume,
+    shouldAttemptInitialStoppedResume:
+      shouldAttemptInitialStoppedResume || shouldAttemptRecoverableStoppedResume,
     isResumingStoppedSandbox,
     sandboxStatus,
   });
@@ -525,6 +599,35 @@ export function useSessionWorkbenchController(input: {
     message: stoppedSessionMessage,
     requiresManualResume: stoppedSessionMessage !== null,
   };
+  const shouldAutoResumeOnEntry =
+    shouldAttemptInitialStoppedResume || shouldAttemptRecoverableStoppedResume;
+
+  useEffect(() => {
+    if (recoverableDisconnect === null) {
+      return;
+    }
+
+    if (activeCodexRecoveryIdRef.current === recoverableDisconnect.id) {
+      setCodexRecoveryBaseMessage(recoverableDisconnect.message);
+      return;
+    }
+
+    activeCodexRecoveryIdRef.current = recoverableDisconnect.id;
+    setCodexReconnectAttemptCount(0);
+    setCodexRecoveryBaseMessage(recoverableDisconnect.message);
+    setCodexRecoveryErrorMessage(null);
+  }, [recoverableDisconnect]);
+
+  useEffect(() => {
+    if (connectedSession === null) {
+      return;
+    }
+
+    activeCodexRecoveryIdRef.current = null;
+    setCodexReconnectAttemptCount(0);
+    setCodexRecoveryBaseMessage(null);
+    setCodexRecoveryErrorMessage(null);
+  }, [connectedSession]);
 
   // Syncs teardown with the external Codex session and PTY lifecycles on unmount.
   useEffect(() => {
@@ -539,6 +642,10 @@ export function useSessionWorkbenchController(input: {
     setComposerText("");
     setPendingComposerAttachments([]);
     setIsUploadingAttachments(false);
+    activeCodexRecoveryIdRef.current = null;
+    setCodexReconnectAttemptCount(0);
+    setCodexRecoveryBaseMessage(null);
+    setCodexRecoveryErrorMessage(null);
   }, [input.sandboxInstanceId]);
 
   // Syncs a browser timer with the external automation-thread preparation window.
@@ -583,6 +690,15 @@ export function useSessionWorkbenchController(input: {
   }, [automationPendingSinceMs, isWaitingForAutomationThread]);
 
   const resolvedStartErrorMessage = startErrorMessage ?? automationPendingErrorMessage;
+  const shouldReconnectCodexSession = shouldAutoRecoverCodexSession({
+    canConnect: connectionReadiness.canConnect,
+    connected: connectedSession !== null,
+    hasRecoveryError: codexRecoveryErrorMessage !== null,
+    isStartingSession,
+    recoverableDisconnect,
+    reconnectAttemptCount: codexReconnectAttemptCount,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
 
   // Syncs React with the external Codex session connection lifecycle.
   useEffect(() => {
@@ -607,6 +723,27 @@ export function useSessionWorkbenchController(input: {
       return;
     }
 
+    if (shouldReconnectCodexSession && recoverableDisconnect !== null) {
+      setCodexReconnectAttemptCount((currentCount) => currentCount + 1);
+      connectSession({
+        sandboxInstanceId: input.sandboxInstanceId,
+        preferredThreadId:
+          recoverableDisconnect.preferredThreadId ??
+          automationConversation?.providerConversationId ??
+          null,
+        recoverableDisconnectId: recoverableDisconnect.id,
+      });
+      return;
+    }
+
+    if (
+      recoverableDisconnect !== null ||
+      codexRecoveryBaseMessage !== null ||
+      codexRecoveryErrorMessage !== null
+    ) {
+      return;
+    }
+
     setHasAttemptedAutoConnect(true);
     // This reconnect path only supports initial bootstrap for the latest
     // persisted automation binding. Live migration of an already-open session
@@ -617,8 +754,13 @@ export function useSessionWorkbenchController(input: {
     });
   }, [
     automationConversation,
+    codexRecoveryBaseMessage,
+    codexRecoveryErrorMessage,
     connectSession,
     connectedSession,
+    recoverableDisconnect,
+    shouldReconnectCodexSession,
+    setCodexReconnectAttemptCount,
     hasAttemptedAutoConnect,
     input.sandboxInstanceId,
     isStartingSession,
@@ -647,17 +789,45 @@ export function useSessionWorkbenchController(input: {
 
   const sandboxStatusLabel =
     effectiveSandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
+  useEffect(() => {
+    if (recoverableDisconnect !== null) {
+      return;
+    }
+
+    if (codexReconnectAttemptCount < MaxCodexReconnectAttempts) {
+      return;
+    }
+
+    activeCodexRecoveryIdRef.current = null;
+    setCodexRecoveryErrorMessage(
+      `Could not reconnect session after ${String(MaxCodexReconnectAttempts)} attempts.`,
+    );
+  }, [codexReconnectAttemptCount, recoverableDisconnect]);
+
+  const sessionReconnectMessage = resolveCodexReconnectMessage({
+    recoveryBaseMessage: codexRecoveryBaseMessage,
+    recoveryErrorMessage: codexRecoveryErrorMessage,
+    reconnectAttemptCount: codexReconnectAttemptCount,
+    sandboxStatus: effectiveSandboxStatus,
+  });
+  const isRecoveringCodexSession =
+    sessionReconnectMessage !== null &&
+    codexRecoveryErrorMessage === null &&
+    effectiveSandboxStatus !== "failed" &&
+    connectedSession === null;
   const sessionHeaderStatusUi = resolveSessionHeaderStatusUi({
     sandboxStatus: sandboxStatusLabel.toLowerCase(),
     agentConnectionState,
     step,
     hasConnectionError: resolvedStartErrorMessage !== null,
+    isRecoveringSession: isRecoveringCodexSession,
   });
 
   const hasActiveTurn = canInterruptTurn || canSteerTurn;
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: sandboxStatusQuery.isError,
+    reconnectMessage: sessionReconnectMessage,
     startErrorMessage: resolvedStartErrorMessage,
     sandboxFailureMessage,
     stoppedSessionMessage: stoppedSessionState.message,
@@ -930,7 +1100,11 @@ export function useSessionWorkbenchController(input: {
       stoppedSessionState,
       hasTopAlert,
       isResumingStoppedSandbox: isShowingResumeInFlightState,
-      shouldAutoResumeOnEntry: shouldAttemptInitialStoppedResume,
+      sessionReconnectState: {
+        isRecovering: isRecoveringCodexSession,
+        message: sessionReconnectMessage,
+      },
+      shouldAutoResumeOnEntry,
       ptyState,
       requestStoppedSandboxResume,
       sandboxLifecycleStatus: effectiveSandboxStatus,

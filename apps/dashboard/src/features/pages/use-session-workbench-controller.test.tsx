@@ -10,10 +10,12 @@ import {
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   isActiveResumeRequest,
+  resolveCodexReconnectMessage,
   resolveSessionEntryPhase,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForEntryPhase,
   seedSandboxInstanceStatusQuery,
+  shouldAutoRecoverCodexSession,
   shouldPollStoppedSandboxStatus,
   shouldShowResumeInFlightState,
   shouldWaitForAutomationSessionThread,
@@ -81,6 +83,10 @@ describe("useSessionWorkbenchController", () => {
       requiresManualResume: false,
     });
     expect(result.current.workbench.hasTopAlert).toBe(false);
+    expect(result.current.workbench.sessionReconnectState).toEqual({
+      isRecovering: false,
+      message: null,
+    });
     expect(result.current.workbench.ptyState.lifecycle.connectedSandboxInstanceId).toBeNull();
     expect(result.current.workbench.ptyState.lifecycle.state).toBe("idle");
     expect(result.current.workbench.ptyState.output.chunks).toEqual([]);
@@ -93,6 +99,76 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.conversationPane.composerProps.isConnected).toBe(false);
     expect(result.current.conversationPane.composerProps.modelOptions).toEqual([]);
     expect(result.current.conversationPane.serverRequestsState.pendingServerRequests).toEqual([]);
+  });
+
+  it("auto-recovers Codex sessions only while the sandbox remains reconnectable", () => {
+    expect(
+      shouldAutoRecoverCodexSession({
+        canConnect: true,
+        connected: false,
+        hasRecoveryError: false,
+        isStartingSession: false,
+        recoverableDisconnect: {
+          id: 1,
+          message: "Sandbox session stream reset.",
+          preferredThreadId: "thread_123",
+        },
+        reconnectAttemptCount: 0,
+        sandboxInstanceId: "sbi_123",
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldAutoRecoverCodexSession({
+        canConnect: true,
+        connected: false,
+        hasRecoveryError: true,
+        isStartingSession: false,
+        recoverableDisconnect: {
+          id: 1,
+          message: "Sandbox session stream reset.",
+          preferredThreadId: "thread_123",
+        },
+        reconnectAttemptCount: 0,
+        sandboxInstanceId: "sbi_123",
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldAutoRecoverCodexSession({
+        canConnect: true,
+        connected: false,
+        hasRecoveryError: false,
+        isStartingSession: false,
+        recoverableDisconnect: {
+          id: 1,
+          message: "Sandbox session stream reset.",
+          preferredThreadId: "thread_123",
+        },
+        reconnectAttemptCount: 3,
+        sandboxInstanceId: "sbi_123",
+      }),
+    ).toBe(false);
+  });
+
+  it("formats reconnect messaging across running and stopped recovery phases", () => {
+    expect(
+      resolveCodexReconnectMessage({
+        recoveryBaseMessage: "Sandbox session stream reset.",
+        recoveryErrorMessage: null,
+        reconnectAttemptCount: 1,
+        sandboxStatus: "running",
+      }),
+    ).toBe("Sandbox session stream reset. Reconnecting session (attempt 1 of 3).");
+
+    expect(
+      resolveCodexReconnectMessage({
+        recoveryBaseMessage: "Sandbox session stream reset.",
+        recoveryErrorMessage: null,
+        reconnectAttemptCount: 0,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe("Sandbox session stream reset. Resuming sandbox to restore the session.");
   });
 
   it("persists terminal panel visibility and size per sandbox instance", () => {

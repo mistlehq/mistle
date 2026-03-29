@@ -152,6 +152,12 @@ function SessionWorkbenchPageContent(input: {
       description: workbench.startErrorMessage,
     });
   }
+  if (workbench.sessionReconnectState.message !== null) {
+    alerts.push({
+      title: "Reconnecting session",
+      description: workbench.sessionReconnectState.message,
+    });
+  }
   if (workbench.stoppedSessionState.message !== null) {
     alerts.push({
       title: "Stopped sandbox",

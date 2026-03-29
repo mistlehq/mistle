@@ -67,10 +67,19 @@ type CodexSessionLifecycleState = {
   step: StartSessionStep;
   startErrorMessage: string | null;
   connectedSession: ConnectedCodexSession | null;
+  recoverableDisconnect: {
+    id: number;
+    message: string;
+    preferredThreadId: string | null;
+  } | null;
   agentConnectionState: CodexSessionConnectionState;
   agentConnectionError: string | null;
   isStartingSession: boolean;
-  connectSession: (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => void;
+  connectSession: (input: {
+    sandboxInstanceId: string;
+    preferredThreadId: string | null;
+    recoverableDisconnectId?: number;
+  }) => void;
   disconnectSession: () => void;
   clearStartErrorMessage: () => void;
   reportStartErrorMessage: (message: string) => void;
@@ -194,9 +203,15 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   const [step, setStep] = useState<StartSessionStep>("idle");
   const [startErrorMessage, setStartErrorMessage] = useState<string | null>(null);
   const [connectedSession, setConnectedSession] = useState<ConnectedCodexSession | null>(null);
+  const [recoverableDisconnect, setRecoverableDisconnect] = useState<{
+    id: number;
+    message: string;
+    preferredThreadId: string | null;
+  } | null>(null);
   const [agentConnectionState, setAgentConnectionState] =
     useState<CodexSessionConnectionState>("idle");
   const [agentConnectionError, setAgentConnectionError] = useState<string | null>(null);
+  const nextRecoverableDisconnectIdRef = useRef(0);
   const [serverRequestsState, dispatchServerRequestsAction] = useReducer(
     reduceCodexApprovalRequestsState,
     undefined,
@@ -289,6 +304,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     resetAdminState();
     setStep("idle");
     setStartErrorMessage(null);
+    setRecoverableDisconnect(null);
     setAgentConnectionState("idle");
     setAgentConnectionError(null);
     resetDebugState();
@@ -380,14 +396,26 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
           setAgentConnectionState(event.state);
           setAgentConnectionError(event.errorMessage);
           const connectionStateTransition = resolveCodexConnectionStateTransition({
+            hasConnectedSession: connectedSession !== null || threadIdRef.current !== null,
             state: event.state,
             errorMessage: event.errorMessage ?? null,
           });
           if (connectionStateTransition.shouldResetSession) {
+            const preferredThreadId = threadIdRef.current;
             connectionGenerationRef.current += 1;
             teardownConnection("Disconnected from Codex session.");
             resetSessionState();
-            setStartErrorMessage(connectionStateTransition.startErrorMessage);
+            if (connectionStateTransition.recoverableDisconnectMessage !== null) {
+              const recoverableDisconnectId = nextRecoverableDisconnectIdRef.current + 1;
+              nextRecoverableDisconnectIdRef.current = recoverableDisconnectId;
+              setRecoverableDisconnect({
+                id: recoverableDisconnectId,
+                message: connectionStateTransition.recoverableDisconnectMessage,
+                preferredThreadId,
+              });
+            } else {
+              setStartErrorMessage(connectionStateTransition.startErrorMessage);
+            }
           }
           return;
         }
@@ -446,7 +474,17 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
         }
 
         if (event.type === "stream_reset") {
-          recordRecentUnhandledMessage(event);
+          const preferredThreadId = threadIdRef.current;
+          connectionGenerationRef.current += 1;
+          teardownConnection("Codex session stream reset.");
+          resetSessionState();
+          const recoverableDisconnectId = nextRecoverableDisconnectIdRef.current + 1;
+          nextRecoverableDisconnectIdRef.current = recoverableDisconnectId;
+          setRecoverableDisconnect({
+            id: recoverableDisconnectId,
+            message: `Sandbox session stream reset (${event.resetInfo.code}): ${event.resetInfo.message}`,
+            preferredThreadId,
+          });
           return;
         }
 
@@ -456,7 +494,11 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   }
 
   const connectSessionMutation = useMutation({
-    mutationFn: async (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => {
+    mutationFn: async (input: {
+      sandboxInstanceId: string;
+      preferredThreadId: string | null;
+      recoverableDisconnectId?: number;
+    }) => {
       const generation = connectionGenerationRef.current + 1;
       connectionGenerationRef.current = generation;
       teardownConnection("Superseded by a new Codex session.");
@@ -541,12 +583,22 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
         ensureCurrentGeneration,
       });
     },
-    onError: (error) => {
+    onError: (error, input) => {
       if (error instanceof StaleConnectionAttemptError) {
         return;
       }
 
       disconnectSession();
+      if (input.recoverableDisconnectId !== undefined) {
+        setRecoverableDisconnect({
+          id: input.recoverableDisconnectId,
+          message:
+            error instanceof Error ? error.message : "Could not re-establish sandbox session.",
+          preferredThreadId: input.preferredThreadId,
+        });
+        return;
+      }
+
       setStep("idle");
       setStartErrorMessage(
         error instanceof Error ? error.message : "Could not establish sandbox session.",
@@ -923,6 +975,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       step,
       startErrorMessage,
       connectedSession,
+      recoverableDisconnect,
       agentConnectionState,
       agentConnectionError,
       isStartingSession,
@@ -938,6 +991,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     connectSession,
     isStartingSession,
     connectedSession,
+    recoverableDisconnect,
     disconnectSession,
     reportStartErrorMessage,
     startErrorMessage,
