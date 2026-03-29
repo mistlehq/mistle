@@ -7,7 +7,7 @@ pub struct ProcessEnvironmentEntry {
 }
 
 #[napi(object)]
-pub struct ExecRuntimeAsUserInput {
+pub struct ExecRuntimeInput {
     pub uid: i32,
     pub gid: i32,
     pub command: String,
@@ -38,9 +38,9 @@ fn ensure_running_as_root() -> Result<(), String> {
     Ok(())
 }
 
-pub fn exec_runtime_as_user_impl(input: ExecRuntimeAsUserInput) -> Result<(), String> {
-    // This native boundary owns the actual privilege transition. TS resolves the
-    // target sandbox identity first, but the syscall-level invariants live here.
+pub fn exec_runtime_impl(input: ExecRuntimeInput) -> Result<(), String> {
+    // This native boundary owns the actual target-identity switch. TS resolves the
+    // target runtime identity first, but the syscall-level invariants live here.
     //
     // This intentionally follows the same broad methodology as a native privilege
     // drop helper like rust-privdrop: validate that we are still privileged, make
@@ -50,17 +50,17 @@ pub fn exec_runtime_as_user_impl(input: ExecRuntimeAsUserInput) -> Result<(), St
     // inheritance fix around execve() for the packaged Node runtime.
     //
     // 1. confirm the bootstrap process is still privileged
-    // 2. replace supplementary groups with the sandbox gid only
+    // 2. replace supplementary groups with the target gid only
     // 3. drop primary gid, then uid
     // 4. clear Node-added FD_CLOEXEC on stdio so exec inherits the original streams
     // 5. execve() the runtime binary so bootstrap code does not continue in-process
     ensure_running_as_root()?;
 
-    if input.uid <= 0 {
-        return Err("sandbox uid must be greater than zero".to_string());
+    if input.uid < 0 {
+        return Err("runtime uid must be non-negative".to_string());
     }
     if input.gid < 0 {
-        return Err("sandbox gid must be non-negative".to_string());
+        return Err("runtime gid must be non-negative".to_string());
     }
     if input.command.trim().is_empty() {
         return Err("runtime command is required".to_string());
@@ -167,7 +167,7 @@ fn clear_close_on_exec(fd: i32) -> Result<(), String> {
 fn set_supplementary_groups(gid: u32) -> Result<(), String> {
     // Keep the supplementary group set explicit and minimal. We do not inherit the
     // bootstrap process groups, and we do not ask libc to resolve any "default"
-    // user groups here. The sandbox runtime should run only with the sandbox gid.
+    // user groups here. The sandbox runtime should run only with the target gid.
     let groups = [gid as nix::libc::gid_t];
     let group_count = setgroups_count(groups.len())?;
     let result = unsafe { nix::libc::setgroups(group_count, groups.as_ptr()) };
@@ -239,8 +239,8 @@ pub fn set_current_process_non_dumpable() -> napi::Result<()> {
 }
 
 #[napi]
-pub fn exec_runtime_as_user(input: ExecRuntimeAsUserInput) -> napi::Result<()> {
-    exec_runtime_as_user_impl(input).map_err(napi::Error::from_reason)
+pub fn exec_runtime(input: ExecRuntimeInput) -> napi::Result<()> {
+    exec_runtime_impl(input).map_err(napi::Error::from_reason)
 }
 
 #[napi]
@@ -251,7 +251,7 @@ pub fn assert_unix_socket_peer_matches_current_process_uid(fd: i32) -> napi::Res
 #[cfg(test)]
 mod tests {
     use super::{
-        ExecRuntimeAsUserInput, ProcessEnvironmentEntry, build_exec_environment,
+        ExecRuntimeInput, ProcessEnvironmentEntry, build_exec_environment,
         clear_close_on_exec, ensure_running_as_root,
     };
     #[cfg(target_os = "linux")]
@@ -276,17 +276,21 @@ mod tests {
     }
 
     #[test]
-    fn rejects_non_positive_uid_for_exec() {
-        let result = super::exec_runtime_as_user_impl(ExecRuntimeAsUserInput {
+    fn accepts_zero_uid_when_running_as_root() {
+        let result = super::exec_runtime_impl(ExecRuntimeInput {
             uid: 0,
             gid: 1000,
-            command: "/usr/bin/node".to_string(),
-            args: vec!["dist/main.js".to_string()],
+            command: "/definitely/missing/runtime".to_string(),
+            args: vec!["runtime-internal".to_string()],
             env: Vec::new(),
         });
 
         if nix::unistd::geteuid().is_root() {
-            assert!(matches!(result, Err(message) if message.contains("uid")));
+            assert!(matches!(
+                result,
+                Err(message) if message.contains("failed to exec sandbox runtime")
+                    || message.contains("No such file or directory")
+            ));
         } else {
             assert!(matches!(result, Err(message) if message.contains("still be running as root")));
         }

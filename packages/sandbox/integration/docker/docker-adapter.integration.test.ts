@@ -188,17 +188,13 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
         command: [
           "sh",
           "-lc",
-          `printenv ${INJECTED_ENV_KEY} && printenv ${SandboxRuntimeEnv.LISTEN_ADDR} && printenv ${SandboxRuntimeEnv.USER}`,
+          `printenv ${INJECTED_ENV_KEY} && printenv ${SandboxRuntimeEnv.LISTEN_ADDR}`,
         ],
       });
 
       expect(result.exitCode).toBe(0);
       expect(normalizeOutput(result.output)).toBe(
-        [
-          injectedEnvValue,
-          SandboxRuntimeEnvDefaults.LISTEN_ADDR,
-          SandboxRuntimeEnvDefaults.USER,
-        ].join("\n"),
+        [injectedEnvValue, SandboxRuntimeEnvDefaults.LISTEN_ADDR].join("\n"),
       );
     } finally {
       if (id !== undefined) {

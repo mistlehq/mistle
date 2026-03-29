@@ -5,9 +5,9 @@ import { generateProxyCa } from "@mistle/sandbox-rs-napi";
 
 import { prepareNativeProxyCaRuntimeEnv } from "../native/proxy-ca-host.js";
 import { ProxyCaCertFdEnv, ProxyCaKeyFdEnv } from "../runtime/config.js";
-import { ProxyCaCertInstallPath } from "./config.js";
 
 export const UpdateCaCertificatesPath = "/usr/sbin/update-ca-certificates";
+export const ProxyCaCertInstallPath = "/usr/local/share/ca-certificates/mistle-proxy-ca.crt";
 
 export type GeneratedProxyCa = ReturnType<typeof generateProxyCa>;
 

@@ -14,8 +14,8 @@ use proxy_ca::{
 };
 pub use pty::{NativePtySession, PtyEnvironmentEntry, SpawnPtyInput, spawn_pty};
 pub use security::{
-    ExecRuntimeAsUserInput, ProcessEnvironmentEntry,
-    assert_unix_socket_peer_matches_current_process_uid, exec_runtime_as_user,
+    ExecRuntimeInput, ProcessEnvironmentEntry, assert_unix_socket_peer_matches_current_process_uid,
+    exec_runtime,
     set_current_process_non_dumpable,
 };
 

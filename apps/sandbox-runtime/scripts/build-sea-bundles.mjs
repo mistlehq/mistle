@@ -10,7 +10,6 @@ const NativeAddonShimPath = resolve(AppRootPath, "scripts/sea/native-addon-shim.
 const SeaSourceRootPath = resolve(AppRootPath, "src/sea");
 
 export const SeaBundleFileNames = {
-  BOOTSTRAP: "sandbox-bootstrap.cjs",
   RUNTIME: "sandboxd.cjs",
 };
 
@@ -31,19 +30,11 @@ async function buildSeaBundle(input) {
 
 export async function buildSeaBundles(outputDirectoryPath) {
   await mkdir(outputDirectoryPath, { recursive: true });
-
-  await Promise.all([
-    buildSeaBundle({
-      entrypoint: "bootstrap-main.ts",
-      outputDirectoryPath,
-      outputFileName: SeaBundleFileNames.BOOTSTRAP,
-    }),
-    buildSeaBundle({
-      entrypoint: "runtime-main.ts",
-      outputDirectoryPath,
-      outputFileName: SeaBundleFileNames.RUNTIME,
-    }),
-  ]);
+  await buildSeaBundle({
+    entrypoint: "runtime-main.ts",
+    outputDirectoryPath,
+    outputFileName: SeaBundleFileNames.RUNTIME,
+  });
 }
 
 const invokedPath = process.argv[1];

@@ -57,15 +57,11 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
 
       const connectedSandbox = await fixture.connectSandbox(sandbox.id);
       const result = await connectedSandbox.commands.run(
-        `printf '%s\\n%s\\n%s' "$${INJECTED_ENV_KEY}" "$${SandboxRuntimeEnv.LISTEN_ADDR}" "$${SandboxRuntimeEnv.USER}"`,
+        `printf '%s\\n%s' "$${INJECTED_ENV_KEY}" "$${SandboxRuntimeEnv.LISTEN_ADDR}"`,
       );
 
       expect(result.stdout).toBe(
-        [
-          injectedEnvValue,
-          SandboxRuntimeEnvDefaults.LISTEN_ADDR,
-          SandboxRuntimeEnvDefaults.USER,
-        ].join("\n"),
+        [injectedEnvValue, SandboxRuntimeEnvDefaults.LISTEN_ADDR].join("\n"),
       );
     } finally {
       if (id !== undefined) {
