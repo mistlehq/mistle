@@ -8,30 +8,25 @@ import { ChatComposer } from "./chat-composer.js";
 function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
   return {
     composerText: "Ship it",
-    composerUi: {
-      action: {
-        canInterruptTurn: false,
-        canSteerTurn: false,
-        canSubmitTurns: true,
-        isInterruptingTurn: false,
-        isStartingTurn: false,
-        isSteeringTurn: false,
-      },
-      completedErrorMessage: null,
-      isConnected: true,
-      isUpdatingConfig: false,
-      isUploadingAttachments: false,
-    },
-    modelOptions: [{ value: "gpt-5.4-codex", label: "GPT-5.4" }],
-    onComposerTextChange: () => {},
-    onModelChange: () => {},
-    onPendingImageFilesAdded: () => {},
-    onReasoningEffortChange: () => {},
-    onRemovePendingAttachment: () => {},
-    onSubmit: () => {},
     pendingAttachments: [],
+    modelOptions: [{ value: "gpt-5.4-codex", label: "GPT-5.4" }],
     selectedModel: "gpt-5.4-codex",
     selectedReasoningEffort: "medium",
+    submitMode: "start",
+    submitLabel: "Send",
+    submitDisabled: false,
+    submitDisabledReason: null,
+    canUploadAttachments: true,
+    isUploadingAttachments: false,
+    configControlsDisabled: false,
+    statusMessage: null,
+    completedTurnErrorMessage: null,
+    onComposerTextChange: () => {},
+    onSubmit: () => {},
+    onModelChange: () => {},
+    onReasoningEffortChange: () => {},
+    onPendingImageFilesAdded: () => {},
+    onRemovePendingAttachment: () => {},
   };
 }
 
@@ -48,18 +43,7 @@ describe("ChatComposer", () => {
 
   it("disables send when turns are not submit-ready", () => {
     const baseProps = createBaseComposerProps();
-    render(
-      <ChatComposer
-        {...baseProps}
-        composerUi={{
-          ...baseProps.composerUi,
-          action: {
-            ...baseProps.composerUi.action,
-            canSubmitTurns: false,
-          },
-        }}
-      />,
-    );
+    render(<ChatComposer {...baseProps} submitDisabled />);
 
     expect(screen.getByRole("button", { name: "Send" }).getAttribute("disabled")).not.toBeNull();
   });
@@ -67,18 +51,7 @@ describe("ChatComposer", () => {
   it("renders a Stop action button when an active turn has no steering text", () => {
     const baseProps = createBaseComposerProps();
     render(
-      <ChatComposer
-        {...baseProps}
-        composerText="   "
-        composerUi={{
-          ...baseProps.composerUi,
-          action: {
-            ...baseProps.composerUi.action,
-            canInterruptTurn: true,
-            canSteerTurn: true,
-          },
-        }}
-      />,
+      <ChatComposer {...baseProps} composerText="   " submitMode="interrupt" submitLabel="Stop" />,
     );
 
     expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
@@ -90,14 +63,8 @@ describe("ChatComposer", () => {
       <ChatComposer
         {...baseProps}
         composerText="Focus on the failing test."
-        composerUi={{
-          ...baseProps.composerUi,
-          action: {
-            ...baseProps.composerUi.action,
-            canInterruptTurn: true,
-            canSteerTurn: true,
-          },
-        }}
+        submitMode="steer"
+        submitLabel="Steer"
       />,
     );
 
@@ -145,10 +112,9 @@ describe("ChatComposer", () => {
     render(
       <ChatComposer
         {...baseProps}
-        composerUi={{
-          ...baseProps.composerUi,
-          isUploadingAttachments: true,
-        }}
+        isUploadingAttachments
+        submitDisabled
+        submitLabel="Uploading..."
         pendingAttachments={[
           {
             id: "att_1",

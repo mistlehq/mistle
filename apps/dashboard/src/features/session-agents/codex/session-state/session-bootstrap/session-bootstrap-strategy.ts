@@ -1,5 +1,10 @@
 import type { ConnectedCodexSession } from "../codex-session-types.js";
 
+export type BootstrapConnectionContext = {
+  connectionKey: string;
+  threadId: string;
+};
+
 export type SessionBootstrapPlan = {
   connectionKey: string | null;
   shouldLoadBootstrapData: boolean;
@@ -10,11 +15,24 @@ function createConnectionKey(connectedSession: ConnectedCodexSession): string {
   return `${connectedSession.sandboxInstanceId}:${connectedSession.connectedAtIso}`;
 }
 
-export function resolveSessionBootstrapPlan(input: {
+export function resolveBootstrapConnectionContext(input: {
   connectedSession: ConnectedCodexSession | null;
+}): BootstrapConnectionContext | null {
+  if (input.connectedSession === null || input.connectedSession.threadId === null) {
+    return null;
+  }
+
+  return {
+    connectionKey: createConnectionKey(input.connectedSession),
+    threadId: input.connectedSession.threadId,
+  };
+}
+
+export function resolveSessionBootstrapPlan(input: {
+  bootstrapConnectionContext: BootstrapConnectionContext | null;
   establishedConnectionKey: string | null;
 }): SessionBootstrapPlan {
-  if (input.connectedSession === null || input.connectedSession.threadId === null) {
+  if (input.bootstrapConnectionContext === null) {
     return {
       connectionKey: null,
       shouldLoadBootstrapData: false,
@@ -22,11 +40,11 @@ export function resolveSessionBootstrapPlan(input: {
     };
   }
 
-  const connectionKey = createConnectionKey(input.connectedSession);
+  const connectionKey = input.bootstrapConnectionContext.connectionKey;
 
   return {
     connectionKey,
     shouldLoadBootstrapData: input.establishedConnectionKey !== connectionKey,
-    threadSyncKey: `${connectionKey}:${input.connectedSession.threadId}`,
+    threadSyncKey: `${connectionKey}:${input.bootstrapConnectionContext.threadId}`,
   };
 }

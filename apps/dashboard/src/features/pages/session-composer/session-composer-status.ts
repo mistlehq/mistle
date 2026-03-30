@@ -1,6 +1,6 @@
 import type { CodexModelSummary } from "@mistle/integrations-definitions/openai/agent/client";
 
-import type { SessionBootstrapState } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
+import type { SessionBootstrapPhase } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import {
   buildModelSelectionRequiredMessage,
   buildNonImageCapableModelWarningMessage,
@@ -15,7 +15,7 @@ export type ComposerStatusMessage = {
 
 export function resolveComposerBootstrapMessage(input: {
   activeComposerModel: CodexModelSummary | null;
-  bootstrapState: SessionBootstrapState;
+  bootstrapState: SessionBootstrapPhase;
   selectedModel: string | null;
 }): string | null {
   if (input.bootstrapState.status === "failed") {
@@ -37,7 +37,7 @@ export function resolveComposerBootstrapMessage(input: {
 
 export function resolveComposerStatusMessage(input: {
   activeComposerModel: CodexModelSummary | null;
-  bootstrapState: SessionBootstrapState;
+  bootstrapState: SessionBootstrapPhase;
   composerErrorMessage: string | null;
   hasPendingAttachments: boolean;
   sessionErrorMessage: string | null;

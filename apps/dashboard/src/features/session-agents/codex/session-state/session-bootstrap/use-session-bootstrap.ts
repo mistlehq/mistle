@@ -9,20 +9,24 @@ import {
   readComposerConfigSnapshot,
   type ComposerConfigSnapshot,
 } from "../../../../pages/session-composer/session-composer-config.js";
-import type { ConnectedCodexSession } from "../codex-session-types.js";
 import { resolveSessionBootstrapState } from "./session-bootstrap-state.js";
-import { resolveSessionBootstrapPlan } from "./session-bootstrap-strategy.js";
+import {
+  resolveSessionBootstrapPlan,
+  type BootstrapConnectionContext,
+} from "./session-bootstrap-strategy.js";
 
-export type SessionBootstrapState =
-  | { status: "disconnected" }
+export type SessionBootstrapPhase =
+  | { status: "unavailable" }
   | { status: "bootstrapping" }
   | { status: "ready" }
   | { status: "failed"; message: string };
 
 export type SessionBootstrapResult = {
-  availableModels: readonly CodexModelSummary[];
-  configSnapshot: ComposerConfigSnapshot;
-  state: SessionBootstrapState;
+  phase: SessionBootstrapPhase;
+  establishedSnapshot: {
+    availableModels: readonly CodexModelSummary[];
+    configSnapshot: ComposerConfigSnapshot;
+  };
 };
 
 const EmptyComposerConfig: ComposerConfigSnapshot = {
@@ -59,7 +63,7 @@ function createConfigQueryKey(
 }
 
 export function useSessionBootstrap(input: {
-  connectedSession: ConnectedCodexSession | null;
+  bootstrapConnectionContext: BootstrapConnectionContext | null;
   ensureCurrentGeneration: (generation: number) => void;
   hydrateInitialThread: (input?: {
     generation?: number;
@@ -80,14 +84,14 @@ export function useSessionBootstrap(input: {
   const threadSyncGenerationRef = useRef(0);
 
   const bootstrapPlan = resolveSessionBootstrapPlan({
-    connectedSession: input.connectedSession,
+    bootstrapConnectionContext: input.bootstrapConnectionContext,
     establishedConnectionKey,
   });
 
   const activeConnectionKey = bootstrapPlan.connectionKey;
   const shouldLoadBootstrapData = bootstrapPlan.shouldLoadBootstrapData;
   const activeThreadSyncKey = bootstrapPlan.threadSyncKey;
-  const activeThreadId = input.connectedSession?.threadId ?? null;
+  const activeThreadId = input.bootstrapConnectionContext?.threadId ?? null;
 
   const modelsQuery = useQuery<LoadModelsResult>({
     queryKey:
@@ -230,7 +234,7 @@ export function useSessionBootstrap(input: {
       (shouldLoadBootstrapData && (modelsQuery.isPending || configQuery.isPending)));
 
   const state = useMemo(
-    (): SessionBootstrapState =>
+    (): SessionBootstrapPhase =>
       resolveSessionBootstrapState({
         activeConnectionKey,
         activeThreadSyncKey,
@@ -268,8 +272,10 @@ export function useSessionBootstrap(input: {
   }, [activeConnectionKey, state.status]);
 
   return {
-    availableModels,
-    configSnapshot,
-    state,
+    phase: state,
+    establishedSnapshot: {
+      availableModels,
+      configSnapshot,
+    },
   } satisfies SessionBootstrapResult;
 }

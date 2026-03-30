@@ -26,6 +26,7 @@ import { type ConnectedCodexSession, type StartSessionStep } from "./codex-sessi
 import {
   useCodexSessionBootstrapData,
   useSessionBootstrap,
+  resolveBootstrapConnectionContext,
   type CodexSessionBootstrapDataState,
   type CodexSessionConfigState,
   type SessionBootstrapResult,
@@ -219,9 +220,16 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     threadIdRef,
   });
   const { connectedSession } = lifecycle;
+  const bootstrapConnectionContext = useMemo(
+    () =>
+      resolveBootstrapConnectionContext({
+        connectedSession,
+      }),
+    [connectedSession],
+  );
 
   const bootstrap = useSessionBootstrap({
-    connectedSession,
+    bootstrapConnectionContext,
     ensureCurrentGeneration,
     hydrateInitialThread,
     loadModelsAsync,

@@ -1,4 +1,4 @@
-import type { SessionBootstrapState } from "./use-session-bootstrap.js";
+import type { SessionBootstrapPhase } from "./use-session-bootstrap.js";
 
 export function resolveSessionBootstrapState(input: {
   activeConnectionKey: string | null;
@@ -7,9 +7,9 @@ export function resolveSessionBootstrapState(input: {
   isCurrentConnectionBootstrapping: boolean;
   modelsError: Error | null;
   threadSyncFailureMessage: string | null;
-}): SessionBootstrapState {
+}): SessionBootstrapPhase {
   if (input.activeConnectionKey === null || input.activeThreadSyncKey === null) {
-    return { status: "disconnected" };
+    return { status: "unavailable" };
   }
 
   if (input.modelsError !== null) {

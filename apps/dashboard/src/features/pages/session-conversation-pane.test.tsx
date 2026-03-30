@@ -15,15 +15,17 @@ describe("SessionConversationBottomPanel", () => {
     render(
       <SessionConversationBottomPanel
         chatEntries={[]}
-        composerProps={SessionComposerFixtureProps}
+        composerViewModel={{
+          ...SessionComposerFixtureProps,
+          statusMessage: {
+            message:
+              "Model GPT-5.3 Codex Spark cannot inspect images. Images will only be sent as file path references.",
+            tone: "warning",
+          },
+        }}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={function onRespondToServerRequest() {}}
         serverRequestPanelEntries={[]}
-        sessionStatusMessage={{
-          message:
-            "Model GPT-5.3 Codex Spark cannot inspect images. Images will only be sent as file path references.",
-          tone: "warning",
-        }}
       />,
     );
 

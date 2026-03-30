@@ -1,8 +1,12 @@
 export {
   useSessionBootstrap,
   type SessionBootstrapResult,
-  type SessionBootstrapState,
+  type SessionBootstrapPhase,
 } from "./use-session-bootstrap.js";
+export {
+  resolveBootstrapConnectionContext,
+  type BootstrapConnectionContext,
+} from "./session-bootstrap-strategy.js";
 export {
   useCodexSessionBootstrapData,
   type CodexSessionBootstrapDataState,

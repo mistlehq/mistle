@@ -97,10 +97,13 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.sandboxLifecycleStatus).toBeNull();
     expect(result.current.workbench.sandboxFailureMessage).toBeNull();
     expect(result.current.conversationPane.chatState.entries).toEqual([]);
-    expect(result.current.conversationPane.composerStateInput.connectedSession).toBeNull();
-    expect(result.current.conversationPane.composerStateInput.bootstrap.availableModels).toEqual(
-      [],
-    );
+    expect(result.current.conversationPane.composerStateInput.bootstrap.phase).toEqual({
+      status: "unavailable",
+    });
+    expect(
+      result.current.conversationPane.composerStateInput.bootstrap.establishedSnapshot
+        .availableModels,
+    ).toEqual([]);
     expect(result.current.conversationPane.serverRequestsState.pendingServerRequests).toEqual([]);
   });
 

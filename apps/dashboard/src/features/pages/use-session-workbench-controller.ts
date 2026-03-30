@@ -2,7 +2,11 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
-import type { SessionComposerStateInput } from "./session-composer/index.js";
+import {
+  useSessionComposerAttachmentControl,
+  useSessionComposerConfigControl,
+  type SessionComposerStateInput,
+} from "./session-composer/index.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 import {
   getSandboxInstanceStatusQueryKey,
@@ -118,13 +122,29 @@ export function useSessionWorkbenchController(input: {
   const codexConfig = sessionState.codexConfig;
   const serverRequests = sessionState.serverRequests;
   const sessionMessage = sessionState.sessionMessage;
-  const hasActiveTurn = chat.canInterruptTurn || chat.canSteerTurn;
 
   const workbenchLifecycleState = useSessionWorkbenchLifecycleState({
     sandboxInstanceId: input.sandboxInstanceId,
     lifecycle,
     ptyState,
     queryClient,
+  });
+  const configControl = useSessionComposerConfigControl({
+    bootstrap: sessionState.bootstrap,
+    clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
+    codexConfig,
+  });
+  const connectedSession = workbenchLifecycleState.connectedSession;
+  const attachmentControl = useSessionComposerAttachmentControl({
+    attachmentTarget:
+      input.sandboxInstanceId !== null &&
+      connectedSession !== null &&
+      connectedSession.threadId !== null
+        ? {
+            sandboxInstanceId: input.sandboxInstanceId,
+            threadId: connectedSession.threadId,
+          }
+        : null,
   });
 
   return {
@@ -148,21 +168,20 @@ export function useSessionWorkbenchController(input: {
       chatState: chat.chatState,
       composerStateInput: {
         bootstrap: sessionState.bootstrap,
-        codexConfig,
-        chat: {
-          canInterruptTurn: chat.canInterruptTurn,
-          canSteerTurn: chat.canSteerTurn,
-          completedErrorMessage: chat.chatState.completedErrorMessage,
+        configControl,
+        attachmentControl,
+        turnControl: {
+          activeTurnState: chat.canInterruptTurn || chat.canSteerTurn ? "running" : "idle",
+          canInterrupt: chat.canInterruptTurn,
+          canSteer: chat.canSteerTurn,
+          completedTurnErrorMessage: chat.chatState.completedErrorMessage,
           interruptTurn: chat.interruptTurn,
-          isInterruptingTurn: chat.isInterruptingTurn,
-          isStartingTurn: chat.isStartingTurn,
-          isSteeringTurn: chat.isSteeringTurn,
+          isInterrupting: chat.isInterruptingTurn,
+          isStarting: chat.isStartingTurn,
+          isSteering: chat.isSteeringTurn,
           startTurn: chat.startTurn,
           steerTurn: chat.steerTurn,
         },
-        connectedSession: workbenchLifecycleState.connectedSession,
-        hasActiveTurn,
-        sandboxInstanceId: input.sandboxInstanceId,
         sessionErrorMessage: sessionMessage.sessionErrorMessage,
         clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
       },

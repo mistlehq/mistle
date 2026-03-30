@@ -19,24 +19,8 @@ export type ChatComposerStatusMessage = {
   tone: "error" | "warning";
 };
 
-export type ChatComposerUiState = {
-  completedErrorMessage: string | null;
-  isConnected: boolean;
-  isUpdatingConfig: boolean;
-  isUploadingAttachments: boolean;
-  action: {
-    canInterruptTurn: boolean;
-    canSteerTurn: boolean;
-    canSubmitTurns: boolean;
-    isInterruptingTurn: boolean;
-    isStartingTurn: boolean;
-    isSteeringTurn: boolean;
-  };
-};
-
-type ChatComposerProps = {
+export type ChatComposerViewModel = {
   composerText: string;
-  composerUi: ChatComposerUiState;
   pendingAttachments: readonly {
     id: string;
     name: string;
@@ -47,66 +31,54 @@ type ChatComposerProps = {
   }[];
   selectedModel: string | null;
   selectedReasoningEffort: string | null;
+  submitMode: "start" | "steer" | "interrupt";
+  submitLabel: string;
+  submitDisabled: boolean;
+  submitDisabledReason: string | null;
+  canUploadAttachments: boolean;
+  isUploadingAttachments: boolean;
+  configControlsDisabled: boolean;
+  statusMessage: ChatComposerStatusMessage | null;
+  completedTurnErrorMessage: string | null;
   onComposerTextChange: (value: string) => void;
+  onSubmit: () => void;
   onModelChange: (value: string) => void;
   onReasoningEffortChange: (value: string) => void;
   onPendingImageFilesAdded: (files: readonly File[]) => void;
   onRemovePendingAttachment: (attachmentId: string) => void;
-  onSubmit: () => void;
 };
 
 export function ChatComposer({
   composerText,
-  composerUi,
   pendingAttachments,
   modelOptions,
   selectedModel,
   selectedReasoningEffort,
+  submitMode,
+  submitLabel,
+  submitDisabled,
+  canUploadAttachments,
+  isUploadingAttachments,
+  configControlsDisabled,
+  completedTurnErrorMessage,
   onComposerTextChange,
+  onSubmit,
   onModelChange,
   onReasoningEffortChange,
   onPendingImageFilesAdded,
   onRemovePendingAttachment,
-  onSubmit,
-}: ChatComposerProps): React.JSX.Element {
+}: ChatComposerViewModel): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const trimmedComposerText = composerText.trim();
-  const hasPendingAttachments = pendingAttachments.length > 0;
-  const hasComposerSubmissionContent = trimmedComposerText.length > 0 || hasPendingAttachments;
-  const hasActiveTurn = composerUi.action.canInterruptTurn || composerUi.action.canSteerTurn;
-  const composerPlaceholder = hasActiveTurn ? "Steer the current turn" : "Ask anything";
-  const composerActionLabel = hasActiveTurn
-    ? hasComposerSubmissionContent
-      ? composerUi.action.isSteeringTurn
-        ? "Steering..."
-        : "Steer"
-      : composerUi.action.isInterruptingTurn
-        ? "Stopping..."
-        : "Stop"
-    : composerUi.isUploadingAttachments
-      ? "Uploading..."
-      : composerUi.action.isStartingTurn
-        ? "Sending..."
-        : "Send";
-  const isComposerActionDisabled = hasActiveTurn
-    ? hasComposerSubmissionContent
-      ? !composerUi.action.canSteerTurn ||
-        composerUi.isUploadingAttachments ||
-        !composerUi.action.canSubmitTurns
-      : !composerUi.action.canInterruptTurn
-    : !composerUi.isConnected ||
-      composerUi.action.isStartingTurn ||
-      composerUi.isUploadingAttachments ||
-      !hasComposerSubmissionContent ||
-      !composerUi.action.canSubmitTurns;
+  const composerPlaceholder =
+    submitMode === "steer" || submitMode === "interrupt"
+      ? "Steer the current turn"
+      : "Ask anything";
   const composerActionIcon =
-    hasActiveTurn && !hasComposerSubmissionContent ? (
+    submitMode === "interrupt" ? (
       <StopCircleIcon aria-hidden="true" weight="fill" />
     ) : (
       <ArrowCircleUpIcon aria-hidden="true" weight="fill" />
     );
-  const isComposerConfigDisabled =
-    !composerUi.isConnected || composerUi.isUpdatingConfig || composerUi.isUploadingAttachments;
   const selectableModelValue = resolveSelectableValue({
     selectedValue: selectedModel,
     optionValues: modelOptions.map((option) => option.value),
@@ -158,7 +130,7 @@ export function ChatComposer({
               <button
                 aria-label={`Remove ${attachment.name}`}
                 className="text-muted-foreground disabled:cursor-not-allowed"
-                disabled={composerUi.isUploadingAttachments}
+                disabled={isUploadingAttachments}
                 onClick={() => {
                   onRemovePendingAttachment(attachment.id);
                 }}
@@ -182,7 +154,7 @@ export function ChatComposer({
           }
 
           event.preventDefault();
-          if (isComposerActionDisabled) {
+          if (submitDisabled) {
             return;
           }
 
@@ -205,7 +177,7 @@ export function ChatComposer({
         <div className="flex flex-wrap items-center gap-2">
           <Button
             className="h-8 gap-1.5 rounded-full"
-            disabled={!composerUi.isConnected || composerUi.isUploadingAttachments}
+            disabled={!canUploadAttachments || isUploadingAttachments}
             onClick={() => {
               fileInputRef.current?.click();
             }}
@@ -217,7 +189,7 @@ export function ChatComposer({
           </Button>
 
           <Select
-            disabled={isComposerConfigDisabled}
+            disabled={configControlsDisabled}
             onValueChange={(value) => {
               if (value === null) {
                 return;
@@ -244,7 +216,7 @@ export function ChatComposer({
           </Select>
 
           <Select
-            disabled={isComposerConfigDisabled}
+            disabled={configControlsDisabled}
             onValueChange={(value) => {
               if (value === null) {
                 return;
@@ -272,24 +244,24 @@ export function ChatComposer({
         </div>
 
         <Button
-          aria-label={composerActionLabel}
+          aria-label={submitLabel}
           className="rounded-full bg-transparent text-primary hover:bg-transparent"
-          disabled={isComposerActionDisabled}
+          disabled={submitDisabled}
           onClick={onSubmit}
           size="icon-fill"
-          title={composerActionLabel}
+          title={submitLabel}
           type="button"
           variant="ghost"
         >
           {composerActionIcon}
         </Button>
       </div>
-      {!composerUi.isUploadingAttachments ? null : (
+      {!isUploadingAttachments ? null : (
         <p className="text-muted-foreground text-sm">Uploading attachments...</p>
       )}
-      {composerUi.completedErrorMessage === null ? null : (
+      {completedTurnErrorMessage === null ? null : (
         <p className="text-destructive text-sm">
-          <span className="font-medium">Turn error:</span> {composerUi.completedErrorMessage}
+          <span className="font-medium">Turn error:</span> {completedTurnErrorMessage}
         </p>
       )}
     </div>

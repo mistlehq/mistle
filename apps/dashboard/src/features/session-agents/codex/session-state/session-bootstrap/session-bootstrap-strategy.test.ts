@@ -1,12 +1,56 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveSessionBootstrapPlan } from "./session-bootstrap-strategy.js";
+import {
+  resolveBootstrapConnectionContext,
+  resolveSessionBootstrapPlan,
+} from "./session-bootstrap-strategy.js";
+
+describe("bootstrap connection context", () => {
+  it("returns null when no connected session exists", () => {
+    expect(
+      resolveBootstrapConnectionContext({
+        connectedSession: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("returns null when no thread is bound yet", () => {
+    expect(
+      resolveBootstrapConnectionContext({
+        connectedSession: {
+          sandboxInstanceId: "sandbox_123",
+          connectedAtIso: "2026-03-27T00:00:00.000Z",
+          expiresAtIso: "2026-03-27T01:00:00.000Z",
+          connectionUrl: "wss://example.invalid",
+          threadId: null,
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("derives a reduced bootstrap context once a thread is bound", () => {
+    expect(
+      resolveBootstrapConnectionContext({
+        connectedSession: {
+          sandboxInstanceId: "sandbox_123",
+          connectedAtIso: "2026-03-27T00:00:00.000Z",
+          expiresAtIso: "2026-03-27T01:00:00.000Z",
+          connectionUrl: "wss://example.invalid",
+          threadId: "thread_123",
+        },
+      }),
+    ).toEqual({
+      connectionKey: "sandbox_123:2026-03-27T00:00:00.000Z",
+      threadId: "thread_123",
+    });
+  });
+});
 
 describe("session bootstrap plan", () => {
   it("returns no active plan when no connected session exists", () => {
     expect(
       resolveSessionBootstrapPlan({
-        connectedSession: null,
+        bootstrapConnectionContext: null,
         establishedConnectionKey: null,
       }),
     ).toEqual({
@@ -19,13 +63,7 @@ describe("session bootstrap plan", () => {
   it("returns no active plan when the connected session has no thread yet", () => {
     expect(
       resolveSessionBootstrapPlan({
-        connectedSession: {
-          sandboxInstanceId: "sandbox_123",
-          connectedAtIso: "2026-03-27T00:00:00.000Z",
-          expiresAtIso: "2026-03-27T01:00:00.000Z",
-          connectionUrl: "wss://example.invalid",
-          threadId: null,
-        },
+        bootstrapConnectionContext: null,
         establishedConnectionKey: null,
       }),
     ).toEqual({
@@ -38,11 +76,8 @@ describe("session bootstrap plan", () => {
   it("loads bootstrap data before a baseline has been established", () => {
     expect(
       resolveSessionBootstrapPlan({
-        connectedSession: {
-          sandboxInstanceId: "sandbox_123",
-          connectedAtIso: "2026-03-27T00:00:00.000Z",
-          expiresAtIso: "2026-03-27T01:00:00.000Z",
-          connectionUrl: "wss://example.invalid",
+        bootstrapConnectionContext: {
+          connectionKey: "sandbox_123:2026-03-27T00:00:00.000Z",
           threadId: "thread_123",
         },
         establishedConnectionKey: null,
@@ -57,11 +92,8 @@ describe("session bootstrap plan", () => {
   it("reloads bootstrap data when reconnecting to the same sandbox instance", () => {
     expect(
       resolveSessionBootstrapPlan({
-        connectedSession: {
-          sandboxInstanceId: "sandbox_123",
-          connectedAtIso: "2026-03-27T00:05:00.000Z",
-          expiresAtIso: "2026-03-27T01:00:00.000Z",
-          connectionUrl: "wss://example.invalid",
+        bootstrapConnectionContext: {
+          connectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
           threadId: "thread_123",
         },
         establishedConnectionKey: "sandbox_123:2026-03-27T00:00:00.000Z",
@@ -76,11 +108,8 @@ describe("session bootstrap plan", () => {
   it("runs thread sync without reloading bootstrap data for the same connection", () => {
     expect(
       resolveSessionBootstrapPlan({
-        connectedSession: {
-          sandboxInstanceId: "sandbox_123",
-          connectedAtIso: "2026-03-27T00:05:00.000Z",
-          expiresAtIso: "2026-03-27T01:00:00.000Z",
-          connectionUrl: "wss://example.invalid",
+        bootstrapConnectionContext: {
+          connectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
           threadId: "thread_123",
         },
         establishedConnectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
@@ -95,11 +124,8 @@ describe("session bootstrap plan", () => {
   it("keeps bootstrap data cached when only the thread changes on the same connection", () => {
     expect(
       resolveSessionBootstrapPlan({
-        connectedSession: {
-          sandboxInstanceId: "sandbox_123",
-          connectedAtIso: "2026-03-27T00:05:00.000Z",
-          expiresAtIso: "2026-03-27T01:00:00.000Z",
-          connectionUrl: "wss://example.invalid",
+        bootstrapConnectionContext: {
+          connectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
           threadId: "thread_456",
         },
         establishedConnectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",

@@ -3,6 +3,21 @@ import { describe, expect, it } from "vitest";
 import { resolveSessionBootstrapState } from "./session-bootstrap-state.js";
 
 describe("session bootstrap state", () => {
+  it("reports unavailable without an active bootstrap context", () => {
+    expect(
+      resolveSessionBootstrapState({
+        activeConnectionKey: null,
+        activeThreadSyncKey: null,
+        configError: null,
+        isCurrentConnectionBootstrapping: false,
+        modelsError: null,
+        threadSyncFailureMessage: null,
+      }),
+    ).toEqual({
+      status: "unavailable",
+    });
+  });
+
   it("fails bootstrap when config read fails", () => {
     expect(
       resolveSessionBootstrapState({

@@ -1,18 +1,9 @@
 import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/openai/agent/client";
-import { uploadSandboxImage } from "@mistle/sandbox-session-client";
-import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
 import { useCallback, useMemo, useState } from "react";
 
-import type { ChatComposerStatusMessage } from "../../chat/components/chat-composer.js";
-import { resolveTurnRepresentation } from "../../session-agents/codex/session-state/codex-attachment-presentation.js";
-import type {
-  CodexSessionConfigState,
-  SessionBootstrapResult,
-} from "../../session-agents/codex/session-state/session-bootstrap/index.js";
-import { mintSandboxInstanceConnectionToken } from "../../sessions/sessions-service.js";
-import type { SessionConversationComposerProps } from "../session-conversation-pane.tsx";
-import { resolveChatComposerAction } from "../session-workbench-view-model.js";
-import { type ComposerConfigSnapshot } from "./session-composer-config.js";
+import type { ChatComposerViewModel } from "../../chat/components/chat-composer.js";
+import type { SessionBootstrapResult } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
+import { resolveComposerSubmitAction } from "./session-composer-capabilities.js";
 import {
   buildModelSelectionRequiredMessage,
   buildUnavailableModelErrorMessage,
@@ -20,7 +11,8 @@ import {
   supportsImageInspection,
 } from "./session-composer-model-readiness.js";
 import { resolveComposerStatusMessage } from "./session-composer-status.js";
-import { resolveUploadErrorMessage } from "./session-composer-upload-errors.js";
+import type { SessionComposerAttachmentControl } from "./use-session-composer-attachment-control.js";
+import type { SessionComposerConfigControl } from "./use-session-composer-config-control.js";
 
 type PendingComposerAttachment = {
   id: string;
@@ -28,18 +20,14 @@ type PendingComposerAttachment = {
   name: string;
 };
 
-type ComposerConnectedSession = {
-  threadId: string | null;
-} | null;
-
-type ComposerChatState = {
-  canInterruptTurn: boolean;
-  canSteerTurn: boolean;
-  completedErrorMessage: string | null;
-  interruptTurn: () => void;
-  isInterruptingTurn: boolean;
-  isStartingTurn: boolean;
-  isSteeringTurn: boolean;
+export type SessionTurnControl = {
+  activeTurnState: "idle" | "running";
+  canSteer: boolean;
+  canInterrupt: boolean;
+  isStarting: boolean;
+  isSteering: boolean;
+  isInterrupting: boolean;
+  completedTurnErrorMessage: string | null;
   startTurn: (input: {
     submittedPrompt: string;
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
@@ -52,69 +40,42 @@ type ComposerChatState = {
     transcriptPrompt?: string;
     displayAttachments?: readonly CodexTurnInputLocalImageItem[];
   }) => Promise<void>;
-};
-
-export type SessionComposerState = {
-  composerProps: SessionConversationComposerProps;
-  sessionStatusMessage: ChatComposerStatusMessage | null;
+  interruptTurn: () => void;
 };
 
 export type SessionComposerStateInput = {
   bootstrap: SessionBootstrapResult;
   clearSessionErrorMessage: () => void;
-  codexConfig: CodexSessionConfigState;
-  chat: ComposerChatState;
-  connectedSession: ComposerConnectedSession;
-  hasActiveTurn: boolean;
-  sandboxInstanceId: string | null;
+  configControl: SessionComposerConfigControl;
+  attachmentControl: SessionComposerAttachmentControl;
   sessionErrorMessage: string | null;
+  turnControl: SessionTurnControl;
 };
 
-export function useSessionComposerState(input: SessionComposerStateInput): SessionComposerState {
-  const { batchWriteConfig, isBatchWritingConfig, isWritingConfigValue, writeConfigValue } =
-    input.codexConfig;
+export function useSessionComposerState(input: SessionComposerStateInput): ChatComposerViewModel {
   const { clearSessionErrorMessage, sessionErrorMessage } = input;
   const [composerText, setComposerText] = useState("");
   const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null);
   const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
     readonly PendingComposerAttachment[]
   >([]);
-  const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
-  const [composerConfigOverrides, setComposerConfigOverrides] = useState<ComposerConfigSnapshot>({
-    model: null,
-    modelReasoningEffort: null,
-  });
-
-  const composerConfig = useMemo<ComposerConfigSnapshot>(() => {
-    return {
-      model: composerConfigOverrides.model ?? input.bootstrap.configSnapshot.model,
-      modelReasoningEffort:
-        composerConfigOverrides.modelReasoningEffort ??
-        input.bootstrap.configSnapshot.modelReasoningEffort,
-    };
-  }, [
-    composerConfigOverrides.model,
-    composerConfigOverrides.modelReasoningEffort,
-    input.bootstrap.configSnapshot.model,
-    input.bootstrap.configSnapshot.modelReasoningEffort,
-  ]);
 
   const activeComposerModel = useMemo(
     () =>
       resolveActiveComposerModel({
-        availableModels: input.bootstrap.availableModels,
-        selectedModel: composerConfig.model,
+        availableModels: input.bootstrap.establishedSnapshot.availableModels,
+        selectedModel: input.configControl.selectedModel,
       }),
-    [composerConfig.model, input.bootstrap.availableModels],
+    [input.bootstrap.establishedSnapshot.availableModels, input.configControl.selectedModel],
   );
 
   const composerStatusMessage = resolveComposerStatusMessage({
     activeComposerModel,
-    bootstrapState: input.bootstrap.state,
+    bootstrapState: input.bootstrap.phase,
     composerErrorMessage,
     hasPendingAttachments: pendingComposerAttachments.length > 0,
     sessionErrorMessage,
-    selectedModel: composerConfig.model,
+    selectedModel: input.configControl.selectedModel,
   });
 
   const handleComposerTextChange = useCallback(
@@ -126,42 +87,22 @@ export function useSessionComposerState(input: SessionComposerStateInput): Sessi
     [clearSessionErrorMessage],
   );
 
-  const setComposerModel = useCallback(
+  const handleModelChange = useCallback(
     (nextModel: string): void => {
       clearSessionErrorMessage();
       setComposerErrorMessage(null);
-      setComposerConfigOverrides((currentConfig) => ({
-        model: nextModel,
-        modelReasoningEffort: currentConfig.modelReasoningEffort,
-      }));
-      batchWriteConfig({
-        edits: [
-          {
-            keyPath: "model",
-            value: nextModel,
-            mergeStrategy: "replace",
-          },
-        ],
-      });
+      input.configControl.setModel(nextModel);
     },
-    [batchWriteConfig, clearSessionErrorMessage],
+    [clearSessionErrorMessage, input.configControl],
   );
 
-  const setComposerReasoningEffort = useCallback(
+  const handleReasoningEffortChange = useCallback(
     (nextReasoningEffort: string): void => {
       clearSessionErrorMessage();
       setComposerErrorMessage(null);
-      setComposerConfigOverrides((currentConfig) => ({
-        model: currentConfig.model,
-        modelReasoningEffort: nextReasoningEffort,
-      }));
-      writeConfigValue({
-        keyPath: "model_reasoning_effort",
-        value: nextReasoningEffort,
-        mergeStrategy: "replace",
-      });
+      input.configControl.setReasoningEffort(nextReasoningEffort);
     },
-    [clearSessionErrorMessage, writeConfigValue],
+    [clearSessionErrorMessage, input.configControl],
   );
 
   const addPendingComposerFiles = useCallback(
@@ -205,102 +146,70 @@ export function useSessionComposerState(input: SessionComposerStateInput): Sessi
     [clearSessionErrorMessage],
   );
 
+  const submitAction = useMemo(
+    () =>
+      resolveComposerSubmitAction({
+        composerText,
+        hasActiveTurn: input.turnControl.activeTurnState === "running",
+        hasPendingAttachments: pendingComposerAttachments.length > 0,
+      }),
+    [composerText, input.turnControl.activeTurnState, pendingComposerAttachments.length],
+  );
+
   const submitComposer = useCallback((): void => {
     void (async () => {
       clearSessionErrorMessage();
       setComposerErrorMessage(null);
-      const action = resolveChatComposerAction({
-        composerText,
-        hasActiveTurn: input.hasActiveTurn,
-        hasPendingAttachments: pendingComposerAttachments.length > 0,
-      });
 
-      if (action.type === "interrupt_turn") {
-        input.chat.interruptTurn();
+      if (submitAction.type === "interrupt_turn") {
+        input.turnControl.interruptTurn();
         return;
       }
 
-      if (input.bootstrap.state.status !== "ready") {
-        if (input.bootstrap.state.status === "failed") {
-          setComposerErrorMessage(input.bootstrap.state.message);
+      if (input.bootstrap.phase.status !== "ready") {
+        if (input.bootstrap.phase.status === "failed") {
+          setComposerErrorMessage(input.bootstrap.phase.message);
         }
         return;
       }
 
       if (activeComposerModel === null) {
         const missingModelMessage =
-          composerConfig.model === null
+          input.configControl.selectedModel === null
             ? buildModelSelectionRequiredMessage()
-            : buildUnavailableModelErrorMessage(composerConfig.model);
+            : buildUnavailableModelErrorMessage(input.configControl.selectedModel);
         setComposerErrorMessage(missingModelMessage);
         return;
       }
 
-      let uploadedAttachments: readonly CodexTurnInputLocalImageItem[] = [];
-      let uploadedAttachmentPaths: readonly string[] = [];
-      if (pendingComposerAttachments.length > 0) {
-        if (
-          input.sandboxInstanceId === null ||
-          input.connectedSession === null ||
-          input.connectedSession.threadId === null
-        ) {
-          setComposerErrorMessage("Connect to a sandbox session before uploading images.");
-          return;
-        }
-
-        setIsUploadingAttachments(true);
-        try {
-          const runtime = createBrowserSandboxSessionRuntime();
-          const uploadedImages = [];
-          const sandboxInstanceId = input.sandboxInstanceId;
-          const threadId = input.connectedSession.threadId;
-          for (const attachment of pendingComposerAttachments) {
-            const mintedConnection = await mintSandboxInstanceConnectionToken({
-              instanceId: sandboxInstanceId,
-            });
-            uploadedImages.push(
-              await uploadSandboxImage({
-                connectionUrl: mintedConnection.connectionUrl,
-                file: attachment.file,
-                runtime,
-                threadId,
-              }),
-            );
-          }
-          uploadedAttachmentPaths = uploadedImages.map((image) => image.path);
-          uploadedAttachments = uploadedImages.map((image) => ({
-            type: "localImage",
-            path: image.path,
-          }));
-        } catch (error) {
-          setComposerErrorMessage(resolveUploadErrorMessage(error));
-          return;
-        } finally {
-          setIsUploadingAttachments(false);
-        }
+      let preparedAttachments;
+      try {
+        preparedAttachments = await input.attachmentControl.prepareAttachments({
+          files: pendingComposerAttachments.map((attachment) => attachment.file),
+          prompt: submitAction.prompt,
+          supportsImageInspection: supportsImageInspection(activeComposerModel),
+        });
+      } catch (error) {
+        setComposerErrorMessage(
+          error instanceof Error ? error.message : "Could not upload attachments.",
+        );
+        return;
       }
 
-      const turnRepresentation = resolveTurnRepresentation({
-        prompt: action.prompt,
-        attachmentPaths: uploadedAttachmentPaths,
-        uploadedAttachments,
-        supportsImageInspection: supportsImageInspection(activeComposerModel),
-      });
-
       try {
-        if (action.type === "steer_turn") {
-          await input.chat.steerTurn({
-            submittedPrompt: turnRepresentation.prompt,
-            submittedAttachments: turnRepresentation.submittedAttachments,
-            displayAttachments: turnRepresentation.displayAttachments,
-            transcriptPrompt: action.prompt,
+        if (submitAction.type === "steer_turn") {
+          await input.turnControl.steerTurn({
+            submittedPrompt: preparedAttachments.prompt,
+            submittedAttachments: preparedAttachments.submittedAttachments,
+            displayAttachments: preparedAttachments.displayAttachments,
+            transcriptPrompt: submitAction.prompt,
           });
         } else {
-          await input.chat.startTurn({
-            submittedPrompt: turnRepresentation.prompt,
-            submittedAttachments: turnRepresentation.submittedAttachments,
-            displayAttachments: turnRepresentation.displayAttachments,
-            transcriptPrompt: action.prompt,
+          await input.turnControl.startTurn({
+            submittedPrompt: preparedAttachments.prompt,
+            submittedAttachments: preparedAttachments.submittedAttachments,
+            displayAttachments: preparedAttachments.displayAttachments,
+            transcriptPrompt: submitAction.prompt,
           });
         }
       } catch (error) {
@@ -310,7 +219,7 @@ export function useSessionComposerState(input: SessionComposerStateInput): Sessi
         return;
       }
 
-      if (action.shouldClearComposer) {
+      if (submitAction.shouldClearComposer) {
         setComposerText("");
       }
       setComposerErrorMessage(null);
@@ -318,54 +227,98 @@ export function useSessionComposerState(input: SessionComposerStateInput): Sessi
     })();
   }, [
     activeComposerModel,
-    composerConfig.model,
-    composerText,
     clearSessionErrorMessage,
-    input.bootstrap.state,
-    input.chat,
-    input.connectedSession,
-    input.hasActiveTurn,
-    input.sandboxInstanceId,
+    input.attachmentControl,
+    input.bootstrap.phase,
+    input.configControl.selectedModel,
+    input.turnControl,
     pendingComposerAttachments,
+    submitAction,
+  ]);
+
+  const submitLabel = useMemo(() => {
+    if (submitAction.submitMode === "interrupt") {
+      return input.turnControl.isInterrupting ? "Stopping..." : "Stop";
+    }
+
+    if (submitAction.submitMode === "steer") {
+      return input.turnControl.isSteering ? "Steering..." : "Steer";
+    }
+
+    if (input.attachmentControl.isUploadingAttachments) {
+      return "Uploading...";
+    }
+
+    return input.turnControl.isStarting ? "Sending..." : "Send";
+  }, [
+    input.attachmentControl.isUploadingAttachments,
+    input.turnControl.isInterrupting,
+    input.turnControl.isStarting,
+    input.turnControl.isSteering,
+    submitAction.submitMode,
+  ]);
+
+  const submitDisabled = useMemo(() => {
+    if (submitAction.submitMode === "interrupt") {
+      return !input.turnControl.canInterrupt;
+    }
+
+    if (input.attachmentControl.isUploadingAttachments) {
+      return true;
+    }
+
+    if (submitAction.submitMode === "steer") {
+      return (
+        !input.turnControl.canSteer ||
+        input.bootstrap.phase.status !== "ready" ||
+        activeComposerModel === null
+      );
+    }
+
+    return (
+      input.bootstrap.phase.status !== "ready" ||
+      input.turnControl.isStarting ||
+      (composerText.trim().length === 0 && pendingComposerAttachments.length === 0) ||
+      activeComposerModel === null
+    );
+  }, [
+    activeComposerModel,
+    composerText,
+    input.attachmentControl.isUploadingAttachments,
+    input.bootstrap.phase.status,
+    input.turnControl.canInterrupt,
+    input.turnControl.canSteer,
+    input.turnControl.isStarting,
+    pendingComposerAttachments.length,
+    submitAction.submitMode,
   ]);
 
   return {
-    composerProps: {
-      composerText,
-      composerUi: {
-        action: {
-          canInterruptTurn: input.chat.canInterruptTurn,
-          canSteerTurn: input.chat.canSteerTurn,
-          canSubmitTurns: input.bootstrap.state.status === "ready" && activeComposerModel !== null,
-          isInterruptingTurn: input.chat.isInterruptingTurn,
-          isStartingTurn: input.chat.isStartingTurn,
-          isSteeringTurn: input.chat.isSteeringTurn,
-        },
-        completedErrorMessage: input.chat.completedErrorMessage,
-        isConnected: input.connectedSession !== null,
-        isUpdatingConfig:
-          input.bootstrap.state.status === "bootstrapping" ||
-          isBatchWritingConfig ||
-          isWritingConfigValue,
-        isUploadingAttachments,
-      },
-      modelOptions: input.bootstrap.availableModels.map((model) => ({
-        value: model.model,
-        label: model.displayName,
-      })),
-      onComposerTextChange: handleComposerTextChange,
-      onModelChange: setComposerModel,
-      onPendingImageFilesAdded: addPendingComposerFiles,
-      onReasoningEffortChange: setComposerReasoningEffort,
-      onRemovePendingAttachment: removePendingComposerAttachment,
-      onSubmit: submitComposer,
-      pendingAttachments: pendingComposerAttachments.map((attachment) => ({
-        id: attachment.id,
-        name: attachment.name,
-      })),
-      selectedModel: composerConfig.model,
-      selectedReasoningEffort: composerConfig.modelReasoningEffort,
-    },
-    sessionStatusMessage: composerStatusMessage,
+    composerText,
+    pendingAttachments: pendingComposerAttachments.map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+    })),
+    modelOptions: input.configControl.modelOptions,
+    selectedModel: input.configControl.selectedModel,
+    selectedReasoningEffort: input.configControl.selectedReasoningEffort,
+    submitMode: submitAction.submitMode,
+    submitLabel,
+    submitDisabled,
+    submitDisabledReason: null,
+    canUploadAttachments: input.attachmentControl.canUploadAttachments,
+    isUploadingAttachments: input.attachmentControl.isUploadingAttachments,
+    configControlsDisabled:
+      input.bootstrap.phase.status !== "ready" ||
+      input.configControl.isUpdating ||
+      input.attachmentControl.isUploadingAttachments,
+    statusMessage: composerStatusMessage,
+    completedTurnErrorMessage: input.turnControl.completedTurnErrorMessage,
+    onComposerTextChange: handleComposerTextChange,
+    onSubmit: submitComposer,
+    onModelChange: handleModelChange,
+    onReasoningEffortChange: handleReasoningEffortChange,
+    onPendingImageFilesAdded: addPendingComposerFiles,
+    onRemovePendingAttachment: removePendingComposerAttachment,
   };
 }

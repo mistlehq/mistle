@@ -56,30 +56,25 @@ export const CodexFixtureSessionServerRequests: readonly CodexApprovalRequestEnt
 
 export const SessionComposerFixtureProps: SessionConversationComposerProps = {
   composerText: "Focus on dashboard asset ownership next.",
-  composerUi: {
-    action: {
-      canInterruptTurn: false,
-      canSteerTurn: false,
-      canSubmitTurns: true,
-      isInterruptingTurn: false,
-      isStartingTurn: false,
-      isSteeringTurn: false,
-    },
-    completedErrorMessage: null,
-    isConnected: true,
-    isUpdatingConfig: false,
-    isUploadingAttachments: false,
-  },
+  pendingAttachments: [],
   modelOptions: CodexFixtureSessionModelOptions,
   selectedModel: "gpt-5.4",
   selectedReasoningEffort: "medium",
+  submitMode: "start",
+  submitLabel: "Send",
+  submitDisabled: false,
+  submitDisabledReason: null,
+  canUploadAttachments: true,
+  isUploadingAttachments: false,
+  configControlsDisabled: false,
+  statusMessage: null,
+  completedTurnErrorMessage: null,
   onComposerTextChange: function onComposerTextChange() {},
-  onModelChange: function onModelChange() {},
-  onPendingImageFilesAdded: function onPendingImageFilesAdded() {},
-  onReasoningEffortChange: function onReasoningEffortChange() {},
-  onRemovePendingAttachment: function onRemovePendingAttachment() {},
   onSubmit: function onSubmit() {},
-  pendingAttachments: [],
+  onModelChange: function onModelChange() {},
+  onReasoningEffortChange: function onReasoningEffortChange() {},
+  onPendingImageFilesAdded: function onPendingImageFilesAdded() {},
+  onRemovePendingAttachment: function onRemovePendingAttachment() {},
 };
 
 export const SessionComposerFixturePropsWithPendingImageAttachments: SessionConversationComposerProps =
@@ -95,10 +90,9 @@ export const SessionComposerFixturePropsWithPendingImageAttachments: SessionConv
 export const SessionComposerFixturePropsUploadingImageAttachments: SessionConversationComposerProps =
   {
     ...SessionComposerFixturePropsWithPendingImageAttachments,
-    composerUi: {
-      ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi,
-      isUploadingAttachments: true,
-    },
+    isUploadingAttachments: true,
+    submitDisabled: true,
+    submitLabel: "Uploading...",
   };
 
 export const SessionComposerFixturePropsForNonImageCapableModel: SessionConversationComposerProps =
@@ -126,13 +120,7 @@ export const SessionComposerFixtureStatusMessageForUnavailableModel: ChatCompose
 
 export const SessionComposerFixturePropsForLoadingModel: SessionConversationComposerProps = {
   ...SessionComposerFixturePropsWithPendingImageAttachments,
-  composerUi: {
-    ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi,
-    action: {
-      ...SessionComposerFixturePropsWithPendingImageAttachments.composerUi.action,
-      canSubmitTurns: false,
-    },
-  },
+  submitDisabled: true,
   selectedModel: "gpt-5.4",
 };
 
