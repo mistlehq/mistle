@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
@@ -465,7 +465,7 @@ describe("WebhookAutomationTriggerPicker", () => {
     ).toBeDefined();
   });
 
-  it("shows a dialog instead of adding a second trigger", () => {
+  it("shows a dialog instead of adding a second trigger", async () => {
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
@@ -505,6 +505,18 @@ describe("WebhookAutomationTriggerPicker", () => {
         name: "Remove Issue comment created trigger",
       }),
     ).toBeDefined();
+
+    const closeButton = screen
+      .getAllByRole("button", { name: "Close" })
+      .find((element) => element.textContent === "Close");
+    if (closeButton === undefined) {
+      throw new Error("Expected dialog close button.");
+    }
+
+    fireEvent.click(closeButton);
+    await waitFor(() => {
+      expect(screen.queryByText("Only one trigger is supported")).toBeNull();
+    });
   });
 
   it("resets unsaved resource query text when the selected value changes", () => {
