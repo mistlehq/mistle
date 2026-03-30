@@ -12,6 +12,7 @@ import { gzipSync } from "node:zlib";
 
 import { type CompiledRuntimePlan } from "@mistle/integrations-core";
 import { generateProxyCa, issueProxyLeafCertificate } from "@mistle/sandbox-rs-napi";
+import { systemScheduler } from "@mistle/time";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createRuntimeHttpServer } from "../src/runtime/http-server.js";
@@ -210,6 +211,62 @@ async function performPlainHttpProxyRequest(input: {
             body: Buffer.concat(chunks).toString("utf8"),
           });
         });
+      },
+    );
+
+    request.once("error", reject);
+    if (input.body !== undefined) {
+      request.write(input.body);
+    }
+    request.end();
+  });
+}
+
+async function performPlainHttpProxyRequestUntilClose(input: {
+  proxyBaseUrl: string;
+  targetUrl: string;
+  method: string;
+  headers?: IncomingHttpHeaders;
+  body?: string;
+}): Promise<{ statusCode: number; headers: IncomingHttpHeaders; body: string; complete: boolean }> {
+  const proxyUrl = new URL(input.proxyBaseUrl);
+  const targetUrl = new URL(input.targetUrl);
+
+  return new Promise((resolve, reject) => {
+    const request = httpRequest(
+      {
+        host: proxyUrl.hostname,
+        port: proxyUrl.port,
+        method: input.method,
+        path: targetUrl.toString(),
+        headers: {
+          Host: targetUrl.host,
+          Connection: "close",
+          ...input.headers,
+        },
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        let settled = false;
+        const finish = (): void => {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
+          resolve({
+            statusCode: response.statusCode ?? 0,
+            headers: response.headers,
+            body: Buffer.concat(chunks).toString("utf8"),
+            complete: response.complete,
+          });
+        };
+
+        response.on("data", (chunk: Buffer) => {
+          chunks.push(chunk);
+        });
+        response.once("end", finish);
+        response.once("close", finish);
       },
     );
 
@@ -624,6 +681,53 @@ describe("proxy mediation", () => {
     expect(tokenizerProxyRequests).toBe(0);
     expect(response.statusCode).toBe(200);
     expect(response.body).toBe("upstream-ok");
+  });
+
+  it("keeps serving requests after a streamed upstream response aborts mid-body", async () => {
+    const upstreamServer = await startHttpServer((request, response) => {
+      if (request.url === "/stream-break") {
+        response.writeHead(200, { "content-type": "text/plain" });
+        response.write("partial-body");
+        response.flushHeaders();
+        systemScheduler.schedule(() => {
+          response.socket?.destroy(new Error("stream aborted"));
+        }, 25);
+        return;
+      }
+
+      if (request.url === "/healthz") {
+        response.writeHead(200, { "content-type": "text/plain" });
+        response.end("upstream-ok");
+        return;
+      }
+
+      response.writeHead(404);
+      response.end();
+    });
+
+    const proxyServer = await startProxyServer({
+      runtimePlan: buildProxyMediationRuntimePlan(),
+      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:1/tokenizer-proxy/egress",
+    });
+
+    const interruptedResponse = await performPlainHttpProxyRequestUntilClose({
+      proxyBaseUrl: proxyServer.baseUrl,
+      targetUrl: `${upstreamServer.baseUrl}/stream-break`,
+      method: "GET",
+    });
+
+    expect(interruptedResponse.statusCode).toBe(200);
+    expect(interruptedResponse.body).toBe("partial-body");
+    expect(interruptedResponse.complete).toBe(false);
+
+    const healthyResponse = await performPlainHttpProxyRequest({
+      proxyBaseUrl: proxyServer.baseUrl,
+      targetUrl: `${upstreamServer.baseUrl}/healthz`,
+      method: "GET",
+    });
+
+    expect(healthyResponse.statusCode).toBe(200);
+    expect(healthyResponse.body).toBe("upstream-ok");
   });
 
   it("re-originates unmatched compressed https traffic without stale encoding headers", async () => {

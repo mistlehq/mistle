@@ -41,6 +41,22 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function writeProxyFailureResponse(input: {
+  response: ServerResponse;
+  body: string;
+  cause: unknown;
+}): void {
+  if (input.response.headersSent || input.response.writableEnded) {
+    input.response.destroy(
+      input.cause instanceof Error ? input.cause : new Error(String(input.cause)),
+    );
+    return;
+  }
+
+  input.response.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
+  input.response.end(input.body);
+}
+
 function normalizeForwardPath(path: string): string {
   if (path.length === 0) {
     return "/";
@@ -440,8 +456,11 @@ export function createProxyServer(input: {
         const upstreamResponse = await sendFetchRequest(target, fetchDispatcher);
         await writeFetchResponse(response, upstreamResponse);
       } catch (error) {
-        response.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
-        response.end(`failed to forward proxy request: ${errorMessage(error)}`);
+        writeProxyFailureResponse({
+          response,
+          body: `failed to forward proxy request: ${errorMessage(error)}`,
+          cause: error,
+        });
       }
     },
 
@@ -511,10 +530,11 @@ export function createProxyServer(input: {
             const upstreamResponse = await sendFetchRequest(target, fetchDispatcher);
             await writeFetchResponse(interceptedResponse, upstreamResponse);
           } catch (error) {
-            interceptedResponse.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
-            interceptedResponse.end(
-              `failed to forward https proxy request: ${errorMessage(error)}`,
-            );
+            writeProxyFailureResponse({
+              response: interceptedResponse,
+              body: `failed to forward https proxy request: ${errorMessage(error)}`,
+              cause: error,
+            });
           }
         },
       );
