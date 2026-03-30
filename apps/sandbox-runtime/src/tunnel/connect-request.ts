@@ -114,6 +114,7 @@ export function parsePtyConnectRequest(payload: string): StreamOpen {
 
   const kind = channel === undefined ? "" : readStringField(channel, "kind");
   const session = channel === undefined ? "" : readStringField(channel, "session");
+  const ptySessionId = channel === undefined ? "" : readStringField(channel, "ptySessionId");
   const cwdValue = channel?.cwd;
   const cwd =
     typeof cwdValue === "string" && cwdValue.trim().length > 0 ? cwdValue.trim() : undefined;
@@ -145,6 +146,9 @@ export function parsePtyConnectRequest(payload: string): StreamOpen {
   if (session !== "create" && session !== "attach") {
     throw new Error(`invalid_pty_session_mode '${session}'`);
   }
+  if (ptySessionId.length === 0) {
+    throw new Error("pty stream.open request channel.ptySessionId is required");
+  }
   if ((cols !== undefined && cols < 0) || (rows !== undefined && rows < 0)) {
     throw new Error("pty stream.open request cols and rows must be greater than or equal to 0");
   }
@@ -166,6 +170,7 @@ export function parsePtyConnectRequest(payload: string): StreamOpen {
     channel: {
       kind: "pty",
       session,
+      ptySessionId,
       ...(cols === undefined ? {} : { cols }),
       ...(rows === undefined ? {} : { rows }),
       ...(cwd === undefined ? {} : { cwd }),

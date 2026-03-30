@@ -314,6 +314,7 @@ describe("sandbox tunnel pty stream integration", () => {
             channel: {
               kind: "pty",
               session: "create",
+              ptySessionId: "terminal",
               cols: 120,
               rows: 40,
             },
@@ -328,6 +329,7 @@ describe("sandbox tunnel pty stream integration", () => {
           channel: {
             kind: "pty",
             session: "create",
+            ptySessionId: "terminal",
             cols: 120,
             rows: 40,
           },
@@ -423,6 +425,7 @@ describe("sandbox tunnel pty stream integration", () => {
             channel: {
               kind: "pty",
               session: "create",
+              ptySessionId: "terminal",
               cols: 120,
               rows: 40,
             },
@@ -479,6 +482,7 @@ describe("sandbox tunnel pty stream integration", () => {
             channel: {
               kind: "pty",
               session: "create",
+              ptySessionId: "terminal",
               cols: 120,
               rows: 40,
             },
@@ -493,6 +497,7 @@ describe("sandbox tunnel pty stream integration", () => {
           channel: {
             kind: "pty",
             session: "create",
+            ptySessionId: "terminal",
             cols: 120,
             rows: 40,
           },
@@ -586,6 +591,7 @@ describe("sandbox tunnel pty stream integration", () => {
             channel: {
               kind: "pty",
               session: "create",
+              ptySessionId: "terminal",
               cols: 120,
               rows: 40,
             },
@@ -600,6 +606,7 @@ describe("sandbox tunnel pty stream integration", () => {
           channel: {
             kind: "pty",
             session: "create",
+            ptySessionId: "terminal",
             cols: 120,
             rows: 40,
           },
@@ -630,6 +637,7 @@ describe("sandbox tunnel pty stream integration", () => {
             channel: {
               kind: "pty",
               session: "attach",
+              ptySessionId: "terminal",
             },
           }),
         );
@@ -642,6 +650,7 @@ describe("sandbox tunnel pty stream integration", () => {
           channel: {
             kind: "pty",
             session: "attach",
+            ptySessionId: "terminal",
           },
         });
 
@@ -686,6 +695,7 @@ describe("sandbox tunnel pty stream integration", () => {
             channel: {
               kind: "pty",
               session: "attach",
+              ptySessionId: "terminal",
             },
           }),
         );
@@ -698,6 +708,7 @@ describe("sandbox tunnel pty stream integration", () => {
           channel: {
             kind: "pty",
             session: "attach",
+            ptySessionId: "terminal",
           },
         });
 
@@ -787,6 +798,7 @@ describe("sandbox tunnel pty stream integration", () => {
             channel: {
               kind: "pty",
               session: "create",
+              ptySessionId: "terminal",
               cols: 120,
               rows: 40,
             },

@@ -27,3 +27,8 @@ export {
 } from "./model-capabilities.js";
 export { compileOpenAiApiKeyBinding } from "./compile-binding.js";
 export { OpenAiApiKeyCredentialSecretTypes } from "./auth.js";
+export {
+  OpenAiCodexAppServerEndpointKey,
+  OpenAiCodexAppServerListenUrl,
+  OpenAiCodexAppServerProcessKey,
+} from "./app-server.js";

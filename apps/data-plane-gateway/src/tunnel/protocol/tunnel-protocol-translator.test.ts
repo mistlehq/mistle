@@ -72,6 +72,7 @@ describe("TunnelProtocolTranslator", () => {
           channel: {
             kind: "pty",
             session: "create",
+            ptySessionId: "terminal",
             cols: 80,
             rows: 24,
           },
@@ -88,6 +89,7 @@ describe("TunnelProtocolTranslator", () => {
           channel: {
             kind: "pty",
             session: "create",
+            ptySessionId: "terminal",
             cols: 80,
             rows: 24,
           },
@@ -145,6 +147,7 @@ describe("TunnelProtocolTranslator", () => {
         channel: {
           kind: "pty",
           session: "create",
+          ptySessionId: "terminal",
           cols: 80,
           rows: 24,
         },

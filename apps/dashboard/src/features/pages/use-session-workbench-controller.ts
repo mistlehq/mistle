@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { OpenAiCodexAppServerListenUrl } from "../../../../../packages/integrations-definitions/src/openai/variants/openai-default/app-server.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
@@ -185,10 +186,11 @@ export function useSessionWorkbenchController(input: {
       serverRequests.resetServerRequests();
       await cliPtyState.actions.openPty({
         sandboxInstanceId: input.sandboxInstanceId,
+        ptySessionId: "cli",
         cols: 120,
         rows: 32,
         command: "codex",
-        args: ["resume", "--remote", sessionSnapshot.connectionUrl, ensuredThreadId],
+        args: ["resume", "--remote", OpenAiCodexAppServerListenUrl, ensuredThreadId],
       });
     } finally {
       setIsSwitchingPrimaryPanel(false);

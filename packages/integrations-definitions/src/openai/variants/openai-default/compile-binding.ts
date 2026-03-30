@@ -2,6 +2,11 @@ import { type CompileBindingInput, type CompileBindingResult } from "@mistle/int
 import { stringify as stringifyToml } from "smol-toml";
 
 import { OpenAiAgentAdapterKeys } from "./adapter-keys.js";
+import {
+  OpenAiCodexAppServerEndpointKey,
+  OpenAiCodexAppServerListenUrl,
+  OpenAiCodexAppServerProcessKey,
+} from "./app-server.js";
 import { resolveOpenAiCredentialSecretType } from "./auth.js";
 import type { OpenAiApiKeyBindingConfig } from "./binding-config-schema.js";
 import type { OpenAiApiKeyTargetConfig } from "./target-config-schema.js";
@@ -12,9 +17,6 @@ export type OpenAiApiKeyCompileBindingInput = CompileBindingInput<
 >;
 
 const CodexCliArtifactKey = "codex-cli";
-const CodexAppServerProcessKey = "codex-app-server";
-const CodexAppServerEndpointKey = "app-server";
-const CodexAppServerListenUrl = "ws://127.0.0.1:4500";
 const ProxyModelProviderKey = "proxy";
 const ProxyModelProviderName = "Proxy";
 const CodexGitHubRepository = "openai/codex";
@@ -160,13 +162,13 @@ export function compileOpenAiApiKeyBinding(
         },
         processes: [
           {
-            processKey: CodexAppServerProcessKey,
+            processKey: OpenAiCodexAppServerProcessKey,
             command: {
-              args: [codexCliInstallPath, "app-server", "--listen", CodexAppServerListenUrl],
+              args: [codexCliInstallPath, "app-server", "--listen", OpenAiCodexAppServerListenUrl],
             },
             readiness: {
               type: "ws",
-              url: CodexAppServerListenUrl,
+              url: OpenAiCodexAppServerListenUrl,
               timeoutMs: RuntimeClientProcessReadinessTimeoutMs,
             },
             stop: {
@@ -178,11 +180,11 @@ export function compileOpenAiApiKeyBinding(
         ],
         endpoints: [
           {
-            endpointKey: CodexAppServerEndpointKey,
-            processKey: CodexAppServerProcessKey,
+            endpointKey: OpenAiCodexAppServerEndpointKey,
+            processKey: OpenAiCodexAppServerProcessKey,
             transport: {
               type: "ws",
-              url: CodexAppServerListenUrl,
+              url: OpenAiCodexAppServerListenUrl,
             },
             connectionMode: "dedicated",
           },
@@ -191,9 +193,9 @@ export function compileOpenAiApiKeyBinding(
     ],
     agentRuntimes: [
       {
-        runtimeKey: CodexAppServerProcessKey,
+        runtimeKey: OpenAiCodexAppServerProcessKey,
         clientId: input.binding.config.runtime,
-        endpointKey: CodexAppServerEndpointKey,
+        endpointKey: OpenAiCodexAppServerEndpointKey,
         adapterKey: OpenAiAgentAdapterKeys.OPENAI_CODEX,
       },
     ],

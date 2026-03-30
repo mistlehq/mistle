@@ -149,8 +149,8 @@ async function handleTunnelConnection(input: {
 
   const relayResultQueue = new AsyncQueue<ActiveTunnelStreamRelayResult>();
   const activeRelaysByStreamId = new Map<number, ActiveTunnelStreamRelay>();
-  let activePtyRelay: ActiveTunnelStreamRelay | undefined;
-  let activePtySession: PtySession | undefined;
+  const activePtyRelaysBySessionId = new Map<string, ActiveTunnelStreamRelay>();
+  const activePtySessionsBySessionId = new Map<string, PtySession>();
 
   try {
     while (!input.signal.aborted) {
@@ -193,12 +193,18 @@ async function handleTunnelConnection(input: {
       if (nextEvent.source === "relay") {
         const updatedState = finishActiveTunnelStreamRelay(
           activeRelaysByStreamId,
-          activePtyRelay,
-          activePtySession,
+          activePtyRelaysBySessionId,
+          activePtySessionsBySessionId,
           nextEvent.result,
         );
-        activePtyRelay = updatedState.activePtyRelay;
-        activePtySession = updatedState.activePtySession;
+        activePtyRelaysBySessionId.clear();
+        for (const [ptySessionId, relay] of updatedState.activePtyRelaysBySessionId.entries()) {
+          activePtyRelaysBySessionId.set(ptySessionId, relay);
+        }
+        activePtySessionsBySessionId.clear();
+        for (const [ptySessionId, session] of updatedState.activePtySessionsBySessionId.entries()) {
+          activePtySessionsBySessionId.set(ptySessionId, session);
+        }
         if (nextEvent.result.error !== undefined) {
           throw nextEvent.result.error;
         }
@@ -219,7 +225,7 @@ async function handleTunnelConnection(input: {
           continue;
         }
 
-        if (connectRequest.channelKind === "pty" && activePtyRelay !== undefined) {
+        if (connectRequest.channelKind === "pty") {
           let ptyConnectRequest;
           try {
             ptyConnectRequest = parsePtyConnectRequest(connectRequest.rawPayload);
@@ -237,12 +243,14 @@ async function handleTunnelConnection(input: {
             throw new Error("pty stream.open request channel.kind must be 'pty'");
           }
 
-          if (ptyConnectRequest.channel.session === "attach") {
+          const activePtyRelay = activePtyRelaysBySessionId.get(
+            ptyConnectRequest.channel.ptySessionId,
+          );
+          if (ptyConnectRequest.channel.session === "attach" && activePtyRelay !== undefined) {
             activeRelaysByStreamId.set(connectRequest.streamId, activePtyRelay);
+            activePtyRelay.messages.push(message);
+            continue;
           }
-
-          activePtyRelay.messages.push(message);
-          continue;
         }
 
         switch (connectRequest.channelKind) {
@@ -262,17 +270,23 @@ async function handleTunnelConnection(input: {
             continue;
           }
           case "pty": {
-            const { ptySession, relay } = await handlePtyConnectRequest({
+            const { ptySessions, relay } = await handlePtyConnectRequest({
               signal: connectionAbortController.signal,
               tunnelSocket: input.tunnelSocket,
               rawPayload: connectRequest.rawPayload,
               streamId: connectRequest.streamId,
-              activePtySession,
+              activePtySessions: activePtySessionsBySessionId,
               relayResultQueue,
             });
-            activePtySession = ptySession;
+            activePtySessionsBySessionId.clear();
+            for (const [ptySessionId, session] of ptySessions.entries()) {
+              activePtySessionsBySessionId.set(ptySessionId, session);
+            }
             if (relay !== undefined) {
-              activePtyRelay = relay;
+              if (relay.ptySessionId === undefined) {
+                throw new Error("PTY relay must include a ptySessionId.");
+              }
+              activePtyRelaysBySessionId.set(relay.ptySessionId, relay);
               activeRelaysByStreamId.set(connectRequest.streamId, relay);
             }
             continue;

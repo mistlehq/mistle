@@ -49,6 +49,7 @@ describe("pty control message parsing", () => {
           channel: {
             kind: "pty",
             session: "create",
+            ptySessionId: "terminal",
             cols: 80,
             rows: 24,
           },
@@ -60,6 +61,7 @@ describe("pty control message parsing", () => {
       channel: {
         kind: "pty",
         session: "create",
+        ptySessionId: "terminal",
         cols: 80,
         rows: 24,
       },
@@ -75,6 +77,7 @@ describe("pty control message parsing", () => {
           channel: {
             kind: "pty",
             session: "create",
+            ptySessionId: "cli",
             cols: 80,
             rows: 24,
             command: "codex",
@@ -88,6 +91,7 @@ describe("pty control message parsing", () => {
       channel: {
         kind: "pty",
         session: "create",
+        ptySessionId: "cli",
         cols: 80,
         rows: 24,
         command: "codex",
@@ -105,6 +109,7 @@ describe("pty control message parsing", () => {
           channel: {
             kind: "pty",
             session: "resume",
+            ptySessionId: "terminal",
             cols: 80,
             rows: 24,
           },
@@ -120,6 +125,7 @@ describe("pty control message parsing", () => {
           channel: {
             kind: "pty",
             session: "create",
+            ptySessionId: "terminal",
             cols: 80,
           },
         }),
@@ -134,6 +140,7 @@ describe("pty control message parsing", () => {
           channel: {
             kind: "pty",
             session: "create",
+            ptySessionId: "terminal",
             cols: 80,
             rows: 24,
             command: "codex",

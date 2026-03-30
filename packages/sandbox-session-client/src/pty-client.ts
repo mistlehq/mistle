@@ -81,6 +81,7 @@ function createPtyOpenMessage(input: {
     channel: {
       kind: "pty",
       session: "create",
+      ptySessionId: input.options.ptySessionId.trim(),
       cols: input.options.cols,
       rows: input.options.rows,
       ...(input.options.cwd === undefined ? {} : { cwd: input.options.cwd }),
@@ -285,6 +286,9 @@ export class SandboxPtyClient {
   }
 
   async open(options: SandboxPtyOpenOptions): Promise<void> {
+    if (options.ptySessionId.trim().length === 0) {
+      throw new Error("Sandbox PTY session id is required.");
+    }
     assertValidPtyDimensions(options, "open");
     if (this.#state !== SandboxPtyStates.CONNECTED) {
       throw new Error("Sandbox PTY stream can only open from the connected state.");

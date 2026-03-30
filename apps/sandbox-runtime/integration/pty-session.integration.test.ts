@@ -13,6 +13,7 @@ function createPtyStreamOpen(): StreamOpen {
     channel: {
       kind: "pty",
       session: "create",
+      ptySessionId: "terminal",
       cols: 80,
       rows: 24,
     },
@@ -26,6 +27,7 @@ function createCommandPtyStreamOpen(input: { command: string; args: string[] }):
     channel: {
       kind: "pty",
       session: "create",
+      ptySessionId: "cli",
       cols: 80,
       rows: 24,
       command: input.command,

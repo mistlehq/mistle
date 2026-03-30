@@ -18,6 +18,7 @@ const AgentStreamChannelSchema = z.object({
 const PTYStreamChannelSchema = z.object({
   kind: z.literal("pty"),
   session: z.enum(["create", "attach"]),
+  ptySessionId: NonEmptyStringSchema,
   cols: PositiveIntegerSchema.optional(),
   rows: PositiveIntegerSchema.optional(),
   cwd: NonEmptyStringSchema.optional(),

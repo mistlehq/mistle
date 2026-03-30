@@ -15,6 +15,7 @@ describe("stream control message parser", () => {
         channel: {
           kind: "pty",
           session: "create",
+          ptySessionId: "terminal",
           cols: 120,
           rows: 40,
           cwd: "/workspace/repo",
@@ -29,6 +30,7 @@ describe("stream control message parser", () => {
       channel: {
         kind: "pty",
         session: "create",
+        ptySessionId: "terminal",
         cols: 120,
         rows: 40,
         cwd: "/workspace/repo",
@@ -44,6 +46,7 @@ describe("stream control message parser", () => {
         channel: {
           kind: "pty",
           session: "create",
+          ptySessionId: "cli",
           cols: 120,
           rows: 40,
           command: "codex",
@@ -58,6 +61,7 @@ describe("stream control message parser", () => {
       channel: {
         kind: "pty",
         session: "create",
+        ptySessionId: "cli",
         cols: 120,
         rows: 40,
         command: "codex",

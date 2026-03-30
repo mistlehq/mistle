@@ -403,6 +403,7 @@ export function SessionTerminalPanel({
 
     void openPty({
       sandboxInstanceId,
+      ptySessionId: "terminal",
       ...INITIAL_PTY_DIMENSIONS,
     })
       .catch((error) => {
@@ -462,6 +463,7 @@ export function SessionTerminalPanel({
     hasAttemptedAutoOpenRef.current = true;
     void openPty({
       sandboxInstanceId,
+      ptySessionId: "terminal",
       ...INITIAL_PTY_DIMENSIONS,
     }).catch(() => {
       // Error state is surfaced through lifecycle state and page alerts.

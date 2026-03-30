@@ -6,6 +6,7 @@ export type ActiveTunnelStreamRelay = {
   primaryStreamId: number;
   channelKind: "agent" | "fileUpload" | "pty";
   messages: AsyncQueue<TunnelSocketMessage>;
+  ptySessionId?: string;
 };
 
 export type ActiveTunnelStreamRelayResult =
@@ -17,18 +18,19 @@ export type ActiveTunnelStreamRelayResult =
   | {
       relay: ActiveTunnelStreamRelay;
       error?: Error;
+      ptySessionId: string;
       ptySession: PtySession | undefined;
       updatesPtySession: true;
     };
 
 export function finishActiveTunnelStreamRelay(
   activeRelaysByStreamId: Map<number, ActiveTunnelStreamRelay>,
-  activePtyRelay: ActiveTunnelStreamRelay | undefined,
-  activePtySession: PtySession | undefined,
+  activePtyRelaysBySessionId: Map<string, ActiveTunnelStreamRelay>,
+  activePtySessionsBySessionId: Map<string, PtySession>,
   result: ActiveTunnelStreamRelayResult,
 ): {
-  activePtyRelay: ActiveTunnelStreamRelay | undefined;
-  activePtySession: PtySession | undefined;
+  activePtyRelaysBySessionId: Map<string, ActiveTunnelStreamRelay>;
+  activePtySessionsBySessionId: Map<string, PtySession>;
 } {
   for (const [streamId, relay] of activeRelaysByStreamId.entries()) {
     if (relay === result.relay) {
@@ -36,8 +38,20 @@ export function finishActiveTunnelStreamRelay(
     }
   }
 
+  if (result.updatesPtySession) {
+    if (activePtyRelaysBySessionId.get(result.ptySessionId) === result.relay) {
+      activePtyRelaysBySessionId.delete(result.ptySessionId);
+    }
+
+    if (result.ptySession === undefined) {
+      activePtySessionsBySessionId.delete(result.ptySessionId);
+    } else {
+      activePtySessionsBySessionId.set(result.ptySessionId, result.ptySession);
+    }
+  }
+
   return {
-    activePtyRelay: activePtyRelay === result.relay ? undefined : activePtyRelay,
-    activePtySession: result.updatesPtySession ? result.ptySession : activePtySession,
+    activePtyRelaysBySessionId,
+    activePtySessionsBySessionId,
   };
 }

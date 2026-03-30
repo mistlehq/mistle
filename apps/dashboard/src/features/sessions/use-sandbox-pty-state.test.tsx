@@ -23,6 +23,7 @@ describe("useSandboxPtyState", () => {
     await expect(
       result.current.actions.openPty({
         sandboxInstanceId: "   ",
+        ptySessionId: "terminal",
         cols: 80,
         rows: 24,
       }),

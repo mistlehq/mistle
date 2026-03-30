@@ -178,9 +178,12 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
 
         try {
           await existingClient.open({
+            ptySessionId: input.ptySessionId,
             cols: input.cols,
             rows: input.rows,
             ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+            ...(input.command === undefined ? {} : { command: input.command }),
+            ...(input.args === undefined ? {} : { args: input.args }),
           });
 
           if (isCurrentGeneration(generation)) {
@@ -232,9 +235,12 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
         }
 
         await client.open({
+          ptySessionId: input.ptySessionId,
           cols: input.cols,
           rows: input.rows,
           ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+          ...(input.command === undefined ? {} : { command: input.command }),
+          ...(input.args === undefined ? {} : { args: input.args }),
         });
         if (!isCurrentGeneration(generation)) {
           await client.disconnect();

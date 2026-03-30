@@ -13,6 +13,7 @@ function createRelay(
     primaryStreamId,
     channelKind,
     messages: new AsyncQueue<TunnelSocketMessage>(),
+    ...(channelKind === "pty" ? { ptySessionId: "terminal" } : {}),
   };
 }
 
@@ -25,12 +26,15 @@ describe("finishActiveTunnelStreamRelay", () => {
       [21, ptyRelay],
       [22, ptyRelay],
     ]);
-    const activePtySession = undefined as PtySession | undefined;
+    const activePtyRelaysBySessionId = new Map<string, ActiveTunnelStreamRelay>([
+      ["terminal", ptyRelay],
+    ]);
+    const activePtySessionsBySessionId = new Map<string, PtySession>();
 
     const nextState = finishActiveTunnelStreamRelay(
       activeRelaysByStreamId,
-      ptyRelay,
-      activePtySession,
+      activePtyRelaysBySessionId,
+      activePtySessionsBySessionId,
       {
         relay: agentRelay,
         updatesPtySession: false,
@@ -39,8 +43,8 @@ describe("finishActiveTunnelStreamRelay", () => {
 
     expect(activeRelaysByStreamId.has(11)).toBe(false);
     expect(activeRelaysByStreamId.has(21)).toBe(true);
-    expect(nextState.activePtyRelay).toBe(ptyRelay);
-    expect(nextState.activePtySession).toBeUndefined();
+    expect(nextState.activePtyRelaysBySessionId.get("terminal")).toBe(ptyRelay);
+    expect(nextState.activePtySessionsBySessionId.size).toBe(0);
   });
 
   it("clears the active PTY relay and updates the PTY session when the PTY relay finishes", () => {
@@ -50,20 +54,25 @@ describe("finishActiveTunnelStreamRelay", () => {
       [21, ptyRelay],
       [22, ptyRelay],
     ]);
+    const activePtyRelaysBySessionId = new Map<string, ActiveTunnelStreamRelay>([
+      ["terminal", ptyRelay],
+    ]);
+    const activePtySessionsBySessionId = new Map<string, PtySession>();
 
     const nextState = finishActiveTunnelStreamRelay(
       activeRelaysByStreamId,
-      ptyRelay,
-      replacementPtySession,
+      activePtyRelaysBySessionId,
+      activePtySessionsBySessionId,
       {
         relay: ptyRelay,
+        ptySessionId: "terminal",
         ptySession: replacementPtySession,
         updatesPtySession: true,
       },
     );
 
     expect(activeRelaysByStreamId.size).toBe(0);
-    expect(nextState.activePtyRelay).toBeUndefined();
-    expect(nextState.activePtySession).toBeUndefined();
+    expect(nextState.activePtyRelaysBySessionId.size).toBe(0);
+    expect(nextState.activePtySessionsBySessionId.size).toBe(0);
   });
 });

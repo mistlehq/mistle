@@ -1284,6 +1284,7 @@ describe("sandbox tunnel websocket integration", () => {
             channel: {
               kind: "pty",
               session: "create",
+              ptySessionId: "terminal",
               cols: 120,
               rows: 40,
             },
@@ -1298,6 +1299,7 @@ describe("sandbox tunnel websocket integration", () => {
           channel: {
             kind: "pty",
             session: "create",
+            ptySessionId: "terminal",
             cols: 120,
             rows: 40,
           },
@@ -1358,6 +1360,7 @@ describe("sandbox tunnel websocket integration", () => {
             channel: {
               kind: "pty",
               session: "create",
+              ptySessionId: "terminal",
               cols: 80,
               rows: 24,
             },
@@ -1372,6 +1375,7 @@ describe("sandbox tunnel websocket integration", () => {
           channel: {
             kind: "pty",
             session: "create",
+            ptySessionId: "terminal",
             cols: 80,
             rows: 24,
           },
@@ -1979,6 +1983,7 @@ describe("sandbox tunnel websocket integration", () => {
             channel: {
               kind: "pty",
               session: "create",
+              ptySessionId: "terminal",
               cols: 80,
               rows: 24,
             },
