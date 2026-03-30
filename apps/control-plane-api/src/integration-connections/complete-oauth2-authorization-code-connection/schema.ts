@@ -9,13 +9,13 @@ import {
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
 
-export const CompleteOAuth2ConnectionParamsSchema = z
+export const CompleteOAuth2AuthorizationCodeConnectionParamsSchema = z
   .object({
     targetKey: z.string().min(1),
   })
   .strict();
 
-export const CompleteOAuth2ConnectionQuerySchema = z
+export const CompleteOAuth2AuthorizationCodeConnectionQuerySchema = z
   .object({
     state: z.string().min(1).optional(),
     code: z.string().min(1).optional(),
@@ -25,7 +25,7 @@ export const CompleteOAuth2ConnectionQuerySchema = z
   })
   .catchall(z.string());
 
-export const CompleteOAuth2ConnectionBadRequestResponseSchema = z.union([
+export const CompleteOAuth2AuthorizationCodeConnectionBadRequestResponseSchema = z.union([
   createCodeMessageErrorSchema(
     z.enum([
       IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_COMPLETE_INPUT,
@@ -39,6 +39,5 @@ export const CompleteOAuth2ConnectionBadRequestResponseSchema = z.union([
   ValidationErrorResponseSchema,
 ]);
 
-export const CompleteOAuth2ConnectionNotFoundResponseSchema = createCodeMessageErrorSchema(
-  z.literal(IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND),
-);
+export const CompleteOAuth2AuthorizationCodeConnectionNotFoundResponseSchema =
+  createCodeMessageErrorSchema(z.literal(IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND));

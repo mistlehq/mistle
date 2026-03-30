@@ -1559,7 +1559,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/integration/connections/:targetKey/oauth2/complete": {
+  "/v1/integration/connections/:targetKey/oauth2-authorization-code/complete": {
     parameters: {
       query?: never;
       header?: never;
@@ -1583,7 +1583,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Complete OAuth2 connection creation and redirect to dashboard integrations. */
+        /** @description Complete OAuth 2.0 (Authorization Code) connection creation and redirect to dashboard integrations. */
         302: {
           headers: {
             Location: string;
@@ -1639,7 +1639,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/integration/connections/:targetKey/oauth2/start": {
+  "/v1/integration/connections/:targetKey/oauth2-authorization-code/start": {
     parameters: {
       query?: never;
       header?: never;
@@ -1665,7 +1665,7 @@ export interface paths {
         };
       };
       responses: {
-        /** @description Create an OAuth2 authorization URL for an integration target. */
+        /** @description Create an OAuth 2.0 (Authorization Code) authorization URL for an integration target. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -1779,7 +1779,7 @@ export interface paths {
                 };
                 connectionMethods?: {
                   /** @enum {string} */
-                  id: "api-key" | "oauth2" | "github-app-installation";
+                  id: "api-key" | "oauth2-authorization-code" | "github-app-installation";
                   /** @enum {string} */
                   kind: "api-key" | "oauth2" | "redirect";
                   label: string;

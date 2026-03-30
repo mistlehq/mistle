@@ -3,7 +3,7 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { buildDashboardUrl } from "../../lib/dashboard-url.js";
 import type { AppContextBindings } from "../../types.js";
-import { completeOAuth2Connection } from "../services/complete-oauth2-connection.js";
+import { completeOAuth2AuthorizationCodeConnection } from "../services/complete-oauth2-authorization-code-connection.js";
 import { route } from "./route.js";
 
 const DashboardOrganizationIntegrationsPath = "/settings/organization/integrations";
@@ -19,7 +19,7 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
   const { targetKey } = ctx.req.valid("param");
   const query = ctx.req.valid("query");
 
-  await completeOAuth2Connection(
+  await completeOAuth2AuthorizationCodeConnection(
     {
       db,
       integrationRegistry,

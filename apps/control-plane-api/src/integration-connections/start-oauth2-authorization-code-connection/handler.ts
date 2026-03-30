@@ -3,7 +3,7 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { startOAuth2Connection } from "../services/start-oauth2-connection.js";
+import { startOAuth2AuthorizationCodeConnection } from "../services/start-oauth2-authorization-code-connection.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -16,7 +16,7 @@ const routeHandler = async (
   const { targetKey } = ctx.req.valid("param");
   const { displayName } = ctx.req.valid("json");
 
-  const startedConnection = await startOAuth2Connection(
+  const startedConnection = await startOAuth2AuthorizationCodeConnection(
     {
       db,
       integrationRegistry,

@@ -128,12 +128,12 @@ export async function deleteIntegrationConnection(input: {
 
 export async function startRedirectIntegrationConnection(input: {
   targetKey: string;
-  methodId: "oauth2" | "github-app-installation";
+  methodId: "oauth2-authorization-code" | "github-app-installation";
   displayName?: string;
 }): Promise<StartedRedirectConnection> {
   const pathname =
-    input.methodId === "oauth2"
-      ? `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth2/start`
+    input.methodId === "oauth2-authorization-code"
+      ? `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth2-authorization-code/start`
       : `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/github-app-installation/start`;
 
   try {

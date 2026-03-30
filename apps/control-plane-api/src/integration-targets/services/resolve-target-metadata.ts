@@ -73,7 +73,7 @@ export type ResolvedIntegrationTargetMetadata = {
   description: string;
   logoKey?: string;
   connectionMethods?: {
-    id: "api-key" | "oauth2" | "github-app-installation";
+    id: "api-key" | "oauth2-authorization-code" | "github-app-installation";
     label: string;
     kind: "api-key" | "oauth2" | "redirect";
   }[];

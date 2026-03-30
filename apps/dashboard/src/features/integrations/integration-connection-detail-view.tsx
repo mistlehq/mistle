@@ -21,7 +21,7 @@ export type IntegrationConnectionDetailResourceSummary = {
 };
 
 export type IntegrationConnectionDetailItem = {
-  authMethodId?: "api-key" | "oauth2" | "github-app-installation" | null;
+  authMethodId?: "api-key" | "oauth2-authorization-code" | "github-app-installation" | null;
   authMethodLabel?: string | null;
   bindingCount: number;
   canDelete: boolean;

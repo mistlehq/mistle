@@ -13,9 +13,9 @@ import {
 } from "@mistle/db/control-plane";
 import {
   IntegrationConnectionMethodIds,
-  type IntegrationOAuth2Capability,
-  IntegrationOAuth2RefreshAccessTokenError,
-  IntegrationOAuth2RefreshAccessTokenErrorClassifications,
+  type IntegrationOAuth2AuthorizationCodeCapability,
+  IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
+  IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
 } from "@mistle/integrations-core";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -84,7 +84,7 @@ type ResolverContextBinding = {
   config: Record<string, unknown>;
 };
 
-type OAuth2ManagedCredentialResolution =
+type OAuth2AuthorizationCodeManagedCredentialResolution =
   | {
       kind: "resolved";
       credential: ResolvedIntegrationCredential;
@@ -374,7 +374,9 @@ async function markConnectionAsError(
     .where(eq(integrationConnections.id, connectionId));
 }
 
-function createOAuth2RefreshFailedError(message: string): InternalIntegrationCredentialsError {
+function createOAuth2AuthorizationCodeRefreshFailedError(
+  message: string,
+): InternalIntegrationCredentialsError {
   return new InternalIntegrationCredentialsError(
     InternalIntegrationCredentialsErrorCodes.OAUTH2_REFRESH_FAILED,
     400,
@@ -382,7 +384,7 @@ function createOAuth2RefreshFailedError(message: string): InternalIntegrationCre
   );
 }
 
-async function resolveOAuth2ManagedCredential(input: {
+async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
   db: AppContext["var"]["db"];
   integrationsConfig: AppContext["var"]["config"]["integrations"];
   connection: {
@@ -393,7 +395,7 @@ async function resolveOAuth2ManagedCredential(input: {
     config: unknown;
   };
   target: ResolverContextTarget;
-  oauth2: IntegrationOAuth2Capability<
+  oauth2AuthorizationCode: IntegrationOAuth2AuthorizationCodeCapability<
     Record<string, unknown>,
     Record<string, string>,
     Record<string, unknown>
@@ -436,236 +438,173 @@ async function resolveOAuth2ManagedCredential(input: {
     });
   }
 
-  const resolution = await input.db.transaction<OAuth2ManagedCredentialResolution>(async (tx) => {
-    const [lockedConnection] = await tx
-      .select({
-        id: integrationConnections.id,
-        organizationId: integrationConnections.organizationId,
-        targetKey: integrationConnections.targetKey,
-        status: integrationConnections.status,
-        externalSubjectId: integrationConnections.externalSubjectId,
-        config: integrationConnections.config,
-      })
-      .from(integrationConnections)
-      .where(eq(integrationConnections.id, input.connection.id))
-      .limit(1)
-      .for("update");
+  const resolution = await input.db.transaction<OAuth2AuthorizationCodeManagedCredentialResolution>(
+    async (tx) => {
+      const [lockedConnection] = await tx
+        .select({
+          id: integrationConnections.id,
+          organizationId: integrationConnections.organizationId,
+          targetKey: integrationConnections.targetKey,
+          status: integrationConnections.status,
+          externalSubjectId: integrationConnections.externalSubjectId,
+          config: integrationConnections.config,
+        })
+        .from(integrationConnections)
+        .where(eq(integrationConnections.id, input.connection.id))
+        .limit(1)
+        .for("update");
 
-    if (lockedConnection === undefined) {
-      throw new InternalIntegrationCredentialsError(
-        InternalIntegrationCredentialsErrorCodes.CONNECTION_NOT_FOUND,
-        404,
-        `Integration connection '${input.connection.id}' was not found.`,
-      );
-    }
+      if (lockedConnection === undefined) {
+        throw new InternalIntegrationCredentialsError(
+          InternalIntegrationCredentialsErrorCodes.CONNECTION_NOT_FOUND,
+          404,
+          `Integration connection '${input.connection.id}' was not found.`,
+        );
+      }
 
-    if (lockedConnection.status !== IntegrationConnectionStatuses.ACTIVE) {
-      throw new InternalIntegrationCredentialsError(
-        InternalIntegrationCredentialsErrorCodes.CONNECTION_NOT_ACTIVE,
-        400,
-        `Integration connection '${lockedConnection.id}' is not active.`,
-      );
-    }
+      if (lockedConnection.status !== IntegrationConnectionStatuses.ACTIVE) {
+        throw new InternalIntegrationCredentialsError(
+          InternalIntegrationCredentialsErrorCodes.CONNECTION_NOT_ACTIVE,
+          400,
+          `Integration connection '${lockedConnection.id}' is not active.`,
+        );
+      }
 
-    const lockedConnectionResolverContext = resolveResolverContextConnection({
-      id: lockedConnection.id,
-      status: lockedConnection.status,
-      externalSubjectId: lockedConnection.externalSubjectId,
-      config: lockedConnection.config,
-    });
-
-    const accessCredential = await resolveLinkedActiveCredential(tx, {
-      connectionId: lockedConnection.id,
-      purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
-      secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-    });
-
-    if (accessCredential !== undefined && !isCredentialExpired(accessCredential.expiresAt)) {
-      return {
-        kind: "resolved",
-        credential: await decryptLinkedActiveCredential(tx, {
-          organizationId: lockedConnection.organizationId,
-          integrationsConfig: input.integrationsConfig,
-          credential: accessCredential,
-        }),
-      };
-    }
-
-    const refreshCredential = await resolveLinkedActiveCredential(tx, {
-      connectionId: lockedConnection.id,
-      purpose: IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN,
-      secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
-    });
-
-    if (refreshCredential === undefined) {
-      await markConnectionAsError(tx, lockedConnection.id);
-      return {
-        kind: "refresh-failed",
-        message: `OAuth2 access token for connection '${lockedConnection.id}' is not usable and no active refresh token is available.`,
-      };
-    }
-
-    if (isCredentialExpired(refreshCredential.expiresAt)) {
-      await markConnectionAsError(tx, lockedConnection.id);
-      return {
-        kind: "refresh-failed",
-        message: `OAuth2 refresh token for connection '${lockedConnection.id}' has expired.`,
-      };
-    }
-
-    const decryptedRefreshToken = await decryptLinkedActiveCredential(tx, {
-      organizationId: lockedConnection.organizationId,
-      integrationsConfig: input.integrationsConfig,
-      credential: refreshCredential,
-    });
-
-    let refreshedAccessToken;
-    try {
-      refreshedAccessToken = await input.oauth2.refreshAccessToken({
-        organizationId: lockedConnection.organizationId,
-        targetKey: lockedConnection.targetKey,
-        target: input.target,
-        connection: lockedConnectionResolverContext,
-        refreshToken: decryptedRefreshToken.value,
+      const lockedConnectionResolverContext = resolveResolverContextConnection({
+        id: lockedConnection.id,
+        status: lockedConnection.status,
+        externalSubjectId: lockedConnection.externalSubjectId,
+        config: lockedConnection.config,
       });
-    } catch (error) {
-      if (error instanceof IntegrationOAuth2RefreshAccessTokenError) {
-        if (
-          error.classification === IntegrationOAuth2RefreshAccessTokenErrorClassifications.PERMANENT
-        ) {
-          await markConnectionAsError(tx, lockedConnection.id);
-        }
 
+      const accessCredential = await resolveLinkedActiveCredential(tx, {
+        connectionId: lockedConnection.id,
+        purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+        secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+      });
+
+      if (accessCredential !== undefined && !isCredentialExpired(accessCredential.expiresAt)) {
         return {
-          kind: "refresh-failed",
-          message: error.message,
+          kind: "resolved",
+          credential: await decryptLinkedActiveCredential(tx, {
+            organizationId: lockedConnection.organizationId,
+            integrationsConfig: input.integrationsConfig,
+            credential: accessCredential,
+          }),
         };
       }
 
-      throw error;
-    }
-
-    const latestOrganizationCredentialKey = await tx.query.organizationCredentialKeys.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, lockedConnection.organizationId),
-      orderBy: (table, { desc }) => [desc(table.version)],
-    });
-
-    if (latestOrganizationCredentialKey === undefined) {
-      throw new Error(
-        `Organization credential key is missing for '${lockedConnection.organizationId}'.`,
-      );
-    }
-
-    const latestMasterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: latestOrganizationCredentialKey.masterKeyVersion,
-      masterEncryptionKeys: input.integrationsConfig.masterEncryptionKeys,
-    });
-    const latestUnwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
-      wrappedCiphertext: latestOrganizationCredentialKey.ciphertext,
-      masterEncryptionKeyMaterial: latestMasterEncryptionKeyMaterial,
-    });
-
-    try {
-      const encryptedAccessToken = encryptCredentialUtf8({
-        plaintext: refreshedAccessToken.accessToken,
-        organizationCredentialKey: latestUnwrappedOrganizationCredentialKey,
+      const refreshCredential = await resolveLinkedActiveCredential(tx, {
+        connectionId: lockedConnection.id,
+        purpose: IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN,
+        secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
       });
 
-      const [createdAccessTokenCredential] = await tx
-        .insert(integrationCredentials)
-        .values({
+      if (refreshCredential === undefined) {
+        await markConnectionAsError(tx, lockedConnection.id);
+        return {
+          kind: "refresh-failed",
+          message: `OAuth 2.0 (Authorization Code) access token for connection '${lockedConnection.id}' is not usable and no active refresh token is available.`,
+        };
+      }
+
+      if (isCredentialExpired(refreshCredential.expiresAt)) {
+        await markConnectionAsError(tx, lockedConnection.id);
+        return {
+          kind: "refresh-failed",
+          message: `OAuth 2.0 (Authorization Code) refresh token for connection '${lockedConnection.id}' has expired.`,
+        };
+      }
+
+      const decryptedRefreshToken = await decryptLinkedActiveCredential(tx, {
+        organizationId: lockedConnection.organizationId,
+        integrationsConfig: input.integrationsConfig,
+        credential: refreshCredential,
+      });
+
+      let refreshedAccessToken;
+      try {
+        refreshedAccessToken = await input.oauth2AuthorizationCode.refreshAccessToken({
           organizationId: lockedConnection.organizationId,
-          secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-          ciphertext: encryptedAccessToken.ciphertext,
-          nonce: encryptedAccessToken.nonce,
-          organizationCredentialKeyVersion: latestOrganizationCredentialKey.version,
-          intendedFamilyId: input.target.familyId,
-          ...(refreshedAccessToken.credentialMetadata === undefined
-            ? {}
-            : { metadata: refreshedAccessToken.credentialMetadata }),
-          ...(refreshedAccessToken.accessTokenExpiresAt === undefined
-            ? {}
-            : { expiresAt: refreshedAccessToken.accessTokenExpiresAt }),
-        })
-        .returning({
-          id: integrationCredentials.id,
+          targetKey: lockedConnection.targetKey,
+          target: input.target,
+          connection: lockedConnectionResolverContext,
+          refreshToken: decryptedRefreshToken.value,
         });
+      } catch (error) {
+        if (error instanceof IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError) {
+          if (
+            error.classification ===
+            IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.PERMANENT
+          ) {
+            await markConnectionAsError(tx, lockedConnection.id);
+          }
 
-      if (createdAccessTokenCredential === undefined) {
-        throw new Error("Failed to create refreshed OAuth2 access token credential.");
+          return {
+            kind: "refresh-failed",
+            message: error.message,
+          };
+        }
+
+        throw error;
       }
 
-      await tx
-        .insert(integrationConnectionCredentials)
-        .values({
-          connectionId: lockedConnection.id,
-          credentialId: createdAccessTokenCredential.id,
-          purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
-        })
-        .onConflictDoUpdate({
-          target: [
-            integrationConnectionCredentials.connectionId,
-            integrationConnectionCredentials.purpose,
-          ],
-          set: {
-            credentialId: createdAccessTokenCredential.id,
-          },
-        });
+      const latestOrganizationCredentialKey = await tx.query.organizationCredentialKeys.findFirst({
+        where: (table, { eq }) => eq(table.organizationId, lockedConnection.organizationId),
+        orderBy: (table, { desc }) => [desc(table.version)],
+      });
 
-      if (
-        accessCredential !== undefined &&
-        accessCredential.credentialId !== createdAccessTokenCredential.id
-      ) {
-        await tx
-          .update(integrationCredentials)
-          .set({
-            revokedAt: sql`now()`,
-            updatedAt: sql`now()`,
-          })
-          .where(
-            and(
-              eq(integrationCredentials.id, accessCredential.credentialId),
-              isNull(integrationCredentials.revokedAt),
-            ),
-          );
+      if (latestOrganizationCredentialKey === undefined) {
+        throw new Error(
+          `Organization credential key is missing for '${lockedConnection.organizationId}'.`,
+        );
       }
 
-      if (refreshedAccessToken.refreshToken !== undefined) {
-        const encryptedRefreshToken = encryptCredentialUtf8({
-          plaintext: refreshedAccessToken.refreshToken,
+      const latestMasterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+        masterKeyVersion: latestOrganizationCredentialKey.masterKeyVersion,
+        masterEncryptionKeys: input.integrationsConfig.masterEncryptionKeys,
+      });
+      const latestUnwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+        wrappedCiphertext: latestOrganizationCredentialKey.ciphertext,
+        masterEncryptionKeyMaterial: latestMasterEncryptionKeyMaterial,
+      });
+
+      try {
+        const encryptedAccessToken = encryptCredentialUtf8({
+          plaintext: refreshedAccessToken.accessToken,
           organizationCredentialKey: latestUnwrappedOrganizationCredentialKey,
         });
 
-        const [createdRefreshTokenCredential] = await tx
+        const [createdAccessTokenCredential] = await tx
           .insert(integrationCredentials)
           .values({
             organizationId: lockedConnection.organizationId,
-            secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
-            ciphertext: encryptedRefreshToken.ciphertext,
-            nonce: encryptedRefreshToken.nonce,
+            secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+            ciphertext: encryptedAccessToken.ciphertext,
+            nonce: encryptedAccessToken.nonce,
             organizationCredentialKeyVersion: latestOrganizationCredentialKey.version,
             intendedFamilyId: input.target.familyId,
             ...(refreshedAccessToken.credentialMetadata === undefined
               ? {}
               : { metadata: refreshedAccessToken.credentialMetadata }),
-            ...(refreshedAccessToken.refreshTokenExpiresAt === undefined
+            ...(refreshedAccessToken.accessTokenExpiresAt === undefined
               ? {}
-              : { expiresAt: refreshedAccessToken.refreshTokenExpiresAt }),
+              : { expiresAt: refreshedAccessToken.accessTokenExpiresAt }),
           })
           .returning({
             id: integrationCredentials.id,
           });
 
-        if (createdRefreshTokenCredential === undefined) {
-          throw new Error("Failed to create refreshed OAuth2 refresh token credential.");
+        if (createdAccessTokenCredential === undefined) {
+          throw new Error("Failed to create refreshed OAuth2 access token credential.");
         }
 
         await tx
           .insert(integrationConnectionCredentials)
           .values({
             connectionId: lockedConnection.id,
-            credentialId: createdRefreshTokenCredential.id,
-            purpose: IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN,
+            credentialId: createdAccessTokenCredential.id,
+            purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
           })
           .onConflictDoUpdate({
             target: [
@@ -673,11 +612,14 @@ async function resolveOAuth2ManagedCredential(input: {
               integrationConnectionCredentials.purpose,
             ],
             set: {
-              credentialId: createdRefreshTokenCredential.id,
+              credentialId: createdAccessTokenCredential.id,
             },
           });
 
-        if (refreshCredential.credentialId !== createdRefreshTokenCredential.id) {
+        if (
+          accessCredential !== undefined &&
+          accessCredential.credentialId !== createdAccessTokenCredential.id
+        ) {
           await tx
             .update(integrationCredentials)
             .set({
@@ -686,29 +628,92 @@ async function resolveOAuth2ManagedCredential(input: {
             })
             .where(
               and(
-                eq(integrationCredentials.id, refreshCredential.credentialId),
+                eq(integrationCredentials.id, accessCredential.credentialId),
                 isNull(integrationCredentials.revokedAt),
               ),
             );
         }
-      }
-    } finally {
-      latestUnwrappedOrganizationCredentialKey.fill(0);
-    }
 
-    return {
-      kind: "resolved",
-      credential: {
-        value: refreshedAccessToken.accessToken,
-        ...(refreshedAccessToken.accessTokenExpiresAt === undefined
-          ? {}
-          : { expiresAt: refreshedAccessToken.accessTokenExpiresAt }),
-      },
-    };
-  });
+        if (refreshedAccessToken.refreshToken !== undefined) {
+          const encryptedRefreshToken = encryptCredentialUtf8({
+            plaintext: refreshedAccessToken.refreshToken,
+            organizationCredentialKey: latestUnwrappedOrganizationCredentialKey,
+          });
+
+          const [createdRefreshTokenCredential] = await tx
+            .insert(integrationCredentials)
+            .values({
+              organizationId: lockedConnection.organizationId,
+              secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+              ciphertext: encryptedRefreshToken.ciphertext,
+              nonce: encryptedRefreshToken.nonce,
+              organizationCredentialKeyVersion: latestOrganizationCredentialKey.version,
+              intendedFamilyId: input.target.familyId,
+              ...(refreshedAccessToken.credentialMetadata === undefined
+                ? {}
+                : { metadata: refreshedAccessToken.credentialMetadata }),
+              ...(refreshedAccessToken.refreshTokenExpiresAt === undefined
+                ? {}
+                : { expiresAt: refreshedAccessToken.refreshTokenExpiresAt }),
+            })
+            .returning({
+              id: integrationCredentials.id,
+            });
+
+          if (createdRefreshTokenCredential === undefined) {
+            throw new Error("Failed to create refreshed OAuth2 refresh token credential.");
+          }
+
+          await tx
+            .insert(integrationConnectionCredentials)
+            .values({
+              connectionId: lockedConnection.id,
+              credentialId: createdRefreshTokenCredential.id,
+              purpose: IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN,
+            })
+            .onConflictDoUpdate({
+              target: [
+                integrationConnectionCredentials.connectionId,
+                integrationConnectionCredentials.purpose,
+              ],
+              set: {
+                credentialId: createdRefreshTokenCredential.id,
+              },
+            });
+
+          if (refreshCredential.credentialId !== createdRefreshTokenCredential.id) {
+            await tx
+              .update(integrationCredentials)
+              .set({
+                revokedAt: sql`now()`,
+                updatedAt: sql`now()`,
+              })
+              .where(
+                and(
+                  eq(integrationCredentials.id, refreshCredential.credentialId),
+                  isNull(integrationCredentials.revokedAt),
+                ),
+              );
+          }
+        }
+      } finally {
+        latestUnwrappedOrganizationCredentialKey.fill(0);
+      }
+
+      return {
+        kind: "resolved",
+        credential: {
+          value: refreshedAccessToken.accessToken,
+          ...(refreshedAccessToken.accessTokenExpiresAt === undefined
+            ? {}
+            : { expiresAt: refreshedAccessToken.accessTokenExpiresAt }),
+        },
+      };
+    },
+  );
 
   if (resolution.kind === "refresh-failed") {
-    throw createOAuth2RefreshFailedError(resolution.message);
+    throw createOAuth2AuthorizationCodeRefreshFailedError(resolution.message);
   }
 
   return resolution.credential;
@@ -989,8 +994,8 @@ export async function resolveIntegrationCredential(
 
   if (
     connectionResolverContext.config["connection_method"] ===
-      IntegrationConnectionMethodIds.OAUTH2 &&
-    definition.oauth2 !== undefined &&
+      IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE &&
+    definition.oauth2AuthorizationCode !== undefined &&
     (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN ||
       input.secretType === IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN)
   ) {
@@ -1000,7 +1005,7 @@ export async function resolveIntegrationCredential(
       integrationsConfig,
     });
 
-    return resolveOAuth2ManagedCredential({
+    return resolveOAuth2AuthorizationCodeManagedCredential({
       db,
       integrationsConfig,
       connection: {
@@ -1011,7 +1016,7 @@ export async function resolveIntegrationCredential(
         config: connection.config,
       },
       target: targetResolverContext,
-      oauth2: definition.oauth2,
+      oauth2AuthorizationCode: definition.oauth2AuthorizationCode,
       secretType: input.secretType,
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     });
