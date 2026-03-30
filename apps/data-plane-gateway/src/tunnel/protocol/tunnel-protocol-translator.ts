@@ -99,6 +99,9 @@ function hasPTYResizeSignal(message: StreamControlMessage): boolean {
 }
 
 function shouldReleaseStreamOnConnectionClose(binding: ClientStreamBinding): boolean {
+  // fileUpload bindings survive client disconnect/close semantics until the
+  // bootstrap side reports a terminal upload outcome or the bootstrap session
+  // itself is torn down.
   return binding.channelKind !== "fileUpload";
 }
 
@@ -115,6 +118,10 @@ function shouldReleaseStreamOnBootstrapMessage(input: {
   }
 
   if (input.binding.channelKind === "fileUpload") {
+    // fileUpload is intentionally two-phase in the current protocol. Client
+    // stream.close only signals that byte upload is complete; the binding stays
+    // alive until the runtime reports a terminal outcome back over the bootstrap
+    // tunnel.
     return hasFileUploadCompletedEvent(input.message);
   }
 

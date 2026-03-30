@@ -56,6 +56,11 @@ const PTYExitEventSchema = z.object({
  * Emitted only after the runtime has accepted the upload as a supported image
  * using lightweight validation and persisted it at the final attachment path.
  *
+ * In the current upload protocol this is also the bootstrap-side terminal
+ * success signal for the fileUpload stream lifecycle. Client stream.close only
+ * ends byte upload; the stream remains active until the runtime reports this
+ * event or a terminal failure.
+ *
  * This is not a guarantee that every downstream image decoder or model input
  * pipeline will accept the file.
  */
