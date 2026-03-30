@@ -32,6 +32,9 @@ export function finishActiveTunnelStreamRelay(
   activePtyRelaysBySessionId: Map<string, ActiveTunnelStreamRelay>;
   activePtySessionsBySessionId: Map<string, PtySession>;
 } {
+  const nextActivePtyRelaysBySessionId = new Map(activePtyRelaysBySessionId);
+  const nextActivePtySessionsBySessionId = new Map(activePtySessionsBySessionId);
+
   for (const [streamId, relay] of activeRelaysByStreamId.entries()) {
     if (relay === result.relay) {
       activeRelaysByStreamId.delete(streamId);
@@ -39,19 +42,19 @@ export function finishActiveTunnelStreamRelay(
   }
 
   if (result.updatesPtySession) {
-    if (activePtyRelaysBySessionId.get(result.ptySessionId) === result.relay) {
-      activePtyRelaysBySessionId.delete(result.ptySessionId);
+    if (nextActivePtyRelaysBySessionId.get(result.ptySessionId) === result.relay) {
+      nextActivePtyRelaysBySessionId.delete(result.ptySessionId);
     }
 
     if (result.ptySession === undefined) {
-      activePtySessionsBySessionId.delete(result.ptySessionId);
+      nextActivePtySessionsBySessionId.delete(result.ptySessionId);
     } else {
-      activePtySessionsBySessionId.set(result.ptySessionId, result.ptySession);
+      nextActivePtySessionsBySessionId.set(result.ptySessionId, result.ptySession);
     }
   }
 
   return {
-    activePtyRelaysBySessionId,
-    activePtySessionsBySessionId,
+    activePtyRelaysBySessionId: nextActivePtyRelaysBySessionId,
+    activePtySessionsBySessionId: nextActivePtySessionsBySessionId,
   };
 }
