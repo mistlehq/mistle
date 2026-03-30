@@ -1,5 +1,9 @@
 import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/openai/agent/client";
-import { uploadSandboxImage } from "@mistle/sandbox-session-client";
+import {
+  uploadSandboxImage,
+  type UploadedSandboxImage,
+  type UploadSandboxImageInput,
+} from "@mistle/sandbox-session-client";
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
 import { useCallback, useState } from "react";
 
@@ -23,13 +27,26 @@ export type SessionComposerAttachmentControl = {
   }) => Promise<PreparedComposerAttachments>;
 };
 
+export type SessionComposerAttachmentControlDependencies = {
+  mintSandboxInstanceConnectionToken: typeof mintSandboxInstanceConnectionToken;
+  uploadSandboxImage: (input: UploadSandboxImageInput) => Promise<UploadedSandboxImage>;
+};
+
+const DefaultSessionComposerAttachmentControlDependencies: SessionComposerAttachmentControlDependencies =
+  {
+    mintSandboxInstanceConnectionToken,
+    uploadSandboxImage,
+  };
+
 export function useSessionComposerAttachmentControl(input: {
   attachmentTarget: {
     sandboxInstanceId: string;
     threadId: string;
   } | null;
+  dependencies?: SessionComposerAttachmentControlDependencies;
 }): SessionComposerAttachmentControl {
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  const dependencies = input.dependencies ?? DefaultSessionComposerAttachmentControlDependencies;
 
   const prepareAttachments = useCallback(
     async (prepareInput: {
@@ -55,11 +72,11 @@ export function useSessionComposerAttachmentControl(input: {
         const runtime = createBrowserSandboxSessionRuntime();
         const uploadedImages = [];
         for (const attachment of prepareInput.files) {
-          const mintedConnection = await mintSandboxInstanceConnectionToken({
+          const mintedConnection = await dependencies.mintSandboxInstanceConnectionToken({
             instanceId: input.attachmentTarget.sandboxInstanceId,
           });
           uploadedImages.push(
-            await uploadSandboxImage({
+            await dependencies.uploadSandboxImage({
               connectionUrl: mintedConnection.connectionUrl,
               file: attachment,
               runtime,
@@ -85,7 +102,7 @@ export function useSessionComposerAttachmentControl(input: {
         setIsUploadingAttachments(false);
       }
     },
-    [input.attachmentTarget],
+    [dependencies, input.attachmentTarget],
   );
 
   return {

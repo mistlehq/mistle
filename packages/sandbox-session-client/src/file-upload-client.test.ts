@@ -5,7 +5,7 @@ import {
   PayloadKindRawBytes,
 } from "@mistle/sandbox-session-protocol";
 import { afterEach, describe, expect, it } from "vitest";
-import { type RawData, WebSocketServer } from "ws";
+import { type RawData, WebSocket, WebSocketServer } from "ws";
 
 import { createBrowserSandboxSessionRuntime } from "./browser.js";
 import { FileUploadRejectedError, uploadSandboxImage } from "./file-upload-client.js";
@@ -35,13 +35,22 @@ type TestUploadServer = {
 };
 
 async function startUploadTestServer(input?: {
+  closeAfterOpenMessage?: boolean;
   rejectOpen?: boolean;
   resetAfterClose?: {
     code: string;
     message: string;
   };
+  resetAfterChunk?: {
+    chunkCount: number;
+    code: string;
+    message: string;
+  };
+  suppressCompletion?: boolean;
+  suppressWindowAfterChunkCount?: number;
 }): Promise<TestUploadServer> {
   const receivedChunks: Uint8Array[] = [];
+  const openSockets = new Set<WebSocket>();
   const wsServer = new WebSocketServer({
     host: "127.0.0.1",
     port: 0,
@@ -53,12 +62,21 @@ async function startUploadTestServer(input?: {
   });
 
   wsServer.on("connection", (socket) => {
+    openSockets.add(socket);
+    socket.on("close", () => {
+      openSockets.delete(socket);
+    });
+
     let streamId: number | null = null;
 
     socket.on("message", (message) => {
       const controlMessage = parseStreamControlMessage(toText(message));
       if (controlMessage?.type === "stream.open") {
         streamId = controlMessage.streamId;
+        if (input?.closeAfterOpenMessage === true) {
+          socket.close();
+          return;
+        }
         socket.send(
           JSON.stringify(
             input?.rejectOpen
@@ -78,6 +96,9 @@ async function startUploadTestServer(input?: {
       }
 
       if (controlMessage?.type === "stream.close" && streamId !== null) {
+        if (input?.suppressCompletion === true) {
+          return;
+        }
         if (input?.resetAfterClose !== undefined) {
           socket.send(
             JSON.stringify({
@@ -115,6 +136,26 @@ async function startUploadTestServer(input?: {
 
       receivedChunks.push(dataFrame.payload);
       if (streamId !== null) {
+        if (
+          input?.resetAfterChunk !== undefined &&
+          receivedChunks.length === input.resetAfterChunk.chunkCount
+        ) {
+          socket.send(
+            JSON.stringify({
+              type: "stream.reset",
+              streamId,
+              code: input.resetAfterChunk.code,
+              message: input.resetAfterChunk.message,
+            }),
+          );
+          return;
+        }
+        if (
+          input?.suppressWindowAfterChunkCount !== undefined &&
+          receivedChunks.length >= input.suppressWindowAfterChunkCount
+        ) {
+          return;
+        }
         socket.send(
           JSON.stringify({
             type: "stream.window",
@@ -133,6 +174,9 @@ async function startUploadTestServer(input?: {
 
   return {
     close: async () => {
+      for (const socket of openSockets) {
+        socket.close();
+      }
       await new Promise<void>((resolve, reject) => {
         wsServer.close((error) => {
           if (error == null) {
@@ -225,4 +269,90 @@ describe("uploadSandboxImage", () => {
       message: "Uploaded file is not a supported image.",
     } satisfies Pick<FileUploadRejectedError, "code" | "message" | "name">);
   });
+
+  it("rejects when the websocket closes before the upload stream opens", async () => {
+    const server = await startUploadTestServer({
+      closeAfterOpenMessage: true,
+    });
+    openServers.add(server);
+    const file = new File([new Uint8Array([1, 2, 3, 4])], "screenshot.png", {
+      type: "image/png",
+    });
+
+    await expect(
+      uploadSandboxImage({
+        connectionUrl: server.url,
+        file,
+        runtime: createBrowserSandboxSessionRuntime(),
+        threadId: "thread_123",
+      }),
+    ).rejects.toThrow("Sandbox websocket connection closed unexpectedly.");
+  });
+
+  it("stops uploading and preserves reset codes when the runtime resets during upload", async () => {
+    const server = await startUploadTestServer({
+      resetAfterChunk: {
+        chunkCount: 1,
+        code: FileUploadResetCodes.INVALID_IMAGE_CONTENT,
+        message: "Uploaded image bytes were rejected during validation.",
+      },
+    });
+    openServers.add(server);
+    const file = new File([new Uint8Array(64 * 1024 + 1)], "screenshot.png", {
+      type: "image/png",
+    });
+
+    await expect(
+      uploadSandboxImage({
+        connectionUrl: server.url,
+        file,
+        runtime: createBrowserSandboxSessionRuntime(),
+        threadId: "thread_123",
+      }),
+    ).rejects.toMatchObject({
+      name: "FileUploadRejectedError",
+      code: FileUploadResetCodes.INVALID_IMAGE_CONTENT,
+      message: "Uploaded image bytes were rejected during validation.",
+    } satisfies Pick<FileUploadRejectedError, "code" | "message" | "name">);
+
+    expect(server.receivedBytes().byteLength).toBe(64 * 1024);
+  });
+
+  it("times out when upload progress stalls waiting for the next stream window", async () => {
+    const server = await startUploadTestServer({
+      suppressWindowAfterChunkCount: 1,
+    });
+    openServers.add(server);
+    const file = new File([new Uint8Array(64 * 1024 + 1)], "screenshot.png", {
+      type: "image/png",
+    });
+
+    await expect(
+      uploadSandboxImage({
+        connectionUrl: server.url,
+        file,
+        runtime: createBrowserSandboxSessionRuntime(),
+        threadId: "thread_123",
+      }),
+    ).rejects.toThrow("Timed out while waiting for upload progress.");
+  }, 20_000);
+
+  it("times out when upload completion never arrives after closing the stream", async () => {
+    const server = await startUploadTestServer({
+      suppressCompletion: true,
+    });
+    openServers.add(server);
+    const file = new File([new Uint8Array([1, 2, 3, 4])], "screenshot.png", {
+      type: "image/png",
+    });
+
+    await expect(
+      uploadSandboxImage({
+        connectionUrl: server.url,
+        file,
+        runtime: createBrowserSandboxSessionRuntime(),
+        threadId: "thread_123",
+      }),
+    ).rejects.toThrow("Timed out while waiting for upload completion.");
+  }, 20_000);
 });

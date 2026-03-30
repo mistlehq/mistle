@@ -8,6 +8,7 @@ export { readComposerConfigSnapshot } from "./session-composer-config.js";
 export {
   useSessionComposerAttachmentControl,
   type SessionComposerAttachmentControl,
+  type SessionComposerAttachmentControlDependencies,
   type PreparedComposerAttachments,
 } from "./use-session-composer-attachment-control.js";
 export {
