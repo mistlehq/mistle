@@ -16,7 +16,6 @@ import { AsyncQueue } from "./async-queue.js";
 import type { TunnelSocketMessage } from "./connect-request.js";
 import { handleFileUploadConnectRequest, handleFileUploadStream } from "./file-upload-channel.js";
 import { CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST } from "./messages.js";
-import { deriveUploadThreadDirectoryName } from "./upload-thread-path.js";
 import { ImageSignatures } from "./validate-uploaded-image.js";
 
 function toUint8Array(data: RawData): Uint8Array {
@@ -140,12 +139,7 @@ describe("handleFileUploadStream", () => {
     const completion = await completionMessage;
     const storedBytes = await readFile(completion.path);
     expect(Array.from(storedBytes)).toEqual(Array.from(ImageSignatures.PNG));
-    expect(
-      completion.path.startsWith(
-        join(tempRoot, "threads", deriveUploadThreadDirectoryName("thread_123")),
-      ),
-    ).toBe(true);
-    expect(completion.path.includes("thread_123")).toBe(false);
+    expect(completion.path.startsWith(join(tempRoot, "thread_123"))).toBe(true);
 
     await closeClientSocket(clientSocket);
   });
@@ -319,14 +313,7 @@ describe("handleFileUploadStream", () => {
       streamId: 13,
       code: FileUploadResetCodes.INVALID_FILE_TYPE,
     });
-    await expect
-      .poll(
-        async () =>
-          await readdir(
-            join(tempRoot, "threads", deriveUploadThreadDirectoryName("thread_invalid")),
-          ),
-      )
-      .toEqual([]);
+    await expect.poll(async () => await readdir(join(tempRoot, "thread_invalid"))).toEqual([]);
 
     await closeClientSocket(clientSocket);
   });
@@ -411,14 +398,7 @@ describe("handleFileUploadStream", () => {
       streamId: 15,
       code: FileUploadResetCodes.MIME_TYPE_MISMATCH,
     });
-    await expect
-      .poll(
-        async () =>
-          await readdir(
-            join(tempRoot, "threads", deriveUploadThreadDirectoryName("thread_mismatch")),
-          ),
-      )
-      .toEqual([]);
+    await expect.poll(async () => await readdir(join(tempRoot, "thread_mismatch"))).toEqual([]);
 
     await closeClientSocket(clientSocket);
   });
@@ -495,12 +475,7 @@ describe("handleFileUploadStream", () => {
 
     signalController.abort(new Error("test abort"));
 
-    await expect
-      .poll(
-        async () =>
-          await readdir(join(tempRoot, "threads", deriveUploadThreadDirectoryName("thread_abort"))),
-      )
-      .toEqual([]);
+    await expect.poll(async () => await readdir(join(tempRoot, "thread_abort"))).toEqual([]);
     expect(
       observedMessages.some(
         (message) =>
@@ -663,9 +638,7 @@ describe("handleFileUploadConnectRequest", () => {
       code: CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
       message: "threadId must use only ASCII letters, digits, '_' or '-'.",
     });
-    await expect(
-      readdir(join(tempRoot, "threads", deriveUploadThreadDirectoryName("thread_escape"))),
-    ).rejects.toThrow("ENOENT");
+    await expect(readdir(join(tempRoot, "thread_escape"))).rejects.toThrow("ENOENT");
     await expect(readdir(escapedPath)).rejects.toThrow("ENOENT");
 
     await closeClientSocket(clientSocket);
@@ -768,12 +741,7 @@ describe("handleFileUploadConnectRequest", () => {
 
     const storedBytes = await readFile(completion.path);
     expect(Array.from(storedBytes)).toEqual(Array.from(ImageSignatures.PNG));
-    expect(
-      completion.path.startsWith(
-        join(tempRoot, "threads", deriveUploadThreadDirectoryName("thread_456")),
-      ),
-    ).toBe(true);
-    expect(completion.path.includes("thread_456")).toBe(false);
+    expect(completion.path.startsWith(join(tempRoot, "thread_456"))).toBe(true);
 
     await closeClientSocket(clientSocket);
   });

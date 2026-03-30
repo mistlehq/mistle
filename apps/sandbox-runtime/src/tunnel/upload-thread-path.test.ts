@@ -2,11 +2,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  assertSafeUploadThreadId,
-  deriveUploadThreadDirectoryName,
-  deriveUploadThreadDirectoryPath,
-} from "./upload-thread-path.js";
+import { assertSafeUploadThreadId, deriveUploadThreadDirectoryPath } from "./upload-thread-path.js";
 
 describe("assertSafeUploadThreadId", () => {
   it("accepts safe thread ids", () => {
@@ -27,15 +23,12 @@ describe("assertSafeUploadThreadId", () => {
 });
 
 describe("deriveUploadThreadDirectoryPath", () => {
-  it("derives a fixed hashed directory under the threads root", () => {
+  it("derives the existing validated per-thread directory path", () => {
     const path = deriveUploadThreadDirectoryPath({
       attachmentRootPath: "/tmp/attachments",
       threadId: "thread_123",
     });
 
-    expect(path).toBe(
-      join("/tmp/attachments", "threads", deriveUploadThreadDirectoryName("thread_123")),
-    );
-    expect(path.includes("thread_123")).toBe(false);
+    expect(path).toBe(join("/tmp/attachments", "thread_123"));
   });
 });

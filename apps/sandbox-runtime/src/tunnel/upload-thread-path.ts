@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { join } from "node:path";
 
 const MaxUploadThreadIdLength = 128;
@@ -22,13 +21,9 @@ export function assertSafeUploadThreadId(threadId: string): string {
   return threadId;
 }
 
-export function deriveUploadThreadDirectoryName(threadId: string): string {
-  return createHash("sha256").update(assertSafeUploadThreadId(threadId)).digest("hex");
-}
-
 export function deriveUploadThreadDirectoryPath(input: {
   attachmentRootPath: string;
   threadId: string;
 }): string {
-  return join(input.attachmentRootPath, "threads", deriveUploadThreadDirectoryName(input.threadId));
+  return join(input.attachmentRootPath, assertSafeUploadThreadId(input.threadId));
 }
