@@ -19,7 +19,6 @@ import {
   CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
   CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED,
   CONNECT_ERROR_CODE_PTY_SESSION_EXISTS,
-  CONNECT_ERROR_CODE_PTY_SESSION_LIMIT_EXCEEDED,
   CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,
   STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
   STREAM_RESET_CODE_INVALID_STREAM_DATA,
@@ -37,8 +36,6 @@ import {
 } from "./messages.js";
 import { PtySession, PtySessionOutputClosedError, startPtySession } from "./pty-session.js";
 import { StreamSendWindow } from "./stream-window.js";
-
-const MaxActivePtySessions = 2;
 
 async function handlePtyControlMessage(input: {
   signal: AbortSignal;
@@ -394,16 +391,6 @@ export async function handlePtyConnectRequest(input: {
         streamId: input.streamId,
         code: CONNECT_ERROR_CODE_PTY_SESSION_EXISTS,
         message: "pty session already exists",
-      });
-      return { ptySessions: input.activePtySessions };
-    }
-
-    if (activePtySession === undefined && input.activePtySessions.size >= MaxActivePtySessions) {
-      await writeStreamOpenError(input.tunnelSocket, {
-        type: "stream.open.error",
-        streamId: input.streamId,
-        code: CONNECT_ERROR_CODE_PTY_SESSION_LIMIT_EXCEEDED,
-        message: `maximum ${String(MaxActivePtySessions)} PTY sessions are allowed`,
       });
       return { ptySessions: input.activePtySessions };
     }

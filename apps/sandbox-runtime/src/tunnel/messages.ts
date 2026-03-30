@@ -20,7 +20,6 @@ export const CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED = "agent_endpoint_dia
 export const CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE = "pty_session_unavailable";
 export const CONNECT_ERROR_CODE_PTY_SESSION_EXISTS = "pty_session_exists";
 export const CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED = "pty_session_create_failed";
-export const CONNECT_ERROR_CODE_PTY_SESSION_LIMIT_EXCEEDED = "pty_session_limit_exceeded";
 export const PTY_CONNECT_ERROR_CODE_INVALID_SESSION_SELECTION = "invalid_pty_session_mode";
 export const STREAM_RESET_CODE_INVALID_STREAM_SIGNAL = "invalid_stream_signal";
 export const STREAM_RESET_CODE_INVALID_STREAM_CLOSE = "invalid_stream_close";

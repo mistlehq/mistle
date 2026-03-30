@@ -109,14 +109,6 @@ async function nextQueueItem<T>(
   }
 }
 
-async function nextTextMessage(
-  clientMessages: AsyncQueue<TunnelSocketMessage>,
-  signal: AbortSignal,
-  label: string,
-): Promise<Record<string, unknown>> {
-  return parseTextMessage(await nextQueueItem(clientMessages, signal, label));
-}
-
 async function waitForTextMessage(input: {
   clientMessages: AsyncQueue<TunnelSocketMessage>;
   signal: AbortSignal;
@@ -236,11 +228,13 @@ async function expectOpenOk(input: {
   streamId: number;
 }): Promise<void> {
   expect(
-    await nextTextMessage(
-      input.clientMessages,
-      input.signal,
-      `failed waiting for stream ${String(input.streamId)} open acknowledgement`,
-    ),
+    await waitForTextMessage({
+      clientMessages: input.clientMessages,
+      signal: input.signal,
+      label: `failed waiting for stream ${String(input.streamId)} open acknowledgement`,
+      predicate: (message) =>
+        message.type === "stream.open.ok" && message.streamId === input.streamId,
+    }),
   ).toEqual({
     type: "stream.open.ok",
     streamId: input.streamId,
@@ -357,7 +351,7 @@ describe("handlePtyConnectRequest", () => {
     }
   });
 
-  it("allows two concurrent named PTY sessions and rejects a third session create", async () => {
+  it("allows opening more than two concurrent named PTY sessions", async () => {
     const signal = new AbortController();
     const relayResultQueue = new AsyncQueue<ActiveTunnelStreamRelayResult>();
     const activePtySessions = new Map();
@@ -403,7 +397,7 @@ describe("handlePtyConnectRequest", () => {
         streamId: 2,
       });
 
-      const overflowOpen = await openNamedPty({
+      const scratchOpen = await openNamedPty({
         activePtySessions: cliOpen.ptySessions,
         relayResultQueue,
         ptySessionId: "scratch",
@@ -412,20 +406,16 @@ describe("handlePtyConnectRequest", () => {
         tunnelSocket: serverSocket,
       });
 
-      expect(overflowOpen.relay).toBeUndefined();
-      expect(overflowOpen.ptySessions.size).toBe(2);
+      expect(scratchOpen.relay).toBeDefined();
+      expect(scratchOpen.ptySessions.size).toBe(3);
+      expect(scratchOpen.ptySessions.has("terminal")).toBe(true);
+      expect(scratchOpen.ptySessions.has("cli")).toBe(true);
+      expect(scratchOpen.ptySessions.has("scratch")).toBe(true);
 
-      expect(
-        await nextTextMessage(
-          clientMessages,
-          signal.signal,
-          "failed waiting for overflow stream.open.error",
-        ),
-      ).toEqual({
-        type: "stream.open.error",
+      await expectOpenOk({
+        clientMessages,
+        signal: signal.signal,
         streamId: 3,
-        code: "pty_session_limit_exceeded",
-        message: "maximum 2 PTY sessions are allowed",
       });
     } finally {
       signal.abort();
