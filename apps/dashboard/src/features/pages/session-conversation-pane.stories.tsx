@@ -21,6 +21,7 @@ import {
   createStorySessionBottomPanel,
   renderSessionWorkbenchStory,
   StorySessionConversationPaneArgs,
+  type SessionConversationStoryArgs,
 } from "./session-story-support.js";
 
 const baseArgs = {
@@ -46,7 +47,7 @@ const meta = {
       });
     },
   ],
-} satisfies Meta<typeof SessionConversationMainContent>;
+} satisfies Meta<SessionConversationStoryArgs>;
 
 export default meta;
 
