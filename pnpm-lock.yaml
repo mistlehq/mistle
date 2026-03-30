@@ -329,6 +329,9 @@ importers:
       vite:
         specifier: ^8.0.1
         version: 8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)
+      ws:
+        specifier: ^8.18.3
+        version: 8.20.0
       zod:
         specifier: ^4.1.12
         version: 4.3.6

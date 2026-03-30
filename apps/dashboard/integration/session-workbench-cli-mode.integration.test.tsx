@@ -6,13 +6,8 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
+import { type RawData, type WebSocket, WebSocket as NodeWebSocket, WebSocketServer } from "ws";
 
-import {
-  type RawData,
-  type WebSocket,
-  WebSocket as NodeWebSocket,
-  WebSocketServer,
-} from "../../../node_modules/.pnpm/node_modules/ws/index.js";
 import { OpenAiCodexAppServerListenUrl } from "../../../packages/integrations-definitions/src/openai/index.ts";
 import {
   decodeDataFrame,
