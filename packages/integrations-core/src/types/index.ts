@@ -607,6 +607,40 @@ export type IntegrationOAuth2AuthorizationCodeCapability<
   ): MaybePromise<IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult>;
 };
 
+export type IntegrationOAuth2ClientCredentialsExchangeInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  clientSecret: string;
+};
+
+export type IntegrationOAuth2ClientCredentialsExchangeResult = {
+  accessToken: string;
+  accessTokenExpiresAt?: string;
+  credentialMetadata?: Record<string, unknown>;
+};
+
+export type IntegrationOAuth2ClientCredentialsCapability<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  exchangeClientCredentials(
+    input: IntegrationOAuth2ClientCredentialsExchangeInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<IntegrationOAuth2ClientCredentialsExchangeResult>;
+};
+
 export type IntegrationWebhookHeaders = Readonly<Record<string, string>>;
 
 export type IntegrationWebhookVerifyFailureCode =
@@ -1121,6 +1155,11 @@ export type IntegrationDefinition<
   >;
   credentialResolvers?: IntegrationCredentialResolvers;
   oauth2AuthorizationCode?: IntegrationOAuth2AuthorizationCodeCapability<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    TConnectionConfig
+  >;
+  oauth2ClientCredentials?: IntegrationOAuth2ClientCredentialsCapability<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig

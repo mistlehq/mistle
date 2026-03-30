@@ -13,12 +13,15 @@ import {
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
+import { IntegrationRegistry, type IntegrationDefinition } from "@mistle/integrations-core";
 import { describe, expect } from "vitest";
+import { z } from "zod";
 
 import {
   CONTROL_PLANE_INTERNAL_AUTH_HEADER,
   INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH,
 } from "../src/internal/integration-credentials/index.js";
+import { resolveIntegrationCredential } from "../src/internal/integration-credentials/services/resolve-credential.js";
 import {
   encryptCredentialUtf8,
   encryptIntegrationTargetSecrets,
@@ -31,6 +34,59 @@ import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 type ConnectionResponse = {
   id: string;
 };
+
+const EmptyConfigSchema = z.object({});
+const ClientCredentialsConnectionMethodId = "oauth2-client-credentials-test";
+
+function createClientCredentialsRegistry(): IntegrationRegistry {
+  const registry = new IntegrationRegistry();
+  const definition: IntegrationDefinition<
+    typeof EmptyConfigSchema,
+    typeof EmptyConfigSchema,
+    typeof EmptyConfigSchema
+  > = {
+    familyId: "oauth2",
+    variantId: "client-credentials-test",
+    kind: "connector",
+    displayName: "OAuth2 Client Credentials Test",
+    logoKey: "oauth2",
+    targetConfigSchema: EmptyConfigSchema,
+    targetSecretSchema: EmptyConfigSchema,
+    bindingConfigSchema: EmptyConfigSchema,
+    connectionMethods: [
+      {
+        id: ClientCredentialsConnectionMethodId,
+        label: "OAuth2 client credentials",
+        kind: "form",
+        secretField: {
+          label: "Client secret",
+          inputType: "password",
+        },
+        secretType: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+        configSchema: z
+          .object({
+            connection_method: z.literal(ClientCredentialsConnectionMethodId),
+          })
+          .strict(),
+      },
+    ],
+    oauth2ClientCredentials: {
+      exchangeClientCredentials: async (input) => ({
+        accessToken: `access-token-for:${input.clientSecret}`,
+        accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
+      }),
+    },
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [],
+      runtimeClients: [],
+    }),
+  };
+
+  registry.register(definition);
+
+  return registry;
+}
 
 async function insertGitHubBindingFixture(input: {
   fixture: ControlPlaneApiIntegrationFixture;
@@ -256,6 +312,165 @@ describe("internal integration credentials resolve", () => {
     await expect(resolveResponse.json()).resolves.toEqual({
       value: "oauth2-access-token-value",
       expiresAt: "2030-01-01T00:00:00.000Z",
+    });
+  });
+
+  it("mints and reuses OAuth2 client-credentials access tokens", async ({ fixture }) => {
+    const authSession = await fixture.authSession();
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "oauth2_client_credentials_target",
+      familyId: "oauth2",
+      variantId: "client-credentials-test",
+      enabled: true,
+      config: {},
+    });
+
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_oauth2_client_credentials",
+      organizationId: authSession.organizationId,
+      targetKey: "oauth2_client_credentials_target",
+      displayName: "OAuth2 client credentials connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: ClientCredentialsConnectionMethodId,
+      },
+    });
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+      wrappedCiphertext: organizationCredentialKey.ciphertext,
+      masterEncryptionKeyMaterial,
+    });
+
+    try {
+      const encryptedClientSecret = encryptCredentialUtf8({
+        plaintext: "client-secret-value",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+
+      await fixture.db.insert(integrationCredentials).values({
+        id: "icr_oauth2_client_secret",
+        organizationId: authSession.organizationId,
+        secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+        ciphertext: encryptedClientSecret.ciphertext,
+        nonce: encryptedClientSecret.nonce,
+        organizationCredentialKeyVersion: organizationCredentialKey.version,
+        intendedFamilyId: "oauth2",
+      });
+    } finally {
+      unwrappedOrganizationCredentialKey.fill(0);
+    }
+
+    await fixture.db.insert(integrationConnectionCredentials).values({
+      connectionId: "icn_oauth2_client_credentials",
+      credentialId: "icr_oauth2_client_secret",
+      purpose: IntegrationConnectionCredentialPurposes.OAUTH2_CLIENT_SECRET,
+    });
+
+    const integrationRegistry = createClientCredentialsRegistry();
+
+    const firstResolution = await resolveIntegrationCredential(
+      {
+        db: fixture.db,
+        integrationRegistry,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        connectionId: "icn_oauth2_client_credentials",
+        secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+        purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+      },
+    );
+
+    expect(firstResolution).toEqual({
+      value: "access-token-for:client-secret-value",
+      expiresAt: "2030-01-01T00:00:00.000Z",
+    });
+
+    const accessCredentialsAfterFirstResolution =
+      await fixture.db.query.integrationCredentials.findMany({
+        columns: {
+          id: true,
+          secretKind: true,
+          revokedAt: true,
+        },
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, authSession.organizationId),
+            eq(table.secretKind, IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN),
+          ),
+      });
+
+    expect(accessCredentialsAfterFirstResolution).toHaveLength(1);
+    const firstAccessCredential = accessCredentialsAfterFirstResolution[0];
+    if (firstAccessCredential === undefined) {
+      throw new Error("Expected one stored access token credential.");
+    }
+    expect(firstAccessCredential.secretKind).toBe(
+      IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+    );
+    expect(firstAccessCredential.revokedAt).toBeNull();
+
+    const secondResolution = await resolveIntegrationCredential(
+      {
+        db: fixture.db,
+        integrationRegistry,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        connectionId: "icn_oauth2_client_credentials",
+        secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+        purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+      },
+    );
+
+    expect(secondResolution).toEqual(firstResolution);
+
+    const accessCredentialsAfterSecondResolution =
+      await fixture.db.query.integrationCredentials.findMany({
+        columns: {
+          id: true,
+        },
+        where: (table, { and, eq, isNull }) =>
+          and(
+            eq(table.organizationId, authSession.organizationId),
+            eq(table.secretKind, IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN),
+            isNull(table.revokedAt),
+          ),
+      });
+
+    expect(accessCredentialsAfterSecondResolution).toHaveLength(1);
+
+    const linkedAccessCredential =
+      await fixture.db.query.integrationConnectionCredentials.findFirst({
+        columns: {
+          credentialId: true,
+        },
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.connectionId, "icn_oauth2_client_credentials"),
+            eq(table.purpose, IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN),
+          ),
+      });
+
+    const activeAccessCredential = accessCredentialsAfterSecondResolution[0];
+    if (activeAccessCredential === undefined) {
+      throw new Error("Expected one active access token credential.");
+    }
+    expect(linkedAccessCredential).toEqual({
+      credentialId: activeAccessCredential.id,
     });
   });
 

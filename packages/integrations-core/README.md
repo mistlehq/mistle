@@ -99,6 +99,7 @@ Key fields and what they drive:
 | `connectionMethods`                     | Declares supported connection methods                             | Connection creation and method gating                |
 | `credentialResolvers` (optional)        | Dynamic credential generation/lookup                              | Internal credential resolution endpoint              |
 | `oauth2AuthorizationCode` (optional)    | OAuth 2.0 authorization-code and refresh behavior                 | OAuth 2.0 authorization-code connection flows        |
+| `oauth2ClientCredentials` (optional)    | OAuth 2.0 client-credentials token exchange behavior              | Machine-to-machine credential resolution             |
 | `redirectHandler` (optional)            | Non-OAuth redirect start/complete behavior                        | Redirect-based connection flows                      |
 | `webhookHandler` (optional)             | Resolve inbound webhook requests to events or immediate responses | Webhook ingest                                       |
 | `mcp` (optional)                        | Declare one or more MCP servers for this binding                  | MCP collection during compile                        |
@@ -140,6 +141,7 @@ flowchart TD
 
 - API key flow: validates target + method support; stores encrypted credentials and connection config.
 - OAuth 2.0 authorization-code flow: uses `oauth2AuthorizationCode.startAuthorization` and `oauth2AuthorizationCode.completeAuthorizationCodeGrant`; stores connection config and any returned credential materials.
+- OAuth 2.0 client-credentials flow: stores static client credentials through a `form` connection method and resolves short-lived access tokens at request time through `oauth2ClientCredentials.exchangeClientCredentials(...)`.
 - Redirect flow: uses `redirectHandler.start` and `redirectHandler.complete`; stores connection config and any returned credential materials.
 
 ### 3) Binding to sandbox profile version
@@ -216,6 +218,7 @@ This is the recommended workflow.
 
 - Set `connectionMethods`.
 - If OAuth 2.0 authorization-code is needed, implement `oauth2AuthorizationCode`.
+- If OAuth 2.0 client-credentials is needed, implement `oauth2ClientCredentials` and use a `form` connection method whose `secretType` is the stored client secret.
 - If a non-OAuth redirect flow is needed, implement `redirectHandler`.
 - If credential material is dynamic, implement `credentialResolvers`.
 

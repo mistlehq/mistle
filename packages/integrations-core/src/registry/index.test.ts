@@ -186,6 +186,50 @@ describe("integration registry", () => {
     expect(definition?.credentialResolvers?.custom?.github_installation_token).toBeDefined();
   });
 
+  it("registers definitions with oauth2 client-credentials capability", () => {
+    const registry = new IntegrationRegistry();
+
+    registry.register({
+      familyId: "oauth2",
+      variantId: "client-credentials-test",
+      kind: "connector",
+      displayName: "OAuth2 Test",
+      logoKey: "oauth2",
+      targetConfigSchema: ConfigSchema,
+      targetSecretSchema: EmptySecretsSchema,
+      bindingConfigSchema: ConfigSchema,
+      connectionMethods: [
+        {
+          id: "oauth2-client-credentials-test",
+          label: "OAuth2 client credentials",
+          kind: "form",
+          secretField: {
+            label: "Client secret",
+            inputType: "password",
+          },
+          secretType: "oauth2_client_secret",
+        },
+      ],
+      oauth2ClientCredentials: {
+        exchangeClientCredentials: async (input) => ({
+          accessToken: `access:${input.clientSecret}`,
+        }),
+      },
+      compileBinding: () => ({
+        egressRoutes: [],
+        artifacts: [],
+        runtimeClients: [],
+      }),
+    });
+
+    const definition = registry.getDefinition({
+      familyId: "oauth2",
+      variantId: "client-credentials-test",
+    });
+
+    expect(definition?.oauth2ClientCredentials).toBeDefined();
+  });
+
   it("rejects definitions with invalid supported webhook event metadata", () => {
     const registry = new IntegrationRegistry();
 
