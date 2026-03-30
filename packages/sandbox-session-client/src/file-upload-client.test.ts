@@ -98,6 +98,86 @@ function createUploadRequest(input: { connectionUrl: string; file: File }) {
   } as const;
 }
 
+function sendControlMessage(socket: WebSocket, message: object): void {
+  socket.send(JSON.stringify(message));
+}
+
+function sendStreamOpenResponse(
+  socket: WebSocket,
+  input:
+    | {
+        kind: "ok";
+        streamId: number;
+      }
+    | {
+        kind: "error";
+        code: string;
+        message: string;
+        streamId: number;
+      },
+): void {
+  if (input.kind === "ok") {
+    sendControlMessage(socket, {
+      type: "stream.open.ok",
+      streamId: input.streamId,
+    });
+    return;
+  }
+
+  sendControlMessage(socket, {
+    type: "stream.open.error",
+    streamId: input.streamId,
+    code: input.code,
+    message: input.message,
+  });
+}
+
+function sendStreamReset(
+  socket: WebSocket,
+  input: { code: string; message: string; streamId: number },
+): void {
+  sendControlMessage(socket, {
+    type: "stream.reset",
+    streamId: input.streamId,
+    code: input.code,
+    message: input.message,
+  });
+}
+
+function sendFileUploadCompleted(
+  socket: WebSocket,
+  input: { sizeBytes: number; streamId: number },
+): void {
+  sendControlMessage(socket, {
+    type: "stream.event",
+    streamId: input.streamId,
+    event: {
+      type: "fileUpload.completed",
+      attachmentId: "att_123",
+      threadId: "thread_123",
+      originalFilename: "screenshot.png",
+      mimeType: "image/png",
+      sizeBytes: input.sizeBytes,
+      path: "/tmp/attachments/thread_123/upload.png",
+    },
+  });
+}
+
+function sendStreamComplete(socket: WebSocket, streamId: number): void {
+  sendControlMessage(socket, {
+    type: "stream.complete",
+    streamId,
+  });
+}
+
+function sendStreamWindow(socket: WebSocket, input: { bytes: number; streamId: number }): void {
+  sendControlMessage(socket, {
+    type: "stream.window",
+    streamId: input.streamId,
+    bytes: input.bytes,
+  });
+}
+
 async function startUploadTestServer(input?: {
   behavior?: UploadServerBehavior;
 }): Promise<TestUploadServer> {
@@ -130,20 +210,19 @@ async function startUploadTestServer(input?: {
           socket.close();
           return;
         }
-        socket.send(
-          JSON.stringify(
-            behavior.kind === "reject_open"
-              ? {
-                  type: "stream.open.error",
-                  streamId,
-                  code: behavior.code,
-                  message: behavior.message,
-                }
-              : {
-                  type: "stream.open.ok",
-                  streamId,
-                },
-          ),
+        sendStreamOpenResponse(
+          socket,
+          behavior.kind === "reject_open"
+            ? {
+                kind: "error",
+                streamId,
+                code: behavior.code,
+                message: behavior.message,
+              }
+            : {
+                kind: "ok",
+                streamId,
+              },
         );
         return;
       }
@@ -153,50 +232,26 @@ async function startUploadTestServer(input?: {
           return;
         }
         if (behavior.kind === "reset_after_close") {
-          socket.send(
-            JSON.stringify({
-              type: "stream.reset",
-              streamId,
-              code: behavior.code,
-              message: behavior.message,
-            }),
-          );
+          sendStreamReset(socket, {
+            streamId,
+            code: behavior.code,
+            message: behavior.message,
+          });
           return;
         }
         if (behavior.kind === "complete_without_event") {
-          socket.send(
-            JSON.stringify({
-              type: "stream.complete",
-              streamId,
-            }),
-          );
+          sendStreamComplete(socket, streamId);
           return;
         }
 
-        socket.send(
-          JSON.stringify({
-            type: "stream.event",
-            streamId,
-            event: {
-              type: "fileUpload.completed",
-              attachmentId: "att_123",
-              threadId: "thread_123",
-              originalFilename: "screenshot.png",
-              mimeType: "image/png",
-              sizeBytes: receivedChunks.reduce((total, chunk) => total + chunk.byteLength, 0),
-              path: "/tmp/attachments/thread_123/upload.png",
-            },
-          }),
-        );
+        sendFileUploadCompleted(socket, {
+          streamId,
+          sizeBytes: receivedChunks.reduce((total, chunk) => total + chunk.byteLength, 0),
+        });
         if (behavior.kind === "event_without_complete") {
           return;
         }
-        socket.send(
-          JSON.stringify({
-            type: "stream.complete",
-            streamId,
-          }),
-        );
+        sendStreamComplete(socket, streamId);
         return;
       }
 
@@ -211,14 +266,11 @@ async function startUploadTestServer(input?: {
           behavior.kind === "reset_after_chunk" &&
           receivedChunks.length === behavior.chunkCount
         ) {
-          socket.send(
-            JSON.stringify({
-              type: "stream.reset",
-              streamId,
-              code: behavior.code,
-              message: behavior.message,
-            }),
-          );
+          sendStreamReset(socket, {
+            streamId,
+            code: behavior.code,
+            message: behavior.message,
+          });
           return;
         }
         if (
@@ -227,13 +279,10 @@ async function startUploadTestServer(input?: {
         ) {
           return;
         }
-        socket.send(
-          JSON.stringify({
-            type: "stream.window",
-            streamId,
-            bytes: dataFrame.payload.byteLength,
-          }),
-        );
+        sendStreamWindow(socket, {
+          streamId,
+          bytes: dataFrame.payload.byteLength,
+        });
       }
     });
   });

@@ -112,6 +112,15 @@ function toFileUploadError(input: { code: string; message: string }): Error {
   return new FileUploadRejectedError(input);
 }
 
+function isFileUploadCompletedEvent(message: StreamControlMessage): message is Extract<
+  StreamControlMessage,
+  { type: "stream.event" }
+> & {
+  event: FileUploadCompletedEvent;
+} {
+  return message.type === "stream.event" && message.event.type === "fileUpload.completed";
+}
+
 function getMessagePump(socket: SandboxSessionSocket): ControlMessagePump {
   const queue: QueuedControlMessage[] = [];
   const waiters: PendingControlMessageWaiter[] = [];
@@ -239,6 +248,52 @@ async function waitForControlMessage(input: {
   });
 }
 
+async function waitForUploadTerminalResult(input: {
+  completedUpload: UploadedSandboxImage | null;
+  pump: ControlMessagePump;
+  runtime: SandboxSessionRuntime;
+  socket: SandboxSessionSocket;
+  streamId: number;
+}): Promise<UploadedSandboxImage> {
+  let completedUpload = input.completedUpload;
+
+  while (true) {
+    const uploadResultMessage = await waitForControlMessage({
+      pump: input.pump,
+      predicate: (message) => {
+        return (
+          message.streamId === input.streamId &&
+          (isFileUploadCompletedEvent(message) ||
+            message.type === "stream.complete" ||
+            message.type === "stream.reset")
+        );
+      },
+      runtime: input.runtime,
+      timeoutMs: UploadIdleTimeoutMs,
+      timeoutMessage: "Timed out while waiting for upload completion.",
+    });
+    if (uploadResultMessage.type === "stream.reset") {
+      throw toFileUploadError({
+        code: uploadResultMessage.code,
+        message: uploadResultMessage.message,
+      });
+    }
+    if (uploadResultMessage.type === "stream.complete") {
+      if (completedUpload === null) {
+        throw new Error("Received stream.complete before file upload completion event.");
+      }
+
+      input.socket.close(1000, "Upload completed.");
+      return completedUpload;
+    }
+    if (!isFileUploadCompletedEvent(uploadResultMessage)) {
+      throw new Error("Expected file upload completion event before stream completion.");
+    }
+
+    completedUpload = normalizeCompletionEvent(uploadResultMessage.event);
+  }
+}
+
 export async function uploadSandboxImage(
   input: UploadSandboxImageInput,
 ): Promise<UploadedSandboxImage> {
@@ -320,10 +375,7 @@ export async function uploadSandboxImage(
             code: nextControlMessage.code,
             message: nextControlMessage.message,
           });
-        } else if (
-          nextControlMessage.type === "stream.event" &&
-          nextControlMessage.event.type === "fileUpload.completed"
-        ) {
+        } else if (isFileUploadCompletedEvent(nextControlMessage)) {
           completedUpload = normalizeCompletionEvent(nextControlMessage.event);
         }
       }
@@ -350,45 +402,13 @@ export async function uploadSandboxImage(
         streamId,
       }),
     );
-
-    while (true) {
-      const uploadResultMessage = await waitForControlMessage({
-        pump: messagePump,
-        predicate: (message) => {
-          return (
-            message.streamId === streamId &&
-            ((message.type === "stream.event" && message.event.type === "fileUpload.completed") ||
-              message.type === "stream.complete" ||
-              message.type === "stream.reset")
-          );
-        },
-        runtime: input.runtime,
-        timeoutMs: UploadIdleTimeoutMs,
-        timeoutMessage: "Timed out while waiting for upload completion.",
-      });
-      if (uploadResultMessage.type === "stream.reset") {
-        throw toFileUploadError({
-          code: uploadResultMessage.code,
-          message: uploadResultMessage.message,
-        });
-      }
-      if (uploadResultMessage.type === "stream.complete") {
-        if (completedUpload === null) {
-          throw new Error("Received stream.complete before file upload completion event.");
-        }
-
-        socket.close(1000, "Upload completed.");
-        return completedUpload;
-      }
-      if (
-        uploadResultMessage.type !== "stream.event" ||
-        uploadResultMessage.event.type !== "fileUpload.completed"
-      ) {
-        throw new Error("Expected file upload completion event before stream completion.");
-      }
-
-      completedUpload = normalizeCompletionEvent(uploadResultMessage.event);
-    }
+    return await waitForUploadTerminalResult({
+      completedUpload,
+      pump: messagePump,
+      runtime: input.runtime,
+      socket,
+      streamId,
+    });
   } catch (error) {
     socket.close(1000, "Upload aborted.");
     throw error;

@@ -59,6 +59,78 @@ async function createTranslatorHarness() {
   };
 }
 
+async function openFileUploadStream(translator: TunnelProtocolTranslator): Promise<void> {
+  await translator.translateInboundMessage({
+    clientSessionId: "conn_1",
+    payload: JSON.stringify({
+      type: "stream.open",
+      streamId: 42,
+      channel: {
+        kind: "fileUpload",
+        threadId: "thread_123",
+        mimeType: "image/png",
+        originalFilename: "upload.png",
+        sizeBytes: 3,
+      },
+    }),
+    sandboxInstanceId: SandboxInstanceId,
+    sourcePeerSide: "connection",
+  });
+}
+
+async function sendBootstrapUploadCompleted(
+  translator: TunnelProtocolTranslator,
+): ReturnType<TunnelProtocolTranslator["translateInboundMessage"]> {
+  return await translator.translateInboundMessage({
+    clientSessionId: BootstrapSessionId,
+    payload: JSON.stringify({
+      type: "stream.event",
+      streamId: 1,
+      event: {
+        type: "fileUpload.completed",
+        attachmentId: "att_123",
+        threadId: "thread_123",
+        originalFilename: "upload.png",
+        mimeType: "image/png",
+        sizeBytes: 3,
+        path: "/tmp/attachments/thread_123/upload.png",
+      },
+    }),
+    sandboxInstanceId: SandboxInstanceId,
+    sourcePeerSide: "bootstrap",
+  });
+}
+
+async function sendBootstrapUploadReset(
+  translator: TunnelProtocolTranslator,
+): ReturnType<TunnelProtocolTranslator["translateInboundMessage"]> {
+  return await translator.translateInboundMessage({
+    clientSessionId: BootstrapSessionId,
+    payload: JSON.stringify({
+      type: "stream.reset",
+      streamId: 1,
+      code: "bootstrap_disconnected",
+      message: "upload interrupted",
+    }),
+    sandboxInstanceId: SandboxInstanceId,
+    sourcePeerSide: "bootstrap",
+  });
+}
+
+async function sendBootstrapStreamComplete(
+  translator: TunnelProtocolTranslator,
+): ReturnType<TunnelProtocolTranslator["translateInboundMessage"]> {
+  return await translator.translateInboundMessage({
+    clientSessionId: BootstrapSessionId,
+    payload: JSON.stringify({
+      type: "stream.complete",
+      streamId: 1,
+    }),
+    sandboxInstanceId: SandboxInstanceId,
+    sourcePeerSide: "bootstrap",
+  });
+}
+
 describe("TunnelProtocolTranslator", () => {
   it("maps a connection stream.open to the bootstrap stream id", async () => {
     const { translator } = await createTranslatorHarness();
@@ -195,22 +267,7 @@ describe("TunnelProtocolTranslator", () => {
   it("forwards fileUpload.completed but keeps the binding alive until stream.complete", async () => {
     const { translator } = await createTranslatorHarness();
 
-    await translator.translateInboundMessage({
-      clientSessionId: "conn_1",
-      payload: JSON.stringify({
-        type: "stream.open",
-        streamId: 42,
-        channel: {
-          kind: "fileUpload",
-          threadId: "thread_123",
-          mimeType: "image/png",
-          originalFilename: "upload.png",
-          sizeBytes: 3,
-        },
-      }),
-      sandboxInstanceId: SandboxInstanceId,
-      sourcePeerSide: "connection",
-    });
+    await openFileUploadStream(translator);
 
     await expect(
       translator.translateInboundMessage({
@@ -232,26 +289,7 @@ describe("TunnelProtocolTranslator", () => {
       },
     });
 
-    await expect(
-      translator.translateInboundMessage({
-        clientSessionId: BootstrapSessionId,
-        payload: JSON.stringify({
-          type: "stream.event",
-          streamId: 1,
-          event: {
-            type: "fileUpload.completed",
-            attachmentId: "att_123",
-            threadId: "thread_123",
-            originalFilename: "upload.png",
-            mimeType: "image/png",
-            sizeBytes: 3,
-            path: "/tmp/attachments/thread_123/upload.png",
-          },
-        }),
-        sandboxInstanceId: SandboxInstanceId,
-        sourcePeerSide: "bootstrap",
-      }),
-    ).resolves.toEqual({
+    await expect(sendBootstrapUploadCompleted(translator)).resolves.toEqual({
       delivery: {
         kind: "forward",
         payload: JSON.stringify({
@@ -271,17 +309,7 @@ describe("TunnelProtocolTranslator", () => {
       },
     });
 
-    await expect(
-      translator.translateInboundMessage({
-        clientSessionId: BootstrapSessionId,
-        payload: JSON.stringify({
-          type: "stream.complete",
-          streamId: 1,
-        }),
-        sandboxInstanceId: SandboxInstanceId,
-        sourcePeerSide: "bootstrap",
-      }),
-    ).resolves.toEqual({
+    await expect(sendBootstrapStreamComplete(translator)).resolves.toEqual({
       delivery: {
         kind: "forward",
         payload: JSON.stringify({
@@ -300,36 +328,9 @@ describe("TunnelProtocolTranslator", () => {
   it("releases fileUpload binding on bootstrap stream.reset without waiting for completion", async () => {
     const { translator } = await createTranslatorHarness();
 
-    await translator.translateInboundMessage({
-      clientSessionId: "conn_1",
-      payload: JSON.stringify({
-        type: "stream.open",
-        streamId: 42,
-        channel: {
-          kind: "fileUpload",
-          threadId: "thread_123",
-          mimeType: "image/png",
-          originalFilename: "upload.png",
-          sizeBytes: 3,
-        },
-      }),
-      sandboxInstanceId: SandboxInstanceId,
-      sourcePeerSide: "connection",
-    });
+    await openFileUploadStream(translator);
 
-    await expect(
-      translator.translateInboundMessage({
-        clientSessionId: BootstrapSessionId,
-        payload: JSON.stringify({
-          type: "stream.reset",
-          streamId: 1,
-          code: "bootstrap_disconnected",
-          message: "upload interrupted",
-        }),
-        sandboxInstanceId: SandboxInstanceId,
-        sourcePeerSide: "bootstrap",
-      }),
-    ).resolves.toEqual({
+    await expect(sendBootstrapUploadReset(translator)).resolves.toEqual({
       delivery: {
         kind: "forward",
         payload: JSON.stringify({
@@ -350,34 +351,9 @@ describe("TunnelProtocolTranslator", () => {
   it("drops late fileUpload.completed after the binding was already released by reset", async () => {
     const { router, translator } = await createTranslatorHarness();
 
-    await translator.translateInboundMessage({
-      clientSessionId: "conn_1",
-      payload: JSON.stringify({
-        type: "stream.open",
-        streamId: 42,
-        channel: {
-          kind: "fileUpload",
-          threadId: "thread_123",
-          mimeType: "image/png",
-          originalFilename: "upload.png",
-          sizeBytes: 3,
-        },
-      }),
-      sandboxInstanceId: SandboxInstanceId,
-      sourcePeerSide: "connection",
-    });
+    await openFileUploadStream(translator);
 
-    const resetTranslation = await translator.translateInboundMessage({
-      clientSessionId: BootstrapSessionId,
-      payload: JSON.stringify({
-        type: "stream.reset",
-        streamId: 1,
-        code: "bootstrap_disconnected",
-        message: "upload interrupted",
-      }),
-      sandboxInstanceId: SandboxInstanceId,
-      sourcePeerSide: "bootstrap",
-    });
+    const resetTranslation = await sendBootstrapUploadReset(translator);
     if (resetTranslation.releaseInteractiveStream === undefined) {
       throw new Error("Expected bootstrap stream.reset to release the upload binding.");
     }
@@ -387,26 +363,7 @@ describe("TunnelProtocolTranslator", () => {
       clientStreamId: resetTranslation.releaseInteractiveStream.clientStreamId,
     });
 
-    await expect(
-      translator.translateInboundMessage({
-        clientSessionId: BootstrapSessionId,
-        payload: JSON.stringify({
-          type: "stream.event",
-          streamId: 1,
-          event: {
-            type: "fileUpload.completed",
-            attachmentId: "att_123",
-            threadId: "thread_123",
-            originalFilename: "upload.png",
-            mimeType: "image/png",
-            sizeBytes: 3,
-            path: "/tmp/attachments/thread_123/upload.png",
-          },
-        }),
-        sandboxInstanceId: SandboxInstanceId,
-        sourcePeerSide: "bootstrap",
-      }),
-    ).resolves.toEqual({
+    await expect(sendBootstrapUploadCompleted(translator)).resolves.toEqual({
       delivery: {
         kind: "drop",
       },
@@ -416,34 +373,9 @@ describe("TunnelProtocolTranslator", () => {
   it("drops late stream.complete after the binding was already released by reset", async () => {
     const { router, translator } = await createTranslatorHarness();
 
-    await translator.translateInboundMessage({
-      clientSessionId: "conn_1",
-      payload: JSON.stringify({
-        type: "stream.open",
-        streamId: 42,
-        channel: {
-          kind: "fileUpload",
-          threadId: "thread_123",
-          mimeType: "image/png",
-          originalFilename: "upload.png",
-          sizeBytes: 3,
-        },
-      }),
-      sandboxInstanceId: SandboxInstanceId,
-      sourcePeerSide: "connection",
-    });
+    await openFileUploadStream(translator);
 
-    const resetTranslation = await translator.translateInboundMessage({
-      clientSessionId: BootstrapSessionId,
-      payload: JSON.stringify({
-        type: "stream.reset",
-        streamId: 1,
-        code: "bootstrap_disconnected",
-        message: "upload interrupted",
-      }),
-      sandboxInstanceId: SandboxInstanceId,
-      sourcePeerSide: "bootstrap",
-    });
+    const resetTranslation = await sendBootstrapUploadReset(translator);
     if (resetTranslation.releaseInteractiveStream === undefined) {
       throw new Error("Expected bootstrap stream.reset to release the upload binding.");
     }
@@ -453,17 +385,7 @@ describe("TunnelProtocolTranslator", () => {
       clientStreamId: resetTranslation.releaseInteractiveStream.clientStreamId,
     });
 
-    await expect(
-      translator.translateInboundMessage({
-        clientSessionId: BootstrapSessionId,
-        payload: JSON.stringify({
-          type: "stream.complete",
-          streamId: 1,
-        }),
-        sandboxInstanceId: SandboxInstanceId,
-        sourcePeerSide: "bootstrap",
-      }),
-    ).resolves.toEqual({
+    await expect(sendBootstrapStreamComplete(translator)).resolves.toEqual({
       delivery: {
         kind: "drop",
       },
