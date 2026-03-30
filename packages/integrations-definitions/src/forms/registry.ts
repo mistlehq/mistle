@@ -9,11 +9,13 @@ import {
   AtlassianConnectionMethodIds,
   AtlassianPersonalApiTokenConnectionConfigSchema,
   AtlassianServiceAccountApiTokenConnectionConfigSchema,
+  AtlassianServiceAccountOauthClientCredentialsConnectionConfigSchema,
 } from "../atlassian/variants/atlassian-default/auth.js";
 import { AtlassianBindingConfigSchema } from "../atlassian/variants/atlassian-default/binding-config-schema.js";
 import {
   AtlassianPersonalApiTokenConnectionConfigForm,
   AtlassianServiceAccountApiTokenConnectionConfigForm,
+  AtlassianServiceAccountOauthClientCredentialsConnectionConfigForm,
 } from "../atlassian/variants/atlassian-default/connection-config-form.js";
 import { AtlassianTargetConfigSchema } from "../atlassian/variants/atlassian-default/target-config-schema.js";
 import {
@@ -94,6 +96,18 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
         ],
         configSchema: AtlassianServiceAccountApiTokenConnectionConfigSchema,
         configForm: AtlassianServiceAccountApiTokenConnectionConfigForm,
+      },
+      {
+        id: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+        label: "Service account OAuth client credentials",
+        kind: "form",
+        secretField: {
+          label: "Client secret",
+          placeholder: "Enter service account OAuth client secret",
+          inputType: "password",
+        },
+        configSchema: AtlassianServiceAccountOauthClientCredentialsConnectionConfigSchema,
+        configForm: AtlassianServiceAccountOauthClientCredentialsConnectionConfigForm,
       },
     ],
   },

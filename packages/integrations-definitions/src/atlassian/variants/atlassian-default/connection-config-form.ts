@@ -49,3 +49,31 @@ export const AtlassianServiceAccountApiTokenConnectionConfigForm: ResolvedIntegr
     },
   },
 };
+
+export const AtlassianServiceAccountOauthClientCredentialsConnectionConfigForm: ResolvedIntegrationForm =
+  {
+    schema: {
+      properties: {
+        connection_method: {
+          default: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+        },
+        cloud_id: {
+          title: "Cloud ID",
+        },
+        client_id: {
+          title: "Client ID",
+        },
+      },
+    },
+    uiSchema: {
+      connection_method: {
+        "ui:widget": "hidden",
+      },
+      cloud_id: {
+        "ui:placeholder": "Your Atlassian cloud ID",
+      },
+      client_id: {
+        "ui:placeholder": "Your Atlassian OAuth 2.0 client ID",
+      },
+    },
+  };

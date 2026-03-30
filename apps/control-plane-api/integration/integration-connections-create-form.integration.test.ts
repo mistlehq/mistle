@@ -307,6 +307,95 @@ describe("integration connections create form integration", () => {
     expect(responseBody.targetSnapshotConfig).toEqual({});
   });
 
+  it("creates Atlassian service account OAuth client credentials connections", async ({
+    fixture,
+  }) => {
+    await upsertAtlassianTarget({ fixture, targetKey: "atlassian-default" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-create-atlassian-service-oauth@example.com",
+    });
+
+    const response = await fixture.request("/v1/integration/connections/atlassian-default/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Atlassian service account OAuth client credentials",
+        methodId: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+        config: {
+          connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+          cloud_id: "cloud-id-123",
+          client_id: "client-id-456",
+        },
+        secrets: {
+          clientSecret: "atlassian-client-secret",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    expect(responseBody.config).toEqual({
+      connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+      cloud_id: "cloud-id-123",
+      client_id: "client-id-456",
+    });
+
+    const createdConnectionCredential =
+      await fixture.db.query.integrationConnectionCredentials.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.connectionId, responseBody.id), eq(table.purpose, "oauth2_client_secret")),
+      });
+    expect(createdConnectionCredential).toBeDefined();
+
+    if (createdConnectionCredential === undefined) {
+      throw new Error("Expected integration connection credential link.");
+    }
+
+    const createdCredential = await fixture.db.query.integrationCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.id, createdConnectionCredential.credentialId),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+    });
+    expect(createdCredential).toBeDefined();
+
+    if (createdCredential === undefined) {
+      throw new Error("Expected integration credential.");
+    }
+
+    expect(createdCredential.secretKind).toBe(
+      IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+    );
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.version, createdCredential.organizationCredentialKeyVersion),
+        ),
+    });
+    expect(organizationCredentialKey).toBeDefined();
+
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    expect(
+      decryptStoredApiKey({
+        wrappedOrganizationKeyCiphertext: organizationCredentialKey.ciphertext,
+        masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+        masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+        nonce: createdCredential.nonce,
+        ciphertext: createdCredential.ciphertext,
+      }),
+    ).toBe("atlassian-client-secret");
+  });
+
   it("returns 400 when Atlassian personal token config is missing site_url", async ({
     fixture,
   }) => {

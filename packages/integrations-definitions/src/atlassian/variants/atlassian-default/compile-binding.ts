@@ -5,6 +5,7 @@ import {
 } from "@mistle/integrations-core";
 
 import {
+  AtlassianCredentialSecretTypes,
   AtlassianConnectionMethodIds,
   AtlassianConnectionConfigSchema,
   normalizeAtlassianBaseUrl,
@@ -70,6 +71,33 @@ export function compileAtlassianBinding(input: AtlassianCompileBindingInput): Co
   }
 
   const upstreamBaseUrl = `https://api.atlassian.com/ex/jira/${parsedConnectionConfig.cloud_id}`;
+
+  if (
+    parsedConnectionConfig.connection_method ===
+    AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS
+  ) {
+    return {
+      egressRoutes: [
+        {
+          match: resolveMatchFromBaseUrl(upstreamBaseUrl),
+          upstream: {
+            baseUrl: upstreamBaseUrl,
+          },
+          authInjection: {
+            type: "bearer",
+            target: "authorization",
+          },
+          credentialResolver: {
+            connectionId: input.connection.id,
+            secretType: AtlassianCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
+            purpose: AtlassianCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
+          },
+        },
+      ],
+      artifacts: [],
+      runtimeClients: [],
+    };
+  }
 
   return {
     egressRoutes: [

@@ -495,6 +495,130 @@ describe("integration connections update form integration", () => {
     });
   });
 
+  it("updates Atlassian service account OAuth client credentials connections", async ({
+    fixture,
+  }) => {
+    await upsertAtlassianTarget({ fixture, targetKey: "atlassian-default" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-update-atlassian-service-oauth@example.com",
+    });
+
+    const createResponse = await fixture.request(
+      "/v1/integration/connections/atlassian-default/form",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Atlassian service account OAuth client credentials",
+          methodId: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+          config: {
+            connection_method:
+              AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+            cloud_id: "cloud-id-123",
+            client_id: "client-id-456",
+          },
+          secrets: {
+            clientSecret: "original-atlassian-client-secret",
+          },
+        }),
+      },
+    );
+
+    expect(createResponse.status).toBe(201);
+    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+
+    const updateResponse = await fixture.request(
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/form`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Atlassian service account OAuth client credentials rotated",
+          config: {
+            connection_method:
+              AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+            cloud_id: "cloud-id-456",
+            client_id: "client-id-789",
+          },
+          secrets: {
+            clientSecret: "rotated-atlassian-client-secret",
+          },
+        }),
+      },
+    );
+
+    expect(updateResponse.status).toBe(200);
+    const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
+    expect(updatedConnection.displayName).toBe(
+      "Atlassian service account OAuth client credentials rotated",
+    );
+    expect(updatedConnection.config).toEqual({
+      connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+      cloud_id: "cloud-id-456",
+      client_id: "client-id-789",
+    });
+
+    const updatedLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.connectionId, createdConnection.id),
+          eq(table.purpose, "oauth2_client_secret"),
+        ),
+    });
+    expect(updatedLink).toBeDefined();
+
+    if (updatedLink === undefined) {
+      throw new Error("Expected updated form credential link.");
+    }
+
+    const updatedCredential = await fixture.db.query.integrationCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.id, updatedLink.credentialId),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+    });
+    expect(updatedCredential).toBeDefined();
+
+    if (updatedCredential === undefined) {
+      throw new Error("Expected updated integration credential.");
+    }
+
+    expect(updatedCredential.secretKind).toBe(
+      IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+    );
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.version, updatedCredential.organizationCredentialKeyVersion),
+        ),
+    });
+    expect(organizationCredentialKey).toBeDefined();
+
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    const decryptedClientSecret = decryptStoredApiKey({
+      wrappedOrganizationKeyCiphertext: organizationCredentialKey.ciphertext,
+      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+      nonce: updatedCredential.nonce,
+      ciphertext: updatedCredential.ciphertext,
+    });
+
+    expect(decryptedClientSecret).toBe("rotated-atlassian-client-secret");
+  });
+
   it("returns 400 when Atlassian service account token updates omit cloud_id", async ({
     fixture,
   }) => {

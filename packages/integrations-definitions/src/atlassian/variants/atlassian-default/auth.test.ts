@@ -66,6 +66,20 @@ describe("Atlassian auth", () => {
     });
   });
 
+  it("parses the service account oauth client credentials connection method", () => {
+    expect(
+      AtlassianConnectionConfigSchema.parse({
+        connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+        cloud_id: "cloud-id-123",
+        client_id: "client-id-456",
+      }),
+    ).toEqual({
+      connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+      cloud_id: "cloud-id-123",
+      client_id: "client-id-456",
+    });
+  });
+
   it("resolves credential secret type for supported Atlassian connection methods", () => {
     expect(
       resolveAtlassianCredentialSecretType({
@@ -81,5 +95,13 @@ describe("Atlassian auth", () => {
         cloud_id: "cloud-id-123",
       }),
     ).toBe("api_key");
+
+    expect(
+      resolveAtlassianCredentialSecretType({
+        connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+        cloud_id: "cloud-id-123",
+        client_id: "client-id-456",
+      }),
+    ).toBe("oauth2_client_secret");
   });
 });

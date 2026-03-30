@@ -5,17 +5,18 @@ import {
   AtlassianConnectionMethodIds,
   type AtlassianConnectionConfig,
   AtlassianCredentialSecretTypes,
-} from "./auth.js";
-import {
   AtlassianPersonalApiTokenConnectionConfigSchema,
   AtlassianServiceAccountApiTokenConnectionConfigSchema,
+  AtlassianServiceAccountOauthClientCredentialsConnectionConfigSchema,
 } from "./auth.js";
 import { AtlassianBindingConfigSchema } from "./binding-config-schema.js";
 import { compileAtlassianBinding } from "./compile-binding.js";
 import {
   AtlassianPersonalApiTokenConnectionConfigForm,
   AtlassianServiceAccountApiTokenConnectionConfigForm,
+  AtlassianServiceAccountOauthClientCredentialsConnectionConfigForm,
 } from "./connection-config-form.js";
+import { exchangeAtlassianClientCredentials } from "./oauth2-client-credentials.js";
 import { AtlassianTargetConfigSchema } from "./target-config-schema.js";
 
 type AtlassianIntegrationDefinition = IntegrationDefinition<
@@ -32,7 +33,8 @@ export const AtlassianDefinition: AtlassianIntegrationDefinition = {
   variantId: "atlassian-default",
   kind: IntegrationKinds.CONNECTOR,
   displayName: "Atlassian",
-  description: "Access Atlassian REST APIs with personal or service-account tokens.",
+  description:
+    "Access Atlassian REST APIs with personal tokens, service-account tokens, or service-account OAuth client credentials.",
   logoKey: "atlassian",
   targetConfigSchema: AtlassianTargetConfigSchema,
   targetSecretSchema: AtlassianTargetSecretSchema,
@@ -70,6 +72,25 @@ export const AtlassianDefinition: AtlassianIntegrationDefinition = {
       configSchema: AtlassianServiceAccountApiTokenConnectionConfigSchema,
       configForm: AtlassianServiceAccountApiTokenConnectionConfigForm,
     },
+    {
+      id: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+      label: "Service account OAuth client credentials",
+      kind: "form",
+      secretFields: [
+        {
+          name: "clientSecret",
+          label: "Client secret",
+          placeholder: "Enter service account OAuth client secret",
+          inputType: "password",
+          secretType: AtlassianCredentialSecretTypes.OAUTH2_CLIENT_SECRET,
+        },
+      ],
+      configSchema: AtlassianServiceAccountOauthClientCredentialsConnectionConfigSchema,
+      configForm: AtlassianServiceAccountOauthClientCredentialsConnectionConfigForm,
+    },
   ],
+  oauth2ClientCredentials: {
+    exchangeClientCredentials: exchangeAtlassianClientCredentials,
+  },
   compileBinding: compileAtlassianBinding,
 };

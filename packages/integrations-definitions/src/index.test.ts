@@ -46,6 +46,12 @@ describe("integrations-definitions index", () => {
             { name: "apiKey", label: "Service account API token", inputType: "password" },
           ],
         },
+        {
+          id: "atlassian-service-account-oauth-client-credentials",
+          label: "Service account OAuth client credentials",
+          kind: "form",
+          secretField: { label: "Client secret", inputType: "password" },
+        },
       ],
     });
     expect(openAiDefinition?.displayName).toBe("OpenAI");

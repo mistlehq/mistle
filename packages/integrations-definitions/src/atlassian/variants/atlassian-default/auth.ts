@@ -3,10 +3,13 @@ import { z } from "zod";
 export const AtlassianConnectionMethodIds = {
   PERSONAL_API_TOKEN: "atlassian-personal-api-token",
   SERVICE_ACCOUNT_API_TOKEN: "atlassian-service-account-api-token",
+  SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS: "atlassian-service-account-oauth-client-credentials",
 } as const;
 
 export const AtlassianCredentialSecretTypes = {
   API_KEY: "api_key",
+  OAUTH2_ACCESS_TOKEN: "oauth2_access_token",
+  OAUTH2_CLIENT_SECRET: "oauth2_client_secret",
 } as const;
 
 export function normalizeAtlassianBaseUrl(input: string): string {
@@ -78,14 +81,35 @@ export const AtlassianServiceAccountApiTokenConnectionConfigSchema = z
   })
   .strict();
 
+export const AtlassianServiceAccountOauthClientCredentialsConnectionConfigSchema = z
+  .object({
+    connection_method: z.literal(
+      AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+    ),
+    cloud_id: z.string().trim().min(1),
+    client_id: z.string().trim().min(1),
+  })
+  .strict();
+
 export const AtlassianConnectionConfigSchema = z.discriminatedUnion("connection_method", [
   AtlassianPersonalApiTokenConnectionConfigSchema,
   AtlassianServiceAccountApiTokenConnectionConfigSchema,
+  AtlassianServiceAccountOauthClientCredentialsConnectionConfigSchema,
 ]);
 
 export type AtlassianConnectionConfig = z.output<typeof AtlassianConnectionConfigSchema>;
 
-export function resolveAtlassianCredentialSecretType(input: unknown): "api_key" {
-  AtlassianConnectionConfigSchema.parse(input);
+export function resolveAtlassianCredentialSecretType(
+  input: unknown,
+): "api_key" | "oauth2_client_secret" {
+  const parsedConfig = AtlassianConnectionConfigSchema.parse(input);
+
+  if (
+    parsedConfig.connection_method ===
+    AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS
+  ) {
+    return AtlassianCredentialSecretTypes.OAUTH2_CLIENT_SECRET;
+  }
+
   return AtlassianCredentialSecretTypes.API_KEY;
 }

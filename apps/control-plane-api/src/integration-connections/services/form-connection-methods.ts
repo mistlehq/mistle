@@ -121,6 +121,13 @@ export function resolvePersistedSecretRefOrThrow(input: {
     };
   }
 
+  if (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET) {
+    return {
+      secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+      purpose: IntegrationConnectionCredentialPurposes.OAUTH2_CLIENT_SECRET,
+    };
+  }
+
   throw new BadRequestError(
     input.invalidInputCode,
     `Unsupported persisted secret type '${input.secretType}'.`,

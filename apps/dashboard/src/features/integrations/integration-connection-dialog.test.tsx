@@ -422,4 +422,60 @@ describe("IntegrationConnectionDialog", () => {
     expect(screen.getByLabelText(/Cloud ID/)).toBeTruthy();
     expect(screen.getByPlaceholderText("Enter service account API token")).toBeTruthy();
   });
+
+  it("renders Atlassian service account OAuth client credentials configuration fields", () => {
+    const dialog: IntegrationConnectionDialogState = {
+      methods: [
+        {
+          id: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+          label: "Service account OAuth client credentials",
+          kind: "form",
+          secretField: {
+            label: "Client secret",
+            placeholder: "Enter service account OAuth client secret",
+            inputType: "password",
+          },
+        },
+      ],
+      mode: "create",
+      targetConfig: {},
+      targetDisplayName: "Atlassian",
+      targetFamilyId: "atlassian",
+      targetKey: "atlassian-default",
+      targetVariantId: "atlassian-default",
+    };
+
+    const configForm = resolveConnectionMethodFormUiModel({
+      dialog,
+      methodId: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+      currentValue: {},
+    });
+
+    render(
+      <IntegrationConnectionDialog
+        configForm={configForm}
+        configValue={{}}
+        connectionDisplayNamePlaceholder="Atlassian connection"
+        connectionDisplayNameValue=""
+        connectError={null}
+        dialog={dialog}
+        hasChanges={true}
+        isConnectionDisplayNameChanged={false}
+        isSecretChanged={false}
+        methodId={AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS}
+        onClose={() => {}}
+        onConfigChange={() => {}}
+        onConnectionDisplayNameChange={() => {}}
+        onMethodChange={() => {}}
+        onSecretChange={() => {}}
+        onSubmit={() => {}}
+        pending={false}
+        secretValue=""
+      />,
+    );
+
+    expect(screen.getByLabelText(/Cloud ID/)).toBeTruthy();
+    expect(screen.getByLabelText(/Client ID/)).toBeTruthy();
+    expect(screen.getByPlaceholderText("Enter service account OAuth client secret")).toBeTruthy();
+  });
 });
