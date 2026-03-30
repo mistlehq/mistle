@@ -75,8 +75,10 @@ export const WithSecondaryPane: Story = {
 export const WithNonImageCapableModelWarning: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
-      composerProps: SessionComposerFixturePropsForNonImageCapableModel,
-      sessionStatusMessage: SessionComposerFixtureStatusMessageForNonImageCapableModel,
+      composerViewModel: {
+        ...SessionComposerFixturePropsForNonImageCapableModel,
+        statusMessage: SessionComposerFixtureStatusMessageForNonImageCapableModel,
+      },
     }),
   },
 };
@@ -84,8 +86,10 @@ export const WithNonImageCapableModelWarning: Story = {
 export const WithUnavailableModelAlert: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
-      composerProps: SessionComposerFixturePropsForUnavailableModel,
-      sessionStatusMessage: SessionComposerFixtureStatusMessageForUnavailableModel,
+      composerViewModel: {
+        ...SessionComposerFixturePropsForUnavailableModel,
+        statusMessage: SessionComposerFixtureStatusMessageForUnavailableModel,
+      },
     }),
   },
 };
@@ -93,8 +97,10 @@ export const WithUnavailableModelAlert: Story = {
 export const WithLoadingSelectedModelAlert: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
-      composerProps: SessionComposerFixturePropsForLoadingModel,
-      sessionStatusMessage: SessionComposerFixtureStatusMessageForLoadingModel,
+      composerViewModel: {
+        ...SessionComposerFixturePropsForLoadingModel,
+        statusMessage: SessionComposerFixtureStatusMessageForLoadingModel,
+      },
     }),
   },
 };

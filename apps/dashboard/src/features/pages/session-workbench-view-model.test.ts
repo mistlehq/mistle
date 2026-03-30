@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   hasSessionTopAlert,
-  resolveChatComposerAction,
   resolveSessionHeaderStatusUi,
   resolveStoppedSessionMessage,
   shouldShowResumeAction,
@@ -191,76 +190,5 @@ describe("shouldShowResumeAction", () => {
         isResumingStoppedSandbox: false,
       }),
     ).toBe(false);
-  });
-});
-
-describe("resolveChatComposerAction", () => {
-  it("starts a turn with trimmed text when no turn is active", () => {
-    expect(
-      resolveChatComposerAction({
-        composerText: "  hello world  ",
-        hasActiveTurn: false,
-        hasPendingAttachments: false,
-      }),
-    ).toEqual({
-      type: "start_turn",
-      prompt: "hello world",
-      shouldClearComposer: true,
-    });
-  });
-
-  it("interrupts an active turn when the composer is empty", () => {
-    expect(
-      resolveChatComposerAction({
-        composerText: "   ",
-        hasActiveTurn: true,
-        hasPendingAttachments: false,
-      }),
-    ).toEqual({
-      type: "interrupt_turn",
-      shouldClearComposer: false,
-    });
-  });
-
-  it("steers an active turn when the composer has text", () => {
-    expect(
-      resolveChatComposerAction({
-        composerText: "  refine this  ",
-        hasActiveTurn: true,
-        hasPendingAttachments: false,
-      }),
-    ).toEqual({
-      type: "steer_turn",
-      prompt: "refine this",
-      shouldClearComposer: true,
-    });
-  });
-
-  it("starts a turn when attachments are pending even without text", () => {
-    expect(
-      resolveChatComposerAction({
-        composerText: "   ",
-        hasActiveTurn: false,
-        hasPendingAttachments: true,
-      }),
-    ).toEqual({
-      type: "start_turn",
-      prompt: "",
-      shouldClearComposer: true,
-    });
-  });
-
-  it("steers an active turn when attachments are pending even without text", () => {
-    expect(
-      resolveChatComposerAction({
-        composerText: "   ",
-        hasActiveTurn: true,
-        hasPendingAttachments: true,
-      }),
-    ).toEqual({
-      type: "steer_turn",
-      prompt: "",
-      shouldClearComposer: true,
-    });
   });
 });

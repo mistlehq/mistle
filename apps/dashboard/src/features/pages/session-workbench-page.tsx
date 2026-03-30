@@ -180,10 +180,9 @@ function SessionWorkbenchPageContent(input: {
         primaryBottomPanel={
           <SessionConversationBottomPanel
             chatEntries={[]}
-            composerProps={createEmptyComposerProps()}
+            composerViewModel={createEmptyComposerProps()}
             isRespondingToServerRequest={false}
             onRespondToServerRequest={function onRespondToServerRequest() {}}
-            sessionStatusMessage={null}
             serverRequestPanelEntries={[]}
           />
         }

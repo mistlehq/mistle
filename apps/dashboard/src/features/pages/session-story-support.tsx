@@ -1,6 +1,5 @@
 import { Badge } from "@mistle/ui";
 
-import type { ChatComposerStatusMessage } from "../chat/components/chat-composer.js";
 import { noop, noopRespondToServerRequest } from "../chat/components/chat-story-support.js";
 import {
   SessionComposerFixtureProps,
@@ -21,7 +20,7 @@ export const StorySandboxInstanceId = "sbi_storybook";
 
 export type SessionConversationStoryArgs = {
   chatEntries: React.ComponentProps<typeof SessionConversationMainContent>["chatEntries"];
-  composerProps: SessionConversationComposerProps;
+  composerViewModel: SessionConversationComposerProps;
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: React.ComponentProps<
     typeof SessionConversationMainContent
@@ -29,22 +28,20 @@ export type SessionConversationStoryArgs = {
   serverRequestPanelEntries: React.ComponentProps<
     typeof SessionConversationMainContent
   >["serverRequestPanelEntries"];
-  sessionStatusMessage: ChatComposerStatusMessage | null;
 };
 
 export const StorySessionConversationPaneArgs = {
   chatEntries: CodexFixtureSessionEntriesWithExploringGroup,
-  composerProps: SessionComposerFixtureProps,
+  composerViewModel: SessionComposerFixtureProps,
   isRespondingToServerRequest: false,
   onRespondToServerRequest: noopRespondToServerRequest,
   serverRequestPanelEntries: CodexFixtureSessionServerRequests,
-  sessionStatusMessage: null,
 } satisfies SessionConversationStoryArgs;
 
 export function createStorySessionMainContent(
   overrides?: Partial<SessionConversationStoryArgs>,
 ): React.JSX.Element {
-  const { sessionStatusMessage: _sessionStatusMessage, ...mainContentProps } = {
+  const { composerViewModel: _composerViewModel, ...mainContentProps } = {
     ...StorySessionConversationPaneArgs,
     ...overrides,
   };

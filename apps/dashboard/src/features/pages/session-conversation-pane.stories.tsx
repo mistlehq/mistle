@@ -26,7 +26,7 @@ import {
 const baseArgs = {
   ...StorySessionConversationPaneArgs,
   chatEntries: CodexFixtureSessionEntries,
-  composerProps: SessionComposerFixtureProps,
+  composerViewModel: SessionComposerFixtureProps,
   serverRequestPanelEntries: CodexFixtureSessionServerRequests,
 };
 
@@ -74,26 +74,30 @@ export const WithStructuredPlan: Story = {
 
 export const WithPendingImageAttachments: Story = {
   args: {
-    composerProps: SessionComposerFixturePropsWithPendingImageAttachments,
+    composerViewModel: SessionComposerFixturePropsWithPendingImageAttachments,
   },
 };
 
 export const UploadingImageAttachments: Story = {
   args: {
-    composerProps: SessionComposerFixturePropsUploadingImageAttachments,
+    composerViewModel: SessionComposerFixturePropsUploadingImageAttachments,
   },
 };
 
 export const NonImageCapableModelWithAttachments: Story = {
   args: {
-    composerProps: SessionComposerFixturePropsForNonImageCapableModel,
-    sessionStatusMessage: SessionComposerFixtureStatusMessageForNonImageCapableModel,
+    composerViewModel: {
+      ...SessionComposerFixturePropsForNonImageCapableModel,
+      statusMessage: SessionComposerFixtureStatusMessageForNonImageCapableModel,
+    },
   },
 };
 
 export const LoadingSelectedModelWithAttachments: Story = {
   args: {
-    composerProps: SessionComposerFixturePropsForLoadingModel,
-    sessionStatusMessage: SessionComposerFixtureStatusMessageForLoadingModel,
+    composerViewModel: {
+      ...SessionComposerFixturePropsForLoadingModel,
+      statusMessage: SessionComposerFixtureStatusMessageForLoadingModel,
+    },
   },
 };

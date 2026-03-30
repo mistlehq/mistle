@@ -19,14 +19,9 @@ type SessionConversationMainContentProps = {
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
 };
 
-type SessionConversationBottomPanelProps =
-  | (SessionConversationMainContentProps & {
-      composerViewModel: ChatComposerViewModel;
-    })
-  | (SessionConversationMainContentProps & {
-      composerProps: SessionConversationComposerProps;
-      sessionStatusMessage: ChatComposerViewModel["statusMessage"];
-    });
+type SessionConversationBottomPanelProps = SessionConversationMainContentProps & {
+  composerViewModel: ChatComposerViewModel;
+};
 
 type SessionConversationBottomPanelControllerProps = SessionConversationMainContentProps & {
   composerStateInput: SessionComposerStateInput;
@@ -52,16 +47,8 @@ export function SessionConversationBottomPanel({
   serverRequestPanelEntries,
   isRespondingToServerRequest,
   onRespondToServerRequest,
-  ...input
+  composerViewModel,
 }: SessionConversationBottomPanelProps): React.JSX.Element {
-  const composerViewModel =
-    "composerViewModel" in input
-      ? input.composerViewModel
-      : {
-          ...input.composerProps,
-          statusMessage: input.sessionStatusMessage,
-        };
-
   return (
     <>
       <CodexApprovalRequestsPanel
