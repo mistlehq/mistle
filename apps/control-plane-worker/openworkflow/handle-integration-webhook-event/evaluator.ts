@@ -1,3 +1,9 @@
+import {
+  containsToken,
+  evaluateFilterNode,
+  getValueAtPath,
+  type SharedFilter,
+} from "../../../../packages/integrations-core/src/triggers.js";
 import type {
   WebhookPayloadFilter,
   WebhookPayloadFilterPath,
@@ -13,122 +19,113 @@ function isWebhookPayloadFilterScalar(value: unknown): value is WebhookPayloadFi
   );
 }
 
-function readOwnPropertyValue(target: object, key: string): unknown {
-  const descriptor = Object.getOwnPropertyDescriptor(target, key);
-  if (descriptor === undefined) {
-    return undefined;
-  }
+function normalizeWebhookFilter(filter: WebhookPayloadFilter): SharedFilter | null {
+  if (filter.op === "and" || filter.op === "or") {
+    const normalizedFilters: SharedFilter[] = [];
 
-  if ("value" in descriptor) {
-    return descriptor.value;
-  }
+    for (const nestedFilter of filter.filters) {
+      const normalizedNestedFilter = normalizeWebhookFilter(nestedFilter);
+      if (normalizedNestedFilter === null) {
+        return null;
+      }
 
-  return descriptor.get?.call(target);
-}
-
-function isTokenBoundaryCharacter(value: string): boolean {
-  return !/[\p{L}\p{N}\p{M}_]/u.test(value);
-}
-
-function getCodePointBefore(input: { value: string; index: number }): string | null {
-  if (input.index <= 0) {
-    return null;
-  }
-
-  const precedingCodeUnit = input.value.charCodeAt(input.index - 1);
-  if (precedingCodeUnit >= 0xdc00 && precedingCodeUnit <= 0xdfff && input.index >= 2) {
-    const leadingCodeUnit = input.value.charCodeAt(input.index - 2);
-    if (leadingCodeUnit >= 0xd800 && leadingCodeUnit <= 0xdbff) {
-      return input.value.slice(input.index - 2, input.index);
-    }
-  }
-
-  return input.value.slice(input.index - 1, input.index);
-}
-
-function getCodePointAfter(input: { value: string; index: number }): string | null {
-  if (input.index >= input.value.length) {
-    return null;
-  }
-
-  const trailingCodeUnit = input.value.charCodeAt(input.index);
-  if (
-    trailingCodeUnit >= 0xd800 &&
-    trailingCodeUnit <= 0xdbff &&
-    input.index + 1 < input.value.length
-  ) {
-    const followingCodeUnit = input.value.charCodeAt(input.index + 1);
-    if (followingCodeUnit >= 0xdc00 && followingCodeUnit <= 0xdfff) {
-      return input.value.slice(input.index, input.index + 2);
-    }
-  }
-
-  return input.value.slice(input.index, input.index + 1);
-}
-
-function containsToken(input: { value: string; token: string }): boolean {
-  if (input.token.length === 0) {
-    return false;
-  }
-
-  let searchStartIndex = 0;
-
-  while (true) {
-    const matchedIndex = input.value.indexOf(input.token, searchStartIndex);
-    if (matchedIndex === -1) {
-      return false;
+      normalizedFilters.push(normalizedNestedFilter);
     }
 
-    const precedingCharacter = getCodePointBefore({
-      value: input.value,
-      index: matchedIndex,
-    });
-    const followingCharacter = getCodePointAfter({
-      value: input.value,
-      index: matchedIndex + input.token.length,
-    });
-    const hasLeadingBoundary =
-      precedingCharacter === null || isTokenBoundaryCharacter(precedingCharacter);
-    const hasTrailingBoundary =
-      followingCharacter === null || isTokenBoundaryCharacter(followingCharacter);
+    return {
+      op: filter.op === "and" ? "all" : "any",
+      filters: normalizedFilters,
+    };
+  }
 
-    if (hasLeadingBoundary && hasTrailingBoundary) {
-      return true;
+  if (filter.op === "not") {
+    const normalizedNestedFilter = normalizeWebhookFilter(filter.filter);
+    if (normalizedNestedFilter === null) {
+      return null;
     }
 
-    searchStartIndex = matchedIndex + 1;
+    return {
+      op: "not",
+      filter: normalizedNestedFilter,
+    };
   }
+
+  if (filter.op === "exists") {
+    return {
+      op: "exists",
+      path: filter.path,
+    };
+  }
+
+  if (filter.op === "eq") {
+    if (filter.value === null) {
+      return null;
+    }
+
+    return {
+      op: "eq",
+      path: filter.path,
+      value: filter.value,
+    };
+  }
+
+  if (filter.op === "in") {
+    const normalizedValues: Array<string | number | boolean> = [];
+
+    for (const value of filter.values) {
+      if (value === null) {
+        return null;
+      }
+
+      normalizedValues.push(value);
+    }
+
+    return {
+      op: "in",
+      path: filter.path,
+      values: normalizedValues,
+    };
+  }
+
+  if (filter.op === "contains") {
+    return {
+      op: "contains",
+      path: filter.path,
+      value: filter.value,
+    };
+  }
+
+  if (filter.op === "contains_token") {
+    return {
+      op: "containsToken",
+      path: filter.path,
+      value: filter.value,
+    };
+  }
+
+  if (filter.op === "starts_with") {
+    return {
+      op: "startsWith",
+      path: filter.path,
+      value: filter.value,
+    };
+  }
+
+  return null;
 }
 
 export function getWebhookPayloadValueAtPath(input: {
   payload: unknown;
   path: WebhookPayloadFilterPath;
 }): unknown {
-  let cursor: unknown = input.payload;
-
-  for (const segment of input.path) {
-    if (Array.isArray(cursor)) {
-      const segmentAsInteger = Number(segment);
-      if (!Number.isInteger(segmentAsInteger) || segmentAsInteger < 0) {
-        return undefined;
-      }
-
-      cursor = cursor[segmentAsInteger];
-      continue;
-    }
-
-    if (typeof cursor !== "object" || cursor === null) {
-      return undefined;
-    }
-
-    if (!Object.prototype.hasOwnProperty.call(cursor, segment)) {
-      return undefined;
-    }
-
-    cursor = readOwnPropertyValue(cursor, segment);
-  }
-
-  return cursor;
+  return getValueAtPath({
+    payload: input.payload,
+    path: input.path,
+    options: {
+      allowArrayTraversal: true,
+      propertyAccess: "own",
+    },
+  });
 }
 
 export function evaluateWebhookPayloadFilter(input: {
@@ -136,6 +133,19 @@ export function evaluateWebhookPayloadFilter(input: {
   payload: unknown;
 }): boolean {
   const { filter, payload } = input;
+  const normalizedFilter = normalizeWebhookFilter(filter);
+
+  if (normalizedFilter !== null) {
+    return evaluateFilterNode({
+      filter: normalizedFilter,
+      resolveValueAtPath(path) {
+        return getWebhookPayloadValueAtPath({
+          payload,
+          path,
+        });
+      },
+    });
+  }
 
   if (filter.op === "and") {
     return filter.filters.every((nestedFilter) =>

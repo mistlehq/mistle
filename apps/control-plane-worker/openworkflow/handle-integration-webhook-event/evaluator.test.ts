@@ -267,4 +267,36 @@ describe("webhook filter evaluator", () => {
 
     expect(matches).toBe(true);
   });
+
+  it("preserves worker-local null semantics", () => {
+    expect(
+      evaluateWebhookPayloadFilter({
+        filter: {
+          op: "eq",
+          path: ["comment", "body"],
+          value: null,
+        },
+        payload: {
+          comment: {
+            body: null,
+          },
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      evaluateWebhookPayloadFilter({
+        filter: {
+          op: "in",
+          path: ["comment", "body"],
+          values: ["ship it", null],
+        },
+        payload: {
+          comment: {
+            body: null,
+          },
+        },
+      }),
+    ).toBe(true);
+  });
 });

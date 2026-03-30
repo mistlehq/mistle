@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { IntegrationTriggerRulesError, TriggerRulesErrorCodes } from "../errors/index.js";
 import type { TriggerFilter, TriggerRule } from "../types/index.js";
+import { evaluateFilterNode, type SharedFilter } from "./evaluate.js";
+import { getValueAtPath, splitDotPath } from "./path.js";
 
 type ValidationIssue = {
   path: ReadonlyArray<PropertyKey>;
@@ -13,7 +15,6 @@ function formatIssues(issues: ReadonlyArray<ValidationIssue>): string {
 }
 
 const TriggerScalarValueSchema = z.union([z.string(), z.number(), z.boolean()]);
-const TriggerPathCursorSchema = z.record(z.string(), z.unknown());
 
 export const TriggerFilterSchema: z.ZodType<TriggerFilter> = z.lazy(() =>
   z.union([
@@ -104,178 +105,83 @@ export const TriggerRuleSchema = z
 
 export const TriggerRulesSchema = z.array(TriggerRuleSchema);
 
-function getValueAtPath(input: { payload: unknown; path: string }): unknown {
-  const segments = input.path.split(".");
-  let cursor: unknown = input.payload;
-
-  for (const segment of segments) {
-    const parsedCursor = TriggerPathCursorSchema.safeParse(cursor);
-    if (!parsedCursor.success) {
-      return undefined;
-    }
-
-    cursor = parsedCursor.data[segment];
-  }
-
-  return cursor;
-}
-
-function isTokenBoundaryCharacter(value: string): boolean {
-  return !/[\p{L}\p{N}\p{M}_]/u.test(value);
-}
-
-function getCodePointBefore(input: { value: string; index: number }): string | null {
-  if (input.index <= 0) {
-    return null;
-  }
-
-  const precedingCodeUnit = input.value.charCodeAt(input.index - 1);
-  if (precedingCodeUnit >= 0xdc00 && precedingCodeUnit <= 0xdfff && input.index >= 2) {
-    const leadingCodeUnit = input.value.charCodeAt(input.index - 2);
-    if (leadingCodeUnit >= 0xd800 && leadingCodeUnit <= 0xdbff) {
-      return input.value.slice(input.index - 2, input.index);
-    }
-  }
-
-  return input.value.slice(input.index - 1, input.index);
-}
-
-function getCodePointAfter(input: { value: string; index: number }): string | null {
-  if (input.index >= input.value.length) {
-    return null;
-  }
-
-  const trailingCodeUnit = input.value.charCodeAt(input.index);
-  if (
-    trailingCodeUnit >= 0xd800 &&
-    trailingCodeUnit <= 0xdbff &&
-    input.index + 1 < input.value.length
-  ) {
-    const followingCodeUnit = input.value.charCodeAt(input.index + 1);
-    if (followingCodeUnit >= 0xdc00 && followingCodeUnit <= 0xdfff) {
-      return input.value.slice(input.index, input.index + 2);
-    }
-  }
-
-  return input.value.slice(input.index, input.index + 1);
-}
-
-function containsToken(input: { value: string; token: string }): boolean {
-  if (input.token.length === 0) {
-    return false;
-  }
-
-  let searchStartIndex = 0;
-
-  while (true) {
-    const matchedIndex = input.value.indexOf(input.token, searchStartIndex);
-    if (matchedIndex === -1) {
-      return false;
-    }
-
-    const precedingCharacter = getCodePointBefore({
-      value: input.value,
-      index: matchedIndex,
-    });
-    const followingCharacter = getCodePointAfter({
-      value: input.value,
-      index: matchedIndex + input.token.length,
-    });
-    const hasLeadingBoundary =
-      precedingCharacter === null || isTokenBoundaryCharacter(precedingCharacter);
-    const hasTrailingBoundary =
-      followingCharacter === null || isTokenBoundaryCharacter(followingCharacter);
-
-    if (hasLeadingBoundary && hasTrailingBoundary) {
-      return true;
-    }
-
-    searchStartIndex = matchedIndex + 1;
-  }
-}
-
-export function evaluateTriggerFilter(input: { filter: TriggerFilter; payload: unknown }): boolean {
-  const { filter, payload } = input;
-
-  if (filter.op === "all") {
-    return filter.filters.every((nestedFilter) =>
-      evaluateTriggerFilter({
-        filter: nestedFilter,
-        payload,
-      }),
-    );
-  }
-
-  if (filter.op === "any") {
-    return filter.filters.some((nestedFilter) =>
-      evaluateTriggerFilter({
-        filter: nestedFilter,
-        payload,
-      }),
-    );
+function normalizeTriggerFilter(filter: TriggerFilter): SharedFilter {
+  if (filter.op === "all" || filter.op === "any") {
+    return {
+      op: filter.op,
+      filters: filter.filters.map((nestedFilter) => normalizeTriggerFilter(nestedFilter)),
+    };
   }
 
   if (filter.op === "not") {
-    return !evaluateTriggerFilter({
-      filter: filter.filter,
-      payload,
-    });
+    return {
+      op: "not",
+      filter: normalizeTriggerFilter(filter.filter),
+    };
   }
 
   if (filter.op === "exists") {
-    return (
-      getValueAtPath({
-        payload,
-        path: filter.path,
-      }) !== undefined
-    );
+    return {
+      op: "exists",
+      path: splitDotPath(filter.path),
+    };
   }
 
-  const resolvedValue = getValueAtPath({
-    payload,
-    path: filter.path,
-  });
-
   if (filter.op === "eq") {
-    return resolvedValue === filter.value;
+    return {
+      op: "eq",
+      path: splitDotPath(filter.path),
+      value: filter.value,
+    };
   }
 
   if (filter.op === "in") {
-    if (typeof resolvedValue !== "string" && typeof resolvedValue !== "number") {
-      return false;
-    }
-
-    return filter.values.includes(resolvedValue);
+    return {
+      op: "in",
+      path: splitDotPath(filter.path),
+      values: [...filter.values],
+    };
   }
 
   if (filter.op === "contains") {
-    if (typeof resolvedValue !== "string") {
-      return false;
-    }
-
-    return resolvedValue.includes(filter.value);
+    return {
+      op: "contains",
+      path: splitDotPath(filter.path),
+      value: filter.value,
+    };
   }
 
   if (filter.op === "containsToken") {
-    if (typeof resolvedValue !== "string") {
-      return false;
-    }
-
-    return containsToken({
-      value: resolvedValue,
-      token: filter.value,
-    });
+    return {
+      op: "containsToken",
+      path: splitDotPath(filter.path),
+      value: filter.value,
+    };
   }
 
-  if (filter.op === "startsWith") {
-    if (typeof resolvedValue !== "string") {
-      return false;
-    }
+  return {
+    op: "startsWith",
+    path: splitDotPath(filter.path),
+    value: filter.value,
+  };
+}
 
-    return resolvedValue.startsWith(filter.value);
-  }
+export function evaluateTriggerFilter(input: { filter: TriggerFilter; payload: unknown }): boolean {
+  const normalizedFilter = normalizeTriggerFilter(input.filter);
 
-  return false;
+  return evaluateFilterNode({
+    filter: normalizedFilter,
+    resolveValueAtPath(path) {
+      return getValueAtPath({
+        payload: input.payload,
+        path,
+        options: {
+          allowArrayTraversal: false,
+          propertyAccess: "plain",
+        },
+      });
+    },
+  });
 }
 
 export function parseTriggerRules(input: unknown): ReadonlyArray<TriggerRule> {
@@ -290,3 +196,7 @@ export function parseTriggerRules(input: unknown): ReadonlyArray<TriggerRule> {
 
   return parsedRules.data;
 }
+
+export * from "./evaluate.js";
+export * from "./operators.js";
+export * from "./path.js";
