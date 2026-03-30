@@ -11,10 +11,11 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
-import type { ActiveTunnelStreamRelayResult } from "./active-relay.js";
+import type { ActiveTunnelStreamRelay, ActiveTunnelStreamRelayResult } from "./active-relay.js";
 import { AsyncQueue } from "./async-queue.js";
 import type { TunnelSocketMessage } from "./connect-request.js";
 import { handleFileUploadConnectRequest, handleFileUploadStream } from "./file-upload-channel.js";
+import { CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST } from "./messages.js";
 import { ImageSignatures } from "./validate-uploaded-image.js";
 
 function toUint8Array(data: RawData): Uint8Array {
@@ -487,6 +488,83 @@ describe("handleFileUploadStream", () => {
 });
 
 describe("handleFileUploadConnectRequest", () => {
+  it("rejects unsupported upload metadata during stream.open before creating a relay", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "mistle-file-upload-connect-invalid-test-"));
+    const wsServer = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+    await new Promise<void>((resolve, reject) => {
+      wsServer.once("listening", () => resolve());
+      wsServer.once("error", (error) => reject(error));
+    });
+    const cleanup = async () => {
+      await new Promise<void>((resolve, reject) => {
+        wsServer.close((error) => {
+          if (error == null) {
+            resolve();
+            return;
+          }
+
+          reject(error);
+        });
+      });
+      await rm(tempRoot, { force: true, recursive: true });
+    };
+    openServers.add({ cleanup, tempRoot });
+
+    const relayResultQueue = new AsyncQueue<ActiveTunnelStreamRelayResult>();
+    let relayPromise: Promise<ActiveTunnelStreamRelay | undefined> | undefined;
+    wsServer.on("connection", (socket) => {
+      relayPromise = handleFileUploadConnectRequest({
+        signal: AbortSignal.timeout(1_000),
+        tunnelSocket: socket,
+        rawPayload: JSON.stringify({
+          type: "stream.open",
+          streamId: 19,
+          channel: {
+            kind: "fileUpload",
+            threadId: "thread_invalid_open",
+            mimeType: "image/svg+xml",
+            originalFilename: "vector.svg",
+            sizeBytes: 123,
+          },
+        }),
+        streamId: 19,
+        relayResultQueue,
+      });
+    });
+
+    const address = wsServer.address();
+    if (typeof address !== "object" || address === null) {
+      throw new Error("Expected websocket server to expose a concrete socket address.");
+    }
+
+    const clientSocket = new WebSocket(`ws://127.0.0.1:${String(address.port)}`);
+    const openErrorMessage = new Promise<ReturnType<typeof parseStreamControlMessage>>(
+      (resolve, reject) => {
+        clientSocket.on("message", (message) => {
+          const controlMessage = parseStreamControlMessage(toText(message));
+          if (controlMessage?.type === "stream.open.error") {
+            resolve(controlMessage);
+          }
+        });
+        clientSocket.on("error", reject);
+      },
+    );
+    await new Promise<void>((resolve, rejectOpen) => {
+      clientSocket.once("open", () => resolve());
+      clientSocket.once("error", (error) => rejectOpen(error));
+    });
+
+    await expect(openErrorMessage).resolves.toMatchObject({
+      type: "stream.open.error",
+      streamId: 19,
+      code: CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
+      message: "Unsupported image MIME type 'image/svg+xml'.",
+    });
+    expect(await relayPromise).toBeUndefined();
+
+    await closeClientSocket(clientSocket);
+  });
+
   it("opens a file upload relay from a valid stream.open request", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "mistle-file-upload-connect-test-"));
     const wsServer = new WebSocketServer({ host: "127.0.0.1", port: 0 });

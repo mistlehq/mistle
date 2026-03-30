@@ -4,6 +4,8 @@ const PositiveIntegerSchema = z.int().positive();
 const NonEmptyStringSchema = z.string().min(1);
 
 export const FileUploadResetCodes = {
+  BYTE_COUNT_EXCEEDED: "byte_count_exceeded",
+  BYTE_COUNT_MISMATCH: "byte_count_mismatch",
   INVALID_FILE_TYPE: "invalid_file_type",
   MIME_TYPE_MISMATCH: "mime_type_mismatch",
   INVALID_IMAGE_CONTENT: "invalid_image_content",

@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 
 import {
   decodeDataFrame,
+  FileUploadResetCodes,
   PayloadKindRawBytes,
   type StreamEventMessage,
 } from "@mistle/sandbox-session-protocol";
@@ -17,6 +18,10 @@ import {
   parseStreamCloseMessage,
   type TunnelSocketMessage,
 } from "./connect-request.js";
+import {
+  classifyUploadMetadataError,
+  logFileUploadTerminalEvent,
+} from "./file-upload-observability.js";
 import {
   CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
   STREAM_RESET_CODE_INVALID_STREAM_DATA,
@@ -68,30 +73,41 @@ export async function handleFileUploadStream(input: {
   threadId: string;
   tunnelSocket: WebSocket;
 }): Promise<void> {
-  assertUploadMetadata(input);
-
-  const extension = resolveImageExtension(input.mimeType);
-  const attachmentId = `att_${randomUUID()}`;
-  const threadDirectoryPath = join(input.attachmentRootPath, input.threadId);
-  await mkdir(threadDirectoryPath, { recursive: true });
-
-  const baseFilename = randomUUID();
-  const tempPath = join(threadDirectoryPath, `.upload-${baseFilename}.part`);
-  const finalPath = join(threadDirectoryPath, `${baseFilename}.${extension}`);
-  if (
-    !isPathWithinRoot({
-      candidatePath: finalPath,
-      rootPath: input.attachmentRootPath,
-    })
-  ) {
-    throw new Error("Final upload path escaped the attachment root.");
-  }
-
-  const fileHandle = await open(tempPath, "w");
+  const logContext = {
+    declaredMimeType: input.mimeType,
+    declaredSizeBytes: input.sizeBytes,
+    receivedBytes: 0,
+    streamId: input.streamId,
+    threadId: input.threadId,
+  };
+  let fileHandle: Awaited<ReturnType<typeof open>> | undefined;
+  let tempPath: string | undefined;
   let receivedBytes = 0;
   let didPersistFinalFile = false;
+  let didLogTerminalOutcome = false;
 
   try {
+    assertUploadMetadata(input);
+
+    const extension = resolveImageExtension(input.mimeType);
+    const threadDirectoryPath = join(input.attachmentRootPath, input.threadId);
+    await mkdir(threadDirectoryPath, { recursive: true });
+
+    const baseFilename = randomUUID();
+    tempPath = join(threadDirectoryPath, `.upload-${baseFilename}.part`);
+    const finalPath = join(threadDirectoryPath, `${baseFilename}.${extension}`);
+    if (
+      !isPathWithinRoot({
+        candidatePath: finalPath,
+        rootPath: input.attachmentRootPath,
+      })
+    ) {
+      throw new Error("Final upload path escaped the attachment root.");
+    }
+
+    fileHandle = await open(tempPath, "w");
+    const attachmentId = `att_${randomUUID()}`;
+
     await writeStreamOpenOk(input.tunnelSocket, {
       type: "stream.open.ok",
       streamId: input.streamId,
@@ -118,6 +134,17 @@ export async function handleFileUploadStream(input: {
             code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
             message: `stream data frame streamId ${String(dataFrame.streamId)} does not match active upload stream ${String(input.streamId)}`,
           });
+          logFileUploadTerminalEvent({
+            context: {
+              ...logContext,
+              receivedBytes,
+            },
+            outcome: {
+              kind: "rejected",
+              code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
+            },
+          });
+          didLogTerminalOutcome = true;
           return;
         }
         if (dataFrame.payloadKind !== PayloadKindRawBytes) {
@@ -127,6 +154,17 @@ export async function handleFileUploadStream(input: {
             code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
             message: "file upload stream only accepts raw byte payloads",
           });
+          logFileUploadTerminalEvent({
+            context: {
+              ...logContext,
+              receivedBytes,
+            },
+            outcome: {
+              kind: "rejected",
+              code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
+            },
+          });
+          didLogTerminalOutcome = true;
           return;
         }
 
@@ -135,9 +173,20 @@ export async function handleFileUploadStream(input: {
           await writeStreamReset(input.tunnelSocket, {
             type: "stream.reset",
             streamId: input.streamId,
-            code: "byte_count_exceeded",
+            code: FileUploadResetCodes.BYTE_COUNT_EXCEEDED,
             message: "Received more bytes than declared by the upload metadata.",
           });
+          logFileUploadTerminalEvent({
+            context: {
+              ...logContext,
+              receivedBytes,
+            },
+            outcome: {
+              kind: "rejected",
+              code: FileUploadResetCodes.BYTE_COUNT_EXCEEDED,
+            },
+          });
+          didLogTerminalOutcome = true;
           return;
         }
 
@@ -158,6 +207,17 @@ export async function handleFileUploadStream(input: {
           code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
           message: "file upload stream only accepts stream.close after open",
         });
+        logFileUploadTerminalEvent({
+          context: {
+            ...logContext,
+            receivedBytes,
+          },
+          outcome: {
+            kind: "rejected",
+            code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
+          },
+        });
+        didLogTerminalOutcome = true;
         return;
       }
 
@@ -169,6 +229,17 @@ export async function handleFileUploadStream(input: {
           code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
           message: `stream.close streamId ${String(closeMessage.streamId)} does not match active upload stream ${String(input.streamId)}`,
         });
+        logFileUploadTerminalEvent({
+          context: {
+            ...logContext,
+            receivedBytes,
+          },
+          outcome: {
+            kind: "rejected",
+            code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
+          },
+        });
+        didLogTerminalOutcome = true;
         return;
       }
 
@@ -176,9 +247,20 @@ export async function handleFileUploadStream(input: {
         await writeStreamReset(input.tunnelSocket, {
           type: "stream.reset",
           streamId: input.streamId,
-          code: "byte_count_mismatch",
+          code: FileUploadResetCodes.BYTE_COUNT_MISMATCH,
           message: "Uploaded byte count did not match declared size.",
         });
+        logFileUploadTerminalEvent({
+          context: {
+            ...logContext,
+            receivedBytes,
+          },
+          outcome: {
+            kind: "rejected",
+            code: FileUploadResetCodes.BYTE_COUNT_MISMATCH,
+          },
+        });
+        didLogTerminalOutcome = true;
         return;
       }
 
@@ -194,6 +276,17 @@ export async function handleFileUploadStream(input: {
           code: validationResult.code,
           message: validationResult.message,
         });
+        logFileUploadTerminalEvent({
+          context: {
+            ...logContext,
+            receivedBytes,
+          },
+          outcome: {
+            kind: "rejected",
+            code: validationResult.code,
+          },
+        });
+        didLogTerminalOutcome = true;
         return;
       }
 
@@ -214,12 +307,61 @@ export async function handleFileUploadStream(input: {
         },
       };
       await writeStreamEvent(input.tunnelSocket, completionEvent);
+      logFileUploadTerminalEvent({
+        context: {
+          ...logContext,
+          receivedBytes,
+        },
+        outcome: {
+          kind: "completed",
+          attachmentId,
+        },
+      });
+      didLogTerminalOutcome = true;
       return;
     }
+    logFileUploadTerminalEvent({
+      context: {
+        ...logContext,
+        receivedBytes,
+      },
+      outcome: {
+        kind: "interrupted",
+        reason: "upload signal aborted before stream completion",
+      },
+    });
+    didLogTerminalOutcome = true;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logFileUploadTerminalEvent({
+      context: {
+        ...logContext,
+        receivedBytes,
+      },
+      outcome: {
+        kind: "failed",
+        errorMessage,
+        failureClass: classifyUploadMetadataError(errorMessage),
+      },
+    });
+    didLogTerminalOutcome = true;
+    throw error;
   } finally {
-    await fileHandle.close().catch(() => undefined);
+    await fileHandle?.close().catch(() => undefined);
     if (!didPersistFinalFile) {
-      await rm(tempPath, { force: true }).catch(() => undefined);
+      await rm(tempPath ?? "", { force: true }).catch(() => undefined);
+    }
+    if (!didLogTerminalOutcome && input.signal.aborted) {
+      logFileUploadTerminalEvent({
+        context: {
+          ...logContext,
+          receivedBytes,
+        },
+        outcome: {
+          kind: "interrupted",
+          reason: "upload signal aborted during cleanup",
+        },
+      });
     }
   }
 }
@@ -247,6 +389,37 @@ export async function handleFileUploadConnectRequest(input: {
 
   if (connectRequest.channel.kind !== "fileUpload") {
     throw new Error("file upload stream.open request channel.kind must be 'fileUpload'");
+  }
+
+  try {
+    assertUploadMetadata({
+      mimeType: connectRequest.channel.mimeType,
+      sizeBytes: connectRequest.channel.sizeBytes,
+      threadId: connectRequest.channel.threadId,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logFileUploadTerminalEvent({
+      context: {
+        declaredMimeType: connectRequest.channel.mimeType,
+        declaredSizeBytes: connectRequest.channel.sizeBytes,
+        receivedBytes: 0,
+        streamId: input.streamId,
+        threadId: connectRequest.channel.threadId,
+      },
+      outcome: {
+        kind: "failed",
+        errorMessage,
+        failureClass: classifyUploadMetadataError(errorMessage),
+      },
+    });
+    await writeStreamOpenError(input.tunnelSocket, {
+      type: "stream.open.error",
+      streamId: input.streamId,
+      code: CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
+      message: errorMessage,
+    });
+    return undefined;
   }
 
   const relay: ActiveTunnelStreamRelay = {
