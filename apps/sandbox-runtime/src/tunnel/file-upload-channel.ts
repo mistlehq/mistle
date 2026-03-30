@@ -33,18 +33,12 @@ import {
   writeStreamWindow,
 } from "./messages.js";
 import { resolveImageExtension } from "./resolve-image-extension.js";
+import { assertSafeUploadThreadId, deriveUploadThreadDirectoryPath } from "./upload-thread-path.js";
 import { validateUploadedImage } from "./validate-uploaded-image.js";
 
 const MaxUploadSizeBytes = 10 * 1024 * 1024;
 
-function assertUploadMetadata(input: {
-  mimeType: string;
-  sizeBytes: number;
-  threadId: string;
-}): void {
-  if (input.threadId.trim().length === 0) {
-    throw new Error("threadId is required.");
-  }
+function assertUploadMetadata(input: { mimeType: string; sizeBytes: number }): void {
   if (input.sizeBytes <= 0) {
     throw new Error("sizeBytes must be greater than 0.");
   }
@@ -132,14 +126,25 @@ export async function handleFileUploadStream(input: {
 
   try {
     assertUploadMetadata(input);
+    const safeThreadId = assertSafeUploadThreadId(input.threadId);
 
     const extension = resolveImageExtension(input.mimeType);
-    const threadDirectoryPath = join(input.attachmentRootPath, input.threadId);
-    await mkdir(threadDirectoryPath, { recursive: true });
+    const threadDirectoryPath = deriveUploadThreadDirectoryPath({
+      attachmentRootPath: input.attachmentRootPath,
+      threadId: safeThreadId,
+    });
 
     const baseFilename = randomUUID();
     tempPath = join(threadDirectoryPath, `.upload-${baseFilename}.part`);
     const finalPath = join(threadDirectoryPath, `${baseFilename}.${extension}`);
+    if (
+      !isPathWithinRoot({
+        candidatePath: threadDirectoryPath,
+        rootPath: input.attachmentRootPath,
+      })
+    ) {
+      throw new Error("Upload thread directory escaped the attachment root.");
+    }
     if (
       !isPathWithinRoot({
         candidatePath: finalPath,
@@ -148,6 +153,7 @@ export async function handleFileUploadStream(input: {
     ) {
       throw new Error("Final upload path escaped the attachment root.");
     }
+    await mkdir(threadDirectoryPath, { recursive: true });
 
     fileHandle = await open(tempPath, "w");
     const attachmentId = `att_${randomUUID()}`;
@@ -338,8 +344,8 @@ export async function handleFileUploadConnectRequest(input: {
     assertUploadMetadata({
       mimeType: connectRequest.channel.mimeType,
       sizeBytes: connectRequest.channel.sizeBytes,
-      threadId: connectRequest.channel.threadId,
     });
+    assertSafeUploadThreadId(connectRequest.channel.threadId);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     await rejectUploadOpen(errorMessage);

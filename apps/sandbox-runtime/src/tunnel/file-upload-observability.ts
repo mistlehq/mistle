@@ -111,6 +111,9 @@ export function createFileUploadObservabilityContext(
 export function classifyUploadMetadataError(errorMessage: string): FileUploadFailureClass {
   if (
     errorMessage === "threadId is required." ||
+    errorMessage === "threadId must not include leading or trailing whitespace." ||
+    errorMessage === "threadId exceeds the configured length limit." ||
+    errorMessage === "threadId must use only ASCII letters, digits, '_' or '-'." ||
     errorMessage === "sizeBytes must be greater than 0." ||
     errorMessage === "sizeBytes exceeds the configured upload limit." ||
     errorMessage.startsWith("Unsupported image MIME type ")

@@ -24,6 +24,12 @@ describe("classifyUploadMetadataError", () => {
     );
   });
 
+  it("treats invalid thread ids as invalid upload metadata", () => {
+    expect(
+      classifyUploadMetadataError("threadId must use only ASCII letters, digits, '_' or '-'."),
+    ).toBe(FileUploadFailureClasses.INVALID_UPLOAD_METADATA);
+  });
+
   it("falls back to runtime storage failure for unknown errors", () => {
     expect(classifyUploadMetadataError("rename failed")).toBe(
       FileUploadFailureClasses.RUNTIME_STORAGE_FAILURE,
