@@ -5,10 +5,6 @@ import type {
   IntegrationKind,
 } from "@mistle/integrations-core";
 
-import { AtlassianConnectionConfigSchema } from "../atlassian/variants/atlassian-default/auth.js";
-import { AtlassianBindingConfigSchema } from "../atlassian/variants/atlassian-default/binding-config-schema.js";
-import { AtlassianConnectionConfigForm } from "../atlassian/variants/atlassian-default/connection-config-form.js";
-import { AtlassianTargetConfigSchema } from "../atlassian/variants/atlassian-default/target-config-schema.js";
 import {
   GitHubApiKeyConnectionConfigSchema,
   GitHubAppInstallationConnectionConfigSchema,
@@ -109,22 +105,6 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
         kind: "api-key",
         configSchema: OpenAiConnectionConfigSchema,
         configForm: OpenAiConnectionConfigForm,
-      },
-    ],
-  },
-  {
-    familyId: "atlassian",
-    variantId: "atlassian-default",
-    kind: "connector",
-    targetConfigSchema: AtlassianTargetConfigSchema,
-    bindingConfigSchema: AtlassianBindingConfigSchema,
-    connectionMethods: [
-      {
-        id: "api-key",
-        label: "API key",
-        kind: "api-key",
-        configSchema: AtlassianConnectionConfigSchema,
-        configForm: AtlassianConnectionConfigForm,
       },
     ],
   },

@@ -10,13 +10,6 @@ describe("sync-integration-targets", () => {
 
     expect(targets).toEqual([
       {
-        targetKey: "atlassian-default",
-        familyId: "atlassian",
-        variantId: "atlassian-default",
-        enabled: false,
-        config: {},
-      },
-      {
         targetKey: "github-cloud",
         familyId: "github",
         variantId: "github-cloud",

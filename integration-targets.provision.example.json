@@ -41,11 +41,6 @@
       }
     },
     {
-      "targetKey": "atlassian-default",
-      "enabled": true,
-      "config": {}
-    },
-    {
       "targetKey": "linear-default",
       "enabled": true,
       "config": {}
