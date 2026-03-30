@@ -3,30 +3,30 @@ import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/htt
 
 import { IntegrationConnectionSchema } from "../schemas.js";
 import {
-  UpdateApiKeyConnectionBadRequestResponseSchema,
-  UpdateApiKeyConnectionBodySchema,
-  UpdateApiKeyConnectionNotFoundResponseSchema,
-  UpdateApiKeyConnectionParamsSchema,
+  CreateFormConnectionBadRequestResponseSchema,
+  CreateFormConnectionBodySchema,
+  CreateFormConnectionNotFoundResponseSchema,
+  CreateFormConnectionParamsSchema,
 } from "./schema.js";
 
 export const route = createRoute({
-  method: "put",
-  path: "/:connectionId/api-key",
+  method: "post",
+  path: "/:targetKey/form",
   tags: ["Integrations"],
   request: {
-    params: UpdateApiKeyConnectionParamsSchema,
+    params: CreateFormConnectionParamsSchema,
     body: {
       required: true,
       content: {
         "application/json": {
-          schema: UpdateApiKeyConnectionBodySchema,
+          schema: CreateFormConnectionBodySchema,
         },
       },
     },
   },
   responses: {
-    200: {
-      description: "Rotate the API key for an existing integration connection.",
+    201: {
+      description: "Create a form-backed integration connection.",
       content: {
         "application/json": {
           schema: IntegrationConnectionSchema,
@@ -37,7 +37,7 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: UpdateApiKeyConnectionBadRequestResponseSchema,
+          schema: CreateFormConnectionBadRequestResponseSchema,
         },
       },
     },
@@ -58,10 +58,10 @@ export const route = createRoute({
       },
     },
     404: {
-      description: "Integration target or connection was not found.",
+      description: "Integration target was not found.",
       content: {
         "application/json": {
-          schema: UpdateApiKeyConnectionNotFoundResponseSchema,
+          schema: CreateFormConnectionNotFoundResponseSchema,
         },
       },
     },

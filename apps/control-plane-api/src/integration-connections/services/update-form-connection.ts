@@ -2,13 +2,10 @@ import {
   integrationConnectionCredentials,
   integrationConnections,
   type ControlPlaneDatabase,
-  IntegrationConnectionCredentialPurposes,
   integrationCredentials,
-  IntegrationCredentialSecretKinds,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import type { IntegrationRegistry } from "@mistle/integrations-core";
+import type { IntegrationConnectionMethodId, IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
 
 import {
@@ -20,7 +17,11 @@ import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
-import { assertApiKeyConnectionMethodSupportedOrThrow } from "./create-api-key-connection.js";
+import {
+  parseFormConnectionConfigOrThrow,
+  resolveFormConnectionMethodOrThrow,
+  resolvePersistedSecretRefOrThrow,
+} from "./form-connection-methods.js";
 
 type UpdatedConnection = {
   id: string;
@@ -34,27 +35,30 @@ type UpdatedConnection = {
   updatedAt: string;
 };
 
-export type UpdateApiKeyConnectionInput = {
+export type UpdateFormConnectionInput = {
   organizationId: string;
   connectionId: string;
   displayName: string;
-  apiKey: string;
+  config: Record<string, unknown>;
+  secret?: string;
 };
 
-function resolveConnectionMethodId(config: Record<string, unknown> | null): string | null {
+function resolveConnectionMethodId(
+  config: Record<string, unknown> | null,
+): IntegrationConnectionMethodId | null {
   if (config === null) {
     return null;
   }
 
   const connectionMethodId = config["connection_method"];
-  if (connectionMethodId !== IntegrationConnectionMethodIds.API_KEY) {
+  if (typeof connectionMethodId !== "string" || connectionMethodId.length === 0) {
     return null;
   }
 
-  return IntegrationConnectionMethodIds.API_KEY;
+  return connectionMethodId;
 }
 
-export async function updateApiKeyConnection(
+export async function updateFormConnection(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
@@ -62,7 +66,7 @@ export async function updateApiKeyConnection(
       masterEncryptionKeys: Record<string, string>;
     };
   },
-  input: UpdateApiKeyConnectionInput,
+  input: UpdateFormConnectionInput,
 ): Promise<UpdatedConnection> {
   const { db, integrationRegistry, integrationsConfig } = ctx;
 
@@ -79,12 +83,10 @@ export async function updateApiKeyConnection(
   }
 
   const existingConnectionMethodId = resolveConnectionMethodId(existingConnection.config);
-  const normalizedApiKey = input.apiKey.trim();
-
-  if (normalizedApiKey.length === 0) {
+  if (existingConnectionMethodId === null) {
     throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
-      "`apiKey` must contain at least one non-whitespace character when provided.",
+      IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_REQUIRED,
+      `Integration connection '${input.connectionId}' is not a form connection.`,
     );
   }
 
@@ -111,16 +113,21 @@ export async function updateApiKeyConnection(
     );
   }
 
-  if (existingConnectionMethodId !== IntegrationConnectionMethodIds.API_KEY) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.API_KEY_CONNECTION_REQUIRED,
-      `Integration connection '${input.connectionId}' is not an API-key connection.`,
-    );
-  }
-
-  assertApiKeyConnectionMethodSupportedOrThrow({
+  const formMethod = resolveFormConnectionMethodOrThrow({
     targetKey: existingConnection.targetKey,
+    methodId: existingConnectionMethodId,
     connectionMethods: definition.connectionMethods,
+    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+  });
+  const parsedConfig = parseFormConnectionConfigOrThrow({
+    targetKey: existingConnection.targetKey,
+    method: formMethod,
+    config: input.config,
+    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+  });
+  const persistedSecretRef = resolvePersistedSecretRefOrThrow({
+    secretType: formMethod.secretType,
+    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
   });
 
   const organizationCredentialKey = await db.query.organizationCredentialKeys.findFirst({
@@ -143,51 +150,65 @@ export async function updateApiKeyConnection(
   });
 
   try {
-    const encryptedApiKey = encryptCredentialUtf8({
-      plaintext: normalizedApiKey,
-      organizationCredentialKey: unwrappedOrganizationCredentialKey,
-    });
-
     return await db.transaction(async (tx) => {
-      const [createdCredential] = await tx
-        .insert(integrationCredentials)
-        .values({
-          organizationId: input.organizationId,
-          secretKind: IntegrationCredentialSecretKinds.API_KEY,
-          ciphertext: encryptedApiKey.ciphertext,
-          nonce: encryptedApiKey.nonce,
-          organizationCredentialKeyVersion: organizationCredentialKey.version,
-          intendedFamilyId: target.familyId,
-        })
-        .returning({
-          id: integrationCredentials.id,
+      if (input.secret !== undefined) {
+        const normalizedSecret = input.secret.trim();
+        if (normalizedSecret.length === 0) {
+          throw new BadRequestError(
+            IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+            "`secret` must contain at least one non-whitespace character when provided.",
+          );
+        }
+
+        const encryptedSecret = encryptCredentialUtf8({
+          plaintext: normalizedSecret,
+          organizationCredentialKey: unwrappedOrganizationCredentialKey,
         });
 
-      if (createdCredential === undefined) {
-        throw new Error("Failed to create integration credential.");
-      }
+        const [createdCredential] = await tx
+          .insert(integrationCredentials)
+          .values({
+            organizationId: input.organizationId,
+            secretKind: persistedSecretRef.secretKind,
+            ciphertext: encryptedSecret.ciphertext,
+            nonce: encryptedSecret.nonce,
+            organizationCredentialKeyVersion: organizationCredentialKey.version,
+            intendedFamilyId: target.familyId,
+          })
+          .returning({
+            id: integrationCredentials.id,
+          });
 
-      await tx
-        .insert(integrationConnectionCredentials)
-        .values({
-          connectionId: existingConnection.id,
-          credentialId: createdCredential.id,
-          purpose: IntegrationConnectionCredentialPurposes.API_KEY,
-        })
-        .onConflictDoUpdate({
-          target: [
-            integrationConnectionCredentials.connectionId,
-            integrationConnectionCredentials.purpose,
-          ],
-          set: {
+        if (createdCredential === undefined) {
+          throw new Error("Failed to create integration credential.");
+        }
+
+        await tx
+          .insert(integrationConnectionCredentials)
+          .values({
+            connectionId: existingConnection.id,
             credentialId: createdCredential.id,
-          },
-        });
+            purpose: persistedSecretRef.purpose,
+          })
+          .onConflictDoUpdate({
+            target: [
+              integrationConnectionCredentials.connectionId,
+              integrationConnectionCredentials.purpose,
+            ],
+            set: {
+              credentialId: createdCredential.id,
+            },
+          });
+      }
 
       const [updatedConnection] = await tx
         .update(integrationConnections)
         .set({
           displayName: input.displayName,
+          config: {
+            ...parsedConfig,
+            connection_method: existingConnectionMethodId,
+          },
           updatedAt: sql`now()`,
         })
         .where(eq(integrationConnections.id, existingConnection.id))

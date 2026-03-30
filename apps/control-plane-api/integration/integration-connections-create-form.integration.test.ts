@@ -11,9 +11,9 @@ import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import {
-  CreateApiKeyConnectionBodySchema,
-  CreateApiKeyConnectionNotFoundResponseSchema,
-} from "../src/integration-connections/create-api-key-connection/schema.js";
+  CreateFormConnectionBodySchema,
+  CreateFormConnectionNotFoundResponseSchema,
+} from "../src/integration-connections/create-form-connection/schema.js";
 import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
 import {
   decryptCredentialUtf8,
@@ -22,7 +22,7 @@ import {
 } from "../src/lib/crypto.js";
 import { it } from "./test-context.js";
 
-describe("integration connections create api key integration", () => {
+describe("integration connections create form integration", () => {
   it("creates connection + encrypted credential + link for an enabled target", async ({
     fixture,
   }) => {
@@ -50,15 +50,19 @@ describe("integration connections create api key integration", () => {
       });
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-create-api-key@example.com",
+      email: "integration-connections-create-form@example.com",
     });
 
-    const requestBody = CreateApiKeyConnectionBodySchema.parse({
+    const requestBody = CreateFormConnectionBodySchema.parse({
       displayName: "Primary OpenAI key",
-      apiKey: "sk-test-connection-api-key",
+      methodId: IntegrationConnectionMethodIds.API_KEY,
+      config: {
+        connection_method: IntegrationConnectionMethodIds.API_KEY,
+      },
+      secret: "sk-test-connection-api-key",
     });
 
-    const response = await fixture.request("/v1/integration/connections/openai-default/api-key", {
+    const response = await fixture.request("/v1/integration/connections/openai-default/form", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -123,7 +127,7 @@ describe("integration connections create api key integration", () => {
 
     expect(createdCredential.secretKind).toBe(IntegrationCredentialSecretKinds.API_KEY);
     expect(createdCredential.intendedFamilyId).toBe("openai");
-    expect(createdCredential.ciphertext).not.toContain(requestBody.apiKey);
+    expect(createdCredential.ciphertext).not.toContain(requestBody.secret);
 
     const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
       where: (table, { and, eq }) =>
@@ -146,15 +150,15 @@ describe("integration connections create api key integration", () => {
       ciphertext: createdCredential.ciphertext,
     });
 
-    expect(decryptedApiKey).toBe(requestBody.apiKey);
+    expect(decryptedApiKey).toBe(requestBody.secret);
   });
 
   it("returns 404 when target does not exist", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-create-api-key-missing-target@example.com",
+      email: "integration-connections-create-form-missing-target@example.com",
     });
 
-    const response = await fixture.request("/v1/integration/connections/missing_target/api-key", {
+    const response = await fixture.request("/v1/integration/connections/missing_target/form", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -162,12 +166,16 @@ describe("integration connections create api key integration", () => {
       },
       body: JSON.stringify({
         displayName: "Missing target",
-        apiKey: "sk-test-missing-target",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+        secret: "sk-test-missing-target",
       }),
     });
 
     expect(response.status).toBe(404);
-    const responseBody = CreateApiKeyConnectionNotFoundResponseSchema.parse(await response.json());
+    const responseBody = CreateFormConnectionNotFoundResponseSchema.parse(await response.json());
     expect(responseBody).toEqual({
       code: "TARGET_NOT_FOUND",
       message: "Integration target 'missing_target' was not found.",
@@ -186,10 +194,10 @@ describe("integration connections create api key integration", () => {
     });
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-create-api-key-disabled-target@example.com",
+      email: "integration-connections-create-form-disabled-target@example.com",
     });
 
-    const response = await fixture.request("/v1/integration/connections/openai-disabled/api-key", {
+    const response = await fixture.request("/v1/integration/connections/openai-disabled/form", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -197,12 +205,16 @@ describe("integration connections create api key integration", () => {
       },
       body: JSON.stringify({
         displayName: "Disabled target",
-        apiKey: "sk-test-disabled-target",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+        secret: "sk-test-disabled-target",
       }),
     });
 
     expect(response.status).toBe(404);
-    const responseBody = CreateApiKeyConnectionNotFoundResponseSchema.parse(await response.json());
+    const responseBody = CreateFormConnectionNotFoundResponseSchema.parse(await response.json());
     expect(responseBody.code).toBe("TARGET_NOT_FOUND");
   });
 
@@ -231,10 +243,10 @@ describe("integration connections create api key integration", () => {
       });
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-create-api-key-validation@example.com",
+      email: "integration-connections-create-form-validation@example.com",
     });
 
-    const response = await fixture.request("/v1/integration/connections/openai-default/api-key", {
+    const response = await fixture.request("/v1/integration/connections/openai-default/form", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -242,7 +254,9 @@ describe("integration connections create api key integration", () => {
       },
       body: JSON.stringify({
         displayName: "",
-        apiKey: "",
+        methodId: "",
+        config: {},
+        secret: "",
       }),
     });
 
@@ -255,14 +269,18 @@ describe("integration connections create api key integration", () => {
   });
 
   it("returns 401 when request is unauthenticated", async ({ fixture }) => {
-    const response = await fixture.request("/v1/integration/connections/openai-default/api-key", {
+    const response = await fixture.request("/v1/integration/connections/openai-default/form", {
       method: "POST",
       headers: {
         "content-type": "application/json",
       },
       body: JSON.stringify({
         displayName: "Unauthenticated",
-        apiKey: "sk-test-unauthenticated",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+        secret: "sk-test-unauthenticated",
       }),
     });
 
@@ -275,10 +293,10 @@ describe("integration connections create api key integration", () => {
 
   it("does not create connection records when target lookup fails", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-create-api-key-no-records@example.com",
+      email: "integration-connections-create-form-no-records@example.com",
     });
 
-    const response = await fixture.request("/v1/integration/connections/missing_target/api-key", {
+    const response = await fixture.request("/v1/integration/connections/missing_target/form", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -286,7 +304,11 @@ describe("integration connections create api key integration", () => {
       },
       body: JSON.stringify({
         displayName: "Missing target connection",
-        apiKey: "sk-test-no-records",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+        secret: "sk-test-no-records",
       }),
     });
 

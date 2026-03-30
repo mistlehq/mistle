@@ -6,14 +6,14 @@ import type { AppContextBindings, AppRoutes } from "../types.js";
 import * as completeGitHubAppInstallationConnection from "./complete-github-app-installation-connection/index.js";
 import * as completeOAuth2AuthorizationCodeConnection from "./complete-oauth2-authorization-code-connection/index.js";
 import { INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH } from "./constants.js";
-import * as createApiKeyConnection from "./create-api-key-connection/index.js";
+import * as createFormConnection from "./create-form-connection/index.js";
 import * as deleteIntegrationConnection from "./delete-integration-connection/index.js";
 import * as listIntegrationConnectionResources from "./list-integration-connection-resources/index.js";
 import * as listIntegrationConnections from "./list-integration-connections/index.js";
 import * as refreshIntegrationConnectionResources from "./refresh-integration-connection-resources/index.js";
 import * as startGitHubAppInstallationConnection from "./start-github-app-installation-connection/index.js";
 import * as startOAuth2AuthorizationCodeConnection from "./start-oauth2-authorization-code-connection/index.js";
-import * as updateApiKeyConnection from "./update-api-key-connection/index.js";
+import * as updateFormConnection from "./update-form-connection/index.js";
 import * as updateIntegrationConnection from "./update-integration-connection/index.js";
 
 export function createIntegrationConnectionsRoutes(): AppRoutes<
@@ -39,8 +39,8 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
     refreshIntegrationConnectionResources.handler,
   );
 
-  routes.use(createApiKeyConnection.route.path, requireAuthSession);
-  routes.openapi(createApiKeyConnection.route, createApiKeyConnection.handler);
+  routes.use(createFormConnection.route.path, requireAuthSession);
+  routes.openapi(createFormConnection.route, createFormConnection.handler);
 
   routes.on(
     updateIntegrationConnection.route.method,
@@ -56,8 +56,8 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
   );
   routes.openapi(deleteIntegrationConnection.route, deleteIntegrationConnection.handler);
 
-  routes.use(updateApiKeyConnection.route.path, requireAuthSession);
-  routes.openapi(updateApiKeyConnection.route, updateApiKeyConnection.handler);
+  routes.use(updateFormConnection.route.path, requireAuthSession);
+  routes.openapi(updateFormConnection.route, updateFormConnection.handler);
 
   routes.use(startGitHubAppInstallationConnection.route.path, requireAuthSession);
   routes.openapi(

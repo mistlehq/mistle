@@ -3,7 +3,7 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { updateApiKeyConnection } from "../services/update-api-key-connection.js";
+import { createFormConnection } from "../services/create-form-connection.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -13,10 +13,10 @@ const routeHandler = async (
   const db = ctx.get("db");
   const integrationRegistry = ctx.get("integrationRegistry");
   const integrationsConfig = ctx.get("config").integrations;
-  const { connectionId } = ctx.req.valid("param");
-  const { apiKey, displayName } = ctx.req.valid("json");
+  const { targetKey } = ctx.req.valid("param");
+  const { config, displayName, methodId, secret } = ctx.req.valid("json");
 
-  const updatedConnection = await updateApiKeyConnection(
+  const createdConnection = await createFormConnection(
     {
       db,
       integrationRegistry,
@@ -24,13 +24,15 @@ const routeHandler = async (
     },
     {
       organizationId: session.activeOrganizationId,
-      connectionId,
+      targetKey,
       displayName,
-      apiKey,
+      methodId,
+      config,
+      secret,
     },
   );
 
-  return ctx.json(updatedConnection, 200);
+  return ctx.json(createdConnection, 201);
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(

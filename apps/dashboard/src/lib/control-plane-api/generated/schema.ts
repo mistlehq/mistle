@@ -863,7 +863,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/integration/connections/:connectionId/api-key": {
+  "/v1/integration/connections/:connectionId/form": {
     parameters: {
       query?: never;
       header?: never;
@@ -883,13 +883,16 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
-            apiKey: string;
+            config: {
+              [key: string]: unknown;
+            };
             displayName: string;
+            secret?: string;
           };
         };
       };
       responses: {
-        /** @description Rotate the API key for an existing integration connection. */
+        /** @description Update a form-backed integration connection. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -935,8 +938,8 @@ export interface paths {
                   /** @enum {string} */
                   code:
                     | "INVALID_UPDATE_CONNECTION_INPUT"
-                    | "API_KEY_CONNECTION_REQUIRED"
-                    | "API_KEY_NOT_SUPPORTED";
+                    | "FORM_CONNECTION_REQUIRED"
+                    | "FORM_CONNECTION_METHOD_NOT_SUPPORTED";
                   message: string;
                 }
               | {
@@ -1242,7 +1245,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/integration/connections/:targetKey/api-key": {
+  "/v1/integration/connections/:targetKey/form": {
     parameters: {
       query?: never;
       header?: never;
@@ -1263,13 +1266,17 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
-            apiKey: string;
+            config: {
+              [key: string]: unknown;
+            };
             displayName: string;
+            methodId: string;
+            secret: string;
           };
         };
       };
       responses: {
-        /** @description Create an API-key backed integration connection. */
+        /** @description Create a form-backed integration connection. */
         201: {
           headers: {
             [name: string]: unknown;
@@ -1313,7 +1320,7 @@ export interface paths {
             "application/json":
               | {
                   /** @enum {string} */
-                  code: "INVALID_CREATE_CONNECTION_INPUT" | "API_KEY_NOT_SUPPORTED";
+                  code: "INVALID_CREATE_CONNECTION_INPUT" | "FORM_CONNECTION_METHOD_NOT_SUPPORTED";
                   message: string;
                 }
               | {

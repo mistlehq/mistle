@@ -3,30 +3,30 @@ import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/htt
 
 import { IntegrationConnectionSchema } from "../schemas.js";
 import {
-  CreateApiKeyConnectionBadRequestResponseSchema,
-  CreateApiKeyConnectionBodySchema,
-  CreateApiKeyConnectionNotFoundResponseSchema,
-  CreateApiKeyConnectionParamsSchema,
+  UpdateFormConnectionBadRequestResponseSchema,
+  UpdateFormConnectionBodySchema,
+  UpdateFormConnectionNotFoundResponseSchema,
+  UpdateFormConnectionParamsSchema,
 } from "./schema.js";
 
 export const route = createRoute({
-  method: "post",
-  path: "/:targetKey/api-key",
+  method: "put",
+  path: "/:connectionId/form",
   tags: ["Integrations"],
   request: {
-    params: CreateApiKeyConnectionParamsSchema,
+    params: UpdateFormConnectionParamsSchema,
     body: {
       required: true,
       content: {
         "application/json": {
-          schema: CreateApiKeyConnectionBodySchema,
+          schema: UpdateFormConnectionBodySchema,
         },
       },
     },
   },
   responses: {
-    201: {
-      description: "Create an API-key backed integration connection.",
+    200: {
+      description: "Update a form-backed integration connection.",
       content: {
         "application/json": {
           schema: IntegrationConnectionSchema,
@@ -37,7 +37,7 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: CreateApiKeyConnectionBadRequestResponseSchema,
+          schema: UpdateFormConnectionBadRequestResponseSchema,
         },
       },
     },
@@ -58,10 +58,10 @@ export const route = createRoute({
       },
     },
     404: {
-      description: "Integration target was not found.",
+      description: "Integration target or connection was not found.",
       content: {
         "application/json": {
-          schema: CreateApiKeyConnectionNotFoundResponseSchema,
+          schema: UpdateFormConnectionNotFoundResponseSchema,
         },
       },
     },

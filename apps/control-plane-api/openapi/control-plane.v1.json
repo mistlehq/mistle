@@ -1880,7 +1880,7 @@
         }
       }
     },
-    "/v1/integration/connections/:targetKey/api-key": {
+    "/v1/integration/connections/:targetKey/form": {
       "post": {
         "tags": ["Integrations"],
         "parameters": [
@@ -1905,12 +1905,21 @@
                     "type": "string",
                     "minLength": 1
                   },
-                  "apiKey": {
+                  "methodId": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "secret": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
                   }
                 },
-                "required": ["displayName", "apiKey"],
+                "required": ["displayName", "methodId", "config", "secret"],
                 "additionalProperties": false
               }
             }
@@ -1918,7 +1927,7 @@
         },
         "responses": {
           "201": {
-            "description": "Create an API-key backed integration connection.",
+            "description": "Create a form-backed integration connection.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2023,7 +2032,10 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["INVALID_CREATE_CONNECTION_INPUT", "API_KEY_NOT_SUPPORTED"]
+                          "enum": [
+                            "INVALID_CREATE_CONNECTION_INPUT",
+                            "FORM_CONNECTION_METHOD_NOT_SUPPORTED"
+                          ]
                         },
                         "message": {
                           "type": "string",
@@ -2493,7 +2505,7 @@
         }
       }
     },
-    "/v1/integration/connections/:connectionId/api-key": {
+    "/v1/integration/connections/:connectionId/form": {
       "put": {
         "tags": ["Integrations"],
         "parameters": [
@@ -2518,13 +2530,17 @@
                     "type": "string",
                     "minLength": 1
                   },
-                  "apiKey": {
+                  "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "secret": {
                     "type": "string",
                     "minLength": 1,
                     "pattern": "\\S"
                   }
                 },
-                "required": ["displayName", "apiKey"],
+                "required": ["displayName", "config"],
                 "additionalProperties": false
               }
             }
@@ -2532,7 +2548,7 @@
         },
         "responses": {
           "200": {
-            "description": "Rotate the API key for an existing integration connection.",
+            "description": "Update a form-backed integration connection.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2639,8 +2655,8 @@
                           "type": "string",
                           "enum": [
                             "INVALID_UPDATE_CONNECTION_INPUT",
-                            "API_KEY_CONNECTION_REQUIRED",
-                            "API_KEY_NOT_SUPPORTED"
+                            "FORM_CONNECTION_REQUIRED",
+                            "FORM_CONNECTION_METHOD_NOT_SUPPORTED"
                           ]
                         },
                         "message": {

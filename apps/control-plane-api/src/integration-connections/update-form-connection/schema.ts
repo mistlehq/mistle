@@ -9,34 +9,36 @@ import {
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
 
-export const UpdateApiKeyConnectionParamsSchema = z
+export const UpdateFormConnectionParamsSchema = z
   .object({
     connectionId: z.string().min(1),
   })
   .strict();
 
-export const UpdateApiKeyConnectionBodySchema = z
+export const UpdateFormConnectionBodySchema = z
   .object({
     displayName: z.string().min(1),
-    apiKey: z
+    config: z.record(z.string(), z.unknown()),
+    secret: z
       .string()
       .min(1)
-      .regex(/\S/, "`apiKey` must contain at least one non-whitespace character when provided."),
+      .regex(/\S/, "`secret` must contain at least one non-whitespace character when provided.")
+      .optional(),
   })
   .strict();
 
-export const UpdateApiKeyConnectionBadRequestResponseSchema = z.union([
+export const UpdateFormConnectionBadRequestResponseSchema = z.union([
   createCodeMessageErrorSchema(
     z.enum([
       IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
-      IntegrationConnectionsBadRequestCodes.API_KEY_CONNECTION_REQUIRED,
-      IntegrationConnectionsBadRequestCodes.API_KEY_NOT_SUPPORTED,
+      IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_REQUIRED,
+      IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
     ]),
   ),
   ValidationErrorResponseSchema,
 ]);
 
-export const UpdateApiKeyConnectionNotFoundResponseSchema = createCodeMessageErrorSchema(
+export const UpdateFormConnectionNotFoundResponseSchema = createCodeMessageErrorSchema(
   z.enum([
     IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND,
     IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,

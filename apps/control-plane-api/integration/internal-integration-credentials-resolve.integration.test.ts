@@ -127,7 +127,7 @@ describe("internal integration credentials resolve", () => {
     });
 
     const createConnectionResponse = await fixture.request(
-      "/v1/integration/connections/openai_default/api-key",
+      "/v1/integration/connections/openai_default/form",
       {
         method: "POST",
         headers: {
@@ -136,7 +136,11 @@ describe("internal integration credentials resolve", () => {
         },
         body: JSON.stringify({
           displayName: "OpenAI internal credential test",
-          apiKey: "sk-integration-test",
+          methodId: "api-key",
+          config: {
+            connection_method: "api-key",
+          },
+          secret: "sk-integration-test",
         }),
       },
     );
