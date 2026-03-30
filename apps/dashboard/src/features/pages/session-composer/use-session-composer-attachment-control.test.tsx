@@ -9,6 +9,20 @@ import {
   type SessionComposerAttachmentControlDependencies,
 } from "./use-session-composer-attachment-control.js";
 
+const UploadedImageFixture = {
+  attachmentId: "att_123",
+  threadId: "thread_123",
+  originalFilename: "screenshot.png",
+  mimeType: "image/png",
+  sizeBytes: 4,
+  path: "/tmp/attachments/thread_123/upload.png",
+} as const;
+
+const PrepareAttachmentInput = {
+  prompt: "inspect this",
+  supportsImageInspection: true,
+} as const;
+
 function createDeferredPromise<T>() {
   let resolvePromise: ((value: T | PromiseLike<T>) => void) | undefined;
   let rejectPromise: ((reason?: unknown) => void) | undefined;
@@ -57,16 +71,22 @@ function renderAttachmentControl(input: {
   );
 }
 
+function createImageFile(): File {
+  return new File([new Uint8Array([1, 2, 3, 4])], "screenshot.png", { type: "image/png" });
+}
+
+function prepareSingleAttachment(
+  control: ReturnType<typeof renderAttachmentControl>["result"]["current"],
+) {
+  return control.prepareAttachments({
+    files: [createImageFile()],
+    ...PrepareAttachmentInput,
+  });
+}
+
 describe("useSessionComposerAttachmentControl", () => {
   it("surfaces mapped upload errors and clears uploading state after failure", async () => {
-    const deferredUpload = createDeferredPromise<{
-      attachmentId: string;
-      threadId: string;
-      originalFilename: string;
-      mimeType: string;
-      sizeBytes: number;
-      path: string;
-    }>();
+    const deferredUpload = createDeferredPromise<typeof UploadedImageFixture>();
     const { result } = renderAttachmentControl({
       dependencies: createDependencies({
         uploadSandboxImage: async () => {
@@ -77,11 +97,7 @@ describe("useSessionComposerAttachmentControl", () => {
 
     let preparePromise: Promise<unknown> | undefined;
     act(() => {
-      preparePromise = result.current.prepareAttachments({
-        files: [new File([new Uint8Array([1, 2, 3, 4])], "screenshot.png", { type: "image/png" })],
-        prompt: "inspect this",
-        supportsImageInspection: true,
-      });
+      preparePromise = prepareSingleAttachment(result.current);
     });
 
     expect(result.current.isUploadingAttachments).toBe(true);
@@ -110,44 +126,27 @@ describe("useSessionComposerAttachmentControl", () => {
             });
           }
 
-          return {
-            attachmentId: "att_123",
-            threadId: "thread_123",
-            originalFilename: "screenshot.png",
-            mimeType: "image/png",
-            sizeBytes: 4,
-            path: "/tmp/attachments/thread_123/upload.png",
-          };
+          return UploadedImageFixture;
         },
       }),
     });
 
-    await expect(
-      result.current.prepareAttachments({
-        files: [new File([new Uint8Array([1, 2, 3, 4])], "screenshot.png", { type: "image/png" })],
-        prompt: "inspect this",
-        supportsImageInspection: true,
-      }),
-    ).rejects.toThrow("That image file could not be validated.");
+    await expect(prepareSingleAttachment(result.current)).rejects.toThrow(
+      "That image file could not be validated.",
+    );
 
-    await expect(
-      result.current.prepareAttachments({
-        files: [new File([new Uint8Array([1, 2, 3, 4])], "screenshot.png", { type: "image/png" })],
-        prompt: "inspect this",
-        supportsImageInspection: true,
-      }),
-    ).resolves.toEqual({
-      prompt: "inspect this",
+    await expect(prepareSingleAttachment(result.current)).resolves.toEqual({
+      prompt: PrepareAttachmentInput.prompt,
       submittedAttachments: [
         {
           type: "localImage",
-          path: "/tmp/attachments/thread_123/upload.png",
+          path: UploadedImageFixture.path,
         },
       ],
       displayAttachments: [
         {
           type: "localImage",
-          path: "/tmp/attachments/thread_123/upload.png",
+          path: UploadedImageFixture.path,
         },
       ],
     });

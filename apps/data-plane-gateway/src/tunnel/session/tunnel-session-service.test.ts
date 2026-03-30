@@ -201,71 +201,83 @@ afterEach(async () => {
   openPairs.clear();
 });
 
+async function createDisconnectTestHarness() {
+  const clock = createMutableClock(1_000);
+  const scheduler = createManualScheduler(clock);
+  const ownerStore = new InMemorySandboxOwnerStore(clock);
+  await ownerStore.claimOwner({
+    sandboxInstanceId: SandboxInstanceId,
+    nodeId: GatewayNodeId,
+    sessionId: BootstrapSessionId,
+    ttlMs: 60_000,
+  });
+
+  const tunnelSessionRegistry = new TunnelSessionRegistry(
+    new InMemoryTunnelSessionRegistryAdapter(),
+  );
+  const relayCoordinator = new TunnelRelayCoordinator(
+    GatewayNodeId,
+    new InMemoryLocalPeerRegistryAdapter(),
+    new InMemoryRelayTransportAdapter(GatewayNodeId),
+  );
+  const interactiveStreamRouter = new InteractiveStreamRouter(
+    GatewayNodeId,
+    new StoreBackedSandboxOwnerResolver(GatewayNodeId, ownerStore),
+    new LocalGatewayForwardingClientAdapter(
+      GatewayNodeId,
+      new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),
+    ),
+  );
+
+  const service = new TunnelSessionService(
+    GatewayNodeId,
+    interactiveStreamRouter,
+    relayCoordinator,
+    tunnelSessionRegistry,
+    ownerStore,
+    new SandboxOwnerLeaseHeartbeat(ownerStore, scheduler, 5_000),
+    new InMemorySandboxPresenceStore(clock),
+    new InMemorySandboxRuntimeAttachmentStore(clock),
+    new SandboxIdleControllerRegistry(() => {
+      throw new Error("Sandbox idle controller should not be created in this test.");
+    }),
+    clock,
+    scheduler,
+  );
+
+  const bootstrapPair = await createWebSocketPair();
+  const connectionPair = await createWebSocketPair();
+  openPairs.add(bootstrapPair);
+  openPairs.add(connectionPair);
+
+  const attachedBootstrapPeer = {
+    relayTarget: relayCoordinator.attachPeer({
+      sandboxInstanceId: SandboxInstanceId,
+      side: "bootstrap",
+      socket: bootstrapPair.peerSocket,
+      sessionId: BootstrapSessionId,
+    }),
+  };
+  relayCoordinator.attachPeer({
+    sandboxInstanceId: SandboxInstanceId,
+    side: "connection",
+    socket: connectionPair.peerSocket,
+    sessionId: ConnectionSessionId,
+  });
+  tunnelSessionRegistry.attachBootstrapSession(attachedBootstrapPeer.relayTarget);
+
+  return {
+    attachedBootstrapPeer,
+    connectionPair,
+    interactiveStreamRouter,
+    service,
+  };
+}
+
 describe("TunnelSessionService", () => {
   it("releases active file upload bindings and notifies the connection peer on bootstrap disconnect", async () => {
-    const clock = createMutableClock(1_000);
-    const scheduler = createManualScheduler(clock);
-    const ownerStore = new InMemorySandboxOwnerStore(clock);
-    await ownerStore.claimOwner({
-      sandboxInstanceId: SandboxInstanceId,
-      nodeId: GatewayNodeId,
-      sessionId: BootstrapSessionId,
-      ttlMs: 60_000,
-    });
-
-    const tunnelSessionRegistry = new TunnelSessionRegistry(
-      new InMemoryTunnelSessionRegistryAdapter(),
-    );
-    const relayCoordinator = new TunnelRelayCoordinator(
-      GatewayNodeId,
-      new InMemoryLocalPeerRegistryAdapter(),
-      new InMemoryRelayTransportAdapter(GatewayNodeId),
-    );
-    const interactiveStreamRouter = new InteractiveStreamRouter(
-      GatewayNodeId,
-      new StoreBackedSandboxOwnerResolver(GatewayNodeId, ownerStore),
-      new LocalGatewayForwardingClientAdapter(
-        GatewayNodeId,
-        new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),
-      ),
-    );
-
-    const service = new TunnelSessionService(
-      GatewayNodeId,
-      interactiveStreamRouter,
-      relayCoordinator,
-      tunnelSessionRegistry,
-      ownerStore,
-      new SandboxOwnerLeaseHeartbeat(ownerStore, scheduler, 5_000),
-      new InMemorySandboxPresenceStore(clock),
-      new InMemorySandboxRuntimeAttachmentStore(clock),
-      new SandboxIdleControllerRegistry(() => {
-        throw new Error("Sandbox idle controller should not be created in this test.");
-      }),
-      clock,
-      scheduler,
-    );
-
-    const bootstrapPair = await createWebSocketPair();
-    const connectionPair = await createWebSocketPair();
-    openPairs.add(bootstrapPair);
-    openPairs.add(connectionPair);
-
-    const attachedBootstrapPeer = {
-      relayTarget: relayCoordinator.attachPeer({
-        sandboxInstanceId: SandboxInstanceId,
-        side: "bootstrap",
-        socket: bootstrapPair.peerSocket,
-        sessionId: BootstrapSessionId,
-      }),
-    };
-    relayCoordinator.attachPeer({
-      sandboxInstanceId: SandboxInstanceId,
-      side: "connection",
-      socket: connectionPair.peerSocket,
-      sessionId: ConnectionSessionId,
-    });
-    tunnelSessionRegistry.attachBootstrapSession(attachedBootstrapPeer.relayTarget);
+    const { attachedBootstrapPeer, connectionPair, interactiveStreamRouter, service } =
+      await createDisconnectTestHarness();
 
     await interactiveStreamRouter.openInteractiveStream({
       sandboxInstanceId: SandboxInstanceId,
