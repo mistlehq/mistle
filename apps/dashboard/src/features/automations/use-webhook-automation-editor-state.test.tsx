@@ -577,7 +577,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       name: "Automation name is required.",
       sandboxProfileId: "Select a sandbox profile.",
       inputTemplate: "Input template is required.",
-      triggerIds: "Select at least one trigger.",
+      triggerIds: "Please add a trigger",
     });
   });
 
@@ -627,7 +627,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     expect(result.current.validationSummaryError).toBe(
       "Please address the fields highlighted in red.",
     );
-    expect(result.current.fieldErrors.triggerIds).toBe("Select at least one trigger.");
+    expect(result.current.fieldErrors.triggerIds).toBe("Please add a trigger");
   });
 
   it("clears stale trigger validation errors when the sandbox profile changes", () => {

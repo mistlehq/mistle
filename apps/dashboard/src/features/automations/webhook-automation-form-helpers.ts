@@ -120,7 +120,7 @@ export function validateWebhookAutomationFormValues(
   }
 
   if (values.triggerIds.length === 0) {
-    errors.triggerIds = "Select at least one trigger.";
+    errors.triggerIds = "Please add a trigger";
   } else {
     const selectedEventOptions = resolveSelectedWebhookAutomationEventOptions({
       eventOptions,

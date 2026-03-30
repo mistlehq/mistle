@@ -65,7 +65,7 @@ const InvalidProfileBindingMessage =
   "The selected profile has no bindings with automation triggers.";
 const LoadProfileBindingsErrorMessage = "Could not load profile bindings.";
 const RequiredFieldSummaryMessage = "Please address the fields highlighted in red.";
-const RequiredTriggerSelectionMessage = "Select at least one trigger.";
+const RequiredTriggerSelectionMessage = "Please add a trigger";
 const UnselectedProfileQueryId = "__unselected__";
 const MissingProfileVersionQueryId = 0;
 

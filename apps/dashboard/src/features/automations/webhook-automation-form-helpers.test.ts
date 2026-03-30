@@ -254,7 +254,7 @@ describe("validateWebhookAutomationFormValues", () => {
       ),
     ).toEqual({
       name: "Automation name is required.",
-      triggerIds: "Select at least one trigger.",
+      triggerIds: "Please add a trigger",
       sandboxProfileId: "Select a sandbox profile.",
       inputTemplate: "Input template is required.",
       conversationKeyTemplate: "Conversation key template is required.",

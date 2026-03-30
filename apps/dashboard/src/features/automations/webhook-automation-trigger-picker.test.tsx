@@ -263,14 +263,14 @@ describe("WebhookAutomationTriggerPicker", () => {
 
   it("reuses the trigger validation copy in the empty state and highlights the container", () => {
     const { container: renderContainer } = renderTriggerPicker({
-      error: "Select at least one trigger.",
+      error: "Please add a trigger",
       hasConnectedIntegrations: true,
       selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
       selectedTriggerIds: [],
       triggerParameterValues: {},
     });
 
-    const errorMessage = screen.getByText("Select at least one trigger.");
+    const errorMessage = screen.getByText("Please add a trigger");
     expect(errorMessage).toBeDefined();
 
     const container = errorMessage.parentElement;

@@ -267,7 +267,12 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubPullRequestConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
     ],
-    parameters: [GitHubRepositoryParameter, GitHubAuthorParameter, GitHubBaseBranchParameter],
+    parameters: [
+      createGitHubExplicitInvocationParameter(["review", "body"]),
+      GitHubRepositoryParameter,
+      GitHubAuthorParameter,
+      GitHubBaseBranchParameter,
+    ],
   }),
   createGitHubWebhookEventDefinition({
     eventType: "github.pull_request_review_comment.created",

@@ -332,7 +332,7 @@ describe("WebhookAutomationForm", () => {
           fieldErrors={{
             name: "Automation name is required.",
             sandboxProfileId: "Select a sandbox profile.",
-            triggerIds: "Select at least one trigger.",
+            triggerIds: "Please add a trigger",
             inputTemplate: "Input template is required.",
           }}
           formError={null}
@@ -362,7 +362,7 @@ describe("WebhookAutomationForm", () => {
     expect(screen.queryByText("Automation name is required.")).toBeNull();
     expect(screen.queryByText("Select a sandbox profile.")).toBeNull();
     expect(screen.queryByText("Input template is required.")).toBeNull();
-    expect(screen.getByText("Select at least one trigger.")).toBeDefined();
+    expect(screen.getByText("Please add a trigger")).toBeDefined();
   });
 
   it("shows save failures at the top of the form", () => {

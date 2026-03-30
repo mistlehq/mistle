@@ -511,7 +511,7 @@ export const ValidationErrors: Story = {
     mode: "create",
     validationSummaryError: "Please address the fields highlighted in red.",
     fieldErrors: {
-      triggerIds: "Select at least one trigger.",
+      triggerIds: "Please add a trigger",
       name: "Required field.",
       sandboxProfileId: "Required field.",
       inputTemplate: "Required field.",
