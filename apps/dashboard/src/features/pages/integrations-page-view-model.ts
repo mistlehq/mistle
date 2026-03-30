@@ -16,6 +16,14 @@ import type {
 import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
 import type { OrganizationIntegrationsSettingsPageCard } from "./organization-integrations-settings-page-view.js";
 
+function resolveTargetConfig(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(Object.entries(value));
+}
+
 export function toConnectionMethods(
   connectionMethods: readonly IntegrationConnectionMethod[] | undefined,
 ): readonly IntegrationConnectionMethod[] {
@@ -60,8 +68,11 @@ export function buildAvailableIntegrationViewCards(input: {
       actionLabel: "Add",
       onAction: () => {
         input.onOpenCreateDialog({
+          targetConfig: resolveTargetConfig(card.target.config),
           targetKey: card.target.targetKey,
           targetDisplayName: card.displayName,
+          targetFamilyId: card.target.familyId,
+          targetVariantId: card.target.variantId,
           methods,
           mode: "create",
         });

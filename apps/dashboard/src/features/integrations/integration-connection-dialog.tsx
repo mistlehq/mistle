@@ -1,3 +1,4 @@
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
   Button,
   Dialog,
@@ -9,78 +10,83 @@ import {
   RadioGroup,
   RadioGroupItem,
 } from "@mistle/ui";
+import Form, { type IChangeEvent } from "@rjsf/core";
+import type { RJSFSchema, UiSchema } from "@rjsf/utils";
+import validator from "@rjsf/validator-ajv8";
 
-export type IntegrationConnectionMethodId = string;
-export const IntegrationConnectionMethodIds: {
-  API_KEY: IntegrationConnectionMethodId;
-  OAUTH2_AUTHORIZATION_CODE: IntegrationConnectionMethodId;
-  GITHUB_APP_INSTALLATION: IntegrationConnectionMethodId;
-} = {
-  API_KEY: "api-key",
-  OAUTH2_AUTHORIZATION_CODE: "oauth2-authorization-code",
-  GITHUB_APP_INSTALLATION: "github-app-installation",
-};
+import {
+  IntegrationFormTemplates,
+  IntegrationFormWidgets,
+} from "../forms/integration-form-theme.js";
+import type { IntegrationConnectionMethod as ServiceIntegrationConnectionMethod } from "./integrations-service-shared.js";
 
-export type IntegrationConnectionMethodSecretField = {
-  name: string;
-  label: string;
-  placeholder?: string | undefined;
-  description?: string | undefined;
-  inputType: "password" | "text";
-};
-
-type IntegrationFormConnectionMethod = {
-  id: IntegrationConnectionMethodId;
-  label: string;
-  kind: "form";
-  secretFields: IntegrationConnectionMethodSecretField[];
-};
-
-type IntegrationRedirectConnectionMethod = {
-  id: IntegrationConnectionMethodId;
-  label: string;
-  kind: "redirect";
-};
-
-export type IntegrationConnectionMethod =
-  | IntegrationFormConnectionMethod
-  | IntegrationRedirectConnectionMethod;
+export type IntegrationConnectionMethod = ServiceIntegrationConnectionMethod;
+export type IntegrationConnectionMethodId = IntegrationConnectionMethod["id"];
+export { IntegrationConnectionMethodIds };
 
 type CreateIntegrationConnectionDialogState = {
-  displayName: string;
-  targetKey: string;
   methods: readonly IntegrationConnectionMethod[];
   mode: "create";
+  targetConfig: Record<string, unknown>;
+  targetDisplayName: string;
+  targetFamilyId: string;
+  targetKey: string;
+  targetVariantId: string;
 };
 
 type UpdateIntegrationConnectionDialogState = {
+  connectionConfig?: Record<string, unknown>;
   connectionId: string;
+  currentConnectionConfig: Record<string, unknown>;
   currentMethod: IntegrationConnectionMethod;
-  displayName: string;
+  displayName?: string;
   initialConnectionDisplayName?: string;
   mode: "update";
+  targetConfig: Record<string, unknown>;
+  targetDisplayName: string;
+  targetFamilyId: string;
   targetKey: string;
+  targetVariantId: string;
 };
 
 export type IntegrationConnectionDialogState =
   | CreateIntegrationConnectionDialogState
   | UpdateIntegrationConnectionDialogState;
 
+type ConnectionMethodFormUiModel =
+  | {
+      mode: "none";
+    }
+  | {
+      mode: "form";
+      schema: RJSFSchema;
+      uiSchema: UiSchema<Record<string, unknown>, RJSFSchema>;
+      value: Record<string, unknown>;
+      visiblePropertyKeys: readonly string[];
+    }
+  | {
+      mode: "unsupported";
+      message: string;
+    };
+
 type IntegrationConnectionDialogProps = {
+  configForm: ConnectionMethodFormUiModel;
+  configValue: Record<string, unknown>;
   connectionDisplayNamePlaceholder: string;
   connectionDisplayNameValue: string;
   connectError: string | null;
-  connectMethodId: IntegrationConnectionMethodId;
   dialog: IntegrationConnectionDialogState | null;
   hasChanges: boolean;
-  isSecretsChanged: boolean;
   isConnectionDisplayNameChanged: boolean;
-  pending: boolean;
-  onConnectionDisplayNameChange: (value: string) => void;
+  isSecretChanged: boolean;
+  methodId: IntegrationConnectionMethodId;
   onClose: () => void;
+  onConfigChange: (value: Record<string, unknown>) => void;
+  onConnectionDisplayNameChange: (value: string) => void;
   onMethodChange: (methodId: IntegrationConnectionMethodId) => void;
   onSecretChange: (name: string, value: string) => void;
   onSubmit: () => void;
+  pending: boolean;
   secrets: Record<string, string>;
 };
 
@@ -88,22 +94,15 @@ function formatIntegrationConnectionMethodLabel(method: IntegrationConnectionMet
   return method.label;
 }
 
-function resolveSelectedMethod(
-  dialog: IntegrationConnectionDialogState,
-  connectMethodId: IntegrationConnectionMethodId,
-): IntegrationConnectionMethod {
-  if (dialog.mode === "update") {
-    return dialog.currentMethod;
+function resolveSelectedMethod(input: {
+  dialog: IntegrationConnectionDialogState;
+  methodId: IntegrationConnectionMethodId;
+}): IntegrationConnectionMethod | null {
+  if (input.dialog.mode === "update") {
+    return input.dialog.currentMethod.id === input.methodId ? input.dialog.currentMethod : null;
   }
 
-  const selectedMethod = dialog.methods.find((method) => method.id === connectMethodId);
-  if (selectedMethod === undefined) {
-    throw new Error(
-      `Connection method '${connectMethodId}' is not defined for target '${dialog.targetKey}'.`,
-    );
-  }
-
-  return selectedMethod;
+  return input.dialog.methods.find((method) => method.id === input.methodId) ?? null;
 }
 
 export function IntegrationConnectionDialog(props: IntegrationConnectionDialogProps) {
@@ -111,7 +110,13 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
   const isUpdateMode = dialog?.mode === "update";
   const showMethodPicker = dialog?.mode === "create" && dialog.methods.length > 1;
   const selectedMethod =
-    dialog === null ? null : resolveSelectedMethod(dialog, props.connectMethodId);
+    dialog === null
+      ? null
+      : resolveSelectedMethod({
+          dialog,
+          methodId: props.methodId,
+        });
+  const showsSecretInput = selectedMethod?.kind === "form";
 
   return (
     <Dialog
@@ -128,7 +133,7 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
         <DialogContent showCloseButton={false}>
           <DialogHeader variant="sectioned">
             <DialogTitle>
-              {isUpdateMode ? "Edit Connection" : `Add ${dialog.displayName} Connection`}
+              {isUpdateMode ? "Edit Connection" : `Add ${dialog.targetDisplayName} Connection`}
             </DialogTitle>
           </DialogHeader>
 
@@ -154,7 +159,7 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
                 onValueChange={(nextValue) => {
                   props.onMethodChange(nextValue);
                 }}
-                value={props.connectMethodId}
+                value={props.methodId}
               >
                 {dialog.methods.map((method) => (
                   <label
@@ -174,13 +179,37 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
             </div>
           ) : null}
 
-          {selectedMethod?.kind === "form" ? (
+          {props.configForm.mode === "form" && props.configForm.visiblePropertyKeys.length > 0 ? (
+            <div className="gap-2 flex flex-col">
+              <p className="text-sm font-medium">Configuration</p>
+              <Form
+                formData={props.configValue}
+                noHtml5Validate
+                onChange={(event: IChangeEvent<Record<string, unknown>, RJSFSchema>) => {
+                  const nextValue = event.formData;
+                  props.onConfigChange(
+                    typeof nextValue === "object" && nextValue !== null && !Array.isArray(nextValue)
+                      ? nextValue
+                      : {},
+                  );
+                }}
+                schema={props.configForm.schema}
+                showErrorList={false}
+                templates={IntegrationFormTemplates}
+                uiSchema={props.configForm.uiSchema}
+                validator={validator}
+                widgets={IntegrationFormWidgets}
+              />
+            </div>
+          ) : null}
+
+          {showsSecretInput && selectedMethod !== null ? (
             <div className="gap-2 flex flex-col">
               {selectedMethod.secretFields.map((secretField) => (
                 <div className="gap-2 flex flex-col" key={secretField.name}>
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-medium">{secretField.label}</p>
-                    {isUpdateMode && props.isSecretsChanged ? (
+                    {isUpdateMode && props.isSecretChanged ? (
                       <span className="text-muted-foreground text-xs">Will update</span>
                     ) : null}
                   </div>
@@ -204,10 +233,12 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
                 </div>
               ))}
             </div>
+          ) : props.configForm.mode === "unsupported" ? (
+            <p className="text-destructive text-sm">{props.configForm.message}</p>
           ) : (
             <p className="text-muted-foreground text-sm">
               {isUpdateMode
-                ? "Save to update this connection name."
+                ? "Save to update this connection."
                 : "Continue to start the connection flow."}
             </p>
           )}

@@ -96,19 +96,34 @@ describe("integrations page view model", () => {
   });
 
   it("builds available integration cards with add actions and disabled invalid entries", () => {
-    let receivedTargetKey: string | null = null;
+    let openedDialogInput: {
+      targetKey: string;
+      targetFamilyId: string;
+      targetVariantId: string;
+      targetConfig: Record<string, unknown>;
+    } | null = null;
 
     const [card] = buildAvailableIntegrationViewCards({
       cards: [createCard({ description: "Bring GitHub into Mistle.", connectionMethods: [] })],
       onOpenCreateDialog: (input) => {
-        receivedTargetKey = input.targetKey;
+        openedDialogInput = {
+          targetKey: input.targetKey,
+          targetFamilyId: input.targetFamilyId,
+          targetVariantId: input.targetVariantId,
+          targetConfig: input.targetConfig,
+        };
       },
     });
 
     expect(card?.actionLabel).toBe("Add");
     expect(card?.actionDisabled).toBe(true);
     card?.onAction();
-    expect(receivedTargetKey).toBe("github");
+    expect(openedDialogInput).toEqual({
+      targetKey: "github",
+      targetFamilyId: "github",
+      targetVariantId: "github-cloud",
+      targetConfig: {},
+    });
   });
 
   it("builds detail items with auth labels and refreshing resource state", () => {

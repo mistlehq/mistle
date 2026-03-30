@@ -9,8 +9,7 @@ import {
   type IntegrationConnectionDialogState,
 } from "./integration-connection-dialog.js";
 
-const dialog: IntegrationConnectionDialogState = {
-  displayName: "OpenAI",
+const createDialog: IntegrationConnectionDialogState = {
   methods: [
     {
       id: IntegrationConnectionMethodIds.API_KEY,
@@ -32,7 +31,11 @@ const dialog: IntegrationConnectionDialogState = {
     },
   ],
   mode: "create",
+  targetConfig: {},
+  targetDisplayName: "OpenAI",
+  targetFamilyId: "openai",
   targetKey: "openai",
+  targetVariantId: "openai-default",
 };
 
 describe("IntegrationConnectionDialog", () => {
@@ -40,19 +43,24 @@ describe("IntegrationConnectionDialog", () => {
     cleanup();
   });
 
-  it("disables 1Password autofill for API key input", () => {
+  it("disables 1Password autofill for form secret input", () => {
     render(
       <IntegrationConnectionDialog
+        configForm={{
+          mode: "none",
+        }}
+        configValue={{}}
         connectionDisplayNamePlaceholder="OpenAI connection"
         connectionDisplayNameValue=""
         connectError={null}
-        connectMethodId={IntegrationConnectionMethodIds.API_KEY}
-        dialog={dialog}
+        dialog={createDialog}
         hasChanges={true}
-        isSecretsChanged={false}
         isConnectionDisplayNameChanged={false}
-        onConnectionDisplayNameChange={() => {}}
+        isSecretChanged={false}
+        methodId={IntegrationConnectionMethodIds.API_KEY}
         onClose={() => {}}
+        onConfigChange={() => {}}
+        onConnectionDisplayNameChange={() => {}}
         onMethodChange={() => {}}
         onSecretChange={() => {}}
         onSubmit={() => {}}
@@ -66,15 +74,95 @@ describe("IntegrationConnectionDialog", () => {
     expect(input.getAttribute("autocomplete")).toBe("off");
   });
 
+  it("renders definition-driven config fields for form methods", () => {
+    render(
+      <IntegrationConnectionDialog
+        configForm={{
+          mode: "form",
+          schema: {
+            type: "object",
+            properties: {
+              endpoint: {
+                type: "string",
+                title: "Endpoint",
+              },
+            },
+          },
+          uiSchema: {},
+          value: {
+            endpoint: "https://api.example.com",
+          },
+          visiblePropertyKeys: ["endpoint"],
+        }}
+        configValue={{
+          endpoint: "https://api.example.com",
+        }}
+        connectionDisplayNamePlaceholder="Example connection"
+        connectionDisplayNameValue=""
+        connectError={null}
+        dialog={{
+          methods: [
+            {
+              id: "custom-form",
+              label: "Custom token",
+              kind: "form",
+              secretFields: [
+                {
+                  name: "token",
+                  label: "Token",
+                  placeholder: "Paste token",
+                  inputType: "text",
+                },
+              ],
+            },
+          ],
+          mode: "create",
+          targetConfig: {},
+          targetDisplayName: "Example",
+          targetFamilyId: "example",
+          targetKey: "example",
+          targetVariantId: "example-default",
+        }}
+        hasChanges={true}
+        isConnectionDisplayNameChanged={false}
+        isSecretChanged={false}
+        methodId="custom-form"
+        onClose={() => {}}
+        onConfigChange={() => {}}
+        onConnectionDisplayNameChange={() => {}}
+        onMethodChange={() => {}}
+        onSecretChange={() => {}}
+        onSubmit={() => {}}
+        pending={false}
+        secrets={{}}
+      />,
+    );
+
+    expect(screen.getByText("Configuration")).toBeTruthy();
+    expect(screen.getByLabelText("Endpoint")).toBeTruthy();
+    expect(screen.getByPlaceholderText("Paste token")).toBeTruthy();
+  });
+
   it("does not render auth method selection in update mode", () => {
     render(
       <IntegrationConnectionDialog
+        configForm={{
+          mode: "none",
+        }}
+        configValue={{
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        }}
         connectionDisplayNamePlaceholder="OpenAI connection"
         connectionDisplayNameValue="Existing connection"
         connectError={null}
-        connectMethodId={IntegrationConnectionMethodIds.API_KEY}
         dialog={{
+          connectionConfig: {
+            connection_method: IntegrationConnectionMethodIds.API_KEY,
+          },
           connectionId: "icn_123",
+          currentConnectionConfig: {
+            connection_method: IntegrationConnectionMethodIds.API_KEY,
+          },
           currentMethod: {
             id: IntegrationConnectionMethodIds.API_KEY,
             label: "API key",
@@ -87,16 +175,21 @@ describe("IntegrationConnectionDialog", () => {
               },
             ],
           },
-          displayName: "OpenAI",
           initialConnectionDisplayName: "Existing connection",
           mode: "update",
+          targetConfig: {},
+          targetDisplayName: "OpenAI",
+          targetFamilyId: "openai",
           targetKey: "openai",
+          targetVariantId: "openai-default",
         }}
         hasChanges={false}
-        isSecretsChanged={false}
         isConnectionDisplayNameChanged={false}
-        onConnectionDisplayNameChange={() => {}}
+        isSecretChanged={false}
+        methodId={IntegrationConnectionMethodIds.API_KEY}
         onClose={() => {}}
+        onConfigChange={() => {}}
+        onConnectionDisplayNameChange={() => {}}
         onMethodChange={() => {}}
         onSecretChange={() => {}}
         onSubmit={() => {}}
@@ -112,27 +205,41 @@ describe("IntegrationConnectionDialog", () => {
   it("renders Save for redirect connections in update mode", () => {
     render(
       <IntegrationConnectionDialog
+        configForm={{
+          mode: "none",
+        }}
+        configValue={{}}
         connectionDisplayNamePlaceholder="OpenAI connection"
         connectionDisplayNameValue="Existing GitHub App installation connection"
         connectError={null}
-        connectMethodId={IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION}
         dialog={{
+          connectionConfig: {
+            connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          },
           connectionId: "icn_456",
+          currentConnectionConfig: {
+            connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          },
           currentMethod: {
             id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
             label: "GitHub App installation",
             kind: "redirect",
           },
-          displayName: "OpenAI",
           initialConnectionDisplayName: "Existing GitHub App installation connection",
           mode: "update",
+          targetConfig: {},
+          targetDisplayName: "OpenAI",
+          targetFamilyId: "openai",
           targetKey: "openai",
+          targetVariantId: "openai-default",
         }}
-        hasChanges={true}
-        isSecretsChanged={false}
-        isConnectionDisplayNameChanged={true}
-        onConnectionDisplayNameChange={() => {}}
+        hasChanges={false}
+        isConnectionDisplayNameChanged={false}
+        isSecretChanged={false}
+        methodId={IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION}
         onClose={() => {}}
+        onConfigChange={() => {}}
+        onConnectionDisplayNameChange={() => {}}
         onMethodChange={() => {}}
         onSecretChange={() => {}}
         onSubmit={() => {}}
@@ -143,7 +250,57 @@ describe("IntegrationConnectionDialog", () => {
 
     expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
-    expect(screen.getByText("Save to update this connection name.")).toBeTruthy();
-    expect(screen.queryByText("Continue to start the connection flow.")).toBeNull();
+    expect(screen.getByText("Save to update this connection.")).toBeTruthy();
+  });
+
+  it("renders Save when only the connection name changes in update mode", () => {
+    render(
+      <IntegrationConnectionDialog
+        configForm={{
+          mode: "none",
+        }}
+        configValue={{}}
+        connectionDisplayNamePlaceholder="OpenAI connection"
+        connectionDisplayNameValue="Updated GitHub App installation connection"
+        connectError={null}
+        dialog={{
+          connectionConfig: {
+            connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          },
+          connectionId: "icn_789",
+          currentConnectionConfig: {
+            connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          },
+          currentMethod: {
+            id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+            label: "GitHub App installation",
+            kind: "redirect",
+          },
+          initialConnectionDisplayName: "Existing GitHub App installation connection",
+          mode: "update",
+          targetConfig: {},
+          targetDisplayName: "OpenAI",
+          targetFamilyId: "openai",
+          targetKey: "openai",
+          targetVariantId: "openai-default",
+        }}
+        hasChanges={true}
+        isConnectionDisplayNameChanged={true}
+        isSecretChanged={false}
+        methodId={IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION}
+        onClose={() => {}}
+        onConfigChange={() => {}}
+        onConnectionDisplayNameChange={() => {}}
+        onMethodChange={() => {}}
+        onSecretChange={() => {}}
+        onSubmit={() => {}}
+        pending={false}
+        secrets={{}}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
+    expect(screen.getByText("Save to update this connection.")).toBeTruthy();
   });
 });

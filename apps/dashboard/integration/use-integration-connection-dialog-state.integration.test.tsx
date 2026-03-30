@@ -2,12 +2,12 @@
 
 import { createServer } from "node:http";
 
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { type ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { IntegrationConnectionMethodIds } from "../src/features/integrations/integration-connection-dialog.js";
 import { useIntegrationConnectionDialogState } from "../src/features/pages/use-integration-connection-dialog-state.js";
 import { createTestQueryClient } from "../src/test-support/query-client.js";
 
@@ -36,12 +36,12 @@ function readJsonBody(bodyText: string): unknown {
   return JSON.parse(bodyText);
 }
 
-describe("useIntegrationConnectionDialogState update API key behavior", () => {
+describe("useIntegrationConnectionDialogState update form behavior", () => {
   afterEach(() => {
     cleanup();
   });
 
-  it("omits apiKey for whitespace-only updates", async () => {
+  it("submits form updates without secret when the secret is blank", async () => {
     const capturedRequests: CapturedRequest[] = [];
     const server = createServer((request, response) => {
       const chunks: Buffer[] = [];
@@ -95,6 +95,9 @@ describe("useIntegrationConnectionDialogState update API key behavior", () => {
       act(() => {
         result.current.openDialog({
           mode: "update",
+          connectionConfig: {
+            connection_method: IntegrationConnectionMethodIds.API_KEY,
+          },
           connectionId: "icn_123",
           connectionDisplayName: "Existing connection",
           currentMethod: {
@@ -109,14 +112,19 @@ describe("useIntegrationConnectionDialogState update API key behavior", () => {
               },
             ],
           },
+          targetConfig: {
+            api_base_url: "https://api.openai.com",
+          },
           targetDisplayName: "OpenAI",
+          targetFamilyId: "openai",
           targetKey: "openai-default",
+          targetVariantId: "openai-default",
         });
         result.current.onConnectionDisplayNameChange("Renamed connection");
         result.current.onSecretChange("apiKey", "   ");
       });
 
-      expect(result.current.isSecretsChanged).toBe(false);
+      expect(result.current.isSecretChanged).toBe(false);
 
       act(() => {
         result.current.submitDialog();
@@ -126,9 +134,12 @@ describe("useIntegrationConnectionDialogState update API key behavior", () => {
         expect(capturedRequests.length).toBe(1);
       });
       expect(capturedRequests[0]?.method).toBe("PUT");
-      expect(capturedRequests[0]?.url).toBe("/v1/integration/connections/icn_123");
+      expect(capturedRequests[0]?.url).toBe("/v1/integration/connections/icn_123/form");
       expect(capturedRequests[0]?.body).toEqual({
         displayName: "Renamed connection",
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
       });
     } finally {
       await new Promise<void>((resolve, reject) => {

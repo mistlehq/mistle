@@ -3,9 +3,11 @@ export {
   refreshIntegrationConnectionResources,
 } from "./integration-connection-resources-service.js";
 export {
+  createFormIntegrationConnection,
   createApiKeyIntegrationConnection,
   deleteIntegrationConnection,
   startRedirectIntegrationConnection,
+  updateFormIntegrationConnection,
   updateApiKeyIntegrationConnection,
   updateIntegrationConnection,
 } from "./integration-connection-mutations-service.js";

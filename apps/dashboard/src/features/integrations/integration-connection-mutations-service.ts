@@ -4,6 +4,7 @@ import { requestControlPlane } from "../api/request-control-plane.js";
 import {
   type CreatedIntegrationConnection,
   type DeletedIntegrationConnection,
+  type IntegrationConnectionMethod,
   type StartedRedirectConnection,
   DeletedIntegrationConnectionSchema,
   IntegrationConnectionSchema,
@@ -12,25 +13,23 @@ import {
   wrapIntegrationsApiError,
 } from "./integrations-service-shared.js";
 
-export async function createApiKeyIntegrationConnection(input: {
+export async function createFormIntegrationConnection(input: {
   targetKey: string;
   displayName: string;
-  apiKey: string;
+  methodId: IntegrationConnectionMethod["id"];
+  config: Record<string, unknown>;
+  secrets: Record<string, string>;
 }): Promise<CreatedIntegrationConnection> {
   try {
     const response = await requestControlPlane({
-      operation: "createApiKeyIntegrationConnection",
+      operation: "createFormIntegrationConnection",
       method: "POST",
       pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/form`,
       body: {
         displayName: input.displayName,
-        methodId: IntegrationConnectionMethodIds.API_KEY,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-        secrets: {
-          apiKey: input.apiKey,
-        },
+        methodId: input.methodId,
+        config: input.config,
+        secrets: input.secrets,
       },
       fallbackMessage: "Could not create integration connection.",
     });
@@ -38,15 +37,33 @@ export async function createApiKeyIntegrationConnection(input: {
     return readJsonWithSchema({
       response,
       schema: IntegrationConnectionSchema,
-      operation: "createApiKeyIntegrationConnection",
+      operation: "createFormIntegrationConnection",
     });
   } catch (error) {
     throw wrapIntegrationsApiError({
-      operation: "createApiKeyIntegrationConnection",
+      operation: "createFormIntegrationConnection",
       error,
       fallbackMessage: "Could not create integration connection.",
     });
   }
+}
+
+export async function createApiKeyIntegrationConnection(input: {
+  targetKey: string;
+  displayName: string;
+  apiKey: string;
+}): Promise<CreatedIntegrationConnection> {
+  return createFormIntegrationConnection({
+    targetKey: input.targetKey,
+    displayName: input.displayName,
+    methodId: IntegrationConnectionMethodIds.API_KEY,
+    config: {
+      connection_method: IntegrationConnectionMethodIds.API_KEY,
+    },
+    secrets: {
+      apiKey: input.apiKey,
+    },
+  });
 }
 
 export async function updateIntegrationConnection(input: {
@@ -78,40 +95,54 @@ export async function updateIntegrationConnection(input: {
   }
 }
 
-export async function updateApiKeyIntegrationConnection(input: {
+export async function updateFormIntegrationConnection(input: {
   connectionId: string;
   displayName: string;
-  apiKey: string;
+  config: Record<string, unknown>;
+  secrets?: Record<string, string>;
 }): Promise<CreatedIntegrationConnection> {
   try {
     const response = await requestControlPlane({
-      operation: "updateApiKeyIntegrationConnection",
+      operation: "updateFormIntegrationConnection",
       method: "PUT",
       pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/form`,
       body: {
         displayName: input.displayName,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-        secrets: {
-          apiKey: input.apiKey,
-        },
+        config: input.config,
+        ...(input.secrets === undefined ? {} : { secrets: input.secrets }),
       },
-      fallbackMessage: "Could not update integration connection API key.",
+      fallbackMessage: "Could not update integration connection.",
     });
 
     return readJsonWithSchema({
       response,
       schema: IntegrationConnectionSchema,
-      operation: "updateApiKeyIntegrationConnection",
+      operation: "updateFormIntegrationConnection",
     });
   } catch (error) {
     throw wrapIntegrationsApiError({
-      operation: "updateApiKeyIntegrationConnection",
+      operation: "updateFormIntegrationConnection",
       error,
-      fallbackMessage: "Could not update integration connection API key.",
+      fallbackMessage: "Could not update integration connection.",
     });
   }
+}
+
+export async function updateApiKeyIntegrationConnection(input: {
+  connectionId: string;
+  displayName: string;
+  apiKey: string;
+}): Promise<CreatedIntegrationConnection> {
+  return updateFormIntegrationConnection({
+    connectionId: input.connectionId,
+    displayName: input.displayName,
+    config: {
+      connection_method: IntegrationConnectionMethodIds.API_KEY,
+    },
+    secrets: {
+      apiKey: input.apiKey,
+    },
+  });
 }
 
 export async function deleteIntegrationConnection(input: {

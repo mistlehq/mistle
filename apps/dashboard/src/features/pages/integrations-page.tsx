@@ -65,18 +65,21 @@ export function IntegrationsPage() {
       connectionDialog={
         <>
           <IntegrationConnectionDialog
+            configForm={connectionDialogState.configForm}
+            configValue={connectionDialogState.configValue}
             connectionDisplayNamePlaceholder={
               connectionDialogState.connectionDisplayNamePlaceholder
             }
             connectionDisplayNameValue={connectionDialogState.connectionDisplayNameValue}
             connectError={connectionDialogState.error}
-            connectMethodId={connectionDialogState.methodId}
             dialog={connectionDialogState.dialog}
             hasChanges={connectionDialogState.hasChanges}
-            isSecretsChanged={connectionDialogState.isSecretsChanged}
             isConnectionDisplayNameChanged={connectionDialogState.isConnectionDisplayNameChanged}
-            onConnectionDisplayNameChange={connectionDialogState.onConnectionDisplayNameChange}
+            isSecretChanged={connectionDialogState.isSecretChanged}
+            methodId={connectionDialogState.methodId}
             onClose={connectionDialogState.closeDialog}
+            onConfigChange={connectionDialogState.onConfigChange}
+            onConnectionDisplayNameChange={connectionDialogState.onConnectionDisplayNameChange}
             onMethodChange={connectionDialogState.onMethodChange}
             onSecretChange={connectionDialogState.onSecretChange}
             onSubmit={connectionDialogState.submitDialog}

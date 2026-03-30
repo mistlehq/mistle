@@ -1,17 +1,17 @@
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import {
-  type IntegrationConnectionDialogState,
-  type IntegrationConnectionMethod,
-  type IntegrationConnectionMethodId,
-  IntegrationConnectionMethodIds,
+import type {
+  IntegrationConnectionDialogState,
+  IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-dialog.js";
+import type { IntegrationConnectionMethod } from "../integrations/integrations-service-shared.js";
 import {
-  createApiKeyIntegrationConnection,
+  createFormIntegrationConnection,
   startRedirectIntegrationConnection,
-  updateApiKeyIntegrationConnection,
+  updateFormIntegrationConnection,
   updateIntegrationConnection,
 } from "../integrations/integrations-service.js";
 import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
@@ -20,7 +20,10 @@ import {
   createOpenIntegrationConnectionDialogState,
   hasIntegrationConnectionDialogChanges,
   isIntegrationConnectionDisplayNameChanged,
+  resolveConnectionMethodFormUiModel,
+  resolveDefaultMethodId,
   resolveIntegrationConnectionDialogValidationError,
+  resolveNextDraftForMethodChange,
 } from "./use-integration-connection-dialog-state-helpers.js";
 
 function isRedirectConnectionMethodId(
@@ -35,17 +38,12 @@ function isRedirectConnectionMethodId(
 function resolveSelectedMethod(input: {
   dialog: IntegrationConnectionDialogState;
   methodId: IntegrationConnectionMethodId;
-}): IntegrationConnectionMethod {
-  const supportedMethods =
-    input.dialog.mode === "create" ? input.dialog.methods : [input.dialog.currentMethod];
-  const selectedMethod = supportedMethods.find((method) => method.id === input.methodId);
-  if (selectedMethod === undefined) {
-    throw new Error(
-      `Connection method '${input.methodId}' is not defined for target '${input.dialog.targetKey}'.`,
-    );
+}): IntegrationConnectionMethod | null {
+  if (input.dialog.mode === "update") {
+    return input.dialog.currentMethod.id === input.methodId ? input.dialog.currentMethod : null;
   }
 
-  return selectedMethod;
+  return input.dialog.methods.find((method) => method.id === input.methodId) ?? null;
 }
 
 export function useIntegrationConnectionDialogState(input: { queryKey: readonly unknown[] }) {
@@ -55,9 +53,14 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     createClosedIntegrationConnectionDialogDraft(IntegrationConnectionMethodIds.API_KEY),
   );
 
-  const createApiKeyMutation = useMutation({
-    mutationFn: async (mutationInput: { targetKey: string; displayName: string; apiKey: string }) =>
-      createApiKeyIntegrationConnection(mutationInput),
+  const createFormMutation = useMutation({
+    mutationFn: async (mutationInput: {
+      targetKey: string;
+      displayName: string;
+      methodId: IntegrationConnectionMethodId;
+      config: Record<string, unknown>;
+      secrets: Record<string, string>;
+    }) => createFormIntegrationConnection(mutationInput),
   });
 
   const startRedirectMutation = useMutation({
@@ -73,13 +76,25 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       updateIntegrationConnection(mutationInput),
   });
 
-  const updateApiKeyMutation = useMutation({
+  const updateFormMutation = useMutation({
     mutationFn: async (mutationInput: {
       connectionId: string;
       displayName: string;
-      apiKey: string;
-    }) => updateApiKeyIntegrationConnection(mutationInput),
+      config: Record<string, unknown>;
+      secrets?: Record<string, string>;
+    }) => updateFormIntegrationConnection(mutationInput),
   });
+
+  const configForm: ReturnType<typeof resolveConnectionMethodFormUiModel> =
+    dialog === null
+      ? {
+          mode: "none",
+        }
+      : resolveConnectionMethodFormUiModel({
+          dialog,
+          methodId: draft.methodId,
+          currentValue: draft.configValue,
+        });
 
   function closeDialog(): void {
     setDialog(null);
@@ -88,6 +103,10 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
 
   function openDialog(openInput: OpenIntegrationConnectionDialogInput): void {
     const nextState = createOpenIntegrationConnectionDialogState({
+      defaultMethodId:
+        openInput.mode === "create"
+          ? resolveDefaultMethodId(openInput.methods)
+          : openInput.currentMethod.id,
       openInput,
     });
     setDialog(nextState.dialog);
@@ -113,44 +132,33 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       return;
     }
 
+    const normalizedConnectionDisplayName = draft.connectionDisplayNameValue.trim();
     const selectedMethod = resolveSelectedMethod({
       dialog,
       methodId: draft.methodId,
     });
 
-    if (selectedMethod.kind === "form") {
-      const submittedSecrets = Object.fromEntries(
-        Object.entries(draft.secrets).map(([key, value]) => [key, value.trim()]),
+    if (selectedMethod?.kind === "form") {
+      const normalizedSecrets = Object.fromEntries(
+        Object.entries(draft.secrets)
+          .map(([name, value]) => [name, value.trim()])
+          .filter(([, value]) => value.length > 0),
       );
-      const populatedSecrets = Object.entries(submittedSecrets).filter(
-        ([, value]) => value.length > 0,
-      );
-      if (populatedSecrets.length > 1) {
-        throw new Error(
-          `Connection method '${selectedMethod.id}' cannot submit multiple secrets until the generic form routes are available.`,
-        );
-      }
-      const normalizedApiKey = populatedSecrets[0]?.[1] ?? "";
-      const normalizedConnectionDisplayName = draft.connectionDisplayNameValue.trim();
 
       if (dialog.mode === "update") {
-        if (normalizedApiKey.length === 0) {
-          await updateConnectionMetadataMutation.mutateAsync({
-            connectionId: dialog.connectionId,
-            displayName: normalizedConnectionDisplayName,
-          });
-        } else {
-          await updateApiKeyMutation.mutateAsync({
-            connectionId: dialog.connectionId,
-            displayName: normalizedConnectionDisplayName,
-            apiKey: normalizedApiKey,
-          });
-        }
+        await updateFormMutation.mutateAsync({
+          connectionId: dialog.connectionId,
+          displayName: normalizedConnectionDisplayName,
+          config: draft.configValue,
+          ...(Object.keys(normalizedSecrets).length === 0 ? {} : { secrets: normalizedSecrets }),
+        });
       } else {
-        await createApiKeyMutation.mutateAsync({
+        await createFormMutation.mutateAsync({
           targetKey: dialog.targetKey,
           displayName: normalizedConnectionDisplayName,
-          apiKey: normalizedApiKey,
+          methodId: draft.methodId,
+          config: draft.configValue,
+          secrets: normalizedSecrets,
         });
       }
 
@@ -165,7 +173,7 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     if (dialog.mode === "update") {
       await updateConnectionMetadataMutation.mutateAsync({
         connectionId: dialog.connectionId,
-        displayName: draft.connectionDisplayNameValue.trim(),
+        displayName: normalizedConnectionDisplayName,
       });
 
       await queryClient.invalidateQueries({
@@ -183,9 +191,9 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     const started = await startRedirectMutation.mutateAsync({
       targetKey: dialog.targetKey,
       methodId: draft.methodId,
-      ...(draft.connectionDisplayNameValue.trim().length === 0
+      ...(normalizedConnectionDisplayName.length === 0
         ? {}
-        : { displayName: draft.connectionDisplayNameValue.trim() }),
+        : { displayName: normalizedConnectionDisplayName }),
     });
     globalThis.location.assign(started.authorizationUrl);
   }
@@ -210,6 +218,8 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
   }
 
   return {
+    configForm,
+    configValue: draft.configValue,
     dialog,
     methodId: draft.methodId,
     connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
@@ -217,17 +227,19 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     secrets: draft.secrets,
     error: draft.error,
     pending:
-      createApiKeyMutation.isPending ||
+      createFormMutation.isPending ||
       startRedirectMutation.isPending ||
       updateConnectionMetadataMutation.isPending ||
-      updateApiKeyMutation.isPending,
+      updateFormMutation.isPending,
     hasChanges: hasIntegrationConnectionDialogChanges({
       dialog,
       connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
       connectionDisplayNameValue: draft.connectionDisplayNameValue,
+      configValue: draft.configValue,
+      initialConfigValue: draft.initialConfigValue,
       secrets: draft.secrets,
     }),
-    isSecretsChanged: Object.values(draft.secrets).some((value) => value.trim().length > 0),
+    isSecretChanged: Object.values(draft.secrets).some((value) => value.trim().length > 0),
     isConnectionDisplayNameChanged: isIntegrationConnectionDisplayNameChanged({
       dialog,
       connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
@@ -236,14 +248,21 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     openDialog,
     closeDialog,
     submitDialog,
+    onConfigChange: (value: Record<string, unknown>): void => {
+      setDraft((currentDraft) => ({
+        ...currentDraft,
+        configValue: value,
+        error: null,
+      }));
+    },
     onSecretChange: (name: string, value: string): void => {
       setDraft((currentDraft) => ({
         ...currentDraft,
+        error: null,
         secrets: {
           ...currentDraft.secrets,
           [name]: value,
         },
-        error: null,
       }));
     },
     onConnectionDisplayNameChange: (value: string): void => {
@@ -254,11 +273,17 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       }));
     },
     onMethodChange: (nextMethodId: IntegrationConnectionMethodId): void => {
-      setDraft((currentDraft) => ({
-        ...currentDraft,
-        methodId: nextMethodId,
-        error: null,
-      }));
+      if (dialog === null) {
+        return;
+      }
+
+      setDraft((currentDraft) =>
+        resolveNextDraftForMethodChange({
+          dialog,
+          nextMethodId,
+          currentDraft,
+        }),
+      );
     },
   };
 }
