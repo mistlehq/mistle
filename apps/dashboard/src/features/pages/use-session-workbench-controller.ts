@@ -221,6 +221,7 @@ export function useSessionWorkbenchController(input: {
 
     setIsSwitchingPrimaryPanel(true);
     try {
+      await cliPtyState.actions.closePty();
       await cliPtyState.actions.disconnectPty();
       serverRequests.resetServerRequests();
       shouldHydrateAfterCliExitRef.current = true;
