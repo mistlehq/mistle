@@ -335,6 +335,17 @@ export function hasFreshSandboxStatusRead(input: {
   return input.currentDataUpdatedAtMs > input.initialDataUpdatedAtMs;
 }
 
+export function hasFreshSandboxStatusReadSinceRecoveryBoundary(input: {
+  recoveryBoundaryDataUpdatedAtMs: number | null;
+  currentDataUpdatedAtMs: number;
+}): boolean {
+  if (input.recoveryBoundaryDataUpdatedAtMs === null) {
+    return true;
+  }
+
+  return input.currentDataUpdatedAtMs > input.recoveryBoundaryDataUpdatedAtMs;
+}
+
 export function shouldShowResumeInFlightState(input: {
   hasAttemptedInitialStoppedResume: boolean;
   resumeActionErrorMessage: string | null;
@@ -462,6 +473,10 @@ export function useSessionWorkbenchLifecycleState(input: {
   const resumeIdempotencyKeyRef = useRef<string | null>(null);
   const nextResumeRequestIdRef = useRef(0);
   const initialSandboxStatusDataUpdatedAtRef = useRef<number | null>(null);
+  // Recovery must not trust a cached pre-reset "running" read. Each reset/disconnect
+  // records the latest query timestamp and blocks reconnect logic until a newer read lands.
+  const recoveryStatusBoundaryDataUpdatedAtRef = useRef<number | null>(null);
+  const lastRecoverableDisconnectIdRef = useRef<number | null>(null);
 
   const {
     agentConnectionState,
@@ -521,10 +536,16 @@ export function useSessionWorkbenchLifecycleState(input: {
     initialSandboxStatusDataUpdatedAtRef.current = sandboxStatusQuery.dataUpdatedAt;
   }
 
-  const hasFreshSandboxStatus = hasFreshSandboxStatusRead({
+  const hasFreshSandboxStatusSinceMount = hasFreshSandboxStatusRead({
     initialDataUpdatedAtMs: initialSandboxStatusDataUpdatedAtRef.current,
     currentDataUpdatedAtMs: sandboxStatusQuery.dataUpdatedAt,
   });
+  const hasFreshSandboxStatusSinceRecovery = hasFreshSandboxStatusReadSinceRecoveryBoundary({
+    recoveryBoundaryDataUpdatedAtMs: recoveryStatusBoundaryDataUpdatedAtRef.current,
+    currentDataUpdatedAtMs: sandboxStatusQuery.dataUpdatedAt,
+  });
+  const hasFreshSandboxStatus =
+    hasFreshSandboxStatusSinceMount && hasFreshSandboxStatusSinceRecovery;
   const sandboxStatus = hasFreshSandboxStatus ? (sandboxStatusQuery.data?.status ?? null) : null;
   const shouldAttemptRecoverableStoppedResume =
     input.sandboxInstanceId !== null &&
@@ -581,6 +602,33 @@ export function useSessionWorkbenchLifecycleState(input: {
   }, [recoverableDisconnect]);
 
   useEffect(() => {
+    if (recoverableDisconnect === null) {
+      return;
+    }
+
+    if (lastRecoverableDisconnectIdRef.current === recoverableDisconnect.id) {
+      return;
+    }
+
+    lastRecoverableDisconnectIdRef.current = recoverableDisconnect.id;
+    recoveryStatusBoundaryDataUpdatedAtRef.current = sandboxStatusQuery.dataUpdatedAt;
+    void sandboxStatusQuery.refetch().catch(() => {});
+  }, [recoverableDisconnect, sandboxStatusQuery.dataUpdatedAt, sandboxStatusQuery.refetch]);
+
+  useEffect(() => {
+    if (input.ptyState.lifecycle.resetInfo === null) {
+      return;
+    }
+
+    recoveryStatusBoundaryDataUpdatedAtRef.current = sandboxStatusQuery.dataUpdatedAt;
+    void sandboxStatusQuery.refetch().catch(() => {});
+  }, [
+    input.ptyState.lifecycle.resetInfo,
+    sandboxStatusQuery.dataUpdatedAt,
+    sandboxStatusQuery.refetch,
+  ]);
+
+  useEffect(() => {
     if (connectedSession === null) {
       return;
     }
@@ -610,6 +658,9 @@ export function useSessionWorkbenchLifecycleState(input: {
     });
     activeResumeRequestRef.current = null;
     resumeIdempotencyKeyRef.current = null;
+    initialSandboxStatusDataUpdatedAtRef.current = null;
+    recoveryStatusBoundaryDataUpdatedAtRef.current = null;
+    lastRecoverableDisconnectIdRef.current = null;
   }, [input.sandboxInstanceId]);
 
   useEffect(() => {

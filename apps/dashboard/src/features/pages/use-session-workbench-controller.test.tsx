@@ -9,6 +9,7 @@ import {
   getSandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
+  hasFreshSandboxStatusReadSinceRecoveryBoundary,
   isActiveResumeRequest,
   reduceCodexRecoveryState,
   resolveCodexReconnectMessage,
@@ -294,6 +295,29 @@ describe("useSessionWorkbenchController", () => {
         sandboxStatus: "stopped",
       }),
     ).toBe("Sandbox session stream reset. Resuming sandbox to restore the session.");
+  });
+
+  it("requires a post-reset sandbox status read before recovery can trust cached status", () => {
+    expect(
+      hasFreshSandboxStatusReadSinceRecoveryBoundary({
+        recoveryBoundaryDataUpdatedAtMs: 1_000,
+        currentDataUpdatedAtMs: 1_000,
+      }),
+    ).toBe(false);
+
+    expect(
+      hasFreshSandboxStatusReadSinceRecoveryBoundary({
+        recoveryBoundaryDataUpdatedAtMs: 1_000,
+        currentDataUpdatedAtMs: 1_001,
+      }),
+    ).toBe(true);
+
+    expect(
+      hasFreshSandboxStatusReadSinceRecoveryBoundary({
+        recoveryBoundaryDataUpdatedAtMs: null,
+        currentDataUpdatedAtMs: 1_000,
+      }),
+    ).toBe(true);
   });
 
   it("persists terminal panel visibility and size per sandbox instance", () => {
