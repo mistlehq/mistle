@@ -5,6 +5,7 @@ export {
 } from "./use-session-bootstrap.js";
 export {
   resolveBootstrapConnectionContext,
+  type BootstrapConnectionCandidate,
   type BootstrapConnectionContext,
 } from "./session-bootstrap-strategy.js";
 export {

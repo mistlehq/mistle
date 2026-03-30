@@ -48,38 +48,23 @@ export const ReadyToSend: Story = {
 export const SteeringTurn: Story = {
   args: {
     composerText: "Focus only on Storybook asset ownership.",
-    composerUi: {
-      ...SessionComposerFixtureProps.composerUi,
-      action: {
-        ...SessionComposerFixtureProps.composerUi.action,
-        canInterruptTurn: true,
-        canSteerTurn: true,
-      },
-    },
+    submitMode: "steer",
+    submitLabel: "Steer",
   },
 };
 
 export const InterruptOnly: Story = {
   args: {
     composerText: "",
-    composerUi: {
-      ...SessionComposerFixtureProps.composerUi,
-      action: {
-        ...SessionComposerFixtureProps.composerUi.action,
-        canInterruptTurn: true,
-        canSteerTurn: false,
-      },
-    },
+    submitMode: "interrupt",
+    submitLabel: "Stop",
   },
 };
 
 export const DisconnectedWithError: Story = {
   args: {
-    composerUi: {
-      ...SessionComposerFixtureProps.composerUi,
-      completedErrorMessage: "The session disconnected before the turn could be submitted.",
-      isConnected: false,
-    },
+    completedTurnErrorMessage: "The session disconnected before the turn could be submitted.",
+    submitDisabled: true,
   },
 };
 

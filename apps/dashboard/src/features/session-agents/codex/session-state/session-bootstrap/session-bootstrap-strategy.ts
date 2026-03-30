@@ -1,8 +1,12 @@
-import type { ConnectedCodexSession } from "../codex-session-types.js";
-
 export type BootstrapConnectionContext = {
   connectionKey: string;
   threadId: string;
+};
+
+export type BootstrapConnectionCandidate = {
+  sandboxInstanceId: string;
+  connectedAtIso: string;
+  threadId: string | null;
 };
 
 export type SessionBootstrapPlan = {
@@ -11,20 +15,20 @@ export type SessionBootstrapPlan = {
   threadSyncKey: string | null;
 };
 
-function createConnectionKey(connectedSession: ConnectedCodexSession): string {
-  return `${connectedSession.sandboxInstanceId}:${connectedSession.connectedAtIso}`;
+function createConnectionKey(candidate: BootstrapConnectionCandidate): string {
+  return `${candidate.sandboxInstanceId}:${candidate.connectedAtIso}`;
 }
 
 export function resolveBootstrapConnectionContext(input: {
-  connectedSession: ConnectedCodexSession | null;
+  connectionCandidate: BootstrapConnectionCandidate | null;
 }): BootstrapConnectionContext | null {
-  if (input.connectedSession === null || input.connectedSession.threadId === null) {
+  if (input.connectionCandidate === null || input.connectionCandidate.threadId === null) {
     return null;
   }
 
   return {
-    connectionKey: createConnectionKey(input.connectedSession),
-    threadId: input.connectedSession.threadId,
+    connectionKey: createConnectionKey(input.connectionCandidate),
+    threadId: input.connectionCandidate.threadId,
   };
 }
 

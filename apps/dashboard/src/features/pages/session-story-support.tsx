@@ -1,5 +1,6 @@
 import { Badge } from "@mistle/ui";
 
+import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { noop, noopRespondToServerRequest } from "../chat/components/chat-story-support.js";
 import {
   SessionComposerFixtureProps,
@@ -9,7 +10,6 @@ import {
 import {
   SessionConversationBottomPanel,
   SessionConversationMainContent,
-  type SessionConversationComposerProps,
 } from "./session-conversation-pane.js";
 import {
   SessionWorkbenchPageView,
@@ -20,7 +20,7 @@ export const StorySandboxInstanceId = "sbi_storybook";
 
 export type SessionConversationStoryArgs = {
   chatEntries: React.ComponentProps<typeof SessionConversationMainContent>["chatEntries"];
-  composerViewModel: SessionConversationComposerProps;
+  composerViewModel: ChatComposerViewModel;
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: React.ComponentProps<
     typeof SessionConversationMainContent

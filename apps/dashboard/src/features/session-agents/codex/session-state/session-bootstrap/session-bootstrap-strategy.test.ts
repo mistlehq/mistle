@@ -9,7 +9,7 @@ describe("bootstrap connection context", () => {
   it("returns null when no connected session exists", () => {
     expect(
       resolveBootstrapConnectionContext({
-        connectedSession: null,
+        connectionCandidate: null,
       }),
     ).toBeNull();
   });
@@ -17,11 +17,9 @@ describe("bootstrap connection context", () => {
   it("returns null when no thread is bound yet", () => {
     expect(
       resolveBootstrapConnectionContext({
-        connectedSession: {
+        connectionCandidate: {
           sandboxInstanceId: "sandbox_123",
           connectedAtIso: "2026-03-27T00:00:00.000Z",
-          expiresAtIso: "2026-03-27T01:00:00.000Z",
-          connectionUrl: "wss://example.invalid",
           threadId: null,
         },
       }),
@@ -31,11 +29,9 @@ describe("bootstrap connection context", () => {
   it("derives a reduced bootstrap context once a thread is bound", () => {
     expect(
       resolveBootstrapConnectionContext({
-        connectedSession: {
+        connectionCandidate: {
           sandboxInstanceId: "sandbox_123",
           connectedAtIso: "2026-03-27T00:00:00.000Z",
-          expiresAtIso: "2026-03-27T01:00:00.000Z",
-          connectionUrl: "wss://example.invalid",
           threadId: "thread_123",
         },
       }),

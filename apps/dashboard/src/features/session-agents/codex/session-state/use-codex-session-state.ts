@@ -27,6 +27,7 @@ import {
   useCodexSessionBootstrapData,
   useSessionBootstrap,
   resolveBootstrapConnectionContext,
+  type BootstrapConnectionCandidate,
   type CodexSessionBootstrapDataState,
   type CodexSessionConfigState,
   type SessionBootstrapResult,
@@ -220,12 +221,23 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     threadIdRef,
   });
   const { connectedSession } = lifecycle;
+  const bootstrapConnectionCandidate = useMemo<BootstrapConnectionCandidate | null>(() => {
+    if (connectedSession === null) {
+      return null;
+    }
+
+    return {
+      sandboxInstanceId: connectedSession.sandboxInstanceId,
+      connectedAtIso: connectedSession.connectedAtIso,
+      threadId: connectedSession.threadId,
+    };
+  }, [connectedSession]);
   const bootstrapConnectionContext = useMemo(
     () =>
       resolveBootstrapConnectionContext({
-        connectedSession,
+        connectionCandidate: bootstrapConnectionCandidate,
       }),
-    [connectedSession],
+    [bootstrapConnectionCandidate],
   );
 
   const bootstrap = useSessionBootstrap({

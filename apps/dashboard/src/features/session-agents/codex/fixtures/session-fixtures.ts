@@ -1,6 +1,8 @@
 import type { ChatEntry } from "../../../chat/chat-types.js";
-import type { ChatComposerStatusMessage } from "../../../chat/components/chat-composer.js";
-import type { SessionConversationComposerProps } from "../../../pages/session-conversation-pane.js";
+import type {
+  ChatComposerStatusMessage,
+  ChatComposerViewModel,
+} from "../../../chat/components/chat-composer.js";
 import type { CodexApprovalRequestEntry } from "../approvals/codex-approval-requests-state.js";
 import { CodexFixtureExploringGroupEntry } from "./chat-fixtures.js";
 
@@ -54,7 +56,7 @@ export const CodexFixtureSessionEntriesWithExploringGroup: readonly ChatEntry[] 
 
 export const CodexFixtureSessionServerRequests: readonly CodexApprovalRequestEntry[] = [];
 
-export const SessionComposerFixtureProps: SessionConversationComposerProps = {
+export const SessionComposerFixtureProps: ChatComposerViewModel = {
   composerText: "Focus on dashboard asset ownership next.",
   pendingAttachments: [],
   modelOptions: CodexFixtureSessionModelOptions,
@@ -77,29 +79,26 @@ export const SessionComposerFixtureProps: SessionConversationComposerProps = {
   onRemovePendingAttachment: function onRemovePendingAttachment() {},
 };
 
-export const SessionComposerFixturePropsWithPendingImageAttachments: SessionConversationComposerProps =
-  {
-    ...SessionComposerFixtureProps,
-    composerText: "Compare the attached screenshots and summarize the UI differences.",
-    pendingAttachments: [
-      { id: "attachment-1", name: "session-workbench-overview.png" },
-      { id: "attachment-2", name: "terminal-panel-empty-state.webp" },
-    ],
-  };
+export const SessionComposerFixturePropsWithPendingImageAttachments: ChatComposerViewModel = {
+  ...SessionComposerFixtureProps,
+  composerText: "Compare the attached screenshots and summarize the UI differences.",
+  pendingAttachments: [
+    { id: "attachment-1", name: "session-workbench-overview.png" },
+    { id: "attachment-2", name: "terminal-panel-empty-state.webp" },
+  ],
+};
 
-export const SessionComposerFixturePropsUploadingImageAttachments: SessionConversationComposerProps =
-  {
-    ...SessionComposerFixturePropsWithPendingImageAttachments,
-    isUploadingAttachments: true,
-    submitDisabled: true,
-    submitLabel: "Uploading...",
-  };
+export const SessionComposerFixturePropsUploadingImageAttachments: ChatComposerViewModel = {
+  ...SessionComposerFixturePropsWithPendingImageAttachments,
+  isUploadingAttachments: true,
+  submitDisabled: true,
+  submitLabel: "Uploading...",
+};
 
-export const SessionComposerFixturePropsForNonImageCapableModel: SessionConversationComposerProps =
-  {
-    ...SessionComposerFixturePropsWithPendingImageAttachments,
-    selectedModel: "gpt-5.3-codex-spark",
-  };
+export const SessionComposerFixturePropsForNonImageCapableModel: ChatComposerViewModel = {
+  ...SessionComposerFixturePropsWithPendingImageAttachments,
+  selectedModel: "gpt-5.3-codex-spark",
+};
 
 export const SessionComposerFixtureStatusMessageForNonImageCapableModel: ChatComposerStatusMessage =
   {
@@ -108,7 +107,7 @@ export const SessionComposerFixtureStatusMessageForNonImageCapableModel: ChatCom
     tone: "warning",
   };
 
-export const SessionComposerFixturePropsForUnavailableModel: SessionConversationComposerProps = {
+export const SessionComposerFixturePropsForUnavailableModel: ChatComposerViewModel = {
   ...SessionComposerFixturePropsWithPendingImageAttachments,
   selectedModel: "gpt-legacy-preview",
 };
@@ -118,7 +117,7 @@ export const SessionComposerFixtureStatusMessageForUnavailableModel: ChatCompose
   tone: "error",
 };
 
-export const SessionComposerFixturePropsForLoadingModel: SessionConversationComposerProps = {
+export const SessionComposerFixturePropsForLoadingModel: ChatComposerViewModel = {
   ...SessionComposerFixturePropsWithPendingImageAttachments,
   submitDisabled: true,
   selectedModel: "gpt-5.4",

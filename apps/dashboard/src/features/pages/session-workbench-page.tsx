@@ -3,12 +3,12 @@ import { TerminalIcon } from "@phosphor-icons/react";
 import { useEffect, useMemo } from "react";
 import { useLocation, useParams } from "react-router";
 
+import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import {
   SessionConversationBottomPanel,
   SessionConversationBottomPanelController,
   SessionConversationMainContent,
-  type SessionConversationComposerProps,
 } from "./session-conversation-pane.js";
 import { SessionTerminalPanel } from "./session-terminal-panel.js";
 import {
@@ -180,7 +180,7 @@ function SessionWorkbenchPageContent(input: {
         primaryBottomPanel={
           <SessionConversationBottomPanel
             chatEntries={[]}
-            composerViewModel={createEmptyComposerProps()}
+            composerViewModel={createEmptyComposerViewModel()}
             isRespondingToServerRequest={false}
             onRespondToServerRequest={function onRespondToServerRequest() {}}
             serverRequestPanelEntries={[]}
@@ -269,7 +269,7 @@ function SessionWorkbenchAutoResumeOnEntry(input: {
   return null;
 }
 
-function createEmptyComposerProps(): SessionConversationComposerProps {
+function createEmptyComposerViewModel(): ChatComposerViewModel {
   return {
     composerText: "",
     pendingAttachments: [],

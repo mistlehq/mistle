@@ -10,8 +10,6 @@ import {
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
 
-export type SessionConversationComposerProps = ChatComposerViewModel;
-
 type SessionConversationMainContentProps = {
   chatEntries: readonly ChatEntry[];
   serverRequestPanelEntries: readonly CodexApprovalRequestEntry[];
