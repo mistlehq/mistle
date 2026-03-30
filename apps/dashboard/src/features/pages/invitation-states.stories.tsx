@@ -4,6 +4,7 @@ import { expect, within } from "storybook/test";
 
 import { AuthStatusPage } from "../auth/auth-status-page.js";
 import { StatusBox } from "../shared/status-box.js";
+import { InvitationLoadingState } from "./invitation-loading-state.js";
 
 const meta = {
   title: "Dashboard/Onboarding/InvitationStates",
@@ -41,6 +42,18 @@ export const LinkInvalid: Story = {
       canvas.queryByRole("button", { name: "Accept invitation" }),
     ).not.toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: "Decline" })).not.toBeInTheDocument();
+  },
+};
+
+export const Loading: Story = {
+  render: () => <InvitationLoadingState />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Shown while the invitation route is resolving session or invitation details before a terminal or actionable state can be rendered.",
+      },
+    },
   },
 };
 

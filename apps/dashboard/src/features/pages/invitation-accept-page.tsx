@@ -22,6 +22,7 @@ import {
 } from "./invitation-accept-state.js";
 import { InvitationAccessView } from "./invitation-access-view.js";
 import { InvitationAuthPrompt } from "./invitation-auth-prompt.js";
+import { InvitationLoadingState } from "./invitation-loading-state.js";
 import { getInvitationPageState } from "./invitation-page-state.js";
 import { useInvitationAuth } from "./use-invitation-auth.js";
 
@@ -161,7 +162,7 @@ export function InvitationAcceptPage(): React.JSX.Element {
   });
 
   if (pageState.kind === "loading_session" || pageState.kind === "loading_invitation") {
-    return <></>;
+    return <InvitationLoadingState />;
   }
 
   if (pageState.kind === "missing_id") {

@@ -18,6 +18,10 @@ export function NoOrganizationAccessViewContent(
 ): React.JSX.Element {
   return (
     <>
+      {props.organizationNameError === null ? null : (
+        <StatusBox tone="destructive">{props.organizationNameError}</StatusBox>
+      )}
+
       {props.createOrganizationError === null ? null : (
         <StatusBox tone="destructive">{props.createOrganizationError}</StatusBox>
       )}
