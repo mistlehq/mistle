@@ -426,14 +426,14 @@ export function useCodexSessionConnection(input: {
       input.setLifecycleErrorMessage(null);
     },
     onError: (error) => {
-      if (error instanceof StaleConnectionAttemptError) {
+      if (isStaleConnectionAttemptError(error)) {
         return;
       }
 
       setStep("idle");
-      if (error instanceof Error) {
-        setAgentConnectionError(error.message);
-      }
+      setAgentConnectionError(
+        getCodexSessionErrorMessage(error, "Could not restore sandbox session."),
+      );
     },
   });
 
