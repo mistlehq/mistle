@@ -1,3 +1,4 @@
+import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -220,16 +221,42 @@ export function useSessionWorkbenchController(input: {
     }
 
     setIsSwitchingPrimaryPanel(true);
+    serverRequests.resetServerRequests();
+    shouldHydrateAfterCliExitRef.current = true;
+    setPrimaryPanelMode("chat");
+    if (sessionSnapshot !== null) {
+      lifecycle.connectSession({
+        sandboxInstanceId: input.sandboxInstanceId,
+        preferredThreadId: sessionSnapshot.threadId,
+      });
+    }
+
     try {
-      await cliPtyState.actions.closePty();
-      await cliPtyState.actions.disconnectPty();
-      serverRequests.resetServerRequests();
-      shouldHydrateAfterCliExitRef.current = true;
-      setPrimaryPanelMode("chat");
+      if (cliPtyState.lifecycle.state === SandboxPtyStates.OPEN) {
+        try {
+          await cliPtyState.actions.closePty();
+        } catch {
+          // Returning to chat must not depend on the CLI PTY still being closable.
+        }
+      }
+      try {
+        await cliPtyState.actions.disconnectPty();
+      } catch {
+        // Returning to chat must not depend on the CLI PTY websocket disconnect succeeding.
+      }
     } finally {
       setIsSwitchingPrimaryPanel(false);
     }
-  }, [cliPtyState.actions, isSwitchingPrimaryPanel, primaryPanelMode, serverRequests]);
+  }, [
+    cliPtyState.actions,
+    cliPtyState.lifecycle.state,
+    input.sandboxInstanceId,
+    isSwitchingPrimaryPanel,
+    lifecycle,
+    primaryPanelMode,
+    sessionSnapshot,
+    serverRequests,
+  ]);
 
   useEffect(() => {
     if (!shouldHydrateAfterCliExitRef.current) {
@@ -243,6 +270,37 @@ export function useSessionWorkbenchController(input: {
     shouldHydrateAfterCliExitRef.current = false;
     void chat.hydrateChatFromThread().catch(() => {});
   }, [chat, lifecycle.transportState, primaryPanelMode]);
+
+  useEffect(() => {
+    if (
+      primaryPanelMode !== "cli" ||
+      cliPtyState.lifecycle.exitInfo === null ||
+      input.sandboxInstanceId === null ||
+      isSwitchingPrimaryPanel
+    ) {
+      return;
+    }
+
+    serverRequests.resetServerRequests();
+    shouldHydrateAfterCliExitRef.current = true;
+    setPrimaryPanelMode("chat");
+    if (sessionSnapshot !== null) {
+      lifecycle.connectSession({
+        sandboxInstanceId: input.sandboxInstanceId,
+        preferredThreadId: sessionSnapshot.threadId,
+      });
+    }
+    void cliPtyState.actions.disconnectPty().catch(() => {});
+  }, [
+    cliPtyState.actions,
+    cliPtyState.lifecycle.exitInfo,
+    input.sandboxInstanceId,
+    isSwitchingPrimaryPanel,
+    lifecycle,
+    primaryPanelMode,
+    serverRequests,
+    sessionSnapshot,
+  ]);
 
   return {
     workbench: {

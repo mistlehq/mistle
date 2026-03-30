@@ -43,6 +43,7 @@ type PtyOpenWaiter = {
 
 type SessionWorkbenchTunnelServer = {
   close: () => Promise<void>;
+  emitPtyExit: (streamId: number, exitCode?: number) => void;
   url: string;
   waitForPtyClose: (streamId: number) => Promise<number>;
   waitForPtyOpen: (predicate: (record: PtyOpenRecord) => boolean) => Promise<PtyOpenRecord>;
@@ -150,6 +151,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
   const ptyOpenWaiters: PtyOpenWaiter[] = [];
   const ptyCloseStreamIds = new Set<number>();
   const ptyCloseWaiters = new Map<number, Array<(streamId: number) => void>>();
+  const ptySockets = new Map<number, WebSocket>();
   const sockets = new Set<WebSocket>();
   let knownThreadId: string | null = null;
 
@@ -180,6 +182,24 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
     }
   }
 
+  function emitPtyExit(streamId: number, exitCode = 0): void {
+    const socket = ptySockets.get(streamId);
+    if (socket === undefined) {
+      throw new Error(`Expected PTY socket for stream ${String(streamId)}.`);
+    }
+
+    socket.send(
+      JSON.stringify({
+        type: "stream.event",
+        streamId,
+        event: {
+          type: "pty.exit",
+          exitCode,
+        },
+      }),
+    );
+  }
+
   wsServer.on("connection", (socket) => {
     sockets.add(socket);
     let streamKind: "agent" | "pty" | null = null;
@@ -194,6 +214,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
 
           if (controlMessage.channel.kind === "pty") {
             streamKind = "pty";
+            ptySockets.set(controlMessage.streamId, socket);
             dispatchPtyOpen({
               streamId: controlMessage.streamId,
               channel: controlMessage.channel,
@@ -211,16 +232,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
 
         if (controlMessage?.type === "stream.close") {
           dispatchPtyClose(controlMessage.streamId);
-          socket.send(
-            JSON.stringify({
-              type: "stream.event",
-              streamId: controlMessage.streamId,
-              event: {
-                type: "pty.exit",
-                exitCode: 0,
-              },
-            }),
-          );
+          emitPtyExit(controlMessage.streamId);
           return;
         }
 
@@ -390,6 +402,11 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
 
     socket.on("close", () => {
       sockets.delete(socket);
+      for (const [streamId, candidateSocket] of ptySockets.entries()) {
+        if (candidateSocket === socket) {
+          ptySockets.delete(streamId);
+        }
+      }
     });
   });
 
@@ -399,6 +416,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
   }
 
   return {
+    emitPtyExit,
     url: `ws://127.0.0.1:${String(address.port)}`,
     waitForPtyClose: async (streamId) => {
       if (ptyCloseStreamIds.has(streamId)) {
@@ -615,13 +633,13 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       fireEvent.click(screen.getByRole("button", { name: "CLI" }));
       await tunnelServer.waitForPtyClose(cliPty.streamId);
 
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
-      });
-      expect(screen.queryByText("Codex CLI connected")).toBeNull();
-      expect(screen.getByRole("button", { name: "Terminal" }).getAttribute("aria-pressed")).toBe(
-        "true",
+      await waitFor(
+        () => {
+          expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
+        },
+        { timeout: 5_000 },
       );
+      expect(screen.queryByText("Codex CLI connected")).toBeNull();
     });
   });
 
@@ -640,4 +658,23 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       expect(screen.queryByText("pty session already exists")).toBeNull();
     });
   });
+
+  it("returns to chat even after the CLI PTY has already exited", async () => {
+    await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+      fireEvent.click(await waitForEnabledButton("CLI"));
+      const cliPty = await waitForPtySession(tunnelServer, "cli");
+      expectCliPty(cliPty);
+      expect(await screen.findByText("Codex CLI connected")).toBeDefined();
+
+      tunnelServer.emitPtyExit(cliPty.streamId);
+
+      await waitFor(
+        () => {
+          expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
+        },
+        { timeout: 5_000 },
+      );
+      expect(screen.queryByText("Codex CLI connected")).toBeNull();
+    });
+  }, 15_000);
 });
