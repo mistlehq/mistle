@@ -253,6 +253,21 @@ describe("sandbox tunnel pty stream integration", () => {
           },
         });
 
+        const forwardedTerminalPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.complete",
+            streamId: 1,
+          }),
+        );
+        const forwardedTerminal = await forwardedTerminalPromise;
+        expect(forwardedTerminal.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedTerminal.data)).toEqual({
+          type: "stream.complete",
+          streamId: clientStreamId,
+        });
+
         await waitForNoWebSocketMessage(bootstrapSocket);
       } finally {
         await Promise.all([

@@ -123,6 +123,18 @@ describe("stream control message parser", () => {
     expect(
       parseStreamControlMessage(
         JSON.stringify({
+          type: "stream.complete",
+          streamId: 8,
+        }),
+      ),
+    ).toEqual({
+      type: "stream.complete",
+      streamId: 8,
+    });
+
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
           type: "stream.reset",
           streamId: 8,
           code: "target_closed",
@@ -165,6 +177,17 @@ describe("stream control message parser", () => {
         path: "/tmp/attachments/thread_123/upload.png",
       },
     });
+  });
+
+  it("rejects malformed stream.complete messages", () => {
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
+          type: "stream.complete",
+          streamId: "8",
+        }),
+      ),
+    ).toBeUndefined();
   });
 
   it("parses execution lease control messages", () => {
@@ -227,6 +250,18 @@ describe("stream control message parser", () => {
         kind: "agent_execution",
         source: "codex",
       },
+    });
+
+    expect(
+      parseBootstrapControlMessage(
+        JSON.stringify({
+          type: "stream.complete",
+          streamId: 17,
+        }),
+      ),
+    ).toEqual({
+      type: "stream.complete",
+      streamId: 17,
     });
 
     expect(

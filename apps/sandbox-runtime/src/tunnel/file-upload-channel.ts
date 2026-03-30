@@ -25,6 +25,7 @@ import {
 } from "./file-upload-observability.js";
 import {
   CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
+  writeStreamComplete,
   STREAM_RESET_CODE_INVALID_STREAM_DATA,
   writeStreamEvent,
   writeStreamOpenError,
@@ -266,6 +267,10 @@ export async function handleFileUploadStream(input: {
         },
       };
       await writeStreamEvent(input.tunnelSocket, completionEvent);
+      await writeStreamComplete(input.tunnelSocket, {
+        type: "stream.complete",
+        streamId: input.streamId,
+      });
       logTerminalOutcome({
         context: createLogContext(),
         outcome: {

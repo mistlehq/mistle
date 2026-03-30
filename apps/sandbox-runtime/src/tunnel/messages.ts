@@ -4,6 +4,7 @@ import {
   type LeaseCreate,
   type LeaseRenew,
   type StreamClose,
+  type StreamComplete,
   type StreamEventMessage,
   type StreamOpenError,
   type StreamOpenOK,
@@ -66,6 +67,13 @@ export function writeStreamEvent(
   streamEvent: StreamEventMessage,
 ): Promise<void> {
   return writeTextJsonMessage(socket, streamEvent);
+}
+
+export function writeStreamComplete(
+  socket: WebSocket,
+  streamComplete: StreamComplete,
+): Promise<void> {
+  return writeTextJsonMessage(socket, streamComplete);
 }
 
 export function writeStreamReset(socket: WebSocket, streamReset: StreamReset): Promise<void> {

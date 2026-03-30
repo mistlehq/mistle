@@ -382,6 +382,19 @@ async function expectUploadCompleted(input: {
     throw new Error("expected fileUpload.completed event payload");
   }
 
+  const terminalMessage = parseTextMessage(
+    await nextQueueItemOrTunnelCompletion({
+      queue: input.connection.messageQueue,
+      signal: AbortSignal.timeout(StepTimeoutMs),
+      label: "waiting for stream.complete",
+      tunnelCompletion: input.tunnelCompletion,
+    }),
+  );
+  expect(terminalMessage).toEqual({
+    type: "stream.complete",
+    streamId: input.streamId,
+  });
+
   return event;
 }
 

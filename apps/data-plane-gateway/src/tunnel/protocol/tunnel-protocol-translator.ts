@@ -86,14 +86,6 @@ function parseFileUploadStreamOpen(payload: string) {
   return message;
 }
 
-function hasPTYExitEvent(message: StreamControlMessage): boolean {
-  return message.type === "stream.event" && message.event.type === "pty.exit";
-}
-
-function hasFileUploadCompletedEvent(message: StreamControlMessage): boolean {
-  return message.type === "stream.event" && message.event.type === "fileUpload.completed";
-}
-
 function hasPTYResizeSignal(message: StreamControlMessage): boolean {
   return message.type === "stream.signal" && message.signal.type === "pty.resize";
 }
@@ -106,16 +98,16 @@ function shouldReleaseStreamOnBootstrapMessage(input: {
   binding: ClientStreamBinding;
   message: Extract<StreamControlMessage, BootstrapControlMessage>;
 }): boolean {
-  if (input.message.type === "stream.open.error" || input.message.type === "stream.reset") {
+  if (
+    input.message.type === "stream.open.error" ||
+    input.message.type === "stream.reset" ||
+    input.message.type === "stream.complete"
+  ) {
     return true;
   }
 
   if (input.binding.channelKind === "pty") {
-    return hasPTYExitEvent(input.message);
-  }
-
-  if (input.binding.channelKind === "fileUpload") {
-    return hasFileUploadCompletedEvent(input.message);
+    return input.message.type === "stream.event" && input.message.event.type === "pty.exit";
   }
 
   return false;
@@ -232,6 +224,7 @@ function isBootstrapStreamControlMessageAllowed(message: StreamControlMessage): 
   return (
     message.type === "stream.open.ok" ||
     message.type === "stream.open.error" ||
+    message.type === "stream.complete" ||
     message.type === "stream.event" ||
     message.type === "stream.reset" ||
     message.type === "stream.window"
@@ -526,7 +519,12 @@ export class TunnelProtocolTranslator {
       tunnelStreamId: controlMessage.streamId,
     });
     if (route === undefined) {
-      if (hasPTYExitEvent(controlMessage) || hasFileUploadCompletedEvent(controlMessage)) {
+      if (
+        controlMessage.type === "stream.complete" ||
+        (controlMessage.type === "stream.event" &&
+          (controlMessage.event.type === "pty.exit" ||
+            controlMessage.event.type === "fileUpload.completed"))
+      ) {
         return createTranslation({
           delivery: {
             kind: "drop",

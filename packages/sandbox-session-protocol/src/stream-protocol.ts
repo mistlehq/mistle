@@ -109,6 +109,11 @@ const StreamCloseSchema = z.object({
   streamId: PositiveIntegerSchema,
 });
 
+const StreamCompleteSchema = z.object({
+  type: z.literal("stream.complete"),
+  streamId: PositiveIntegerSchema,
+});
+
 const StreamResetSchema = z.object({
   type: z.literal("stream.reset"),
   streamId: PositiveIntegerSchema,
@@ -149,6 +154,7 @@ const StreamControlMessageSchema = z.discriminatedUnion("type", [
   StreamSignalMessageSchema,
   StreamEventMessageSchema,
   StreamCloseSchema,
+  StreamCompleteSchema,
   StreamResetSchema,
   StreamWindowSchema,
 ]);
@@ -162,6 +168,7 @@ const BootstrapControlMessageSchema = z.discriminatedUnion("type", [
   StreamOpenOKSchema,
   StreamOpenErrorSchema,
   StreamEventMessageSchema,
+  StreamCompleteSchema,
   StreamResetSchema,
   StreamWindowSchema,
   LeaseCreateSchema,
@@ -186,6 +193,7 @@ export type StreamOpenError = z.infer<typeof StreamOpenErrorSchema>;
 export type StreamSignalMessage = z.infer<typeof StreamSignalMessageSchema>;
 export type StreamEventMessage = z.infer<typeof StreamEventMessageSchema>;
 export type StreamClose = z.infer<typeof StreamCloseSchema>;
+export type StreamComplete = z.infer<typeof StreamCompleteSchema>;
 export type StreamReset = z.infer<typeof StreamResetSchema>;
 export type StreamWindow = z.infer<typeof StreamWindowSchema>;
 export type StreamControlMessage = z.infer<typeof StreamControlMessageSchema>;

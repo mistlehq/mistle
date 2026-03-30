@@ -103,14 +103,24 @@ describe("handleFileUploadStream", () => {
     }
 
     const clientSocket = new WebSocket(`ws://127.0.0.1:${String(address.port)}`);
-    const completionMessage = new Promise<{ path: string }>((resolve, reject) => {
+    const terminalSuccess = new Promise<{ path: string }>((resolve, reject) => {
+      let completedEventPath: string | null = null;
       clientSocket.on("message", (message) => {
         const controlMessage = parseStreamControlMessage(toText(message));
         if (
           controlMessage?.type === "stream.event" &&
           controlMessage.event.type === "fileUpload.completed"
         ) {
-          resolve({ path: controlMessage.event.path });
+          completedEventPath = controlMessage.event.path;
+          return;
+        }
+        if (controlMessage?.type === "stream.complete") {
+          if (completedEventPath === null) {
+            reject(new Error("Expected fileUpload.completed before stream.complete."));
+            return;
+          }
+
+          resolve({ path: completedEventPath });
         }
       });
       clientSocket.on("error", reject);
@@ -136,7 +146,7 @@ describe("handleFileUploadStream", () => {
       }),
     });
 
-    const completion = await completionMessage;
+    const completion = await terminalSuccess;
     const storedBytes = await readFile(completion.path);
     expect(Array.from(storedBytes)).toEqual(Array.from(ImageSignatures.PNG));
     expect(completion.path.startsWith(join(tempRoot, "thread_123"))).toBe(true);
@@ -716,14 +726,24 @@ describe("handleFileUploadConnectRequest", () => {
     }
 
     const clientSocket = new WebSocket(`ws://127.0.0.1:${String(address.port)}`);
-    const completionMessage = new Promise<{ path: string }>((resolve, reject) => {
+    const terminalSuccess = new Promise<{ path: string }>((resolve, reject) => {
+      let completedEventPath: string | null = null;
       clientSocket.on("message", (message) => {
         const controlMessage = parseStreamControlMessage(toText(message));
         if (
           controlMessage?.type === "stream.event" &&
           controlMessage.event.type === "fileUpload.completed"
         ) {
-          resolve({ path: controlMessage.event.path });
+          completedEventPath = controlMessage.event.path;
+          return;
+        }
+        if (controlMessage?.type === "stream.complete") {
+          if (completedEventPath === null) {
+            reject(new Error("Expected fileUpload.completed before stream.complete."));
+            return;
+          }
+
+          resolve({ path: completedEventPath });
         }
       });
       clientSocket.on("error", reject);
@@ -733,7 +753,7 @@ describe("handleFileUploadConnectRequest", () => {
       clientSocket.once("error", (error) => rejectOpen(error));
     });
 
-    const completion = await completionMessage;
+    const completion = await terminalSuccess;
     const relayResult = await relayResultQueue.next();
     if (relayResult.error !== undefined) {
       throw relayResult.error;

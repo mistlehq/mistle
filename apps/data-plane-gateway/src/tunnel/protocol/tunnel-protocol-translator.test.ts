@@ -192,7 +192,7 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
-  it("keeps fileUpload bindings alive after client stream.close until completion arrives", async () => {
+  it("forwards fileUpload.completed but keeps the binding alive until stream.complete", async () => {
     const { translator } = await createTranslatorHarness();
 
     await translator.translateInboundMessage({
@@ -266,6 +266,27 @@ describe("TunnelProtocolTranslator", () => {
             sizeBytes: 3,
             path: "/tmp/attachments/thread_123/upload.png",
           },
+        }),
+        targetConnectionSessionId: "conn_1",
+      },
+    });
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: JSON.stringify({
+          type: "stream.complete",
+          streamId: 1,
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "forward",
+        payload: JSON.stringify({
+          type: "stream.complete",
+          streamId: 42,
         }),
         targetConnectionSessionId: "conn_1",
       },
@@ -381,6 +402,63 @@ describe("TunnelProtocolTranslator", () => {
             sizeBytes: 3,
             path: "/tmp/attachments/thread_123/upload.png",
           },
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "drop",
+      },
+    });
+  });
+
+  it("drops late stream.complete after the binding was already released by reset", async () => {
+    const { router, translator } = await createTranslatorHarness();
+
+    await translator.translateInboundMessage({
+      clientSessionId: "conn_1",
+      payload: JSON.stringify({
+        type: "stream.open",
+        streamId: 42,
+        channel: {
+          kind: "fileUpload",
+          threadId: "thread_123",
+          mimeType: "image/png",
+          originalFilename: "upload.png",
+          sizeBytes: 3,
+        },
+      }),
+      sandboxInstanceId: SandboxInstanceId,
+      sourcePeerSide: "connection",
+    });
+
+    const resetTranslation = await translator.translateInboundMessage({
+      clientSessionId: BootstrapSessionId,
+      payload: JSON.stringify({
+        type: "stream.reset",
+        streamId: 1,
+        code: "bootstrap_disconnected",
+        message: "upload interrupted",
+      }),
+      sandboxInstanceId: SandboxInstanceId,
+      sourcePeerSide: "bootstrap",
+    });
+    if (resetTranslation.releaseInteractiveStream === undefined) {
+      throw new Error("Expected bootstrap stream.reset to release the upload binding.");
+    }
+    await router.closeInteractiveStream({
+      sandboxInstanceId: SandboxInstanceId,
+      clientSessionId: resetTranslation.releaseInteractiveStream.clientSessionId,
+      clientStreamId: resetTranslation.releaseInteractiveStream.clientStreamId,
+    });
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: JSON.stringify({
+          type: "stream.complete",
+          streamId: 1,
         }),
         sandboxInstanceId: SandboxInstanceId,
         sourcePeerSide: "bootstrap",

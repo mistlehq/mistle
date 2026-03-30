@@ -39,7 +39,13 @@ type UploadServerBehavior =
       kind: "accept";
     }
   | {
+      kind: "complete_without_event";
+    }
+  | {
       kind: "close_after_open";
+    }
+  | {
+      kind: "event_without_complete";
     }
   | {
       kind: "reject_open";
@@ -157,6 +163,15 @@ async function startUploadTestServer(input?: {
           );
           return;
         }
+        if (behavior.kind === "complete_without_event") {
+          socket.send(
+            JSON.stringify({
+              type: "stream.complete",
+              streamId,
+            }),
+          );
+          return;
+        }
 
         socket.send(
           JSON.stringify({
@@ -171,6 +186,15 @@ async function startUploadTestServer(input?: {
               sizeBytes: receivedChunks.reduce((total, chunk) => total + chunk.byteLength, 0),
               path: "/tmp/attachments/thread_123/upload.png",
             },
+          }),
+        );
+        if (behavior.kind === "event_without_complete") {
+          return;
+        }
+        socket.send(
+          JSON.stringify({
+            type: "stream.complete",
+            streamId,
           }),
         );
         return;
@@ -364,7 +388,7 @@ describe("uploadSandboxImage", () => {
   it("times out when upload completion never arrives after closing the stream", async () => {
     const server = await startUploadTestServer({
       behavior: {
-        kind: "stall_completion_after_close",
+        kind: "event_without_complete",
       },
     });
     openServers.add(server);
@@ -374,4 +398,18 @@ describe("uploadSandboxImage", () => {
       uploadSandboxImage(createUploadRequest({ connectionUrl: server.url, file })),
     ).rejects.toThrow("Timed out while waiting for upload completion.");
   }, 20_000);
+
+  it("rejects when stream.complete arrives before fileUpload.completed", async () => {
+    const server = await startUploadTestServer({
+      behavior: {
+        kind: "complete_without_event",
+      },
+    });
+    openServers.add(server);
+    const file = createImageFile();
+
+    await expect(
+      uploadSandboxImage(createUploadRequest({ connectionUrl: server.url, file })),
+    ).rejects.toThrow("Received stream.complete before file upload completion event.");
+  });
 });
