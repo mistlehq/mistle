@@ -4,6 +4,7 @@ import { useState } from "react";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
   type IntegrationConnectionDialogState,
+  type IntegrationConnectionMethod,
   type IntegrationConnectionMethodId,
   IntegrationConnectionMethodIds,
 } from "../integrations/integration-connection-dialog.js";
@@ -29,6 +30,22 @@ function isRedirectConnectionMethodId(
     methodId === IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE ||
     methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
   );
+}
+
+function resolveSelectedMethod(input: {
+  dialog: IntegrationConnectionDialogState;
+  methodId: IntegrationConnectionMethodId;
+}): IntegrationConnectionMethod {
+  const supportedMethods =
+    input.dialog.mode === "create" ? input.dialog.methods : [input.dialog.currentMethod];
+  const selectedMethod = supportedMethods.find((method) => method.id === input.methodId);
+  if (selectedMethod === undefined) {
+    throw new Error(
+      `Connection method '${input.methodId}' is not defined for target '${input.dialog.targetKey}'.`,
+    );
+  }
+
+  return selectedMethod;
 }
 
 export function useIntegrationConnectionDialogState(input: { queryKey: readonly unknown[] }) {
@@ -71,7 +88,6 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
 
   function openDialog(openInput: OpenIntegrationConnectionDialogInput): void {
     const nextState = createOpenIntegrationConnectionDialogState({
-      defaultMethodId: IntegrationConnectionMethodIds.API_KEY,
       openInput,
     });
     setDialog(nextState.dialog);
@@ -97,7 +113,12 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       return;
     }
 
-    if (draft.methodId === IntegrationConnectionMethodIds.API_KEY) {
+    const selectedMethod = resolveSelectedMethod({
+      dialog,
+      methodId: draft.methodId,
+    });
+
+    if (selectedMethod.kind === "form") {
       const normalizedApiKey = draft.apiKeyValue.trim();
       const normalizedConnectionDisplayName = draft.connectionDisplayNameValue.trim();
 

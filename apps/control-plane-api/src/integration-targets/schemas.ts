@@ -1,12 +1,31 @@
 import { z } from "@hono/zod-openapi";
 
-const IntegrationConnectionMethodSchema = z
+const IntegrationConnectionMethodSecretFieldSchema = z
   .object({
-    id: z.enum(["api-key", "oauth2-authorization-code", "github-app-installation"]),
     label: z.string().min(1),
-    kind: z.enum(["api-key", "oauth2", "redirect"]),
+    placeholder: z.string().min(1).optional(),
+    description: z.string().min(1).optional(),
+    inputType: z.enum(["password", "text"]),
   })
   .strict();
+
+const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      id: z.string().min(1),
+      label: z.string().min(1),
+      kind: z.literal("form"),
+      secretField: IntegrationConnectionMethodSecretFieldSchema,
+    })
+    .strict(),
+  z
+    .object({
+      id: z.string().min(1),
+      label: z.string().min(1),
+      kind: z.literal("redirect"),
+    })
+    .strict(),
+]);
 
 export const IntegrationWebhookEventDefinitionSchema = z
   .object({

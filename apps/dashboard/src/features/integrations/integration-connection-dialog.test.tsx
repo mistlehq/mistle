@@ -15,7 +15,12 @@ const dialog: IntegrationConnectionDialogState = {
     {
       id: IntegrationConnectionMethodIds.API_KEY,
       label: "API key",
-      kind: "api-key",
+      kind: "form",
+      secretField: {
+        label: "API key",
+        placeholder: "Enter API key",
+        inputType: "password",
+      },
     },
     {
       id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
@@ -68,7 +73,15 @@ describe("IntegrationConnectionDialog", () => {
         connectMethodId={IntegrationConnectionMethodIds.API_KEY}
         dialog={{
           connectionId: "icn_123",
-          currentMethodId: IntegrationConnectionMethodIds.API_KEY,
+          currentMethod: {
+            id: IntegrationConnectionMethodIds.API_KEY,
+            label: "API key",
+            kind: "form",
+            secretField: {
+              label: "API key",
+              inputType: "password",
+            },
+          },
           displayName: "OpenAI",
           initialConnectionDisplayName: "Existing connection",
           mode: "update",
@@ -100,7 +113,11 @@ describe("IntegrationConnectionDialog", () => {
         connectMethodId={IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION}
         dialog={{
           connectionId: "icn_456",
-          currentMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          currentMethod: {
+            id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+            label: "GitHub App installation",
+            kind: "redirect",
+          },
           displayName: "OpenAI",
           initialConnectionDisplayName: "Existing GitHub App installation connection",
           mode: "update",

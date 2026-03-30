@@ -1777,13 +1777,27 @@ export interface paths {
                 config: {
                   [key: string]: unknown;
                 };
-                connectionMethods?: {
-                  /** @enum {string} */
-                  id: "api-key" | "oauth2-authorization-code" | "github-app-installation";
-                  /** @enum {string} */
-                  kind: "api-key" | "oauth2" | "redirect";
-                  label: string;
-                }[];
+                connectionMethods?: (
+                  | {
+                      id: string;
+                      /** @enum {string} */
+                      kind: "form";
+                      label: string;
+                      secretField: {
+                        description?: string;
+                        /** @enum {string} */
+                        inputType: "password" | "text";
+                        label: string;
+                        placeholder?: string;
+                      };
+                    }
+                  | {
+                      id: string;
+                      /** @enum {string} */
+                      kind: "redirect";
+                      label: string;
+                    }
+                )[];
                 description: string;
                 descriptionOverride?: string;
                 displayName: string;

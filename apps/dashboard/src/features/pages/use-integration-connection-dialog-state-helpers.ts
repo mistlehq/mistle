@@ -1,5 +1,6 @@
 import type {
   IntegrationConnectionDialogState,
+  IntegrationConnectionMethod,
   IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-dialog.js";
 import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
@@ -25,16 +26,13 @@ export function createClosedIntegrationConnectionDialogDraft(
 }
 
 export function createOpenIntegrationConnectionDialogState(input: {
-  defaultMethodId: IntegrationConnectionMethodId;
   openInput: OpenIntegrationConnectionDialogInput;
 }): {
   dialog: IntegrationConnectionDialogState;
   draft: IntegrationConnectionDialogDraft;
 } {
   const supportedMethods =
-    input.openInput.mode === "create"
-      ? input.openInput.methods.map((method) => method.id)
-      : [input.openInput.currentMethodId];
+    input.openInput.mode === "create" ? input.openInput.methods : [input.openInput.currentMethod];
   const defaultMethod = supportedMethods[0];
   if (defaultMethod === undefined) {
     throw new Error(
@@ -59,7 +57,7 @@ export function createOpenIntegrationConnectionDialogState(input: {
         }
       : {
           connectionId: input.openInput.connectionId,
-          currentMethodId: input.openInput.currentMethodId,
+          currentMethod: input.openInput.currentMethod,
           targetKey: input.openInput.targetKey,
           displayName: input.openInput.targetDisplayName,
           mode: input.openInput.mode,
@@ -75,9 +73,31 @@ export function createOpenIntegrationConnectionDialogState(input: {
       connectionDisplayNamePlaceholder: defaultConnectionDisplayName,
       connectionDisplayNameValue: existingConnectionDisplayName ?? "",
       error: null,
-      methodId: defaultMethod ?? input.defaultMethodId,
+      methodId: defaultMethod.id,
     },
   };
+}
+
+function resolveSupportedMethods(
+  dialog: IntegrationConnectionDialogState,
+): readonly IntegrationConnectionMethod[] {
+  return dialog.mode === "create" ? dialog.methods : [dialog.currentMethod];
+}
+
+function resolveSelectedMethod(input: {
+  dialog: IntegrationConnectionDialogState;
+  methodId: IntegrationConnectionMethodId;
+}): IntegrationConnectionMethod {
+  const selectedMethod = resolveSupportedMethods(input.dialog).find(
+    (method) => method.id === input.methodId,
+  );
+  if (selectedMethod === undefined) {
+    throw new Error(
+      `Connect method '${input.methodId}' is not supported for target '${input.dialog.targetKey}'.`,
+    );
+  }
+
+  return selectedMethod;
 }
 
 export function hasIntegrationConnectionDialogChanges(input: {
@@ -118,27 +138,22 @@ export function resolveIntegrationConnectionDialogValidationError(input: {
   apiKeyValue: string;
   connectionDisplayNameValue: string;
 }): string | null {
-  const supportedMethods =
-    input.dialog.mode === "create"
-      ? input.dialog.methods.map((method) => method.id)
-      : [input.dialog.currentMethodId];
-  if (!supportedMethods.includes(input.methodId)) {
-    throw new Error(
-      `Connect method '${input.methodId}' is not supported for target '${input.dialog.targetKey}'.`,
-    );
-  }
+  const selectedMethod = resolveSelectedMethod({
+    dialog: input.dialog,
+    methodId: input.methodId,
+  });
 
   const normalizedConnectionDisplayName = input.connectionDisplayNameValue.trim();
   if (normalizedConnectionDisplayName.length === 0) {
     return "Connection name is required.";
   }
 
-  if (input.methodId !== "api-key") {
+  if (selectedMethod.kind !== "form") {
     return null;
   }
 
   if (input.dialog.mode === "create" && input.apiKeyValue.trim().length === 0) {
-    return "API key is required.";
+    return `${selectedMethod.secretField.label} is required.`;
   }
 
   return null;

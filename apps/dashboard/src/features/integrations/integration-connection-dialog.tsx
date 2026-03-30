@@ -10,10 +10,7 @@ import {
   RadioGroupItem,
 } from "@mistle/ui";
 
-export type IntegrationConnectionMethodId =
-  | "api-key"
-  | "oauth2-authorization-code"
-  | "github-app-installation";
+export type IntegrationConnectionMethodId = string;
 export const IntegrationConnectionMethodIds: {
   API_KEY: IntegrationConnectionMethodId;
   OAUTH2_AUTHORIZATION_CODE: IntegrationConnectionMethodId;
@@ -24,11 +21,29 @@ export const IntegrationConnectionMethodIds: {
   GITHUB_APP_INSTALLATION: "github-app-installation",
 };
 
-export type IntegrationConnectionMethod = {
+export type IntegrationConnectionMethodSecretField = {
+  label: string;
+  placeholder?: string | undefined;
+  description?: string | undefined;
+  inputType: "password" | "text";
+};
+
+type IntegrationFormConnectionMethod = {
   id: IntegrationConnectionMethodId;
   label: string;
-  kind: "api-key" | "oauth2" | "redirect";
+  kind: "form";
+  secretField: IntegrationConnectionMethodSecretField;
 };
+
+type IntegrationRedirectConnectionMethod = {
+  id: IntegrationConnectionMethodId;
+  label: string;
+  kind: "redirect";
+};
+
+export type IntegrationConnectionMethod =
+  | IntegrationFormConnectionMethod
+  | IntegrationRedirectConnectionMethod;
 
 type CreateIntegrationConnectionDialogState = {
   displayName: string;
@@ -39,7 +54,7 @@ type CreateIntegrationConnectionDialogState = {
 
 type UpdateIntegrationConnectionDialogState = {
   connectionId: string;
-  currentMethodId: IntegrationConnectionMethodId;
+  currentMethod: IntegrationConnectionMethod;
   displayName: string;
   initialConnectionDisplayName?: string;
   mode: "update";
@@ -72,10 +87,30 @@ function formatIntegrationConnectionMethodLabel(method: IntegrationConnectionMet
   return method.label;
 }
 
+function resolveSelectedMethod(
+  dialog: IntegrationConnectionDialogState,
+  connectMethodId: IntegrationConnectionMethodId,
+): IntegrationConnectionMethod {
+  if (dialog.mode === "update") {
+    return dialog.currentMethod;
+  }
+
+  const selectedMethod = dialog.methods.find((method) => method.id === connectMethodId);
+  if (selectedMethod === undefined) {
+    throw new Error(
+      `Connection method '${connectMethodId}' is not defined for target '${dialog.targetKey}'.`,
+    );
+  }
+
+  return selectedMethod;
+}
+
 export function IntegrationConnectionDialog(props: IntegrationConnectionDialogProps) {
   const dialog = props.dialog;
   const isUpdateMode = dialog?.mode === "update";
   const showMethodPicker = dialog?.mode === "create" && dialog.methods.length > 1;
+  const selectedMethod =
+    dialog === null ? null : resolveSelectedMethod(dialog, props.connectMethodId);
 
   return (
     <Dialog
@@ -116,13 +151,7 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
                 className="gap-2"
                 name={`connect-auth-method-${dialog.targetKey}`}
                 onValueChange={(nextValue) => {
-                  if (
-                    nextValue === IntegrationConnectionMethodIds.API_KEY ||
-                    nextValue === IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE ||
-                    nextValue === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-                  ) {
-                    props.onMethodChange(nextValue);
-                  }
+                  props.onMethodChange(nextValue);
                 }}
                 value={props.connectMethodId}
               >
@@ -144,14 +173,19 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
             </div>
           ) : null}
 
-          {props.connectMethodId === IntegrationConnectionMethodIds.API_KEY ? (
+          {selectedMethod?.kind === "form" ? (
             <div className="gap-2 flex flex-col">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium">API key</p>
+                <p className="text-sm font-medium">{selectedMethod.secretField.label}</p>
                 {isUpdateMode && props.isApiKeyChanged ? (
                   <span className="text-muted-foreground text-xs">Will update</span>
                 ) : null}
               </div>
+              {selectedMethod.secretField.description ? (
+                <p className="text-muted-foreground text-sm">
+                  {selectedMethod.secretField.description}
+                </p>
+              ) : null}
               <Input
                 autoComplete="off"
                 data-1p-ignore="true"
@@ -159,9 +193,11 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
                   props.onApiKeyChange(event.currentTarget.value);
                 }}
                 placeholder={
-                  isUpdateMode ? "Leave blank to keep existing API key" : "Enter API key"
+                  isUpdateMode
+                    ? `Leave blank to keep existing ${selectedMethod.secretField.label.toLowerCase()}`
+                    : (selectedMethod.secretField.placeholder ?? "Enter secret")
                 }
-                type="password"
+                type={selectedMethod.secretField.inputType}
                 value={props.apiKeyValue}
               />
             </div>
@@ -188,7 +224,7 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
             >
               {isUpdateMode
                 ? "Save"
-                : props.connectMethodId === IntegrationConnectionMethodIds.API_KEY
+                : selectedMethod?.kind === "form"
                   ? "Create connection"
                   : "Continue"}
             </Button>

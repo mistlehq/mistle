@@ -1,6 +1,5 @@
 import {
   IntegrationConnectionMethodIds,
-  IntegrationConnectionMethodKinds,
   IntegrationKinds,
   IntegrationMcpTransports,
   type IntegrationDefinition,
@@ -36,7 +35,12 @@ export const LinearDefinition: LinearIntegrationDefinition = {
     {
       id: IntegrationConnectionMethodIds.API_KEY,
       label: "API key",
-      kind: IntegrationConnectionMethodKinds.API_KEY,
+      kind: "form",
+      secretField: {
+        label: "API key",
+        placeholder: "Enter API key",
+        inputType: "password",
+      },
       configSchema: LinearConnectionConfigSchema,
       configForm: LinearConnectionConfigForm,
     },

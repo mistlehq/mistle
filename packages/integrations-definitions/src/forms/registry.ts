@@ -1,6 +1,6 @@
 import type {
+  IntegrationBrowserSafeConnectionMethodDefinition,
   IntegrationConfigSchema,
-  IntegrationFormConnectionMethodDefinition,
   IntegrationFormDefinition,
   IntegrationKind,
 } from "@mistle/integrations-core";
@@ -38,7 +38,7 @@ export type IntegrationFormDefinitionRecord = {
     Record<string, unknown>,
     Record<string, unknown>
   >;
-  connectionMethods: readonly IntegrationFormConnectionMethodDefinition<
+  connectionMethods: readonly IntegrationBrowserSafeConnectionMethodDefinition<
     Record<string, unknown>,
     Record<string, string>,
     Record<string, unknown>,
@@ -58,7 +58,12 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
       {
         id: "api-key",
         label: "API key",
-        kind: "api-key",
+        kind: "form",
+        secretField: {
+          label: "API key",
+          placeholder: "Enter API key",
+          inputType: "password",
+        },
         configSchema: GitHubApiKeyConnectionConfigSchema,
       },
       {
@@ -80,7 +85,12 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
       {
         id: "api-key",
         label: "API key",
-        kind: "api-key",
+        kind: "form",
+        secretField: {
+          label: "API key",
+          placeholder: "Enter API key",
+          inputType: "password",
+        },
         configSchema: GitHubApiKeyConnectionConfigSchema,
       },
       {
@@ -102,7 +112,12 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
       {
         id: "api-key",
         label: "API key",
-        kind: "api-key",
+        kind: "form",
+        secretField: {
+          label: "API key",
+          placeholder: "Enter API key",
+          inputType: "password",
+        },
         configSchema: OpenAiConnectionConfigSchema,
         configForm: OpenAiConnectionConfigForm,
       },
@@ -118,7 +133,12 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
       {
         id: "api-key",
         label: "API key",
-        kind: "api-key",
+        kind: "form",
+        secretField: {
+          label: "API key",
+          placeholder: "Enter API key",
+          inputType: "password",
+        },
         configSchema: LinearConnectionConfigSchema,
         configForm: LinearConnectionConfigForm,
       },

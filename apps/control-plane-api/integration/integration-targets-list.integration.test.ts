@@ -142,7 +142,16 @@ describe("integration targets discovery integration", () => {
       description: "GitHub Cloud target",
       logoKey: "github",
       connectionMethods: [
-        { id: "api-key", label: "API key", kind: "api-key" },
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretField: {
+            label: "API key",
+            placeholder: "Enter API key",
+            inputType: "password",
+          },
+        },
         {
           id: "github-app-installation",
           label: "GitHub App installation",
@@ -207,7 +216,18 @@ describe("integration targets discovery integration", () => {
       displayName: "OpenAI",
       description: "Enable OpenAI model access with API key authentication.",
       logoKey: "openai",
-      connectionMethods: [{ id: "api-key", label: "API key", kind: "api-key" }],
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretField: {
+            label: "API key",
+            placeholder: "Enter API key",
+            inputType: "password",
+          },
+        },
+      ],
       targetHealth: {
         configStatus: "valid",
       },
@@ -306,7 +326,16 @@ describe("integration targets discovery integration", () => {
     expect(openAiTarget).toBeDefined();
     expect(openAiTarget?.targetHealth.configStatus).toBe("valid");
     expect(openAiTarget?.connectionMethods).toEqual([
-      { id: "api-key", label: "API key", kind: "api-key" },
+      {
+        id: "api-key",
+        label: "API key",
+        kind: "form",
+        secretField: {
+          label: "API key",
+          placeholder: "Enter API key",
+          inputType: "password",
+        },
+      },
     ]);
     expect("resolvedBindingEditorUi" in (openAiTarget ?? {})).toBe(false);
   }, 60_000);

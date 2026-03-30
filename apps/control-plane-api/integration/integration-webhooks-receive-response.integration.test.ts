@@ -1,7 +1,6 @@
 import { integrationTargets } from "@mistle/db/control-plane";
 import {
   IntegrationConnectionMethodIds,
-  IntegrationConnectionMethodKinds,
   IntegrationKinds,
   IntegrationRegistry,
   type IntegrationDefinition,
@@ -33,7 +32,11 @@ const ImmediateResponseWebhookDefinition: IntegrationDefinition<
     {
       id: IntegrationConnectionMethodIds.API_KEY,
       label: "API key",
-      kind: IntegrationConnectionMethodKinds.API_KEY,
+      kind: "form",
+      secretField: {
+        label: "API key",
+        inputType: "password",
+      },
     },
   ],
   webhookHandler: {

@@ -21,13 +21,30 @@ export const IntegrationTargetSchema = z
     logoKey: z.string().min(1).optional(),
     connectionMethods: z
       .array(
-        z
-          .object({
-            id: z.enum(["api-key", "oauth2-authorization-code", "github-app-installation"]),
-            label: z.string().min(1),
-            kind: z.enum(["api-key", "oauth2", "redirect"]),
-          })
-          .strict(),
+        z.discriminatedUnion("kind", [
+          z
+            .object({
+              id: z.string().min(1),
+              label: z.string().min(1),
+              kind: z.literal("form"),
+              secretField: z
+                .object({
+                  label: z.string().min(1),
+                  placeholder: z.string().min(1).optional(),
+                  description: z.string().min(1).optional(),
+                  inputType: z.enum(["password", "text"]),
+                })
+                .strict(),
+            })
+            .strict(),
+          z
+            .object({
+              id: z.string().min(1),
+              label: z.string().min(1),
+              kind: z.literal("redirect"),
+            })
+            .strict(),
+        ]),
       )
       .min(1)
       .optional(),

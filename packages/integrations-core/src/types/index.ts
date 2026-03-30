@@ -14,10 +14,7 @@ export const IntegrationKinds: {
   CONNECTOR: "connector",
 };
 
-export type IntegrationConnectionMethodId =
-  | "api-key"
-  | "oauth2-authorization-code"
-  | "github-app-installation";
+export type IntegrationConnectionMethodId = string;
 
 export const IntegrationConnectionMethodIds: {
   API_KEY: IntegrationConnectionMethodId;
@@ -29,16 +26,21 @@ export const IntegrationConnectionMethodIds: {
   GITHUB_APP_INSTALLATION: "github-app-installation",
 };
 
-export type IntegrationConnectionMethodKind = "api-key" | "oauth2" | "redirect";
+export type IntegrationConnectionMethodKind = "form" | "redirect";
 
 export const IntegrationConnectionMethodKinds: {
-  API_KEY: IntegrationConnectionMethodKind;
-  OAUTH2: IntegrationConnectionMethodKind;
+  FORM: IntegrationConnectionMethodKind;
   REDIRECT: IntegrationConnectionMethodKind;
 } = {
-  API_KEY: "api-key",
-  OAUTH2: "oauth2",
+  FORM: "form",
   REDIRECT: "redirect",
+};
+
+export type IntegrationConnectionMethodSecretField = {
+  label: string;
+  placeholder?: string;
+  description?: string;
+  inputType: "password" | "text";
 };
 
 export type IntegrationTarget = {
@@ -264,7 +266,7 @@ export type IntegrationResolvedTarget<
   secrets: TTargetSecrets;
 };
 
-export type IntegrationConnectionMethodDefinition<
+type IntegrationConnectionMethodDefinitionBase<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TBindingConfig = Record<string, unknown>,
@@ -272,7 +274,6 @@ export type IntegrationConnectionMethodDefinition<
 > = {
   id: IntegrationConnectionMethodId;
   label: string;
-  kind: IntegrationConnectionMethodKind;
   configSchema?: IntegrationConfigSchema<TConnectionConfig>;
   configForm?: IntegrationFormDefinition<
     TTargetConfig,
@@ -281,6 +282,55 @@ export type IntegrationConnectionMethodDefinition<
     TConnectionConfig
   >;
 };
+
+export type IntegrationFormConnectionMethodDefinition<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TBindingConfig = Record<string, unknown>,
+  TConnectionConfig = Record<string, unknown>,
+> = IntegrationConnectionMethodDefinitionBase<
+  TTargetConfig,
+  TTargetSecrets,
+  TBindingConfig,
+  TConnectionConfig
+> & {
+  kind: "form";
+  secretField: IntegrationConnectionMethodSecretField;
+};
+
+export type IntegrationRedirectConnectionMethodDefinition<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TBindingConfig = Record<string, unknown>,
+  TConnectionConfig = Record<string, unknown>,
+> = IntegrationConnectionMethodDefinitionBase<
+  TTargetConfig,
+  TTargetSecrets,
+  TBindingConfig,
+  TConnectionConfig
+> & {
+  kind: "redirect";
+  secretField?: never;
+};
+
+export type IntegrationConnectionMethodDefinition<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TBindingConfig = Record<string, unknown>,
+  TConnectionConfig = Record<string, unknown>,
+> =
+  | IntegrationFormConnectionMethodDefinition<
+      TTargetConfig,
+      TTargetSecrets,
+      TBindingConfig,
+      TConnectionConfig
+    >
+  | IntegrationRedirectConnectionMethodDefinition<
+      TTargetConfig,
+      TTargetSecrets,
+      TBindingConfig,
+      TConnectionConfig
+    >;
 
 type MaybePromise<TValue> = TValue | Promise<TValue>;
 
@@ -1116,7 +1166,7 @@ export type AnyIntegrationDefinition = IntegrationDefinition<
   Record<string, unknown>
 >;
 
-export type IntegrationFormConnectionMethodDefinition<
+export type IntegrationBrowserSafeConnectionMethodDefinition<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TBindingConfig = Record<string, unknown>,

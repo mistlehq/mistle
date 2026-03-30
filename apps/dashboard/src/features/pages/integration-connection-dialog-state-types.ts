@@ -1,7 +1,4 @@
-import type {
-  IntegrationConnectionMethod,
-  IntegrationConnectionMethodId,
-} from "../integrations/integration-connection-dialog.js";
+import type { IntegrationConnectionMethod } from "../integrations/integration-connection-dialog.js";
 
 export type OpenIntegrationConnectionDialogInput =
   | {
@@ -13,7 +10,7 @@ export type OpenIntegrationConnectionDialogInput =
   | {
       connectionDisplayName?: string;
       connectionId: string;
-      currentMethodId: IntegrationConnectionMethodId;
+      currentMethod: IntegrationConnectionMethod;
       mode: "update";
       targetDisplayName: string;
       targetKey: string;

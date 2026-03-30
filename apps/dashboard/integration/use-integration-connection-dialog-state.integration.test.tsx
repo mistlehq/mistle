@@ -97,7 +97,15 @@ describe("useIntegrationConnectionDialogState update API key behavior", () => {
           mode: "update",
           connectionId: "icn_123",
           connectionDisplayName: "Existing connection",
-          currentMethodId: IntegrationConnectionMethodIds.API_KEY,
+          currentMethod: {
+            id: IntegrationConnectionMethodIds.API_KEY,
+            label: "API key",
+            kind: "form",
+            secretField: {
+              label: "API key",
+              inputType: "password",
+            },
+          },
           targetDisplayName: "OpenAI",
           targetKey: "openai-default",
         });

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { IntegrationCardViewModel } from "../integrations/directory-model.js";
-import { IntegrationConnectionMethodIds } from "../integrations/integration-connection-dialog.js";
+import {
+  IntegrationConnectionMethodIds,
+  type IntegrationConnectionMethod,
+} from "../integrations/integration-connection-dialog.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import {
   buildAvailableIntegrationViewCards,
@@ -29,7 +32,11 @@ describe("integrations page view model", () => {
         {
           id: IntegrationConnectionMethodIds.API_KEY,
           label: "API key",
-          kind: "api-key",
+          kind: "form",
+          secretField: {
+            label: "API key",
+            inputType: "password",
+          },
         },
       ]),
     ).toEqual([
@@ -41,7 +48,11 @@ describe("integrations page view model", () => {
       {
         id: IntegrationConnectionMethodIds.API_KEY,
         label: "API key",
-        kind: "api-key",
+        kind: "form",
+        secretField: {
+          label: "API key",
+          inputType: "password",
+        },
       },
     ]);
     expect(toConnectionMethods(undefined)).toEqual([]);
@@ -341,11 +352,7 @@ function createCard(input: {
   connectionCount?: number;
   connections?: readonly IntegrationConnection[];
   connectionStatuses?: readonly IntegrationConnection["status"][];
-  connectionMethods?: readonly {
-    id: "api-key" | "oauth2-authorization-code" | "github-app-installation";
-    label: string;
-    kind: "api-key" | "oauth2" | "redirect";
-  }[];
+  connectionMethods?: readonly IntegrationConnectionMethod[];
 }): IntegrationCardViewModel {
   if (input.connections !== undefined) {
     return {

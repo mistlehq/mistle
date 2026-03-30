@@ -72,13 +72,45 @@ export type ResolvedIntegrationTargetMetadata = {
   displayName: string;
   description: string;
   logoKey?: string;
-  connectionMethods?: {
-    id: "api-key" | "oauth2-authorization-code" | "github-app-installation";
-    label: string;
-    kind: "api-key" | "oauth2" | "redirect";
-  }[];
+  connectionMethods?: (
+    | {
+        id: string;
+        label: string;
+        kind: "form";
+        secretField: {
+          label: string;
+          placeholder?: string;
+          description?: string;
+          inputType: "password" | "text";
+        };
+      }
+    | {
+        id: string;
+        label: string;
+        kind: "redirect";
+      }
+  )[];
   supportedWebhookEvents?: ResolvedWebhookEvent[];
 };
+
+function cloneConnectionMethod(
+  method: NonNullable<ResolvedIntegrationTargetMetadata["connectionMethods"]>[number],
+): NonNullable<ResolvedIntegrationTargetMetadata["connectionMethods"]>[number] {
+  if (method.kind === "form") {
+    return {
+      id: method.id,
+      label: method.label,
+      kind: "form",
+      secretField: method.secretField,
+    };
+  }
+
+  return {
+    id: method.id,
+    label: method.label,
+    kind: "redirect",
+  };
+}
 
 function cloneWebhookEventParameters(
   parameters: readonly IntegrationWebhookEventParameterDefinition[],
@@ -195,11 +227,9 @@ export function resolveTargetMetadata(input: {
         displayName: input.displayNameOverride ?? definition.displayName,
         description: input.descriptionOverride,
         logoKey: definition.logoKey,
-        connectionMethods: definition.connectionMethods.map((method) => ({
-          id: method.id,
-          label: method.label,
-          kind: method.kind,
-        })),
+        connectionMethods: definition.connectionMethods.map((method) =>
+          cloneConnectionMethod(method),
+        ),
         ...(definition.supportedWebhookEvents === undefined
           ? {}
           : {
@@ -217,11 +247,7 @@ export function resolveTargetMetadata(input: {
     displayName: input.displayNameOverride ?? definition.displayName,
     description: input.descriptionOverride ?? definition.description,
     logoKey: definition.logoKey,
-    connectionMethods: definition.connectionMethods.map((method) => ({
-      id: method.id,
-      label: method.label,
-      kind: method.kind,
-    })),
+    connectionMethods: definition.connectionMethods.map((method) => cloneConnectionMethod(method)),
     ...(definition.supportedWebhookEvents === undefined
       ? {}
       : {

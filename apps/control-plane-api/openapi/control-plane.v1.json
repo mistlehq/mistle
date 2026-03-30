@@ -3461,27 +3461,69 @@
                           "connectionMethods": {
                             "type": "array",
                             "items": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
-                                  "enum": [
-                                    "api-key",
-                                    "oauth2-authorization-code",
-                                    "github-app-installation"
-                                  ]
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": ["form"]
+                                    },
+                                    "secretField": {
+                                      "type": "object",
+                                      "properties": {
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "placeholder": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "description": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "inputType": {
+                                          "type": "string",
+                                          "enum": ["password", "text"]
+                                        }
+                                      },
+                                      "required": ["label", "inputType"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["id", "label", "kind", "secretField"],
+                                  "additionalProperties": false
                                 },
-                                "label": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "kind": {
-                                  "type": "string",
-                                  "enum": ["api-key", "oauth2", "redirect"]
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": ["redirect"]
+                                    }
+                                  },
+                                  "required": ["id", "label", "kind"],
+                                  "additionalProperties": false
                                 }
-                              },
-                              "required": ["id", "label", "kind"],
-                              "additionalProperties": false
+                              ]
                             },
                             "minItems": 1
                           },

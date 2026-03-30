@@ -4,11 +4,7 @@ import { z } from "zod";
 
 import { compileRuntimePlan } from "../src/compiler/index.js";
 import { IntegrationRegistry } from "../src/registry/index.js";
-import {
-  IntegrationConnectionMethodIds,
-  IntegrationConnectionMethodKinds,
-  type IntegrationDefinition,
-} from "../src/types/index.js";
+import { IntegrationConnectionMethodIds, type IntegrationDefinition } from "../src/types/index.js";
 
 const EmptyTargetConfigSchema = z.object({});
 const EmptyTargetSecretsSchema = z.object({});
@@ -20,7 +16,11 @@ const ApiKeyConnectionMethods = [
   {
     id: IntegrationConnectionMethodIds.API_KEY,
     label: "API key",
-    kind: IntegrationConnectionMethodKinds.API_KEY,
+    kind: "form",
+    secretField: {
+      label: "API key",
+      inputType: "password",
+    },
   },
 ] as const;
 

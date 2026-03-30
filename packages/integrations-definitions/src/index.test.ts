@@ -30,7 +30,12 @@ describe("integrations-definitions index", () => {
       kind: "git",
       displayName: "GitHub",
       connectionMethods: [
-        { id: "api-key", label: "API key", kind: "api-key" },
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretField: { label: "API key", inputType: "password" },
+        },
         {
           id: "github-app-installation",
           label: "GitHub App installation",
@@ -86,7 +91,12 @@ describe("integrations-definitions index", () => {
       kind: "git",
       displayName: "GitHub Enterprise Server",
       connectionMethods: [
-        { id: "api-key", label: "API key", kind: "api-key" },
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretField: { label: "API key", inputType: "password" },
+        },
         {
           id: "github-app-installation",
           label: "GitHub App installation",
@@ -113,7 +123,14 @@ describe("integrations-definitions index", () => {
       variantId: "linear-default",
       kind: "connector",
       displayName: "Linear",
-      connectionMethods: [{ id: "api-key", label: "API key", kind: "api-key" }],
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretField: { label: "API key", inputType: "password" },
+        },
+      ],
     });
     expect(linearDefinition?.mcp).toBeDefined();
   });

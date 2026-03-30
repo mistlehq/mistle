@@ -1,6 +1,5 @@
 import {
   IntegrationConnectionMethodIds,
-  IntegrationConnectionMethodKinds,
   IntegrationKinds,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
@@ -51,13 +50,18 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
     {
       id: IntegrationConnectionMethodIds.API_KEY,
       label: "API key",
-      kind: IntegrationConnectionMethodKinds.API_KEY,
+      kind: "form",
+      secretField: {
+        label: "API key",
+        placeholder: "Enter API key",
+        inputType: "password",
+      },
       configSchema: GitHubApiKeyConnectionConfigSchema,
     },
     {
       id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       label: "GitHub App installation",
-      kind: IntegrationConnectionMethodKinds.REDIRECT,
+      kind: "redirect",
       configSchema: GitHubAppInstallationConnectionConfigSchema,
     },
   ],
