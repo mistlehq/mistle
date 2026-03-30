@@ -3,7 +3,8 @@ import {
   evaluateFilterNode,
   getValueAtPath,
   type SharedFilter,
-} from "../../../../packages/integrations-core/src/triggers.js";
+} from "@mistle/integrations-core/triggers";
+
 import type {
   WebhookPayloadFilter,
   WebhookPayloadFilterPath,

@@ -9,6 +9,18 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./triggers": {
+      "types": "./src/triggers.ts",
+      "node": "./dist/triggers.js",
+      "import": "./src/triggers.ts",
+      "default": "./src/triggers.ts"
+    },
+    "./triggers.js": {
+      "types": "./src/triggers.ts",
+      "node": "./dist/triggers.js",
+      "import": "./src/triggers.ts",
+      "default": "./src/triggers.ts"
+    },
     "./*.js": {
       "types": "./src/*.ts",
       "node": "./dist/*.js",
