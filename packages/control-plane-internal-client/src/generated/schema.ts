@@ -327,7 +327,7 @@ export interface paths {
               failureMessage: string | null;
               id: string;
               /** @enum {string} */
-              status: "starting" | "running" | "stopped" | "failed";
+              status: "pending" | "starting" | "running" | "stopped" | "failed";
             };
           };
         };

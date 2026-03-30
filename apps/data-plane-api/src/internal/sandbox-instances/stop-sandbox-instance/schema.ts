@@ -3,7 +3,7 @@ import { z } from "@hono/zod-openapi";
 export const StopSandboxInstanceInputSchema = z
   .object({
     sandboxInstanceId: z.string().min(1),
-    stopReason: z.enum(["idle", "disconnected"]),
+    stopReason: z.literal("idle"),
     expectedOwnerLeaseId: z.string().min(1),
     idempotencyKey: z.string().min(1).max(255),
   })

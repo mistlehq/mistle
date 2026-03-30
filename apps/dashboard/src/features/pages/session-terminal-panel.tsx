@@ -1,7 +1,11 @@
-import type { SandboxPtyExitInfo, SandboxPtyState } from "@mistle/sandbox-session-client";
+import type {
+  SandboxPtyExitInfo,
+  SandboxPtyResetInfo,
+  SandboxPtyState,
+} from "@mistle/sandbox-session-client";
 import { Button, cn } from "@mistle/ui";
 import { MinusIcon, SpinnerGapIcon, XIcon } from "@phosphor-icons/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useReducer, useRef } from "react";
 
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
@@ -11,6 +15,51 @@ import {
 import { INITIAL_PTY_DIMENSIONS, SessionTerminalSurface } from "./session-terminal-surface.js";
 
 const TERMINAL_BORDER_COLOR = "#D6D3D1";
+const MaxTerminalReconnectAttempts = 3;
+
+type SessionTerminalRecoverySandboxStatus =
+  | "pending"
+  | "starting"
+  | "running"
+  | "resuming"
+  | "stopped"
+  | "failed"
+  | null;
+
+export type TerminalRecoveryState =
+  | {
+      kind: "idle";
+    }
+  | {
+      kind: "recovering";
+      attemptCount: number;
+      command: "none" | "resume" | "reopen";
+      errorMessage: string | null;
+      resetInfo: SandboxPtyResetInfo;
+    };
+
+type TerminalRecoveryEvent =
+  | {
+      type: "reopen_failed";
+      message: string;
+    }
+  | {
+      type: "reopen_requested";
+    }
+  | {
+      type: "reset_seen";
+      resetInfo: SandboxPtyResetInfo;
+    }
+  | {
+      type: "resume_requested";
+    }
+  | {
+      type: "sync_observed";
+      isReconnectAttemptInFlight: boolean;
+      isResumingSandbox: boolean;
+      lifecycleState: SandboxPtyState;
+      sandboxStatus: SessionTerminalRecoverySandboxStatus;
+    };
 
 function shouldAutoOpenTerminal(input: {
   isVisible: boolean;
@@ -44,11 +93,160 @@ function shouldHandleTerminalExit(input: {
   return input.exitInfo !== null && !input.hasHandledExit;
 }
 
+function shouldOpenPtyForRecovery(input: {
+  attemptCount: number;
+  errorMessage: string | null;
+  isReconnectAttemptInFlight: boolean;
+  lifecycleState: SandboxPtyState;
+  sandboxStatus: SessionTerminalRecoverySandboxStatus;
+}): boolean {
+  if (
+    input.errorMessage !== null ||
+    input.isReconnectAttemptInFlight ||
+    input.sandboxStatus !== "running" ||
+    input.attemptCount >= MaxTerminalReconnectAttempts
+  ) {
+    return false;
+  }
+
+  return (
+    input.lifecycleState !== "open" &&
+    input.lifecycleState !== "opening" &&
+    input.lifecycleState !== "connecting"
+  );
+}
+
+export function reduceTerminalRecoveryState(
+  state: TerminalRecoveryState,
+  event: TerminalRecoveryEvent,
+): TerminalRecoveryState {
+  switch (state.kind) {
+    case "idle": {
+      if (event.type === "reset_seen") {
+        return {
+          kind: "recovering",
+          attemptCount: 0,
+          command: "none",
+          errorMessage: null,
+          resetInfo: event.resetInfo,
+        };
+      }
+
+      return state;
+    }
+    case "recovering": {
+      switch (event.type) {
+        case "reset_seen":
+          return {
+            kind: "recovering",
+            attemptCount: 0,
+            command: "none",
+            errorMessage: null,
+            resetInfo: event.resetInfo,
+          };
+        case "resume_requested":
+          if (state.command !== "resume") {
+            return state;
+          }
+
+          return {
+            ...state,
+            command: "none",
+          };
+        case "reopen_requested":
+          if (state.command !== "reopen") {
+            return state;
+          }
+
+          return {
+            ...state,
+            attemptCount: state.attemptCount + 1,
+            command: "none",
+          };
+        case "reopen_failed":
+          return {
+            ...state,
+            command: "none",
+            errorMessage: event.message,
+          };
+        case "sync_observed":
+          if (event.lifecycleState === "open") {
+            return {
+              kind: "idle",
+            };
+          }
+
+          if (event.sandboxStatus === "failed") {
+            return {
+              ...state,
+              command: "none",
+              errorMessage: "Terminal disconnected and the sandbox failed.",
+            };
+          }
+
+          if (state.errorMessage !== null) {
+            return state.command === "none"
+              ? state
+              : {
+                  ...state,
+                  command: "none",
+                };
+          }
+
+          if (state.attemptCount >= MaxTerminalReconnectAttempts) {
+            return {
+              ...state,
+              command: "none",
+              errorMessage: `Could not reconnect terminal after ${String(MaxTerminalReconnectAttempts)} attempts.`,
+            };
+          }
+
+          if (event.sandboxStatus === "stopped" && !event.isResumingSandbox) {
+            return state.command === "resume"
+              ? state
+              : {
+                  ...state,
+                  command: "resume",
+                };
+          }
+
+          if (
+            shouldOpenPtyForRecovery({
+              attemptCount: state.attemptCount,
+              errorMessage: state.errorMessage,
+              isReconnectAttemptInFlight: event.isReconnectAttemptInFlight,
+              lifecycleState: event.lifecycleState,
+              sandboxStatus: event.sandboxStatus,
+            })
+          ) {
+            return state.command === "reopen"
+              ? state
+              : {
+                  ...state,
+                  command: "reopen",
+                };
+          }
+
+          return state.command === "none"
+            ? state
+            : {
+                ...state,
+                command: "none",
+              };
+      }
+    }
+  }
+}
+
 function SessionTerminalToolbarStatus(input: {
   errorMessage: string | null;
+  isRecovering: boolean;
   state: SandboxPtyState;
 }): React.JSX.Element {
-  const presentation = resolveSessionTerminalStatusPresentation(input.state);
+  const presentation = resolveSessionTerminalStatusPresentation({
+    state: input.state,
+    isRecovering: input.isRecovering,
+  });
   const dotClass = sessionTerminalStatusDotClassName(presentation.tone);
   const liveStatusText =
     input.errorMessage === null
@@ -80,27 +278,155 @@ function SessionTerminalToolbarStatus(input: {
   );
 }
 
+export function shouldRequestTerminalResume(input: { recovery: TerminalRecoveryState }): boolean {
+  return input.recovery.kind === "recovering" && input.recovery.command === "resume";
+}
+
+export function shouldAttemptTerminalReconnect(input: {
+  recovery: TerminalRecoveryState;
+}): boolean {
+  return input.recovery.kind === "recovering" && input.recovery.command === "reopen";
+}
+
+export function resolveTerminalRecoveryMessage(input: {
+  recovery: TerminalRecoveryState;
+  sandboxStatus: SessionTerminalRecoverySandboxStatus;
+}): string | null {
+  if (input.recovery.kind !== "recovering") {
+    return null;
+  }
+
+  if (input.recovery.errorMessage !== null) {
+    return input.recovery.errorMessage;
+  }
+
+  const prefix = `Terminal disconnected: ${input.recovery.resetInfo.message}`;
+  switch (input.sandboxStatus) {
+    case "stopped":
+      return `${prefix} Resuming sandbox to restore the terminal.`;
+    case "pending":
+    case "starting":
+    case "resuming":
+      return `${prefix} Waiting for the sandbox to become ready again.`;
+    case "running":
+      return `${prefix} Reconnecting terminal${input.recovery.attemptCount > 0 ? ` (attempt ${String(input.recovery.attemptCount)} of ${String(MaxTerminalReconnectAttempts)})` : ""}.`;
+    case "failed":
+      return `${prefix} The sandbox failed and the terminal cannot reconnect.`;
+    default:
+      return `${prefix} Reconnecting terminal.`;
+  }
+}
+
 type SessionTerminalPanelProps = {
+  isResumingSandbox: boolean;
   onHide: () => void;
   isVisible: boolean;
   isConnectionReady: boolean;
   onDisconnectTerminal: () => Promise<void> | void;
+  onRequestSandboxResume: () => Promise<void>;
   ptyState: ReturnType<typeof useSandboxPtyState>;
+  sandboxStatus: SessionTerminalRecoverySandboxStatus;
   sandboxInstanceId: string;
 };
 
 export function SessionTerminalPanel({
+  isResumingSandbox,
   onHide,
   isVisible,
   isConnectionReady,
   onDisconnectTerminal,
+  onRequestSandboxResume,
   ptyState,
+  sandboxStatus,
   sandboxInstanceId,
 }: SessionTerminalPanelProps): React.JSX.Element | null {
   const { lifecycle, output, actions } = ptyState;
   const { openPty, resizePty, writeInput } = actions;
   const hasAttemptedAutoOpenRef = useRef(false);
   const hasHandledExitRef = useRef(false);
+  const isReconnectAttemptInFlightRef = useRef(false);
+  const lastHandledResetRef = useRef<SandboxPtyResetInfo | null>(null);
+  const [recovery, dispatchRecoveryEvent] = useReducer(reduceTerminalRecoveryState, {
+    kind: "idle",
+  } satisfies TerminalRecoveryState);
+
+  useEffect(() => {
+    if (
+      !isVisible ||
+      lifecycle.resetInfo === null ||
+      lastHandledResetRef.current === lifecycle.resetInfo
+    ) {
+      return;
+    }
+
+    lastHandledResetRef.current = lifecycle.resetInfo;
+    isReconnectAttemptInFlightRef.current = false;
+    dispatchRecoveryEvent({
+      type: "reset_seen",
+      resetInfo: lifecycle.resetInfo,
+    });
+  }, [isVisible, lifecycle.resetInfo]);
+
+  useEffect(() => {
+    dispatchRecoveryEvent({
+      type: "sync_observed",
+      isReconnectAttemptInFlight: isReconnectAttemptInFlightRef.current,
+      isResumingSandbox,
+      lifecycleState: lifecycle.state,
+      sandboxStatus,
+    });
+  }, [isResumingSandbox, lifecycle.state, recovery.kind, sandboxStatus]);
+
+  useEffect(() => {
+    if (!shouldRequestTerminalResume({ recovery })) {
+      return;
+    }
+
+    dispatchRecoveryEvent({
+      type: "resume_requested",
+    });
+
+    void onRequestSandboxResume().catch(() => {
+      // Resume errors surface through the existing stopped-sandbox alert state.
+    });
+  }, [onRequestSandboxResume, recovery]);
+
+  useEffect(() => {
+    if (!shouldAttemptTerminalReconnect({ recovery })) {
+      return;
+    }
+
+    isReconnectAttemptInFlightRef.current = true;
+    dispatchRecoveryEvent({
+      type: "reopen_requested",
+    });
+
+    void openPty({
+      sandboxInstanceId,
+      ...INITIAL_PTY_DIMENSIONS,
+    })
+      .catch((error) => {
+        dispatchRecoveryEvent({
+          type: "reopen_failed",
+          message: error instanceof Error ? error.message : "Could not reopen sandbox terminal.",
+        });
+      })
+      .finally(() => {
+        isReconnectAttemptInFlightRef.current = false;
+        dispatchRecoveryEvent({
+          type: "sync_observed",
+          isReconnectAttemptInFlight: false,
+          isResumingSandbox,
+          lifecycleState: lifecycle.state,
+          sandboxStatus,
+        });
+      });
+  }, [isResumingSandbox, lifecycle.state, openPty, recovery, sandboxInstanceId, sandboxStatus]);
+
+  const terminalRecoveryMessage = resolveTerminalRecoveryMessage({
+    recovery,
+    sandboxStatus,
+  });
 
   useEffect(() => {
     if (lifecycle.exitInfo === null) {
@@ -165,6 +491,7 @@ export function SessionTerminalPanel({
         <div className="flex items-center gap-2 bg-white px-3 py-1">
           <SessionTerminalToolbarStatus
             errorMessage={lifecycle.errorMessage}
+            isRecovering={recovery.kind === "recovering"}
             state={lifecycle.state}
           />
           <div className="flex shrink-0 items-center gap-1">
@@ -188,6 +515,11 @@ export function SessionTerminalPanel({
             </Button>
           </div>
         </div>
+        {terminalRecoveryMessage === null ? null : (
+          <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
+            {terminalRecoveryMessage}
+          </div>
+        )}
         <SessionTerminalSurface
           isVisible={isVisible}
           lifecycleState={lifecycle.state}
@@ -200,4 +532,4 @@ export function SessionTerminalPanel({
   );
 }
 
-export { shouldHandleTerminalExit, shouldAutoOpenTerminal };
+export { shouldAutoOpenTerminal, shouldHandleTerminalExit };

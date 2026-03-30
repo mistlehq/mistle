@@ -1,5 +1,6 @@
 import {
   createDataPlaneDatabase,
+  sandboxInstanceRuntimePlans,
   sandboxInstances,
   SandboxStopReasons,
   SandboxInstanceStatuses,
@@ -10,10 +11,12 @@ import {
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
 import { startPostgresWithPgBouncer } from "@mistle/test-harness";
+import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { markSandboxInstanceStarting } from "../openworkflow/resume-sandbox-instance/mark-sandbox-instance-starting.js";
+import { resolveResumableSandboxInstanceState } from "../openworkflow/resume-sandbox-instance/resolve-resumable-sandbox-instance-state.js";
 
 const IntegrationTestTimeoutMs = 60_000;
 
@@ -35,6 +38,25 @@ function getDbPool(): Pool {
 
 function createDatabase() {
   return createDataPlaneDatabase(getDbPool());
+}
+
+function createRuntimePlan(input?: {
+  sandboxProfileId?: string;
+  version?: number;
+}): StartSandboxInstanceWorkflowInput["runtimePlan"] {
+  return {
+    sandboxProfileId: input?.sandboxProfileId ?? "sbp_resume_state_integration",
+    version: input?.version ?? 1,
+    image: {
+      source: "base",
+      imageRef: "registry:resume",
+    },
+    egressRoutes: [],
+    artifacts: [],
+    runtimeClients: [],
+    workspaceSources: [],
+    agentRuntimes: [],
+  };
 }
 
 describe("resume sandbox instance state integration", () => {
@@ -59,8 +81,101 @@ describe("resume sandbox instance state integration", () => {
   });
 
   beforeEach(async () => {
+    await createDatabase().delete(sandboxInstanceRuntimePlans);
     await createDatabase().delete(sandboxInstances);
   });
+
+  it(
+    "resolves the active compiled runtime plan for a resumable sandbox instance",
+    async () => {
+      const db = createDatabase();
+      const sandboxInstanceId = "sbi_resume_state_runtime_plan";
+
+      await db.insert(sandboxInstances).values({
+        id: sandboxInstanceId,
+        organizationId: "org_resume_state_runtime_plan",
+        sandboxProfileId: "sbp_resume_state_runtime_plan",
+        sandboxProfileVersion: 2,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-runtime-plan",
+        status: SandboxInstanceStatuses.STOPPED,
+        startedByKind: "system",
+        startedById: "worker_resume_state_runtime_plan",
+        source: "dashboard",
+      });
+
+      await db.insert(sandboxInstanceRuntimePlans).values([
+        {
+          sandboxInstanceId,
+          revision: 1,
+          compiledRuntimePlan: createRuntimePlan({
+            sandboxProfileId: "sbp_resume_state_runtime_plan",
+            version: 1,
+          }),
+          compiledFromProfileId: "sbp_resume_state_runtime_plan",
+          compiledFromProfileVersion: 1,
+          supersededAt: "2026-03-18T00:00:00.000Z",
+        },
+        {
+          sandboxInstanceId,
+          revision: 2,
+          compiledRuntimePlan: createRuntimePlan({
+            sandboxProfileId: "sbp_resume_state_runtime_plan",
+            version: 2,
+          }),
+          compiledFromProfileId: "sbp_resume_state_runtime_plan",
+          compiledFromProfileVersion: 2,
+        },
+      ]);
+
+      await expect(
+        resolveResumableSandboxInstanceState({
+          db,
+          sandboxInstanceId,
+        }),
+      ).resolves.toEqual({
+        sandboxInstanceId,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-runtime-plan",
+        runtimePlan: createRuntimePlan({
+          sandboxProfileId: "sbp_resume_state_runtime_plan",
+          version: 2,
+        }),
+      });
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "fails fast when a resumable sandbox instance has no active compiled runtime plan",
+    async () => {
+      const db = createDatabase();
+      const sandboxInstanceId = "sbi_resume_state_missing_runtime_plan";
+
+      await db.insert(sandboxInstances).values({
+        id: sandboxInstanceId,
+        organizationId: "org_resume_state_missing_runtime_plan",
+        sandboxProfileId: "sbp_resume_state_missing_runtime_plan",
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-runtime-missing-plan",
+        status: SandboxInstanceStatuses.STOPPED,
+        startedByKind: "system",
+        startedById: "worker_resume_state_missing_runtime_plan",
+        source: "dashboard",
+      });
+
+      await expect(
+        resolveResumableSandboxInstanceState({
+          db,
+          sandboxInstanceId,
+        }),
+      ).rejects.toThrow(
+        `Expected resumable sandbox instance '${sandboxInstanceId}' to have an active compiled runtime plan.`,
+      );
+    },
+    IntegrationTestTimeoutMs,
+  );
 
   it(
     "transitions a stopped sandbox instance back to starting while preserving the provider sandbox id",

@@ -11,7 +11,6 @@ describe("withRequiredSandboxRuntimeEnv", () => {
   it("injects required runtime env values", () => {
     expect(withRequiredSandboxRuntimeEnv(undefined)).toEqual({
       [SandboxRuntimeEnv.LISTEN_ADDR]: SandboxRuntimeEnvDefaults.LISTEN_ADDR,
-      [SandboxRuntimeEnv.USER]: SandboxRuntimeEnvDefaults.USER,
     });
   });
 
@@ -23,7 +22,6 @@ describe("withRequiredSandboxRuntimeEnv", () => {
     ).toEqual({
       MISTLE_CUSTOM_ENV: "present",
       [SandboxRuntimeEnv.LISTEN_ADDR]: SandboxRuntimeEnvDefaults.LISTEN_ADDR,
-      [SandboxRuntimeEnv.USER]: SandboxRuntimeEnvDefaults.USER,
     });
   });
 
@@ -31,14 +29,6 @@ describe("withRequiredSandboxRuntimeEnv", () => {
     expect(() =>
       withRequiredSandboxRuntimeEnv({
         [SandboxRuntimeEnv.LISTEN_ADDR]: "127.0.0.1:9000",
-      }),
-    ).toThrow(SandboxConfigurationError);
-  });
-
-  it("rejects conflicting reserved sandbox user values", () => {
-    expect(() =>
-      withRequiredSandboxRuntimeEnv({
-        [SandboxRuntimeEnv.USER]: "root",
       }),
     ).toThrow(SandboxConfigurationError);
   });

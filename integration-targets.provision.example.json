@@ -46,6 +46,11 @@
       "config": {}
     },
     {
+      "targetKey": "linear-default",
+      "enabled": false,
+      "config": {}
+    },
+    {
       "targetKey": "github-cloud",
       "enabled": true,
       "config": {

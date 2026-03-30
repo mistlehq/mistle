@@ -30,11 +30,11 @@ import {
 import { validateCompiledBindingResults } from "../validation/index.js";
 
 const SandboxPaths: SandboxPathRefs = {
-  userHomeDir: "/home/sandbox",
-  userProjectsDir: "/home/sandbox/projects",
+  userHomeDir: "/root",
+  workspaceDir: "/root",
   runtimeDataDir: "/var/lib/mistle",
   runtimeArtifactDir: "/var/lib/mistle/artifacts",
-  runtimeArtifactBinDir: "/var/lib/mistle/bin",
+  runtimeArtifactBinDir: "/usr/local/bin",
 };
 
 function artifactBinPath(name: string): string {
@@ -158,7 +158,7 @@ type RuntimeArtifactLifecycleHook =
 
 function resolveLifecycleHook(input: {
   artifactKey: string;
-  hookName: "install" | "update" | "remove";
+  hookName: "install" | "remove";
   hook: RuntimeArtifactLifecycleHook | undefined;
   refs: RuntimeArtifactRefs;
 }): ReadonlyArray<RuntimeArtifactCommand> | undefined {
@@ -212,25 +212,6 @@ function resolveRuntimeArtifacts(input: {
       );
     }
 
-    const update = resolveLifecycleHook({
-      artifactKey: artifact.artifactKey,
-      hookName: "update",
-      hook: artifact.lifecycle.update,
-      refs,
-    });
-    const remove = resolveLifecycleHook({
-      artifactKey: artifact.artifactKey,
-      hookName: "remove",
-      hook: artifact.lifecycle.remove,
-      refs,
-    });
-    if (remove === undefined) {
-      throw new IntegrationCompilerError(
-        CompilerErrorCodes.ARTIFACT_CONFLICT,
-        `Artifact '${artifact.artifactKey}' must define remove commands.`,
-      );
-    }
-
     return {
       artifactKey: artifact.artifactKey,
       name: artifact.name,
@@ -238,8 +219,6 @@ function resolveRuntimeArtifacts(input: {
       ...(artifact.env === undefined ? {} : { env: { ...artifact.env } }),
       lifecycle: {
         install,
-        ...(update === undefined ? {} : { update }),
-        remove,
       },
     };
   });

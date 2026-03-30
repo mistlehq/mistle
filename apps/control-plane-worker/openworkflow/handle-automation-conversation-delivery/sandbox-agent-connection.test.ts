@@ -24,6 +24,7 @@ type AgentTestServer = {
   connectRequest: Promise<{ streamId: number }>;
   payload: Promise<{ streamId: number; payload: string }>;
   socketClosed: Promise<void>;
+  sendStreamReset: (input: { code: string; message: string }) => void;
   close: () => Promise<void>;
 };
 
@@ -141,6 +142,8 @@ async function startAgentTestServer(mode: AgentTestServerMode): Promise<AgentTes
     wsServer.once("error", (error) => reject(error));
   });
 
+  let activeStreamId: number | null = null;
+
   wsServer.on("connection", (socket) => {
     let didHandleConnect = false;
 
@@ -149,6 +152,7 @@ async function startAgentTestServer(mode: AgentTestServerMode): Promise<AgentTes
         didHandleConnect = true;
         try {
           const streamId = parseStreamIdFromOpenMessage(message);
+          activeStreamId = streamId;
           connectDeferred.resolve({ streamId });
 
           if (mode === "reject") {
@@ -219,6 +223,26 @@ async function startAgentTestServer(mode: AgentTestServerMode): Promise<AgentTes
     connectRequest: connectDeferred.promise,
     payload: payloadDeferred.promise,
     socketClosed: socketClosedDeferred.promise,
+    sendStreamReset: (input) => {
+      if (activeStreamId === null) {
+        throw new Error("Expected stream.open handshake before sending reset.");
+      }
+
+      const clientSockets = wsServer.clients;
+      const connectedSocket = Array.from(clientSockets).at(0);
+      if (connectedSocket === undefined) {
+        throw new Error("Expected websocket client to be connected before sending reset.");
+      }
+
+      connectedSocket.send(
+        JSON.stringify({
+          type: "stream.reset",
+          streamId: activeStreamId,
+          code: input.code,
+          message: input.message,
+        }),
+      );
+    },
     close: async () => {
       await new Promise<void>((resolve, reject) => {
         wsServer.close((error) => {
@@ -364,6 +388,43 @@ describe("sandbox agent websocket delivery", () => {
 
       await server.socketClosed;
     } finally {
+      await server.close();
+    }
+  });
+
+  it("surfaces active stream resets as explicit delivery errors", async () => {
+    const server = await startAgentTestServer("accept");
+    let connection: Awaited<ReturnType<typeof connectSandboxAgentConnection>> | undefined;
+
+    try {
+      connection = await connectSandboxAgentConnection({
+        connectionUrl: server.url,
+      });
+
+      await server.connectRequest;
+      server.sendStreamReset({
+        code: "bootstrap_disconnected",
+        message:
+          "Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.",
+      });
+      await systemSleeper.sleep(50);
+
+      await expect(
+        sendSandboxAgentMessage({
+          connection,
+          message: "hello-agent",
+          autoClose: false,
+        }),
+      ).rejects.toThrow(
+        "Sandbox agent stream was reset (bootstrap_disconnected): Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.",
+      );
+    } finally {
+      if (connection !== undefined && connection.socket.readyState === WebSocket.OPEN) {
+        await connection.close({
+          code: 1000,
+          reason: "test complete",
+        });
+      }
       await server.close();
     }
   });

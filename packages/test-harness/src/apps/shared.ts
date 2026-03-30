@@ -49,6 +49,7 @@ export type StartDockerTargetAppInput = {
   dockerfileRelativePath: string;
   dockerTarget: string;
   cacheBustKey?: string;
+  prebuiltImageName?: string;
   buildArgs?: Record<string, string>;
   command?: readonly string[];
   environment: Record<string, string>;
@@ -592,6 +593,10 @@ export async function startDockerTargetApp(
     dockerfileRelativePath: input.dockerfileRelativePath,
   });
 
+  if (input.prebuiltImageName !== undefined && input.cacheBustKey !== undefined) {
+    throw new Error("cacheBustKey cannot be used with prebuiltImageName.");
+  }
+
   if (input.command !== undefined && input.command.length === 0) {
     throw new Error("command must include at least one segment when provided.");
   }
@@ -610,13 +615,15 @@ export async function startDockerTargetApp(
     });
 
     const resolveImageStartedAt = Date.now();
-    imageName = await resolveDockerTargetImageName({
-      buildContextHostPath: input.buildContextHostPath,
-      dockerfileRelativePath: input.dockerfileRelativePath,
-      dockerTarget: input.dockerTarget,
-      cacheBustKey: input.cacheBustKey ?? "",
-      buildArgs: input.buildArgs,
-    });
+    imageName =
+      input.prebuiltImageName ??
+      (await resolveDockerTargetImageName({
+        buildContextHostPath: input.buildContextHostPath,
+        dockerfileRelativePath: input.dockerfileRelativePath,
+        dockerTarget: input.dockerTarget,
+        cacheBustKey: input.cacheBustKey ?? "",
+        buildArgs: input.buildArgs,
+      }));
     traceTestHarness(
       `resolved Docker target image for ${input.dockerTarget} in ${String(Date.now() - resolveImageStartedAt)}ms`,
     );
@@ -651,7 +658,9 @@ export async function startDockerTargetApp(
     traceTestHarness(
       `started Docker target app ${input.dockerTarget} in ${String(Date.now() - containerStartStartedAt)}ms`,
     );
-    retainDockerTargetImage(imageName);
+    if (input.prebuiltImageName === undefined) {
+      retainDockerTargetImage(imageName);
+    }
     traceTestHarness(
       `Docker target app ${input.dockerTarget} startup complete in ${String(Date.now() - startupStartedAt)}ms`,
     );
@@ -663,9 +672,13 @@ export async function startDockerTargetApp(
       networkAlias: input.networkAlias,
       containerPort: input.containerPort,
       createdNetwork,
-      postStopCleanupTask: async () => {
-        await releaseDockerTargetImage(startedImageName);
-      },
+      ...(input.prebuiltImageName === undefined
+        ? {
+            postStopCleanupTask: async () => {
+              await releaseDockerTargetImage(startedImageName);
+            },
+          }
+        : {}),
     });
   } catch (startupError) {
     try {

@@ -9,32 +9,52 @@ describe("codex session lifecycle policy", () => {
   it("resets session state when the transport closes or errors", () => {
     expect(
       resolveCodexConnectionStateTransition({
+        hasConnectedSession: false,
         state: "closed",
         errorMessage: null,
       }),
     ).toEqual({
+      recoverableDisconnectMessage: null,
       shouldResetSession: true,
       startErrorMessage: "The Codex session connection closed.",
     });
 
     expect(
       resolveCodexConnectionStateTransition({
+        hasConnectedSession: false,
         state: "error",
         errorMessage: "Socket failed.",
       }),
     ).toEqual({
+      recoverableDisconnectMessage: null,
       shouldResetSession: true,
       startErrorMessage: "Socket failed.",
+    });
+  });
+
+  it("surfaces connected-session transport loss as recoverable disconnect", () => {
+    expect(
+      resolveCodexConnectionStateTransition({
+        hasConnectedSession: true,
+        state: "closed",
+        errorMessage: "Stream dropped.",
+      }),
+    ).toEqual({
+      recoverableDisconnectMessage: "Stream dropped.",
+      shouldResetSession: true,
+      startErrorMessage: null,
     });
   });
 
   it("does not reset session state for non-terminal transport states", () => {
     expect(
       resolveCodexConnectionStateTransition({
+        hasConnectedSession: false,
         state: "ready",
         errorMessage: null,
       }),
     ).toEqual({
+      recoverableDisconnectMessage: null,
       shouldResetSession: false,
       startErrorMessage: null,
     });

@@ -1,5 +1,6 @@
 .git
 .turbo
+.local
 .DS_Store
 .pkgrep
 node_modules

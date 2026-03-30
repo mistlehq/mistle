@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
+  SandboxStartupModes,
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxStartupInput,
 } from "./sandbox-startup-input.js";
@@ -176,6 +177,7 @@ const RuntimePlanSchema = z.object({
 });
 
 const SandboxStartupInputSchema = z.object({
+  startupMode: z.enum([SandboxStartupModes.NEW, SandboxStartupModes.EXISTING]),
   bootstrapToken: z.string().min(1),
   tunnelExchangeToken: z.string().min(1),
   tunnelGatewayWsUrl: z.string().min(1),
@@ -242,6 +244,7 @@ describe("encodeSandboxStartupInput", () => {
 
   it("encodes bootstrap token, tunnel exchange token, tunnel gateway ws url, and runtime plan as newline-delimited json", () => {
     const encoded = encodeSandboxStartupInput({
+      startupMode: SandboxStartupModes.NEW,
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -256,6 +259,7 @@ describe("encodeSandboxStartupInput", () => {
 
     const decoded = SandboxStartupInputSchema.parse(JSON.parse(encodedText.trimEnd()));
     expect(decoded).toEqual({
+      startupMode: SandboxStartupModes.NEW,
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",

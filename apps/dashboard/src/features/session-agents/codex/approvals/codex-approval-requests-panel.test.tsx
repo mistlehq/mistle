@@ -21,7 +21,7 @@ describe("CodexApprovalRequestsPanel", () => {
             itemId: "cmd_1",
             reason: "Needs approval",
             command: "rm -rf /tmp/build",
-            cwd: "/home/sandbox",
+            cwd: "/root",
             availableDecisions: ["accept", "decline"],
             networkHost: null,
             networkProtocol: null,

@@ -60,7 +60,7 @@ export function useSandboxSessionLaunchState(): UseSandboxSessionLaunchStateResu
 
   useEffect(() => {
     const sessionsPendingStatus = launchedSessions.filter(
-      (session) => session.status === "starting",
+      (session) => session.status === "pending" || session.status === "starting",
     );
     if (sessionsPendingStatus.length === 0) {
       return;
@@ -128,7 +128,7 @@ export function useSandboxSessionLaunchState(): UseSandboxSessionLaunchStateResu
           sandboxInstanceId: result.sandboxInstanceId,
           workflowRunId: result.workflowRunId,
           createdAtIso: new Date().toISOString(),
-          status: "starting",
+          status: "pending",
           failureCode: null,
           failureMessage: null,
         },

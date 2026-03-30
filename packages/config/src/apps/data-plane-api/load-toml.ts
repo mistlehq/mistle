@@ -1,3 +1,4 @@
+import { hasEntries } from "../../core/load-env.js";
 import { asObjectRecord } from "../../core/record.js";
 import { type PartialDataPlaneApiConfigInput, PartialDataPlaneApiConfigSchema } from "./schema.js";
 
@@ -10,6 +11,24 @@ export function loadDataPlaneApiFromToml(
   const database = asObjectRecord(dataPlaneApi.database);
   const workflow = asObjectRecord(dataPlaneApi.workflow);
   const runtimeState = asObjectRecord(dataPlaneApi.runtime_state);
+  const sandbox = asObjectRecord(dataPlaneApi.sandbox);
+  const sandboxDocker = asObjectRecord(sandbox.docker);
+  const sandboxE2B = asObjectRecord(sandbox.e2b);
+
+  const sandboxConfig: Record<string, unknown> = {};
+
+  if (hasEntries(sandboxDocker)) {
+    sandboxConfig.docker = {
+      socketPath: sandboxDocker.socket_path,
+    };
+  }
+
+  if (hasEntries(sandboxE2B)) {
+    sandboxConfig.e2b = {
+      apiKey: sandboxE2B.api_key,
+      domain: sandboxE2B.domain,
+    };
+  }
 
   return PartialDataPlaneApiConfigSchema.parse({
     server: {
@@ -27,5 +46,6 @@ export function loadDataPlaneApiFromToml(
     runtimeState: {
       gatewayBaseUrl: runtimeState.gateway_base_url,
     },
+    sandbox: sandboxConfig,
   });
 }

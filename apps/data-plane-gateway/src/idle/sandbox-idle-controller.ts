@@ -1,3 +1,4 @@
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { Clock, Scheduler, TimerHandle } from "@mistle/time";
 
 import { logger } from "../logger.js";
@@ -5,7 +6,11 @@ import type { SandboxActivityStore } from "../runtime-state/sandbox-activity-sto
 import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
 import type { SandboxOwnerStore } from "../tunnel/ownership/sandbox-owner-store.js";
-import type { StopSandboxRequester } from "./stop-sandbox-requester.js";
+
+type SandboxIdleControllerDataPlaneClient = Pick<
+  DataPlaneSandboxInstancesClient,
+  "stopSandboxInstance" | "reconcileSandboxInstance"
+>;
 
 /**
  * Constructor dependencies for an owner-local idle controller.
@@ -25,7 +30,7 @@ export type SandboxIdleControllerDependencies = {
   activityStore: SandboxActivityStore;
   presenceStore: SandboxPresenceStore;
   runtimeAttachmentStore: SandboxRuntimeAttachmentStore;
-  stopRequester: StopSandboxRequester;
+  dataPlaneClient: SandboxIdleControllerDataPlaneClient;
 };
 
 /**
@@ -288,11 +293,11 @@ export class LocalSandboxIdleController implements SandboxIdleController {
     }
 
     try {
-      await this.dependencies.stopRequester.requestStop({
+      await this.dependencies.dataPlaneClient.stopSandboxInstance({
         sandboxInstanceId: this.sandboxInstanceId,
         stopReason: "idle",
         expectedOwnerLeaseId: this.ownerLeaseId,
-        idempotencyKey: this.createStopIdempotencyKey("idle"),
+        idempotencyKey: this.createStopIdempotencyKey(),
       });
       logger.info(
         {
@@ -383,21 +388,21 @@ export class LocalSandboxIdleController implements SandboxIdleController {
     }
 
     try {
-      await this.dependencies.stopRequester.requestStop({
+      await this.dependencies.dataPlaneClient.reconcileSandboxInstance({
         sandboxInstanceId: this.sandboxInstanceId,
-        stopReason: "disconnected",
+        reason: "disconnect_grace_elapsed",
         expectedOwnerLeaseId: this.ownerLeaseId,
-        idempotencyKey: this.createStopIdempotencyKey("disconnected"),
+        idempotencyKey: this.createReconcileIdempotencyKey(),
       });
       logger.info(
         {
-          event: "sandbox_stop_requested",
+          event: "sandbox_reconcile_requested",
           sandboxInstanceId: this.sandboxInstanceId,
           ownerLeaseId: this.ownerLeaseId,
-          stopReason: "disconnected",
+          reconcileReason: "disconnect_grace_elapsed",
           nowMs,
         },
-        "Requested fenced sandbox stop",
+        "Requested fenced sandbox reconciliation",
       );
     } catch (error) {
       logger.error(
@@ -406,15 +411,19 @@ export class LocalSandboxIdleController implements SandboxIdleController {
           sandboxInstanceId: this.sandboxInstanceId,
           ownerLeaseId: this.ownerLeaseId,
         },
-        "Failed to request fenced disconnected sandbox stop",
+        "Failed to request fenced disconnected sandbox reconciliation",
       );
       return;
     }
 
-    this.disposeWithReason("disconnected_stop_requested");
+    this.disposeWithReason("disconnected_reconcile_requested");
   }
 
-  private createStopIdempotencyKey(stopReason: "idle" | "disconnected"): string {
-    return `${this.sandboxInstanceId}:${this.ownerLeaseId}:${stopReason}`;
+  private createStopIdempotencyKey(): string {
+    return `${this.sandboxInstanceId}:${this.ownerLeaseId}:idle_stop`;
+  }
+
+  private createReconcileIdempotencyKey(): string {
+    return `${this.sandboxInstanceId}:${this.ownerLeaseId}:disconnect_grace_elapsed:reconcile`;
   }
 }

@@ -13,15 +13,19 @@ Maintainer docs for local config initialization scripts.
   - Applies development preset generators.
   - Writes `config/config.development.toml` (overwrites on each run).
 
-## CI Init Script
+## Integration Init Script
 
-- Command: `pnpm config:init:ci`
-- Script: `scripts/config/init-ci.ts`
-- Output: `config/config.ci.toml`
+- Command: `pnpm config:init:integration`
+- Script: `scripts/config/init-integration.ts`
+- Output:
+  - `config/config.integration.docker.toml`
+  - `config/config.integration.e2b.toml`
 - Behavior:
   - Reads `config/config.sample.toml`.
-  - Applies deterministic CI overrides.
-  - Writes `config/config.ci.toml` (overwrites on each run).
+  - Applies development preset defaults and generators as the integration baseline.
+  - Shapes the config per requested sandbox provider from `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS`.
+  - Overlays canonical runtime config env vars onto the generated TOML.
+  - Writes one provider-specific integration config file per requested provider.
 
 ## Conversion Scripts
 
@@ -44,10 +48,13 @@ Notes:
 
 - Conversion currently covers `@mistle/config` managed runtime modules (global plus control/data plane apps).
 - Unknown keys are ignored.
+- `config:init:integration` expects `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS` to be set.
 
 ## Preset Modules
 
 Development preset modules live under `scripts/config/presets/development/`.
+
+Integration provider presets live under `scripts/config/presets/integration/`.
 
 Each module exports:
 

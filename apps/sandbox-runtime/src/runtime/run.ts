@@ -28,6 +28,7 @@ import { createProxyServer } from "./proxy/proxy-server.js";
 import { readStartupInput, DefaultStartupInputMaxBytes } from "./read-startup-input.js";
 import { applyCurrentProcessSecurity } from "./security.js";
 import { type StartupInput } from "./startup-input.js";
+import { RuntimeStartupModes } from "./startup-input.js";
 
 type LookupEnv = (key: string) => string | undefined;
 
@@ -95,6 +96,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     level: "info",
     event: "sandbox_runtime_startup_started",
     fields: {
+      startupMode: startupInput.startupMode,
       artifactCount: startupInput.runtimePlan.artifacts.length,
       workspaceSourceCount: startupInput.runtimePlan.workspaceSources.length,
       runtimeClientCount: startupInput.runtimePlan.runtimeClients.length,
@@ -141,30 +143,40 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
   let processManager: RuntimeClientProcessManager | undefined;
   let tunnelClient: StartedTunnelClient | undefined;
   let startupStage:
+    | "skip_runtime_plan"
     | "apply_runtime_plan"
     | "start_runtime_clients"
     | "start_tunnel"
     | "startup_ready" = "apply_runtime_plan";
   try {
-    logSandboxRuntimeEvent({
-      level: "info",
-      event: "sandbox_runtime_plan_apply_started",
-      fields: {
-        artifactCount: startupInput.runtimePlan.artifacts.length,
-        workspaceSourceCount: startupInput.runtimePlan.workspaceSources.length,
-      },
-    });
-    const applyRuntimePlanStartedAtMs = Date.now();
-    await applyRuntimePlan({
-      runtimePlan: startupInput.runtimePlan,
-    });
-    logSandboxRuntimeEvent({
-      level: "info",
-      event: "sandbox_runtime_plan_apply_completed",
-      fields: {
-        elapsedMs: Date.now() - applyRuntimePlanStartedAtMs,
-      },
-    });
+    if (startupInput.startupMode === RuntimeStartupModes.NEW) {
+      // Initial startup owns provisioning the sandbox filesystem from the
+      // compiled runtime plan before any long-lived processes are relaunched.
+      logSandboxRuntimeEvent({
+        level: "info",
+        event: "sandbox_runtime_plan_apply_started",
+        fields: {
+          artifactCount: startupInput.runtimePlan.artifacts.length,
+          workspaceSourceCount: startupInput.runtimePlan.workspaceSources.length,
+        },
+      });
+      const applyRuntimePlanStartedAtMs = Date.now();
+      await applyRuntimePlan({
+        runtimePlan: startupInput.runtimePlan,
+      });
+      logSandboxRuntimeEvent({
+        level: "info",
+        event: "sandbox_runtime_plan_apply_completed",
+        fields: {
+          elapsedMs: Date.now() - applyRuntimePlanStartedAtMs,
+        },
+      });
+    } else {
+      // Resume must preserve user/runtime state accumulated inside the sandbox,
+      // so existing sandboxes skip runtime-plan mutation and only relaunch the
+      // processes/tunnel that depend on fresh connection material.
+      startupStage = "skip_runtime_plan";
+    }
     const artifactEnvironment = aggregateArtifactEnvironment(startupInput.runtimePlan.artifacts);
     if (artifactEnvironment !== undefined) {
       restoreArtifactEnvironment = applyEnvironmentEntries(artifactEnvironment);

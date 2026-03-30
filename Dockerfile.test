@@ -19,7 +19,7 @@ FROM base AS control-plane-api-test-runtime
 COPY --from=control-plane-api-test-deps /app /app
 COPY docker/apps/control-plane-api/entrypoint.sh /usr/local/bin/mistle-control-plane-api-entrypoint
 RUN chmod +x /usr/local/bin/mistle-control-plane-api-entrypoint
-ENV MISTLE_CONFIG_PATH=/app/config/config.development.toml
+ENV MISTLE_CONFIG_PATH=/app/config/config.integration.docker.toml
 EXPOSE 5100
 ENTRYPOINT ["/usr/local/bin/mistle-control-plane-api-entrypoint"]
 
@@ -30,7 +30,7 @@ FROM base AS control-plane-worker-test-runtime
 COPY --from=control-plane-worker-test-deps /app /app
 COPY docker/apps/control-plane-worker/entrypoint.sh /usr/local/bin/mistle-control-plane-worker-entrypoint
 RUN chmod +x /usr/local/bin/mistle-control-plane-worker-entrypoint
-ENV MISTLE_CONFIG_PATH=/app/config/config.development.toml
+ENV MISTLE_CONFIG_PATH=/app/config/config.integration.docker.toml
 EXPOSE 5101
 ENTRYPOINT ["/usr/local/bin/mistle-control-plane-worker-entrypoint"]
 
@@ -41,7 +41,7 @@ FROM base AS data-plane-api-test-runtime
 COPY --from=data-plane-api-test-deps /app /app
 COPY docker/apps/data-plane-api/entrypoint.sh /usr/local/bin/mistle-data-plane-api-entrypoint
 RUN chmod +x /usr/local/bin/mistle-data-plane-api-entrypoint
-ENV MISTLE_CONFIG_PATH=/app/config/config.development.toml
+ENV MISTLE_CONFIG_PATH=/app/config/config.integration.docker.toml
 EXPOSE 5200
 ENTRYPOINT ["/usr/local/bin/mistle-data-plane-api-entrypoint"]
 
@@ -52,7 +52,7 @@ FROM base AS data-plane-worker-test-runtime
 COPY --from=data-plane-worker-test-deps /app /app
 COPY docker/apps/data-plane-worker/entrypoint.sh /usr/local/bin/mistle-data-plane-worker-entrypoint
 RUN chmod +x /usr/local/bin/mistle-data-plane-worker-entrypoint
-ENV MISTLE_CONFIG_PATH=/app/config/config.development.toml
+ENV MISTLE_CONFIG_PATH=/app/config/config.integration.docker.toml
 EXPOSE 5201
 ENTRYPOINT ["/usr/local/bin/mistle-data-plane-worker-entrypoint"]
 
@@ -63,7 +63,7 @@ FROM base AS data-plane-gateway-test-runtime
 COPY --from=data-plane-gateway-test-deps /app /app
 COPY docker/apps/data-plane-gateway/entrypoint.sh /usr/local/bin/mistle-data-plane-gateway-entrypoint
 RUN chmod +x /usr/local/bin/mistle-data-plane-gateway-entrypoint
-ENV MISTLE_CONFIG_PATH=/app/config/config.development.toml
+ENV MISTLE_CONFIG_PATH=/app/config/config.integration.docker.toml
 EXPOSE 5202
 ENTRYPOINT ["/usr/local/bin/mistle-data-plane-gateway-entrypoint"]
 
@@ -74,6 +74,6 @@ FROM base AS tokenizer-proxy-test-runtime
 COPY --from=tokenizer-proxy-test-deps /app /app
 COPY docker/apps/tokenizer-proxy/entrypoint.sh /usr/local/bin/mistle-tokenizer-proxy-entrypoint
 RUN chmod +x /usr/local/bin/mistle-tokenizer-proxy-entrypoint
-ENV MISTLE_CONFIG_PATH=/app/config/config.development.toml
+ENV MISTLE_CONFIG_PATH=/app/config/config.integration.docker.toml
 EXPOSE 5205
 ENTRYPOINT ["/usr/local/bin/mistle-tokenizer-proxy-entrypoint"]

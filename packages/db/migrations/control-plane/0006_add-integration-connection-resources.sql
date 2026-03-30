@@ -3,7 +3,7 @@ CREATE TABLE "control_plane"."integration_connection_resource_states" (
 	"family_id" text NOT NULL,
 	"kind" text NOT NULL,
 	"sync_state" text DEFAULT 'never-synced' NOT NULL,
-	"total_count" integer DEFAULT 0 NOT NULL,
+	"total_count" bigint DEFAULT 0 NOT NULL,
 	"last_synced_at" timestamp with time zone,
 	"last_sync_started_at" timestamp with time zone,
 	"last_sync_finished_at" timestamp with time zone,

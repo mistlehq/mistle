@@ -121,6 +121,11 @@ describe("parseConfigRecord", () => {
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
           },
+          sandbox: {
+            docker: {
+              socketPath: "/var/run/docker.sock",
+            },
+          },
         },
         data_plane_worker: {
           database: {
@@ -300,6 +305,11 @@ describe("parseConfigRecord", () => {
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
           },
+          sandbox: {
+            docker: {
+              socketPath: "/var/run/docker.sock",
+            },
+          },
         },
         data_plane_worker: {
           database: {
@@ -478,6 +488,11 @@ describe("parseConfigRecord", () => {
           },
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
+          },
+          sandbox: {
+            docker: {
+              socketPath: "/var/run/docker.sock",
+            },
           },
         },
         data_plane_worker: {

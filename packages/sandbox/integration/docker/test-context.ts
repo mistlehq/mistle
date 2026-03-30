@@ -5,12 +5,11 @@ import { GenericContainer, type StartedTestContainer } from "testcontainers";
 import { it as vitestIt } from "vitest";
 import { z } from "zod";
 
+import { SandboxProvider, type SandboxImageHandle } from "../../src/index.js";
 import {
-  SandboxProvider,
-  createSandboxAdapter,
-  type SandboxAdapter,
-  type SandboxImageHandle,
-} from "../../src/index.js";
+  createDockerAdapter,
+  type DockerSandboxAdapter,
+} from "../../src/providers/docker/index.js";
 import { resolveSandboxIntegrationSettings } from "../config.js";
 import { resolveDockerAdapterIntegrationSettings } from "./config.js";
 
@@ -44,7 +43,7 @@ type DockerRegistryAuthConfig = {
 };
 
 export type DockerAdapterIntegrationFixture = {
-  adapter: SandboxAdapter;
+  adapter: DockerSandboxAdapter;
   baseImage: SandboxImageHandle;
   dockerClient: Docker;
 };
@@ -74,11 +73,8 @@ export const it = vitestIt.extend<{ fixture: DockerAdapterIntegrationFixture }>(
       const dockerClient = new Docker({
         socketPath: settings.socketPath,
       });
-      const adapter = createSandboxAdapter({
-        provider: SandboxProvider.DOCKER,
-        docker: {
-          socketPath: settings.socketPath,
-        },
+      const adapter = createDockerAdapter({
+        socketPath: settings.socketPath,
       });
 
       try {

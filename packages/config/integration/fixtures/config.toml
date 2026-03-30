@@ -107,6 +107,9 @@ namespace_id = "fixture"
 [apps.data_plane_api.runtime_state]
 gateway_base_url = "http://127.0.0.1:5302"
 
+[apps.data_plane_api.sandbox.docker]
+socket_path = "/var/run/docker.sock"
+
 [apps.data_plane_gateway.server]
 host = "0.0.0.0"
 port = 5302

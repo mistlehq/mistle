@@ -1,44 +1,27 @@
-import { Body, Container, Head, Html, Preview, Section, Text } from "jsx-email";
+import { Section, Text } from "jsx-email";
 import type { CSSProperties, ReactElement } from "react";
+
+import { BrandedEmailShell } from "../shared/branded-email-shell.js";
 
 export type OrganizationInvitationTemplateProps = {
   organizationName: string;
   inviterDisplayName: string;
+  preview: string;
   role: string;
   invitationUrl: string;
-};
-
-const bodyStyle: CSSProperties = {
-  backgroundColor: "#f6f7fb",
-  fontFamily: "Helvetica, Arial, sans-serif",
-  margin: 0,
-  padding: "32px 0",
-};
-
-const containerStyle: CSSProperties = {
-  backgroundColor: "#ffffff",
-  borderRadius: "12px",
-  margin: "0 auto",
-  maxWidth: "520px",
-  padding: "28px",
-};
-
-const headingStyle: CSSProperties = {
-  color: "#111827",
-  fontSize: "24px",
-  fontWeight: 700,
-  margin: "0 0 18px",
 };
 
 const paragraphStyle: CSSProperties = {
   color: "#374151",
   fontSize: "15px",
   lineHeight: "22px",
-  margin: "0 0 16px",
+  margin: "0 0 18px",
+  textAlign: "center",
 };
 
 const buttonSectionStyle: CSSProperties = {
-  margin: "20px 0 22px",
+  margin: "20px 0 28px",
+  textAlign: "center",
 };
 
 const buttonStyle: CSSProperties = {
@@ -56,37 +39,52 @@ const footerStyle: CSSProperties = {
   color: "#6b7280",
   fontSize: "13px",
   lineHeight: "20px",
-  marginTop: "20px",
+  textAlign: "center",
+};
+
+const fallbackPromptStyle: CSSProperties = {
+  ...footerStyle,
+  margin: "0 0 4px",
+};
+
+const fallbackLinkStyle: CSSProperties = {
+  color: "#111827",
+  fontSize: "13px",
+  lineHeight: "20px",
+  margin: "0 0 18px",
+  textAlign: "center",
+  wordBreak: "break-all",
+};
+
+const ignoreMessageStyle: CSSProperties = {
+  ...footerStyle,
+  margin: 0,
 };
 
 export function OrganizationInvitationTemplate({
   organizationName,
   inviterDisplayName,
+  preview,
   role,
   invitationUrl,
 }: OrganizationInvitationTemplateProps): ReactElement {
-  const subject = `You're invited to join ${organizationName}`;
+  const subject = `Join ${organizationName} on Mistle`;
 
   return (
-    <Html>
-      <Head />
-      <Preview>{subject}</Preview>
-      <Body style={bodyStyle}>
-        <Container style={containerStyle}>
-          <Text style={headingStyle}>{subject}</Text>
-          <Text style={paragraphStyle}>
-            {`${inviterDisplayName} invited you to join ${organizationName} as ${role}.`}
-          </Text>
-          <Section style={buttonSectionStyle}>
-            <a href={invitationUrl} style={buttonStyle}>
-              Accept invitation
-            </a>
-          </Section>
-          <Text style={footerStyle}>
-            If you did not expect this invitation, you can ignore this email.
-          </Text>
-        </Container>
-      </Body>
-    </Html>
+    <BrandedEmailShell preview={preview} title={subject}>
+      <Text style={paragraphStyle}>
+        {`${inviterDisplayName} invited you to join ${organizationName} as ${role}.`}
+      </Text>
+      <Section style={buttonSectionStyle}>
+        <a href={invitationUrl} style={buttonStyle}>
+          Accept invitation
+        </a>
+      </Section>
+      <Text style={fallbackPromptStyle}>If the button does not work, use this link:</Text>
+      <Text style={fallbackLinkStyle}>{invitationUrl}</Text>
+      <Text style={ignoreMessageStyle}>
+        If you did not expect this invitation, you can ignore this email.
+      </Text>
+    </BrandedEmailShell>
   );
 }

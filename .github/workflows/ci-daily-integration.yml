@@ -60,9 +60,6 @@ jobs:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
-      - name: Generate CI config
-        run: nix develop --command pnpm run config:init:ci
-
       - name: Fetch Infisical secrets
         uses: Infisical/secrets-action@v1.0.11
         with:
@@ -72,9 +69,12 @@ jobs:
           env-slug: ci
           secret-path: /integration-tests
 
+      - name: Generate integration config
+        run: nix develop --command pnpm run config:init:integration
+
       - name: Run daily integration suite in Nix shell
         env:
-          MISTLE_CONFIG_PATH: ${{ github.workspace }}/config/config.ci.toml
+          MISTLE_CONFIG_PATH: ${{ github.workspace }}/config/config.integration.docker.toml
         run: nix develop --command pnpm test:integration
 
       - name: Save Turbo local cache

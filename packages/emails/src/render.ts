@@ -1,7 +1,14 @@
 import { render, renderPlainText } from "jsx-email";
 import type { ReactElement } from "react";
 
+export type EmailTemplateMetadata = {
+  templateName: string;
+  subject: string;
+  preview: string;
+};
+
 export type EmailTemplate = {
+  metadata: EmailTemplateMetadata;
   subject: string;
   html: string;
   text: string;

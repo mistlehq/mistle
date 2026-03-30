@@ -4241,7 +4241,7 @@
                           },
                           "status": {
                             "type": "string",
-                            "enum": ["starting", "running", "stopped", "failed"]
+                            "enum": ["pending", "starting", "running", "stopped", "failed"]
                           },
                           "startedBy": {
                             "type": "object",
@@ -4466,7 +4466,7 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["starting", "running", "stopped", "failed"]
+                      "enum": ["pending", "starting", "running", "stopped", "failed"]
                     },
                     "failureCode": {
                       "type": ["string", "null"],
@@ -4656,7 +4656,7 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["starting", "running", "stopped", "failed"]
+                      "enum": ["pending", "starting", "running", "stopped", "failed"]
                     },
                     "failureCode": {
                       "type": ["string", "null"],

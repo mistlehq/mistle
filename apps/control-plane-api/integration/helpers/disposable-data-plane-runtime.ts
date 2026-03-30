@@ -185,6 +185,9 @@ export async function createDisposableDataPlaneRuntime(input: {
     dbPool = new Pool({
       connectionString: databaseUrl,
     });
+    // The fixture forcibly drops the disposable database during teardown, which can
+    // terminate any last idle client while pools are unwinding.
+    dbPool.on("error", () => undefined);
 
     const configuredBaseUrl = new URL(input.baseUrl);
     const host = configuredBaseUrl.hostname;
@@ -209,6 +212,11 @@ export async function createDisposableDataPlaneRuntime(input: {
       },
       runtimeState: {
         gatewayBaseUrl: `http://${host}:${String(gatewayPort)}`,
+      },
+      sandbox: {
+        docker: {
+          socketPath: "/var/run/docker.sock",
+        },
       },
     };
 

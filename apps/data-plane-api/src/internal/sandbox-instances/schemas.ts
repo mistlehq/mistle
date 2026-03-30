@@ -2,6 +2,7 @@ import { z } from "@hono/zod-openapi";
 import { createKeysetPaginationEnvelopeSchema } from "@mistle/http/pagination";
 
 export const DataPlaneSandboxInstanceStatuses = Object.freeze({
+  PENDING: "pending",
   STARTING: "starting",
   RUNNING: "running",
   STOPPED: "stopped",
@@ -9,6 +10,7 @@ export const DataPlaneSandboxInstanceStatuses = Object.freeze({
 });
 
 export const DataPlaneSandboxInstanceStatusSchema = z.enum([
+  DataPlaneSandboxInstanceStatuses.PENDING,
   DataPlaneSandboxInstanceStatuses.STARTING,
   DataPlaneSandboxInstanceStatuses.RUNNING,
   DataPlaneSandboxInstanceStatuses.STOPPED,

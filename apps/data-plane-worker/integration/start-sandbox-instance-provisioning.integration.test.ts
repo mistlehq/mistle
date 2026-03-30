@@ -115,7 +115,7 @@ describe("start sandbox instance provisioning integration", () => {
 
       expect(persistedStartingInstance).toEqual({
         id: sandboxInstanceId,
-        status: SandboxInstanceStatuses.STARTING,
+        status: SandboxInstanceStatuses.PENDING,
       });
 
       await persistSandboxInstanceProvisioning(
@@ -134,6 +134,7 @@ describe("start sandbox instance provisioning integration", () => {
       const persistedProvisionedInstance = await db.query.sandboxInstances.findFirst({
         columns: {
           id: true,
+          status: true,
           providerSandboxId: true,
         },
         where: (table, { eq }) => eq(table.id, sandboxInstanceId),
@@ -141,6 +142,7 @@ describe("start sandbox instance provisioning integration", () => {
 
       expect(persistedProvisionedInstance).toEqual({
         id: sandboxInstanceId,
+        status: SandboxInstanceStatuses.STARTING,
         providerSandboxId: "provider-runtime-start-provisioning",
       });
 

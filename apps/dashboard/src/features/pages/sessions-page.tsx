@@ -42,7 +42,7 @@ import { useCachedRequiredSession } from "../shell/session-context.js";
 const SANDBOX_INSTANCE_LIST_LIMIT = 20;
 const SANDBOX_INSTANCE_LIST_MAX_LIMIT = 100;
 
-type SandboxSessionStatus = "starting" | "running" | "stopped" | "failed";
+type SandboxSessionStatus = "pending" | "starting" | "running" | "stopped" | "failed";
 
 function parseListLimit(rawValue: string | null): number {
   if (rawValue === null) {
@@ -111,6 +111,13 @@ function getSandboxSessionStatusBadgeUi(status: SandboxSessionStatus): {
   if (status === "stopped") {
     return {
       label: "Stopped",
+      variant: "outline",
+    };
+  }
+
+  if (status === "pending") {
+    return {
+      label: "Pending",
       variant: "outline",
     };
   }
@@ -308,10 +315,11 @@ export function SessionsPage(): React.JSX.Element {
     ...(sandboxInstancesQuery.data?.items ?? []),
   ].sort((left, right) => {
     const statusRank: Record<SandboxSessionStatus, number> = {
-      starting: 0,
-      running: 1,
-      failed: 2,
-      stopped: 3,
+      pending: 0,
+      starting: 1,
+      running: 2,
+      failed: 3,
+      stopped: 4,
     };
 
     const rankDifference = statusRank[left.status] - statusRank[right.status];

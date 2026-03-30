@@ -5,7 +5,7 @@ import {
 import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { describe, expect } from "vitest";
 
-import { INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "../src/internal/sandbox-instances/index.js";
+import { INTERNAL_SANDBOX_ROUTE_BASE_PATH } from "../src/internal/index.js";
 import { it } from "./test-context.js";
 
 describe("internal sandbox instances list integration", () => {
@@ -125,17 +125,14 @@ describe("internal sandbox instances list integration", () => {
 
   it("returns 400 for invalid pagination cursor", async ({ fixture }) => {
     const response = await fetch(
-      new URL(`${INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH}/list`, fixture.baseUrl),
+      new URL(
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances?organizationId=org_dp_list_invalid_cursor&after=invalid!`,
+        fixture.baseUrl,
+      ),
       {
-        method: "POST",
         headers: {
-          "content-type": "application/json",
           [DATA_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
         },
-        body: JSON.stringify({
-          organizationId: "org_dp_list_invalid_cursor",
-          after: "invalid!",
-        }),
       },
     );
 

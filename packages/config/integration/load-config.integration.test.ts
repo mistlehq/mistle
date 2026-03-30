@@ -233,6 +233,11 @@ const dataPlaneApiEnvConfig = {
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5003",
   },
+  sandbox: {
+    docker: {
+      socketPath: "/var/run/docker.sock",
+    },
+  },
 } as const;
 
 const dataPlaneApiFixtureConfig = {

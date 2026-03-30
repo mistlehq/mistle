@@ -1,7 +1,7 @@
+import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { createMutableClock, createManualScheduler } from "@mistle/time/testing";
 import { describe, expect, it } from "vitest";
 
-import { DataPlaneApiStopSandboxClient } from "../clients/data-plane-api-stop-sandbox-client.js";
 import { InMemorySandboxActivityStore } from "../runtime-state/adapters/in-memory-sandbox-activity-store.js";
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
@@ -17,7 +17,7 @@ describe("SandboxIdleControllerRegistry", () => {
     const activityStore = new InMemorySandboxActivityStore(clock);
     const presenceStore = new InMemorySandboxPresenceStore(clock);
     const runtimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
-    const stopRequester = new DataPlaneApiStopSandboxClient({
+    const dataPlaneClient = createDataPlaneSandboxInstancesClient({
       baseUrl: "http://127.0.0.1:1",
       serviceToken: "test-service-token",
     });
@@ -34,7 +34,7 @@ describe("SandboxIdleControllerRegistry", () => {
           activityStore,
           presenceStore,
           runtimeAttachmentStore,
-          stopRequester,
+          dataPlaneClient,
         },
         input.onDisposed,
       );
@@ -61,7 +61,7 @@ describe("SandboxIdleControllerRegistry", () => {
     const activityStore = new InMemorySandboxActivityStore(clock);
     const presenceStore = new InMemorySandboxPresenceStore(clock);
     const runtimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
-    const stopRequester = new DataPlaneApiStopSandboxClient({
+    const dataPlaneClient = createDataPlaneSandboxInstancesClient({
       baseUrl: "http://127.0.0.1:1",
       serviceToken: "test-service-token",
     });
@@ -78,7 +78,7 @@ describe("SandboxIdleControllerRegistry", () => {
           activityStore,
           presenceStore,
           runtimeAttachmentStore,
-          stopRequester,
+          dataPlaneClient,
         },
         input.onDisposed,
       );
@@ -106,7 +106,7 @@ describe("SandboxIdleControllerRegistry", () => {
     const activityStore = new InMemorySandboxActivityStore(clock);
     const presenceStore = new InMemorySandboxPresenceStore(clock);
     const runtimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
-    const stopRequester = new DataPlaneApiStopSandboxClient({
+    const dataPlaneClient = createDataPlaneSandboxInstancesClient({
       baseUrl: "http://127.0.0.1:1",
       serviceToken: "test-service-token",
     });
@@ -123,7 +123,7 @@ describe("SandboxIdleControllerRegistry", () => {
           activityStore,
           presenceStore,
           runtimeAttachmentStore,
-          stopRequester,
+          dataPlaneClient,
         },
         input.onDisposed,
       );

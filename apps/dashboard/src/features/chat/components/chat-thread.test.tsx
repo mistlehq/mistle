@@ -26,9 +26,9 @@ describe("ChatThread", () => {
             id: "cmd_1",
             turnId: "turn_1",
             kind: "command-execution",
-            command: "cat > /home/sandbox/file.md",
+            command: "cat > /root/file.md",
             output: null,
-            cwd: "/home/sandbox",
+            cwd: "/root",
             exitCode: null,
             commandStatus: "completed",
             reason: null,
@@ -48,8 +48,8 @@ describe("ChatThread", () => {
             turnId: "turn_1",
             itemId: "cmd_1",
             reason: "Do you want me to overwrite the file?",
-            command: "cat > /home/sandbox/file.md",
-            cwd: "/home/sandbox",
+            command: "cat > /root/file.md",
+            cwd: "/root",
             availableDecisions: ["accept", "cancel"],
             networkHost: null,
             networkProtocol: null,
@@ -87,9 +87,9 @@ describe("ChatThread", () => {
             id: "cmd_1",
             turnId: "turn_1",
             kind: "command-execution",
-            command: `/bin/sh -lc "cat > /home/sandbox/two-little-pigs.md <<'EOF'\n# Two Little Pigs\nEOF"`,
+            command: `/bin/sh -lc "cat > /root/two-little-pigs.md <<'EOF'\n# Two Little Pigs\nEOF"`,
             output: null,
-            cwd: "/home/sandbox",
+            cwd: "/root",
             exitCode: null,
             commandStatus: "completed",
             reason: null,
@@ -171,7 +171,7 @@ describe("ChatThread", () => {
     expect(screen.getByText("Search")).toBeTruthy();
     expect(screen.queryByText("Show results")).toBeNull();
     expect(screen.getAllByText("Toggle results")).toHaveLength(2);
-    expect(container.textContent?.includes("cwd: /home/sandbox")).toBe(false);
+    expect(container.textContent?.includes("cwd: /root")).toBe(false);
   });
 
   it("renders command approvals inline for grouped command items", () => {
@@ -227,7 +227,7 @@ describe("ChatThread", () => {
             itemId: "cmd_1",
             reason: "Approve the grouped command.",
             command: "pnpm --filter @mistle/dashboard lint",
-            cwd: "/home/sandbox",
+            cwd: "/root",
             availableDecisions: ["accept", "cancel"],
             networkHost: null,
             networkProtocol: null,

@@ -1,7 +1,12 @@
 export function isSessionPageNavigableSandboxStatus(
   sandboxStatus: string | null,
-): sandboxStatus is "starting" | "running" | "stopped" {
-  return sandboxStatus === "starting" || sandboxStatus === "running" || sandboxStatus === "stopped";
+): sandboxStatus is "pending" | "starting" | "running" | "stopped" {
+  return (
+    sandboxStatus === "pending" ||
+    sandboxStatus === "starting" ||
+    sandboxStatus === "running" ||
+    sandboxStatus === "stopped"
+  );
 }
 
 export type SessionConnectionReadiness = {
@@ -49,7 +54,7 @@ export function resolveSessionConnectionReadiness(input: {
     };
   }
 
-  if (input.sandboxStatus === "starting") {
+  if (input.sandboxStatus === "pending" || input.sandboxStatus === "starting") {
     return {
       canConnect: false,
       reason: "starting",

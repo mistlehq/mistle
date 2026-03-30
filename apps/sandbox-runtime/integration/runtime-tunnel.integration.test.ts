@@ -20,6 +20,7 @@ function createLookupEnv(): (key: string) => string | undefined {
 
 function createStartupInputJson(tunnelGatewayWsUrl: string): string {
   return `{
+    "startupMode": "new",
     "bootstrapToken": "test-token",
     "tunnelExchangeToken": "test-exchange-token",
     "tunnelGatewayWsUrl": "${tunnelGatewayWsUrl}",
@@ -35,7 +36,8 @@ function createStartupInputJson(tunnelGatewayWsUrl: string): string {
       "runtimeClients": [],
       "workspaceSources": [],
       "agentRuntimes": []
-    }
+    },
+    "egressGrantByRuleId": {}
   }`;
 }
 

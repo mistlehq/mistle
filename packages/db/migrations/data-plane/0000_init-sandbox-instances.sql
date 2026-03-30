@@ -7,7 +7,7 @@ CREATE TABLE "data_plane"."sandbox_instances" (
 	"sandbox_profile_version" bigint NOT NULL,
 	"runtime_provider" text NOT NULL,
 	"provider_sandbox_id" text,
-	"status" text DEFAULT 'starting' NOT NULL,
+	"status" text DEFAULT 'pending' NOT NULL,
 	"started_by_kind" text NOT NULL,
 	"started_by_id" text NOT NULL,
 	"source" text NOT NULL,

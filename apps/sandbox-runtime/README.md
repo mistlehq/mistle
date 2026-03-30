@@ -7,7 +7,7 @@ It owns:
 - supervisor orchestration for secure one-shot startup configuration
 - bootstrap orchestration for root-only proxy CA trust setup
 - runtime startup, health, proxying, runtime-plan application, and tunnel handling
-- Linux SEA packaging for `sandbox-bootstrap` and `sandboxd`
+- Linux SEA packaging for `sandboxd`
 - the base sandbox image definition used by the system harness and dev flows
 
 The native boundary lives in `packages/sandbox-rs-napi`.
@@ -17,7 +17,7 @@ Rust owns:
 - PTY primitives
 - managed process spawn / signal / process-group behavior
 - proxy CA inherited-FD handoff
-- privilege drop, stdio inheritance, and Linux hardening helpers
+- target identity handoff, stdio inheritance, and Linux hardening helpers
 
 TypeScript owns:
 
@@ -33,7 +33,6 @@ TypeScript owns:
 - `integration/`: app-level integration coverage
 - `scripts/`: SEA bundle/build/smoke helpers
 - `Dockerfile`: canonical sandbox base image definition
-- `mistle-path.sh`: image shell-path setup
 
 ## Base Image
 
@@ -53,9 +52,10 @@ The base image:
 
 - packages the SEA binaries from `apps/sandbox-runtime/dist-sea`
 - contains `/usr/local/bin/sandboxd serve` and `/usr/local/bin/sandboxd apply-startup`
-- launches `/usr/local/bin/sandbox-bootstrap runtime-internal` only after startup is applied
-- trusts a per-sandbox proxy CA before dropping privileges
-- execs `/usr/local/bin/sandboxd runtime-internal` as the `sandbox` user
+- launches `/usr/local/bin/sandboxd bootstrap-runtime` only after startup is applied
+- trusts a per-sandbox proxy CA before execing the runtime
+- execs `/usr/local/bin/sandboxd runtime-internal` as `root`
+- stays agent-agnostic; agent-specific config directories under `/etc` are created on demand by runtime-plan file application
 - provides `mise` at `/usr/local/bin/mise`
 - includes a small developer tool set: `bash`, `curl`, `git`, `iproute2`, `jq`, `less`, `lsof`, `procps`, `ripgrep`, `strace`, `unzip`, and `vim`
 
@@ -63,23 +63,29 @@ The base image:
 
 - Supervisor command: `/usr/local/bin/sandboxd serve`
 - Startup apply command: `/usr/local/bin/sandboxd apply-startup`
-- Internal bootstrap command: `/usr/local/bin/sandbox-bootstrap runtime-internal`
+- Internal bootstrap command: `/usr/local/bin/sandboxd bootstrap-runtime`
 - Runtime executable: `/usr/local/bin/sandboxd runtime-internal`
 - Providers must supply `SANDBOX_RUNTIME_LISTEN_ADDR`, currently `127.0.0.1:8090`
 - Control directory env: `SANDBOX_RUNTIME_CONTROL_DIR` defaults to `/run/mistle`
-- Providers must supply `SANDBOX_USER=sandbox`
 - Tokenizer proxy egress base URL env: `SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL`
 - Proxy CA install path: `/usr/local/share/ca-certificates/mistle-proxy-ca.crt`
 - Proxy CA signer FDs are passed through:
   - `SANDBOX_RUNTIME_PROXY_CA_CERT_FD`
   - `SANDBOX_RUNTIME_PROXY_CA_KEY_FD`
 - Startup input must be provided to `sandboxd apply-startup` on process `stdin` with:
+  - `startupMode`
   - `bootstrapToken`
   - `tunnelExchangeToken`
   - `tunnelGatewayWsUrl`
   - `runtimePlan`
+  - `egressGrantByRuleId`
+- `startupMode: "new"` applies the runtime plan before starting processes and the tunnel
+- `startupMode: "existing"` skips runtime-plan filesystem mutation and only relaunches processes and the tunnel
 - The supervisor control socket and token live under `/run/mistle` with root-only permissions in the image runtime
 - `GET /__healthz` returns 200 only after startup is ready
-- User-owned state lives under `/home/sandbox`
+- User home and default working directory are `/root`
+- The integration workspace root is also `/root`, so the shell experience matches a conventional root-owned VM
+- Repositories clone under `/root/<owner>/<repo>`
+- Runtime-installed executables live under `/usr/local/bin`
 - Runtime-owned mutable state lives under `/var/lib/mistle`
 - The base image does not set the runtime env contract itself; providers inject the required runtime env at sandbox start time

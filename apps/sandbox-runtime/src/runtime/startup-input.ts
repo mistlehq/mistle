@@ -1,6 +1,16 @@
 import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "@mistle/integrations-core";
 
+export const RuntimeStartupModes = {
+  NEW: "new",
+  EXISTING: "existing",
+} as const;
+
+export type RuntimeStartupMode = (typeof RuntimeStartupModes)[keyof typeof RuntimeStartupModes];
+
 export type StartupInput = {
+  // `new` performs initial provisioning from the runtime plan. `existing`
+  // reuses the sandbox filesystem as-is and only restarts processes/tunnel.
+  startupMode: RuntimeStartupMode;
   bootstrapToken: string;
   tunnelExchangeToken: string;
   tunnelGatewayWsUrl: string;
@@ -24,6 +34,15 @@ function readRequiredStringField(payload: object, fieldName: string): string {
   }
 
   return fieldValue;
+}
+
+function readRequiredStartupModeField(payload: object): RuntimeStartupMode {
+  const startupMode = Object.getOwnPropertyDescriptor(payload, "startupMode")?.value;
+  if (startupMode === RuntimeStartupModes.NEW || startupMode === RuntimeStartupModes.EXISTING) {
+    return startupMode;
+  }
+
+  throw new Error("startup input startupMode is required");
 }
 
 function readRequiredRuntimePlanField(payload: object): CompiledRuntimePlan {
@@ -87,6 +106,7 @@ function readRequiredEgressGrantByRuleIdField(
 
 function validateExpectedFields(payload: object): void {
   const allowedFields = new Set([
+    "startupMode",
     "bootstrapToken",
     "tunnelExchangeToken",
     "tunnelGatewayWsUrl",
@@ -111,6 +131,7 @@ export function parseStartupInputPayload(payload: unknown): StartupInput {
   const runtimePlan = readRequiredRuntimePlanField(payload);
 
   return {
+    startupMode: readRequiredStartupModeField(payload),
     bootstrapToken: normalizeRequiredString(
       readRequiredStringField(payload, "bootstrapToken"),
       "bootstrap token",

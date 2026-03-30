@@ -31,6 +31,12 @@ export const E2BClientOperationIds = {
    */
   CONNECT_SANDBOX: "connect_sandbox",
   /**
+   * `Sandbox.getInfo(...)`.
+   * Source:
+   * https://e2b.dev/docs/sdk-reference/js-sdk/v2.10.5/sandbox
+   */
+  GET_SANDBOX_INFO: "get_sandbox_info",
+  /**
    * `sandbox.pause()`.
    * Source:
    * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/index.ts#L588-L589

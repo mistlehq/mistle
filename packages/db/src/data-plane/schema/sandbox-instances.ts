@@ -12,6 +12,7 @@ export type SandboxInstanceProvider =
   (typeof SandboxInstanceProviders)[keyof typeof SandboxInstanceProviders];
 
 export const SandboxInstanceStatuses = {
+  PENDING: "pending",
   STARTING: "starting",
   RUNNING: "running",
   STOPPED: "stopped",
@@ -61,7 +62,7 @@ export const sandboxInstances = dataPlaneSchema.table(
     status: text("status")
       .notNull()
       .$type<SandboxInstanceStatus>()
-      .default(SandboxInstanceStatuses.STARTING),
+      .default(SandboxInstanceStatuses.PENDING),
     startedByKind: text("started_by_kind").notNull().$type<SandboxInstanceStarterKind>(),
     startedById: text("started_by_id").notNull(),
     source: text("source").notNull().$type<SandboxInstanceSource>(),

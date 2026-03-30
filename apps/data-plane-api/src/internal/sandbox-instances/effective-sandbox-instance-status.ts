@@ -8,7 +8,7 @@ import { DataPlaneSandboxInstanceStatuses, type GetSandboxInstanceResponse } fro
  * Composes the effective user-facing sandbox status from durable lifecycle
  * state and live gateway attachment state.
  *
- * Durable `failed` and `stopped` states always win. For durable `starting` and
+ * Durable `pending`, `failed`, and `stopped` states always win. For durable `starting` and
  * `running`, gateway attachment determines whether the sandbox is effectively
  * `running` or still `starting`.
  */
@@ -16,6 +16,10 @@ export function resolveEffectiveSandboxInstanceStatus(input: {
   persistedStatus: string;
   runtimeStateSnapshot: SandboxRuntimeStateSnapshot | null;
 }): NonNullable<GetSandboxInstanceResponse>["status"] {
+  if (input.persistedStatus === SandboxInstanceStatuses.PENDING) {
+    return DataPlaneSandboxInstanceStatuses.PENDING;
+  }
+
   if (input.persistedStatus === SandboxInstanceStatuses.FAILED) {
     return DataPlaneSandboxInstanceStatuses.FAILED;
   }

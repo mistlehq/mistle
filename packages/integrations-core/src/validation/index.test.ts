@@ -54,18 +54,6 @@ function createCompiledBindingResult(input: {
     cwd?: string;
     timeoutMs?: number;
   }>;
-  artifactUpdateCommands?: ReadonlyArray<{
-    args: ReadonlyArray<string>;
-    env?: Record<string, string>;
-    cwd?: string;
-    timeoutMs?: number;
-  }>;
-  artifactRemoveCommands?: ReadonlyArray<{
-    args: ReadonlyArray<string>;
-    env?: Record<string, string>;
-    cwd?: string;
-    timeoutMs?: number;
-  }>;
   runtimeClientSetup?: {
     clientId: string;
     env: Record<string, string>;
@@ -91,12 +79,6 @@ function createCompiledBindingResult(input: {
         lifecycle: {
           install: input.artifactInstallCommands ?? [
             { args: ["echo", "install", input.route.egressRuleId] },
-          ],
-          ...(input.artifactUpdateCommands === undefined
-            ? {}
-            : { update: input.artifactUpdateCommands }),
-          remove: input.artifactRemoveCommands ?? [
-            { args: ["echo", "remove", input.route.egressRuleId] },
           ],
         },
       },
@@ -141,7 +123,7 @@ describe("validateCompiledBindingResults", () => {
         files: [
           {
             fileId: "codex_config",
-            path: "/home/sandbox/.codex/config.toml",
+            path: "/root/.codex/config.toml",
             mode: 384,
             content: 'model = "gpt-5.3-codex"',
           },
@@ -217,7 +199,7 @@ describe("validateCompiledBindingResults", () => {
         {
           sourceKind: "git-clone",
           resourceKind: "repository",
-          path: "/home/sandbox/projects/mistlehq/mistle",
+          path: "/root/mistlehq/mistle",
           originUrl: "https://github.com/mistlehq/mistle.git",
         },
       ],
@@ -233,7 +215,7 @@ describe("validateCompiledBindingResults", () => {
         {
           sourceKind: "git-clone",
           resourceKind: "repository",
-          path: "/home/sandbox/projects/mistlehq/mistle",
+          path: "/root/mistlehq/mistle",
           originUrl: "https://github.example.com/mistlehq/mistle.git",
         },
       ],
@@ -357,7 +339,7 @@ describe("validateCompiledBindingResults", () => {
         files: [
           {
             fileId: "codex_config",
-            path: "/home/sandbox/.codex/config.toml",
+            path: "/root/.codex/config.toml",
             mode: 384,
             content: 'model = "gpt-5.3-codex"',
           },
@@ -377,7 +359,7 @@ describe("validateCompiledBindingResults", () => {
         files: [
           {
             fileId: "codex_config",
-            path: "/home/sandbox/.codex/override.toml",
+            path: "/root/.codex/override.toml",
             mode: 384,
             content: 'model = "gpt-5.3-codex"',
           },
@@ -734,24 +716,6 @@ describe("validateCompiledBindingResults", () => {
       }),
       artifactKey: "codex-cli",
       artifactInstallCommands: [],
-    });
-
-    expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
-      }),
-    ).toThrow(IntegrationCompilerError);
-  });
-
-  it("fails when an artifact has no remove commands", () => {
-    const result = createCompiledBindingResult({
-      route: createRoute({
-        egressRuleId: "egress_rule_a",
-        bindingId: "bind_a",
-        hosts: ["api.openai.com"],
-      }),
-      artifactKey: "codex-cli",
-      artifactRemoveCommands: [],
     });
 
     expect(() =>

@@ -2,12 +2,10 @@ import { SandboxConfigurationError } from "./errors.js";
 
 export const SandboxRuntimeEnv = {
   LISTEN_ADDR: "SANDBOX_RUNTIME_LISTEN_ADDR",
-  USER: "SANDBOX_USER",
 } as const;
 
 export const SandboxRuntimeEnvDefaults = {
   LISTEN_ADDR: "127.0.0.1:8090",
-  USER: "sandbox",
 } as const;
 
 export function withRequiredSandboxRuntimeEnv(
@@ -22,10 +20,8 @@ export function withRequiredSandboxRuntimeEnv(
     SandboxRuntimeEnv.LISTEN_ADDR,
     SandboxRuntimeEnvDefaults.LISTEN_ADDR,
   );
-  assertReservedRuntimeEnvValue(nextEnv, SandboxRuntimeEnv.USER, SandboxRuntimeEnvDefaults.USER);
 
   nextEnv[SandboxRuntimeEnv.LISTEN_ADDR] = SandboxRuntimeEnvDefaults.LISTEN_ADDR;
-  nextEnv[SandboxRuntimeEnv.USER] = SandboxRuntimeEnvDefaults.USER;
 
   return nextEnv;
 }

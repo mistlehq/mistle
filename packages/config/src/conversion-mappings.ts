@@ -296,6 +296,21 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL",
   },
   {
+    configPath: ["apps", "data_plane_api", "sandbox", "docker", "socketPath"],
+    tomlPath: ["apps", "data_plane_api", "sandbox", "docker", "socket_path"],
+    envVar: "MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH",
+  },
+  {
+    configPath: ["apps", "data_plane_api", "sandbox", "e2b", "apiKey"],
+    tomlPath: ["apps", "data_plane_api", "sandbox", "e2b", "api_key"],
+    envVar: "MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY",
+  },
+  {
+    configPath: ["apps", "data_plane_api", "sandbox", "e2b", "domain"],
+    tomlPath: ["apps", "data_plane_api", "sandbox", "e2b", "domain"],
+    envVar: "MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_DOMAIN",
+  },
+  {
     configPath: ["apps", "data_plane_gateway", "server", "host"],
     tomlPath: ["apps", "data_plane_gateway", "server", "host"],
     envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_HOST",

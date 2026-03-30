@@ -2,7 +2,10 @@ import { z } from "zod";
 
 import { ControlPlaneApiConfigSchema } from "./apps/control-plane-api/schema.js";
 import { ControlPlaneWorkerConfigSchema } from "./apps/control-plane-worker/schema.js";
-import { DataPlaneApiConfigSchema } from "./apps/data-plane-api/schema.js";
+import {
+  DataPlaneApiConfigSchema,
+  getDataPlaneApiSandboxProviderValidationIssue,
+} from "./apps/data-plane-api/schema.js";
 import { DataPlaneGatewayConfigSchema } from "./apps/data-plane-gateway/schema.js";
 import {
   DataPlaneWorkerConfigSchema,
@@ -26,6 +29,19 @@ export const ConfigSchema = z
       .strict(),
   })
   .superRefine((value, ctx) => {
+    const dataPlaneApiIssue = getDataPlaneApiSandboxProviderValidationIssue({
+      globalSandboxProvider: value.global.sandbox.provider,
+      appSandbox: value.apps.data_plane_api.sandbox,
+    });
+
+    if (dataPlaneApiIssue !== null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["apps", "data_plane_api", ...dataPlaneApiIssue.path],
+        message: dataPlaneApiIssue.message,
+      });
+    }
+
     const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
       globalSandboxProvider: value.global.sandbox.provider,
       appSandbox: value.apps.data_plane_worker.sandbox,

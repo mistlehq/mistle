@@ -9,12 +9,29 @@ import {
   type SandboxAdapter,
   type SandboxDestroyRequest,
   type SandboxHandle,
+  type SandboxInspectRequest,
   type SandboxResumeRequestV1,
   type SandboxStartRequest,
   type SandboxStopRequest,
 } from "../../types.js";
 import { DockerClientError, DockerClientErrorCodes } from "./client-errors.js";
 import type { DockerClient } from "./client.js";
+import type { DockerSandboxInspectResult } from "./types.js";
+
+function createSandboxHandle(runtimeId: string): SandboxHandle {
+  return {
+    provider: SandboxProvider.DOCKER,
+    id: runtimeId,
+  };
+}
+
+function toSandboxNotFoundError(resourceId: string, error: unknown): SandboxResourceNotFoundError {
+  return new SandboxResourceNotFoundError({
+    resourceType: "sandbox",
+    resourceId,
+    cause: error,
+  });
+}
 
 export class DockerSandboxAdapter implements SandboxAdapter {
   readonly #client: DockerClient;
@@ -32,12 +49,25 @@ export class DockerSandboxAdapter implements SandboxAdapter {
       imageRef: request.image.imageId,
       env: withRequiredSandboxRuntimeEnv(request.env),
     });
-    const id = response.runtimeId;
+    return createSandboxHandle(response.runtimeId);
+  }
 
-    return {
-      provider: SandboxProvider.DOCKER,
-      id,
-    };
+  async inspect(request: SandboxInspectRequest): Promise<DockerSandboxInspectResult> {
+    if (request.id.trim().length === 0) {
+      throw new SandboxConfigurationError("Runtime id is required.");
+    }
+
+    try {
+      return await this.#client.inspectSandbox({
+        runtimeId: request.id,
+      });
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw toSandboxNotFoundError(request.id, error);
+      }
+
+      throw error;
+    }
   }
 
   async resume(request: SandboxResumeRequestV1): Promise<SandboxHandle> {
@@ -45,15 +75,19 @@ export class DockerSandboxAdapter implements SandboxAdapter {
       throw new SandboxConfigurationError("Previous runtime id is required.");
     }
 
-    const response = await this.#client.resumeSandbox({
-      runtimeId: request.id,
-    });
-    const id = response.runtimeId;
+    try {
+      const response = await this.#client.resumeSandbox({
+        runtimeId: request.id,
+      });
 
-    return {
-      provider: SandboxProvider.DOCKER,
-      id,
-    };
+      return createSandboxHandle(response.runtimeId);
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw toSandboxNotFoundError(request.id, error);
+      }
+
+      throw error;
+    }
   }
 
   async stop(request: SandboxStopRequest): Promise<void> {
@@ -65,11 +99,7 @@ export class DockerSandboxAdapter implements SandboxAdapter {
       await this.#client.stopSandbox({ runtimeId: request.id });
     } catch (error) {
       if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
-        throw new SandboxResourceNotFoundError({
-          resourceType: "sandbox",
-          resourceId: request.id,
-          cause: error,
-        });
+        throw toSandboxNotFoundError(request.id, error);
       }
 
       throw error;
@@ -85,11 +115,7 @@ export class DockerSandboxAdapter implements SandboxAdapter {
       await this.#client.destroySandbox({ runtimeId: request.id });
     } catch (error) {
       if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
-        throw new SandboxResourceNotFoundError({
-          resourceType: "sandbox",
-          resourceId: request.id,
-          cause: error,
-        });
+        throw toSandboxNotFoundError(request.id, error);
       }
 
       throw error;
@@ -97,7 +123,7 @@ export class DockerSandboxAdapter implements SandboxAdapter {
   }
 }
 
-export function createDockerSandboxAdapter(input: { client: DockerClient }): SandboxAdapter {
+export function createDockerSandboxAdapter(input: { client: DockerClient }): DockerSandboxAdapter {
   if (input.client === undefined) {
     throw new SandboxProviderNotImplementedError("Docker client is required to construct adapter.");
   }

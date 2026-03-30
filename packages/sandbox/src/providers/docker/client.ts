@@ -1,6 +1,7 @@
 import Docker from "dockerode";
 import { z } from "zod";
 
+import { SandboxInspectDispositions, SandboxInspectStates } from "../../types.js";
 import {
   DockerClientOperationIds,
   mapDockerClientError,
@@ -8,15 +9,18 @@ import {
 } from "./client-errors.js";
 import {
   DockerDestroySandboxRequestSchema,
+  DockerInspectSandboxRequestSchema,
   DockerResumeSandboxRequestSchema,
   DockerStartSandboxRequestSchema,
   DockerStopSandboxRequestSchema,
   type DockerDestroySandboxRequest,
+  type DockerInspectSandboxRequest,
   type DockerResumeSandboxRequest,
   type DockerSandboxConfig,
   type DockerStartSandboxRequest,
   type DockerStopSandboxRequest,
 } from "./schemas.js";
+import type { DockerSandboxInspectResult } from "./types.js";
 
 export type DockerStartSandboxResponse = {
   runtimeId: string;
@@ -24,6 +28,7 @@ export type DockerStartSandboxResponse = {
 
 export interface DockerClient {
   startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse>;
+  inspectSandbox(request: DockerInspectSandboxRequest): Promise<DockerSandboxInspectResult>;
   resumeSandbox(request: DockerResumeSandboxRequest): Promise<DockerStartSandboxResponse>;
   stopSandbox(request: DockerStopSandboxRequest): Promise<void>;
   destroySandbox(request: DockerDestroySandboxRequest): Promise<void>;
@@ -102,6 +107,53 @@ function toDockerEnv(env: Record<string, string> | undefined): string[] | undefi
   return entries.map(([key, value]) => `${key}=${value}`);
 }
 
+function normalizeDockerInspectState(state: string): DockerSandboxInspectResult["state"] {
+  switch (state) {
+    case "running":
+      return SandboxInspectStates.RUNNING;
+    case "created":
+    case "paused":
+    case "restarting":
+    case "removing":
+    case "exited":
+    case "dead":
+      return SandboxInspectStates.STOPPED;
+    default:
+      throw new Error(`Unsupported Docker container state: ${state}`);
+  }
+}
+
+function normalizeDockerInspectDisposition(
+  state: string,
+): DockerSandboxInspectResult["disposition"] {
+  // Docker exposes more lifecycle detail than the shared inspect contract.
+  // This mapping preserves the distinction the data plane cares about without
+  // leaking Docker-specific status handling into higher layers.
+  switch (state) {
+    case "running":
+    case "restarting":
+      return SandboxInspectDispositions.ACTIVE;
+    case "paused":
+    case "exited":
+      return SandboxInspectDispositions.RESUMABLE_STOPPED;
+    case "dead":
+    case "removing":
+      return SandboxInspectDispositions.TERMINAL_STOPPED;
+    case "created":
+      throw new Error("Sandbox inspect does not support Docker created containers.");
+    default:
+      throw new Error(`Unsupported Docker container disposition state: ${state}`);
+  }
+}
+
+function normalizeDockerTimestamp(value: string): string | null {
+  if (value.length === 0 || value.startsWith("0001-01-01")) {
+    return null;
+  }
+
+  return value;
+}
+
 export class DockerApiClient implements DockerClient {
   readonly #config: DockerSandboxConfig;
   readonly #docker: Docker;
@@ -135,12 +187,42 @@ export class DockerApiClient implements DockerClient {
       DockerClientOperationIds.CREATE_CONTAINER,
       () => this.#docker.createContainer(createContainerOptions),
     );
-    await this.#runDockerClientOperation(DockerClientOperationIds.START_CONTAINER, () =>
-      container.start(),
-    );
+
+    try {
+      await this.#runDockerClientOperation(DockerClientOperationIds.START_CONTAINER, () =>
+        container.start(),
+      );
+    } catch (error) {
+      await this.#runDockerClientOperation(DockerClientOperationIds.REMOVE_CONTAINER, () =>
+        container.remove({
+          force: true,
+        }),
+      );
+      throw error;
+    }
 
     return {
       runtimeId: container.id,
+    };
+  }
+
+  async inspectSandbox(request: DockerInspectSandboxRequest): Promise<DockerSandboxInspectResult> {
+    const parsedRequest = DockerInspectSandboxRequestSchema.parse(request);
+    const container = this.#docker.getContainer(parsedRequest.runtimeId);
+    const inspect = await this.#runDockerClientOperation(
+      DockerClientOperationIds.INSPECT_CONTAINER,
+      () => container.inspect(),
+    );
+
+    return {
+      provider: "docker",
+      id: inspect.Id,
+      state: normalizeDockerInspectState(inspect.State.Status),
+      disposition: normalizeDockerInspectDisposition(inspect.State.Status),
+      createdAt: inspect.Created,
+      startedAt: normalizeDockerTimestamp(inspect.State.StartedAt),
+      endedAt: normalizeDockerTimestamp(inspect.State.FinishedAt),
+      raw: inspect,
     };
   }
 

@@ -107,19 +107,6 @@ export function compileOpenAiApiKeyBinding(
               timeoutMs: ArtifactCommandTimeoutMs,
             }),
           ],
-          update: ({ refs }) => [
-            refs.githubReleases.installLatestBinary({
-              repository: CodexGitHubRepository,
-              assets: CodexGitHubAssets,
-              installPath: refs.artifactBinPath("codex"),
-              timeoutMs: ArtifactCommandTimeoutMs,
-            }),
-          ],
-          remove: ({ refs }) => [
-            refs.command.exec({
-              args: ["rm", "-f", refs.artifactBinPath("codex")],
-            }),
-          ],
         },
       },
     ],

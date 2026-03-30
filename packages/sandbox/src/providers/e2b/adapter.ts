@@ -8,12 +8,14 @@ import {
   type SandboxAdapter,
   type SandboxDestroyRequest,
   type SandboxHandle,
+  type SandboxInspectRequest,
   type SandboxResumeRequestV1,
   type SandboxStartRequest,
   type SandboxStopRequest,
 } from "../../types.js";
 import { E2BClientError, E2BClientErrorCodes } from "./client-errors.js";
 import type { E2BClient } from "./client.js";
+import type { E2BSandboxInspectResult } from "./types.js";
 
 function createSandboxHandle(sandboxId: string): SandboxHandle {
   return {
@@ -54,6 +56,20 @@ export class E2BSandboxAdapter implements SandboxAdapter {
     });
 
     return createSandboxHandle(response.sandboxId);
+  }
+
+  async inspect(request: SandboxInspectRequest): Promise<E2BSandboxInspectResult> {
+    requireSandboxId(request.id);
+
+    try {
+      return await this.#client.inspectSandbox({ sandboxId: request.id });
+    } catch (error) {
+      if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
+        throw toSandboxNotFoundError(request.id, error);
+      }
+
+      throw error;
+    }
   }
 
   async resume(request: SandboxResumeRequestV1): Promise<SandboxHandle> {
@@ -100,7 +116,7 @@ export class E2BSandboxAdapter implements SandboxAdapter {
   }
 }
 
-export function createE2BSandboxAdapter(input: { client: E2BClient }): SandboxAdapter {
+export function createE2BSandboxAdapter(input: { client: E2BClient }): E2BSandboxAdapter {
   if (input.client === undefined) {
     throw new SandboxProviderNotImplementedError("E2B client is required to construct adapter.");
   }

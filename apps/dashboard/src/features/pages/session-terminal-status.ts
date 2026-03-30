@@ -17,10 +17,15 @@ export function sessionTerminalStatusDotClassName(tone: SessionTerminalStatusTon
   return SESSION_TERMINAL_STATUS_DOT_CLASS[tone];
 }
 
-export function resolveSessionTerminalStatusPresentation(
-  state: SandboxPtyState,
-): SessionTerminalStatusPresentation {
-  switch (state) {
+export function resolveSessionTerminalStatusPresentation(input: {
+  state: SandboxPtyState;
+  isRecovering: boolean;
+}): SessionTerminalStatusPresentation {
+  if (input.isRecovering) {
+    return { label: "Reconnecting", showSpinner: true, tone: "offline" };
+  }
+
+  switch (input.state) {
     case SandboxPtyStates.IDLE:
       return { label: "Inactive", showSpinner: false, tone: "offline" };
     case SandboxPtyStates.CONNECTING:
@@ -40,7 +45,7 @@ export function resolveSessionTerminalStatusPresentation(
     case SandboxPtyStates.EXITED:
       return { label: "Inactive", showSpinner: false, tone: "offline" };
     default: {
-      const exhaustive: never = state;
+      const exhaustive: never = input.state;
       throw new Error(`Unhandled sandbox PTY state: ${String(exhaustive)}`);
     }
   }

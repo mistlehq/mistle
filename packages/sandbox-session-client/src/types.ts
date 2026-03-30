@@ -12,6 +12,11 @@ export type SandboxSessionConnectionState =
 
 export type SandboxControlMessage = StreamOpenOK | StreamOpenError;
 
+export type SandboxSessionResetInfo = {
+  code: string;
+  message: string;
+};
+
 export type JsonRpcId = number | string;
 
 export type JsonRpcSuccessResponse = {
@@ -56,6 +61,10 @@ export type SandboxSessionEvent =
   | {
       type: "response";
       response: JsonRpcSuccessResponse | JsonRpcErrorResponse;
+    }
+  | {
+      type: "stream_reset";
+      resetInfo: SandboxSessionResetInfo;
     }
   | {
       type: "unhandled_message";

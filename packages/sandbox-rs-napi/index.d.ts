@@ -55,7 +55,7 @@ export interface SpawnPtyInput {
   rows?: number;
 }
 
-export interface ExecRuntimeAsUserInput {
+export interface ExecRuntimeInput {
   uid: number;
   gid: number;
   command: string;
@@ -90,7 +90,7 @@ export declare function issueProxyLeafCertificate(
   input: IssueProxyLeafCertificateInput,
 ): IssuedProxyLeafCertificateResult;
 export declare function assertUnixSocketPeerMatchesCurrentProcessUid(fd: number): void;
-export declare function execRuntimeAsUser(input: ExecRuntimeAsUserInput): void;
+export declare function execRuntime(input: ExecRuntimeInput): void;
 export declare function setCurrentProcessNonDumpable(): void;
 export declare function spawnManagedProcess(
   input: SpawnManagedProcessInput,

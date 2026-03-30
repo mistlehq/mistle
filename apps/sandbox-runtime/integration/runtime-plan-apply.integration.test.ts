@@ -331,7 +331,6 @@ describe("applyRuntimePlan", () => {
                   },
                 },
               ],
-              remove: [],
             },
           },
         ],
@@ -387,7 +386,6 @@ describe("applyRuntimePlan", () => {
                   },
                 },
               ],
-              remove: [],
             },
           },
         ],
@@ -407,7 +405,7 @@ describe("applyRuntimePlan", () => {
     );
   });
 
-  it("runs install commands for profile-base sources and does not need update commands", async () => {
+  it("runs install commands for profile-base sources", async () => {
     const tempDirectory = await createTemporaryDirectory("mistle-runtime-plan-profile-base-");
     const installMarkerPath = join(tempDirectory, "install-marker.txt");
 
@@ -433,12 +431,6 @@ describe("applyRuntimePlan", () => {
                   },
                 },
               ],
-              update: [
-                {
-                  args: ["sh", "-euc", "exit 91"],
-                },
-              ],
-              remove: [],
             },
           },
         ],
@@ -462,7 +454,6 @@ describe("applyRuntimePlan", () => {
                     args: ["sh", "-euc", "exit 7"],
                   },
                 ],
-                remove: [],
               },
             },
           ],
@@ -485,7 +476,6 @@ describe("applyRuntimePlan", () => {
                     args: ["sh", "-euc", 'printf "stdout-only"; exit 7'],
                   },
                 ],
-                remove: [],
               },
             },
           ],
@@ -508,7 +498,6 @@ describe("applyRuntimePlan", () => {
                     args: ["sh", "-euc", 'printf "stdout-line"; printf "stderr-line" >&2; exit 7'],
                   },
                 ],
-                remove: [],
               },
             },
           ],
@@ -542,7 +531,6 @@ describe("applyRuntimePlan", () => {
                   },
                 },
               ],
-              remove: [],
             },
           },
         ],
@@ -567,7 +555,6 @@ describe("applyRuntimePlan", () => {
                     timeoutMs: 10,
                   },
                 ],
-                remove: [],
               },
             },
           ],
