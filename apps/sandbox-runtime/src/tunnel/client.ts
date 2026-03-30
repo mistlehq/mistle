@@ -141,176 +141,187 @@ async function handleTunnelConnection(input: {
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
 }): Promise<void> {
+  const connectionAbortController = new AbortController();
+  const abortConnection = (): void => {
+    connectionAbortController.abort(input.signal.reason);
+  };
+  input.signal.addEventListener("abort", abortConnection, { once: true });
+
   const relayResultQueue = new AsyncQueue<ActiveTunnelStreamRelayResult>();
   const activeRelaysByStreamId = new Map<number, ActiveTunnelStreamRelay>();
   let activePtyRelay: ActiveTunnelStreamRelay | undefined;
   let activePtySession: PtySession | undefined;
 
-  while (!input.signal.aborted) {
-    const nextTunnelMessageAbortController = new AbortController();
-    const nextRelayResultAbortController = new AbortController();
-    const abortRace = createAbortRace(input.signal);
+  try {
+    while (!input.signal.aborted) {
+      const nextTunnelMessageAbortController = new AbortController();
+      const nextRelayResultAbortController = new AbortController();
+      const abortRace = createAbortRace(input.signal);
 
-    let nextEvent:
-      | {
-          source: "tunnel";
-          message: TunnelSocketMessage;
-        }
-      | {
-          source: "relay";
-          result: ActiveTunnelStreamRelayResult;
-        };
+      let nextEvent:
+        | {
+            source: "tunnel";
+            message: TunnelSocketMessage;
+          }
+        | {
+            source: "relay";
+            result: ActiveTunnelStreamRelayResult;
+          };
 
-    try {
-      const nextTunnelMessage = ignorePromiseRejectionAfterAbort(
-        input.tunnelMessages.next(nextTunnelMessageAbortController.signal).then((message) => ({
-          source: "tunnel" as const,
-          message,
-        })),
-        nextTunnelMessageAbortController.signal,
-      );
-      const nextRelayResult = ignorePromiseRejectionAfterAbort(
-        relayResultQueue.next(nextRelayResultAbortController.signal).then((result) => ({
-          source: "relay" as const,
-          result,
-        })),
-        nextRelayResultAbortController.signal,
-      );
-      nextEvent = await Promise.race([nextTunnelMessage, nextRelayResult, abortRace.promise]);
-    } finally {
-      abortRace.dispose();
-      nextTunnelMessageAbortController.abort();
-      nextRelayResultAbortController.abort();
-    }
-
-    if (nextEvent.source === "relay") {
-      const updatedState = finishActiveTunnelStreamRelay(
-        activeRelaysByStreamId,
-        activePtyRelay,
-        activePtySession,
-        nextEvent.result,
-      );
-      activePtyRelay = updatedState.activePtyRelay;
-      activePtySession = updatedState.activePtySession;
-      if (nextEvent.result.error !== undefined) {
-        throw nextEvent.result.error;
+      try {
+        const nextTunnelMessage = ignorePromiseRejectionAfterAbort(
+          input.tunnelMessages.next(nextTunnelMessageAbortController.signal).then((message) => ({
+            source: "tunnel" as const,
+            message,
+          })),
+          nextTunnelMessageAbortController.signal,
+        );
+        const nextRelayResult = ignorePromiseRejectionAfterAbort(
+          relayResultQueue.next(nextRelayResultAbortController.signal).then((result) => ({
+            source: "relay" as const,
+            result,
+          })),
+          nextRelayResultAbortController.signal,
+        );
+        nextEvent = await Promise.race([nextTunnelMessage, nextRelayResult, abortRace.promise]);
+      } finally {
+        abortRace.dispose();
+        nextTunnelMessageAbortController.abort();
+        nextRelayResultAbortController.abort();
       }
-      continue;
-    }
 
-    const message = nextEvent.message;
-    let connectRequest;
-    try {
-      connectRequest = parseConnectRequestMessage(message);
-    } catch {
-      connectRequest = undefined;
-    }
-
-    if (connectRequest !== undefined) {
-      if (activeRelaysByStreamId.has(connectRequest.streamId)) {
-        await writeStreamAlreadyOpenError(input.tunnelSocket, connectRequest.streamId);
+      if (nextEvent.source === "relay") {
+        const updatedState = finishActiveTunnelStreamRelay(
+          activeRelaysByStreamId,
+          activePtyRelay,
+          activePtySession,
+          nextEvent.result,
+        );
+        activePtyRelay = updatedState.activePtyRelay;
+        activePtySession = updatedState.activePtySession;
+        if (nextEvent.result.error !== undefined) {
+          throw nextEvent.result.error;
+        }
         continue;
       }
 
-      if (connectRequest.channelKind === "pty" && activePtyRelay !== undefined) {
-        let ptyConnectRequest;
-        try {
-          ptyConnectRequest = parsePtyConnectRequest(connectRequest.rawPayload);
-        } catch (error) {
-          await writeStreamOpenError(input.tunnelSocket, {
-            type: "stream.open.error",
-            streamId: connectRequest.streamId,
-            code: CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
-            message: error instanceof Error ? error.message : String(error),
-          });
+      const message = nextEvent.message;
+      let connectRequest;
+      try {
+        connectRequest = parseConnectRequestMessage(message);
+      } catch {
+        connectRequest = undefined;
+      }
+
+      if (connectRequest !== undefined) {
+        if (activeRelaysByStreamId.has(connectRequest.streamId)) {
+          await writeStreamAlreadyOpenError(input.tunnelSocket, connectRequest.streamId);
           continue;
         }
 
-        if (ptyConnectRequest.channel.kind !== "pty") {
-          throw new Error("pty stream.open request channel.kind must be 'pty'");
+        if (connectRequest.channelKind === "pty" && activePtyRelay !== undefined) {
+          let ptyConnectRequest;
+          try {
+            ptyConnectRequest = parsePtyConnectRequest(connectRequest.rawPayload);
+          } catch (error) {
+            await writeStreamOpenError(input.tunnelSocket, {
+              type: "stream.open.error",
+              streamId: connectRequest.streamId,
+              code: CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
+              message: error instanceof Error ? error.message : String(error),
+            });
+            continue;
+          }
+
+          if (ptyConnectRequest.channel.kind !== "pty") {
+            throw new Error("pty stream.open request channel.kind must be 'pty'");
+          }
+
+          if (ptyConnectRequest.channel.session === "attach") {
+            activeRelaysByStreamId.set(connectRequest.streamId, activePtyRelay);
+          }
+
+          activePtyRelay.messages.push(message);
+          continue;
         }
 
-        if (ptyConnectRequest.channel.session === "attach") {
-          activeRelaysByStreamId.set(connectRequest.streamId, activePtyRelay);
+        switch (connectRequest.channelKind) {
+          case "agent": {
+            const relay = await handleAgentConnectRequest({
+              signal: connectionAbortController.signal,
+              tunnelSocket: input.tunnelSocket,
+              streamId: connectRequest.streamId,
+              agentRuntimes: input.agentRuntimes,
+              runtimeClients: input.runtimeClients,
+              executionLeases: input.executionLeases,
+              relayResultQueue,
+            });
+            if (relay !== undefined) {
+              activeRelaysByStreamId.set(connectRequest.streamId, relay);
+            }
+            continue;
+          }
+          case "pty": {
+            const { ptySession, relay } = await handlePtyConnectRequest({
+              signal: connectionAbortController.signal,
+              tunnelSocket: input.tunnelSocket,
+              rawPayload: connectRequest.rawPayload,
+              streamId: connectRequest.streamId,
+              activePtySession,
+              relayResultQueue,
+            });
+            activePtySession = ptySession;
+            if (relay !== undefined) {
+              activePtyRelay = relay;
+              activeRelaysByStreamId.set(connectRequest.streamId, relay);
+            }
+            continue;
+          }
+          case "fileUpload": {
+            const relay = await handleFileUploadConnectRequest({
+              signal: connectionAbortController.signal,
+              tunnelSocket: input.tunnelSocket,
+              rawPayload: connectRequest.rawPayload,
+              streamId: connectRequest.streamId,
+              relayResultQueue,
+              attachmentRootPath: FileUploadAttachmentRootPath,
+            });
+            if (relay !== undefined) {
+              activeRelaysByStreamId.set(connectRequest.streamId, relay);
+            }
+            continue;
+          }
+          default:
+            await writeStreamOpenError(input.tunnelSocket, {
+              type: "stream.open.error",
+              streamId: connectRequest.streamId,
+              code: CONNECT_ERROR_CODE_UNSUPPORTED_CHANNEL,
+              message: `channel kind '${connectRequest.channelKind}' is not supported`,
+            });
+            continue;
         }
+      }
 
-        activePtyRelay.messages.push(message);
+      const routing = parseTunnelMessageRouting(message);
+      const relay = activeRelaysByStreamId.get(routing.streamId);
+      if (relay === undefined) {
+        await writeUnboundStreamReset(input.tunnelSocket, routing);
         continue;
       }
 
-      switch (connectRequest.channelKind) {
-        case "agent": {
-          const relay = await handleAgentConnectRequest({
-            signal: input.signal,
-            tunnelSocket: input.tunnelSocket,
-            streamId: connectRequest.streamId,
-            agentRuntimes: input.agentRuntimes,
-            runtimeClients: input.runtimeClients,
-            executionLeases: input.executionLeases,
-            relayResultQueue,
-          });
-          if (relay !== undefined) {
-            activeRelaysByStreamId.set(connectRequest.streamId, relay);
-          }
-          continue;
-        }
-        case "pty": {
-          const { ptySession, relay } = await handlePtyConnectRequest({
-            signal: input.signal,
-            tunnelSocket: input.tunnelSocket,
-            rawPayload: connectRequest.rawPayload,
-            streamId: connectRequest.streamId,
-            activePtySession,
-            relayResultQueue,
-          });
-          activePtySession = ptySession;
-          if (relay !== undefined) {
-            activePtyRelay = relay;
-            activeRelaysByStreamId.set(connectRequest.streamId, relay);
-          }
-          continue;
-        }
-        case "fileUpload": {
-          const relay = await handleFileUploadConnectRequest({
-            signal: input.signal,
-            tunnelSocket: input.tunnelSocket,
-            rawPayload: connectRequest.rawPayload,
-            streamId: connectRequest.streamId,
-            relayResultQueue,
-            attachmentRootPath: FileUploadAttachmentRootPath,
-          });
-          if (relay !== undefined) {
-            activeRelaysByStreamId.set(connectRequest.streamId, relay);
-          }
-          continue;
-        }
-        default:
-          await writeStreamOpenError(input.tunnelSocket, {
-            type: "stream.open.error",
-            streamId: connectRequest.streamId,
-            code: CONNECT_ERROR_CODE_UNSUPPORTED_CHANNEL,
-            message: `channel kind '${connectRequest.channelKind}' is not supported`,
-          });
-          continue;
+      const releasePtyAttachBinding =
+        routing.controlMessageType === "stream.close" &&
+        relay.channelKind === "pty" &&
+        routing.streamId !== relay.primaryStreamId;
+
+      relay.messages.push(message);
+      if (releasePtyAttachBinding) {
+        activeRelaysByStreamId.delete(routing.streamId);
       }
     }
-
-    const routing = parseTunnelMessageRouting(message);
-    const relay = activeRelaysByStreamId.get(routing.streamId);
-    if (relay === undefined) {
-      await writeUnboundStreamReset(input.tunnelSocket, routing);
-      continue;
-    }
-
-    const releasePtyAttachBinding =
-      routing.controlMessageType === "stream.close" &&
-      relay.channelKind === "pty" &&
-      routing.streamId !== relay.primaryStreamId;
-
-    relay.messages.push(message);
-    if (releasePtyAttachBinding) {
-      activeRelaysByStreamId.delete(routing.streamId);
-    }
+  } finally {
+    connectionAbortController.abort();
+    input.signal.removeEventListener("abort", abortConnection);
   }
 }
 

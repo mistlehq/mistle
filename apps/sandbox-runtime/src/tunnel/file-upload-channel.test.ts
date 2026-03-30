@@ -86,6 +86,7 @@ describe("handleFileUploadStream", () => {
       void handleFileUploadStream({
         attachmentRootPath: tempRoot,
         messages,
+        signal: new AbortController().signal,
         streamId: 7,
         threadId: "thread_123",
         mimeType: "image/png",
@@ -169,6 +170,7 @@ describe("handleFileUploadStream", () => {
       void handleFileUploadStream({
         attachmentRootPath: tempRoot,
         messages,
+        signal: new AbortController().signal,
         streamId: 9,
         threadId: "thread_window",
         mimeType: "image/png",
@@ -257,6 +259,7 @@ describe("handleFileUploadStream", () => {
       void handleFileUploadStream({
         attachmentRootPath: tempRoot,
         messages,
+        signal: new AbortController().signal,
         streamId: 13,
         threadId: "thread_invalid",
         mimeType: "image/png",
@@ -341,6 +344,7 @@ describe("handleFileUploadStream", () => {
       void handleFileUploadStream({
         attachmentRootPath: tempRoot,
         messages,
+        signal: new AbortController().signal,
         streamId: 15,
         threadId: "thread_mismatch",
         mimeType: "image/jpeg",

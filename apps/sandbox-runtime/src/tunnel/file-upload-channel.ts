@@ -63,6 +63,7 @@ export async function handleFileUploadStream(input: {
   mimeType: string;
   originalFilename: string;
   sizeBytes: number;
+  signal: AbortSignal;
   streamId: number;
   threadId: string;
   tunnelSocket: WebSocket;
@@ -96,8 +97,17 @@ export async function handleFileUploadStream(input: {
       streamId: input.streamId,
     });
 
-    while (true) {
-      const message = await input.messages.next();
+    while (!input.signal.aborted) {
+      let message: TunnelSocketMessage;
+      try {
+        message = await input.messages.next(input.signal);
+      } catch (error) {
+        if (input.signal.aborted) {
+          return;
+        }
+
+        throw error;
+      }
 
       if (message.kind === "binary") {
         const dataFrame = decodeDataFrame(message.payload);
@@ -251,6 +261,7 @@ export async function handleFileUploadConnectRequest(input: {
     mimeType: connectRequest.channel.mimeType,
     originalFilename: connectRequest.channel.originalFilename,
     sizeBytes: connectRequest.channel.sizeBytes,
+    signal: input.signal,
     streamId: input.streamId,
     threadId: connectRequest.channel.threadId,
     tunnelSocket: input.tunnelSocket,
