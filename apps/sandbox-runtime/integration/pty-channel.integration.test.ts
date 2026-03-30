@@ -23,6 +23,15 @@ type WebSocketPair = {
   clientMessages: AsyncQueue<TunnelSocketMessage>;
 };
 
+type OpenNamedPtyInput = {
+  activePtySessions: Parameters<typeof handlePtyConnectRequest>[0]["activePtySessions"];
+  relayResultQueue: AsyncQueue<ActiveTunnelStreamRelayResult>;
+  ptySessionId: string;
+  signal: AbortSignal;
+  streamId: number;
+  tunnelSocket: WebSocket;
+};
+
 function createPtyStreamOpenPayload(input: { streamId: number; ptySessionId: string }): string {
   return JSON.stringify({
     type: "stream.open",
@@ -80,6 +89,14 @@ async function nextQueueItem<T>(
   } catch (error) {
     throw new Error(`${label}: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+async function nextTextMessage(
+  clientMessages: AsyncQueue<TunnelSocketMessage>,
+  signal: AbortSignal,
+  label: string,
+): Promise<Record<string, unknown>> {
+  return parseTextMessage(await nextQueueItem(clientMessages, signal, label));
 }
 
 async function createWebSocketPair(): Promise<WebSocketPair> {
@@ -158,6 +175,41 @@ async function closeWebSocketServer(server: WebSocketServer): Promise<void> {
   });
 }
 
+async function openNamedPty(
+  input: OpenNamedPtyInput,
+): Promise<Awaited<ReturnType<typeof handlePtyConnectRequest>>> {
+  const openResult = await handlePtyConnectRequest({
+    signal: input.signal,
+    tunnelSocket: input.tunnelSocket,
+    rawPayload: createPtyStreamOpenPayload({
+      streamId: input.streamId,
+      ptySessionId: input.ptySessionId,
+    }),
+    streamId: input.streamId,
+    activePtySessions: input.activePtySessions,
+    relayResultQueue: input.relayResultQueue,
+  });
+
+  return openResult;
+}
+
+async function expectOpenOk(input: {
+  clientMessages: AsyncQueue<TunnelSocketMessage>;
+  signal: AbortSignal;
+  streamId: number;
+}): Promise<void> {
+  expect(
+    await nextTextMessage(
+      input.clientMessages,
+      input.signal,
+      `failed waiting for stream ${String(input.streamId)} open acknowledgement`,
+    ),
+  ).toEqual({
+    type: "stream.open.ok",
+    streamId: input.streamId,
+  });
+}
+
 describe("handlePtyConnectRequest", () => {
   it("emits the PTY exit event only after the final output is sent", async () => {
     const signal = new AbortController();
@@ -166,16 +218,13 @@ describe("handlePtyConnectRequest", () => {
     const { server, serverSocket, clientSocket, clientMessages } = await createWebSocketPair();
 
     try {
-      const { relay } = await handlePtyConnectRequest({
-        signal: signal.signal,
-        tunnelSocket: serverSocket,
-        rawPayload: createPtyStreamOpenPayload({
-          streamId: 1,
-          ptySessionId: "terminal",
-        }),
-        streamId: 1,
+      const { relay } = await openNamedPty({
         activePtySessions: new Map(),
         relayResultQueue,
+        ptySessionId: "terminal",
+        signal: signal.signal,
+        streamId: 1,
+        tunnelSocket: serverSocket,
       });
 
       expect(relay).toBeDefined();
@@ -183,11 +232,9 @@ describe("handlePtyConnectRequest", () => {
         throw new Error("pty relay is required");
       }
 
-      const openOk = parseTextMessage(
-        await nextQueueItem(clientMessages, signal.signal, "failed waiting for stream.open.ok"),
-      );
-      expect(openOk).toEqual({
-        type: "stream.open.ok",
+      await expectOpenOk({
+        clientMessages,
+        signal: signal.signal,
         streamId: 1,
       });
 
@@ -280,44 +327,32 @@ describe("handlePtyConnectRequest", () => {
     const { server, serverSocket, clientSocket, clientMessages } = await createWebSocketPair();
 
     try {
-      const terminalOpen = await handlePtyConnectRequest({
-        signal: signal.signal,
-        tunnelSocket: serverSocket,
-        rawPayload: createPtyStreamOpenPayload({
-          streamId: 1,
-          ptySessionId: "terminal",
-        }),
-        streamId: 1,
+      const terminalOpen = await openNamedPty({
         activePtySessions,
         relayResultQueue,
+        ptySessionId: "terminal",
+        signal: signal.signal,
+        streamId: 1,
+        tunnelSocket: serverSocket,
       });
 
       expect(terminalOpen.relay).toBeDefined();
       expect(terminalOpen.ptySessions.size).toBe(1);
       expect(terminalOpen.ptySessions.has("terminal")).toBe(true);
 
-      const terminalOpenOk = parseTextMessage(
-        await nextQueueItem(
-          clientMessages,
-          signal.signal,
-          "failed waiting for terminal stream.open.ok",
-        ),
-      );
-      expect(terminalOpenOk).toEqual({
-        type: "stream.open.ok",
+      await expectOpenOk({
+        clientMessages,
+        signal: signal.signal,
         streamId: 1,
       });
 
-      const cliOpen = await handlePtyConnectRequest({
-        signal: signal.signal,
-        tunnelSocket: serverSocket,
-        rawPayload: createPtyStreamOpenPayload({
-          streamId: 2,
-          ptySessionId: "cli",
-        }),
-        streamId: 2,
+      const cliOpen = await openNamedPty({
         activePtySessions: terminalOpen.ptySessions,
         relayResultQueue,
+        ptySessionId: "cli",
+        signal: signal.signal,
+        streamId: 2,
+        tunnelSocket: serverSocket,
       });
 
       expect(cliOpen.relay).toBeDefined();
@@ -325,37 +360,31 @@ describe("handlePtyConnectRequest", () => {
       expect(cliOpen.ptySessions.has("terminal")).toBe(true);
       expect(cliOpen.ptySessions.has("cli")).toBe(true);
 
-      const cliOpenOk = parseTextMessage(
-        await nextQueueItem(clientMessages, signal.signal, "failed waiting for CLI stream.open.ok"),
-      );
-      expect(cliOpenOk).toEqual({
-        type: "stream.open.ok",
+      await expectOpenOk({
+        clientMessages,
+        signal: signal.signal,
         streamId: 2,
       });
 
-      const overflowOpen = await handlePtyConnectRequest({
-        signal: signal.signal,
-        tunnelSocket: serverSocket,
-        rawPayload: createPtyStreamOpenPayload({
-          streamId: 3,
-          ptySessionId: "scratch",
-        }),
-        streamId: 3,
+      const overflowOpen = await openNamedPty({
         activePtySessions: cliOpen.ptySessions,
         relayResultQueue,
+        ptySessionId: "scratch",
+        signal: signal.signal,
+        streamId: 3,
+        tunnelSocket: serverSocket,
       });
 
       expect(overflowOpen.relay).toBeUndefined();
       expect(overflowOpen.ptySessions.size).toBe(2);
 
-      const overflowError = parseTextMessage(
-        await nextQueueItem(
+      expect(
+        await nextTextMessage(
           clientMessages,
           signal.signal,
           "failed waiting for overflow stream.open.error",
         ),
-      );
-      expect(overflowError).toEqual({
+      ).toEqual({
         type: "stream.open.error",
         streamId: 3,
         code: "pty_session_limit_exceeded",

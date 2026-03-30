@@ -47,6 +47,13 @@ type SessionWorkbenchTunnelServer = {
   waitForPtyOpen: (predicate: (record: PtyOpenRecord) => boolean) => Promise<PtyOpenRecord>;
 };
 
+type DashboardPageHandle = Awaited<ReturnType<typeof renderDashboardPageIntegration>>;
+
+type SessionWorkbenchCliHarness = {
+  renderedPage: DashboardPageHandle;
+  tunnelServer: SessionWorkbenchTunnelServer;
+};
+
 function toText(data: RawData): string {
   if (typeof data === "string") {
     return data;
@@ -106,6 +113,24 @@ function createThreadStartResult(threadId: string) {
     thread: {
       id: threadId,
     },
+  };
+}
+
+function installNodeWebSocket(): () => void {
+  const originalWebSocket = globalThis.WebSocket;
+
+  Object.defineProperty(globalThis, "WebSocket", {
+    configurable: true,
+    value: NodeWebSocket,
+    writable: true,
+  });
+
+  return () => {
+    Object.defineProperty(globalThis, "WebSocket", {
+      configurable: true,
+      value: originalWebSocket,
+      writable: true,
+    });
   };
 }
 
@@ -391,6 +416,57 @@ function extractConnectionTokenSandboxInstanceId(pathname: string): string | nul
   return match?.[1] ?? null;
 }
 
+function createWorkbenchRequestHandler(
+  tunnelServer: SessionWorkbenchTunnelServer,
+): (request: IncomingMessage, response: ServerResponse<IncomingMessage>) => void {
+  return (request, response) => {
+    const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+    const statusSandboxInstanceId = extractSandboxInstanceId(requestUrl.pathname);
+    const connectionTokenSandboxInstanceId = extractConnectionTokenSandboxInstanceId(
+      requestUrl.pathname,
+    );
+
+    if (
+      request.method === "GET" &&
+      statusSandboxInstanceId !== null &&
+      requestUrl.pathname === `/v1/sandbox/instances/${statusSandboxInstanceId}`
+    ) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify({
+          id: statusSandboxInstanceId,
+          status: "running",
+          failureCode: null,
+          failureMessage: null,
+          automationConversation: null,
+        }),
+      );
+      return;
+    }
+
+    if (
+      request.method === "POST" &&
+      connectionTokenSandboxInstanceId !== null &&
+      requestUrl.pathname ===
+        `/v1/sandbox/instances/${connectionTokenSandboxInstanceId}/connection-tokens`
+    ) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify({
+          instanceId: connectionTokenSandboxInstanceId,
+          url: tunnelServer.url,
+          token: "tok_cli_test",
+          expiresAt: "2026-03-31T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+
+    response.writeHead(404, { "content-type": "application/json" });
+    response.end(JSON.stringify({ message: "Not found" }));
+  };
+}
+
 function HeaderActionsHost(input: { children: React.ReactNode }): React.JSX.Element {
   const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
 
@@ -404,209 +480,94 @@ function HeaderActionsHost(input: { children: React.ReactNode }): React.JSX.Elem
   );
 }
 
+async function renderSessionWorkbenchCliHarness(): Promise<SessionWorkbenchCliHarness> {
+  const tunnelServer = await startSessionWorkbenchTunnelServer();
+  const renderedPage = await renderDashboardPageIntegration({
+    handler: createWorkbenchRequestHandler(tunnelServer),
+    ui: (
+      <HeaderActionsHost>
+        <MemoryRouter initialEntries={["/sessions/sbi_cli_test"]}>
+          <Routes>
+            <Route element={<SessionWorkbenchPage />} path="/sessions/:sandboxInstanceId" />
+          </Routes>
+        </MemoryRouter>
+      </HeaderActionsHost>
+    ),
+  });
+
+  return {
+    renderedPage,
+    tunnelServer,
+  };
+}
+
+async function withSessionWorkbenchCliHarness(
+  run: (harness: SessionWorkbenchCliHarness) => Promise<void>,
+): Promise<void> {
+  const restoreWebSocket = installNodeWebSocket();
+  const harness = await renderSessionWorkbenchCliHarness();
+
+  try {
+    await run(harness);
+  } finally {
+    await harness.renderedPage.close();
+    await harness.tunnelServer.close();
+    restoreWebSocket();
+  }
+}
+
+async function waitForEnabledButton(name: string): Promise<HTMLButtonElement> {
+  const button = await screen.findByRole("button", { name });
+  await waitFor(() => {
+    expect(button).toHaveProperty("disabled", false);
+  });
+
+  return button as HTMLButtonElement;
+}
+
+async function waitForPtySession(
+  tunnelServer: SessionWorkbenchTunnelServer,
+  ptySessionId: string,
+): Promise<PtyOpenRecord> {
+  return await tunnelServer.waitForPtyOpen(
+    (record) => record.channel.ptySessionId === ptySessionId,
+  );
+}
+
+function expectCliPty(record: PtyOpenRecord): void {
+  expect(record.channel.session).toBe("create");
+  expect(record.channel.ptySessionId).toBe("cli");
+  expect(record.channel.command).toBe("codex");
+  expect(record.channel.args).toEqual([
+    "resume",
+    "--remote",
+    OpenAiCodexAppServerListenUrl,
+    "thread_cli_test",
+  ]);
+}
+
+function expectTerminalPty(record: PtyOpenRecord): void {
+  expect(record.channel.session).toBe("create");
+  expect(record.channel.ptySessionId).toBe("terminal");
+  expect(record.channel.command).toBeUndefined();
+  expect(record.channel.args).toBeUndefined();
+}
+
 describe("SessionWorkbenchPage CLI mode integration", () => {
   afterEach(() => {
     cleanup();
   });
 
   it("runs Codex CLI in the primary panel while keeping the side terminal available", async () => {
-    const originalWebSocket = globalThis.WebSocket;
-    const originalMatchMedia = window.matchMedia;
-    const originalGetContextDescriptor = Object.getOwnPropertyDescriptor(
-      HTMLCanvasElement.prototype,
-      "getContext",
-    );
-    const originalGetContext = originalGetContextDescriptor?.value;
-    const originalResizeObserver = globalThis.ResizeObserver;
-    Object.defineProperty(globalThis, "WebSocket", {
-      configurable: true,
-      value: NodeWebSocket,
-      writable: true,
-    });
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      value: (query: string) => {
-        return {
-          addEventListener() {},
-          addListener() {},
-          dispatchEvent() {
-            return false;
-          },
-          matches: false,
-          media: query,
-          onchange: null,
-          removeEventListener() {},
-          removeListener() {},
-        };
-      },
-      writable: true,
-    });
-    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
-      configurable: true,
-      value: () => {
-        return {
-          canvas: document.createElement("canvas"),
-          beginPath() {},
-          clearRect() {},
-          clip() {},
-          closePath() {},
-          createImageData() {
-            return {
-              colorSpace: "srgb",
-              data: new Uint8ClampedArray(4),
-              height: 1,
-              width: 1,
-            };
-          },
-          createLinearGradient() {
-            return {
-              addColorStop() {},
-            };
-          },
-          drawImage() {},
-          fill() {},
-          fillRect() {},
-          fillText() {},
-          getImageData() {
-            return {
-              colorSpace: "srgb",
-              data: new Uint8ClampedArray(4),
-              height: 1,
-              width: 1,
-            };
-          },
-          lineTo() {},
-          measureText() {
-            return {
-              actualBoundingBoxAscent: 0,
-              actualBoundingBoxDescent: 0,
-              actualBoundingBoxLeft: 0,
-              actualBoundingBoxRight: 0,
-              fontBoundingBoxAscent: 0,
-              fontBoundingBoxDescent: 0,
-              width: 0,
-            };
-          },
-          moveTo() {},
-          putImageData() {},
-          rect() {},
-          restore() {},
-          save() {},
-          scale() {},
-          setLineDash() {},
-          setTransform() {},
-          stroke() {},
-          strokeRect() {},
-          translate() {},
-        };
-      },
-      writable: true,
-    });
-    Object.defineProperty(globalThis, "ResizeObserver", {
-      configurable: true,
-      value: class ResizeObserver {
-        disconnect(): void {}
-        observe(): void {}
-        unobserve(): void {}
-      },
-      writable: true,
-    });
-    const tunnelServer = await startSessionWorkbenchTunnelServer();
-    const renderedPage = await renderDashboardPageIntegration({
-      handler: (request: IncomingMessage, response: ServerResponse<IncomingMessage>) => {
-        const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
-        const statusSandboxInstanceId = extractSandboxInstanceId(requestUrl.pathname);
-        const connectionTokenSandboxInstanceId = extractConnectionTokenSandboxInstanceId(
-          requestUrl.pathname,
-        );
-
-        if (
-          request.method === "GET" &&
-          statusSandboxInstanceId !== null &&
-          requestUrl.pathname === `/v1/sandbox/instances/${statusSandboxInstanceId}`
-        ) {
-          response.writeHead(200, { "content-type": "application/json" });
-          response.end(
-            JSON.stringify({
-              id: statusSandboxInstanceId,
-              status: "running",
-              failureCode: null,
-              failureMessage: null,
-              automationConversation: null,
-            }),
-          );
-          return;
-        }
-
-        if (
-          request.method === "POST" &&
-          connectionTokenSandboxInstanceId !== null &&
-          requestUrl.pathname ===
-            `/v1/sandbox/instances/${connectionTokenSandboxInstanceId}/connection-tokens`
-        ) {
-          response.writeHead(200, { "content-type": "application/json" });
-          response.end(
-            JSON.stringify({
-              instanceId: connectionTokenSandboxInstanceId,
-              url: tunnelServer.url,
-              token: "tok_cli_test",
-              expiresAt: "2026-03-31T00:00:00.000Z",
-            }),
-          );
-          return;
-        }
-
-        response.writeHead(404, { "content-type": "application/json" });
-        response.end(JSON.stringify({ message: "Not found" }));
-      },
-      ui: (
-        <HeaderActionsHost>
-          <MemoryRouter initialEntries={["/sessions/sbi_cli_test"]}>
-            <Routes>
-              <Route element={<SessionWorkbenchPage />} path="/sessions/:sandboxInstanceId" />
-            </Routes>
-          </MemoryRouter>
-        </HeaderActionsHost>
-      ),
-    });
-
-    try {
-      const cliButton = await screen.findByRole("button", { name: "CLI" });
-      await waitFor(() => {
-        expect(cliButton).toHaveProperty("disabled", false);
-      });
-
-      fireEvent.click(cliButton);
-
-      const cliPtyOpen = await tunnelServer.waitForPtyOpen((record) => {
-        return record.channel.command === "codex";
-      });
-      expect(cliPtyOpen.channel.session).toBe("create");
-      expect(cliPtyOpen.channel.ptySessionId).toBe("cli");
-      expect(cliPtyOpen.channel.command).toBe("codex");
-      expect(cliPtyOpen.channel.args).toEqual([
-        "resume",
-        "--remote",
-        OpenAiCodexAppServerListenUrl,
-        "thread_cli_test",
-      ]);
+    await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+      fireEvent.click(await waitForEnabledButton("CLI"));
+      expectCliPty(await waitForPtySession(tunnelServer, "cli"));
 
       expect(await screen.findByText("Codex CLI connected")).toBeDefined();
       expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
 
-      const openTerminalButton = screen.getByRole("button", { name: "Open terminal" });
-      await waitFor(() => {
-        expect(openTerminalButton).toHaveProperty("disabled", false);
-      });
-      fireEvent.click(openTerminalButton);
-
-      const sideTerminalPtyOpen = await tunnelServer.waitForPtyOpen((record) => {
-        return record.channel.command === undefined;
-      });
-      expect(sideTerminalPtyOpen.channel.session).toBe("create");
-      expect(sideTerminalPtyOpen.channel.ptySessionId).toBe("terminal");
-      expect(sideTerminalPtyOpen.channel.command).toBeUndefined();
-      expect(sideTerminalPtyOpen.channel.args).toBeUndefined();
+      fireEvent.click(await waitForEnabledButton("Open terminal"));
+      expectTerminalPty(await waitForPtySession(tunnelServer, "terminal"));
 
       fireEvent.click(screen.getByRole("button", { name: "CLI" }));
 
@@ -617,267 +578,22 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       expect(screen.getByRole("button", { name: "Terminal" }).getAttribute("aria-pressed")).toBe(
         "true",
       );
-    } finally {
-      await renderedPage.close();
-      await tunnelServer.close();
-      Object.defineProperty(globalThis, "WebSocket", {
-        configurable: true,
-        value: originalWebSocket,
-        writable: true,
-      });
-      Object.defineProperty(window, "matchMedia", {
-        configurable: true,
-        value: originalMatchMedia,
-        writable: true,
-      });
-      Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
-        configurable: true,
-        value:
-          originalGetContext === undefined
-            ? undefined
-            : function getContext(
-                this: HTMLCanvasElement,
-                ...args: Parameters<NonNullable<HTMLCanvasElement["getContext"]>>
-              ) {
-                return originalGetContext.call(this, ...args);
-              },
-        writable: true,
-      });
-      Object.defineProperty(globalThis, "ResizeObserver", {
-        configurable: true,
-        value: originalResizeObserver,
-        writable: true,
-      });
-    }
+    });
   });
 
   it("opens the CLI after the side terminal without PTY session collisions", async () => {
-    const originalWebSocket = globalThis.WebSocket;
-    const originalMatchMedia = window.matchMedia;
-    const originalGetContextDescriptor = Object.getOwnPropertyDescriptor(
-      HTMLCanvasElement.prototype,
-      "getContext",
-    );
-    const originalGetContext = originalGetContextDescriptor?.value;
-    const originalResizeObserver = globalThis.ResizeObserver;
-    Object.defineProperty(globalThis, "WebSocket", {
-      configurable: true,
-      value: NodeWebSocket,
-      writable: true,
-    });
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      value: (query: string) => {
-        return {
-          addEventListener() {},
-          addListener() {},
-          dispatchEvent() {
-            return false;
-          },
-          matches: false,
-          media: query,
-          onchange: null,
-          removeEventListener() {},
-          removeListener() {},
-        };
-      },
-      writable: true,
-    });
-    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
-      configurable: true,
-      value: () => {
-        return {
-          canvas: document.createElement("canvas"),
-          beginPath() {},
-          clearRect() {},
-          clip() {},
-          closePath() {},
-          createImageData() {
-            return {
-              colorSpace: "srgb",
-              data: new Uint8ClampedArray(4),
-              height: 1,
-              width: 1,
-            };
-          },
-          createLinearGradient() {
-            return {
-              addColorStop() {},
-            };
-          },
-          drawImage() {},
-          fill() {},
-          fillRect() {},
-          fillText() {},
-          getImageData() {
-            return {
-              colorSpace: "srgb",
-              data: new Uint8ClampedArray(4),
-              height: 1,
-              width: 1,
-            };
-          },
-          lineTo() {},
-          measureText() {
-            return {
-              actualBoundingBoxAscent: 0,
-              actualBoundingBoxDescent: 0,
-              actualBoundingBoxLeft: 0,
-              actualBoundingBoxRight: 0,
-              fontBoundingBoxAscent: 0,
-              fontBoundingBoxDescent: 0,
-              width: 0,
-            };
-          },
-          moveTo() {},
-          putImageData() {},
-          rect() {},
-          restore() {},
-          save() {},
-          scale() {},
-          setLineDash() {},
-          setTransform() {},
-          stroke() {},
-          strokeRect() {},
-          translate() {},
-        };
-      },
-      writable: true,
-    });
-    Object.defineProperty(globalThis, "ResizeObserver", {
-      configurable: true,
-      value: class ResizeObserver {
-        disconnect(): void {}
-        observe(): void {}
-        unobserve(): void {}
-      },
-      writable: true,
-    });
-    const tunnelServer = await startSessionWorkbenchTunnelServer();
-    const renderedPage = await renderDashboardPageIntegration({
-      handler: (request: IncomingMessage, response: ServerResponse<IncomingMessage>) => {
-        const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
-        const statusSandboxInstanceId = extractSandboxInstanceId(requestUrl.pathname);
-        const connectionTokenSandboxInstanceId = extractConnectionTokenSandboxInstanceId(
-          requestUrl.pathname,
-        );
+    await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+      fireEvent.click(await waitForEnabledButton("Open terminal"));
+      expectTerminalPty(await waitForPtySession(tunnelServer, "terminal"));
 
-        if (
-          request.method === "GET" &&
-          statusSandboxInstanceId !== null &&
-          requestUrl.pathname === `/v1/sandbox/instances/${statusSandboxInstanceId}`
-        ) {
-          response.writeHead(200, { "content-type": "application/json" });
-          response.end(
-            JSON.stringify({
-              id: statusSandboxInstanceId,
-              status: "running",
-              failureCode: null,
-              failureMessage: null,
-              automationConversation: null,
-            }),
-          );
-          return;
-        }
-
-        if (
-          request.method === "POST" &&
-          connectionTokenSandboxInstanceId !== null &&
-          requestUrl.pathname ===
-            `/v1/sandbox/instances/${connectionTokenSandboxInstanceId}/connection-tokens`
-        ) {
-          response.writeHead(200, { "content-type": "application/json" });
-          response.end(
-            JSON.stringify({
-              instanceId: connectionTokenSandboxInstanceId,
-              url: tunnelServer.url,
-              token: "tok_cli_test",
-              expiresAt: "2026-03-31T00:00:00.000Z",
-            }),
-          );
-          return;
-        }
-
-        response.writeHead(404, { "content-type": "application/json" });
-        response.end(JSON.stringify({ message: "Not found" }));
-      },
-      ui: (
-        <HeaderActionsHost>
-          <MemoryRouter initialEntries={["/sessions/sbi_cli_test"]}>
-            <Routes>
-              <Route element={<SessionWorkbenchPage />} path="/sessions/:sandboxInstanceId" />
-            </Routes>
-          </MemoryRouter>
-        </HeaderActionsHost>
-      ),
-    });
-
-    try {
-      const openTerminalButton = await screen.findByRole("button", { name: "Open terminal" });
-      await waitFor(() => {
-        expect(openTerminalButton).toHaveProperty("disabled", false);
-      });
-
-      fireEvent.click(openTerminalButton);
-
-      const sideTerminalPtyOpen = await tunnelServer.waitForPtyOpen((record) => {
-        return record.channel.ptySessionId === "terminal";
-      });
-      expect(sideTerminalPtyOpen.channel.command).toBeUndefined();
-
-      const cliButton = screen.getByRole("button", { name: "CLI" });
-      await waitFor(() => {
-        expect(cliButton).toHaveProperty("disabled", false);
-      });
-      fireEvent.click(cliButton);
-
-      const cliPtyOpen = await tunnelServer.waitForPtyOpen((record) => {
-        return record.channel.ptySessionId === "cli";
-      });
-      expect(cliPtyOpen.channel.command).toBe("codex");
-      expect(cliPtyOpen.channel.args).toEqual([
-        "resume",
-        "--remote",
-        OpenAiCodexAppServerListenUrl,
-        "thread_cli_test",
-      ]);
+      fireEvent.click(await waitForEnabledButton("CLI"));
+      expectCliPty(await waitForPtySession(tunnelServer, "cli"));
 
       expect(await screen.findByText("Codex CLI connected")).toBeDefined();
       expect(screen.getByRole("button", { name: "Terminal" }).getAttribute("aria-pressed")).toBe(
         "true",
       );
       expect(screen.queryByText("pty session already exists")).toBeNull();
-    } finally {
-      await renderedPage.close();
-      await tunnelServer.close();
-      Object.defineProperty(globalThis, "WebSocket", {
-        configurable: true,
-        value: originalWebSocket,
-        writable: true,
-      });
-      Object.defineProperty(window, "matchMedia", {
-        configurable: true,
-        value: originalMatchMedia,
-        writable: true,
-      });
-      Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
-        configurable: true,
-        value:
-          originalGetContext === undefined
-            ? undefined
-            : function getContext(
-                this: HTMLCanvasElement,
-                ...args: Parameters<NonNullable<HTMLCanvasElement["getContext"]>>
-              ) {
-                return originalGetContext.call(this, ...args);
-              },
-        writable: true,
-      });
-      Object.defineProperty(globalThis, "ResizeObserver", {
-        configurable: true,
-        value: originalResizeObserver,
-        writable: true,
-      });
-    }
+    });
   });
 });

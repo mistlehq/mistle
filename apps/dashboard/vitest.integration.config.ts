@@ -6,5 +6,6 @@ export default defineConfig({
   },
   test: {
     include: ["integration/**/*.integration.test.ts", "integration/**/*.integration.test.tsx"],
+    setupFiles: ["./integration/setup-vitest.ts"],
   },
 });
