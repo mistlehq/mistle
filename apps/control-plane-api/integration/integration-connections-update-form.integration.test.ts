@@ -5,6 +5,7 @@ import {
 } from "@mistle/db/control-plane";
 import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import { AtlassianConnectionMethodIds } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import { CreateFormConnectionBodySchema } from "../src/integration-connections/create-form-connection/schema.js";
@@ -369,6 +370,64 @@ describe("integration connections update form integration", () => {
       message: "Invalid request.",
     });
   });
+
+  it("updates Atlassian service account token connections", async ({ fixture }) => {
+    await upsertAtlassianTarget({ fixture, targetKey: "atlassian-default" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-update-atlassian-service@example.com",
+    });
+
+    const createResponse = await fixture.request(
+      "/v1/integration/connections/atlassian-default/form",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Atlassian service account token",
+          methodId: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+          config: {
+            connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+            cloud_id: "cloud-id-123",
+          },
+          secret: "original-atlassian-service-token",
+        }),
+      },
+    );
+
+    expect(createResponse.status).toBe(201);
+    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+
+    const updateResponse = await fixture.request(
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/form`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Atlassian service account token rotated",
+          config: {
+            connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+            cloud_id: "cloud-id-456",
+          },
+          secret: "rotated-atlassian-service-token",
+        }),
+      },
+    );
+
+    expect(updateResponse.status).toBe(200);
+    const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
+    expect(updatedConnection.displayName).toBe("Atlassian service account token rotated");
+    expect(updatedConnection.config).toEqual({
+      connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+      cloud_id: "cloud-id-456",
+    });
+  });
 });
 
 async function upsertOpenAiTarget(input: {
@@ -395,6 +454,30 @@ async function upsertOpenAiTarget(input: {
         config: {
           api_base_url: "https://api.openai.com",
         },
+      },
+    });
+}
+
+async function upsertAtlassianTarget(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  targetKey: string;
+}) {
+  await input.fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "atlassian",
+      variantId: "atlassian-default",
+      enabled: true,
+      config: {},
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "atlassian",
+        variantId: "atlassian-default",
+        enabled: true,
+        config: {},
       },
     });
 }

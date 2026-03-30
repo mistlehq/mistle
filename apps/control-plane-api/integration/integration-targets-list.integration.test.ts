@@ -26,6 +26,13 @@ describe("integration targets discovery integration", () => {
       .insert(integrationTargets)
       .values([
         {
+          targetKey: "atlassian-default-it",
+          familyId: "atlassian",
+          variantId: "atlassian-default",
+          enabled: true,
+          config: {},
+        },
+        {
           targetKey: "github_cloud_it",
           familyId: "github",
           variantId: "github-cloud",
@@ -79,7 +86,7 @@ describe("integration targets discovery integration", () => {
     expect(firstPageResponse.status).toBe(200);
     const firstPage = ListIntegrationTargetsResponseSchema.parse(await firstPageResponse.json());
 
-    expect(firstPage.totalResults).toBe(baselinePage.totalResults + 3);
+    expect(firstPage.totalResults).toBe(baselinePage.totalResults + 4);
     expect(firstPage.previousPage).toBeNull();
     expect(firstPage.nextPage).not.toBeNull();
 
@@ -97,7 +104,7 @@ describe("integration targets discovery integration", () => {
     );
     expect(secondPageResponse.status).toBe(200);
     const secondPage = ListIntegrationTargetsResponseSchema.parse(await secondPageResponse.json());
-    expect(secondPage.totalResults).toBe(baselinePage.totalResults + 3);
+    expect(secondPage.totalResults).toBe(baselinePage.totalResults + 4);
     expect(secondPage.previousPage).not.toBeNull();
 
     if (secondPage.previousPage === null) {
@@ -116,7 +123,7 @@ describe("integration targets discovery integration", () => {
     const previousPage = ListIntegrationTargetsResponseSchema.parse(
       await previousPageResponse.json(),
     );
-    expect(previousPage.totalResults).toBe(baselinePage.totalResults + 3);
+    expect(previousPage.totalResults).toBe(baselinePage.totalResults + 4);
 
     const allTargetsResponse = await fixture.request("/v1/integration/targets?limit=100", {
       headers: {
@@ -239,6 +246,44 @@ describe("integration targets discovery integration", () => {
       },
     });
     expect(insertedOpenAiTarget?.config.api_base_url).toBe("https://api.openai.com");
+
+    const insertedAtlassianTarget = allTargets.items.find(
+      (item) => item.targetKey === "atlassian-default-it",
+    );
+    expect(insertedAtlassianTarget).toMatchObject({
+      targetKey: "atlassian-default-it",
+      familyId: "atlassian",
+      variantId: "atlassian-default",
+      enabled: true,
+      displayName: "Atlassian",
+      description: "Access Atlassian REST APIs with personal or service-account tokens.",
+      logoKey: "atlassian",
+      connectionMethods: [
+        {
+          id: "atlassian-personal-api-token",
+          label: "Personal API token",
+          kind: "form",
+          secretField: {
+            label: "Personal API token",
+            placeholder: "Enter personal API token",
+            inputType: "password",
+          },
+        },
+        {
+          id: "atlassian-service-account-api-token",
+          label: "Service account API token",
+          kind: "form",
+          secretField: {
+            label: "Service account API token",
+            placeholder: "Enter service account API token",
+            inputType: "password",
+          },
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    });
 
     expect(allTargets.items.some((item) => item.targetKey === "zzz_disabled_target_it")).toBe(
       false,

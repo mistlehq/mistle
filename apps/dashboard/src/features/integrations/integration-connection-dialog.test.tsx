@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
+import { AtlassianConnectionMethodIds } from "@mistle/integrations-definitions";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { resolveConnectionMethodFormUiModel } from "../pages/use-integration-connection-dialog-state-helpers.js";
 import {
   IntegrationConnectionDialog,
   IntegrationConnectionMethodIds,
@@ -302,5 +304,116 @@ describe("IntegrationConnectionDialog", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
     expect(screen.getByText("Save to update this connection.")).toBeTruthy();
+  });
+
+  it("renders Atlassian personal token configuration fields", () => {
+    const dialog: IntegrationConnectionDialogState = {
+      methods: [
+        {
+          id: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+          label: "Personal API token",
+          kind: "form",
+          secretField: {
+            label: "Personal API token",
+            placeholder: "Enter personal API token",
+            inputType: "password",
+          },
+        },
+      ],
+      mode: "create",
+      targetConfig: {},
+      targetDisplayName: "Atlassian",
+      targetFamilyId: "atlassian",
+      targetKey: "atlassian-default",
+      targetVariantId: "atlassian-default",
+    };
+
+    const configForm = resolveConnectionMethodFormUiModel({
+      dialog,
+      methodId: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+      currentValue: {},
+    });
+
+    render(
+      <IntegrationConnectionDialog
+        configForm={configForm}
+        configValue={{}}
+        connectionDisplayNamePlaceholder="Atlassian connection"
+        connectionDisplayNameValue=""
+        connectError={null}
+        dialog={dialog}
+        hasChanges={true}
+        isConnectionDisplayNameChanged={false}
+        isSecretChanged={false}
+        methodId={AtlassianConnectionMethodIds.PERSONAL_API_TOKEN}
+        onClose={() => {}}
+        onConfigChange={() => {}}
+        onConnectionDisplayNameChange={() => {}}
+        onMethodChange={() => {}}
+        onSecretChange={() => {}}
+        onSubmit={() => {}}
+        pending={false}
+        secretValue=""
+      />,
+    );
+
+    expect(screen.getByLabelText(/Site URL/)).toBeTruthy();
+    expect(screen.getByLabelText(/Email/)).toBeTruthy();
+    expect(screen.getByPlaceholderText("Enter personal API token")).toBeTruthy();
+  });
+
+  it("renders Atlassian service account token configuration fields", () => {
+    const dialog: IntegrationConnectionDialogState = {
+      methods: [
+        {
+          id: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+          label: "Service account API token",
+          kind: "form",
+          secretField: {
+            label: "Service account API token",
+            placeholder: "Enter service account API token",
+            inputType: "password",
+          },
+        },
+      ],
+      mode: "create",
+      targetConfig: {},
+      targetDisplayName: "Atlassian",
+      targetFamilyId: "atlassian",
+      targetKey: "atlassian-default",
+      targetVariantId: "atlassian-default",
+    };
+
+    const configForm = resolveConnectionMethodFormUiModel({
+      dialog,
+      methodId: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+      currentValue: {},
+    });
+
+    render(
+      <IntegrationConnectionDialog
+        configForm={configForm}
+        configValue={{}}
+        connectionDisplayNamePlaceholder="Atlassian connection"
+        connectionDisplayNameValue=""
+        connectError={null}
+        dialog={dialog}
+        hasChanges={true}
+        isConnectionDisplayNameChanged={false}
+        isSecretChanged={false}
+        methodId={AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN}
+        onClose={() => {}}
+        onConfigChange={() => {}}
+        onConnectionDisplayNameChange={() => {}}
+        onMethodChange={() => {}}
+        onSecretChange={() => {}}
+        onSubmit={() => {}}
+        pending={false}
+        secretValue=""
+      />,
+    );
+
+    expect(screen.getByLabelText(/Cloud ID/)).toBeTruthy();
+    expect(screen.getByPlaceholderText("Enter service account API token")).toBeTruthy();
   });
 });

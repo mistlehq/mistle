@@ -6,6 +6,17 @@ import type {
 } from "@mistle/integrations-core";
 
 import {
+  AtlassianConnectionMethodIds,
+  AtlassianPersonalApiTokenConnectionConfigSchema,
+  AtlassianServiceAccountApiTokenConnectionConfigSchema,
+} from "../atlassian/variants/atlassian-default/auth.js";
+import { AtlassianBindingConfigSchema } from "../atlassian/variants/atlassian-default/binding-config-schema.js";
+import {
+  AtlassianPersonalApiTokenConnectionConfigForm,
+  AtlassianServiceAccountApiTokenConnectionConfigForm,
+} from "../atlassian/variants/atlassian-default/connection-config-form.js";
+import { AtlassianTargetConfigSchema } from "../atlassian/variants/atlassian-default/target-config-schema.js";
+import {
   GitHubApiKeyConnectionConfigSchema,
   GitHubAppInstallationConnectionConfigSchema,
 } from "../github/shared/auth.js";
@@ -47,6 +58,39 @@ export type IntegrationFormDefinitionRecord = {
 };
 
 const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRecord[] = [
+  {
+    familyId: "atlassian",
+    variantId: "atlassian-default",
+    kind: "connector",
+    targetConfigSchema: AtlassianTargetConfigSchema,
+    bindingConfigSchema: AtlassianBindingConfigSchema,
+    connectionMethods: [
+      {
+        id: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+        label: "Personal API token",
+        kind: "form",
+        secretField: {
+          label: "Personal API token",
+          placeholder: "Enter personal API token",
+          inputType: "password",
+        },
+        configSchema: AtlassianPersonalApiTokenConnectionConfigSchema,
+        configForm: AtlassianPersonalApiTokenConnectionConfigForm,
+      },
+      {
+        id: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+        label: "Service account API token",
+        kind: "form",
+        secretField: {
+          label: "Service account API token",
+          placeholder: "Enter service account API token",
+          inputType: "password",
+        },
+        configSchema: AtlassianServiceAccountApiTokenConnectionConfigSchema,
+        configForm: AtlassianServiceAccountApiTokenConnectionConfigForm,
+      },
+    ],
+  },
   {
     familyId: "github",
     variantId: "github-cloud",
