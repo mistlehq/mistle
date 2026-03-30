@@ -104,7 +104,7 @@ describe("invitation accept state", () => {
       "This invitation belongs to a different account.",
     );
     expect(toInvitationFetchErrorMessage({ status: 400 })).toBe(
-      "This invitation is invalid, expired, or no longer pending.",
+      "This invitation link is invalid or can no longer be used.",
     );
   });
 

@@ -2,8 +2,9 @@ import { cn } from "@mistle/ui";
 import type { ReactNode } from "react";
 
 export type StatusBoxProps = {
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
+  title?: ReactNode;
   tone?: "neutral" | "destructive";
   variant?: "boxed" | "subtle";
 };
@@ -27,7 +28,16 @@ export function StatusBox(input: StatusBoxProps): React.JSX.Element {
         input.className,
       )}
     >
-      <div className="text-sm">{input.children}</div>
+      {input.title === undefined ? (
+        <div className="text-sm">{input.children}</div>
+      ) : (
+        <div className="flex flex-col gap-1">
+          {input.title === undefined ? null : (
+            <div className="text-sm font-medium">{input.title}</div>
+          )}
+          {input.children === undefined ? null : <div className="text-sm">{input.children}</div>}
+        </div>
+      )}
     </div>
   );
 }

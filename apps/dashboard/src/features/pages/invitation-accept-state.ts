@@ -137,7 +137,7 @@ export function toInvitationFetchErrorMessage(error: unknown): string {
     return "This invitation belongs to a different account.";
   }
   if (status === 400) {
-    return "This invitation is invalid, expired, or no longer pending.";
+    return "This invitation link is invalid or can no longer be used.";
   }
 
   return readErrorMessage(error) ?? "Unable to load invitation details.";
@@ -163,8 +163,14 @@ export function toInvitationMutationErrorMessage(
   }
 
   const defaultMessage =
-    action === "accept" ? "Unable to accept invitation." : "Unable to decline invitation.";
+    action === "accept"
+      ? "Unable to accept invitation. Please try again later or contact your administrator."
+      : "Unable to decline invitation.";
   return readErrorMessage(error) ?? defaultMessage;
+}
+
+export function isInvitationMutationUnavailableError(error: unknown): boolean {
+  return readHttpStatus(error) === 400;
 }
 
 export function formatInvitationRole(role: string): string {

@@ -22,7 +22,7 @@ export function OtpStepForm(props: OtpStepFormProps): React.JSX.Element {
         </Label>
         <Input
           autoComplete="one-time-code"
-          className="h-12 text-base"
+          className="h-12"
           data-1p-ignore="true"
           id="otp"
           inputMode="numeric"

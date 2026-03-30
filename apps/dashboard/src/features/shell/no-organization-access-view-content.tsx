@@ -1,17 +1,8 @@
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  Button,
-  Field,
-  FieldContent,
-  FieldError,
-  FieldLabel,
-  Input,
-} from "@mistle/ui";
+import { Button, Field, FieldContent, Input } from "@mistle/ui";
+
+import { StatusBox } from "../shared/status-box.js";
 
 type NoOrganizationAccessViewContentProps = {
-  email: string;
   organizationName: string;
   organizationNameError: string | null;
   createOrganizationError: string | null;
@@ -27,46 +18,56 @@ export function NoOrganizationAccessViewContent(
 ): React.JSX.Element {
   return (
     <>
-      <div className="rounded-md border px-4 py-3">
-        <p className="text-sm">{`Your account ${props.email} isn't in any organizations yet.`}</p>
-      </div>
-
       {props.createOrganizationError === null ? null : (
-        <Alert variant="destructive">
-          <AlertTitle>Could not create organization</AlertTitle>
-          <AlertDescription>{props.createOrganizationError}</AlertDescription>
-        </Alert>
+        <StatusBox tone="destructive">{props.createOrganizationError}</StatusBox>
       )}
 
-      <form className="gap-4 grid" onSubmit={props.onCreateOrganization}>
+      <form className="flex flex-col gap-4" onSubmit={props.onCreateOrganization}>
         <Field>
-          <FieldLabel htmlFor="onboarding-organization-name">Organization name</FieldLabel>
           <FieldContent>
             <Input
+              aria-label="Organization name"
+              aria-invalid={props.organizationNameError === null ? undefined : true}
+              className="h-12"
               id="onboarding-organization-name"
               onChange={(event) => props.onOrganizationNameChange(event.currentTarget.value)}
+              placeholder="Organization name"
               value={props.organizationName}
             />
           </FieldContent>
-          {props.organizationNameError === null ? null : (
-            <FieldError errors={[{ message: props.organizationNameError }]} />
-          )}
         </Field>
 
-        <Button className="w-full" disabled={props.isCreatingOrganization} type="submit">
+        <Button
+          className="h-12 w-full text-sm"
+          disabled={props.isCreatingOrganization}
+          size="lg"
+          type="submit"
+        >
           {props.isCreatingOrganization ? "Creating organization..." : "Create organization"}
+        </Button>
+
+        <Button
+          className="h-12 w-full text-sm"
+          disabled={props.isSigningOut || props.isCreatingOrganization}
+          onClick={props.onSignOut}
+          size="lg"
+          type="button"
+          variant="outline"
+        >
+          {props.isSigningOut ? "Signing out..." : "Sign Out"}
         </Button>
       </form>
 
-      <Button
-        className="w-full"
-        disabled={props.isSigningOut || props.isCreatingOrganization}
-        onClick={props.onSignOut}
-        type="button"
-        variant="outline"
-      >
-        {props.isSigningOut ? "Signing out..." : "Sign Out"}
-      </Button>
+      <div className="mt-6 grid gap-3">
+        <div className="text-muted-foreground flex items-center gap-4">
+          <div className="bg-border h-px flex-1" />
+          <p className="text-xs font-medium tracking-[0.2em] uppercase">Have an existing org?</p>
+          <div className="bg-border h-px flex-1" />
+        </div>
+        <div className="grid gap-2 text-center">
+          <p className="text-muted-foreground text-sm">Ask your administrator for an invite.</p>
+        </div>
+      </div>
     </>
   );
 }

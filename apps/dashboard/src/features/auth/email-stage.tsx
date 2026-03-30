@@ -1,5 +1,6 @@
 import type React from "react";
 
+import { StatusBox } from "../shared/status-box.js";
 import { EmailStepForm } from "./email-step-form.js";
 import { ErrorNotice } from "./error-notice.js";
 
@@ -20,7 +21,9 @@ export function EmailStage(props: EmailStageProps): React.JSX.Element {
   return (
     <div className="gap-4 pt-1 flex flex-col">
       {props.beforeForm === undefined ? null : props.beforeForm}
-      <ErrorNotice message={props.authError} />
+      {props.authError === null ? null : (
+        <StatusBox tone="destructive">{props.authError}</StatusBox>
+      )}
       <EmailStepForm
         email={props.email}
         isSendingOtp={props.isSendingOtp}

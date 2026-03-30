@@ -26,7 +26,7 @@ export function EmailStepForm(props: EmailStepFormProps): React.JSX.Element {
       ) : isEmailEditable ? (
         <Input
           autoComplete="email"
-          className="h-12 text-base"
+          className="h-12"
           id="email"
           name="email"
           onChange={(event) => {
@@ -39,7 +39,7 @@ export function EmailStepForm(props: EmailStepFormProps): React.JSX.Element {
       ) : (
         <div
           aria-label="Email address"
-          className="bg-muted/40 text-foreground h-12 rounded-md border px-3 py-2 text-base leading-7"
+          className="bg-muted/40 text-foreground flex h-12 items-center rounded-md border px-2.5 py-1 text-sm"
           id="email"
           role="note"
         >

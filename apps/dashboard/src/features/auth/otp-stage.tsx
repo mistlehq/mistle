@@ -1,3 +1,4 @@
+import { StatusBox } from "../shared/status-box.js";
 import { ErrorNotice } from "./error-notice.js";
 import { OtpStepForm } from "./otp-step-form.js";
 
@@ -15,7 +16,9 @@ type OtpStageProps = {
 export function OtpStage(props: OtpStageProps): React.JSX.Element {
   return (
     <div className="gap-4 pt-1 flex flex-col">
-      <ErrorNotice message={props.authError} />
+      {props.authError === null ? null : (
+        <StatusBox tone="destructive">{props.authError}</StatusBox>
+      )}
       <OtpStepForm
         email={props.email}
         isVerifyingOtp={props.isVerifyingOtp}

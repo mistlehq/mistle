@@ -16,7 +16,7 @@ import { SESSION_QUERY_KEY, useSessionQuery } from "./session-query.js";
 export function NoOrganizationAccessView(): React.JSX.Element {
   const sessionQuery = useSessionQuery();
   const queryClient = useQueryClient();
-  const session = requireAuthenticatedSession(sessionQuery.data ?? null);
+  requireAuthenticatedSession(sessionQuery.data ?? null);
   const [organizationName, setOrganizationName] = useState("");
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [createOrganizationError, setCreateOrganizationError] = useState<string | null>(null);
@@ -85,10 +85,9 @@ export function NoOrganizationAccessView(): React.JSX.Element {
   }
 
   return (
-    <AuthPageShell maxWidthClass={AuthPageWidths.SM} title="Create your organization">
+    <AuthPageShell maxWidthClass={AuthPageWidths.SM} title="Create an organization">
       <NoOrganizationAccessViewContent
         createOrganizationError={createOrganizationError}
-        email={session.user.email}
         isCreatingOrganization={createOrganizationMutation.isPending}
         isSigningOut={signOutMutation.isPending}
         onCreateOrganization={handleCreateOrganization}
