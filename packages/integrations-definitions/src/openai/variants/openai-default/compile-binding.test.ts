@@ -179,8 +179,10 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(configContent).toContain('wire_api = "responses"');
     expect(configContent).toContain("requires_openai_auth = false");
     expect(configContent).toContain("supports_websockets = false");
+    expect(configContent).toContain("developer_instructions");
+    expect(configContent).toContain("Mistle-managed sandbox context:");
+    expect(configContent).toContain("managed outbound proxy");
     expect(configContent).toContain('trust_level = "trusted"');
-    expect(configContent).not.toContain("developer_instructions");
     expect(configContent).not.toContain("openai_base_url");
     expect(compiled.runtimeClients[0]?.processes).toEqual([
       {
@@ -259,8 +261,16 @@ describe("compileOpenAiApiKeyBinding", () => {
 
     const configContent = compiled.runtimeClients[0]?.setup.files[0]?.content;
     expect(configContent).toContain("developer_instructions");
+    expect(configContent).toContain("Mistle-managed sandbox context:");
+    expect(configContent).toContain("User-provided additional instructions:");
     expect(configContent).toContain("Prefer concise answers.");
     expect(configContent).toContain("Always explain tradeoffs.");
+    expect(configContent?.indexOf("Mistle-managed sandbox context:")).toBeLessThan(
+      configContent?.indexOf("User-provided additional instructions:") ?? 0,
+    );
+    expect(configContent?.indexOf("User-provided additional instructions:")).toBeLessThan(
+      configContent?.indexOf("Prefer concise answers.") ?? 0,
+    );
   });
 
   it("uses target base-url host and path for custom upstreams", () => {

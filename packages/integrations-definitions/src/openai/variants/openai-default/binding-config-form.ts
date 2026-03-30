@@ -87,7 +87,7 @@ export function resolveOpenAiBindingConfigForm(
         },
         additionalInstructions: {
           title: "Additional instructions",
-          description: "Added to the runtime's built-in agent instructions.",
+          description: "Appended after Mistle-managed runtime instructions.",
         },
       },
     },

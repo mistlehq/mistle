@@ -33,6 +33,30 @@ const RuntimeClientProcessReadinessTimeoutMs = 5_000;
 const RuntimeClientProcessStopTimeoutMs = 10_000;
 const RuntimeClientProcessStopGracePeriodMs = 2_000;
 const OpenAiAllowedPathPrefix = "/";
+const ManagedSandboxContext = [
+  "Mistle-managed sandbox context:",
+  "",
+  "- This runtime operates behind a managed outbound proxy.",
+  "- Network tools and scripts should use the sandbox's existing proxy configuration rather than expecting direct outbound access.",
+  "- Provider credentials may be injected by the platform outside the sandboxed process environment.",
+  "- Do not assume missing API keys or auth-related environment variables inside the sandbox mean authentication is misconfigured.",
+  "- Prefer debugging request behavior and proxy-mediated access before treating missing in-process credentials as the root cause.",
+  "- Do not modify proxy-related environment variables unless explicitly instructed.",
+].join("\n");
+
+function composeDeveloperInstructions(additionalInstructions?: string): string {
+  if (additionalInstructions === undefined) {
+    return ManagedSandboxContext;
+  }
+
+  return [
+    ManagedSandboxContext,
+    "",
+    "User-provided additional instructions:",
+    "",
+    additionalInstructions,
+  ].join("\n");
+}
 
 function renderCodexConfig(input: {
   model: string;
@@ -46,6 +70,7 @@ function renderCodexConfig(input: {
     model_reasoning_effort: input.reasoningEffort,
     approval_policy: "never",
     sandbox_mode: "danger-full-access",
+    developer_instructions: composeDeveloperInstructions(input.additionalInstructions),
     model_providers: {
       [ProxyModelProviderKey]: {
         name: ProxyModelProviderName,
@@ -55,9 +80,6 @@ function renderCodexConfig(input: {
         supports_websockets: false,
       },
     },
-    ...(input.additionalInstructions === undefined
-      ? {}
-      : { developer_instructions: input.additionalInstructions }),
     projects: {
       "/": {
         trust_level: "trusted",
