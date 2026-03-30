@@ -159,7 +159,10 @@ export function useSessionWorkbenchController(input: {
       ? "Session id is required."
       : sessionSnapshot === null
         ? "CLI is available after the session is connected."
-        : null;
+        : !workbenchLifecycleState.connectionReadiness.canConnect
+          ? (workbenchLifecycleState.stoppedSessionState.message ??
+            "CLI is available only when the sandbox is running.")
+          : null;
   const canEnterCli = enterCliDisabledReason === null && !isSwitchingPrimaryPanel;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
@@ -174,7 +177,12 @@ export function useSessionWorkbenchController(input: {
   });
 
   const enterCliMode = useCallback(async (): Promise<void> => {
-    if (input.sandboxInstanceId === null || sessionSnapshot === null || isSwitchingPrimaryPanel) {
+    if (
+      input.sandboxInstanceId === null ||
+      sessionSnapshot === null ||
+      !workbenchLifecycleState.connectionReadiness.canConnect ||
+      isSwitchingPrimaryPanel
+    ) {
       return;
     }
 
@@ -202,6 +210,7 @@ export function useSessionWorkbenchController(input: {
     lifecycle,
     serverRequests,
     sessionSnapshot,
+    workbenchLifecycleState.connectionReadiness.canConnect,
     threads,
   ]);
 

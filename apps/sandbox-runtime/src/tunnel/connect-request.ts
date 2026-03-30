@@ -119,11 +119,17 @@ export function parsePtyConnectRequest(payload: string): StreamOpen {
   const cwd =
     typeof cwdValue === "string" && cwdValue.trim().length > 0 ? cwdValue.trim() : undefined;
   const commandValue = channel?.command;
+  if (commandValue !== undefined && typeof commandValue !== "string") {
+    throw new Error("pty stream.open request command must be a non-empty string");
+  }
   const command =
     typeof commandValue === "string" && commandValue.trim().length > 0
       ? commandValue.trim()
       : undefined;
   const argsValue = channel?.args;
+  if (argsValue !== undefined && !Array.isArray(argsValue)) {
+    throw new Error("pty stream.open request args must be an array of non-empty strings");
+  }
   const args =
     Array.isArray(argsValue) &&
     argsValue.every((entry) => typeof entry === "string" && entry.trim().length > 0)
@@ -159,6 +165,9 @@ export function parsePtyConnectRequest(payload: string): StreamOpen {
     throw new Error(
       "pty stream.open request cols and rows must both be provided when either is set",
     );
+  }
+  if (typeof commandValue === "string" && command === undefined) {
+    throw new Error("pty stream.open request command must be a non-empty string");
   }
   if (Array.isArray(argsValue) && args === undefined) {
     throw new Error("pty stream.open request args must contain only non-empty strings");

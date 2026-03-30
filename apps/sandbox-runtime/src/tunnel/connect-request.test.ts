@@ -149,6 +149,58 @@ describe("pty control message parsing", () => {
         }),
       ),
     ).toThrow("pty stream.open request args must contain only non-empty strings");
+
+    expect(() =>
+      parsePtyConnectRequest(
+        JSON.stringify({
+          type: "stream.open",
+          streamId: 7,
+          channel: {
+            kind: "pty",
+            session: "create",
+            ptySessionId: "terminal",
+            cols: 80,
+            rows: 24,
+            command: 42,
+          },
+        }),
+      ),
+    ).toThrow("pty stream.open request command must be a non-empty string");
+
+    expect(() =>
+      parsePtyConnectRequest(
+        JSON.stringify({
+          type: "stream.open",
+          streamId: 7,
+          channel: {
+            kind: "pty",
+            session: "create",
+            ptySessionId: "terminal",
+            cols: 80,
+            rows: 24,
+            command: "   ",
+          },
+        }),
+      ),
+    ).toThrow("pty stream.open request command must be a non-empty string");
+
+    expect(() =>
+      parsePtyConnectRequest(
+        JSON.stringify({
+          type: "stream.open",
+          streamId: 7,
+          channel: {
+            kind: "pty",
+            session: "create",
+            ptySessionId: "terminal",
+            cols: 80,
+            rows: 24,
+            command: "codex",
+            args: "resume",
+          },
+        }),
+      ),
+    ).toThrow("pty stream.open request args must be an array of non-empty strings");
   });
 
   it("parses pty resize and close messages", () => {
