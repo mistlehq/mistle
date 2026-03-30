@@ -9,6 +9,7 @@ import {
   readComposerConfigSnapshot,
   type ComposerConfigSnapshot,
 } from "../../../../pages/session-composer/session-composer-config.js";
+import { StaleConnectionAttemptError } from "../session-connection/codex-session-errors.js";
 import { resolveSessionBootstrapState } from "./session-bootstrap-state.js";
 import {
   resolveSessionBootstrapPlan,
@@ -33,6 +34,15 @@ const EmptyComposerConfig: ComposerConfigSnapshot = {
   model: null,
   modelReasoningEffort: null,
 };
+
+export function ensureCurrentThreadSyncGeneration(input: {
+  currentGeneration: number;
+  expectedGeneration: number;
+}): void {
+  if (input.currentGeneration !== input.expectedGeneration) {
+    throw new StaleConnectionAttemptError();
+  }
+}
 
 type LoadModelsResult = {
   models: readonly CodexModelSummary[];
@@ -64,7 +74,6 @@ function createConfigQueryKey(
 
 export function useSessionBootstrap(input: {
   bootstrapConnectionContext: BootstrapConnectionContext | null;
-  ensureCurrentGeneration: (generation: number) => void;
   hydrateInitialThread: (input?: {
     generation?: number;
     ensureCurrentGeneration?: (generation: number) => void;
@@ -139,11 +148,20 @@ export function useSessionBootstrap(input: {
       try {
         await input.hydrateInitialThread({
           generation: currentThreadSyncGeneration,
-          ensureCurrentGeneration: input.ensureCurrentGeneration,
+          ensureCurrentGeneration: (generation) => {
+            ensureCurrentThreadSyncGeneration({
+              currentGeneration: threadSyncGenerationRef.current,
+              expectedGeneration: generation,
+            });
+          },
           ...(input.rpcClientRef.current === null ? {} : { rpcClient: input.rpcClientRef.current }),
           threadId: activeThreadId,
         });
       } catch (error) {
+        if (error instanceof StaleConnectionAttemptError) {
+          return;
+        }
+
         if (threadSyncGenerationRef.current !== currentThreadSyncGeneration) {
           return;
         }
@@ -165,13 +183,7 @@ export function useSessionBootstrap(input: {
         threadSyncKey: activeThreadSyncKey,
       });
     })();
-  }, [
-    activeThreadId,
-    activeThreadSyncKey,
-    input.ensureCurrentGeneration,
-    input.hydrateInitialThread,
-    input.rpcClientRef,
-  ]);
+  }, [activeThreadId, activeThreadSyncKey, input.hydrateInitialThread, input.rpcClientRef]);
 
   const establishedModels = useMemo(() => {
     if (establishedConnectionKey === null) {

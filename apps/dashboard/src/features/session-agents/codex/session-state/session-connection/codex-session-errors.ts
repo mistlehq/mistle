@@ -4,8 +4,14 @@ export class StaleConnectionAttemptError extends Error {
   }
 }
 
+export function isStaleConnectionAttemptError(
+  error: unknown,
+): error is StaleConnectionAttemptError {
+  return error instanceof StaleConnectionAttemptError;
+}
+
 export function describeCodexSessionStepError(stepLabel: string, error: unknown): Error {
-  if (error instanceof StaleConnectionAttemptError) {
+  if (isStaleConnectionAttemptError(error)) {
     return error;
   }
 
@@ -14,4 +20,10 @@ export function describeCodexSessionStepError(stepLabel: string, error: unknown)
   }
 
   return new Error(`${stepLabel} failed.`);
+}
+
+export function getCodexSessionErrorMessage(error: unknown, fallbackMessage: string): string {
+  return error instanceof Error && error.message.trim().length > 0
+    ? error.message
+    : fallbackMessage;
 }

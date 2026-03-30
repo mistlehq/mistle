@@ -242,7 +242,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
 
   const bootstrap = useSessionBootstrap({
     bootstrapConnectionContext,
-    ensureCurrentGeneration,
     hydrateInitialThread,
     loadModelsAsync,
     readConfigAsync,

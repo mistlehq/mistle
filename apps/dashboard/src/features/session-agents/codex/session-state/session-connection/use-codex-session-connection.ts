@@ -23,7 +23,8 @@ import {
 } from "./codex-session-connect.js";
 import {
   describeCodexSessionStepError,
-  StaleConnectionAttemptError,
+  getCodexSessionErrorMessage,
+  isStaleConnectionAttemptError,
 } from "./codex-session-errors.js";
 import { resolveCodexConnectionStateTransition } from "./codex-session-lifecycle-policy.js";
 
@@ -218,6 +219,10 @@ export function useCodexSessionConnection(input: {
               void input
                 .refreshThreadCollections({ generation: listenerInput.generation })
                 .catch((error: unknown) => {
+                  if (isStaleConnectionAttemptError(error)) {
+                    return;
+                  }
+
                   input.setLifecycleErrorMessage(
                     error instanceof Error
                       ? error.message
@@ -336,14 +341,14 @@ export function useCodexSessionConnection(input: {
       input.setLifecycleErrorMessage(null);
     },
     onError: (error) => {
-      if (error instanceof StaleConnectionAttemptError) {
+      if (isStaleConnectionAttemptError(error)) {
         return;
       }
 
       disconnectSession();
       setStep("idle");
       input.setLifecycleErrorMessage(
-        error instanceof Error ? error.message : "Could not establish sandbox session.",
+        getCodexSessionErrorMessage(error, "Could not establish sandbox session."),
       );
     },
   });
