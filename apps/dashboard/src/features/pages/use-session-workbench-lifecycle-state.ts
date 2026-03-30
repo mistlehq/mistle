@@ -450,18 +450,21 @@ export function seedSandboxInstanceStatusQuery(input: {
 
 export function useSessionWorkbenchLifecycleState(input: {
   sandboxInstanceId: string | null;
+  chatTransportPolicy: "auto_attach" | "detached_for_cli";
   lifecycle: Pick<
     ReturnType<typeof useCodexSessionState>["lifecycle"],
     | "agentConnectionState"
     | "clearLifecycleErrorMessage"
     | "connectSession"
-    | "connectedSession"
+    | "detachSessionTransport"
     | "disconnectSession"
     | "isStartingSession"
     | "lifecycleErrorMessage"
     | "recoverSession"
     | "recoverableDisconnect"
+    | "sessionSnapshot"
     | "step"
+    | "transportState"
   >;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   queryClient: QueryClient;
@@ -490,13 +493,14 @@ export function useSessionWorkbenchLifecycleState(input: {
     agentConnectionState,
     clearLifecycleErrorMessage,
     connectSession,
-    connectedSession,
+    sessionSnapshot,
     disconnectSession,
     isStartingSession,
     lifecycleErrorMessage,
     recoverSession,
     recoverableDisconnect,
     step,
+    transportState,
   } = input.lifecycle;
   const { disconnectPty } = input.ptyState.actions;
 
@@ -574,7 +578,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxStatus,
   });
   const sessionEntryPhase = resolveSessionEntryPhase({
-    connectedSession: connectedSession !== null,
+    connectedSession: sessionSnapshot !== null,
     hasResumeInFlightState: isShowingResumeInFlightState,
     isStatusPending: sandboxStatusQuery.isPending,
     sandboxStatus,
@@ -638,14 +642,14 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   useEffect(() => {
-    if (connectedSession === null) {
+    if (transportState !== "connected") {
       return;
     }
 
     dispatchCodexRecoveryEvent({
       type: "session_connected",
     });
-  }, [connectedSession]);
+  }, [transportState]);
 
   useEffect(() => {
     return () => {
@@ -671,6 +675,12 @@ export function useSessionWorkbenchLifecycleState(input: {
     recoveryStatusBoundaryDataUpdatedAtRef.current = null;
     lastRecoverableDisconnectIdRef.current = null;
   }, [input.sandboxInstanceId]);
+
+  useEffect(() => {
+    if (input.chatTransportPolicy === "auto_attach") {
+      setHasAttemptedAutoConnect(false);
+    }
+  }, [input.chatTransportPolicy]);
 
   useEffect(() => {
     if (!isWaitingForAutomationThread) {
@@ -731,7 +741,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       type: "sync_observed",
       observation: {
         canConnect: connectionReadiness.canConnect,
-        connected: connectedSession !== null,
+        connected: transportState === "connected",
         hasLifecycleError: resolvedLifecycleErrorMessage !== null,
         isStartingSession,
         isWaitingForAutomationThread,
@@ -740,16 +750,20 @@ export function useSessionWorkbenchLifecycleState(input: {
       },
     });
   }, [
-    connectedSession,
     connectionReadiness.canConnect,
     effectiveSandboxStatus,
     input.sandboxInstanceId,
     isStartingSession,
     isWaitingForAutomationThread,
     resolvedLifecycleErrorMessage,
+    transportState,
   ]);
 
   useEffect(() => {
+    if (input.chatTransportPolicy !== "auto_attach") {
+      return;
+    }
+
     if (input.sandboxInstanceId === null) {
       return;
     }
@@ -758,7 +772,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       !shouldAutoConnectSession({
         sandboxInstanceId: input.sandboxInstanceId,
         canConnect: connectionReadiness.canConnect,
-        connected: connectedSession !== null,
+        connected: transportState === "connected",
         isStartingSession,
         hasAttemptedAutoConnect,
         hasStartError: resolvedLifecycleErrorMessage !== null,
@@ -779,16 +793,21 @@ export function useSessionWorkbenchLifecycleState(input: {
   }, [
     automationConversation,
     connectSession,
-    connectedSession,
+    input.chatTransportPolicy,
     connectionReadiness.canConnect,
     hasAttemptedAutoConnect,
     input.sandboxInstanceId,
     isStartingSession,
     isWaitingForAutomationThread,
     resolvedLifecycleErrorMessage,
+    transportState,
   ]);
 
   useEffect(() => {
+    if (input.chatTransportPolicy !== "auto_attach") {
+      return;
+    }
+
     if (codexRecoveryState.kind !== "recovering") {
       return;
     }
@@ -815,10 +834,16 @@ export function useSessionWorkbenchLifecycleState(input: {
     }
 
     connectSession(recoveryInput);
-  }, [codexRecoveryState, connectSession, input.sandboxInstanceId, recoverSession]);
+  }, [
+    codexRecoveryState,
+    connectSession,
+    input.chatTransportPolicy,
+    input.sandboxInstanceId,
+    recoverSession,
+  ]);
 
   useEffect(() => {
-    if (input.sandboxInstanceId === null || connectedSession === null) {
+    if (input.sandboxInstanceId === null || sessionSnapshot === null) {
       return;
     }
 
@@ -828,9 +853,9 @@ export function useSessionWorkbenchLifecycleState(input: {
 
     void sandboxStatusQuery.refetch();
   }, [
-    connectedSession,
     connectionReadiness.reason,
     input.sandboxInstanceId,
+    sessionSnapshot,
     sandboxStatusQuery.refetch,
   ]);
 
@@ -847,7 +872,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: sandboxStatusQuery.isError,
     lifecycleErrorMessage: resolvedLifecycleErrorMessage,
-    reconnectMessage: sessionReconnectMessage,
+    reconnectMessage: input.chatTransportPolicy === "auto_attach" ? sessionReconnectMessage : null,
     sandboxFailureMessage,
     stoppedSessionMessage: stoppedSessionState.message,
   });
@@ -936,7 +961,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   return {
-    connectedSession,
+    sessionSnapshot,
     connectionReadiness,
     hasTopAlert,
     isResumingStoppedSandbox: isShowingResumeInFlightState,

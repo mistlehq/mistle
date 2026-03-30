@@ -7,6 +7,8 @@ type SpawnPtyHostInput = {
   cwd?: string;
   cols?: number;
   rows?: number;
+  command?: string;
+  args?: string[];
 };
 
 type SpawnPtyHostCallbacks = {
@@ -50,10 +52,13 @@ export function resolveDefaultPtyShell(): string {
 }
 
 export function startNativePtySession(input: SpawnPtyHostInput, callbacks: SpawnPtyHostCallbacks) {
+  const command = input.command ?? resolveDefaultPtyShell();
+  const args = input.command === undefined ? ["-i"] : (input.args ?? []);
+
   return spawnPty(
     {
-      command: resolveDefaultPtyShell(),
-      args: ["-i"],
+      command,
+      args,
       env: resolvePtyEnvironment(),
       ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
       ...(input.cols === undefined ? {} : { cols: input.cols }),

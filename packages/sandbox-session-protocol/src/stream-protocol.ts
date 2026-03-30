@@ -21,6 +21,8 @@ const PTYStreamChannelSchema = z.object({
   cols: PositiveIntegerSchema.optional(),
   rows: PositiveIntegerSchema.optional(),
   cwd: NonEmptyStringSchema.optional(),
+  command: NonEmptyStringSchema.optional(),
+  args: z.array(NonEmptyStringSchema).optional(),
 });
 
 const FileUploadStreamChannelSchema = z.object({

@@ -36,6 +36,36 @@ describe("stream control message parser", () => {
     });
   });
 
+  it("parses pty stream opens with an explicit startup command", () => {
+    const message = parseStreamControlMessage(
+      JSON.stringify({
+        type: "stream.open",
+        streamId: 18,
+        channel: {
+          kind: "pty",
+          session: "create",
+          cols: 120,
+          rows: 40,
+          command: "codex",
+          args: ["resume", "--remote", "ws://127.0.0.1:4500", "thread_123"],
+        },
+      }),
+    );
+
+    expect(message).toEqual({
+      type: "stream.open",
+      streamId: 18,
+      channel: {
+        kind: "pty",
+        session: "create",
+        cols: 120,
+        rows: 40,
+        command: "codex",
+        args: ["resume", "--remote", "ws://127.0.0.1:4500", "thread_123"],
+      },
+    });
+  });
+
   it("rejects malformed pty stream opens", () => {
     expect(
       parseStreamControlMessage(

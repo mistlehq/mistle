@@ -19,6 +19,21 @@ function createPtyStreamOpen(): StreamOpen {
   };
 }
 
+function createCommandPtyStreamOpen(input: { command: string; args: string[] }): StreamOpen {
+  return {
+    type: "stream.open",
+    streamId: 1,
+    channel: {
+      kind: "pty",
+      session: "create",
+      cols: 80,
+      rows: 24,
+      command: input.command,
+      args: input.args,
+    },
+  };
+}
+
 describe("PtySession", () => {
   async function collectPtyOutputUntilClosed(session: ReturnType<typeof startPtySession>) {
     const outputChunks: string[] = [];
@@ -89,6 +104,21 @@ describe("PtySession", () => {
       await session.terminate();
       await collectPtyOutputUntilClosed(session);
     }
+  });
+
+  it("launches an explicit startup command instead of the default shell", async () => {
+    const session = startPtySession(
+      createCommandPtyStreamOpen({
+        command: "/bin/sh",
+        args: ["-lc", "printf '__MISTLE_PTY_COMMAND__\\n'"],
+      }),
+    );
+
+    const output = await collectPtyOutputUntilClosed(session);
+    const exitCode = await session.waitForExit();
+
+    expect(exitCode).toBe(0);
+    expect(output).toContain("__MISTLE_PTY_COMMAND__");
   });
 
   it("terminates a long-running PTY session", async () => {

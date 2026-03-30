@@ -37,7 +37,8 @@ type CodexThreadCollectionsRefreshResult = {
 export type CodexSessionConnectionLifecycleState = {
   step: StartSessionStep;
   lifecycleErrorMessage: string | null;
-  connectedSession: ConnectedCodexSession | null;
+  sessionSnapshot: ConnectedCodexSession | null;
+  transportState: "detached" | "connecting" | "connected" | "recovering";
   recoverableDisconnect: {
     id: number;
     message: string;
@@ -49,6 +50,7 @@ export type CodexSessionConnectionLifecycleState = {
   isStartingSession: boolean;
   connectSession: (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => void;
   recoverSession: (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => void;
+  detachSessionTransport: () => void;
   disconnectSession: () => void;
   clearLifecycleErrorMessage: () => void;
   reportLifecycleErrorMessage: (message: string) => void;
@@ -77,7 +79,10 @@ export function useCodexSessionConnection(input: {
   threadIdRef: RefObject<string | null>;
 }): CodexSessionConnectionStateResult {
   const [step, setStep] = useState<StartSessionStep>("idle");
-  const [connectedSession, setConnectedSession] = useState<ConnectedCodexSession | null>(null);
+  const [sessionSnapshot, setSessionSnapshot] = useState<ConnectedCodexSession | null>(null);
+  const [transportState, setTransportState] = useState<
+    "detached" | "connecting" | "connected" | "recovering"
+  >("detached");
   const [recoverableDisconnect, setRecoverableDisconnect] = useState<{
     id: number;
     message: string;
@@ -93,7 +98,7 @@ export function useCodexSessionConnection(input: {
   const updateActiveThread = useCallback(
     (threadId: string | null): void => {
       input.threadIdRef.current = threadId;
-      setConnectedSession((currentSession) => {
+      setSessionSnapshot((currentSession) => {
         if (currentSession === null) {
           return currentSession;
         }
@@ -121,17 +126,35 @@ export function useCodexSessionConnection(input: {
     [input.rpcClientRef, input.sessionClientRef, input.sessionEventUnsubscribersRef],
   );
 
+  const detachSessionTransport = useCallback((): void => {
+    input.connectionGenerationRef.current += 1;
+    teardownConnection("Detached from Codex session transport.");
+    setRecoverableDisconnect(null);
+    setStep("idle");
+    setTransportState("detached");
+    setAgentConnectionState("idle");
+    setAgentConnectionError(null);
+    input.setLifecycleErrorMessage(null);
+  }, [input.connectionGenerationRef, input.setLifecycleErrorMessage, teardownConnection]);
+
   const disconnectSession = useCallback((): void => {
     input.connectionGenerationRef.current += 1;
     teardownConnection("Disconnected from sessions page.");
-    setConnectedSession(null);
+    setSessionSnapshot(null);
     setRecoverableDisconnect(null);
     lastConnectedSessionRef.current = null;
+    input.threadIdRef.current = null;
     setStep("idle");
+    setTransportState("detached");
     input.setLifecycleErrorMessage(null);
     setAgentConnectionState("idle");
     setAgentConnectionError(null);
-  }, [input.connectionGenerationRef, input.setLifecycleErrorMessage, teardownConnection]);
+  }, [
+    input.connectionGenerationRef,
+    input.setLifecycleErrorMessage,
+    input.threadIdRef,
+    teardownConnection,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -158,7 +181,8 @@ export function useCodexSessionConnection(input: {
             setAgentConnectionState(event.state);
             setAgentConnectionError(event.errorMessage);
             const connectionStateTransition = resolveCodexConnectionStateTransition({
-              hasConnectedSession: connectedSession !== null || input.threadIdRef.current !== null,
+              hasConnectedSession:
+                lastConnectedSessionRef.current !== null || input.threadIdRef.current !== null,
               state: event.state,
               errorMessage: event.errorMessage ?? null,
             });
@@ -166,7 +190,7 @@ export function useCodexSessionConnection(input: {
               const preferredThreadId = input.threadIdRef.current;
               input.connectionGenerationRef.current += 1;
               teardownConnection("Disconnected from Codex session.");
-              setConnectedSession(null);
+              setTransportState("recovering");
               if (connectionStateTransition.recoverableDisconnectMessage !== null) {
                 const recoverableDisconnectId = nextRecoverableDisconnectIdRef.current + 1;
                 nextRecoverableDisconnectIdRef.current = recoverableDisconnectId;
@@ -178,6 +202,10 @@ export function useCodexSessionConnection(input: {
                 });
               } else {
                 setRecoverableDisconnect(null);
+                setSessionSnapshot(null);
+                lastConnectedSessionRef.current = null;
+                input.threadIdRef.current = null;
+                setTransportState("detached");
               }
               setStep("idle");
               setAgentConnectionState("idle");
@@ -189,7 +217,8 @@ export function useCodexSessionConnection(input: {
 
           if (event.type === "stream_reset") {
             const preferredThreadId = input.threadIdRef.current;
-            const hasConnectedSession = connectedSession !== null || preferredThreadId !== null;
+            const hasConnectedSession =
+              lastConnectedSessionRef.current !== null || preferredThreadId !== null;
             if (!hasConnectedSession) {
               return;
             }
@@ -198,7 +227,7 @@ export function useCodexSessionConnection(input: {
             // reopening the logical agent stream once sandbox readiness catches up.
             const recoverableDisconnectId = nextRecoverableDisconnectIdRef.current + 1;
             nextRecoverableDisconnectIdRef.current = recoverableDisconnectId;
-            setConnectedSession(null);
+            setTransportState("recovering");
             setRecoverableDisconnect({
               id: recoverableDisconnectId,
               message: `Sandbox session stream reset (${event.resetInfo.code}): ${event.resetInfo.message}`,
@@ -240,7 +269,6 @@ export function useCodexSessionConnection(input: {
       ];
     },
     [
-      connectedSession,
       input.connectionGenerationRef,
       input.handleChatNotificationReceived,
       input.onServerRequestNotification,
@@ -262,8 +290,9 @@ export function useCodexSessionConnection(input: {
       const generation = input.connectionGenerationRef.current + 1;
       input.connectionGenerationRef.current = generation;
       teardownConnection("Superseded by a new Codex session.");
-      setConnectedSession(null);
+      setSessionSnapshot(null);
       setRecoverableDisconnect(null);
+      setTransportState("connecting");
       input.setLifecycleErrorMessage(null);
       setStep("securing");
 
@@ -333,8 +362,9 @@ export function useCodexSessionConnection(input: {
         threadId: result.threadId,
       });
       lastConnectedSessionRef.current = nextConnectedSession;
-      setConnectedSession(nextConnectedSession);
+      setSessionSnapshot(nextConnectedSession);
       setRecoverableDisconnect(null);
+      setTransportState("connected");
       setAgentConnectionState("ready");
       setAgentConnectionError(null);
       setStep("connected");
@@ -369,6 +399,7 @@ export function useCodexSessionConnection(input: {
 
       input.setLifecycleErrorMessage(null);
       setStep("connecting");
+      setTransportState("recovering");
 
       try {
         // Recovery on stream reset reuses the existing websocket transport. The only
@@ -418,8 +449,9 @@ export function useCodexSessionConnection(input: {
         threadId: result.recoveredThread.threadId,
       };
       lastConnectedSessionRef.current = nextConnectedSession;
-      setConnectedSession(nextConnectedSession);
+      setSessionSnapshot(nextConnectedSession);
       setRecoverableDisconnect(null);
+      setTransportState("connected");
       setAgentConnectionState("ready");
       setAgentConnectionError(null);
       setStep("connected");
@@ -466,13 +498,15 @@ export function useCodexSessionConnection(input: {
     () => ({
       step,
       lifecycleErrorMessage: input.lifecycleErrorMessage,
-      connectedSession,
+      sessionSnapshot,
+      transportState,
       recoverableDisconnect,
       agentConnectionState,
       agentConnectionError,
       isStartingSession: connectSessionMutation.isPending || recoverSessionMutation.isPending,
       connectSession,
       recoverSession,
+      detachSessionTransport,
       disconnectSession,
       clearLifecycleErrorMessage,
       reportLifecycleErrorMessage,
@@ -483,7 +517,7 @@ export function useCodexSessionConnection(input: {
       clearLifecycleErrorMessage,
       connectSession,
       connectSessionMutation.isPending,
-      connectedSession,
+      detachSessionTransport,
       recoverSession,
       recoverSessionMutation.isPending,
       recoverableDisconnect,
@@ -491,6 +525,8 @@ export function useCodexSessionConnection(input: {
       reportLifecycleErrorMessage,
       input.lifecycleErrorMessage,
       step,
+      sessionSnapshot,
+      transportState,
     ],
   );
 

@@ -51,7 +51,13 @@ export class PtySession {
     this.#output.push(new Uint8Array(data));
   }
 
-  static create(input: { cwd?: string; cols?: number; rows?: number }): PtySession {
+  static create(input: {
+    cwd?: string;
+    cols?: number;
+    rows?: number;
+    command?: string;
+    args?: string[];
+  }): PtySession {
     let resolveExit: (exitCode: number) => void = () => undefined;
     let session: PtySession | undefined;
     const pendingEvents: Array<
@@ -218,5 +224,7 @@ export function startPtySession(connectRequest: StreamOpen): PtySession {
     ...(channel.cwd === undefined ? {} : { cwd: channel.cwd }),
     ...(channel.cols === undefined ? {} : { cols: channel.cols }),
     ...(channel.rows === undefined ? {} : { rows: channel.rows }),
+    ...(channel.command === undefined ? {} : { command: channel.command }),
+    ...(channel.args === undefined ? {} : { args: channel.args }),
   });
 }

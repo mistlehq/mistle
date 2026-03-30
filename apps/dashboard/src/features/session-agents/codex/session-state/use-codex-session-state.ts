@@ -60,8 +60,8 @@ type CodexSessionThreadState = {
   refreshThreadList: () => void;
   refreshLoadedThreadList: () => void;
   refreshArchivedThreadList: () => void;
-  startNewThread: () => void;
-  resumeThread: (threadId: string) => void;
+  startNewThread: () => Promise<string>;
+  resumeThread: (threadId: string) => Promise<string>;
   forkThread: (threadId: string) => void;
   archiveThread: (threadId: string) => void;
   unarchiveThread: (threadId: string) => void;
@@ -99,6 +99,7 @@ type CodexSessionServerRequestState = {
   pendingServerRequests: readonly CodexApprovalRequestEntry[];
   isRespondingToServerRequest: boolean;
   respondToServerRequest: (requestId: string | number, result: unknown) => void;
+  resetServerRequests: () => void;
 };
 
 type CodexSessionMessageState = {
@@ -220,18 +221,18 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     setLifecycleErrorMessage,
     threadIdRef,
   });
-  const { connectedSession } = lifecycle;
+  const { sessionSnapshot } = lifecycle;
   const bootstrapConnectionCandidate = useMemo<BootstrapConnectionCandidate | null>(() => {
-    if (connectedSession === null) {
+    if (sessionSnapshot === null) {
       return null;
     }
 
     return {
-      sandboxInstanceId: connectedSession.sandboxInstanceId,
-      connectedAtIso: connectedSession.connectedAtIso,
-      threadId: connectedSession.threadId,
+      sandboxInstanceId: sessionSnapshot.sandboxInstanceId,
+      connectedAtIso: sessionSnapshot.connectedAtIso,
+      threadId: sessionSnapshot.threadId,
     };
-  }, [connectedSession]);
+  }, [sessionSnapshot]);
   const bootstrapConnectionContext = useMemo(
     () =>
       resolveBootstrapConnectionContext({
@@ -520,8 +521,10 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     refreshLoadedThreadListMutation;
   const { mutate: refreshArchivedThreadListMutate, isPending: isRefreshingArchivedThreads } =
     refreshArchivedThreadListMutation;
-  const { mutate: startNewThreadMutate, isPending: isStartingNewThread } = startNewThreadMutation;
-  const { mutate: resumeThreadMutate, isPending: isResumingThread } = resumeThreadMutation;
+  const { mutateAsync: startNewThreadMutateAsync, isPending: isStartingNewThread } =
+    startNewThreadMutation;
+  const { mutateAsync: resumeThreadMutateAsync, isPending: isResumingThread } =
+    resumeThreadMutation;
   const { mutate: forkThreadMutate, isPending: isForkingThread } = forkThreadMutation;
   const { mutate: archiveThreadMutate, isPending: isArchivingThread } = archiveThreadMutation;
   const { mutate: unarchiveThreadMutate, isPending: isUnarchivingThread } = unarchiveThreadMutation;
@@ -544,15 +547,17 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     refreshArchivedThreadListMutate();
   }, [refreshArchivedThreadListMutate]);
 
-  const startNewThread = useCallback(() => {
-    startNewThreadMutate();
-  }, [startNewThreadMutate]);
+  const startNewThread = useCallback(async (): Promise<string> => {
+    const result = await startNewThreadMutateAsync();
+    return result.threadId;
+  }, [startNewThreadMutateAsync]);
 
   const resumeThread = useCallback(
-    (threadId: string) => {
-      resumeThreadMutate(threadId);
+    async (threadId: string): Promise<string> => {
+      const result = await resumeThreadMutateAsync(threadId);
+      return result.threadId;
     },
-    [resumeThreadMutate],
+    [resumeThreadMutateAsync],
   );
 
   const forkThread = useCallback(
@@ -609,6 +614,12 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     },
     [respondToServerRequestMutate],
   );
+
+  const resetServerRequests = useCallback(() => {
+    dispatchServerRequestsAction({
+      type: "reset",
+    });
+  }, []);
 
   const threads = useMemo<CodexSessionThreadState>(() => {
     return {
@@ -732,8 +743,14 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       pendingServerRequests: serverRequestsState.entries,
       isRespondingToServerRequest,
       respondToServerRequest,
+      resetServerRequests,
     };
-  }, [isRespondingToServerRequest, respondToServerRequest, serverRequestsState.entries]);
+  }, [
+    isRespondingToServerRequest,
+    resetServerRequests,
+    respondToServerRequest,
+    serverRequestsState.entries,
+  ]);
 
   const sessionMessage = useMemo<CodexSessionMessageState>(() => {
     return {

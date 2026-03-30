@@ -18,6 +18,8 @@ export type SandboxPtyOpenOptions = {
   cols: number;
   rows: number;
   cwd?: string;
+  command?: string;
+  args?: string[];
 };
 
 export type SandboxPtyExitInfo = {

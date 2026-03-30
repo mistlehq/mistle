@@ -461,6 +461,43 @@ describe("SandboxPtyClient", () => {
     expect(client.streamId).toBe(1);
   });
 
+  it("sends explicit startup command fields when provided", async () => {
+    const server = await startPtyTestServer();
+    startedServers.push(server);
+    const client = new SandboxPtyClient({
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+
+    await client.connect();
+    const openPromise = client.open({
+      cols: 120,
+      rows: 40,
+      command: "codex",
+      args: ["resume", "--remote", "ws://127.0.0.1:4500", "thread_123"],
+    });
+
+    const openRequest = await server.waitForNextMessage();
+    expect(openRequest).toEqual({
+      kind: "control",
+      message: {
+        type: "stream.open",
+        streamId: 1,
+        channel: {
+          kind: "pty",
+          session: "create",
+          cols: 120,
+          rows: 40,
+          command: "codex",
+          args: ["resume", "--remote", "ws://127.0.0.1:4500", "thread_123"],
+        },
+      },
+    });
+
+    server.sendOpenOk(1);
+    await openPromise;
+  });
+
   it("forwards PTY output bytes and acknowledges the receive window", async () => {
     const server = await startPtyTestServer();
     startedServers.push(server);

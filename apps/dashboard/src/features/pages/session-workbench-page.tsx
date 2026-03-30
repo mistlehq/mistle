@@ -5,6 +5,7 @@ import { useLocation, useParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
+import { SessionCliPanel } from "./session-cli-panel.js";
 import {
   SessionConversationBottomPanel,
   SessionConversationBottomPanelController,
@@ -39,6 +40,10 @@ function SessionWorkbenchPageContent(input: {
     ? (workbench.stoppedSessionState.message ??
       "Terminal is available only when the sandbox is running.")
     : terminalButtonLabel;
+  const cliButtonLabel = "CLI";
+  const cliButtonTitle =
+    workbench.primaryPanelState.disabledReason ??
+    (workbench.primaryPanelState.mode === "cli" ? "Return to chat" : "Open Codex CLI");
   const showResumeButton = shouldShowResumeAction({
     requiresManualResume: workbench.stoppedSessionState.requiresManualResume,
     isResumingStoppedSandbox: workbench.isResumingStoppedSandbox,
@@ -66,6 +71,32 @@ function SessionWorkbenchPageContent(input: {
             {workbench.isResumingStoppedSandbox ? "Resuming..." : "Resume"}
           </Button>
         ) : null}
+        <Button
+          aria-label={cliButtonLabel}
+          aria-pressed={workbench.primaryPanelState.mode === "cli"}
+          className={
+            workbench.primaryPanelState.mode === "cli"
+              ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
+              : "bg-transparent text-foreground shadow-none hover:bg-stone-100"
+          }
+          disabled={
+            !workbench.primaryPanelState.canEnterCli && workbench.primaryPanelState.mode !== "cli"
+          }
+          onClick={() => {
+            if (workbench.primaryPanelState.mode === "cli") {
+              void workbench.primaryPanelState.exitCliMode();
+              return;
+            }
+
+            void workbench.primaryPanelState.enterCliMode();
+          }}
+          size="sm"
+          title={cliButtonTitle}
+          type="button"
+          variant="ghost"
+        >
+          CLI
+        </Button>
         <Button
           aria-label={terminalButtonLabel}
           aria-pressed={workbench.terminalPanelState.isVisible}
@@ -95,8 +126,16 @@ function SessionWorkbenchPageContent(input: {
     ),
     [
       isTerminalOpenDisabled,
+      cliButtonTitle,
+      terminalButtonLabel,
       showResumeButton,
       terminalButtonTitle,
+      workbench.primaryPanelState.canEnterCli,
+      workbench.primaryPanelState.disabledReason,
+      workbench.primaryPanelState.enterCliMode,
+      workbench.primaryPanelState.exitCliMode,
+      workbench.primaryPanelState.isSwitching,
+      workbench.primaryPanelState.mode,
       workbench.isResumingStoppedSandbox,
       workbench.ptyState.actions.disconnectPty,
       workbench.requestStoppedSandboxResume,
@@ -206,34 +245,40 @@ function SessionWorkbenchPageContent(input: {
       alerts={workbench.hasTopAlert ? alerts : []}
       isSecondaryPanelVisible={workbench.terminalPanelState.isVisible}
       mainContent={
-        <SessionConversationMainContent
-          chatEntries={conversationPane.chatState.entries}
-          isRespondingToServerRequest={
-            conversationPane.serverRequestsState.isRespondingToServerRequest
-          }
-          onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
-          serverRequestPanelEntries={unmatchedServerRequests}
-        />
-      }
-      onSecondaryPanelResize={workbench.terminalPanelState.setPanelSize}
-      primaryBottomPanel={
-        <>
-          {workbench.shouldAutoResumeOnEntry ? (
-            <SessionWorkbenchAutoResumeOnEntry
-              requestStoppedSandboxResume={workbench.requestStoppedSandboxResume}
-            />
-          ) : null}
-          <SessionConversationBottomPanelController
+        workbench.primaryPanelState.mode === "cli" ? (
+          <SessionCliPanel ptyState={workbench.cliPtyState} />
+        ) : (
+          <SessionConversationMainContent
             chatEntries={conversationPane.chatState.entries}
-            composerStateInput={conversationPane.composerStateInput}
             isRespondingToServerRequest={
               conversationPane.serverRequestsState.isRespondingToServerRequest
             }
             onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
-            key={input.sandboxInstanceId ?? "missing-session"}
             serverRequestPanelEntries={unmatchedServerRequests}
           />
-        </>
+        )
+      }
+      onSecondaryPanelResize={workbench.terminalPanelState.setPanelSize}
+      primaryBottomPanel={
+        workbench.primaryPanelState.mode === "cli" ? null : (
+          <>
+            {workbench.shouldAutoResumeOnEntry ? (
+              <SessionWorkbenchAutoResumeOnEntry
+                requestStoppedSandboxResume={workbench.requestStoppedSandboxResume}
+              />
+            ) : null}
+            <SessionConversationBottomPanelController
+              chatEntries={conversationPane.chatState.entries}
+              composerStateInput={conversationPane.composerStateInput}
+              isRespondingToServerRequest={
+                conversationPane.serverRequestsState.isRespondingToServerRequest
+              }
+              onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
+              key={input.sandboxInstanceId ?? "missing-session"}
+              serverRequestPanelEntries={unmatchedServerRequests}
+            />
+          </>
+        )
       }
       secondaryPanel={
         <SessionTerminalPanel

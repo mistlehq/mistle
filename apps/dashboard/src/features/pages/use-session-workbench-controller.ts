@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
@@ -59,6 +60,15 @@ type SessionWorkbenchState = {
     typeof useSessionWorkbenchLifecycleState
   >["sessionHeaderStatusUi"];
   lifecycleErrorMessage: string | null;
+  cliPtyState: ReturnType<typeof useSandboxPtyState>;
+  primaryPanelState: {
+    mode: "chat" | "cli";
+    isSwitching: boolean;
+    canEnterCli: boolean;
+    disabledReason: string | null;
+    enterCliMode: () => Promise<void>;
+    exitCliMode: () => Promise<void>;
+  };
   terminalPanelState: {
     closePanel: () => void;
     isVisible: boolean;
@@ -113,7 +123,13 @@ export function useSessionWorkbenchController(input: {
 }): UseSessionWorkbenchControllerResult {
   const queryClient = useQueryClient();
   const sessionState = useCodexSessionState();
+  const [primaryPanelMode, setPrimaryPanelMode] = useState<"chat" | "cli">("chat");
+  const [isSwitchingPrimaryPanel, setIsSwitchingPrimaryPanel] = useState(false);
+  const shouldHydrateAfterCliExitRef = useRef(false);
+  const chatTransportPolicy =
+    primaryPanelMode === "cli" ? ("detached_for_cli" as const) : ("auto_attach" as const);
   const ptyState = useSandboxPtyState();
+  const cliPtyState = useSandboxPtyState();
   const terminalPanelState = useSessionTerminalWorkbenchState({
     sandboxInstanceId: input.sandboxInstanceId,
   });
@@ -122,9 +138,11 @@ export function useSessionWorkbenchController(input: {
   const codexConfig = sessionState.codexConfig;
   const serverRequests = sessionState.serverRequests;
   const sessionMessage = sessionState.sessionMessage;
+  const threads = sessionState.threads;
 
   const workbenchLifecycleState = useSessionWorkbenchLifecycleState({
     sandboxInstanceId: input.sandboxInstanceId,
+    chatTransportPolicy,
     lifecycle,
     ptyState,
     queryClient,
@@ -134,18 +152,85 @@ export function useSessionWorkbenchController(input: {
     clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
     codexConfig,
   });
-  const connectedSession = workbenchLifecycleState.connectedSession;
+  const sessionSnapshot = workbenchLifecycleState.sessionSnapshot;
+  const enterCliDisabledReason =
+    input.sandboxInstanceId === null
+      ? "Session id is required."
+      : sessionSnapshot === null
+        ? "CLI is available after the session is connected."
+        : null;
+  const canEnterCli = enterCliDisabledReason === null && !isSwitchingPrimaryPanel;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
       input.sandboxInstanceId !== null &&
-      connectedSession !== null &&
-      connectedSession.threadId !== null
+      sessionSnapshot !== null &&
+      sessionSnapshot.threadId !== null
         ? {
             sandboxInstanceId: input.sandboxInstanceId,
-            threadId: connectedSession.threadId,
+            threadId: sessionSnapshot.threadId,
           }
         : null,
   });
+
+  const enterCliMode = useCallback(async (): Promise<void> => {
+    if (input.sandboxInstanceId === null || sessionSnapshot === null || isSwitchingPrimaryPanel) {
+      return;
+    }
+
+    setIsSwitchingPrimaryPanel(true);
+    try {
+      const ensuredThreadId = sessionSnapshot.threadId ?? (await threads.startNewThread());
+      setPrimaryPanelMode("cli");
+      lifecycle.detachSessionTransport();
+      serverRequests.resetServerRequests();
+      await cliPtyState.actions.openPty({
+        sandboxInstanceId: input.sandboxInstanceId,
+        cols: 120,
+        rows: 32,
+        command: "codex",
+        args: ["resume", "--remote", sessionSnapshot.connectionUrl, ensuredThreadId],
+      });
+    } finally {
+      setIsSwitchingPrimaryPanel(false);
+    }
+  }, [
+    cliPtyState.actions,
+    input.sandboxInstanceId,
+    isSwitchingPrimaryPanel,
+    lifecycle,
+    serverRequests,
+    sessionSnapshot,
+    threads,
+  ]);
+
+  const exitCliMode = useCallback(async (): Promise<void> => {
+    if (primaryPanelMode !== "cli" || input.sandboxInstanceId === null || isSwitchingPrimaryPanel) {
+      return;
+    }
+
+    setIsSwitchingPrimaryPanel(true);
+    try {
+      await cliPtyState.actions.disconnectPty();
+      serverRequests.resetServerRequests();
+      shouldHydrateAfterCliExitRef.current = true;
+      setPrimaryPanelMode("chat");
+    } finally {
+      setIsSwitchingPrimaryPanel(false);
+    }
+  }, [cliPtyState.actions, isSwitchingPrimaryPanel, primaryPanelMode, serverRequests]);
+
+  useEffect(() => {
+    if (!shouldHydrateAfterCliExitRef.current) {
+      return;
+    }
+
+    if (primaryPanelMode !== "chat" || lifecycle.transportState !== "connected") {
+      return;
+    }
+
+    shouldHydrateAfterCliExitRef.current = false;
+    void chat.hydrateChatFromThread().catch(() => {});
+  }, [chat, lifecycle.transportState, primaryPanelMode]);
 
   return {
     workbench: {
@@ -156,12 +241,21 @@ export function useSessionWorkbenchController(input: {
       sessionReconnectState: workbenchLifecycleState.sessionReconnectState,
       shouldAutoResumeOnEntry: workbenchLifecycleState.shouldAutoResumeOnEntry,
       ptyState,
+      cliPtyState,
       requestStoppedSandboxResume: workbenchLifecycleState.requestStoppedSandboxResume,
       sandboxLifecycleStatus: workbenchLifecycleState.sandboxLifecycleStatus,
       sandboxFailureMessage: workbenchLifecycleState.sandboxFailureMessage,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,
       sessionHeaderStatusUi: workbenchLifecycleState.sessionHeaderStatusUi,
       lifecycleErrorMessage: workbenchLifecycleState.lifecycleErrorMessage,
+      primaryPanelState: {
+        mode: primaryPanelMode,
+        isSwitching: isSwitchingPrimaryPanel,
+        canEnterCli,
+        disabledReason: enterCliDisabledReason,
+        enterCliMode,
+        exitCliMode,
+      },
       terminalPanelState,
     },
     conversationPane: {
