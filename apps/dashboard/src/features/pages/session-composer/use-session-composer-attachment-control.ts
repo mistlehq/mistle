@@ -71,6 +71,8 @@ export function useSessionComposerAttachmentControl(input: {
       try {
         const runtime = createBrowserSandboxSessionRuntime();
         const uploadedImages = [];
+        // Uploads are intentionally serialized in the supported composer flow.
+        // Parallel attachment uploads are not part of the current product contract.
         for (const attachment of prepareInput.files) {
           const mintedConnection = await dependencies.mintSandboxInstanceConnectionToken({
             instanceId: input.attachmentTarget.sandboxInstanceId,

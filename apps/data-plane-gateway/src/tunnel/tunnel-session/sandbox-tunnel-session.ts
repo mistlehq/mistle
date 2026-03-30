@@ -41,7 +41,8 @@ export class SandboxTunnelSession {
    * This class is intentionally a local implementation detail behind
    * `TunnelSessionRegistryAdapter`. The default binding configuration allows the
    * owner-local bootstrap tunnel to carry multiple active interactive streams at
-   * once while still enforcing one active stream per client websocket session.
+   * once across different client websocket sessions while still enforcing one
+   * active interactive stream per individual client websocket session.
    */
   public constructor(
     public readonly bootstrapTarget: RelayTarget,
