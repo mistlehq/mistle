@@ -15,9 +15,11 @@ const SleepBuffer = new Int32Array(new SharedArrayBuffer(4));
 
 function createStartupInputJson() {
   return JSON.stringify({
+    startupMode: "new",
     bootstrapToken: "test-token",
     tunnelExchangeToken: "test-exchange-token",
     tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+    egressGrantByRuleId: {},
     runtimePlan: {
       sandboxProfileId: "sbp_test",
       version: 1,

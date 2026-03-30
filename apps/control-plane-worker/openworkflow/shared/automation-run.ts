@@ -379,7 +379,7 @@ export async function prepareAutomationRun(
   }
 
   const sandboxProfileVersion = automationTarget.sandboxProfileVersion;
-  if (sandboxProfileVersion === null) {
+  if (typeof sandboxProfileVersion !== "number") {
     throw new AutomationRunExecutionError({
       code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
       message: `Automation target '${automationTarget.id}' does not define a sandbox profile version.`,

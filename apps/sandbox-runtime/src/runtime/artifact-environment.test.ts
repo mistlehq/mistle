@@ -12,7 +12,6 @@ describe("aggregateArtifactEnvironment", () => {
           env: {},
           lifecycle: {
             install: [],
-            remove: [],
           },
         },
       ]),
@@ -30,7 +29,6 @@ describe("aggregateArtifactEnvironment", () => {
           },
           lifecycle: {
             install: [],
-            remove: [],
           },
         },
         {
@@ -41,7 +39,6 @@ describe("aggregateArtifactEnvironment", () => {
           },
           lifecycle: {
             install: [],
-            remove: [],
           },
         },
       ]),
@@ -62,7 +59,6 @@ describe("aggregateArtifactEnvironment", () => {
           },
           lifecycle: {
             install: [],
-            remove: [],
           },
         },
         {
@@ -73,7 +69,6 @@ describe("aggregateArtifactEnvironment", () => {
           },
           lifecycle: {
             install: [],
-            remove: [],
           },
         },
       ]),
@@ -93,7 +88,6 @@ describe("aggregateArtifactEnvironment", () => {
           },
           lifecycle: {
             install: [],
-            remove: [],
           },
         },
         {
@@ -104,7 +98,6 @@ describe("aggregateArtifactEnvironment", () => {
           },
           lifecycle: {
             install: [],
-            remove: [],
           },
         },
       ]),

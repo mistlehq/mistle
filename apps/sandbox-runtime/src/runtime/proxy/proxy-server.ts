@@ -369,12 +369,14 @@ function sendUpgradeRequest(
 export function createProxyServer(input: {
   runtimePlan: CompiledRuntimePlan;
   tokenizerProxyEgressBaseUrl: string;
+  egressGrantByRuleId: Record<string, string>;
   certificateAuthority?: CertificateAuthority;
   trustedCaCertificatesPem?: string[];
 }): ProxyServer {
   const proxyMediator = createProxyMediator({
     runtimePlan: input.runtimePlan,
     tokenizerProxyEgressBaseUrl: input.tokenizerProxyEgressBaseUrl,
+    egressGrantByRuleId: input.egressGrantByRuleId,
   });
   const trustedCaBundle =
     input.trustedCaCertificatesPem === undefined || input.trustedCaCertificatesPem.length === 0
@@ -403,19 +405,19 @@ export function createProxyServer(input: {
       try {
         ({ classification, target } = buildPlainHttpTarget(request));
 
-        const mediationMatch = proxyMediator.match(classification, {
+        const routingDecision = proxyMediator.resolve(classification, {
           headers: request.headers,
           body: target.body,
           rawQuery: target.url.search.startsWith("?")
             ? target.url.search.slice(1)
             : target.url.search,
         });
-        if (mediationMatch !== undefined) {
+        if (routingDecision.kind === "mediated") {
           target = {
-            url: mediationMatch.request.url,
-            method: mediationMatch.request.method,
-            headers: fetchHeadersFromOutgoingHeaders(mediationMatch.request.headers),
-            body: mediationMatch.request.body,
+            url: routingDecision.match.request.url,
+            method: routingDecision.match.request.method,
+            headers: fetchHeadersFromOutgoingHeaders(routingDecision.match.request.headers),
+            body: routingDecision.match.request.body,
           };
         }
       } catch (error) {
@@ -482,19 +484,19 @@ export function createProxyServer(input: {
               requestHost,
               interceptedRequest,
             ));
-            const mediationMatch = proxyMediator.match(classification, {
+            const routingDecision = proxyMediator.resolve(classification, {
               headers: interceptedRequest.headers,
               body: target.body,
               rawQuery: target.url.search.startsWith("?")
                 ? target.url.search.slice(1)
                 : target.url.search,
             });
-            if (mediationMatch !== undefined) {
+            if (routingDecision.kind === "mediated") {
               target = {
-                url: mediationMatch.request.url,
-                method: mediationMatch.request.method,
-                headers: fetchHeadersFromOutgoingHeaders(mediationMatch.request.headers),
-                body: mediationMatch.request.body,
+                url: routingDecision.match.request.url,
+                method: routingDecision.match.request.method,
+                headers: fetchHeadersFromOutgoingHeaders(routingDecision.match.request.headers),
+                body: routingDecision.match.request.body,
               };
             }
           } catch (error) {
@@ -530,18 +532,18 @@ export function createProxyServer(input: {
             requestHost,
             interceptedRequest,
           ));
-          const mediationMatch = proxyMediator.match(classification, {
+          const routingDecision = proxyMediator.resolve(classification, {
             headers: interceptedRequest.headers,
             body: undefined,
             rawQuery: target.url.search.startsWith("?")
               ? target.url.search.slice(1)
               : target.url.search,
           });
-          if (mediationMatch !== undefined) {
+          if (routingDecision.kind === "mediated") {
             target = {
-              url: mediationMatch.request.url,
-              method: mediationMatch.request.method,
-              headers: fetchHeadersFromOutgoingHeaders(mediationMatch.request.headers),
+              url: routingDecision.match.request.url,
+              method: routingDecision.match.request.method,
+              headers: fetchHeadersFromOutgoingHeaders(routingDecision.match.request.headers),
               body: undefined,
             };
           }

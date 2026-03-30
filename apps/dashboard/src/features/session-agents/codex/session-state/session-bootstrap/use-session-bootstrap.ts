@@ -3,7 +3,7 @@ import type {
   CodexModelSummary,
 } from "@mistle/integrations-definitions/openai/agent/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import {
   readComposerConfigSnapshot,
@@ -69,7 +69,7 @@ export function useSessionBootstrap(input: {
   }) => Promise<"empty" | "hydrated">;
   loadModelsAsync: () => Promise<{ models: readonly CodexModelSummary[]; response: unknown }>;
   readConfigAsync: (includeLayers: boolean) => Promise<{ config: unknown; response: unknown }>;
-  rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
+  rpcClientRef: RefObject<CodexJsonRpcClient | null>;
 }) {
   const queryClient = useQueryClient();
   const [establishedConnectionKey, setEstablishedConnectionKey] = useState<string | null>(null);

@@ -16,6 +16,8 @@
         devShells.default = pkgs.mkShell {
           packages = [
             nodejs
+            pkgs.typos
+            pkgs.llvm
             pkgs.pnpm
             pkgs.rustc
             pkgs.cargo

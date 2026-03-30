@@ -19,10 +19,12 @@ const ValidRuntimePlanJson = `{
 }`;
 
 const ValidStartupInputJson = `{
+  "startupMode": "new",
   "bootstrapToken": "test-token",
   "tunnelExchangeToken": "test-exchange-token",
   "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
-  "runtimePlan": ${ValidRuntimePlanJson}
+  "runtimePlan": ${ValidRuntimePlanJson},
+  "egressGrantByRuleId": {}
 }`;
 
 function createReader(input: string): Readable {
@@ -36,12 +38,14 @@ describe("readStartupInput", () => {
       maxBytes: 4096,
     });
 
+    expect(startupInput.startupMode).toBe("new");
     expect(startupInput.bootstrapToken).toBe("test-token");
     expect(startupInput.tunnelExchangeToken).toBe("test-exchange-token");
     expect(startupInput.tunnelGatewayWsUrl).toBe("ws://127.0.0.1:5003/tunnel/sandbox");
     expect(startupInput.runtimePlan.sandboxProfileId).toBe("sbp_123");
     expect(startupInput.runtimePlan.image.source).toBe("base");
     expect(startupInput.runtimePlan.agentRuntimes).toEqual([]);
+    expect(startupInput.egressGrantByRuleId).toEqual({});
   });
 
   it("reads startup input without waiting for stdin eof", async () => {
@@ -67,10 +71,12 @@ describe("readStartupInput", () => {
     const startupInput = await readStartupInput({
       reader: createReader(`
         {
+          "startupMode": "new",
           "bootstrapToken": "  test-token  ",
           "tunnelExchangeToken": "  test-exchange-token  ",
           "tunnelGatewayWsUrl": "  ws://127.0.0.1:5003/tunnel/sandbox  ",
-          "runtimePlan": ${ValidRuntimePlanJson}
+          "runtimePlan": ${ValidRuntimePlanJson},
+          "egressGrantByRuleId": {}
         }
       `),
       maxBytes: 4096,
@@ -130,9 +136,11 @@ describe("readStartupInput", () => {
     await expect(
       readStartupInput({
         reader: createReader(`{
+          "startupMode": "new",
           "tunnelExchangeToken": "test-exchange-token",
           "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
-          "runtimePlan": ${ValidRuntimePlanJson}
+          "runtimePlan": ${ValidRuntimePlanJson},
+          "egressGrantByRuleId": {}
         }`),
         maxBytes: 4096,
       }),
@@ -143,9 +151,11 @@ describe("readStartupInput", () => {
     await expect(
       readStartupInput({
         reader: createReader(`{
+          "startupMode": "new",
           "bootstrapToken": "test-token",
           "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
-          "runtimePlan": ${ValidRuntimePlanJson}
+          "runtimePlan": ${ValidRuntimePlanJson},
+          "egressGrantByRuleId": {}
         }`),
         maxBytes: 4096,
       }),
@@ -156,9 +166,11 @@ describe("readStartupInput", () => {
     await expect(
       readStartupInput({
         reader: createReader(`{
+          "startupMode": "new",
           "bootstrapToken": "test-token",
           "tunnelExchangeToken": "test-exchange-token",
-          "runtimePlan": ${ValidRuntimePlanJson}
+          "runtimePlan": ${ValidRuntimePlanJson},
+          "egressGrantByRuleId": {}
         }`),
         maxBytes: 4096,
       }),
@@ -169,6 +181,7 @@ describe("readStartupInput", () => {
     await expect(
       readStartupInput({
         reader: createReader(`{
+          "startupMode": "new",
           "bootstrapToken": "test-token",
           "tunnelExchangeToken": "test-exchange-token",
           "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox"
@@ -178,7 +191,7 @@ describe("readStartupInput", () => {
     ).rejects.toThrow("startup input runtime plan is required");
   });
 
-  it("fails when startup input has an unknown field", async () => {
+  it("fails when startup mode is missing", async () => {
     await expect(
       readStartupInput({
         reader: createReader(`{
@@ -186,11 +199,63 @@ describe("readStartupInput", () => {
           "tunnelExchangeToken": "test-exchange-token",
           "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
           "runtimePlan": ${ValidRuntimePlanJson},
+          "egressGrantByRuleId": {}
+        }`),
+        maxBytes: 4096,
+      }),
+    ).rejects.toThrow("startup input startupMode is required");
+  });
+
+  it("fails when startup input has an unknown field", async () => {
+    await expect(
+      readStartupInput({
+        reader: createReader(`{
+          "startupMode": "new",
+          "bootstrapToken": "test-token",
+          "tunnelExchangeToken": "test-exchange-token",
+          "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+          "runtimePlan": ${ValidRuntimePlanJson},
+          "egressGrantByRuleId": {},
           "unexpected": true
         }`),
         maxBytes: 4096,
       }),
     ).rejects.toThrow("startup input from stdin must be valid json: unexpected field unexpected");
+  });
+
+  it("fails when egressGrantByRuleId is missing", async () => {
+    await expect(
+      readStartupInput({
+        reader: createReader(`{
+          "startupMode": "new",
+          "bootstrapToken": "test-token",
+          "tunnelExchangeToken": "test-exchange-token",
+          "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+          "runtimePlan": ${ValidRuntimePlanJson}
+        }`),
+        maxBytes: 4096,
+      }),
+    ).rejects.toThrow("startup input egressGrantByRuleId is required");
+  });
+
+  it("fails when egressGrantByRuleId contains an unexpected route key", async () => {
+    await expect(
+      readStartupInput({
+        reader: createReader(`{
+          "startupMode": "new",
+          "bootstrapToken": "test-token",
+          "tunnelExchangeToken": "test-exchange-token",
+          "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+          "runtimePlan": ${ValidRuntimePlanJson},
+          "egressGrantByRuleId": {
+            "egress_rule_unexpected": "grant"
+          }
+        }`),
+        maxBytes: 4096,
+      }),
+    ).rejects.toThrow(
+      "startup input egressGrantByRuleId has unexpected grant key egress_rule_unexpected",
+    );
   });
 
   it("fails when startup input has trailing json content in the same stream chunk", async () => {

@@ -30,31 +30,10 @@ export function shouldExecuteSandboxStop(input: {
   expectedOwnerLeaseId: string;
   snapshot: SandboxRuntimeStateSnapshot;
 }): boolean {
-  if (input.stopReason === "idle") {
-    return (
-      input.snapshot.ownerLeaseId === input.expectedOwnerLeaseId &&
-      input.snapshot.attachment?.ownerLeaseId === input.expectedOwnerLeaseId
-    );
-  }
-
-  if (
-    input.snapshot.attachment?.ownerLeaseId !== undefined &&
-    input.snapshot.attachment.ownerLeaseId !== input.expectedOwnerLeaseId
-  ) {
-    return false;
-  }
-
-  if (
-    input.snapshot.ownerLeaseId !== null &&
-    input.snapshot.ownerLeaseId !== input.expectedOwnerLeaseId
-  ) {
-    return false;
-  }
-
   return (
-    input.snapshot.attachment === null &&
-    (input.snapshot.ownerLeaseId === null ||
-      input.snapshot.ownerLeaseId === input.expectedOwnerLeaseId)
+    input.stopReason === "idle" &&
+    input.snapshot.ownerLeaseId === input.expectedOwnerLeaseId &&
+    input.snapshot.attachment?.ownerLeaseId === input.expectedOwnerLeaseId
   );
 }
 

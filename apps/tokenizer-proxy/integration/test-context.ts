@@ -27,6 +27,11 @@ export const it = vitestIt.extend<{ fixture: TokenizerProxyIntegrationFixture }>
           },
         },
         internalAuthServiceToken: "integration-service-token",
+        egressGrantConfig: {
+          tokenSecret: "integration-egress-grant-secret",
+          tokenIssuer: "mistle-tokenizer-proxy-integration",
+          tokenAudience: "tokenizer-proxy",
+        },
       };
 
       const runtime = createTokenizerProxyRuntime(runtimeConfig);

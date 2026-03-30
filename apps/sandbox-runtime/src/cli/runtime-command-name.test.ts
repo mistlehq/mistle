@@ -16,6 +16,9 @@ describe("resolveRuntimeCommandName", () => {
     expect(resolveRuntimeCommandName(["node", "/app/main.js", "apply-startup"])).toBe(
       "apply-startup",
     );
+    expect(resolveRuntimeCommandName(["node", "/app/main.js", "bootstrap-runtime"])).toBe(
+      "bootstrap-runtime",
+    );
     expect(resolveRuntimeCommandName(["node", "/app/main.js", "runtime-internal"])).toBe(
       "runtime-internal",
     );
@@ -25,6 +28,9 @@ describe("resolveRuntimeCommandName", () => {
     expect(resolveRuntimeCommandName(["/usr/local/bin/sandboxd", "serve"])).toBe("serve");
     expect(resolveRuntimeCommandName(["/usr/local/bin/sandboxd", "apply-startup"])).toBe(
       "apply-startup",
+    );
+    expect(resolveRuntimeCommandName(["/usr/local/bin/sandboxd", "bootstrap-runtime"])).toBe(
+      "bootstrap-runtime",
     );
   });
 

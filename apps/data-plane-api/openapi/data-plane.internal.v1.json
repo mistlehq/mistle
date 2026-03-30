@@ -9,7 +9,7 @@
     "parameters": {}
   },
   "paths": {
-    "/internal/sandbox-instances/start": {
+    "/internal/sandbox/instances": {
       "post": {
         "tags": ["Internal"],
         "requestBody": {
@@ -250,69 +250,9 @@
                                     "required": ["args"],
                                     "additionalProperties": false
                                   }
-                                },
-                                "update": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "object",
-                                    "properties": {
-                                      "args": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string"
-                                        }
-                                      },
-                                      "env": {
-                                        "type": "object",
-                                        "additionalProperties": {
-                                          "type": "string"
-                                        }
-                                      },
-                                      "cwd": {
-                                        "type": "string",
-                                        "minLength": 1
-                                      },
-                                      "timeoutMs": {
-                                        "type": "integer",
-                                        "exclusiveMinimum": 0
-                                      }
-                                    },
-                                    "required": ["args"],
-                                    "additionalProperties": false
-                                  }
-                                },
-                                "remove": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "object",
-                                    "properties": {
-                                      "args": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string"
-                                        }
-                                      },
-                                      "env": {
-                                        "type": "object",
-                                        "additionalProperties": {
-                                          "type": "string"
-                                        }
-                                      },
-                                      "cwd": {
-                                        "type": "string",
-                                        "minLength": 1
-                                      },
-                                      "timeoutMs": {
-                                        "type": "integer",
-                                        "exclusiveMinimum": 0
-                                      }
-                                    },
-                                    "required": ["args"],
-                                    "additionalProperties": false
-                                  }
                                 }
                               },
-                              "required": ["install", "remove"],
+                              "required": ["install"],
                               "additionalProperties": false
                             }
                           },
@@ -776,395 +716,49 @@
             }
           }
         }
-      }
-    },
-    "/internal/sandbox-instances/get": {
-      "post": {
+      },
+      "get": {
         "tags": ["Internal"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "organizationId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "instanceId": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": ["organizationId", "instanceId"],
-                "additionalProperties": false
-              }
-            }
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "organizationId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "after",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "before",
+            "in": "query"
           }
-        },
-        "responses": {
-          "200": {
-            "description": "Get sandbox instance status for internal callers.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": ["object", "null"],
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": ["starting", "running", "stopped", "failed"]
-                    },
-                    "failureCode": {
-                      "type": ["string", "null"],
-                      "minLength": 1
-                    },
-                    "failureMessage": {
-                      "type": ["string", "null"],
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["id", "status", "failureCode", "failureMessage"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request body.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["VALIDATION_ERROR"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Internal service authentication failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/sandbox-instances/resume": {
-      "post": {
-        "tags": ["Internal"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "organizationId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "instanceId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "idempotencyKey": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255
-                  }
-                },
-                "required": ["organizationId", "instanceId"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Queue sandbox instance resume for internal callers.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": ["accepted"]
-                    },
-                    "sandboxInstanceId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "workflowRunId": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["status", "sandboxInstanceId", "workflowRunId"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request body.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["VALIDATION_ERROR"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Internal service authentication failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/sandbox-instances/stop": {
-      "post": {
-        "tags": ["Internal"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "sandboxInstanceId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "stopReason": {
-                    "type": "string",
-                    "enum": ["idle", "disconnected"]
-                  },
-                  "expectedOwnerLeaseId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "idempotencyKey": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255
-                  }
-                },
-                "required": [
-                  "sandboxInstanceId",
-                  "stopReason",
-                  "expectedOwnerLeaseId",
-                  "idempotencyKey"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Queue sandbox instance stop for internal callers.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": ["accepted"]
-                    },
-                    "sandboxInstanceId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "workflowRunId": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["status", "sandboxInstanceId", "workflowRunId"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request body.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["VALIDATION_ERROR"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Internal service authentication failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/sandbox-instances/list": {
-      "post": {
-        "tags": ["Internal"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "organizationId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "limit": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 100
-                  },
-                  "after": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "before": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": ["organizationId"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
+        ],
         "responses": {
           "200": {
             "description": "List sandbox instances for internal callers.",
@@ -1196,7 +790,7 @@
                           },
                           "status": {
                             "type": "string",
-                            "enum": ["starting", "running", "stopped", "failed"]
+                            "enum": ["pending", "starting", "running", "stopped", "failed"]
                           },
                           "startedBy": {
                             "type": "object",
@@ -1289,34 +883,11 @@
             }
           },
           "400": {
-            "description": "Invalid request body.",
+            "description": "Invalid request query.",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "enum": ["INVALID_LIST_INPUT"]
-                            },
-                            {
-                              "type": "string",
-                              "enum": ["INVALID_PAGINATION_CURSOR"]
-                            }
-                          ]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
-                    },
                     {
                       "type": "object",
                       "properties": {
@@ -1331,8 +902,509 @@
                       },
                       "required": ["code", "message"],
                       "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_LIST_INPUT", "INVALID_PAGINATION_CURSOR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
                     }
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox/instances/:id": {
+      "get": {
+        "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "organizationId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get sandbox instance status for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": ["object", "null"],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["pending", "starting", "running", "stopped", "failed"]
+                    },
+                    "failureCode": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "failureMessage": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["id", "status", "failureCode", "failureMessage"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox/instances/:id/reconcile": {
+      "post": {
+        "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "enum": ["disconnect_grace_elapsed"]
+                  },
+                  "expectedOwnerLeaseId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "required": ["reason", "expectedOwnerLeaseId", "idempotencyKey"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Queue sandbox instance reconciliation for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["accepted"]
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "workflowRunId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["status", "sandboxInstanceId", "workflowRunId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox/instances/:id/resume": {
+      "post": {
+        "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "required": ["organizationId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Queue sandbox instance resume for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["accepted"]
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "workflowRunId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["status", "sandboxInstanceId", "workflowRunId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox/instances/:id/stop": {
+      "post": {
+        "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "stopReason": {
+                    "type": "string",
+                    "enum": ["idle"]
+                  },
+                  "expectedOwnerLeaseId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "required": ["stopReason", "expectedOwnerLeaseId", "idempotencyKey"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Queue sandbox instance stop for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["accepted"]
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "workflowRunId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["status", "sandboxInstanceId", "workflowRunId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }

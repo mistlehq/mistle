@@ -55,7 +55,7 @@ describe("webhook automations types", () => {
         target: {
           id: "target_123",
           sandboxProfileId: "sbp_123",
-          sandboxProfileVersion: null,
+          sandboxProfileVersion: 1,
         },
         updatedAt: "2026-03-11T10:05:00.000Z",
       }),

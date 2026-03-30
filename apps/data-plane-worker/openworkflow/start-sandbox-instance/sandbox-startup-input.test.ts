@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
+  SandboxStartupModes,
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxStartupInput,
 } from "./sandbox-startup-input.js";
@@ -176,10 +177,12 @@ const RuntimePlanSchema = z.object({
 });
 
 const SandboxStartupInputSchema = z.object({
+  startupMode: z.enum([SandboxStartupModes.NEW, SandboxStartupModes.EXISTING]),
   bootstrapToken: z.string().min(1),
   tunnelExchangeToken: z.string().min(1),
   tunnelGatewayWsUrl: z.string().min(1),
   runtimePlan: RuntimePlanSchema,
+  egressGrantByRuleId: z.record(z.string(), z.string()),
 });
 
 function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
@@ -241,10 +244,14 @@ describe("encodeSandboxStartupInput", () => {
 
   it("encodes bootstrap token, tunnel exchange token, tunnel gateway ws url, and runtime plan as newline-delimited json", () => {
     const encoded = encodeSandboxStartupInput({
+      startupMode: SandboxStartupModes.NEW,
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       runtimePlan: createRuntimePlan(),
+      egressGrantByRuleId: {
+        egress_rule_1: "egress-grant-token-value",
+      },
     });
 
     const encodedText = Decoder.decode(encoded);
@@ -252,10 +259,14 @@ describe("encodeSandboxStartupInput", () => {
 
     const decoded = SandboxStartupInputSchema.parse(JSON.parse(encodedText.trimEnd()));
     expect(decoded).toEqual({
+      startupMode: SandboxStartupModes.NEW,
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       runtimePlan: createRuntimePlan(),
+      egressGrantByRuleId: {
+        egress_rule_1: "egress-grant-token-value",
+      },
     });
   });
 });

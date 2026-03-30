@@ -54,18 +54,6 @@ function createCompiledBindingResult(input: {
     cwd?: string;
     timeoutMs?: number;
   }>;
-  artifactUpdateCommands?: ReadonlyArray<{
-    args: ReadonlyArray<string>;
-    env?: Record<string, string>;
-    cwd?: string;
-    timeoutMs?: number;
-  }>;
-  artifactRemoveCommands?: ReadonlyArray<{
-    args: ReadonlyArray<string>;
-    env?: Record<string, string>;
-    cwd?: string;
-    timeoutMs?: number;
-  }>;
   runtimeClientSetup?: {
     clientId: string;
     env: Record<string, string>;
@@ -91,12 +79,6 @@ function createCompiledBindingResult(input: {
         lifecycle: {
           install: input.artifactInstallCommands ?? [
             { args: ["echo", "install", input.route.egressRuleId] },
-          ],
-          ...(input.artifactUpdateCommands === undefined
-            ? {}
-            : { update: input.artifactUpdateCommands }),
-          remove: input.artifactRemoveCommands ?? [
-            { args: ["echo", "remove", input.route.egressRuleId] },
           ],
         },
       },
@@ -141,7 +123,7 @@ describe("validateCompiledBindingResults", () => {
         files: [
           {
             fileId: "codex_config",
-            path: "/home/sandbox/.codex/config.toml",
+            path: "/root/.codex/config.toml",
             mode: 384,
             content: 'model = "gpt-5.3-codex"',
           },
@@ -192,16 +174,17 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.ROUTE_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.ROUTE_CONFLICT });
   });
 
   it("fails on duplicate workspace source paths", () => {
@@ -216,7 +199,7 @@ describe("validateCompiledBindingResults", () => {
         {
           sourceKind: "git-clone",
           resourceKind: "repository",
-          path: "/home/sandbox/projects/mistlehq/mistle",
+          path: "/root/mistlehq/mistle",
           originUrl: "https://github.com/mistlehq/mistle.git",
         },
       ],
@@ -232,7 +215,7 @@ describe("validateCompiledBindingResults", () => {
         {
           sourceKind: "git-clone",
           resourceKind: "repository",
-          path: "/home/sandbox/projects/mistlehq/mistle",
+          path: "/root/mistlehq/mistle",
           originUrl: "https://github.example.com/mistlehq/mistle.git",
         },
       ],
@@ -244,16 +227,19 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({
+      code: CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+    });
   });
 
   it("fails when a route contains an empty path prefix", () => {
@@ -273,16 +259,17 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.ROUTE_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.ROUTE_CONFLICT });
   });
 
   it("fails on runtime client env conflicts", () => {
@@ -323,16 +310,19 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({
+      code: CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+    });
   });
 
   it("fails on runtime client fileId conflicts", () => {
@@ -349,7 +339,7 @@ describe("validateCompiledBindingResults", () => {
         files: [
           {
             fileId: "codex_config",
-            path: "/home/sandbox/.codex/config.toml",
+            path: "/root/.codex/config.toml",
             mode: 384,
             content: 'model = "gpt-5.3-codex"',
           },
@@ -369,7 +359,7 @@ describe("validateCompiledBindingResults", () => {
         files: [
           {
             fileId: "codex_config",
-            path: "/home/sandbox/.codex/override.toml",
+            path: "/root/.codex/override.toml",
             mode: 384,
             content: 'model = "gpt-5.3-codex"',
           },
@@ -383,16 +373,19 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({
+      code: CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+    });
   });
 
   it("accepts runtime client env values that are structurally equivalent", () => {
@@ -732,24 +725,6 @@ describe("validateCompiledBindingResults", () => {
     ).toThrow(IntegrationCompilerError);
   });
 
-  it("fails when an artifact has no remove commands", () => {
-    const result = createCompiledBindingResult({
-      route: createRoute({
-        egressRuleId: "egress_rule_a",
-        bindingId: "bind_a",
-        hosts: ["api.openai.com"],
-      }),
-      artifactKey: "codex-cli",
-      artifactRemoveCommands: [],
-    });
-
-    expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
-      }),
-    ).toThrow(IntegrationCompilerError);
-  });
-
   it("fails when an artifact command has empty args", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
@@ -852,16 +827,17 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.AGENT_RUNTIME_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.AGENT_RUNTIME_CONFLICT });
   });
 
   it("fails when an agent runtime references a missing endpoint", () => {
@@ -903,16 +879,17 @@ describe("validateCompiledBindingResults", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.AGENT_RUNTIME_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.AGENT_RUNTIME_CONFLICT });
   });
 
   it("fails when an agent runtime omits adapterKey", () => {

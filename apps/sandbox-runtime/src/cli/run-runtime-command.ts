@@ -1,5 +1,6 @@
 import { type Readable, type Writable } from "node:stream";
 
+import { runBootstrap } from "../bootstrap/run.js";
 import { runRuntime } from "../runtime/run.js";
 import { resolveBootstrapLaunchTarget } from "../supervisor/bootstrap-launch-target.js";
 import { type BootstrapLaunchTarget } from "../supervisor/bootstrap-launch-target.js";
@@ -69,6 +70,30 @@ export async function runRuntimeCommand(input: RunRuntimeCommandInput): Promise<
       await applyStartupToSupervisor({
         lookupEnv: input.lookupEnv,
         stdin: input.stdin,
+      });
+      return;
+    case "bootstrap-runtime":
+      if (input.packagedRuntimeExecutablePath !== undefined) {
+        await runBootstrap({
+          processArgv: input.processArgv,
+          runtimeExecTarget: {
+            kind: "packaged-binary",
+            runtimeExecutablePath: input.packagedRuntimeExecutablePath,
+          },
+        });
+        return;
+      }
+
+      if (input.currentEntrypointPath === undefined) {
+        throw new Error("runtime entrypoint path is required for bootstrap mode");
+      }
+
+      await runBootstrap({
+        processArgv: input.processArgv,
+        runtimeExecTarget: {
+          kind: "node-script",
+          runtimeEntrypointPath: input.currentEntrypointPath,
+        },
       });
       return;
     case "runtime-internal":

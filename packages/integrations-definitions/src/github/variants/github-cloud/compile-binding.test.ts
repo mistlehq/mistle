@@ -4,21 +4,19 @@ import { describe, expect, it } from "vitest";
 import { compileGitHubCloudBinding } from "./compile-binding.js";
 
 function artifactBinPath(name: string): string {
-  return `/var/lib/mistle/bin/${name}`;
+  return `/usr/local/bin/${name}`;
 }
 
 const SandboxPaths = {
-  userHomeDir: "/home/sandbox",
-  userProjectsDir: "/home/sandbox/projects",
+  userHomeDir: "/root",
+  workspaceDir: "/root",
   runtimeDataDir: "/var/lib/mistle",
   runtimeArtifactDir: "/var/lib/mistle/artifacts",
-  runtimeArtifactBinDir: "/var/lib/mistle/bin",
+  runtimeArtifactBinDir: "/usr/local/bin",
 } as const;
 
 function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
   install: ReadonlyArray<RuntimeArtifactCommand>;
-  update?: ReadonlyArray<RuntimeArtifactCommand>;
-  remove: ReadonlyArray<RuntimeArtifactCommand>;
 } {
   const refs = {
     command: {
@@ -55,21 +53,8 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
     typeof artifact.lifecycle.install === "function"
       ? artifact.lifecycle.install({ refs })
       : artifact.lifecycle.install;
-  const update =
-    artifact.lifecycle.update === undefined
-      ? undefined
-      : typeof artifact.lifecycle.update === "function"
-        ? artifact.lifecycle.update({ refs })
-        : artifact.lifecycle.update;
-  const remove =
-    typeof artifact.lifecycle.remove === "function"
-      ? artifact.lifecycle.remove({ refs })
-      : artifact.lifecycle.remove;
-
   return {
     install,
-    ...(update === undefined ? {} : { update }),
-    remove,
   };
 }
 
@@ -189,34 +174,19 @@ describe("compileGitHubCloudBinding", () => {
           timeoutMs: 120_000,
         },
       ],
-      update: [
-        {
-          args: [
-            "sh",
-            "-euc",
-            expect.stringContaining("https://github.com/cli/cli/releases/latest"),
-          ],
-          timeoutMs: 120_000,
-        },
-      ],
-      remove: [
-        {
-          args: ["rm", "-f", "/var/lib/mistle/bin/gh"],
-        },
-      ],
     });
     expect(compiled.runtimeClients).toEqual([]);
     expect(compiled.workspaceSources).toEqual([
       {
         sourceKind: "git-clone",
         resourceKind: "repository",
-        path: "/home/sandbox/projects/acme/repo-a",
+        path: "/root/acme/repo-a",
         originUrl: "https://github.com/acme/repo-a.git",
       },
       {
         sourceKind: "git-clone",
         resourceKind: "repository",
-        path: "/home/sandbox/projects/acme/repo-b",
+        path: "/root/acme/repo-b",
         originUrl: "https://github.com/acme/repo-b.git",
       },
     ]);
@@ -269,7 +239,7 @@ describe("compileGitHubCloudBinding", () => {
       {
         sourceKind: "git-clone",
         resourceKind: "repository",
-        path: "/home/sandbox/projects/acme/repo",
+        path: "/root/acme/repo",
         originUrl: "https://proxy.example.com/github/acme/repo.git",
       },
     ]);
@@ -406,6 +376,6 @@ describe("compileGitHubCloudBinding", () => {
           artifactBinPath,
         },
       }),
-    ).toThrow();
+    ).toThrow(/Invalid input/);
   });
 });

@@ -1,8 +1,7 @@
+import { systemScheduler } from "@mistle/time";
 import WebSocket, { type RawData } from "ws";
 
 const ConnectTimeoutMs = 4_000;
-const scheduleTimeout = globalThis.setTimeout.bind(globalThis);
-const cancelTimeout = globalThis.clearTimeout.bind(globalThis);
 type UnexpectedResponse = {
   statusCode?: number;
 };
@@ -214,12 +213,12 @@ export function waitForNoWebSocketMessage(socket: WebSocket, timeoutMs = 150): P
     };
 
     const cleanup = (): void => {
-      cancelTimeout(timeoutHandle);
+      systemScheduler.cancel(timeoutHandle);
       socket.off("message", onMessage);
       socket.off("error", onError);
     };
 
-    const timeoutHandle = scheduleTimeout(() => {
+    const timeoutHandle = systemScheduler.schedule(() => {
       cleanup();
       resolve();
     }, timeoutMs);

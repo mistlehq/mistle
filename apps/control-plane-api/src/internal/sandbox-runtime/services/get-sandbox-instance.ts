@@ -17,7 +17,7 @@ export async function getSandboxInstance(
   },
 ): Promise<{
   id: string;
-  status: "starting" | "running" | "stopped" | "failed";
+  status: "pending" | "starting" | "running" | "stopped" | "failed";
   failureCode: string | null;
   failureMessage: string | null;
 }> {

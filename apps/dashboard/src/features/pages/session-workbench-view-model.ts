@@ -13,6 +13,7 @@ export function resolveSessionHeaderStatusUi(input: {
   agentConnectionState: CodexSessionConnectionState;
   step: StartSessionStep;
   hasConnectionError: boolean;
+  isRecoveringSession: boolean;
 }): SessionHeaderStatusUi {
   if (input.sandboxStatus === "failed") {
     return {
@@ -25,6 +26,13 @@ export function resolveSessionHeaderStatusUi(input: {
     return {
       label: "Connection failed",
       variant: "destructive",
+    };
+  }
+
+  if (input.isRecoveringSession && input.sandboxStatus === "running") {
+    return {
+      label: "Reconnecting session",
+      variant: "outline",
     };
   }
 
@@ -92,12 +100,14 @@ export function resolveSessionHeaderStatusUi(input: {
 export function hasSessionTopAlert(input: {
   hasSandboxStatusError: boolean;
   lifecycleErrorMessage: string | null;
+  reconnectMessage: string | null;
   sandboxFailureMessage: string | null;
   stoppedSessionMessage: string | null;
 }): boolean {
   return (
     input.hasSandboxStatusError ||
     input.lifecycleErrorMessage !== null ||
+    input.reconnectMessage !== null ||
     input.sandboxFailureMessage !== null ||
     input.stoppedSessionMessage !== null
   );

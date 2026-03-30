@@ -5,6 +5,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   DEFAULT_SHARED_SYSTEM_INFRA_KEY,
+  DockerIntegrationConfigPathInContainer,
   startControlPlaneSystemEnvironment,
 } from "../src/index.js";
 
@@ -17,7 +18,7 @@ describe("control-plane system environment integration", () => {
     async () => {
       const environment = await startControlPlaneSystemEnvironment({
         buildContextHostPath: PROJECT_ROOT_HOST_PATH,
-        configPathInContainer: "/app/config/config.development.toml",
+        configPathInContainer: DockerIntegrationConfigPathInContainer,
         startupTimeoutMs: 120_000,
         sharedInfraKey: DEFAULT_SHARED_SYSTEM_INFRA_KEY,
         postgres: {},

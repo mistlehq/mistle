@@ -1,10 +1,13 @@
 import { resolve } from "node:path";
 
-import type { ExecRuntimeAsUserInput, ProcessEnvironmentEntry } from "@mistle/sandbox-rs-napi";
+import type { ExecRuntimeInput, ProcessEnvironmentEntry } from "@mistle/sandbox-rs-napi";
 
 import { ProxyCaCertFdEnv, ProxyCaKeyFdEnv } from "../runtime/config.js";
 
-type SandboxUserRecord = {
+const BootstrapRuntimeCommandName = "bootstrap-runtime";
+const RuntimeInternalCommandName = "runtime-internal";
+
+type TargetIdentity = {
   username: string;
   uid: number;
   gid: number;
@@ -13,7 +16,6 @@ type SandboxUserRecord = {
 
 export const HomeEnv = "HOME";
 export const LognameEnv = "LOGNAME";
-export const PackagedRuntimeBinaryName = "sandboxd";
 export const UserEnv = "USER";
 
 function normalizePathArgument(argument: string): string {
@@ -47,46 +49,53 @@ function buildProcessEnvironmentEntries(environment: NodeJS.ProcessEnv): Process
   return entries;
 }
 
-export function buildRuntimeExecArgs(
-  processArgv: readonly string[],
-  bootstrapEntrypointPath: string,
-  runtimeEntrypointPath: string,
-): string[] {
-  const runtimeArgs = processArgv.slice(1);
-  const bootstrapEntrypointIndex = runtimeArgs.findIndex(
-    (argument) => normalizePathArgument(argument) === bootstrapEntrypointPath,
+function replaceBootstrapRuntimeCommand(runtimeArgs: readonly string[]): string[] {
+  // Supervisor always launches the bootstrap command first. Bootstrap then execs
+  // back into the same runtime binary/entrypoint with runtime-internal so setup
+  // does not continue in-process.
+  const bootstrapCommandIndex = runtimeArgs.findIndex(
+    (argument) => argument === BootstrapRuntimeCommandName,
   );
-
-  if (bootstrapEntrypointIndex < 0) {
-    throw new Error(`failed to locate bootstrap entrypoint "${bootstrapEntrypointPath}" in argv`);
+  if (bootstrapCommandIndex < 0) {
+    throw new Error(
+      `failed to locate bootstrap runtime command "${BootstrapRuntimeCommandName}" in argv`,
+    );
   }
 
   return runtimeArgs.map((argument, index) =>
-    index === bootstrapEntrypointIndex ? runtimeEntrypointPath : argument,
+    index === bootstrapCommandIndex ? RuntimeInternalCommandName : argument,
   );
 }
 
-export function buildRuntimeExecInput(input: {
+export function buildNodeScriptRuntimeArgs(processArgv: readonly string[]): string[] {
+  // In node-script mode, process.argv starts at the JS entrypoint path.
+  return replaceBootstrapRuntimeCommand(processArgv.slice(1));
+}
+
+export function buildPackagedRuntimeArgs(processArgv: readonly string[]): string[] {
+  // In SEA mode, process.argv[1] is the packaged binary path again, so the runtime
+  // command begins at process.argv[2].
+  return replaceBootstrapRuntimeCommand(processArgv.slice(2));
+}
+
+function buildRuntimeExecEnvironment(input: {
   processEnv: NodeJS.ProcessEnv;
-  processArgv: readonly string[];
-  bootstrapEntrypointPath: string;
-  runtimeEntrypointPath: string;
-  userRecord: SandboxUserRecord;
+  targetIdentity: TargetIdentity;
   additionalEnv: Record<string, string>;
-}): ExecRuntimeAsUserInput {
+}): ProcessEnvironmentEntry[] {
   const env = buildProcessEnvironmentEntries(input.processEnv);
   env.push(
     {
       name: HomeEnv,
-      value: input.userRecord.homeDir,
+      value: input.targetIdentity.homeDir,
     },
     {
       name: LognameEnv,
-      value: input.userRecord.username,
+      value: input.targetIdentity.username,
     },
     {
       name: UserEnv,
-      value: input.userRecord.username,
+      value: input.targetIdentity.username,
     },
   );
 
@@ -97,16 +106,29 @@ export function buildRuntimeExecInput(input: {
     });
   }
 
+  return env;
+}
+
+export function buildRuntimeExecInput(input: {
+  processEnv: NodeJS.ProcessEnv;
+  processArgv: readonly string[];
+  runtimeEntrypointPath: string;
+  targetIdentity: TargetIdentity;
+  additionalEnv: Record<string, string>;
+}): ExecRuntimeInput {
+  const runtimeArgs = buildNodeScriptRuntimeArgs(input.processArgv);
+  if (
+    !runtimeArgs.some((argument) => normalizePathArgument(argument) === input.runtimeEntrypointPath)
+  ) {
+    throw new Error(`failed to locate runtime entrypoint "${input.runtimeEntrypointPath}" in argv`);
+  }
+
   return {
-    uid: input.userRecord.uid,
-    gid: input.userRecord.gid,
+    uid: input.targetIdentity.uid,
+    gid: input.targetIdentity.gid,
     command: process.execPath,
-    args: buildRuntimeExecArgs(
-      input.processArgv,
-      input.bootstrapEntrypointPath,
-      input.runtimeEntrypointPath,
-    ),
-    env,
+    args: runtimeArgs,
+    env: buildRuntimeExecEnvironment(input),
   };
 }
 
@@ -114,38 +136,14 @@ export function buildPackagedRuntimeExecInput(input: {
   processEnv: NodeJS.ProcessEnv;
   processArgv: readonly string[];
   runtimeExecutablePath: string;
-  userRecord: SandboxUserRecord;
+  targetIdentity: TargetIdentity;
   additionalEnv: Record<string, string>;
-}): ExecRuntimeAsUserInput {
-  const env = buildProcessEnvironmentEntries(input.processEnv);
-  env.push(
-    {
-      name: HomeEnv,
-      value: input.userRecord.homeDir,
-    },
-    {
-      name: LognameEnv,
-      value: input.userRecord.username,
-    },
-    {
-      name: UserEnv,
-      value: input.userRecord.username,
-    },
-  );
-
-  for (const [name, value] of Object.entries(input.additionalEnv)) {
-    env.push({
-      name,
-      value,
-    });
-  }
-
+}): ExecRuntimeInput {
   return {
-    uid: input.userRecord.uid,
-    gid: input.userRecord.gid,
+    uid: input.targetIdentity.uid,
+    gid: input.targetIdentity.gid,
     command: input.runtimeExecutablePath,
-    // In SEA entrypoints, user-provided arguments start at process.argv[2].
-    args: input.processArgv.slice(2),
-    env,
+    args: buildPackagedRuntimeArgs(input.processArgv),
+    env: buildRuntimeExecEnvironment(input),
   };
 }

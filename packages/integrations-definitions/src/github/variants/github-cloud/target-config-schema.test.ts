@@ -39,6 +39,6 @@ describe("GitHubCloudTargetConfigSchema", () => {
         api_base_url: "not-a-url",
         web_base_url: "https://github.com",
       }),
-    ).toThrow();
+    ).toThrow(/Invalid URL/);
   });
 });

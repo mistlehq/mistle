@@ -17,6 +17,20 @@ describe("integration run id helpers", () => {
     ).toBe("runid123");
   });
 
+  it("trims boundary underscores from database prefixes without pathological regex backtracking", () => {
+    const runtimeDatabaseName = createIntegrationRuntimeDatabaseName({
+      prefix: `${"_".repeat(5_000)}mistle_control_plane_api_it_runtime${"_".repeat(5_000)}`,
+      runId: "abc123def456",
+      filePath: "/tmp/example.integration.test.ts",
+      scopeId: "scope1234",
+    });
+
+    expect(runtimeDatabaseName).toMatch(
+      /^mistle_control_plane_api_it_runtime_abc123def456_[a-f0-9]{4,12}_scope123$/u,
+    );
+    expect(runtimeDatabaseName.length).toBeLessThanOrEqual(63);
+  });
+
   it("creates stable PostgreSQL-safe template and runtime database names", () => {
     const templateDatabaseName = createIntegrationTemplateDatabaseName({
       prefix: "mistle_control_plane_api_it_template",

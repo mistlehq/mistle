@@ -3,16 +3,16 @@ import { BadRequestError } from "@mistle/http/errors.js";
 
 import { AutomationWebhooksBadRequestCodes } from "../constants.js";
 
-export async function assertSandboxProfileTriggerReferenceOrThrow(
+export async function resolveSandboxProfileTriggerReferenceOrThrow(
   ctx: {
     db: ControlPlaneDatabase | ControlPlaneTransaction;
   },
   input: {
     sandboxProfileId: string;
-    sandboxProfileVersion?: number | null | undefined;
+    sandboxProfileVersion?: number | undefined;
     integrationConnectionId: string;
   },
-): Promise<void> {
+): Promise<number> {
   const sandboxProfileVersion =
     input.sandboxProfileVersion ??
     (
@@ -50,4 +50,6 @@ export async function assertSandboxProfileTriggerReferenceOrThrow(
       "Sandbox profile must bind the selected integration connection to use its automation triggers.",
     );
   }
+
+  return sandboxProfileVersion;
 }

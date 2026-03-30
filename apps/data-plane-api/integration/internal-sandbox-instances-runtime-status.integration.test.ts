@@ -1,5 +1,6 @@
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { createSandboxAdapter, SandboxProvider } from "@mistle/sandbox";
 import { systemClock, systemSleeper } from "@mistle/time";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
@@ -16,7 +17,38 @@ const RuntimeStatusTestTimeoutMs = 60_000;
 const StatusPollTimeoutMs = 10_000;
 const StatusPollIntervalMs = 50;
 
-async function waitForSandboxStatus(input: {
+async function waitForListedSandboxStatus(input: {
+  fixture: DataPlaneApiIntegrationFixture;
+  organizationId: string;
+  sandboxInstanceId: string;
+  expectedStatus: string;
+}): Promise<void> {
+  const client = createDataPlaneSandboxInstancesClient({
+    baseUrl: input.fixture.baseUrl,
+    serviceToken: input.fixture.internalAuthServiceToken,
+  });
+  const deadlineMs = systemClock.nowMs() + StatusPollTimeoutMs;
+
+  while (systemClock.nowMs() < deadlineMs) {
+    const response = await client.listSandboxInstances({
+      organizationId: input.organizationId,
+      limit: 100,
+    });
+    const sandboxInstance = response.items.find((item) => item.id === input.sandboxInstanceId);
+
+    if (sandboxInstance?.status === input.expectedStatus) {
+      return;
+    }
+
+    await systemSleeper.sleep(StatusPollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for sandbox '${input.sandboxInstanceId}' to reach status '${input.expectedStatus}'.`,
+  );
+}
+
+async function waitForGetSandboxStatus(input: {
   fixture: DataPlaneApiIntegrationFixture;
   organizationId: string;
   sandboxInstanceId: string;
@@ -42,7 +74,7 @@ async function waitForSandboxStatus(input: {
   }
 
   throw new Error(
-    `Timed out waiting for sandbox '${input.sandboxInstanceId}' to reach status '${input.expectedStatus}'.`,
+    `Timed out waiting for sandbox '${input.sandboxInstanceId}' getSandboxInstance status to reach '${input.expectedStatus}'.`,
   );
 }
 
@@ -58,7 +90,7 @@ async function startGatewayForFixture(input: { fixture: DataPlaneApiIntegrationF
 
 describe("internal sandbox instance runtime status integration", () => {
   it(
-    "returns starting until bootstrap attachment is live and returns running once attached",
+    "returns starting before tunnel readiness, then running after attachment, and reconciles missing runtimes",
     async ({ fixture }) => {
       const client = createDataPlaneSandboxInstancesClient({
         baseUrl: fixture.baseUrl,
@@ -67,8 +99,21 @@ describe("internal sandbox instance runtime status integration", () => {
       const gateway = await startGatewayForFixture({
         fixture,
       });
+      const adapter = createSandboxAdapter({
+        provider: SandboxProvider.DOCKER,
+        docker: {
+          socketPath: fixture.config.sandbox.docker?.socketPath ?? "/var/run/docker.sock",
+        },
+      });
       const organizationId = `org_${typeid("org").toString()}`;
       const sandboxInstanceId = typeid("sbi").toString();
+      const sandbox = await adapter.start({
+        image: {
+          provider: SandboxProvider.DOCKER,
+          imageId: "registry:3",
+          createdAt: "2026-03-27T00:00:00.000Z",
+        },
+      });
 
       try {
         await fixture.db.insert(sandboxInstances).values({
@@ -77,7 +122,7 @@ describe("internal sandbox instance runtime status integration", () => {
           sandboxProfileId: "sbp_runtime_status",
           sandboxProfileVersion: 1,
           runtimeProvider: "docker",
-          providerSandboxId: "provider-runtime-status",
+          providerSandboxId: sandbox.id,
           status: SandboxInstanceStatuses.RUNNING,
           startedByKind: "user",
           startedById: "usr_runtime_status",
@@ -94,32 +139,150 @@ describe("internal sandbox instance runtime status integration", () => {
           status: "starting",
         });
 
+        const bootstrapToken = await mintValidBootstrapToken({
+          sandboxInstanceId,
+        });
         const bootstrapSocket = await connectBootstrapSocket({
           websocketBaseUrl: gateway.websocketBaseUrl,
           sandboxInstanceId,
-          token: await mintValidBootstrapToken({
+          token: bootstrapToken,
+        });
+
+        try {
+          await waitForGetSandboxStatus({
+            fixture,
+            organizationId,
             sandboxInstanceId,
-          }),
-        });
+            expectedStatus: "running",
+          });
 
-        await waitForSandboxStatus({
-          fixture,
-          organizationId,
-          sandboxInstanceId,
-          expectedStatus: "running",
-        });
+          await expect(
+            client.getSandboxInstance({
+              organizationId,
+              instanceId: sandboxInstanceId,
+            }),
+          ).resolves.toMatchObject({
+            id: sandboxInstanceId,
+            status: "running",
+          });
 
-        await closeWebSocket(bootstrapSocket);
+          await adapter.destroy({
+            id: sandbox.id,
+          });
 
-        await waitForSandboxStatus({
-          fixture,
-          organizationId,
-          sandboxInstanceId,
-          expectedStatus: "starting",
-        });
+          await expect(
+            client.getSandboxInstance({
+              organizationId,
+              instanceId: sandboxInstanceId,
+            }),
+          ).resolves.toMatchObject({
+            id: sandboxInstanceId,
+            status: "failed",
+            failureCode: "provider_runtime_missing",
+            failureMessage: "Sandbox runtime was not found at the provider during inspection.",
+          });
+        } finally {
+          await closeWebSocket(bootstrapSocket);
+        }
       } finally {
         await gateway.stop();
+        await adapter
+          .destroy({
+            id: sandbox.id,
+          })
+          .catch(() => undefined);
       }
+    },
+    RuntimeStatusTestTimeoutMs,
+  );
+
+  it("returns pending from getSandboxInstance before provider provisioning begins", async ({
+    fixture,
+  }) => {
+    const client = createDataPlaneSandboxInstancesClient({
+      baseUrl: fixture.baseUrl,
+      serviceToken: fixture.internalAuthServiceToken,
+    });
+    const organizationId = `org_${typeid("org").toString()}`;
+    const sandboxInstanceId = typeid("sbi").toString();
+
+    await fixture.db.insert(sandboxInstances).values({
+      id: sandboxInstanceId,
+      organizationId,
+      sandboxProfileId: "sbp_runtime_status",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: null,
+      status: SandboxInstanceStatuses.PENDING,
+      startedByKind: "user",
+      startedById: "usr_runtime_status",
+      source: "dashboard",
+    });
+
+    await expect(
+      client.getSandboxInstance({
+        organizationId,
+        instanceId: sandboxInstanceId,
+      }),
+    ).resolves.toMatchObject({
+      id: sandboxInstanceId,
+      status: "pending",
+      failureCode: null,
+      failureMessage: null,
+    });
+  });
+
+  it(
+    "marks starting sandboxes failed when provider inspection reports the runtime missing",
+    async ({ fixture }) => {
+      const client = createDataPlaneSandboxInstancesClient({
+        baseUrl: fixture.baseUrl,
+        serviceToken: fixture.internalAuthServiceToken,
+      });
+      const adapter = createSandboxAdapter({
+        provider: SandboxProvider.DOCKER,
+        docker: {
+          socketPath: fixture.config.sandbox.docker?.socketPath ?? "/var/run/docker.sock",
+        },
+      });
+      const organizationId = `org_${typeid("org").toString()}`;
+      const sandboxInstanceId = typeid("sbi").toString();
+      const sandbox = await adapter.start({
+        image: {
+          provider: SandboxProvider.DOCKER,
+          imageId: "registry:3",
+          createdAt: "2026-03-27T00:00:00.000Z",
+        },
+      });
+
+      await fixture.db.insert(sandboxInstances).values({
+        id: sandboxInstanceId,
+        organizationId,
+        sandboxProfileId: "sbp_runtime_status",
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: sandbox.id,
+        status: SandboxInstanceStatuses.STARTING,
+        startedByKind: "user",
+        startedById: "usr_runtime_status",
+        source: "dashboard",
+      });
+
+      await adapter.destroy({
+        id: sandbox.id,
+      });
+
+      await expect(
+        client.getSandboxInstance({
+          organizationId,
+          instanceId: sandboxInstanceId,
+        }),
+      ).resolves.toMatchObject({
+        id: sandboxInstanceId,
+        status: "failed",
+        failureCode: "provider_runtime_missing",
+        failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
+      });
     },
     RuntimeStatusTestTimeoutMs,
   );
@@ -210,7 +373,7 @@ describe("internal sandbox instance runtime status integration", () => {
           }),
         });
 
-        await waitForSandboxStatus({
+        await waitForListedSandboxStatus({
           fixture,
           organizationId,
           sandboxInstanceId: connectedSandboxInstanceId,

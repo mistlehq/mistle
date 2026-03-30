@@ -9,6 +9,7 @@ import {
   PayloadKindWebSocketText,
   type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
+import { systemSleeper } from "@mistle/time";
 import { afterEach, describe, expect, it } from "vitest";
 import { type RawData, WebSocketServer } from "ws";
 
@@ -88,9 +89,7 @@ function createDeferred<T>(): Deferred<T> {
 }
 
 async function waitForEventLoopTurn(): Promise<void> {
-  await new Promise<void>((resolve) => {
-    globalThis.setTimeout(resolve, 0);
-  });
+  await systemSleeper.sleep(0);
 }
 
 function waitForState(
@@ -137,9 +136,7 @@ async function expectNoServerMessageWithin(
       server.waitForNextMessage().then((message) => {
         throw new Error(`Expected no server message, but received ${JSON.stringify(message)}.`);
       }),
-      new Promise<void>((resolve) => {
-        globalThis.setTimeout(resolve, timeoutMs);
-      }),
+      systemSleeper.sleep(timeoutMs),
     ]),
   ).resolves.toBeUndefined();
 }

@@ -1,52 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { resolvePackagedRuntimeExecutablePath } from "./run.js";
-import {
-  buildPackagedRuntimeExecInput,
-  buildRuntimeExecArgs,
-  buildRuntimeExecInput,
-  PackagedRuntimeBinaryName,
-} from "./runtime-exec-input.js";
-
-describe("buildRuntimeExecArgs", () => {
-  it("replaces the bootstrap entrypoint for a built node invocation", () => {
-    expect(
-      buildRuntimeExecArgs(
-        ["/usr/local/bin/node", "/tmp/dist/bootstrap/main.js"],
-        "/tmp/dist/bootstrap/main.js",
-        "/tmp/dist/main.js",
-      ),
-    ).toEqual(["/tmp/dist/main.js"]);
-  });
-
-  it("replaces the bootstrap entrypoint for a tsx watch invocation", () => {
-    expect(
-      buildRuntimeExecArgs(
-        [
-          "/usr/local/bin/node",
-          "/tmp/node_modules/tsx/dist/cli.mjs",
-          "watch",
-          "/workspace/src/bootstrap/main.ts",
-        ],
-        "/workspace/src/bootstrap/main.ts",
-        "/workspace/src/main.ts",
-      ),
-    ).toEqual(["/tmp/node_modules/tsx/dist/cli.mjs", "watch", "/workspace/src/main.ts"]);
-  });
-
-  it("fails when the bootstrap entrypoint is not present in argv", () => {
-    expect(() =>
-      buildRuntimeExecArgs(
-        ["/usr/local/bin/node", "/tmp/dist/main.js"],
-        "/tmp/dist/bootstrap/main.js",
-        "/tmp/dist/main.js",
-      ),
-    ).toThrow('failed to locate bootstrap entrypoint "/tmp/dist/bootstrap/main.js" in argv');
-  });
-});
+import { buildPackagedRuntimeExecInput, buildRuntimeExecInput } from "./runtime-exec-input.js";
 
 describe("buildRuntimeExecInput", () => {
-  it("filters bootstrap-owned environment keys and injects sandbox user values", () => {
+  it("filters bootstrap-owned environment keys and injects root values", () => {
     const input = buildRuntimeExecInput({
       processEnv: {
         KEEP_ME: "value",
@@ -55,14 +12,13 @@ describe("buildRuntimeExecInput", () => {
         USER: "root",
         SANDBOX_RUNTIME_PROXY_CA_CERT_FD: "99",
       },
-      processArgv: ["/usr/local/bin/node", "/tmp/dist/bootstrap/main.js"],
-      bootstrapEntrypointPath: "/tmp/dist/bootstrap/main.js",
+      processArgv: ["/usr/local/bin/node", "/tmp/dist/main.js", "bootstrap-runtime"],
       runtimeEntrypointPath: "/tmp/dist/main.js",
-      userRecord: {
-        username: "sandbox",
-        uid: 1000,
-        gid: 1000,
-        homeDir: "/home/sandbox",
+      targetIdentity: {
+        username: "root",
+        uid: 0,
+        gid: 0,
+        homeDir: "/root",
       },
       additionalEnv: {
         SANDBOX_RUNTIME_PROXY_CA_CERT_FD: "12",
@@ -70,10 +26,10 @@ describe("buildRuntimeExecInput", () => {
     });
 
     expect(input).toEqual({
-      uid: 1000,
-      gid: 1000,
+      uid: 0,
+      gid: 0,
       command: process.execPath,
-      args: ["/tmp/dist/main.js"],
+      args: ["/tmp/dist/main.js", "runtime-internal"],
       env: [
         {
           name: "KEEP_ME",
@@ -81,15 +37,15 @@ describe("buildRuntimeExecInput", () => {
         },
         {
           name: "HOME",
-          value: "/home/sandbox",
+          value: "/root",
         },
         {
           name: "LOGNAME",
-          value: "sandbox",
+          value: "root",
         },
         {
           name: "USER",
-          value: "sandbox",
+          value: "root",
         },
         {
           name: "SANDBOX_RUNTIME_PROXY_CA_CERT_FD",
@@ -101,7 +57,7 @@ describe("buildRuntimeExecInput", () => {
 });
 
 describe("buildPackagedRuntimeExecInput", () => {
-  it("targets the packaged runtime binary and forwards user arguments unchanged", () => {
+  it("targets the packaged runtime binary and rewrites bootstrap-runtime", () => {
     const input = buildPackagedRuntimeExecInput({
       processEnv: {
         KEEP_ME: "value",
@@ -110,13 +66,13 @@ describe("buildPackagedRuntimeExecInput", () => {
         USER: "root",
         SANDBOX_RUNTIME_PROXY_CA_KEY_FD: "88",
       },
-      processArgv: ["/tmp/sandbox-bootstrap", "/tmp/sandbox-bootstrap", "--trace", "child"],
+      processArgv: ["/tmp/sandboxd", "/tmp/sandboxd", "bootstrap-runtime", "--trace", "child"],
       runtimeExecutablePath: "/tmp/sandboxd",
-      userRecord: {
-        username: "sandbox",
-        uid: 1000,
-        gid: 1000,
-        homeDir: "/home/sandbox",
+      targetIdentity: {
+        username: "root",
+        uid: 0,
+        gid: 0,
+        homeDir: "/root",
       },
       additionalEnv: {
         SANDBOX_RUNTIME_PROXY_CA_KEY_FD: "12",
@@ -124,10 +80,10 @@ describe("buildPackagedRuntimeExecInput", () => {
     });
 
     expect(input).toEqual({
-      uid: 1000,
-      gid: 1000,
+      uid: 0,
+      gid: 0,
       command: "/tmp/sandboxd",
-      args: ["--trace", "child"],
+      args: ["runtime-internal", "--trace", "child"],
       env: [
         {
           name: "KEEP_ME",
@@ -135,15 +91,15 @@ describe("buildPackagedRuntimeExecInput", () => {
         },
         {
           name: "HOME",
-          value: "/home/sandbox",
+          value: "/root",
         },
         {
           name: "LOGNAME",
-          value: "sandbox",
+          value: "root",
         },
         {
           name: "USER",
-          value: "sandbox",
+          value: "root",
         },
         {
           name: "SANDBOX_RUNTIME_PROXY_CA_KEY_FD",
@@ -151,13 +107,5 @@ describe("buildPackagedRuntimeExecInput", () => {
         },
       ],
     });
-  });
-});
-
-describe("resolvePackagedRuntimeExecutablePath", () => {
-  it("resolves a sibling packaged runtime binary", () => {
-    expect(resolvePackagedRuntimeExecutablePath("/tmp/bin/sandbox-bootstrap")).toBe(
-      `/tmp/bin/${PackagedRuntimeBinaryName}`,
-    );
   });
 });

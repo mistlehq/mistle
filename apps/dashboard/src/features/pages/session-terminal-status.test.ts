@@ -12,7 +12,10 @@ describe("resolveSessionTerminalStatusPresentation", () => {
     expect(states).toHaveLength(9);
 
     for (const state of states) {
-      const presentation = resolveSessionTerminalStatusPresentation(state);
+      const presentation = resolveSessionTerminalStatusPresentation({
+        state,
+        isRecovering: false,
+      });
       expect(presentation.label.length).toBeGreaterThan(0);
       expect(typeof presentation.showSpinner).toBe("boolean");
       expect(sessionTerminalStatusDotClassName(presentation.tone)).toMatch(/^bg-/);
@@ -20,7 +23,12 @@ describe("resolveSessionTerminalStatusPresentation", () => {
   });
 
   it("marks only open as live with no spinner", () => {
-    expect(resolveSessionTerminalStatusPresentation(SandboxPtyStates.OPEN)).toEqual({
+    expect(
+      resolveSessionTerminalStatusPresentation({
+        state: SandboxPtyStates.OPEN,
+        isRecovering: false,
+      }),
+    ).toEqual({
       label: "Active",
       showSpinner: false,
       tone: "live",
@@ -28,24 +36,57 @@ describe("resolveSessionTerminalStatusPresentation", () => {
   });
 
   it("treats non-open states as inactive", () => {
-    expect(resolveSessionTerminalStatusPresentation(SandboxPtyStates.CONNECTING)).toEqual({
+    expect(
+      resolveSessionTerminalStatusPresentation({
+        state: SandboxPtyStates.CONNECTING,
+        isRecovering: false,
+      }),
+    ).toEqual({
       label: "Inactive",
       showSpinner: false,
       tone: "offline",
     });
-    expect(resolveSessionTerminalStatusPresentation(SandboxPtyStates.OPENING)).toEqual({
+    expect(
+      resolveSessionTerminalStatusPresentation({
+        state: SandboxPtyStates.OPENING,
+        isRecovering: false,
+      }),
+    ).toEqual({
       label: "Inactive",
       showSpinner: false,
       tone: "offline",
     });
-    expect(resolveSessionTerminalStatusPresentation(SandboxPtyStates.CLOSING)).toEqual({
+    expect(
+      resolveSessionTerminalStatusPresentation({
+        state: SandboxPtyStates.CLOSING,
+        isRecovering: false,
+      }),
+    ).toEqual({
       label: "Inactive",
       showSpinner: false,
       tone: "offline",
     });
-    expect(resolveSessionTerminalStatusPresentation(SandboxPtyStates.ERROR)).toEqual({
+    expect(
+      resolveSessionTerminalStatusPresentation({
+        state: SandboxPtyStates.ERROR,
+        isRecovering: false,
+      }),
+    ).toEqual({
       label: "Inactive",
       showSpinner: false,
+      tone: "offline",
+    });
+  });
+
+  it("surfaces reconnecting as an explicit spinner state", () => {
+    expect(
+      resolveSessionTerminalStatusPresentation({
+        state: SandboxPtyStates.CONNECTED,
+        isRecovering: true,
+      }),
+    ).toEqual({
+      label: "Reconnecting",
+      showSpinner: true,
       tone: "offline",
     });
   });

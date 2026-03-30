@@ -7,7 +7,7 @@ import {
   type CodexModelSummary,
 } from "@mistle/integrations-definitions/openai/agent/client";
 import { useMutation } from "@tanstack/react-query";
-import { useCallback, useState, type MutableRefObject } from "react";
+import { useCallback, useState, type RefObject } from "react";
 
 type CodexConfigValueEdit = {
   keyPath: string;
@@ -49,7 +49,7 @@ export type CodexSessionConfigState = {
 };
 
 export function useCodexSessionBootstrapData(input: {
-  rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
+  rpcClientRef: RefObject<CodexJsonRpcClient | null>;
   setLifecycleErrorMessage: (message: string | null) => void;
 }): CodexSessionBootstrapDataState & CodexSessionConfigState {
   const [availableModels, setAvailableModels] = useState<readonly CodexModelSummary[]>([]);

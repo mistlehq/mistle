@@ -16,6 +16,7 @@ import type {
   AppContextBindings,
   TokenizerProxyApp,
   TokenizerProxyConfig,
+  TokenizerProxyRuntimeConfig,
   TokenizerProxyUpgradeHandler,
 } from "./types.js";
 
@@ -27,6 +28,7 @@ type TokenizerProxyAppComponents = {
 export function createAppComponents(
   config: TokenizerProxyConfig,
   internalAuthServiceToken: string,
+  egressGrantConfig: TokenizerProxyRuntimeConfig["egressGrantConfig"],
 ): TokenizerProxyAppComponents {
   const app = new Hono<AppContextBindings>();
   const controlPlaneInternalClient = new ControlPlaneInternalClient({
@@ -43,10 +45,12 @@ export function createAppComponents(
   const egressProxyHandler = createEgressProxyHandler({
     controlPlaneInternalClient,
     credentialCache,
+    egressGrantConfig,
   });
   const egressProxyUpgradeHandler = createEgressProxyUpgradeHandler({
     controlPlaneInternalClient,
     credentialCache,
+    egressGrantConfig,
   });
 
   app.use("*", async (ctx, next) => {
@@ -71,6 +75,7 @@ export function createAppComponents(
 export function createApp(
   config: TokenizerProxyConfig,
   internalAuthServiceToken: string,
+  egressGrantConfig: TokenizerProxyRuntimeConfig["egressGrantConfig"],
 ): TokenizerProxyApp {
-  return createAppComponents(config, internalAuthServiceToken).app;
+  return createAppComponents(config, internalAuthServiceToken, egressGrantConfig).app;
 }

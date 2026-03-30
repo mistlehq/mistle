@@ -80,9 +80,9 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
 
             return createPtyChunks(
               [
-                "mistle@sandbox:~$ pwd",
-                "/workspace",
-                "mistle@sandbox:~$ echo 'storybook terminal ready'",
+                "root@sandbox:~# pwd",
+                "/root",
+                "root@sandbox:~# echo 'storybook terminal ready'",
                 "storybook terminal ready",
                 "",
               ].join("\n"),
@@ -110,6 +110,7 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
         primaryBottomPanel: createStorySessionBottomPanel(),
         secondaryPanel: (
           <SessionTerminalPanel
+            isResumingSandbox={false}
             isConnectionReady={true}
             isVisible={isTerminalVisible}
             onHide={() => {
@@ -118,7 +119,11 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
             onDisconnectTerminal={() => {
               setIsTerminalVisible(false);
             }}
+            onRequestSandboxResume={async () => {
+              return;
+            }}
             ptyState={ptyState}
+            sandboxStatus="running"
             sandboxInstanceId={StorySandboxInstanceId}
           />
         ),
@@ -166,7 +171,7 @@ export const OpenEmpty: Story = {
 export const OpenWithOutput: Story = {
   args: {
     initialOutput: [
-      "mistle@sandbox:~/workspace$ git status --short",
+      "root@sandbox:~# git status --short",
       " M apps/dashboard/src/features/pages/session-terminal-panel.tsx",
       " M apps/dashboard/src/features/pages/session-workbench-page.tsx",
       "",
@@ -194,7 +199,7 @@ export const ErrorState: Story = {
 export const ErrorWithBufferedOutput: Story = {
   args: {
     initialErrorMessage: "Sandbox PTY websocket connection failed.",
-    initialOutput: ["mistle@sandbox:~/workspace$ ./long-task.sh", "running\u2026", ""].join("\n"),
+    initialOutput: ["root@sandbox:~# ./long-task.sh", "running\u2026", ""].join("\n"),
     initialState: "error",
     initialTerminalVisible: true,
   },

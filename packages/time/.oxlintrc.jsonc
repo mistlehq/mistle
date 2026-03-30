@@ -3,19 +3,10 @@
   "extends": ["../../.oxlintrc.jsonc"],
   "overrides": [
     {
-      "files": ["src/**/*.ts"],
+      "files": ["src/**/*.ts", "src/**/*.tsx"],
       "rules": {
-        "eslint/no-restricted-globals": [
-          "error",
-          {
-            "name": "vi",
-            "message": "Do not use vi-based mocks/spies. Assert observable behavior instead.",
-          },
-          {
-            "name": "jest",
-            "message": "Do not use jest-based mocks/spies. Assert observable behavior instead.",
-          },
-        ],
+        "mistle/no-qualified-timer-globals": "off",
+        "eslint/no-restricted-globals": "off",
       },
     },
   ],

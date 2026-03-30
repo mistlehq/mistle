@@ -1,4 +1,5 @@
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import type { EgressGrantConfig } from "@mistle/sandbox-egress-auth";
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 import type { Context } from "hono";
 
@@ -7,6 +8,11 @@ import type { AppContextBindings } from "../types.js";
 import { EGRESS_BASE_PATH, EgressRequestHeaders } from "./constants.js";
 import { CredentialCache } from "./credential-cache.js";
 import {
+  authorizeEgressGrant,
+  EgressGrantRequestError,
+  type AuthorizedEgressGrant,
+} from "./grant.js";
+import {
   createEgressTelemetryBaseAttributes,
   createUpstreamTelemetryAttributes,
 } from "./telemetry.js";
@@ -14,18 +20,7 @@ import {
 type CreateEgressProxyHandlerInput = {
   controlPlaneInternalClient: ControlPlaneInternalClient;
   credentialCache: CredentialCache;
-};
-
-type EgressRouteMetadata = {
-  upstreamBaseUrl: string;
-  authInjectionType: "bearer" | "basic" | "header" | "query";
-  authInjectionTarget: string;
-  authInjectionUsername?: string;
-  bindingId: string;
-  connectionId: string;
-  secretType: string;
-  purpose?: string;
-  resolverKey?: string;
+  egressGrantConfig: EgressGrantConfig;
 };
 
 type ErrorResponse = {
@@ -42,15 +37,6 @@ function createErrorResponse(input: ErrorResponse): ErrorResponse {
   };
 }
 
-function readRequiredHeader(headers: Headers, headerName: string): string {
-  const value = headers.get(headerName);
-  if (value === null || value.trim().length === 0) {
-    throw new Error(`Required header '${headerName}' is missing.`);
-  }
-
-  return value;
-}
-
 function readOptionalHeader(headers: Headers, headerName: string): string | undefined {
   const value = headers.get(headerName);
   if (value === null) {
@@ -59,43 +45,6 @@ function readOptionalHeader(headers: Headers, headerName: string): string | unde
 
   const trimmed = value.trim();
   return trimmed.length === 0 ? undefined : trimmed;
-}
-
-function parseAuthInjectionType(value: string): EgressRouteMetadata["authInjectionType"] {
-  if (value === "bearer" || value === "basic" || value === "header" || value === "query") {
-    return value;
-  }
-
-  throw new Error(`Unsupported auth injection type '${value}'.`);
-}
-
-// Route metadata is carried on internal headers by sandboxd so tokenizer-proxy
-// can stay stateless and enforce the exact policy compileBinding resolved.
-function resolveRouteMetadata(ctx: Context<AppContextBindings>): EgressRouteMetadata {
-  const headers = ctx.req.raw.headers;
-  const credentialPurpose = readOptionalHeader(headers, EgressRequestHeaders.CREDENTIAL_PURPOSE);
-  const credentialResolverKey = readOptionalHeader(
-    headers,
-    EgressRequestHeaders.CREDENTIAL_RESOLVER_KEY,
-  );
-  const authInjectionUsername = readOptionalHeader(
-    headers,
-    EgressRequestHeaders.AUTH_INJECTION_USERNAME,
-  );
-
-  return {
-    upstreamBaseUrl: readRequiredHeader(headers, EgressRequestHeaders.UPSTREAM_BASE_URL),
-    authInjectionType: parseAuthInjectionType(
-      readRequiredHeader(headers, EgressRequestHeaders.AUTH_INJECTION_TYPE),
-    ),
-    authInjectionTarget: readRequiredHeader(headers, EgressRequestHeaders.AUTH_INJECTION_TARGET),
-    ...(authInjectionUsername === undefined ? {} : { authInjectionUsername }),
-    bindingId: readRequiredHeader(headers, EgressRequestHeaders.BINDING_ID),
-    connectionId: readRequiredHeader(headers, EgressRequestHeaders.CONNECTION_ID),
-    secretType: readRequiredHeader(headers, EgressRequestHeaders.CREDENTIAL_SECRET_TYPE),
-    ...(credentialPurpose === undefined ? {} : { purpose: credentialPurpose }),
-    ...(credentialResolverKey === undefined ? {} : { resolverKey: credentialResolverKey }),
-  };
 }
 
 function joinPath(basePath: string, suffixPath: string): string {
@@ -134,10 +83,6 @@ function resolveRequestTargetPath(ctx: Context<AppContextBindings>): string {
   );
 }
 
-function resolveEgressRuleId(ctx: Context<AppContextBindings>): string | undefined {
-  return readOptionalHeader(ctx.req.raw.headers, EgressRequestHeaders.EGRESS_RULE_ID);
-}
-
 function normalizePath(path: string): string {
   if (path === "") {
     return "/";
@@ -165,14 +110,18 @@ function resolveForwardPath(basePath: string, targetPath: string): string {
   return joinPath(normalizedBasePath, normalizedTargetPath);
 }
 
-// The incoming request path is relative to the sandbox route URL, while the
-// upstream base URL still points at the canonical origin. This reattaches the
-// route-relative suffix to the canonical upstream path before forwarding.
-function createUpstreamUrl(ctx: Context<AppContextBindings>, upstreamBaseUrl: string): URL {
-  const upstreamUrl = new URL(upstreamBaseUrl);
-  const incomingUrl = new URL(ctx.req.url);
+function createUpstreamUrl(input: {
+  requestUrl: string;
+  targetPath: string;
+  upstreamBaseUrl: string;
+}): URL {
+  // The incoming request path is relative to the sandbox route URL, while the
+  // upstream base URL still points at the canonical origin. This reattaches the
+  // route-relative suffix to the canonical upstream path before forwarding.
+  const upstreamUrl = new URL(input.upstreamBaseUrl);
+  const incomingUrl = new URL(input.requestUrl);
 
-  upstreamUrl.pathname = resolveForwardPath(upstreamUrl.pathname, resolveRequestTargetPath(ctx));
+  upstreamUrl.pathname = resolveForwardPath(upstreamUrl.pathname, input.targetPath);
 
   for (const [queryKey, queryValue] of incomingUrl.searchParams.entries()) {
     upstreamUrl.searchParams.append(queryKey, queryValue);
@@ -183,9 +132,10 @@ function createUpstreamUrl(ctx: Context<AppContextBindings>, upstreamBaseUrl: st
   return upstreamUrl;
 }
 
-// Some upstreams expect Basic auth as username:secret rather than a bare secret.
-// GitHub App HTTP Git access is the motivating case: x-access-token:<token>.
 function toBasicAuthorizationValue(input: { secretValue: string; username?: string }): string {
+  // Some upstreams expect Basic auth as username:secret rather than a bare
+  // secret. GitHub App HTTP Git access is the motivating case:
+  // x-access-token:<token>.
   const credentials =
     input.username === undefined ? input.secretValue : `${input.username}:${input.secretValue}`;
 
@@ -196,16 +146,16 @@ function toBearerAuthorizationValue(secretValue: string): string {
   return `Bearer ${secretValue}`;
 }
 
-// applyAuthInjection mutates the outgoing request in place because header- and
-// query-based auth schemes share the same forwarding pipeline.
 function applyAuthInjection(input: {
   upstreamUrl: URL;
   outgoingHeaders: Headers;
-  authInjectionType: EgressRouteMetadata["authInjectionType"];
+  authInjectionType: AuthorizedEgressGrant["authInjectionType"];
   authInjectionTarget: string;
   authInjectionUsername?: string;
   secretValue: string;
 }): void {
+  // applyAuthInjection mutates the outgoing request in place because header-
+  // and query-based auth schemes share the same forwarding pipeline.
   switch (input.authInjectionType) {
     case "bearer":
       input.outgoingHeaders.set(
@@ -253,7 +203,7 @@ function removeHopByHopHeaders(headers: Headers): void {
 }
 
 function removeInternalHeaders(headers: Headers): void {
-  const internalHeaderNames = Object.values(EgressRequestHeaders);
+  const internalHeaderNames = [...Object.values(EgressRequestHeaders)];
 
   for (const headerName of internalHeaderNames) {
     headers.delete(headerName);
@@ -291,58 +241,90 @@ function copyResponseHeaders(source: Headers): Headers {
 
 export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
   return async (ctx: Context<AppContextBindings>) => {
-    const egressRuleId = resolveEgressRuleId(ctx);
     const span = EgressTracer.startSpan("tokenizer_proxy.egress.proxy_request", {
       attributes: {
         "http.request.method": ctx.req.method,
         "url.path": ctx.req.path,
-        ...(egressRuleId === undefined ? {} : { "mistle.egress.rule_id": egressRuleId }),
       },
     });
 
     return await context.with(trace.setSpan(context.active(), span), async () => {
       try {
-        let routeMetadata: EgressRouteMetadata;
-
+        let targetPath: string;
         try {
-          routeMetadata = resolveRouteMetadata(ctx);
+          targetPath = resolveRequestTargetPath(ctx);
         } catch (error) {
           span.recordException(error instanceof Error ? error : new Error(String(error)));
           span.setStatus({
             code: SpanStatusCode.ERROR,
-            message: "invalid egress route metadata",
+            message: "invalid egress target path",
           });
           return ctx.json(
             createErrorResponse({
-              code: "INVALID_EGRESS_ROUTE_METADATA",
-              message: error instanceof Error ? error.message : "Egress route metadata is invalid.",
+              code: "INVALID_EGRESS_TARGET_PATH",
+              message: error instanceof Error ? error.message : "Egress target path is invalid.",
             }),
             400,
           );
         }
 
+        let egressGrant: AuthorizedEgressGrant;
+
+        try {
+          egressGrant = await authorizeEgressGrant({
+            grantToken: readOptionalHeader(ctx.req.raw.headers, EgressRequestHeaders.GRANT),
+            config: input.egressGrantConfig,
+            method: ctx.req.method,
+            targetPath,
+          });
+        } catch (error) {
+          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: "invalid egress grant",
+          });
+
+          if (error instanceof EgressGrantRequestError) {
+            ctx.status(error.statusCode);
+            return ctx.json(
+              createErrorResponse({
+                code: error.responseCode,
+                message: error.message,
+              }),
+            );
+          }
+
+          return ctx.json(
+            createErrorResponse({
+              code: "INVALID_EGRESS_GRANT",
+              message: error instanceof Error ? error.message : "Egress grant is invalid.",
+            }),
+            401,
+          );
+        }
+
         span.setAttributes(
           createEgressTelemetryBaseAttributes({
+            egressRuleId: egressGrant.egressRuleId,
             method: ctx.req.method,
             requestPath: ctx.req.path,
-            bindingId: routeMetadata.bindingId,
-            connectionId: routeMetadata.connectionId,
-            ...(egressRuleId === undefined ? {} : { egressRuleId }),
+            bindingId: egressGrant.bindingId,
+            connectionId: egressGrant.connectionId,
           }),
         );
-        span.setAttribute("mistle.auth.injection.type", routeMetadata.authInjectionType);
-        if (routeMetadata.resolverKey !== undefined) {
-          span.setAttribute("mistle.credential.resolver_key", routeMetadata.resolverKey);
+        span.setAttribute("mistle.auth.injection.type", egressGrant.authInjectionType);
+        if (egressGrant.resolverKey !== undefined) {
+          span.setAttribute("mistle.credential.resolver_key", egressGrant.resolverKey);
         }
 
         const cacheKey = {
-          bindingId: routeMetadata.bindingId,
-          connectionId: routeMetadata.connectionId,
-          secretType: routeMetadata.secretType,
-          ...(routeMetadata.purpose === undefined ? {} : { purpose: routeMetadata.purpose }),
-          ...(routeMetadata.resolverKey === undefined
+          bindingId: egressGrant.bindingId,
+          connectionId: egressGrant.connectionId,
+          secretType: egressGrant.secretType,
+          ...(egressGrant.purpose === undefined ? {} : { purpose: egressGrant.purpose }),
+          ...(egressGrant.resolverKey === undefined
             ? {}
-            : { resolverKey: routeMetadata.resolverKey }),
+            : { resolverKey: egressGrant.resolverKey }),
         };
 
         let resolvedCredentialValue = input.credentialCache.get(cacheKey);
@@ -355,25 +337,25 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
               async (credentialSpan) => {
                 credentialSpan.setAttributes(
                   createEgressTelemetryBaseAttributes({
+                    egressRuleId: egressGrant.egressRuleId,
                     method: ctx.req.method,
                     requestPath: ctx.req.path,
-                    bindingId: routeMetadata.bindingId,
-                    connectionId: routeMetadata.connectionId,
-                    ...(egressRuleId === undefined ? {} : { egressRuleId }),
+                    bindingId: egressGrant.bindingId,
+                    connectionId: egressGrant.connectionId,
                   }),
                 );
                 try {
                   const resolvedCredential =
                     await input.controlPlaneInternalClient.resolveIntegrationCredential({
-                      connectionId: routeMetadata.connectionId,
-                      bindingId: routeMetadata.bindingId,
-                      secretType: routeMetadata.secretType,
-                      ...(routeMetadata.purpose === undefined
+                      connectionId: egressGrant.connectionId,
+                      bindingId: egressGrant.bindingId,
+                      secretType: egressGrant.secretType,
+                      ...(egressGrant.purpose === undefined
                         ? {}
-                        : { purpose: routeMetadata.purpose }),
-                      ...(routeMetadata.resolverKey === undefined
+                        : { purpose: egressGrant.purpose }),
+                      ...(egressGrant.resolverKey === undefined
                         ? {}
-                        : { resolverKey: routeMetadata.resolverKey }),
+                        : { resolverKey: egressGrant.resolverKey }),
                     });
 
                   input.credentialCache.set(cacheKey, resolvedCredential);
@@ -397,7 +379,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             logger.error(
               {
                 err: error,
-                egressRuleId,
+                egressRuleId: egressGrant.egressRuleId,
               },
               "Failed to resolve integration credential from control-plane-api",
             );
@@ -416,18 +398,22 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           }
         }
 
-        const upstreamUrl = createUpstreamUrl(ctx, routeMetadata.upstreamBaseUrl);
+        const upstreamUrl = createUpstreamUrl({
+          requestUrl: ctx.req.url,
+          targetPath,
+          upstreamBaseUrl: egressGrant.upstreamBaseUrl,
+        });
         span.setAttributes(createUpstreamTelemetryAttributes({ upstreamUrl }));
         const outgoingHeaders = buildOutgoingRequestHeaders(ctx);
 
         applyAuthInjection({
           upstreamUrl,
           outgoingHeaders,
-          authInjectionType: routeMetadata.authInjectionType,
-          authInjectionTarget: routeMetadata.authInjectionTarget,
-          ...(routeMetadata.authInjectionUsername === undefined
+          authInjectionType: egressGrant.authInjectionType,
+          authInjectionTarget: egressGrant.authInjectionTarget,
+          ...(egressGrant.authInjectionUsername === undefined
             ? {}
-            : { authInjectionUsername: routeMetadata.authInjectionUsername }),
+            : { authInjectionUsername: egressGrant.authInjectionUsername }),
           secretValue: resolvedCredentialValue,
         });
 
@@ -464,8 +450,8 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           logger.error(
             {
               err: error,
-              egressRuleId,
-              upstreamBaseUrl: routeMetadata.upstreamBaseUrl,
+              egressRuleId: egressGrant.egressRuleId,
+              upstreamBaseUrl: egressGrant.upstreamBaseUrl,
             },
             "Failed to forward egress request to upstream",
           );

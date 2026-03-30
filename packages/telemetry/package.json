@@ -18,7 +18,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
-    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
+    "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run --passWithNoTests",
     "format": "oxfmt .",
@@ -28,10 +28,10 @@
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/api-logs": "^0.213.0",
     "@opentelemetry/auto-instrumentations-node": "^0.71.0",
-    "@opentelemetry/exporter-logs-otlp-http": "^0.213.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.213.0",
-    "@opentelemetry/instrumentation-pg": "^0.65.0",
-    "@opentelemetry/sdk-logs": "^0.213.0",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.214.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.214.0",
+    "@opentelemetry/instrumentation-pg": "^0.66.0",
+    "@opentelemetry/sdk-logs": "^0.214.0",
     "@opentelemetry/sdk-node": "^0.213.0"
   }
 }

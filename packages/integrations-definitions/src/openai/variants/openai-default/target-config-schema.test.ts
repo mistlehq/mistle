@@ -34,7 +34,7 @@ describe("OpenAiApiKeyTargetConfigSchema", () => {
         api_base_url: "not-a-url",
         binding_capabilities: createOpenAiRawBindingCapabilities(),
       }),
-    ).toThrow();
+    ).toThrow(/Invalid URL/);
   });
 
   it("fails when binding capabilities are missing", () => {
@@ -42,6 +42,6 @@ describe("OpenAiApiKeyTargetConfigSchema", () => {
       OpenAiApiKeyTargetConfigSchema.parse({
         api_base_url: "https://api.openai.com",
       }),
-    ).toThrow();
+    ).toThrow(/Invalid input/);
   });
 });

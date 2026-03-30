@@ -1,3 +1,12 @@
+export const WebhookAutomationEventOptionAvailabilities = {
+  AVAILABLE: "available",
+  MISSING_INTEGRATION: "missing_integration",
+  WRONG_PROFILE: "wrong_profile",
+} as const;
+
+export type WebhookAutomationEventOptionAvailability =
+  (typeof WebhookAutomationEventOptionAvailabilities)[keyof typeof WebhookAutomationEventOptionAvailabilities];
+
 export type WebhookAutomationEventParameterOption =
   | {
       id: string;
@@ -46,7 +55,7 @@ export type WebhookAutomationEventOption = {
   description?: string;
   category?: string;
   logoKey?: string;
-  unavailable?: boolean;
+  availability?: WebhookAutomationEventOptionAvailability;
   conversationKeyOptions?: readonly WebhookAutomationConversationKeyOption[];
   parameters?: readonly WebhookAutomationEventParameterOption[];
 };

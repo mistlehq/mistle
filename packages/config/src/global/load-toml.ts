@@ -11,6 +11,7 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
   const sandbox = asObjectRecord(global.sandbox);
   const sandboxBootstrap = asObjectRecord(sandbox.bootstrap);
   const sandboxConnect = asObjectRecord(sandbox.connect);
+  const sandboxEgress = asObjectRecord(sandbox.egress);
 
   return PartialGlobalConfigSchema.parse({
     env: global.env,
@@ -61,7 +62,8 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
     typeof sandbox.gateway_ws_url === "string" ||
     typeof sandbox.internal_gateway_ws_url === "string" ||
     typeof sandboxBootstrap.token_secret === "string" ||
-    typeof sandboxConnect.token_secret === "string"
+    typeof sandboxConnect.token_secret === "string" ||
+    typeof sandboxEgress.token_secret === "string"
       ? {
           sandbox: {
             provider: sandbox.provider,
@@ -77,6 +79,11 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
               tokenSecret: sandboxConnect.token_secret,
               tokenIssuer: sandboxConnect.token_issuer,
               tokenAudience: sandboxConnect.token_audience,
+            },
+            egress: {
+              tokenSecret: sandboxEgress.token_secret,
+              tokenIssuer: sandboxEgress.token_issuer,
+              tokenAudience: sandboxEgress.token_audience,
             },
           },
         }

@@ -5,7 +5,7 @@ import { applyEnvironmentEntries, resolveBaselineProxyEnvironment } from "./prox
 describe("resolveBaselineProxyEnvironment", () => {
   it("derives loopback proxy URLs and internal no-proxy coverage", () => {
     const environment = resolveBaselineProxyEnvironment({
-      listenAddr: ":8090",
+      listenAddr: "127.0.0.1:8090",
       tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy.internal:8081/egress",
     });
 

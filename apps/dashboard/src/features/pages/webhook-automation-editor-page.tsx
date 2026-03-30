@@ -202,6 +202,7 @@ function LoadedWebhookAutomationEditor(input: {
         connectionOptions={state.connectionOptions}
         fieldErrors={state.fieldErrors}
         formError={state.formError}
+        validationSummaryError={state.validationSummaryError}
         isDeleting={state.isDeleting}
         isSaving={state.isSaving}
         mode={input.mode}

@@ -5,15 +5,17 @@ import type { SandboxRuntimeControl } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
+import { createEgressGrantByRuleId } from "./egress-grants.js";
 import {
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxStartupInput,
   type SandboxStartupInput,
 } from "./sandbox-startup-input.js";
 
-function createSandboxStartupInput(input: {
+async function createSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
   sandboxInstanceId: string;
+  startupMode: SandboxStartupInput["startupMode"];
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
 }): Promise<SandboxStartupInput> {
   const bootstrapTokenJti = randomUUID();
@@ -23,7 +25,7 @@ function createSandboxStartupInput(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
 
-  return Promise.all([
+  const [bootstrapToken, tunnelExchangeToken, egressGrantByRuleId] = await Promise.all([
     mintBootstrapToken({
       config: {
         bootstrapTokenSecret: input.config.sandbox.bootstrap.tokenSecret,
@@ -46,12 +48,21 @@ function createSandboxStartupInput(input: {
       exchangeTokenTtlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
       ttlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
     }),
-  ]).then(([bootstrapToken, tunnelExchangeToken]) => ({
+    createEgressGrantByRuleId({
+      config: input.config,
+      sandboxInstanceId: input.sandboxInstanceId,
+      runtimePlan: input.runtimePlan,
+    }),
+  ]);
+
+  return {
+    startupMode: input.startupMode,
     bootstrapToken,
     tunnelExchangeToken,
     tunnelGatewayWsUrl,
     runtimePlan: input.runtimePlan,
-  }));
+    egressGrantByRuleId,
+  };
 }
 
 export async function applySandboxStartupConfiguration(
@@ -62,12 +73,14 @@ export async function applySandboxStartupConfiguration(
   input: {
     sandboxInstanceId: string;
     providerSandboxId: string;
+    startupMode: SandboxStartupInput["startupMode"];
     runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   },
 ): Promise<void> {
   const startupInput = await createSandboxStartupInput({
     config: ctx.config,
     sandboxInstanceId: input.sandboxInstanceId,
+    startupMode: input.startupMode,
     runtimePlan: input.runtimePlan,
   });
 

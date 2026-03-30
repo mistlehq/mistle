@@ -156,7 +156,7 @@ flowchart TD
 
 - `compileBinding(...)` from each definition emits:
 - `egressRoutes` (match/upstream/auth injection/credential resolver)
-- `artifacts` (install/update/remove runtime tools)
+- `artifacts` (install runtime tools)
 - `runtimeClients` (files/env/processes/endpoints)
 
 - `integrations-core` then runs an MCP pass across the whole sandbox profile version:

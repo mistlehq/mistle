@@ -16,6 +16,7 @@ export async function readEffectiveSandboxStatus(
   },
 ): Promise<NonNullable<GetSandboxInstanceResponse>["status"]> {
   if (
+    input.persistedStatus !== SandboxInstanceStatuses.PENDING &&
     input.persistedStatus !== SandboxInstanceStatuses.STARTING &&
     input.persistedStatus !== SandboxInstanceStatuses.RUNNING
   ) {

@@ -1,6 +1,15 @@
-const RuntimeCommandNames = new Set(["serve", "apply-startup", "runtime-internal"]);
+const RuntimeCommandNames = new Set([
+  "serve",
+  "apply-startup",
+  "bootstrap-runtime",
+  "runtime-internal",
+]);
 
-export type RuntimeCommandName = "serve" | "apply-startup" | "runtime-internal";
+export type RuntimeCommandName =
+  | "serve"
+  | "apply-startup"
+  | "bootstrap-runtime"
+  | "runtime-internal";
 
 export function resolveRuntimeCommandName(processArgv: readonly string[]): RuntimeCommandName {
   for (let index = processArgv.length - 1; index >= 1; index -= 1) {

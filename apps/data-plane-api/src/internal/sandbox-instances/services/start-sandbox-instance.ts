@@ -108,7 +108,7 @@ export async function startSandboxInstance(
       sandboxProfileVersion: input.sandboxProfileVersion,
       runtimeProvider: ctx.sandboxProvider,
       providerSandboxId: null,
-      status: SandboxInstanceStatuses.STARTING,
+      status: SandboxInstanceStatuses.PENDING,
       startedByKind: input.startedBy.kind,
       startedById: input.startedBy.id,
       source: input.source,

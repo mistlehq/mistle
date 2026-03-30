@@ -32,7 +32,11 @@ export async function resumeInstance(
     },
   );
 
-  if (sandboxInstance.status === "running" || sandboxInstance.status === "starting") {
+  if (
+    sandboxInstance.status === "running" ||
+    sandboxInstance.status === "pending" ||
+    sandboxInstance.status === "starting"
+  ) {
     return sandboxInstance;
   }
 

@@ -38,6 +38,15 @@ function formatOpenErrorMessage(client: SandboxSessionClient): string {
   return `Sandbox agent stream.open request was rejected (${openError.code}): ${openError.message}`;
 }
 
+function formatResetErrorMessage(client: SandboxSessionClient): string | null {
+  const resetInfo = client.resetInfo;
+  if (resetInfo === null) {
+    return null;
+  }
+
+  return `Sandbox agent stream was reset (${resetInfo.code}): ${resetInfo.message}`;
+}
+
 export async function connectSandboxAgentConnection(
   input: ConnectSandboxAgentConnectionInput,
 ): Promise<SandboxAgentConnection> {
@@ -77,7 +86,20 @@ export async function connectSandboxAgentConnection(
     streamId,
     socket,
     sessionClient: client,
-    sendText: (message) => client.sendText(message),
+    sendText: async (message) => {
+      try {
+        await client.sendText(message);
+      } catch (error) {
+        const resetErrorMessage = formatResetErrorMessage(client);
+        if (resetErrorMessage !== null) {
+          throw new Error(resetErrorMessage, {
+            cause: error,
+          });
+        }
+
+        throw error;
+      }
+    },
     close: async (closeInput) =>
       await new Promise<void>((resolve, reject) => {
         if (socket.readyState === SandboxSessionSocketReadyStates.CLOSED) {

@@ -8,7 +8,7 @@ import {
   type CodexJsonRpcClient,
 } from "@mistle/integrations-definitions/openai/agent/client";
 import { useMutation } from "@tanstack/react-query";
-import { useCallback, useReducer, type MutableRefObject } from "react";
+import { useCallback, useReducer, type RefObject } from "react";
 
 import {
   createInitialCodexChatState,
@@ -58,8 +58,8 @@ function buildTurnRequest(input: {
 }
 
 export function useCodexChatController(input: {
-  rpcClientRef: MutableRefObject<CodexJsonRpcClient | null>;
-  threadIdRef: MutableRefObject<string | null>;
+  rpcClientRef: RefObject<CodexJsonRpcClient | null>;
+  threadIdRef: RefObject<string | null>;
   setSessionErrorMessage: (message: string | null) => void;
 }) {
   const [chatState, dispatchChatAction] = useReducer(

@@ -103,21 +103,13 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(installCommand?.args.slice(0, 2)).toEqual(["sh", "-euc"]);
     expect(installCommand?.timeoutMs).toBe(120_000);
 
-    const updateCommand = runtimePlan.artifacts[0]?.lifecycle.update?.[0];
-    expect(updateCommand?.args.slice(0, 2)).toEqual(["sh", "-euc"]);
-    expect(updateCommand?.timeoutMs).toBe(120_000);
-
-    expect(runtimePlan.artifacts[0]?.lifecycle.remove).toEqual([
-      { args: ["rm", "-f", "/var/lib/mistle/bin/codex"] },
-    ]);
-
     const installScript = installCommand?.args[2];
     expect(typeof installScript).toBe("string");
     expect(installScript).toContain("repo=openai/codex");
     expect(installScript).toContain("releases/latest/download/$asset_name");
     expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
-    expect(installScript).toContain("/var/lib/mistle/bin/codex");
+    expect(installScript).toContain("/usr/local/bin/codex");
     expect(runtimePlan.runtimeClients).toHaveLength(1);
     expect(runtimePlan.runtimeClients[0]).toMatchObject({
       clientId: "codex-cli",
@@ -138,7 +130,7 @@ describe("sandbox profile compile runtime plan integration", () => {
         {
           processKey: "codex-app-server",
           command: {
-            args: ["/var/lib/mistle/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
+            args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
           },
           readiness: {
             type: "ws",

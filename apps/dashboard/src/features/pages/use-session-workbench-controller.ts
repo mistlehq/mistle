@@ -9,7 +9,9 @@ import {
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   isActiveResumeRequest,
+  reduceCodexRecoveryState,
   resolveAutomationSessionPreparationTimeoutDelayMs,
+  resolveCodexReconnectMessage,
   resolveSessionEntryPhase,
   resolveStoppedSessionMessageForEntryPhase,
   seedSandboxInstanceStatusQuery,
@@ -38,9 +40,14 @@ type SessionWorkbenchState = {
   };
   hasTopAlert: boolean;
   isResumingStoppedSandbox: boolean;
+  sessionReconnectState: {
+    isRecovering: boolean;
+    message: string | null;
+  };
   shouldAutoResumeOnEntry: boolean;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   requestStoppedSandboxResume: () => Promise<void>;
+  sandboxLifecycleStatus: "resuming" | "starting" | "running" | "stopped" | "failed" | null;
   sandboxFailureMessage: string | null;
   sandboxStatusQuery: ReturnType<typeof useSessionWorkbenchLifecycleState>["sandboxStatusQuery"];
   sessionHeaderStatusUi: ReturnType<
@@ -79,7 +86,9 @@ export {
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   isActiveResumeRequest,
+  reduceCodexRecoveryState,
   resolveAutomationSessionPreparationTimeoutDelayMs,
+  resolveCodexReconnectMessage,
   resolveSessionEntryPhase,
   resolveStoppedSessionMessageForEntryPhase,
   seedSandboxInstanceStatusQuery,
@@ -122,9 +131,11 @@ export function useSessionWorkbenchController(input: {
       stoppedSessionState: workbenchLifecycleState.stoppedSessionState,
       hasTopAlert: workbenchLifecycleState.hasTopAlert,
       isResumingStoppedSandbox: workbenchLifecycleState.isResumingStoppedSandbox,
+      sessionReconnectState: workbenchLifecycleState.sessionReconnectState,
       shouldAutoResumeOnEntry: workbenchLifecycleState.shouldAutoResumeOnEntry,
       ptyState,
       requestStoppedSandboxResume: workbenchLifecycleState.requestStoppedSandboxResume,
+      sandboxLifecycleStatus: workbenchLifecycleState.sandboxLifecycleStatus,
       sandboxFailureMessage: workbenchLifecycleState.sandboxFailureMessage,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,
       sessionHeaderStatusUi: workbenchLifecycleState.sessionHeaderStatusUi,

@@ -28,6 +28,11 @@ token_secret = "fixture-bootstrap-token-secret"
 token_issuer = "data-plane-worker"
 token_audience = "data-plane-gateway"
 
+[global.sandbox.egress]
+token_secret = "fixture-egress-token-secret"
+token_issuer = "data-plane-worker"
+token_audience = "tokenizer-proxy"
+
 [global.sandbox]
 provider = "docker"
 default_base_image = "127.0.0.1:5001/mistle/sandbox-base:dev"

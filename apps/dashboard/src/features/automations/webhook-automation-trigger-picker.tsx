@@ -21,6 +21,11 @@ import { useId, useState } from "react";
 
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { StatusBox } from "../shared/status-box.js";
+import {
+  createSyntheticWebhookAutomationEventOption,
+  isWebhookAutomationEventOptionUnavailable,
+} from "./webhook-automation-event-option-availability.js";
 import type {
   WebhookAutomationEventOption,
   WebhookAutomationTriggerParameterValueMap,
@@ -83,14 +88,10 @@ export function resolveSelectedWebhookAutomationEventOptions(input: {
     }
 
     return {
-      id: triggerId,
-      eventType: triggerId,
-      connectionId: "",
-      connectionLabel: "",
-      label: triggerId,
-      description: "No longer available from your connected integrations.",
-      category: "Unavailable",
-      unavailable: true,
+      ...createSyntheticWebhookAutomationEventOption({
+        triggerId,
+        availability: "missing_integration",
+      }),
     } satisfies WebhookAutomationEventOption;
   });
 }
@@ -113,7 +114,8 @@ function resolveWebhookAutomationTriggerPickerState(input: {
 
   const selectedTriggerIdSet = new Set(input.selectedTriggerIds);
   const availableEventOptions = input.eventOptions.filter(
-    (option) => option.unavailable !== true && !selectedTriggerIdSet.has(option.id),
+    (option) =>
+      !isWebhookAutomationEventOptionUnavailable(option) && !selectedTriggerIdSet.has(option.id),
   );
   const hasAvailableTriggers = availableEventOptions.length > 0;
 
@@ -154,6 +156,7 @@ export function WebhookAutomationTriggerPicker(input: {
     eventOptions: input.eventOptions,
     selectedTriggerIds: input.selectedTriggerIds,
   });
+  const emptyStateMessage = input.error === undefined ? "No triggers added yet." : input.error;
 
   return (
     <div className="space-y-3">
@@ -169,37 +172,44 @@ export function WebhookAutomationTriggerPicker(input: {
       )}
 
       {pickerState.helperMessage === null ? null : (
-        <p className="text-muted-foreground text-sm">{pickerState.helperMessage}</p>
+        <StatusBox tone="destructive">{pickerState.helperMessage}</StatusBox>
       )}
 
       {selectedEventOptions.length === 0 ? (
         pickerState.disabled ? null : (
-          <p className="text-muted-foreground text-sm">No triggers added yet.</p>
+          <StatusBox tone={input.error === undefined ? "neutral" : "destructive"}>
+            {emptyStateMessage}
+          </StatusBox>
         )
       ) : (
         <div className="space-y-1.5">
           {selectedEventOptions.map((option) => (
             <div
-              className="bg-muted/20 grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-3 gap-y-2 rounded-lg border px-3.5 py-2"
+              className={
+                isWebhookAutomationEventOptionUnavailable(option)
+                  ? "bg-destructive/5 flex flex-col gap-3 rounded-lg border border-destructive/40 px-3.5 py-2 md:grid md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-start md:gap-x-3 md:gap-y-2"
+                  : "bg-muted/20 flex flex-col gap-3 rounded-lg border px-3.5 py-2 md:grid md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-start md:gap-x-3 md:gap-y-2"
+              }
               key={option.id}
             >
-              <div className="col-start-1 row-start-1 flex min-w-0 self-center items-center gap-2.5">
-                {option.logoKey === undefined ? null : (
-                  <img
-                    alt=""
-                    aria-hidden
-                    className="size-4 shrink-0"
-                    src={resolveIntegrationLogoPath({ logoKey: option.logoKey })}
-                  />
-                )}
-                <p className="text-sm leading-none font-medium whitespace-nowrap">{option.label}</p>
-                {option.unavailable === true ? (
-                  <span className="text-destructive text-xs whitespace-nowrap">Unavailable</span>
-                ) : null}
+              <div className="min-w-0 self-start md:col-start-1 md:row-start-1">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  {option.logoKey === undefined ? null : (
+                    <img
+                      alt=""
+                      aria-hidden
+                      className="size-4 shrink-0"
+                      src={resolveIntegrationLogoPath({ logoKey: option.logoKey })}
+                    />
+                  )}
+                  <p className="text-sm leading-none font-medium whitespace-nowrap">
+                    {option.label}
+                  </p>
+                </div>
               </div>
               {option.parameters?.map((parameter, index) => (
                 <div
-                  className="col-start-2 justify-self-end"
+                  className="w-full md:col-start-2 md:w-auto md:justify-self-end"
                   key={`${option.id}:${parameter.id}`}
                   style={{ gridRowStart: index + 1 }}
                 >
@@ -218,9 +228,18 @@ export function WebhookAutomationTriggerPicker(input: {
                   />
                 </div>
               ))}
+              {isWebhookAutomationEventOptionUnavailable(option) &&
+              option.description !== undefined ? (
+                <p
+                  className="text-destructive text-sm md:col-start-1 md:self-end"
+                  style={{ gridRowStart: Math.max(option.parameters?.length ?? 0, 2) }}
+                >
+                  {option.description}
+                </p>
+              ) : null}
               <Button
                 aria-label={`Remove ${option.label} trigger`}
-                className="col-start-3 row-start-1 size-7 shrink-0 self-center"
+                className="size-7 shrink-0 self-end md:col-start-3 md:row-start-1 md:self-center"
                 onClick={() => {
                   input.onValueChange(
                     input.selectedTriggerIds.filter(
@@ -384,12 +403,12 @@ function TriggerParameterField(input: {
 
   if (input.parameter.kind === "string") {
     return (
-      <span className="flex shrink-0 items-center justify-end gap-2 whitespace-nowrap">
-        <span className="text-muted-foreground text-sm whitespace-nowrap">
+      <span className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
+        <span className="text-muted-foreground shrink-0 text-sm whitespace-nowrap">
           {input.parameter.prefix ?? input.parameter.label}
         </span>
         <Input
-          className="min-w-32"
+          className="min-w-0 flex-1 md:min-w-32 md:flex-none"
           onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
             input.onValueChange(event.currentTarget.value);
           }}
@@ -402,8 +421,8 @@ function TriggerParameterField(input: {
 
   if (input.parameter.kind === "enum-select") {
     return (
-      <span className="flex shrink-0 items-center justify-end gap-2 whitespace-nowrap">
-        <span className="text-muted-foreground text-sm whitespace-nowrap">
+      <span className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
+        <span className="text-muted-foreground shrink-0 text-sm whitespace-nowrap">
           {input.parameter.prefix ?? input.parameter.label}
         </span>
         <Select
@@ -418,7 +437,7 @@ function TriggerParameterField(input: {
           }}
           value={input.value.length === 0 ? null : input.value}
         >
-          <SelectTrigger className="min-w-44">
+          <SelectTrigger className="min-w-0 flex-1 md:min-w-44 md:flex-none">
             <SelectValue
               placeholder={input.parameter.placeholder ?? `Any ${input.parameter.label}`}
             >
@@ -486,8 +505,8 @@ function ResourceSelectParameterField(input: {
   const [resourceQueryText, setResourceQueryText] = useState(input.selectedDisplayName);
 
   return (
-    <span className="flex shrink-0 items-center justify-end gap-2 whitespace-nowrap">
-      <span className="text-muted-foreground text-sm whitespace-nowrap">
+    <span className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
+      <span className="text-muted-foreground shrink-0 text-sm whitespace-nowrap">
         {input.parameter.prefix ?? input.parameter.label}
       </span>
       <Combobox<string>
@@ -512,7 +531,7 @@ function ResourceSelectParameterField(input: {
         }}
         value={input.value.length === 0 ? null : input.value}
       >
-        <div className="min-w-44" ref={resourceAnchorRef}>
+        <div className="min-w-0 flex-1 md:min-w-44 md:flex-none" ref={resourceAnchorRef}>
           <ComboboxInput
             className="w-full"
             placeholder={

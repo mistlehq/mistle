@@ -3,8 +3,10 @@
   "env": {
     "builtin": true,
   },
+  "jsPlugins": ["./tools/oxlint-plugins/no-qualified-timer-globals.js"],
   "plugins": ["eslint", "typescript", "node", "vitest"],
   "rules": {
+    "mistle/no-qualified-timer-globals": "error",
     "typescript/no-deprecated": "error",
     "eslint/no-restricted-imports": [
       "error",

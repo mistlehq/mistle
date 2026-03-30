@@ -1,5 +1,6 @@
+import { systemScheduler } from "@mistle/time";
 import { type QueryClient, useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import type { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
@@ -18,6 +19,8 @@ const AutomationSessionStatusRefetchIntervalMs = 2_000;
 const AutomationSessionPreparationTimeoutMs = 30_000;
 const AutomationSessionPreparationTimeoutMessage =
   "This chat session is taking longer than expected to become ready. Please try again shortly.";
+const MaxCodexReconnectAttempts = 3;
+const CodexReconnectLimitMessage = `Could not reconnect session after ${String(MaxCodexReconnectAttempts)} attempts.`;
 
 type SandboxAutomationConversation = {
   conversationId: string;
@@ -29,6 +32,210 @@ type ResumeRequestGuard = {
   requestId: number;
   sandboxInstanceId: string;
 };
+
+type RecoverableCodexDisconnect = {
+  id: number;
+  message: string;
+  preferredThreadId: string | null;
+};
+
+type CodexRecoveryReconnectCommand = "none" | "reconnect";
+
+type CodexRecoveryObservedState = {
+  canConnect: boolean;
+  connected: boolean;
+  hasLifecycleError: boolean;
+  isStartingSession: boolean;
+  isWaitingForAutomationThread: boolean;
+  sandboxInstanceId: string | null;
+  sandboxStatus: "resuming" | "starting" | "running" | "stopped" | "failed" | null;
+};
+
+export type CodexRecoveryState =
+  | {
+      kind: "idle";
+    }
+  | {
+      kind: "recovering";
+      baseMessage: string;
+      errorMessage: string | null;
+      preferredThreadId: string | null;
+      reconnectAttemptCount: number;
+      reconnectCommand: CodexRecoveryReconnectCommand;
+      recoverableDisconnectId: number;
+    };
+
+export type CodexRecoveryEvent =
+  | {
+      type: "recoverable_disconnect_observed";
+      disconnect: RecoverableCodexDisconnect;
+    }
+  | {
+      type: "reconnect_attempt_started";
+    }
+  | {
+      type: "sandbox_changed";
+    }
+  | {
+      type: "session_connected";
+    }
+  | {
+      type: "sync_observed";
+      observation: CodexRecoveryObservedState;
+    };
+
+function createCodexRecoveryStateFromDisconnect(
+  disconnect: RecoverableCodexDisconnect,
+): CodexRecoveryState {
+  return {
+    kind: "recovering",
+    baseMessage: disconnect.message,
+    errorMessage: null,
+    preferredThreadId: disconnect.preferredThreadId,
+    reconnectAttemptCount: 0,
+    reconnectCommand: "none",
+    recoverableDisconnectId: disconnect.id,
+  };
+}
+
+export function reduceCodexRecoveryState(
+  state: CodexRecoveryState,
+  event: CodexRecoveryEvent,
+): CodexRecoveryState {
+  switch (state.kind) {
+    case "idle": {
+      if (event.type === "recoverable_disconnect_observed") {
+        return createCodexRecoveryStateFromDisconnect(event.disconnect);
+      }
+
+      return state;
+    }
+
+    case "recovering": {
+      switch (event.type) {
+        case "recoverable_disconnect_observed": {
+          if (state.recoverableDisconnectId === event.disconnect.id) {
+            return {
+              ...state,
+              baseMessage: event.disconnect.message,
+              preferredThreadId: event.disconnect.preferredThreadId,
+            };
+          }
+
+          return createCodexRecoveryStateFromDisconnect(event.disconnect);
+        }
+
+        case "reconnect_attempt_started": {
+          if (state.reconnectCommand !== "reconnect") {
+            return state;
+          }
+
+          return {
+            ...state,
+            reconnectAttemptCount: state.reconnectAttemptCount + 1,
+            reconnectCommand: "none",
+          };
+        }
+
+        case "sandbox_changed":
+        case "session_connected": {
+          return {
+            kind: "idle",
+          };
+        }
+
+        case "sync_observed": {
+          if (event.observation.connected) {
+            return {
+              kind: "idle",
+            };
+          }
+
+          if (state.errorMessage !== null) {
+            return state.reconnectCommand === "none"
+              ? state
+              : {
+                  ...state,
+                  reconnectCommand: "none",
+                };
+          }
+
+          if (event.observation.sandboxStatus === "failed") {
+            return {
+              ...state,
+              errorMessage: `${state.baseMessage} The sandbox failed and the session cannot reconnect.`,
+              reconnectCommand: "none",
+            };
+          }
+
+          if (state.reconnectAttemptCount >= MaxCodexReconnectAttempts) {
+            return {
+              ...state,
+              errorMessage: CodexReconnectLimitMessage,
+              reconnectCommand: "none",
+            };
+          }
+
+          if (
+            event.observation.sandboxInstanceId === null ||
+            !event.observation.canConnect ||
+            event.observation.hasLifecycleError ||
+            event.observation.isStartingSession ||
+            event.observation.isWaitingForAutomationThread ||
+            event.observation.sandboxStatus !== "running"
+          ) {
+            return state.reconnectCommand === "none"
+              ? state
+              : {
+                  ...state,
+                  reconnectCommand: "none",
+                };
+          }
+
+          return state.reconnectCommand === "reconnect"
+            ? state
+            : {
+                ...state,
+                reconnectCommand: "reconnect",
+              };
+        }
+      }
+    }
+  }
+}
+
+export function resolveCodexReconnectMessage(input: {
+  recoveryBaseMessage: string | null;
+  recoveryErrorMessage: string | null;
+  reconnectAttemptCount: number;
+  sandboxStatus: "resuming" | "starting" | "running" | "stopped" | "failed" | null;
+}): string | null {
+  if (input.recoveryErrorMessage !== null) {
+    return input.recoveryErrorMessage;
+  }
+
+  if (input.recoveryBaseMessage === null) {
+    return null;
+  }
+
+  if (input.sandboxStatus === "stopped") {
+    return `${input.recoveryBaseMessage} Resuming sandbox to restore the session.`;
+  }
+
+  if (
+    input.sandboxStatus === "resuming" ||
+    input.sandboxStatus === "starting" ||
+    input.sandboxStatus === null
+  ) {
+    return `${input.recoveryBaseMessage} Waiting for the sandbox to become ready again.`;
+  }
+
+  if (input.sandboxStatus === "failed") {
+    return `${input.recoveryBaseMessage} The sandbox failed and the session cannot reconnect.`;
+  }
+
+  return `${input.recoveryBaseMessage} Reconnecting session${input.reconnectAttemptCount > 0 ? ` (attempt ${String(input.reconnectAttemptCount)} of ${String(MaxCodexReconnectAttempts)})` : ""}.`;
+}
 
 type SessionEntryPhase =
   | "connecting"
@@ -133,7 +340,7 @@ export function shouldShowResumeInFlightState(input: {
   resumeActionErrorMessage: string | null;
   shouldAttemptInitialStoppedResume: boolean;
   isResumingStoppedSandbox: boolean;
-  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
+  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed" | null;
 }): boolean {
   return (
     input.sandboxStatus === "stopped" &&
@@ -144,7 +351,7 @@ export function shouldShowResumeInFlightState(input: {
 }
 
 export function shouldPollStoppedSandboxStatus(input: {
-  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
+  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed" | null;
   hasAttemptedInitialStoppedResume: boolean;
   isResumingStoppedSandbox: boolean;
   resumeActionErrorMessage: string | null;
@@ -165,7 +372,7 @@ export function resolveSessionEntryPhase(input: {
   connectedSession: boolean;
   hasResumeInFlightState: boolean;
   isStatusPending: boolean;
-  sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
+  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed" | null;
 }): SessionEntryPhase {
   if (input.sandboxStatus === "failed") {
     return "sandbox_failed";
@@ -234,6 +441,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     | "disconnectSession"
     | "isStartingSession"
     | "lifecycleErrorMessage"
+    | "recoverableDisconnect"
     | "step"
   >;
   ptyState: ReturnType<typeof useSandboxPtyState>;
@@ -247,6 +455,9 @@ export function useSessionWorkbenchLifecycleState(input: {
   const [hasAttemptedInitialStoppedResume, setHasAttemptedInitialStoppedResume] = useState(false);
   const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(false);
   const [resumeActionErrorMessage, setResumeActionErrorMessage] = useState<string | null>(null);
+  const [codexRecoveryState, dispatchCodexRecoveryEvent] = useReducer(reduceCodexRecoveryState, {
+    kind: "idle",
+  });
   const activeResumeRequestRef = useRef<ResumeRequestGuard | null>(null);
   const resumeIdempotencyKeyRef = useRef<string | null>(null);
   const nextResumeRequestIdRef = useRef(0);
@@ -260,6 +471,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     disconnectSession,
     isStartingSession,
     lifecycleErrorMessage,
+    recoverableDisconnect,
     step,
   } = input.lifecycle;
   const { disconnectPty } = input.ptyState.actions;
@@ -314,14 +526,20 @@ export function useSessionWorkbenchLifecycleState(input: {
     currentDataUpdatedAtMs: sandboxStatusQuery.dataUpdatedAt,
   });
   const sandboxStatus = hasFreshSandboxStatus ? (sandboxStatusQuery.data?.status ?? null) : null;
+  const shouldAttemptRecoverableStoppedResume =
+    input.sandboxInstanceId !== null &&
+    sandboxStatus === "stopped" &&
+    recoverableDisconnect !== null;
   const shouldAttemptInitialStoppedResume =
     input.sandboxInstanceId !== null &&
     sandboxStatus === "stopped" &&
+    recoverableDisconnect === null &&
     !hasAttemptedInitialStoppedResume;
   const isShowingResumeInFlightState = shouldShowResumeInFlightState({
     hasAttemptedInitialStoppedResume,
     resumeActionErrorMessage,
-    shouldAttemptInitialStoppedResume,
+    shouldAttemptInitialStoppedResume:
+      shouldAttemptInitialStoppedResume || shouldAttemptRecoverableStoppedResume,
     isResumingStoppedSandbox,
     sandboxStatus,
   });
@@ -352,6 +570,27 @@ export function useSessionWorkbenchLifecycleState(input: {
   };
 
   useEffect(() => {
+    if (recoverableDisconnect === null) {
+      return;
+    }
+
+    dispatchCodexRecoveryEvent({
+      type: "recoverable_disconnect_observed",
+      disconnect: recoverableDisconnect,
+    });
+  }, [recoverableDisconnect]);
+
+  useEffect(() => {
+    if (connectedSession === null) {
+      return;
+    }
+
+    dispatchCodexRecoveryEvent({
+      type: "session_connected",
+    });
+  }, [connectedSession]);
+
+  useEffect(() => {
     return () => {
       clearLifecycleErrorMessage();
       disconnectSession();
@@ -366,6 +605,9 @@ export function useSessionWorkbenchLifecycleState(input: {
     setHasAttemptedInitialStoppedResume(false);
     setIsResumingStoppedSandbox(false);
     setResumeActionErrorMessage(null);
+    dispatchCodexRecoveryEvent({
+      type: "sandbox_changed",
+    });
     activeResumeRequestRef.current = null;
     resumeIdempotencyKeyRef.current = null;
   }, [input.sandboxInstanceId]);
@@ -401,16 +643,51 @@ export function useSessionWorkbenchLifecycleState(input: {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
+    const timeoutHandle = systemScheduler.schedule(() => {
       setAutomationPendingErrorMessage(AutomationSessionPreparationTimeoutMessage);
     }, timeoutDelayMs);
 
     return () => {
-      window.clearTimeout(timeoutId);
+      systemScheduler.cancel(timeoutHandle);
     };
   }, [automationPendingSinceMs, isWaitingForAutomationThread]);
 
   const resolvedLifecycleErrorMessage = lifecycleErrorMessage ?? automationPendingErrorMessage;
+  const codexRecoveryBaseMessage =
+    codexRecoveryState.kind === "recovering" ? codexRecoveryState.baseMessage : null;
+  const codexRecoveryErrorMessage =
+    codexRecoveryState.kind === "recovering" ? codexRecoveryState.errorMessage : null;
+  const codexReconnectAttemptCount =
+    codexRecoveryState.kind === "recovering" ? codexRecoveryState.reconnectAttemptCount : 0;
+  const sessionReconnectMessage = resolveCodexReconnectMessage({
+    recoveryBaseMessage: codexRecoveryBaseMessage,
+    recoveryErrorMessage: codexRecoveryErrorMessage,
+    reconnectAttemptCount: codexReconnectAttemptCount,
+    sandboxStatus: effectiveSandboxStatus,
+  });
+
+  useEffect(() => {
+    dispatchCodexRecoveryEvent({
+      type: "sync_observed",
+      observation: {
+        canConnect: connectionReadiness.canConnect,
+        connected: connectedSession !== null,
+        hasLifecycleError: resolvedLifecycleErrorMessage !== null,
+        isStartingSession,
+        isWaitingForAutomationThread,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sandboxStatus: effectiveSandboxStatus,
+      },
+    });
+  }, [
+    connectedSession,
+    connectionReadiness.canConnect,
+    effectiveSandboxStatus,
+    input.sandboxInstanceId,
+    isStartingSession,
+    isWaitingForAutomationThread,
+    resolvedLifecycleErrorMessage,
+  ]);
 
   useEffect(() => {
     if (input.sandboxInstanceId === null) {
@@ -452,6 +729,28 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   useEffect(() => {
+    if (codexRecoveryState.kind !== "recovering") {
+      return;
+    }
+
+    if (codexRecoveryState.reconnectCommand !== "reconnect") {
+      return;
+    }
+
+    if (input.sandboxInstanceId === null) {
+      return;
+    }
+
+    dispatchCodexRecoveryEvent({
+      type: "reconnect_attempt_started",
+    });
+    connectSession({
+      sandboxInstanceId: input.sandboxInstanceId,
+      preferredThreadId: codexRecoveryState.preferredThreadId,
+    });
+  }, [codexRecoveryState, connectSession, input.sandboxInstanceId]);
+
+  useEffect(() => {
     if (input.sandboxInstanceId === null || connectedSession === null) {
       return;
     }
@@ -475,11 +774,13 @@ export function useSessionWorkbenchLifecycleState(input: {
     agentConnectionState,
     step,
     hasConnectionError: resolvedLifecycleErrorMessage !== null,
+    isRecoveringSession: codexRecoveryState.kind === "recovering",
   });
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: sandboxStatusQuery.isError,
     lifecycleErrorMessage: resolvedLifecycleErrorMessage,
+    reconnectMessage: sessionReconnectMessage,
     sandboxFailureMessage,
     stoppedSessionMessage: stoppedSessionState.message,
   });
@@ -573,10 +874,16 @@ export function useSessionWorkbenchLifecycleState(input: {
     hasTopAlert,
     isResumingStoppedSandbox: isShowingResumeInFlightState,
     requestStoppedSandboxResume,
+    sandboxLifecycleStatus: effectiveSandboxStatus,
     sandboxFailureMessage,
     sandboxStatusQuery,
+    sessionReconnectState: {
+      isRecovering: codexRecoveryState.kind === "recovering",
+      message: sessionReconnectMessage,
+    },
     sessionHeaderStatusUi,
-    shouldAutoResumeOnEntry: shouldAttemptInitialStoppedResume,
+    shouldAutoResumeOnEntry:
+      shouldAttemptInitialStoppedResume || shouldAttemptRecoverableStoppedResume,
     lifecycleErrorMessage: resolvedLifecycleErrorMessage,
     stoppedSessionState,
   };

@@ -118,11 +118,6 @@ function createOpenAiDefinition(): IntegrationDefinition<
                 args: ["echo", `binding:${refs.compileContext.bindingId}`],
               }),
             ],
-            remove: ({ refs }) => [
-              refs.command.exec({
-                args: ["rm", "-f", refs.artifactBinPath("codex")],
-              }),
-            ],
           },
         },
       ],
@@ -137,7 +132,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
             files: [
               {
                 fileId: "codex_config",
-                path: "/home/sandbox/.codex/config.toml",
+                path: "/root/.codex/config.toml",
                 mode: 384,
                 content: 'model = "gpt-5.3-codex"',
                 writeMode: "if-absent",
@@ -225,7 +220,7 @@ function createJsonAgentDefinition(): IntegrationDefinition<
             files: [
               {
                 fileId: "claude_config",
-                path: "/home/sandbox/.claude/settings.json",
+                path: "/root/.claude/settings.json",
                 mode: 384,
                 content: `{
   "theme": "dark"
@@ -354,13 +349,8 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
                     binaryPath: "codex-aarch64-unknown-linux-musl",
                   },
                 },
-                installPath: "/var/lib/mistle/bin/codex",
+                installPath: "/usr/local/bin/codex",
                 timeoutMs: 120_000,
-              }),
-            ],
-            remove: ({ refs }) => [
-              refs.command.exec({
-                args: ["rm", "-f", "/var/lib/mistle/bin/codex"],
               }),
             ],
           },
@@ -441,7 +431,7 @@ describe("compileRuntimePlan", () => {
       {
         processKey: "codex-app-server",
         command: {
-          args: ["/var/lib/mistle/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
+          args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
         },
         readiness: {
           type: "tcp",
@@ -523,7 +513,7 @@ describe("compileRuntimePlan", () => {
     expect(installScript).toContain("openai/codex");
     expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
-    expect(installScript).toContain("/var/lib/mistle/bin/codex");
+    expect(installScript).toContain("/usr/local/bin/codex");
   });
 
   it("collects MCP servers from connectors and maps them into agent runtime files", () => {
@@ -774,6 +764,7 @@ describe("compileRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       compileRuntimePlan({
         organizationId: "org_123",
@@ -863,11 +854,11 @@ describe("compileRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.MCP_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.MCP_CONFLICT });
   });
 
   it("fails when target is disabled", () => {
@@ -910,6 +901,7 @@ describe("compileRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       compileRuntimePlan({
         organizationId: "org_123",
@@ -945,11 +937,11 @@ describe("compileRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.TARGET_DISABLED);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.TARGET_DISABLED });
   });
 
   it("fails when resolved connection does not match binding connectionId", () => {
@@ -992,6 +984,7 @@ describe("compileRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       compileRuntimePlan({
         organizationId: "org_123",
@@ -1027,11 +1020,11 @@ describe("compileRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.CONNECTION_MISMATCH);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.CONNECTION_MISMATCH });
   });
 
   it("fails when target config does not satisfy schema", () => {
@@ -1078,6 +1071,7 @@ describe("compileRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       compileRuntimePlan({
         organizationId: "org_123",
@@ -1117,11 +1111,11 @@ describe("compileRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.INVALID_TARGET_CONFIG);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.INVALID_TARGET_CONFIG });
   });
 
   it("fails when target secrets do not satisfy schema", () => {
@@ -1193,6 +1187,7 @@ describe("compileRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       compileRuntimePlan({
         organizationId: "org_123",
@@ -1232,11 +1227,11 @@ describe("compileRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.INVALID_TARGET_SECRETS);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.INVALID_TARGET_SECRETS });
   });
 
   it("fails when binding config does not satisfy schema", () => {
@@ -1283,6 +1278,7 @@ describe("compileRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       compileRuntimePlan({
         organizationId: "org_123",
@@ -1322,11 +1318,11 @@ describe("compileRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.INVALID_BINDING_CONFIG);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.INVALID_BINDING_CONFIG });
   });
 
   it("passes parsed schema outputs into compileBinding", () => {

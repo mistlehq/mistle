@@ -6,7 +6,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   DEFAULT_SHARED_SYSTEM_INFRA_KEY,
-  DefaultSandboxBaseImageBuild,
+  DockerIntegrationConfigPathInContainer,
   startFullSystemEnvironment,
 } from "../src/index.js";
 
@@ -24,7 +24,7 @@ describe("full system environment integration", () => {
     async () => {
       const environment = await startFullSystemEnvironment({
         buildContextHostPath: PROJECT_ROOT_HOST_PATH,
-        configPathInContainer: "/app/config/config.development.toml",
+        configPathInContainer: DockerIntegrationConfigPathInContainer,
         startupTimeoutMs: 120_000,
         sharedInfraKey: DEFAULT_SHARED_SYSTEM_INFRA_KEY,
         postgres: {},
@@ -34,7 +34,6 @@ describe("full system environment integration", () => {
         dashboardBaseUrl: "http://localhost:5173",
         authTrustedOrigins:
           "http://localhost:5100,http://127.0.0.1:5100,http://localhost:5173,http://127.0.0.1:5173",
-        sandboxBaseImageBuild: DefaultSandboxBaseImageBuild,
       });
 
       try {

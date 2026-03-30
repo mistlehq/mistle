@@ -20,7 +20,7 @@ CREATE TABLE "control_plane"."automation_targets" (
 	"id" text PRIMARY KEY NOT NULL,
 	"automation_id" text NOT NULL,
 	"sandbox_profile_id" text NOT NULL,
-	"sandbox_profile_version" bigint,
+	"sandbox_profile_version" bigint NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -50,9 +50,9 @@ CREATE TABLE "control_plane"."automation_conversation_delivery_tasks" (
 	"automation_run_id" text NOT NULL,
 	"source_webhook_event_id" text NOT NULL,
 	"source_order_key" text NOT NULL,
-	"processor_generation" integer,
+	"processor_generation" bigint,
 	"status" text DEFAULT 'queued' NOT NULL,
-	"attempt_count" integer DEFAULT 0 NOT NULL,
+	"attempt_count" bigint DEFAULT 0 NOT NULL,
 	"failure_code" text,
 	"failure_message" text,
 	"claimed_at" timestamp with time zone,

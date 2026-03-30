@@ -8,6 +8,7 @@ import { startRuntime, type StartedRuntime } from "../src/runtime/run.js";
 const StartedRuntimes: StartedRuntime[] = [];
 
 const ValidStartupInputJson = `{
+  "startupMode": "new",
   "bootstrapToken": "test-token",
   "tunnelExchangeToken": "test-exchange-token",
   "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -23,7 +24,8 @@ const ValidStartupInputJson = `{
     "runtimeClients": [],
     "workspaceSources": [],
     "agentRuntimes": []
-  }
+  },
+  "egressGrantByRuleId": {}
 }`;
 
 function createLookupEnv(): (key: string) => string | undefined {
@@ -82,6 +84,7 @@ describe("startRuntime", () => {
     delete process.env.GH_TOKEN;
 
     const startupInputJson = `{
+      "startupMode": "new",
       "bootstrapToken": "test-token",
       "tunnelExchangeToken": "test-exchange-token",
       "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -109,7 +112,8 @@ describe("startRuntime", () => {
         "runtimeClients": [],
         "workspaceSources": [],
         "agentRuntimes": []
-      }
+      },
+      "egressGrantByRuleId": {}
     }`;
 
     const runtime = await startRuntime({

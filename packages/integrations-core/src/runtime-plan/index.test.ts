@@ -27,7 +27,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 {
                   processKey: "codex-app-server",
                   command: {
-                    args: ["/var/lib/mistle/bin/codex", "app-server"],
+                    args: ["/usr/local/bin/codex", "app-server"],
                   },
                   readiness: {
                     type: "none",
@@ -108,7 +108,6 @@ describe("assembleCompiledRuntimePlan", () => {
               },
               lifecycle: {
                 install: [{ args: ["mise", "install", "gh@latest"] }],
-                remove: [{ args: ["rm", "-f", "/usr/local/bin/gh"] }],
               },
             },
           ],
@@ -193,7 +192,6 @@ describe("assembleCompiledRuntimePlan", () => {
               name: "Codex CLI",
               lifecycle: {
                 install: [{ args: ["sh", "-euc", "install-codex-latest"] }],
-                remove: [{ args: ["rm", "-f", "/usr/local/bin/codex"] }],
               },
             },
           ],
@@ -207,7 +205,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 files: [
                   {
                     fileId: "codex_config",
-                    path: "/home/sandbox/.codex/config.toml",
+                    path: "/root/.codex/config.toml",
                     mode: 384,
                     content: 'model = "gpt-5.3-codex"',
                   },
@@ -357,6 +355,7 @@ describe("assembleCompiledRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       assembleCompiledRuntimePlan({
         sandboxProfileId: "sbp_123",
@@ -407,11 +406,13 @@ describe("assembleCompiledRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({
+      code: CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+    });
   });
 
   it("fails on runtime client fileId merge conflicts", () => {
@@ -435,7 +436,7 @@ describe("assembleCompiledRuntimePlan", () => {
                   files: [
                     {
                       fileId: "codex_config",
-                      path: "/home/sandbox/.codex/config.toml",
+                      path: "/root/.codex/config.toml",
                       mode: 384,
                       content: 'model = "gpt-5.3-codex"',
                     },
@@ -459,7 +460,7 @@ describe("assembleCompiledRuntimePlan", () => {
                   files: [
                     {
                       fileId: "codex_config",
-                      path: "/home/sandbox/.codex/override.toml",
+                      path: "/root/.codex/override.toml",
                       mode: 384,
                       content: 'model = "gpt-5.3-codex"',
                     },
@@ -476,6 +477,7 @@ describe("assembleCompiledRuntimePlan", () => {
       }),
     ).toThrow(IntegrationCompilerError);
 
+    let caughtError: unknown;
     try {
       assembleCompiledRuntimePlan({
         sandboxProfileId: "sbp_123",
@@ -496,7 +498,7 @@ describe("assembleCompiledRuntimePlan", () => {
                   files: [
                     {
                       fileId: "codex_config",
-                      path: "/home/sandbox/.codex/config.toml",
+                      path: "/root/.codex/config.toml",
                       mode: 384,
                       content: 'model = "gpt-5.3-codex"',
                     },
@@ -520,7 +522,7 @@ describe("assembleCompiledRuntimePlan", () => {
                   files: [
                     {
                       fileId: "codex_config",
-                      path: "/home/sandbox/.codex/override.toml",
+                      path: "/root/.codex/override.toml",
                       mode: 384,
                       content: 'model = "gpt-5.3-codex"',
                     },
@@ -536,10 +538,12 @@ describe("assembleCompiledRuntimePlan", () => {
         ],
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({
+      code: CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+    });
   });
 });

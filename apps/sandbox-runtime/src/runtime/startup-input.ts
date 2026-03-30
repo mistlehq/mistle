@@ -1,10 +1,21 @@
 import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "@mistle/integrations-core";
 
+export const RuntimeStartupModes = {
+  NEW: "new",
+  EXISTING: "existing",
+} as const;
+
+export type RuntimeStartupMode = (typeof RuntimeStartupModes)[keyof typeof RuntimeStartupModes];
+
 export type StartupInput = {
+  // `new` performs initial provisioning from the runtime plan. `existing`
+  // reuses the sandbox filesystem as-is and only restarts processes/tunnel.
+  startupMode: RuntimeStartupMode;
   bootstrapToken: string;
   tunnelExchangeToken: string;
   tunnelGatewayWsUrl: string;
   runtimePlan: CompiledRuntimePlan;
+  egressGrantByRuleId: Record<string, string>;
 };
 
 function normalizeRequiredString(value: string, fieldLabel: string): string {
@@ -25,6 +36,15 @@ function readRequiredStringField(payload: object, fieldName: string): string {
   return fieldValue;
 }
 
+function readRequiredStartupModeField(payload: object): RuntimeStartupMode {
+  const startupMode = Object.getOwnPropertyDescriptor(payload, "startupMode")?.value;
+  if (startupMode === RuntimeStartupModes.NEW || startupMode === RuntimeStartupModes.EXISTING) {
+    return startupMode;
+  }
+
+  throw new Error("startup input startupMode is required");
+}
+
 function readRequiredRuntimePlanField(payload: object): CompiledRuntimePlan {
   const runtimePlan = Object.getOwnPropertyDescriptor(payload, "runtimePlan")?.value;
   if (runtimePlan === undefined) {
@@ -42,12 +62,56 @@ function readRequiredRuntimePlanField(payload: object): CompiledRuntimePlan {
   return parsedRuntimePlan.data;
 }
 
+function readRequiredEgressGrantByRuleIdField(
+  payload: object,
+  runtimePlan: CompiledRuntimePlan,
+): Record<string, string> {
+  const egressGrantByRuleIdValue = Object.getOwnPropertyDescriptor(
+    payload,
+    "egressGrantByRuleId",
+  )?.value;
+  if (
+    typeof egressGrantByRuleIdValue !== "object" ||
+    egressGrantByRuleIdValue === null ||
+    Array.isArray(egressGrantByRuleIdValue)
+  ) {
+    throw new Error("startup input egressGrantByRuleId is required");
+  }
+
+  const expectedRuleIds = new Set(runtimePlan.egressRoutes.map((route) => route.egressRuleId));
+  const egressGrantByRuleId: Record<string, string> = {};
+
+  for (const [ruleId, grant] of Object.entries(egressGrantByRuleIdValue)) {
+    if (!expectedRuleIds.has(ruleId)) {
+      throw new Error(`startup input egressGrantByRuleId has unexpected grant key ${ruleId}`);
+    }
+
+    if (typeof grant !== "string" || grant.trim().length === 0) {
+      throw new Error(`startup input egressGrantByRuleId.${ruleId} is required`);
+    }
+
+    egressGrantByRuleId[ruleId] = grant;
+  }
+
+  for (const route of runtimePlan.egressRoutes) {
+    if (egressGrantByRuleId[route.egressRuleId] === undefined) {
+      throw new Error(
+        `startup input egressGrantByRuleId is missing grant for route ${route.egressRuleId}`,
+      );
+    }
+  }
+
+  return egressGrantByRuleId;
+}
+
 function validateExpectedFields(payload: object): void {
   const allowedFields = new Set([
+    "startupMode",
     "bootstrapToken",
     "tunnelExchangeToken",
     "tunnelGatewayWsUrl",
     "runtimePlan",
+    "egressGrantByRuleId",
   ]);
 
   for (const fieldName of Object.keys(payload)) {
@@ -64,7 +128,10 @@ export function parseStartupInputPayload(payload: unknown): StartupInput {
 
   validateExpectedFields(payload);
 
+  const runtimePlan = readRequiredRuntimePlanField(payload);
+
   return {
+    startupMode: readRequiredStartupModeField(payload),
     bootstrapToken: normalizeRequiredString(
       readRequiredStringField(payload, "bootstrapToken"),
       "bootstrap token",
@@ -77,6 +144,7 @@ export function parseStartupInputPayload(payload: unknown): StartupInput {
       readRequiredStringField(payload, "tunnelGatewayWsUrl"),
       "tunnel gateway ws url",
     ),
-    runtimePlan: readRequiredRuntimePlanField(payload),
+    runtimePlan,
+    egressGrantByRuleId: readRequiredEgressGrantByRuleIdField(payload, runtimePlan),
   };
 }

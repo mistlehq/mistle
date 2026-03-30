@@ -9,7 +9,11 @@ import type {
 export function createTokenizerProxyRuntime(
   config: TokenizerProxyRuntimeConfig,
 ): TokenizerProxyRuntime {
-  const { app, onUpgrade } = createAppComponents(config.app, config.internalAuthServiceToken);
+  const { app, onUpgrade } = createAppComponents(
+    config.app,
+    config.internalAuthServiceToken,
+    config.egressGrantConfig,
+  );
 
   let startedServer: StartedServer | undefined;
   let stopPromise: Promise<void> | undefined;

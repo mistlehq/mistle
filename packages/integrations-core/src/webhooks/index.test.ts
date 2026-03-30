@@ -99,17 +99,20 @@ describe("webhook helpers", () => {
       }),
     ).toThrow(IntegrationWebhookError);
 
+    let caughtError: unknown;
     try {
       getWebhookHandlerOrThrow({
         familyId: "openai",
         variantId: "openai-default",
       });
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationWebhookError);
-      if (error instanceof IntegrationWebhookError) {
-        expect(error.code).toBe(WebhookErrorCodes.WEBHOOK_HANDLER_NOT_CONFIGURED);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationWebhookError);
+    expect(caughtError).toMatchObject({
+      code: WebhookErrorCodes.WEBHOOK_HANDLER_NOT_CONFIGURED,
+    });
   });
 
   it("resolves, verifies, and returns webhook events", async () => {

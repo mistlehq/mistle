@@ -4,115 +4,26 @@
  */
 
 export interface paths {
-  "/internal/sandbox-instances/get": {
+  "/internal/sandbox/instances": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get?: never;
-    put?: never;
-    post: {
+    get: {
       parameters: {
-        query?: never;
+        query: {
+          after?: string;
+          before?: string;
+          limit?: number;
+          organizationId: string;
+        };
         header?: never;
         path?: never;
         cookie?: never;
       };
-      requestBody: {
-        content: {
-          "application/json": {
-            instanceId: string;
-            organizationId: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Get sandbox instance status for internal callers. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              failureCode: string | null;
-              failureMessage: string | null;
-              id: string;
-              /** @enum {string} */
-              status: "starting" | "running" | "stopped" | "failed";
-            } | null;
-          };
-        };
-        /** @description Invalid request body. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal service authentication failed. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal server error. */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/internal/sandbox-instances/list": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          "application/json": {
-            after?: string;
-            before?: string;
-            limit?: number;
-            organizationId: string;
-          };
-        };
-      };
+      requestBody?: never;
       responses: {
         /** @description List sandbox instances for internal callers. */
         200: {
@@ -136,7 +47,7 @@ export interface paths {
                   kind: "user" | "system";
                 };
                 /** @enum {string} */
-                status: "starting" | "running" | "stopped" | "failed";
+                status: "pending" | "starting" | "running" | "stopped" | "failed";
                 updatedAt: string;
               }[];
               nextPage: {
@@ -151,7 +62,7 @@ export interface paths {
             };
           };
         };
-        /** @description Invalid request body. */
+        /** @description Invalid request query. */
         400: {
           headers: {
             [name: string]: unknown;
@@ -159,12 +70,13 @@ export interface paths {
           content: {
             "application/json":
               | {
-                  code: "INVALID_LIST_INPUT" | "INVALID_PAGINATION_CURSOR";
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
                   message: string;
                 }
               | {
                   /** @enum {string} */
-                  code: "VALIDATION_ERROR";
+                  code: "INVALID_LIST_INPUT" | "INVALID_PAGINATION_CURSOR";
                   message: string;
                 };
           };
@@ -193,103 +105,6 @@ export interface paths {
         };
       };
     };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/internal/sandbox-instances/resume": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          "application/json": {
-            idempotencyKey?: string;
-            instanceId: string;
-            organizationId: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Queue sandbox instance resume for internal callers. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              sandboxInstanceId: string;
-              /** @enum {string} */
-              status: "accepted";
-              workflowRunId: string;
-            };
-          };
-        };
-        /** @description Invalid request body. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal service authentication failed. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal server error. */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/internal/sandbox-instances/start": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
     put?: never;
     post: {
       parameters: {
@@ -323,22 +138,6 @@ export interface paths {
                 };
                 lifecycle: {
                   install: {
-                    args: string[];
-                    cwd?: string;
-                    env?: {
-                      [key: string]: string;
-                    };
-                    timeoutMs?: number;
-                  }[];
-                  remove: {
-                    args: string[];
-                    cwd?: string;
-                    env?: {
-                      [key: string]: string;
-                    };
-                    timeoutMs?: number;
-                  }[];
-                  update?: {
                     args: string[];
                     cwd?: string;
                     env?: {
@@ -541,7 +340,87 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/internal/sandbox-instances/stop": {
+  "/internal/sandbox/instances/:id": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query: {
+          organizationId: string;
+        };
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get sandbox instance status for internal callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              failureCode: string | null;
+              failureMessage: string | null;
+              id: string;
+              /** @enum {string} */
+              status: "pending" | "starting" | "running" | "stopped" | "failed";
+            } | null;
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/sandbox/instances/:id/reconcile": {
     parameters: {
       query?: never;
       header?: never;
@@ -554,7 +433,9 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path?: never;
+        path: {
+          id: string;
+        };
         cookie?: never;
       };
       requestBody: {
@@ -562,9 +443,178 @@ export interface paths {
           "application/json": {
             expectedOwnerLeaseId: string;
             idempotencyKey: string;
-            sandboxInstanceId: string;
             /** @enum {string} */
-            stopReason: "idle" | "disconnected";
+            reason: "disconnect_grace_elapsed";
+          };
+        };
+      };
+      responses: {
+        /** @description Queue sandbox instance reconciliation for internal callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              sandboxInstanceId: string;
+              /** @enum {string} */
+              status: "accepted";
+              workflowRunId: string;
+            };
+          };
+        };
+        /** @description Invalid request body. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/sandbox/instances/:id/resume": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            idempotencyKey?: string;
+            organizationId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Queue sandbox instance resume for internal callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              sandboxInstanceId: string;
+              /** @enum {string} */
+              status: "accepted";
+              workflowRunId: string;
+            };
+          };
+        };
+        /** @description Invalid request body. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/sandbox/instances/:id/stop": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            expectedOwnerLeaseId: string;
+            idempotencyKey: string;
+            /** @enum {string} */
+            stopReason: "idle";
           };
         };
       };

@@ -18,6 +18,6 @@ describe("GitHubEnterpriseServerBindingConfigSchema", () => {
       GitHubEnterpriseServerBindingConfigSchema.parse({
         repositories: ["acme"],
       }),
-    ).toThrow();
+    ).toThrow("Repository must be in <owner>/<repo> format.");
   });
 });

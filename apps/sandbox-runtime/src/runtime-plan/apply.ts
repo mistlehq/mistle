@@ -1,8 +1,4 @@
-import {
-  SandboxImageSources,
-  type CompiledRuntimePlan,
-  type SandboxImageSource,
-} from "@mistle/integrations-core";
+import { type CompiledRuntimePlan } from "@mistle/integrations-core";
 
 import { runRuntimeArtifactCommand } from "./artifact-command.js";
 import { errorMessage } from "./error-message.js";
@@ -13,32 +9,14 @@ type ApplyRuntimePlanInput = {
   runtimePlan: CompiledRuntimePlan;
 };
 
-type ArtifactLifecycleCommandSet = "install" | "update";
-
-const ArtifactLifecycleCommandSets = {
-  [SandboxImageSources.BASE]: "install",
-  [SandboxImageSources.PROFILE_BASE]: "install",
-} as const satisfies Record<SandboxImageSource, ArtifactLifecycleCommandSet>;
-
-function resolveArtifactLifecycleCommandSet(
-  source: SandboxImageSource,
-): ArtifactLifecycleCommandSet {
-  return ArtifactLifecycleCommandSets[source];
-}
-
 export async function applyRuntimePlan(input: ApplyRuntimePlanInput): Promise<void> {
-  const commandSet = resolveArtifactLifecycleCommandSet(input.runtimePlan.image.source);
-
   for (const [artifactIndex, artifact] of input.runtimePlan.artifacts.entries()) {
-    const commands =
-      commandSet === "update" ? (artifact.lifecycle.update ?? []) : artifact.lifecycle.install;
-
-    for (const [commandIndex, command] of commands.entries()) {
+    for (const [commandIndex, command] of artifact.lifecycle.install.entries()) {
       try {
         await runRuntimeArtifactCommand(command);
       } catch (error) {
         throw new Error(
-          `runtime plan artifacts[${artifactIndex}] lifecycle.${commandSet}[${commandIndex}] failed (artifactKey=${artifact.artifactKey}): ${errorMessage(error)}`,
+          `runtime plan artifacts[${artifactIndex}] lifecycle.install[${commandIndex}] failed (artifactKey=${artifact.artifactKey}): ${errorMessage(error)}`,
         );
       }
     }

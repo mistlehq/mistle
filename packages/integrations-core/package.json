@@ -18,7 +18,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
-    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
+    "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts --passWithNoTests",
     "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",

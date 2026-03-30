@@ -12,6 +12,7 @@ import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "./mark-sandbox-instance-running.js";
 import { persistSandboxInstanceProvisioning } from "./persist-sandbox-instance-provisioning.js";
+import { SandboxStartupModes } from "./sandbox-startup-input.js";
 import { startSandbox } from "./start-sandbox.js";
 import { waitForSandboxTunnelReadiness } from "./wait-for-sandbox-tunnel-readiness.js";
 
@@ -218,6 +219,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           {
             sandboxInstanceId: startedSandbox.sandboxInstanceId,
             providerSandboxId: startedSandbox.providerSandboxId,
+            startupMode: SandboxStartupModes.NEW,
             runtimePlan: workflowInput.runtimePlan,
           },
         );

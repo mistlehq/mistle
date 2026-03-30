@@ -40,6 +40,11 @@ describe("parseConfigRecord", () => {
             tokenIssuer: "data-plane-worker",
             tokenAudience: "data-plane-gateway",
           },
+          egress: {
+            tokenSecret: "test-egress-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "tokenizer-proxy",
+          },
         },
       },
       apps: {
@@ -115,6 +120,11 @@ describe("parseConfigRecord", () => {
           },
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
+          },
+          sandbox: {
+            docker: {
+              socketPath: "/var/run/docker.sock",
+            },
           },
         },
         data_plane_worker: {
@@ -214,6 +224,11 @@ describe("parseConfigRecord", () => {
             tokenIssuer: "data-plane-worker",
             tokenAudience: "data-plane-gateway",
           },
+          egress: {
+            tokenSecret: "test-egress-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "tokenizer-proxy",
+          },
         },
       },
       apps: {
@@ -289,6 +304,11 @@ describe("parseConfigRecord", () => {
           },
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
+          },
+          sandbox: {
+            docker: {
+              socketPath: "/var/run/docker.sock",
+            },
           },
         },
         data_plane_worker: {
@@ -388,6 +408,11 @@ describe("parseConfigRecord", () => {
             tokenIssuer: "data-plane-worker",
             tokenAudience: "data-plane-gateway",
           },
+          egress: {
+            tokenSecret: "test-egress-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "tokenizer-proxy",
+          },
         },
       },
       apps: {
@@ -463,6 +488,11 @@ describe("parseConfigRecord", () => {
           },
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
+          },
+          sandbox: {
+            docker: {
+              socketPath: "/var/run/docker.sock",
+            },
           },
         },
         data_plane_worker: {

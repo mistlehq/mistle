@@ -65,7 +65,6 @@ function createGithubBinaryInstallDefinition(): IntegrationDefinition<
                 timeoutMs: 120_000,
               }),
             ],
-            remove: [{ args: ["rm", "-f", InstallPath] }],
           },
         },
       ],

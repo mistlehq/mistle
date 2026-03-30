@@ -30,13 +30,13 @@ describe("compileAtlassianBinding", () => {
       },
       refs: {
         sandboxPaths: {
-          userHomeDir: "/home/sandbox",
-          userProjectsDir: "/home/sandbox/projects",
+          userHomeDir: "/root",
+          workspaceDir: "/root",
           runtimeDataDir: "/var/lib/mistle",
           runtimeArtifactDir: "/var/lib/mistle/artifacts",
-          runtimeArtifactBinDir: "/var/lib/mistle/bin",
+          runtimeArtifactBinDir: "/usr/local/bin",
         },
-        artifactBinPath: (name) => `/var/lib/mistle/bin/${name}`,
+        artifactBinPath: (name) => `/usr/local/bin/${name}`,
       },
     });
 

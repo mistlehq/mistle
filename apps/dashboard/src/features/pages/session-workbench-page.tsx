@@ -134,7 +134,6 @@ function SessionWorkbenchPageContent(input: {
   );
   const terminalPanelKey = [
     input.sandboxInstanceId,
-    workbench.sandboxStatusQuery.data?.status ?? "unknown",
     workbench.terminalPanelState.isVisible ? "visible" : "hidden",
   ].join(":");
 
@@ -152,6 +151,12 @@ function SessionWorkbenchPageContent(input: {
     alerts.push({
       title: "Session connection error",
       description: workbench.lifecycleErrorMessage,
+    });
+  }
+  if (workbench.sessionReconnectState.message !== null) {
+    alerts.push({
+      title: "Reconnecting session",
+      description: workbench.sessionReconnectState.message,
     });
   }
   if (workbench.stoppedSessionState.message !== null) {
@@ -234,6 +239,7 @@ function SessionWorkbenchPageContent(input: {
       secondaryPanel={
         <SessionTerminalPanel
           key={terminalPanelKey}
+          isResumingSandbox={workbench.isResumingStoppedSandbox}
           isConnectionReady={workbench.connectionReadiness.canConnect}
           isVisible={workbench.terminalPanelState.isVisible}
           onHide={workbench.terminalPanelState.closePanel}
@@ -241,7 +247,9 @@ function SessionWorkbenchPageContent(input: {
             workbench.terminalPanelState.closePanel();
             await workbench.ptyState.actions.disconnectPty();
           }}
+          onRequestSandboxResume={workbench.requestStoppedSandboxResume}
           ptyState={workbench.ptyState}
+          sandboxStatus={workbench.sandboxLifecycleStatus}
           sandboxInstanceId={input.sandboxInstanceId}
         />
       }

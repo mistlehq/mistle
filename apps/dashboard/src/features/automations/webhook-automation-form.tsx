@@ -9,6 +9,7 @@ import {
   FieldHeader,
   FieldLabel,
   Input,
+  InlineCode,
   Select,
   SelectContent,
   SelectItem,
@@ -20,17 +21,20 @@ import {
 import { TrashIcon } from "@phosphor-icons/react";
 
 import { FormPageFooter, FormPageHeader, FormPageSection } from "../shared/form-page.js";
-import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
+import { StatusBox } from "../shared/status-box.js";
+import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
+import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
+import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
 import type {
-  WebhookAutomationConversationKeyOption,
   WebhookAutomationEventOption,
   WebhookAutomationTriggerParameterValueMap,
 } from "./webhook-automation-trigger-types.js";
 export type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
+export type { WebhookAutomationEventOptionAvailability } from "./webhook-automation-trigger-types.js";
 
 export type WebhookAutomationFormOption = {
   value: string;
@@ -42,7 +46,7 @@ export type WebhookAutomationFormValues = {
   name: string;
   sandboxProfileId: string;
   enabled: boolean;
-  instructions: string;
+  inputTemplate: string;
   conversationKeyTemplate: string;
   triggerIds: string[];
   triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
@@ -58,6 +62,7 @@ type WebhookAutomationFormProps = {
   webhookEventOptions: readonly WebhookAutomationEventOption[];
   triggerPickerDisabledReason: string | null;
   fieldErrors: Partial<Record<WebhookAutomationFormValueKey, string>>;
+  validationSummaryError: string | null;
   formError: string | null;
   isSaving: boolean;
   isDeleting: boolean;
@@ -68,6 +73,17 @@ type WebhookAutomationFormProps = {
   onSubmit: () => void;
   onDelete: (() => void) | null;
 };
+
+function shouldRenderInlineFieldError(input: {
+  key: WebhookAutomationFormValueKey;
+  message: string | undefined;
+}): boolean {
+  if (input.message === undefined) {
+    return false;
+  }
+
+  return input.key !== "name" && input.key !== "sandboxProfileId" && input.key !== "inputTemplate";
+}
 
 function FieldError(input: { message: string | undefined }): React.JSX.Element | null {
   if (input.message === undefined) {
@@ -83,10 +99,12 @@ function SelectField(input: {
   placeholder: string;
   options: readonly WebhookAutomationFormOption[];
   error: string | undefined;
+  showInlineError?: boolean;
   orientation?: "vertical" | "horizontal";
   onValueChange: (value: string) => void;
 }): React.JSX.Element {
   const selectedOption = input.options.find((option) => option.value === input.value);
+  const isInvalid = input.error !== undefined;
 
   return (
     <Field orientation={input.orientation ?? "vertical"}>
@@ -102,7 +120,10 @@ function SelectField(input: {
           }}
           value={input.value}
         >
-          <SelectTrigger className={input.orientation === "horizontal" ? undefined : "w-full"}>
+          <SelectTrigger
+            aria-invalid={isInvalid ? true : undefined}
+            className={input.orientation === "horizontal" ? undefined : "w-full"}
+          >
             <SelectValue placeholder={input.placeholder}>{selectedOption?.label}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -118,36 +139,14 @@ function SelectField(input: {
             ))}
           </SelectContent>
         </Select>
-        <FieldError message={input.error} />
+        <FieldError message={input.showInlineError === false ? undefined : input.error} />
       </FieldContent>
     </Field>
   );
 }
 
-export function resolveConversationKeyFieldOptions(input: {
-  selectedEventOptions: readonly WebhookAutomationEventOption[];
-  currentTemplate: string;
-}): {
-  options: readonly WebhookAutomationConversationKeyOption[];
-  selectedTemplate: string;
-  hasUnsupportedCurrentTemplate: boolean;
-} {
-  const options = resolveCommonWebhookAutomationConversationKeyOptions({
-    selectedEventOptions: input.selectedEventOptions,
-  });
-  const isCurrentTemplateSupported =
-    input.currentTemplate.trim().length > 0 &&
-    options.some((option) => option.template === input.currentTemplate);
-
-  return {
-    options,
-    selectedTemplate: isCurrentTemplateSupported ? input.currentTemplate : "",
-    hasUnsupportedCurrentTemplate:
-      input.currentTemplate.trim().length > 0 && !isCurrentTemplateSupported,
-  };
-}
-
 export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.JSX.Element {
+  const inputTemplateLabelId = "automation-input-template-label";
   const submitLabel = input.mode === "create" ? "Create automation" : "Save changes";
   const selectedTriggerOptions = resolveSelectedWebhookAutomationEventOptions({
     eventOptions: input.webhookEventOptions,
@@ -155,6 +154,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
   });
   const selectedConnectionIds = new Set(
     selectedTriggerOptions
+      .filter((option) => !isWebhookAutomationEventOptionUnavailable(option))
       .map((option) => option.connectionId)
       .filter((connectionId) => connectionId.trim().length > 0),
   );
@@ -171,6 +171,14 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
     selectedConversationGroupingOption === undefined
       ? undefined
       : selectedConversationGroupingOption.label;
+  const triggerHeaderMessage =
+    input.values.triggerIds.length > 0 &&
+    input.fieldErrors.triggerIds !== undefined &&
+    input.fieldErrors.triggerIds !== "Trigger is unavailable for the selected sandbox profile."
+      ? input.fieldErrors.triggerIds
+      : undefined;
+  const isInputTemplateDefault =
+    input.values.inputTemplate === DefaultWebhookAutomationInputTemplate;
 
   return (
     <div className="flex flex-col gap-6">
@@ -180,7 +188,14 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <WebhookAutomationTitleEditor
-              errorMessage={input.fieldErrors.name}
+              errorMessage={
+                shouldRenderInlineFieldError({
+                  key: "name",
+                  message: input.fieldErrors.name,
+                })
+                  ? input.fieldErrors.name
+                  : undefined
+              }
               onCommit={(nextValue) => {
                 input.onValueChange("name", nextValue);
               }}
@@ -206,7 +221,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
       {input.formError === null ? null : (
         <Alert variant="destructive">
-          <AlertTitle>Could not save automation</AlertTitle>
+          <AlertTitle>Automation could not be saved</AlertTitle>
           <AlertDescription>{input.formError}</AlertDescription>
         </Alert>
       )}
@@ -238,6 +253,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
               </FieldHeader>
               <FieldContent>
                 <Input
+                  aria-invalid={input.fieldErrors.name !== undefined ? true : undefined}
                   id="automation-name"
                   disabled={input.isDeleting || input.isSaving}
                   onChange={(event) => {
@@ -245,7 +261,16 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                   }}
                   value={input.values.name}
                 />
-                <FieldError message={input.fieldErrors.name} />
+                <FieldError
+                  message={
+                    shouldRenderInlineFieldError({
+                      key: "name",
+                      message: input.fieldErrors.name,
+                    })
+                      ? input.fieldErrors.name
+                      : undefined
+                  }
+                />
               </FieldContent>
             </Field>
           </div>
@@ -260,6 +285,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             }}
             options={input.sandboxProfileOptions}
             placeholder="Select profile"
+            showInlineError={false}
             value={input.values.sandboxProfileId}
           />
         </div>
@@ -268,7 +294,12 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       <FormPageSection
         header={
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold">Triggers</h2>
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold">Triggers</h2>
+              {triggerHeaderMessage === undefined ? null : (
+                <p className="text-destructive text-sm">{triggerHeaderMessage}</p>
+              )}
+            </div>
             <WebhookAutomationTriggerPickerAddButton
               error={input.fieldErrors.triggerIds}
               disabledReason={input.triggerPickerDisabledReason}
@@ -306,7 +337,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             showAddTriggerControl={false}
             triggerParameterValues={input.values.triggerParameterValues}
           />
-          <FieldError message={input.fieldErrors.triggerIds} />
         </div>
 
         {input.values.triggerIds.length === 0 ? null : (
@@ -327,7 +357,12 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                   }}
                   value={conversationKeySelectionState.selectedTemplate}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger
+                    aria-invalid={
+                      input.fieldErrors.conversationKeyTemplate !== undefined ? true : undefined
+                    }
+                    className="w-full"
+                  >
                     <SelectValue placeholder="Select conversation grouping">
                       {selectedConversationGroupingLabel}
                     </SelectValue>
@@ -356,29 +391,66 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         <div className="p-4">
           <Field>
             <FieldHeader>
-              <FieldLabel htmlFor="automation-instructions">Agent Instructions</FieldLabel>
-              <FieldDescription>
-                These instructions are sent together with the webhook payload and event type.
-              </FieldDescription>
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <FieldLabel id={inputTemplateLabelId}>Agent Instructions</FieldLabel>
+                  <FieldDescription>
+                    <span className="block">
+                      These are the instructions the agent will receive.
+                    </span>
+                    <span className="block">
+                      Use Liquid syntax with{" "}
+                      <InlineCode variant="muted">{"{{webhookEvent.eventType}}"}</InlineCode> and{" "}
+                      <InlineCode variant="muted">{"{{payload}}"}</InlineCode>.
+                    </span>
+                  </FieldDescription>
+                </div>
+                <Button
+                  disabled={input.isDeleting || input.isSaving || isInputTemplateDefault}
+                  onClick={() => {
+                    input.onValueChange("inputTemplate", DefaultWebhookAutomationInputTemplate);
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  Reset to default
+                </Button>
+              </div>
             </FieldHeader>
             <FieldContent>
               <Textarea
-                className="min-h-36"
-                id="automation-instructions"
+                aria-invalid={input.fieldErrors.inputTemplate !== undefined ? true : undefined}
+                aria-labelledby={inputTemplateLabelId}
+                className="min-h-48 text-sm"
+                id="automation-input-template"
                 disabled={input.isDeleting || input.isSaving}
                 onChange={(event) => {
-                  input.onValueChange("instructions", event.currentTarget.value);
+                  input.onValueChange("inputTemplate", event.currentTarget.value);
                 }}
-                rows={5}
-                value={input.values.instructions}
+                rows={8}
+                value={input.values.inputTemplate}
               />
-              <FieldError message={input.fieldErrors.instructions} />
+              <FieldError
+                message={
+                  shouldRenderInlineFieldError({
+                    key: "inputTemplate",
+                    message: input.fieldErrors.inputTemplate,
+                  })
+                    ? input.fieldErrors.inputTemplate
+                    : undefined
+                }
+              />
             </FieldContent>
           </Field>
         </div>
       </FormPageSection>
 
       <FormPageFooter>
+        {input.validationSummaryError === null ? null : (
+          <StatusBox tone="destructive" variant="subtle">
+            {input.validationSummaryError}
+          </StatusBox>
+        )}
         <Button
           disabled={input.isDeleting || input.isSaving}
           onClick={input.onSubmit}

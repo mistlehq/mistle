@@ -3,14 +3,14 @@ import { fileURLToPath } from "node:url";
 
 import {
   DEFAULT_SHARED_SYSTEM_INFRA_KEY,
-  DefaultSandboxBaseImageBuild,
+  DockerIntegrationConfigPathInContainer,
   removeTestContext,
   startFullSystemEnvironment,
   writeTestContext,
 } from "@mistle/test-harness";
 
 const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../..", import.meta.url));
-const CONFIG_PATH_IN_CONTAINER = "/app/config/config.development.toml";
+const CONFIG_PATH_IN_CONTAINER = DockerIntegrationConfigPathInContainer;
 const APP_STARTUP_TIMEOUT_MS = 120_000;
 const AUTH_ORIGIN = "http://localhost:5100";
 const TestContextId = "system";
@@ -29,7 +29,6 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
       dashboardBaseUrl: "http://localhost:5173",
       authTrustedOrigins:
         "http://localhost:5100,http://127.0.0.1:5100,http://localhost:5173,http://127.0.0.1:5173",
-      sandboxBaseImageBuild: DefaultSandboxBaseImageBuild,
     });
 
     try {

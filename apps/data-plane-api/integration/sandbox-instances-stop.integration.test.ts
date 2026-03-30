@@ -22,7 +22,7 @@ type WorkflowRunRow = {
 const WorkflowRunInputSchema = z
   .object({
     sandboxInstanceId: z.string().min(1),
-    stopReason: z.union([z.literal("idle"), z.literal("disconnected")]),
+    stopReason: z.literal("idle"),
     expectedOwnerLeaseId: z.string().min(1),
   })
   .strict();
@@ -32,7 +32,7 @@ const WorkflowRunIdempotencyKeySchema = z
     version: z.literal(1),
     sandboxInstanceId: z.string().min(1),
     action: z.literal("stop"),
-    stopReason: z.union([z.literal("idle"), z.literal("disconnected")]),
+    stopReason: z.literal("idle"),
     expectedOwnerLeaseId: z.string().min(1),
     idempotencyKey: z.string().min(1),
   })
@@ -158,7 +158,7 @@ describe("sandboxInstances.stop integration", () => {
     const sandboxInstanceId = "sbi_dp_api_stop_integration_idempotent";
     const workflowInput: StopSandboxInstanceInput = {
       sandboxInstanceId,
-      stopReason: "disconnected",
+      stopReason: "idle",
       expectedOwnerLeaseId: "sol_dp_api_stop_integration_idempotent",
       idempotencyKey: "gateway-stop-idempotent-001",
     };

@@ -1,9 +1,11 @@
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
+import type { SandboxAdapter } from "@mistle/sandbox";
 import { Pool } from "pg";
 
 import { createDataPlaneBackend, createDataPlaneOpenWorkflow } from "./openworkflow/index.js";
 import { GatewayHttpSandboxRuntimeStateReader } from "./runtime-state/gateway-http-sandbox-runtime-state-reader.js";
 import type { SandboxRuntimeStateReader } from "./runtime-state/sandbox-runtime-state-reader.js";
+import { createSandboxRuntimeAdapter } from "./sandbox/adapter.js";
 import type { DataPlaneApiRuntimeConfig } from "./types.js";
 
 export type AppRuntimeResources = {
@@ -13,6 +15,7 @@ export type AppRuntimeResources = {
   workflowBackend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
   openWorkflow: ReturnType<typeof createDataPlaneOpenWorkflow>;
   runtimeStateReader: SandboxRuntimeStateReader;
+  sandboxAdapter: SandboxAdapter;
 };
 
 export async function createAppResources(
@@ -29,6 +32,7 @@ export async function createAppResources(
     baseUrl: runtimeConfig.app.runtimeState.gatewayBaseUrl,
     serviceToken: runtimeConfig.internalAuthServiceToken,
   });
+  const sandboxAdapter = createSandboxRuntimeAdapter(runtimeConfig);
 
   let workflowBackend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
 
@@ -51,6 +55,7 @@ export async function createAppResources(
     workflowBackend,
     openWorkflow: createDataPlaneOpenWorkflow({ backend: workflowBackend }),
     runtimeStateReader,
+    sandboxAdapter,
   };
 }
 

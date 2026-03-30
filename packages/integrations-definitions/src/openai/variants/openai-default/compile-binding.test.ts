@@ -10,10 +10,10 @@ import { createOpenAiRawBindingCapabilities } from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 
 const OpenAiApiKeyConnectionMethod = "api-key" as const;
-const RuntimeArtifactBinDirectory = "/var/lib/mistle/bin";
+const RuntimeArtifactBinDirectory = "/usr/local/bin";
 const SandboxPaths = {
-  userHomeDir: "/home/sandbox",
-  userProjectsDir: "/home/sandbox/projects",
+  userHomeDir: "/root",
+  workspaceDir: "/root",
   runtimeDataDir: "/var/lib/mistle",
   runtimeArtifactDir: "/var/lib/mistle/artifacts",
   runtimeArtifactBinDir: RuntimeArtifactBinDirectory,
@@ -153,17 +153,8 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(installCommands?.[0]?.args[1]).toContain(
       '"fileName":"codex-aarch64-unknown-linux-musl.tar.gz"',
     );
-    expect(installCommands?.[0]?.args[1]).toContain('"installPath":"/var/lib/mistle/bin/codex"');
+    expect(installCommands?.[0]?.args[1]).toContain('"installPath":"/usr/local/bin/codex"');
     expect(installCommands?.[0]?.timeoutMs).toBe(120_000);
-
-    const updateCommands = resolveArtifactLifecycleHook(codexArtifact?.lifecycle.update);
-    expect(updateCommands).toEqual(installCommands);
-
-    expect(resolveArtifactLifecycleHook(codexArtifact?.lifecycle.remove)).toEqual([
-      {
-        args: ["rm", "-f", "/var/lib/mistle/bin/codex"],
-      },
-    ]);
 
     expect(compiled.runtimeClients).toHaveLength(1);
     expect(compiled.runtimeClients[0]?.setup.env).toEqual({
@@ -195,7 +186,7 @@ describe("compileOpenAiApiKeyBinding", () => {
       {
         processKey: "codex-app-server",
         command: {
-          args: ["/var/lib/mistle/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
+          args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
         },
         readiness: {
           type: "ws",
@@ -388,6 +379,6 @@ describe("compileOpenAiApiKeyBinding", () => {
           artifactBinPath,
         },
       }),
-    ).toThrow();
+    ).toThrow(/Invalid input/);
   });
 });

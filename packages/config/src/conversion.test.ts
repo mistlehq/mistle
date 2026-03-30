@@ -23,6 +23,9 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: "fixture-bootstrap-secret",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: "data-plane-worker",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE: "data-plane-gateway",
+      MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_SECRET: "fixture-egress-secret",
+      MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_ISSUER: "data-plane-worker",
+      MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE: "tokenizer-proxy",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: "fixture-connection-secret",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER: "control-plane-api",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE: "data-plane-gateway",
@@ -42,6 +45,9 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
       MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5302",
+      MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
+      MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY: "test-data-plane-api-key",
+      MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_DOMAIN: "sandbox.e2b.app",
       MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "valkey",
       MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL: "redis://127.0.0.1:6379",
       MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_KEY_PREFIX: "mistle:runtime-state:test",
@@ -78,6 +84,11 @@ describe("convertEnvToTomlRecord", () => {
             token_secret: "fixture-bootstrap-secret",
             token_issuer: "data-plane-worker",
             token_audience: "data-plane-gateway",
+          },
+          egress: {
+            token_secret: "fixture-egress-secret",
+            token_issuer: "data-plane-worker",
+            token_audience: "tokenizer-proxy",
           },
           connect: {
             token_secret: "fixture-connection-secret",
@@ -121,6 +132,15 @@ describe("convertEnvToTomlRecord", () => {
         data_plane_api: {
           runtime_state: {
             gateway_base_url: "http://127.0.0.1:5302",
+          },
+          sandbox: {
+            docker: {
+              socket_path: "/var/run/docker.sock",
+            },
+            e2b: {
+              api_key: "test-data-plane-api-key",
+              domain: "sandbox.e2b.app",
+            },
           },
         },
         data_plane_worker: {
@@ -180,6 +200,11 @@ describe("convertTomlToEnvRecord", () => {
             token_issuer: "data-plane-worker",
             token_audience: "data-plane-gateway",
           },
+          egress: {
+            token_secret: "prod-egress-secret",
+            token_issuer: "data-plane-worker",
+            token_audience: "tokenizer-proxy",
+          },
           connect: {
             token_secret: "prod-connection-secret",
             token_issuer: "control-plane-api",
@@ -217,6 +242,15 @@ describe("convertTomlToEnvRecord", () => {
         data_plane_api: {
           runtime_state: {
             gateway_base_url: "http://127.0.0.1:5302",
+          },
+          sandbox: {
+            docker: {
+              socket_path: "/var/run/docker.sock",
+            },
+            e2b: {
+              api_key: "test-data-plane-api-key",
+              domain: "sandbox.e2b.app",
+            },
           },
         },
         data_plane_worker: {
@@ -257,6 +291,9 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: "prod-bootstrap-secret",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: "data-plane-worker",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE: "data-plane-gateway",
+      MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_SECRET: "prod-egress-secret",
+      MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_ISSUER: "data-plane-worker",
+      MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE: "tokenizer-proxy",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: "prod-connection-secret",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER: "control-plane-api",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE: "data-plane-gateway",
@@ -273,6 +310,9 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
       MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5302",
+      MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
+      MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY: "test-data-plane-api-key",
+      MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_DOMAIN: "sandbox.e2b.app",
       MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "valkey",
       MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL: "redis://127.0.0.1:6379",
       MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_KEY_PREFIX: "mistle:runtime-state:test",

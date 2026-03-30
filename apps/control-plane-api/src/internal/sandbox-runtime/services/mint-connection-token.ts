@@ -161,7 +161,7 @@ export async function mintConnectionToken(
     throw createInstanceFailedError(sandboxInstance);
   }
 
-  if (sandboxInstance.status === "starting") {
+  if (sandboxInstance.status === "pending" || sandboxInstance.status === "starting") {
     sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
       organizationId: input.organizationId,
       instanceId: input.instanceId,

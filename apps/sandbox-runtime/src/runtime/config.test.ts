@@ -13,7 +13,7 @@ describe("loadRuntimeConfig", () => {
     const config = loadRuntimeConfig((key) => {
       switch (key) {
         case ListenAddrEnv:
-          return ":8090";
+          return "127.0.0.1:8090";
         case TokenizerProxyEgressBaseUrlEnv:
           return "http://127.0.0.1:8091/tokenizer-proxy/egress";
         default:
@@ -21,7 +21,7 @@ describe("loadRuntimeConfig", () => {
       }
     });
 
-    expect(config.listenAddr).toBe(":8090");
+    expect(config.listenAddr).toBe("127.0.0.1:8090");
     expect(config.tokenizerProxyEgressBaseUrl).toBe("http://127.0.0.1:8091/tokenizer-proxy/egress");
     expect(config.proxyCaConfigured).toBe(false);
   });
@@ -30,7 +30,7 @@ describe("loadRuntimeConfig", () => {
     const config = loadRuntimeConfig((key) => {
       switch (key) {
         case ListenAddrEnv:
-          return ":8090";
+          return "127.0.0.1:8090";
         case TokenizerProxyEgressBaseUrlEnv:
           return "http://127.0.0.1:8091/tokenizer-proxy/egress";
         case ProxyCaCertFdEnv:
@@ -56,7 +56,7 @@ describe("loadRuntimeConfig", () => {
       loadRuntimeConfig((key) => {
         switch (key) {
           case ListenAddrEnv:
-            return ":8090";
+            return "127.0.0.1:8090";
           case TokenizerProxyEgressBaseUrlEnv:
             return "not-a-url";
           default:
@@ -71,7 +71,7 @@ describe("loadRuntimeConfig", () => {
       loadRuntimeConfig((key) => {
         switch (key) {
           case ListenAddrEnv:
-            return ":8090";
+            return "127.0.0.1:8090";
           case TokenizerProxyEgressBaseUrlEnv:
             return "http://127.0.0.1:8091/tokenizer-proxy/egress";
           case ProxyCaCertFdEnv:

@@ -1,3 +1,4 @@
+import { systemScheduler } from "@mistle/time";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
@@ -59,14 +60,14 @@ export function useSandboxSessionLaunchState(): UseSandboxSessionLaunchStateResu
 
   useEffect(() => {
     const sessionsPendingStatus = launchedSessions.filter(
-      (session) => session.status === "starting",
+      (session) => session.status === "pending" || session.status === "starting",
     );
     if (sessionsPendingStatus.length === 0) {
       return;
     }
 
     let cancelled = false;
-    const timeoutId = window.setTimeout(() => {
+    const timeoutHandle = systemScheduler.schedule(() => {
       void Promise.all(
         sessionsPendingStatus.map(async (session) => {
           const status = await getSandboxInstanceStatus({
@@ -98,7 +99,7 @@ export function useSandboxSessionLaunchState(): UseSandboxSessionLaunchStateResu
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timeoutId);
+      systemScheduler.cancel(timeoutHandle);
     };
   }, [launchedSessions]);
 
@@ -127,7 +128,7 @@ export function useSandboxSessionLaunchState(): UseSandboxSessionLaunchStateResu
           sandboxInstanceId: result.sandboxInstanceId,
           workflowRunId: result.workflowRunId,
           createdAtIso: new Date().toISOString(),
-          status: "starting",
+          status: "pending",
           failureCode: null,
           failureMessage: null,
         },

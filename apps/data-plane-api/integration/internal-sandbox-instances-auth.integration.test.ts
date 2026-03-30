@@ -1,13 +1,14 @@
 import {
   DATA_PLANE_INTERNAL_AUTH_HEADER,
   createDataPlaneSandboxInstancesClient,
+  type ReconcileSandboxInstanceInput,
   type StopSandboxInstanceInput,
   type StartSandboxInstanceInput,
 } from "@mistle/data-plane-internal-client";
 import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { describe, expect } from "vitest";
 
-import { INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "../src/internal/sandbox-instances/index.js";
+import { INTERNAL_SANDBOX_ROUTE_BASE_PATH } from "../src/internal/index.js";
 import { it } from "./test-context.js";
 
 function createRuntimePlan(input: {
@@ -79,6 +80,17 @@ function createStopSandboxInput(input: { sandboxInstanceId: string }): StopSandb
   };
 }
 
+function createReconcileSandboxInput(input: {
+  sandboxInstanceId: string;
+}): ReconcileSandboxInstanceInput {
+  return {
+    sandboxInstanceId: input.sandboxInstanceId,
+    reason: "disconnect_grace_elapsed",
+    expectedOwnerLeaseId: "sol_dp_api_integration_reconcile_auth",
+    idempotencyKey: "gateway-reconcile-auth-001",
+  };
+}
+
 describe("internal sandbox instances auth integration", () => {
   it("allows requests with valid service token", async ({ fixture }) => {
     const client = createSandboxInstancesClient(fixture.baseUrl, fixture.internalAuthServiceToken);
@@ -112,7 +124,7 @@ describe("internal sandbox instances auth integration", () => {
 
   it("rejects requests missing service token", async ({ fixture }) => {
     const response = await fetch(
-      createRouteUrl(fixture.baseUrl, `${INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH}/start`),
+      createRouteUrl(fixture.baseUrl, `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances`),
       {
         method: "POST",
         headers: {
@@ -155,7 +167,7 @@ describe("internal sandbox instances auth integration", () => {
 
   it("rejects malformed request bodies", async ({ fixture }) => {
     const response = await fetch(
-      createRouteUrl(fixture.baseUrl, `${INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH}/start`),
+      createRouteUrl(fixture.baseUrl, `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances`),
       {
         method: "POST",
         headers: {
@@ -191,18 +203,24 @@ describe("internal sandbox instances auth integration", () => {
   }, 60_000);
 
   it("rejects stop requests missing service token", async ({ fixture }) => {
+    const stopInput = createStopSandboxInput({
+      sandboxInstanceId: "sbi_dp_api_integration_stop_unauth_missing",
+    });
     const response = await fetch(
-      createRouteUrl(fixture.baseUrl, `${INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH}/stop`),
+      createRouteUrl(
+        fixture.baseUrl,
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/${stopInput.sandboxInstanceId}/stop`,
+      ),
       {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify(
-          createStopSandboxInput({
-            sandboxInstanceId: "sbi_dp_api_integration_stop_unauth_missing",
-          }),
-        ),
+        body: JSON.stringify({
+          stopReason: stopInput.stopReason,
+          expectedOwnerLeaseId: stopInput.expectedOwnerLeaseId,
+          idempotencyKey: stopInput.idempotencyKey,
+        }),
       },
     );
 
@@ -220,6 +238,47 @@ describe("internal sandbox instances auth integration", () => {
       client.stopSandboxInstance(
         createStopSandboxInput({
           sandboxInstanceId: "sbi_dp_api_integration_stop_unauth_invalid",
+        }),
+      ),
+    ).rejects.toThrow("Internal service authentication failed.");
+  }, 60_000);
+
+  it("rejects reconcile requests missing service token", async ({ fixture }) => {
+    const reconcileInput = createReconcileSandboxInput({
+      sandboxInstanceId: "sbi_dp_api_integration_reconcile_unauth_missing",
+    });
+    const response = await fetch(
+      createRouteUrl(
+        fixture.baseUrl,
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/${reconcileInput.sandboxInstanceId}/reconcile`,
+      ),
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          reason: reconcileInput.reason,
+          expectedOwnerLeaseId: reconcileInput.expectedOwnerLeaseId,
+          idempotencyKey: reconcileInput.idempotencyKey,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      code: "UNAUTHORIZED",
+      message: "Internal service authentication failed.",
+    });
+  }, 60_000);
+
+  it("rejects reconcile requests with invalid service token", async ({ fixture }) => {
+    const client = createSandboxInstancesClient(fixture.baseUrl, "invalid-service-token");
+
+    await expect(
+      client.reconcileSandboxInstance(
+        createReconcileSandboxInput({
+          sandboxInstanceId: "sbi_dp_api_integration_reconcile_unauth_invalid",
         }),
       ),
     ).rejects.toThrow("Internal service authentication failed.");

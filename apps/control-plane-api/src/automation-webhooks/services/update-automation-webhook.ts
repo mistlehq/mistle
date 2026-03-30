@@ -9,7 +9,7 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
 
 import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-reference-or-throw.js";
-import { assertSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
+import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
 import { assertWebhookConnectionReferenceOrThrow } from "./assert-webhook-connection-reference-or-throw.js";
 import { loadWebhookAutomationAggregateOrThrow } from "./load-webhook-automation-aggregate-or-throw.js";
 
@@ -27,7 +27,7 @@ export type UpdateWebhookAutomationInput = {
   target?:
     | {
         sandboxProfileId?: string | undefined;
-        sandboxProfileVersion?: number | null | undefined;
+        sandboxProfileVersion?: number | undefined;
       }
     | undefined;
 };
@@ -70,7 +70,7 @@ export async function updateAutomationWebhook(
       sandboxProfileId,
     },
   );
-  await assertSandboxProfileTriggerReferenceOrThrow(
+  const resolvedSandboxProfileVersion = await resolveSandboxProfileTriggerReferenceOrThrow(
     { db: ctx.db },
     {
       sandboxProfileId,
@@ -82,7 +82,16 @@ export async function updateAutomationWebhook(
   return ctx.db.transaction(async (tx) => {
     await updateAutomationBaseRow(tx, input);
     await updateWebhookConfigRow(tx, input);
-    await updateAutomationTargetRow(tx, existingAutomation.target, input);
+    await updateAutomationTargetRow(
+      tx,
+      existingAutomation.target.id,
+      input.target === undefined
+        ? undefined
+        : {
+            sandboxProfileId,
+            sandboxProfileVersion: resolvedSandboxProfileVersion,
+          },
+    );
 
     return loadWebhookAutomationAggregateOrThrow(
       { db: tx },
@@ -162,26 +171,24 @@ async function updateWebhookConfigRow(
 
 async function updateAutomationTargetRow(
   tx: ControlPlaneTransaction,
-  existingTarget: {
-    id: string;
-    sandboxProfileId: string;
-    sandboxProfileVersion: number | null;
-  },
-  input: UpdateWebhookAutomationInput,
+  automationTargetId: string,
+  nextTarget:
+    | {
+        sandboxProfileId: string;
+        sandboxProfileVersion: number;
+      }
+    | undefined,
 ): Promise<void> {
-  if (input.target === undefined) {
+  if (nextTarget === undefined) {
     return;
   }
 
   await tx
     .update(automationTargets)
     .set({
-      sandboxProfileId: input.target.sandboxProfileId ?? existingTarget.sandboxProfileId,
-      sandboxProfileVersion:
-        input.target.sandboxProfileVersion === undefined
-          ? existingTarget.sandboxProfileVersion
-          : input.target.sandboxProfileVersion,
+      sandboxProfileId: nextTarget.sandboxProfileId,
+      sandboxProfileVersion: nextTarget.sandboxProfileVersion,
       updatedAt: sql`now()`,
     })
-    .where(eq(automationTargets.id, existingTarget.id));
+    .where(eq(automationTargets.id, automationTargetId));
 }

@@ -85,14 +85,17 @@ describe("integration registry", () => {
 
     expect(() => registry.register(definition)).toThrow(IntegrationDefinitionRegistryError);
 
+    let caughtError: unknown;
     try {
       registry.register(definition);
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationDefinitionRegistryError);
-      if (error instanceof IntegrationDefinitionRegistryError) {
-        expect(error.code).toBe(DefinitionRegistryErrorCodes.DUPLICATE_DEFINITION);
-      }
+      caughtError = error;
     }
+
+    expect(caughtError).toBeInstanceOf(IntegrationDefinitionRegistryError);
+    expect(caughtError).toMatchObject({
+      code: DefinitionRegistryErrorCodes.DUPLICATE_DEFINITION,
+    });
   });
 
   it("lists definitions in deterministic order", () => {

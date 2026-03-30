@@ -15,22 +15,27 @@ export type CodexConnectionThreadStrategy =
     };
 
 export function resolveCodexConnectionStateTransition(input: {
+  hasConnectedSession: boolean;
   state: CodexSessionConnectionState;
   errorMessage: string | null;
 }): {
   shouldDisconnectSession: boolean;
   lifecycleErrorMessage: string | null;
+  recoverableDisconnectMessage: string | null;
 } {
   if (input.state === "closed" || input.state === "error") {
+    const disconnectMessage = input.errorMessage ?? "The Codex session connection closed.";
     return {
       shouldDisconnectSession: true,
-      lifecycleErrorMessage: input.errorMessage ?? "The Codex session connection closed.",
+      lifecycleErrorMessage: input.hasConnectedSession ? null : disconnectMessage,
+      recoverableDisconnectMessage: input.hasConnectedSession ? disconnectMessage : null,
     };
   }
 
   return {
     shouldDisconnectSession: false,
     lifecycleErrorMessage: null,
+    recoverableDisconnectMessage: null,
   };
 }
 

@@ -17,7 +17,7 @@ export const automationTargets = controlPlaneSchema.table(
     sandboxProfileId: text("sandbox_profile_id")
       .notNull()
       .references(() => sandboxProfiles.id, { onDelete: "cascade" }),
-    sandboxProfileVersion: bigint("sandbox_profile_version", { mode: "number" }),
+    sandboxProfileVersion: bigint("sandbox_profile_version", { mode: "number" }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),

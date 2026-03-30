@@ -1,7 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { readRepositoryVersion } from "@mistle/config";
 
-import { createInternalSandboxInstancesRoutes } from "./internal/index.js";
+import { createInternalSandboxRoutes } from "./internal/index.js";
 import type { AppRuntimeResources } from "./resources.js";
 import type {
   AppContextBindings,
@@ -67,7 +67,7 @@ export function registerApiRouteModules(app: DataPlaneApp): void {
 }
 
 export function registerInternalApiRouteModules(app: DataPlaneApp): void {
-  const internalSandboxInstancesRoutes = createInternalSandboxInstancesRoutes();
+  const internalSandboxRoutes = createInternalSandboxRoutes();
 
-  app.route(internalSandboxInstancesRoutes.basePath, internalSandboxInstancesRoutes.routes);
+  app.route(internalSandboxRoutes.basePath, internalSandboxRoutes.routes);
 }

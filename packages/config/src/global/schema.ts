@@ -76,6 +76,7 @@ export const GlobalSandboxConfigSchema = z
     internalGatewayWsUrl: z.string().trim().min(1),
     connect: GlobalSandboxTokenConfigSchema,
     bootstrap: GlobalSandboxTokenConfigSchema,
+    egress: GlobalSandboxTokenConfigSchema,
   })
   .strict();
 
@@ -87,6 +88,7 @@ export const PartialGlobalSandboxConfigSchema = z
     internalGatewayWsUrl: z.string().trim().min(1).optional(),
     connect: GlobalSandboxTokenConfigSchema.partial().optional(),
     bootstrap: GlobalSandboxTokenConfigSchema.partial().optional(),
+    egress: GlobalSandboxTokenConfigSchema.partial().optional(),
   })
   .strict();
 

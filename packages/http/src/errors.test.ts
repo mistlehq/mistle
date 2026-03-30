@@ -26,7 +26,7 @@ describe("errors", () => {
         message: "Missing resource.",
         extra: "nope",
       }),
-    ).toThrow();
+    ).toThrow(/extra/);
   });
 
   it("defines a flat validation error schema", () => {

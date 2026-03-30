@@ -10,6 +10,8 @@ import {
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   isActiveResumeRequest,
+  reduceCodexRecoveryState,
+  resolveCodexReconnectMessage,
   resolveSessionEntryPhase,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForEntryPhase,
@@ -81,12 +83,17 @@ describe("useSessionWorkbenchController", () => {
       requiresManualResume: false,
     });
     expect(result.current.workbench.hasTopAlert).toBe(false);
+    expect(result.current.workbench.sessionReconnectState).toEqual({
+      isRecovering: false,
+      message: null,
+    });
     expect(result.current.workbench.ptyState.lifecycle.connectedSandboxInstanceId).toBeNull();
     expect(result.current.workbench.ptyState.lifecycle.state).toBe("idle");
     expect(result.current.workbench.ptyState.output.chunks).toEqual([]);
     expect(result.current.workbench.terminalPanelState.isVisible).toBe(false);
     expect(result.current.workbench.terminalPanelState.panelSize).toBe(DEFAULT_TERMINAL_PANEL_SIZE);
     expect(result.current.workbench.lifecycleErrorMessage).toBeNull();
+    expect(result.current.workbench.sandboxLifecycleStatus).toBeNull();
     expect(result.current.workbench.sandboxFailureMessage).toBeNull();
     expect(result.current.conversationPane.chatState.entries).toEqual([]);
     expect(result.current.conversationPane.composerStateInput.connectedSession).toBeNull();
@@ -94,6 +101,199 @@ describe("useSessionWorkbenchController", () => {
       [],
     );
     expect(result.current.conversationPane.serverRequestsState.pendingServerRequests).toEqual([]);
+  });
+
+  it("starts Codex recovery from a recoverable disconnect and preserves attempts for the same event", () => {
+    const startedRecovery = reduceCodexRecoveryState(
+      { kind: "idle" },
+      {
+        type: "recoverable_disconnect_observed",
+        disconnect: {
+          id: 1,
+          message: "Sandbox session stream reset.",
+          preferredThreadId: "thread_123",
+        },
+      },
+    );
+
+    expect(startedRecovery).toEqual({
+      kind: "recovering",
+      baseMessage: "Sandbox session stream reset.",
+      errorMessage: null,
+      preferredThreadId: "thread_123",
+      reconnectAttemptCount: 0,
+      reconnectCommand: "none",
+      recoverableDisconnectId: 1,
+    });
+
+    const sameDisconnectReconnect = reduceCodexRecoveryState(startedRecovery, {
+      type: "sync_observed",
+      observation: {
+        canConnect: true,
+        connected: false,
+        hasLifecycleError: false,
+        isStartingSession: false,
+        isWaitingForAutomationThread: false,
+        sandboxInstanceId: "sbi_123",
+        sandboxStatus: "running",
+      },
+    });
+    const reconnectAttemptStarted = reduceCodexRecoveryState(sameDisconnectReconnect, {
+      type: "reconnect_attempt_started",
+    });
+
+    expect(reconnectAttemptStarted).toEqual({
+      kind: "recovering",
+      baseMessage: "Sandbox session stream reset.",
+      errorMessage: null,
+      preferredThreadId: "thread_123",
+      reconnectAttemptCount: 1,
+      reconnectCommand: "none",
+      recoverableDisconnectId: 1,
+    });
+
+    expect(
+      reduceCodexRecoveryState(reconnectAttemptStarted, {
+        type: "recoverable_disconnect_observed",
+        disconnect: {
+          id: 1,
+          message: "Sandbox session stream reset. Reconnect failed once; retrying.",
+          preferredThreadId: "thread_123",
+        },
+      }),
+    ).toEqual({
+      kind: "recovering",
+      baseMessage: "Sandbox session stream reset. Reconnect failed once; retrying.",
+      errorMessage: null,
+      preferredThreadId: "thread_123",
+      reconnectAttemptCount: 1,
+      reconnectCommand: "none",
+      recoverableDisconnectId: 1,
+    });
+  });
+
+  it("issues reconnect commands only when the recovered sandbox is connectable again", () => {
+    const waitingRecovery = {
+      kind: "recovering" as const,
+      baseMessage: "Sandbox session stream reset.",
+      errorMessage: null,
+      preferredThreadId: "thread_123",
+      reconnectAttemptCount: 0,
+      reconnectCommand: "none" as const,
+      recoverableDisconnectId: 1,
+    };
+
+    expect(
+      reduceCodexRecoveryState(waitingRecovery, {
+        type: "sync_observed",
+        observation: {
+          canConnect: false,
+          connected: false,
+          hasLifecycleError: false,
+          isStartingSession: false,
+          isWaitingForAutomationThread: false,
+          sandboxInstanceId: "sbi_123",
+          sandboxStatus: "stopped",
+        },
+      }),
+    ).toEqual(waitingRecovery);
+
+    expect(
+      reduceCodexRecoveryState(waitingRecovery, {
+        type: "sync_observed",
+        observation: {
+          canConnect: true,
+          connected: false,
+          hasLifecycleError: false,
+          isStartingSession: false,
+          isWaitingForAutomationThread: false,
+          sandboxInstanceId: "sbi_123",
+          sandboxStatus: "running",
+        },
+      }),
+    ).toEqual({
+      ...waitingRecovery,
+      reconnectCommand: "reconnect",
+    });
+  });
+
+  it("stops Codex recovery once attempts are exhausted or the sandbox fails", () => {
+    const exhaustedRecovery = {
+      kind: "recovering" as const,
+      baseMessage: "Sandbox session stream reset.",
+      errorMessage: null,
+      preferredThreadId: "thread_123",
+      reconnectAttemptCount: 3,
+      reconnectCommand: "none" as const,
+      recoverableDisconnectId: 1,
+    };
+
+    expect(
+      reduceCodexRecoveryState(exhaustedRecovery, {
+        type: "sync_observed",
+        observation: {
+          canConnect: true,
+          connected: false,
+          hasLifecycleError: false,
+          isStartingSession: false,
+          isWaitingForAutomationThread: false,
+          sandboxInstanceId: "sbi_123",
+          sandboxStatus: "running",
+        },
+      }),
+    ).toEqual({
+      ...exhaustedRecovery,
+      errorMessage: "Could not reconnect session after 3 attempts.",
+    });
+
+    const failedRecovery = {
+      kind: "recovering" as const,
+      baseMessage: "Sandbox session stream reset.",
+      errorMessage: null,
+      preferredThreadId: "thread_123",
+      reconnectAttemptCount: 1,
+      reconnectCommand: "none" as const,
+      recoverableDisconnectId: 1,
+    };
+
+    expect(
+      reduceCodexRecoveryState(failedRecovery, {
+        type: "sync_observed",
+        observation: {
+          canConnect: false,
+          connected: false,
+          hasLifecycleError: false,
+          isStartingSession: false,
+          isWaitingForAutomationThread: false,
+          sandboxInstanceId: "sbi_123",
+          sandboxStatus: "failed",
+        },
+      }),
+    ).toEqual({
+      ...failedRecovery,
+      errorMessage:
+        "Sandbox session stream reset. The sandbox failed and the session cannot reconnect.",
+    });
+  });
+
+  it("formats reconnect messaging across running and stopped recovery phases", () => {
+    expect(
+      resolveCodexReconnectMessage({
+        recoveryBaseMessage: "Sandbox session stream reset.",
+        recoveryErrorMessage: null,
+        reconnectAttemptCount: 1,
+        sandboxStatus: "running",
+      }),
+    ).toBe("Sandbox session stream reset. Reconnecting session (attempt 1 of 3).");
+
+    expect(
+      resolveCodexReconnectMessage({
+        recoveryBaseMessage: "Sandbox session stream reset.",
+        recoveryErrorMessage: null,
+        reconnectAttemptCount: 0,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe("Sandbox session stream reset. Resuming sandbox to restore the session.");
   });
 
   it("persists terminal panel visibility and size per sandbox instance", () => {

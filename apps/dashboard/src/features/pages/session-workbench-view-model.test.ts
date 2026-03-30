@@ -17,6 +17,7 @@ describe("resolveSessionHeaderStatusUi", () => {
         agentConnectionState: "ready",
         step: "connected",
         hasConnectionError: false,
+        isRecoveringSession: false,
       } as const,
       expected: {
         label: "Connected",
@@ -31,6 +32,7 @@ describe("resolveSessionHeaderStatusUi", () => {
         agentConnectionState: "ready",
         step: "connected",
         hasConnectionError: false,
+        isRecoveringSession: false,
       } as const,
       expected: {
         label: "Sandbox failed",
@@ -44,6 +46,7 @@ describe("resolveSessionHeaderStatusUi", () => {
         agentConnectionState: "opening_agent_stream",
         step: "connecting",
         hasConnectionError: false,
+        isRecoveringSession: false,
       } as const,
       expected: {
         label: "Connecting",
@@ -57,6 +60,7 @@ describe("resolveSessionHeaderStatusUi", () => {
         agentConnectionState: "idle",
         step: "securing",
         hasConnectionError: false,
+        isRecoveringSession: false,
       } as const,
       expected: {
         label: "Resuming sandbox",
@@ -71,11 +75,26 @@ describe("resolveSessionHeaderStatusUi", () => {
         agentConnectionState: "ready",
         step: "connected",
         hasConnectionError: false,
+        isRecoveringSession: false,
       } as const,
       expected: {
         label: "Connected",
         variant: "secondary",
         className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+      },
+    },
+    {
+      description: "shows reconnecting while recovering an interrupted running session",
+      input: {
+        sandboxStatus: "running",
+        agentConnectionState: "idle",
+        step: "idle",
+        hasConnectionError: false,
+        isRecoveringSession: true,
+      } as const,
+      expected: {
+        label: "Reconnecting session",
+        variant: "outline",
       },
     },
   ])("$description", ({ input, expected }) => {
@@ -90,6 +109,7 @@ describe("hasSessionTopAlert", () => {
       input: {
         hasSandboxStatusError: false,
         lifecycleErrorMessage: null,
+        reconnectMessage: null,
         sandboxFailureMessage: null,
         stoppedSessionMessage: null,
       },
@@ -100,6 +120,7 @@ describe("hasSessionTopAlert", () => {
       input: {
         hasSandboxStatusError: false,
         lifecycleErrorMessage: "Could not connect.",
+        reconnectMessage: null,
         sandboxFailureMessage: null,
         stoppedSessionMessage: null,
       },
@@ -110,8 +131,20 @@ describe("hasSessionTopAlert", () => {
       input: {
         hasSandboxStatusError: false,
         lifecycleErrorMessage: null,
+        reconnectMessage: null,
         sandboxFailureMessage: null,
         stoppedSessionMessage: "This sandbox is stopped.",
+      },
+      expected: true,
+    },
+    {
+      description: "returns true for a reconnecting-session alert",
+      input: {
+        hasSandboxStatusError: false,
+        lifecycleErrorMessage: null,
+        reconnectMessage: "Reconnecting session after stream reset.",
+        sandboxFailureMessage: null,
+        stoppedSessionMessage: null,
       },
       expected: true,
     },
