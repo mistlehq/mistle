@@ -526,7 +526,7 @@ export class TunnelProtocolTranslator {
       tunnelStreamId: controlMessage.streamId,
     });
     if (route === undefined) {
-      if (hasPTYExitEvent(controlMessage)) {
+      if (hasPTYExitEvent(controlMessage) || hasFileUploadCompletedEvent(controlMessage)) {
         return createTranslation({
           delivery: {
             kind: "drop",

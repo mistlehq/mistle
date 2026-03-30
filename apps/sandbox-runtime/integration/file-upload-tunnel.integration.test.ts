@@ -348,6 +348,95 @@ describe("startTunnelClient fileUpload integration", () => {
   );
 
   it(
+    "does not emit completion and leaves no files when the tunnel websocket closes after open but before upload bytes",
+    async () => {
+      const threadId = `thread_${randomUUID()}`;
+      const expectedAttachmentDirectory = join("/tmp/attachments", threadId);
+
+      await mkdir(expectedAttachmentDirectory, { recursive: true });
+      await rm(expectedAttachmentDirectory, { force: true, recursive: true });
+
+      const wsServer = new WebSocketServer({
+        host: "127.0.0.1",
+        port: 0,
+      });
+      openServers.add({
+        close: async () => {
+          await new Promise<void>((resolve, reject) => {
+            wsServer.close((error) => {
+              if (error === undefined) {
+                resolve();
+                return;
+              }
+
+              reject(error);
+            });
+          });
+        },
+      });
+
+      await once(wsServer, "listening");
+
+      const signalController = new AbortController();
+      const tunnelClient = startTunnelClient({
+        signal: signalController.signal,
+        gatewayWsUrl: `ws://127.0.0.1:${String(readListeningPort(wsServer))}/tunnel/sandbox`,
+        bootstrapToken: "bootstrap-token",
+        tunnelExchangeToken: "exchange-token",
+        agentRuntimes: [],
+        runtimeClients: [],
+      });
+
+      const gatewayConnection = await waitForGatewayConnection(wsServer);
+      const stepSignal = AbortSignal.timeout(StepTimeoutMs);
+
+      try {
+        gatewayConnection.socket.send(
+          JSON.stringify({
+            type: "stream.open",
+            streamId: 31,
+            channel: {
+              kind: "fileUpload",
+              threadId,
+              mimeType: "image/png",
+              originalFilename: "no-bytes.png",
+              sizeBytes: ImageSignatures.PNG.byteLength,
+            },
+          }),
+        );
+
+        expect(
+          parseTextMessage(
+            await nextQueueItemOrTunnelCompletion({
+              queue: gatewayConnection.messageQueue,
+              signal: stepSignal,
+              label: "waiting for stream.open.ok",
+              tunnelCompletion: tunnelClient.completion,
+            }),
+          ),
+        ).toEqual({
+          type: "stream.open.ok",
+          streamId: 31,
+        });
+
+        await closeWebSocket(gatewayConnection.socket);
+        await waitForAttachmentDirectoryEntries({
+          path: expectedAttachmentDirectory,
+          expectedEntries: [],
+          timeoutMs: 1_000,
+        });
+      } finally {
+        signalController.abort();
+        await Promise.all([
+          tunnelClient.close(),
+          rm(expectedAttachmentDirectory, { force: true, recursive: true }),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
     "removes partial upload files when the tunnel websocket closes mid-upload",
     async () => {
       const threadId = `thread_${randomUUID()}`;
@@ -444,6 +533,121 @@ describe("startTunnelClient fileUpload integration", () => {
           type: "stream.window",
           streamId: 17,
           bytes: partialBytes.byteLength,
+        });
+
+        await closeWebSocket(gatewayConnection.socket);
+        await waitForAttachmentDirectoryEntries({
+          path: expectedAttachmentDirectory,
+          expectedEntries: [],
+          timeoutMs: 1_000,
+        });
+      } finally {
+        signalController.abort();
+        await Promise.all([
+          tunnelClient.close(),
+          rm(expectedAttachmentDirectory, { force: true, recursive: true }),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "does not emit completion and leaves no files when the tunnel websocket closes after all bytes arrive but before stream.close",
+    async () => {
+      const threadId = `thread_${randomUUID()}`;
+      const expectedBytes = ImageSignatures.PNG;
+      const expectedAttachmentDirectory = join("/tmp/attachments", threadId);
+
+      await mkdir(expectedAttachmentDirectory, { recursive: true });
+      await rm(expectedAttachmentDirectory, { force: true, recursive: true });
+
+      const wsServer = new WebSocketServer({
+        host: "127.0.0.1",
+        port: 0,
+      });
+      openServers.add({
+        close: async () => {
+          await new Promise<void>((resolve, reject) => {
+            wsServer.close((error) => {
+              if (error === undefined) {
+                resolve();
+                return;
+              }
+
+              reject(error);
+            });
+          });
+        },
+      });
+
+      await once(wsServer, "listening");
+
+      const signalController = new AbortController();
+      const tunnelClient = startTunnelClient({
+        signal: signalController.signal,
+        gatewayWsUrl: `ws://127.0.0.1:${String(readListeningPort(wsServer))}/tunnel/sandbox`,
+        bootstrapToken: "bootstrap-token",
+        tunnelExchangeToken: "exchange-token",
+        agentRuntimes: [],
+        runtimeClients: [],
+      });
+
+      const gatewayConnection = await waitForGatewayConnection(wsServer);
+      const stepSignal = AbortSignal.timeout(StepTimeoutMs);
+
+      try {
+        gatewayConnection.socket.send(
+          JSON.stringify({
+            type: "stream.open",
+            streamId: 41,
+            channel: {
+              kind: "fileUpload",
+              threadId,
+              mimeType: "image/png",
+              originalFilename: "all-bytes-no-close.png",
+              sizeBytes: expectedBytes.byteLength,
+            },
+          }),
+        );
+
+        expect(
+          parseTextMessage(
+            await nextQueueItemOrTunnelCompletion({
+              queue: gatewayConnection.messageQueue,
+              signal: stepSignal,
+              label: "waiting for stream.open.ok",
+              tunnelCompletion: tunnelClient.completion,
+            }),
+          ),
+        ).toEqual({
+          type: "stream.open.ok",
+          streamId: 41,
+        });
+
+        gatewayConnection.socket.send(
+          Buffer.from(
+            encodeDataFrame({
+              streamId: 41,
+              payloadKind: PayloadKindRawBytes,
+              payload: expectedBytes,
+            }),
+          ),
+        );
+
+        expect(
+          parseTextMessage(
+            await nextQueueItemOrTunnelCompletion({
+              queue: gatewayConnection.messageQueue,
+              signal: stepSignal,
+              label: "waiting for stream.window",
+              tunnelCompletion: tunnelClient.completion,
+            }),
+          ),
+        ).toEqual({
+          type: "stream.window",
+          streamId: 41,
+          bytes: expectedBytes.byteLength,
         });
 
         await closeWebSocket(gatewayConnection.socket);
