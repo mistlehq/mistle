@@ -17,6 +17,7 @@ describe("codex session lifecycle policy", () => {
       shouldDisconnectSession: true,
       lifecycleErrorMessage: "The Codex session connection closed.",
       recoverableDisconnectMessage: null,
+      recoverableDisconnectStrategy: null,
     });
 
     expect(
@@ -29,6 +30,7 @@ describe("codex session lifecycle policy", () => {
       shouldDisconnectSession: true,
       lifecycleErrorMessage: "Socket failed.",
       recoverableDisconnectMessage: null,
+      recoverableDisconnectStrategy: null,
     });
   });
 
@@ -43,6 +45,7 @@ describe("codex session lifecycle policy", () => {
       shouldDisconnectSession: true,
       lifecycleErrorMessage: null,
       recoverableDisconnectMessage: "Stream dropped.",
+      recoverableDisconnectStrategy: "reconnect_transport",
     });
   });
 
@@ -57,6 +60,7 @@ describe("codex session lifecycle policy", () => {
       shouldDisconnectSession: false,
       lifecycleErrorMessage: null,
       recoverableDisconnectMessage: null,
+      recoverableDisconnectStrategy: null,
     });
   });
 

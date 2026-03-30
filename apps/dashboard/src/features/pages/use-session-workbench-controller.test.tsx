@@ -113,6 +113,7 @@ describe("useSessionWorkbenchController", () => {
           id: 1,
           message: "Sandbox session stream reset.",
           preferredThreadId: "thread_123",
+          recoveryStrategy: "reopen_stream",
         },
       },
     );
@@ -122,6 +123,7 @@ describe("useSessionWorkbenchController", () => {
       baseMessage: "Sandbox session stream reset.",
       errorMessage: null,
       preferredThreadId: "thread_123",
+      recoveryStrategy: "reopen_stream",
       reconnectAttemptCount: 0,
       reconnectCommand: "none",
       recoverableDisconnectId: 1,
@@ -148,6 +150,7 @@ describe("useSessionWorkbenchController", () => {
       baseMessage: "Sandbox session stream reset.",
       errorMessage: null,
       preferredThreadId: "thread_123",
+      recoveryStrategy: "reopen_stream",
       reconnectAttemptCount: 1,
       reconnectCommand: "none",
       recoverableDisconnectId: 1,
@@ -160,6 +163,7 @@ describe("useSessionWorkbenchController", () => {
           id: 1,
           message: "Sandbox session stream reset. Reconnect failed once; retrying.",
           preferredThreadId: "thread_123",
+          recoveryStrategy: "reopen_stream",
         },
       }),
     ).toEqual({
@@ -167,6 +171,7 @@ describe("useSessionWorkbenchController", () => {
       baseMessage: "Sandbox session stream reset. Reconnect failed once; retrying.",
       errorMessage: null,
       preferredThreadId: "thread_123",
+      recoveryStrategy: "reopen_stream",
       reconnectAttemptCount: 1,
       reconnectCommand: "none",
       recoverableDisconnectId: 1,
@@ -179,6 +184,7 @@ describe("useSessionWorkbenchController", () => {
       baseMessage: "Sandbox session stream reset.",
       errorMessage: null,
       preferredThreadId: "thread_123",
+      recoveryStrategy: "reopen_stream" as const,
       reconnectAttemptCount: 0,
       reconnectCommand: "none" as const,
       recoverableDisconnectId: 1,
@@ -214,7 +220,32 @@ describe("useSessionWorkbenchController", () => {
       }),
     ).toEqual({
       ...waitingRecovery,
-      reconnectCommand: "reconnect",
+      reconnectCommand: "reopen_stream",
+    });
+
+    expect(
+      reduceCodexRecoveryState(
+        {
+          ...waitingRecovery,
+          recoveryStrategy: "reconnect_transport" as const,
+        },
+        {
+          type: "sync_observed",
+          observation: {
+            canConnect: true,
+            connected: false,
+            hasLifecycleError: false,
+            isStartingSession: false,
+            isWaitingForAutomationThread: false,
+            sandboxInstanceId: "sbi_123",
+            sandboxStatus: "running",
+          },
+        },
+      ),
+    ).toEqual({
+      ...waitingRecovery,
+      recoveryStrategy: "reconnect_transport",
+      reconnectCommand: "reconnect_transport",
     });
   });
 
@@ -224,6 +255,7 @@ describe("useSessionWorkbenchController", () => {
       baseMessage: "Sandbox session stream reset.",
       errorMessage: null,
       preferredThreadId: "thread_123",
+      recoveryStrategy: "reopen_stream" as const,
       reconnectAttemptCount: 3,
       reconnectCommand: "none" as const,
       recoverableDisconnectId: 1,
@@ -252,6 +284,7 @@ describe("useSessionWorkbenchController", () => {
       baseMessage: "Sandbox session stream reset.",
       errorMessage: null,
       preferredThreadId: "thread_123",
+      recoveryStrategy: "reopen_stream" as const,
       reconnectAttemptCount: 1,
       reconnectCommand: "none" as const,
       recoverableDisconnectId: 1,

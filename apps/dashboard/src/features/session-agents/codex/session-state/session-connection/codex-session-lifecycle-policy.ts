@@ -22,6 +22,7 @@ export function resolveCodexConnectionStateTransition(input: {
   shouldDisconnectSession: boolean;
   lifecycleErrorMessage: string | null;
   recoverableDisconnectMessage: string | null;
+  recoverableDisconnectStrategy: "reconnect_transport" | null;
 } {
   if (input.state === "closed" || input.state === "error") {
     const disconnectMessage = input.errorMessage ?? "The Codex session connection closed.";
@@ -29,6 +30,7 @@ export function resolveCodexConnectionStateTransition(input: {
       shouldDisconnectSession: true,
       lifecycleErrorMessage: input.hasConnectedSession ? null : disconnectMessage,
       recoverableDisconnectMessage: input.hasConnectedSession ? disconnectMessage : null,
+      recoverableDisconnectStrategy: input.hasConnectedSession ? "reconnect_transport" : null,
     };
   }
 
@@ -36,6 +38,7 @@ export function resolveCodexConnectionStateTransition(input: {
     shouldDisconnectSession: false,
     lifecycleErrorMessage: null,
     recoverableDisconnectMessage: null,
+    recoverableDisconnectStrategy: null,
   };
 }
 

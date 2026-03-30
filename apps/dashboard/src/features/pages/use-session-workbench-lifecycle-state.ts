@@ -37,9 +37,10 @@ type RecoverableCodexDisconnect = {
   id: number;
   message: string;
   preferredThreadId: string | null;
+  recoveryStrategy: "reconnect_transport" | "reopen_stream";
 };
 
-type CodexRecoveryReconnectCommand = "none" | "reconnect";
+type CodexRecoveryReconnectCommand = "none" | "reconnect_transport" | "reopen_stream";
 
 type CodexRecoveryObservedState = {
   canConnect: boolean;
@@ -60,6 +61,7 @@ export type CodexRecoveryState =
       baseMessage: string;
       errorMessage: string | null;
       preferredThreadId: string | null;
+      recoveryStrategy: "reconnect_transport" | "reopen_stream";
       reconnectAttemptCount: number;
       reconnectCommand: CodexRecoveryReconnectCommand;
       recoverableDisconnectId: number;
@@ -92,6 +94,7 @@ function createCodexRecoveryStateFromDisconnect(
     baseMessage: disconnect.message,
     errorMessage: null,
     preferredThreadId: disconnect.preferredThreadId,
+    recoveryStrategy: disconnect.recoveryStrategy,
     reconnectAttemptCount: 0,
     reconnectCommand: "none",
     recoverableDisconnectId: disconnect.id,
@@ -119,6 +122,7 @@ export function reduceCodexRecoveryState(
               ...state,
               baseMessage: event.disconnect.message,
               preferredThreadId: event.disconnect.preferredThreadId,
+              recoveryStrategy: event.disconnect.recoveryStrategy,
             };
           }
 
@@ -126,7 +130,7 @@ export function reduceCodexRecoveryState(
         }
 
         case "reconnect_attempt_started": {
-          if (state.reconnectCommand !== "reconnect") {
+          if (state.reconnectCommand === "none") {
             return state;
           }
 
@@ -192,11 +196,14 @@ export function reduceCodexRecoveryState(
                 };
           }
 
-          return state.reconnectCommand === "reconnect"
+          const reconnectCommand =
+            state.recoveryStrategy === "reopen_stream" ? "reopen_stream" : "reconnect_transport";
+
+          return state.reconnectCommand === reconnectCommand
             ? state
             : {
                 ...state,
-                reconnectCommand: "reconnect",
+                reconnectCommand,
               };
         }
       }
@@ -452,6 +459,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     | "disconnectSession"
     | "isStartingSession"
     | "lifecycleErrorMessage"
+    | "recoverSession"
     | "recoverableDisconnect"
     | "step"
   >;
@@ -486,6 +494,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     disconnectSession,
     isStartingSession,
     lifecycleErrorMessage,
+    recoverSession,
     recoverableDisconnect,
     step,
   } = input.lifecycle;
@@ -784,7 +793,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       return;
     }
 
-    if (codexRecoveryState.reconnectCommand !== "reconnect") {
+    if (codexRecoveryState.reconnectCommand === "none") {
       return;
     }
 
@@ -795,11 +804,18 @@ export function useSessionWorkbenchLifecycleState(input: {
     dispatchCodexRecoveryEvent({
       type: "reconnect_attempt_started",
     });
-    connectSession({
+    const recoveryInput = {
       sandboxInstanceId: input.sandboxInstanceId,
       preferredThreadId: codexRecoveryState.preferredThreadId,
-    });
-  }, [codexRecoveryState, connectSession, input.sandboxInstanceId]);
+    };
+
+    if (codexRecoveryState.reconnectCommand === "reopen_stream") {
+      recoverSession(recoveryInput);
+      return;
+    }
+
+    connectSession(recoveryInput);
+  }, [codexRecoveryState, connectSession, input.sandboxInstanceId, recoverSession]);
 
   useEffect(() => {
     if (input.sandboxInstanceId === null || connectedSession === null) {

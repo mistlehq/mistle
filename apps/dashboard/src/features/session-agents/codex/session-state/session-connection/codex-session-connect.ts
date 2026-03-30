@@ -64,6 +64,12 @@ export type CodexConnectionBootstrapResult = {
   threadId: string;
 };
 
+export type EstablishedCodexThreadResult = {
+  generation: number;
+  sandboxInstanceId: string;
+  threadId: string;
+};
+
 export function resolveInitialCodexThreadAction(input: {
   preferredThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
@@ -76,16 +82,15 @@ export function resolveInitialCodexThreadAction(input: {
   });
 }
 
-export async function establishInitialCodexThread(input: {
+export async function establishCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
   preferredThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
   generation: number;
   sandboxInstanceId: string;
-  mintedConnection: MintSandboxConnectionTokenResult;
   ensureCurrentGeneration: (generation: number) => void;
-}): Promise<CodexConnectionBootstrapResult> {
+}): Promise<EstablishedCodexThreadResult> {
   const action = resolveInitialCodexThreadAction({
     preferredThreadId: input.preferredThreadId,
     availableThreads: input.availableThreads,
@@ -125,7 +130,6 @@ export async function establishInitialCodexThread(input: {
         return {
           generation: input.generation,
           sandboxInstanceId: input.sandboxInstanceId,
-          mintedConnection: input.mintedConnection,
           threadId: startedThread.threadId,
         };
       }
@@ -137,7 +141,6 @@ export async function establishInitialCodexThread(input: {
     return {
       generation: input.generation,
       sandboxInstanceId: input.sandboxInstanceId,
-      mintedConnection: input.mintedConnection,
       threadId: resumedThread.threadId,
     };
   }
@@ -151,8 +154,25 @@ export async function establishInitialCodexThread(input: {
   return {
     generation: input.generation,
     sandboxInstanceId: input.sandboxInstanceId,
-    mintedConnection: input.mintedConnection,
     threadId: startedThread.threadId,
+  };
+}
+
+export async function establishInitialCodexThread(input: {
+  rpcClient: CodexJsonRpcClient;
+  preferredThreadId: string | null;
+  availableThreads: readonly CodexThreadSummary[];
+  loadedThreadIds: readonly string[];
+  generation: number;
+  sandboxInstanceId: string;
+  mintedConnection: MintSandboxConnectionTokenResult;
+  ensureCurrentGeneration: (generation: number) => void;
+}): Promise<CodexConnectionBootstrapResult> {
+  const establishedThread = await establishCodexThread(input);
+
+  return {
+    ...establishedThread,
+    mintedConnection: input.mintedConnection,
   };
 }
 

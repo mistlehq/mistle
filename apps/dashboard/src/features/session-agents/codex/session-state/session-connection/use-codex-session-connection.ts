@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { mintSandboxInstanceConnectionToken } from "../../../../sessions/sessions-service.js";
 import type { ConnectedCodexSession, StartSessionStep } from "../codex-session-types.js";
 import {
+  establishCodexThread,
   createConnectedCodexSession,
   establishInitialCodexThread,
 } from "./codex-session-connect.js";
@@ -40,11 +41,13 @@ export type CodexSessionConnectionLifecycleState = {
     id: number;
     message: string;
     preferredThreadId: string | null;
+    recoveryStrategy: "reconnect_transport" | "reopen_stream";
   } | null;
   agentConnectionState: CodexSessionConnectionState;
   agentConnectionError: string | null;
   isStartingSession: boolean;
   connectSession: (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => void;
+  recoverSession: (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => void;
   disconnectSession: () => void;
   clearLifecycleErrorMessage: () => void;
   reportLifecycleErrorMessage: (message: string) => void;
@@ -78,11 +81,13 @@ export function useCodexSessionConnection(input: {
     id: number;
     message: string;
     preferredThreadId: string | null;
+    recoveryStrategy: "reconnect_transport" | "reopen_stream";
   } | null>(null);
   const [agentConnectionState, setAgentConnectionState] =
     useState<CodexSessionConnectionState>("idle");
   const [agentConnectionError, setAgentConnectionError] = useState<string | null>(null);
   const nextRecoverableDisconnectIdRef = useRef(0);
+  const lastConnectedSessionRef = useRef<ConnectedCodexSession | null>(null);
 
   const updateActiveThread = useCallback(
     (threadId: string | null): void => {
@@ -120,6 +125,7 @@ export function useCodexSessionConnection(input: {
     teardownConnection("Disconnected from sessions page.");
     setConnectedSession(null);
     setRecoverableDisconnect(null);
+    lastConnectedSessionRef.current = null;
     setStep("idle");
     input.setLifecycleErrorMessage(null);
     setAgentConnectionState("idle");
@@ -167,6 +173,7 @@ export function useCodexSessionConnection(input: {
                   id: recoverableDisconnectId,
                   message: connectionStateTransition.recoverableDisconnectMessage,
                   preferredThreadId,
+                  recoveryStrategy: "reconnect_transport",
                 });
               } else {
                 setRecoverableDisconnect(null);
@@ -176,6 +183,31 @@ export function useCodexSessionConnection(input: {
               setAgentConnectionError(null);
               input.setLifecycleErrorMessage(connectionStateTransition.lifecycleErrorMessage);
             }
+            return;
+          }
+
+          if (event.type === "stream_reset") {
+            const preferredThreadId = input.threadIdRef.current;
+            const hasConnectedSession = connectedSession !== null || preferredThreadId !== null;
+            if (!hasConnectedSession) {
+              return;
+            }
+
+            // Keep the existing websocket transport alive and let the dashboard recover by
+            // reopening the logical agent stream once sandbox readiness catches up.
+            const recoverableDisconnectId = nextRecoverableDisconnectIdRef.current + 1;
+            nextRecoverableDisconnectIdRef.current = recoverableDisconnectId;
+            setConnectedSession(null);
+            setRecoverableDisconnect({
+              id: recoverableDisconnectId,
+              message: `Sandbox session stream reset (${event.resetInfo.code}): ${event.resetInfo.message}`,
+              preferredThreadId,
+              recoveryStrategy: "reopen_stream",
+            });
+            setStep("idle");
+            setAgentConnectionState("connected_socket");
+            setAgentConnectionError(null);
+            input.setLifecycleErrorMessage(null);
             return;
           }
 
@@ -289,14 +321,14 @@ export function useCodexSessionConnection(input: {
       }
 
       updateActiveThread(result.threadId);
-      setConnectedSession(
-        createConnectedCodexSession({
-          sandboxInstanceId: result.sandboxInstanceId,
-          connectedAtIso: new Date().toISOString(),
-          mintedConnection: result.mintedConnection,
-          threadId: result.threadId,
-        }),
-      );
+      const nextConnectedSession = createConnectedCodexSession({
+        sandboxInstanceId: result.sandboxInstanceId,
+        connectedAtIso: new Date().toISOString(),
+        mintedConnection: result.mintedConnection,
+        threadId: result.threadId,
+      });
+      lastConnectedSessionRef.current = nextConnectedSession;
+      setConnectedSession(nextConnectedSession);
       setRecoverableDisconnect(null);
       setAgentConnectionState("ready");
       setAgentConnectionError(null);
@@ -316,11 +348,102 @@ export function useCodexSessionConnection(input: {
     },
   });
 
+  const recoverSessionMutation = useMutation({
+    mutationFn: async (recoverInput: {
+      preferredThreadId: string | null;
+      sandboxInstanceId: string;
+    }) => {
+      const generation = input.connectionGenerationRef.current;
+      const sessionClient = input.sessionClientRef.current;
+      const rpcClient = input.rpcClientRef.current;
+      const previousConnectedSession = lastConnectedSessionRef.current;
+
+      if (sessionClient === null || rpcClient === null || previousConnectedSession === null) {
+        throw new Error("Codex session recovery requires an existing sandbox transport.");
+      }
+
+      input.setLifecycleErrorMessage(null);
+      setStep("connecting");
+
+      try {
+        // Recovery on stream reset reuses the existing websocket transport. The only
+        // thing that needs to be rebuilt is the logical agent stream and its JSON-RPC
+        // initialization handshake.
+        await sessionClient.openAgentStream();
+        input.ensureCurrentGeneration(generation);
+      } catch (error) {
+        throw describeCodexSessionStepError("Reopening sandbox agent channel", error);
+      }
+
+      try {
+        await rpcClient.initialize();
+        input.ensureCurrentGeneration(generation);
+      } catch (error) {
+        throw describeCodexSessionStepError("Reinitializing Codex app server", error);
+      }
+
+      const threadCollections = await input.refreshThreadCollections({
+        generation,
+        rpcClient,
+      });
+      const recoveredThread = await establishCodexThread({
+        rpcClient,
+        preferredThreadId: recoverInput.preferredThreadId,
+        availableThreads: threadCollections.availableThreads,
+        loadedThreadIds: threadCollections.loadedThreadIds,
+        generation,
+        sandboxInstanceId: recoverInput.sandboxInstanceId,
+        ensureCurrentGeneration: input.ensureCurrentGeneration,
+      });
+
+      return {
+        previousConnectedSession,
+        recoveredThread,
+      };
+    },
+    onSuccess: (result) => {
+      if (input.connectionGenerationRef.current !== result.recoveredThread.generation) {
+        return;
+      }
+
+      updateActiveThread(result.recoveredThread.threadId);
+      const nextConnectedSession = {
+        ...result.previousConnectedSession,
+        connectedAtIso: new Date().toISOString(),
+        threadId: result.recoveredThread.threadId,
+      };
+      lastConnectedSessionRef.current = nextConnectedSession;
+      setConnectedSession(nextConnectedSession);
+      setRecoverableDisconnect(null);
+      setAgentConnectionState("ready");
+      setAgentConnectionError(null);
+      setStep("connected");
+      input.setLifecycleErrorMessage(null);
+    },
+    onError: (error) => {
+      if (error instanceof StaleConnectionAttemptError) {
+        return;
+      }
+
+      setStep("idle");
+      if (error instanceof Error) {
+        setAgentConnectionError(error.message);
+      }
+    },
+  });
+
   const connectSession = useCallback(
     (connectInput: { sandboxInstanceId: string; preferredThreadId: string | null }) => {
       connectSessionMutation.mutate(connectInput);
     },
     [connectSessionMutation],
+  );
+
+  const recoverSession = useCallback(
+    (recoverInput: { sandboxInstanceId: string; preferredThreadId: string | null }) => {
+      recoverSessionMutation.mutate(recoverInput);
+    },
+    [recoverSessionMutation],
   );
 
   const clearLifecycleErrorMessage = useCallback(() => {
@@ -342,8 +465,9 @@ export function useCodexSessionConnection(input: {
       recoverableDisconnect,
       agentConnectionState,
       agentConnectionError,
-      isStartingSession: connectSessionMutation.isPending,
+      isStartingSession: connectSessionMutation.isPending || recoverSessionMutation.isPending,
       connectSession,
+      recoverSession,
       disconnectSession,
       clearLifecycleErrorMessage,
       reportLifecycleErrorMessage,
@@ -355,6 +479,8 @@ export function useCodexSessionConnection(input: {
       connectSession,
       connectSessionMutation.isPending,
       connectedSession,
+      recoverSession,
+      recoverSessionMutation.isPending,
       recoverableDisconnect,
       disconnectSession,
       reportLifecycleErrorMessage,

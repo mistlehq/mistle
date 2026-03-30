@@ -26,6 +26,7 @@ type TestServerMode = "accept" | "close_after_payload" | "reject";
 type TestServer = {
   url: string;
   openRequest: Promise<string>;
+  openRequests: string[];
   payload: Promise<{ streamId: number; payload: string }>;
   receivedPayloads: Array<{ streamId: number; payload: string }>;
   socketClosed: Promise<void>;
@@ -120,75 +121,82 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
 
   let connectedSocket: import("ws").WebSocket | null = null;
   let activeStreamId: number | null = null;
+  const openRequests: string[] = [];
   const receivedPayloads: Array<{ streamId: number; payload: string }> = [];
 
   wsServer.on("connection", (socket) => {
     connectedSocket = socket;
-    let didHandleConnect = false;
 
     socket.on("message", (message) => {
-      if (didHandleConnect) {
-        const controlMessage = parseStreamControlMessage(toText(message));
-        if (controlMessage?.type === "stream.window") {
-          windowUpdateDeferred.resolve({
-            bytes: controlMessage.bytes,
-            streamId: controlMessage.streamId,
-          });
+      const messageText = toText(message);
+      const parsedOpenRequest = parseStreamOpenControlMessage(messageText);
+      if (parsedOpenRequest !== null) {
+        throw new Error("Server should not receive stream.open control responses from the client.");
+      }
+
+      try {
+        const parsedJson = JSON.parse(messageText) as unknown;
+        if (
+          typeof parsedJson === "object" &&
+          parsedJson !== null &&
+          !Array.isArray(parsedJson) &&
+          "type" in parsedJson &&
+          parsedJson.type === "stream.open" &&
+          "streamId" in parsedJson &&
+          typeof parsedJson.streamId === "number"
+        ) {
+          openRequests.push(messageText);
+          if (openRequests.length === 1) {
+            openRequestDeferred.resolve(messageText);
+          }
+          activeStreamId = parsedJson.streamId;
+
+          const controlMessage = parseStreamOpenControlMessage(
+            JSON.stringify({
+              type: mode === "reject" ? "stream.open.error" : "stream.open.ok",
+              streamId: parsedJson.streamId,
+              ...(mode === "reject"
+                ? {
+                    code: "agent_endpoint_unavailable",
+                    message: "agent endpoint unavailable",
+                  }
+                : {}),
+            }),
+          );
+          if (controlMessage === null) {
+            openRequestDeferred.reject(new Error("Expected valid stream.open control message."));
+            return;
+          }
+
+          socket.send(JSON.stringify(controlMessage));
           return;
         }
+      } catch {
+        // Continue to framed/control-path handling below.
+      }
 
-        try {
-          const decodedPayload = decodeAgentTextDataFrame(message);
-          receivedPayloads.push(decodedPayload);
-          if (receivedPayloads.length === 1) {
-            payloadDeferred.resolve(decodedPayload);
-          }
-        } catch (error) {
-          payloadDeferred.reject(error);
+      const controlMessage = parseStreamControlMessage(messageText);
+      if (controlMessage?.type === "stream.window") {
+        windowUpdateDeferred.resolve({
+          bytes: controlMessage.bytes,
+          streamId: controlMessage.streamId,
+        });
+        return;
+      }
+
+      try {
+        const decodedPayload = decodeAgentTextDataFrame(message);
+        receivedPayloads.push(decodedPayload);
+        if (receivedPayloads.length === 1) {
+          payloadDeferred.resolve(decodedPayload);
         }
-
-        if (mode === "close_after_payload") {
-          socket.close(1011, "close after payload");
-        }
-        return;
+      } catch (error) {
+        payloadDeferred.reject(error);
       }
 
-      didHandleConnect = true;
-      const openRequestText = toText(message);
-      openRequestDeferred.resolve(openRequestText);
-      const parsedOpenRequest = JSON.parse(openRequestText);
-      if (
-        typeof parsedOpenRequest !== "object" ||
-        parsedOpenRequest === null ||
-        Array.isArray(parsedOpenRequest) ||
-        !("streamId" in parsedOpenRequest) ||
-        typeof parsedOpenRequest.streamId !== "number"
-      ) {
-        openRequestDeferred.reject(
-          new Error("Expected stream.open to provide a numeric streamId."),
-        );
-        return;
+      if (mode === "close_after_payload") {
+        socket.close(1011, "close after payload");
       }
-      activeStreamId = parsedOpenRequest.streamId;
-
-      const controlMessage = parseStreamOpenControlMessage(
-        JSON.stringify({
-          type: mode === "reject" ? "stream.open.error" : "stream.open.ok",
-          streamId: 1,
-          ...(mode === "reject"
-            ? {
-                code: "agent_endpoint_unavailable",
-                message: "agent endpoint unavailable",
-              }
-            : {}),
-        }),
-      );
-      if (controlMessage === null) {
-        openRequestDeferred.reject(new Error("Expected valid stream.open control message."));
-        return;
-      }
-
-      socket.send(JSON.stringify(controlMessage));
     });
 
     socket.on("close", () => {
@@ -210,6 +218,7 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
   return {
     url: `ws://127.0.0.1:${String(address.port)}`,
     openRequest: openRequestDeferred.promise,
+    openRequests,
     payload: payloadDeferred.promise,
     receivedPayloads,
     socketClosed: socketClosedDeferred.promise,
@@ -637,6 +646,59 @@ describe("sandbox session client", () => {
     await expect(client.sendJson({ method: "after-reset" })).rejects.toThrow(
       "Sandbox session stream is not open.",
     );
+  });
+
+  it("reopens the agent stream on the existing websocket after a reset", async () => {
+    const server = await createManagedTestServer("accept");
+    const client = createClient(server.url);
+
+    await expectClientToOpenAgentStream({
+      client,
+      server,
+    });
+
+    server.sendReset({
+      code: "bootstrap_disconnected",
+      message: "Sandbox bootstrap tunnel disconnected.",
+    });
+
+    await waitForCondition({
+      description: "client to observe stream reset",
+      timeoutMs: 500,
+      evaluate: () => client.streamId === null && client.state === "connected_socket",
+    });
+
+    await client.openAgentStream();
+
+    expect(server.openRequests).toHaveLength(2);
+    expect(JSON.parse(server.openRequests[1] ?? "")).toEqual({
+      type: "stream.open",
+      streamId: 2,
+      channel: {
+        kind: "agent",
+      },
+    });
+
+    await client.sendJson({
+      jsonrpc: "2.0",
+      id: "req-2",
+      method: "ping",
+    });
+
+    await waitForCondition({
+      description: "reopened stream payload to reach the server",
+      timeoutMs: 500,
+      evaluate: () => server.receivedPayloads.length >= 1,
+    });
+
+    expect(server.receivedPayloads.at(-1)).toEqual({
+      streamId: 2,
+      payload: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "req-2",
+        method: "ping",
+      }),
+    });
   });
 
   it("reports queued send guarantees in the browser runtime", async () => {

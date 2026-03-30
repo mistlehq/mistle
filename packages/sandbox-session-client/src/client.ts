@@ -271,14 +271,40 @@ export class SandboxSessionClient {
     this.#openError = null;
     this.#resetInfo = null;
     this.#streamId = null;
-    this.#setState("connecting_socket", null);
+    await this.#connectSocket();
 
-    const socket = this.#runtime.createSocket(this.#connectionUrl);
-    this.#socket = socket;
+    try {
+      await this.openAgentStream();
+    } catch (error) {
+      if (this.#socket !== null && this.#openError !== null) {
+        this.#closeConnectedSocketWithError(
+          error instanceof Error ? error.message : "Failed to open sandbox agent stream.",
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  async openAgentStream(): Promise<void> {
+    const socket = this.#socket;
+    if (socket === null || socket.readyState !== SandboxSessionSocketReadyStates.OPEN) {
+      throw new Error("Sandbox session socket is not open.");
+    }
+    if (this.#streamId !== null) {
+      throw new Error("Sandbox session stream is already open.");
+    }
+
+    // A stream reset leaves the websocket transport alive but invalidates the logical
+    // agent stream. Reopen removes the steady-state listeners temporarily so the next
+    // stream.open handshake can complete without being treated as normal traffic.
+    this.#detachConnectedSocketListeners(socket);
+    this.#openError = null;
+    this.#resetInfo = null;
+    this.#setState("opening_agent_stream", null);
 
     await new Promise<void>((resolve, reject) => {
       const streamId = this.#runtime.createStreamId();
-      this.#streamId = streamId;
       let settled = false;
 
       const timeoutTask = this.#runtime.scheduleTimeout(() => {
@@ -287,10 +313,20 @@ export class SandboxSessionClient {
 
       const cleanup = (): void => {
         timeoutTask.cancel();
-        socket.removeEventListener("open", handleOpen);
         socket.removeEventListener("message", handleMessage);
         socket.removeEventListener("error", handleError);
         socket.removeEventListener("close", handleClose);
+      };
+
+      const restoreConnectedSocketState = (): void => {
+        if (this.#socket !== socket) {
+          return;
+        }
+
+        this.#availableSendWindowBytes = 0;
+        this.#streamId = null;
+        this.#attachConnectedSocketListeners(socket);
+        this.#setState("connected_socket", null);
       };
 
       const fail = (error: Error): void => {
@@ -299,11 +335,21 @@ export class SandboxSessionClient {
         }
         settled = true;
         cleanup();
-        this.#setState("error", error.message);
-        this.#socket = null;
-        this.#streamId = null;
-        socket.close();
+        restoreConnectedSocketState();
         reject(error);
+      };
+
+      const failWithTerminalSocketState = (state: "closed" | "error", message: string): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        this.#socket = null;
+        this.#availableSendWindowBytes = 0;
+        this.#streamId = null;
+        this.#setState(state, message);
+        reject(new Error(message));
       };
 
       const succeed = (): void => {
@@ -314,29 +360,9 @@ export class SandboxSessionClient {
         cleanup();
         this.#availableSendWindowBytes = DefaultStreamWindowBytes;
         this.#streamId = streamId;
+        this.#attachConnectedSocketListeners(socket);
         this.#setState("connected_socket", null);
-        socket.addEventListener("message", this.#handleConnectedMessage);
-        socket.addEventListener("close", this.#handleSocketClose);
-        socket.addEventListener("error", this.#handleSocketError);
         resolve();
-      };
-
-      const handleOpen = (): void => {
-        this.#setState("opening_agent_stream", null);
-        const openMessage: StreamOpen = {
-          type: "stream.open",
-          streamId,
-          channel: {
-            kind: "agent",
-          },
-        };
-        void socket.send(JSON.stringify(openMessage)).catch((error: unknown) => {
-          fail(
-            error instanceof Error
-              ? error
-              : new Error("Failed to send sandbox agent stream.open request."),
-          );
-        });
       };
 
       const handleMessage = (event: unknown): void => {
@@ -360,17 +386,34 @@ export class SandboxSessionClient {
       };
 
       const handleError = (): void => {
-        fail(new Error("Sandbox websocket connection failed."));
+        failWithTerminalSocketState("error", "Sandbox websocket connection failed.");
       };
 
       const handleClose = (): void => {
-        fail(new Error("Sandbox websocket connection closed before agent stream was ready."));
+        failWithTerminalSocketState(
+          "closed",
+          "Sandbox websocket connection closed before agent stream was ready.",
+        );
       };
 
-      socket.addEventListener("open", handleOpen);
       socket.addEventListener("message", handleMessage);
       socket.addEventListener("error", handleError);
       socket.addEventListener("close", handleClose);
+
+      const openMessage: StreamOpen = {
+        type: "stream.open",
+        streamId,
+        channel: {
+          kind: "agent",
+        },
+      };
+      void socket.send(JSON.stringify(openMessage)).catch((error: unknown) => {
+        fail(
+          error instanceof Error
+            ? error
+            : new Error("Failed to send sandbox agent stream.open request."),
+        );
+      });
     });
   }
 
@@ -426,6 +469,59 @@ export class SandboxSessionClient {
 
   markReady(): void {
     this.#setState("ready", null);
+  }
+
+  async #connectSocket(): Promise<void> {
+    this.#setState("connecting_socket", null);
+
+    const socket = this.#runtime.createSocket(this.#connectionUrl);
+    this.#socket = socket;
+
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+
+      const cleanup = (): void => {
+        socket.removeEventListener("open", handleOpen);
+        socket.removeEventListener("error", handleError);
+        socket.removeEventListener("close", handleClose);
+      };
+
+      const finishWithFailure = (state: "closed" | "error", message: string): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        this.#socket = null;
+        this.#setState(state, message);
+        socket.close();
+        reject(new Error(message));
+      };
+
+      const handleOpen = (): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        resolve();
+      };
+
+      const handleError = (): void => {
+        finishWithFailure("error", "Sandbox websocket connection failed.");
+      };
+
+      const handleClose = (): void => {
+        finishWithFailure(
+          "closed",
+          "Sandbox websocket connection closed before agent stream was ready.",
+        );
+      };
+
+      socket.addEventListener("open", handleOpen);
+      socket.addEventListener("error", handleError);
+      socket.addEventListener("close", handleClose);
+    });
   }
 
   #setState(state: SandboxSessionConnectionState, errorMessage: string | null): void {
@@ -610,6 +706,18 @@ export class SandboxSessionClient {
     this.#setState("error", "Sandbox websocket connection failed.");
   };
 
+  #attachConnectedSocketListeners(socket: import("./runtime.js").SandboxSessionSocket): void {
+    socket.addEventListener("message", this.#handleConnectedMessage);
+    socket.addEventListener("close", this.#handleSocketClose);
+    socket.addEventListener("error", this.#handleSocketError);
+  }
+
+  #detachConnectedSocketListeners(socket: import("./runtime.js").SandboxSessionSocket): void {
+    socket.removeEventListener("message", this.#handleConnectedMessage);
+    socket.removeEventListener("close", this.#handleSocketClose);
+    socket.removeEventListener("error", this.#handleSocketError);
+  }
+
   #closeConnectedSocketWithError(message: string): void {
     const socket = this.#socket;
     this.#socket = null;
@@ -617,9 +725,7 @@ export class SandboxSessionClient {
     this.#streamId = null;
 
     if (socket !== null) {
-      socket.removeEventListener("message", this.#handleConnectedMessage);
-      socket.removeEventListener("close", this.#handleSocketClose);
-      socket.removeEventListener("error", this.#handleSocketError);
+      this.#detachConnectedSocketListeners(socket);
       socket.close(ProtocolViolationCloseCode, message);
     }
 
