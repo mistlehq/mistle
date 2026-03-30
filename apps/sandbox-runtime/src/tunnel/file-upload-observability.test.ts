@@ -5,16 +5,17 @@ import {
   FileUploadTerminalEvents,
   classifyFileUploadResetCode,
   classifyUploadMetadataError,
+  createFileUploadObservabilityContext,
   createFileUploadTerminalLogEntry,
 } from "./file-upload-observability.js";
 
-const UploadContext = {
+const UploadContext = createFileUploadObservabilityContext({
   declaredMimeType: "image/png",
   declaredSizeBytes: 8,
   receivedBytes: 4,
   streamId: 17,
   threadId: "thread_123",
-} as const;
+});
 
 describe("classifyUploadMetadataError", () => {
   it("treats unsupported MIME declarations as invalid upload metadata", () => {
@@ -80,6 +81,27 @@ describe("createFileUploadTerminalLogEntry", () => {
         ...UploadContext,
         failureClass: FileUploadFailureClasses.INCOMPLETE_TRANSPORT,
         resetCode: "byte_count_exceeded",
+      },
+    });
+  });
+
+  it("produces a structured metadata rejection log entry without a reset code", () => {
+    expect(
+      createFileUploadTerminalLogEntry({
+        context: UploadContext,
+        outcome: {
+          kind: "rejected",
+          errorMessage: "Unsupported image MIME type 'image/svg+xml'.",
+          failureClass: FileUploadFailureClasses.INVALID_UPLOAD_METADATA,
+        },
+      }),
+    ).toEqual({
+      level: "warn",
+      event: FileUploadTerminalEvents.REJECTED,
+      fields: {
+        ...UploadContext,
+        errorMessage: "Unsupported image MIME type 'image/svg+xml'.",
+        failureClass: FileUploadFailureClasses.INVALID_UPLOAD_METADATA,
       },
     });
   });

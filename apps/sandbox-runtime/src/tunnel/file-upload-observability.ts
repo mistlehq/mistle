@@ -24,7 +24,7 @@ export const FileUploadTerminalEvents = {
   REJECTED: "sandbox_file_upload_rejected",
 } as const;
 
-type FileUploadObservabilityContext = {
+export type FileUploadObservabilityContext = {
   declaredMimeType: string;
   declaredSizeBytes: number;
   receivedBytes: number;
@@ -38,10 +38,16 @@ type FileUploadTerminalLogEntry = {
   level: SandboxRuntimeLogLevel;
 };
 
-type FileUploadRejectedOutcome = {
-  code: string;
-  kind: "rejected";
-};
+type FileUploadRejectedOutcome =
+  | {
+      code: string;
+      kind: "rejected";
+    }
+  | {
+      errorMessage: string;
+      failureClass: FileUploadFailureClass;
+      kind: "rejected";
+    };
 
 type FileUploadCompletedOutcome = {
   attachmentId: string;
@@ -94,6 +100,12 @@ function createBaseLogFields(input: FileUploadObservabilityContext): SandboxRunt
     streamId: input.streamId,
     threadId: input.threadId,
   };
+}
+
+export function createFileUploadObservabilityContext(
+  input: FileUploadObservabilityContext,
+): FileUploadObservabilityContext {
+  return input;
 }
 
 export function classifyUploadMetadataError(errorMessage: string): FileUploadFailureClass {
@@ -149,13 +161,25 @@ export function createFileUploadTerminalLogEntry(input: {
         },
       };
     case "rejected":
+      if ("code" in input.outcome) {
+        return {
+          level: "warn",
+          event: FileUploadTerminalEvents.REJECTED,
+          fields: {
+            ...baseFields,
+            failureClass: classifyValidationResetCode(input.outcome.code),
+            resetCode: input.outcome.code,
+          },
+        };
+      }
+
       return {
         level: "warn",
         event: FileUploadTerminalEvents.REJECTED,
         fields: {
           ...baseFields,
-          failureClass: classifyValidationResetCode(input.outcome.code),
-          resetCode: input.outcome.code,
+          errorMessage: input.outcome.errorMessage,
+          failureClass: input.outcome.failureClass,
         },
       };
   }

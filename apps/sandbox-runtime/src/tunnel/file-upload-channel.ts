@@ -20,6 +20,7 @@ import {
 } from "./connect-request.js";
 import {
   classifyUploadMetadataError,
+  createFileUploadObservabilityContext,
   logFileUploadTerminalEvent,
 } from "./file-upload-observability.js";
 import {
@@ -73,18 +74,61 @@ export async function handleFileUploadStream(input: {
   threadId: string;
   tunnelSocket: WebSocket;
 }): Promise<void> {
-  const logContext = {
+  const baseLogContext = createFileUploadObservabilityContext({
     declaredMimeType: input.mimeType,
     declaredSizeBytes: input.sizeBytes,
     receivedBytes: 0,
     streamId: input.streamId,
     threadId: input.threadId,
-  };
+  });
   let fileHandle: Awaited<ReturnType<typeof open>> | undefined;
   let tempPath: string | undefined;
   let receivedBytes = 0;
   let didPersistFinalFile = false;
   let didLogTerminalOutcome = false;
+
+  const createLogContext = () => ({
+    ...baseLogContext,
+    receivedBytes,
+  });
+  const logTerminalOutcome: typeof logFileUploadTerminalEvent = (terminalInput) => {
+    logFileUploadTerminalEvent(terminalInput);
+    didLogTerminalOutcome = true;
+  };
+  const rejectUpload = async (reset: { code: string; message: string }): Promise<void> => {
+    await writeStreamReset(input.tunnelSocket, {
+      type: "stream.reset",
+      streamId: input.streamId,
+      code: reset.code,
+      message: reset.message,
+    });
+    logTerminalOutcome({
+      context: createLogContext(),
+      outcome: {
+        kind: "rejected",
+        code: reset.code,
+      },
+    });
+  };
+  const interruptUpload = (reason: string): void => {
+    logTerminalOutcome({
+      context: createLogContext(),
+      outcome: {
+        kind: "interrupted",
+        reason,
+      },
+    });
+  };
+  const failUpload = (errorMessage: string): void => {
+    logTerminalOutcome({
+      context: createLogContext(),
+      outcome: {
+        kind: "failed",
+        errorMessage,
+        failureClass: classifyUploadMetadataError(errorMessage),
+      },
+    });
+  };
 
   try {
     assertUploadMetadata(input);
@@ -128,65 +172,26 @@ export async function handleFileUploadStream(input: {
       if (message.kind === "binary") {
         const dataFrame = decodeDataFrame(message.payload);
         if (dataFrame.streamId !== input.streamId) {
-          await writeStreamReset(input.tunnelSocket, {
-            type: "stream.reset",
-            streamId: input.streamId,
+          await rejectUpload({
             code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
             message: `stream data frame streamId ${String(dataFrame.streamId)} does not match active upload stream ${String(input.streamId)}`,
           });
-          logFileUploadTerminalEvent({
-            context: {
-              ...logContext,
-              receivedBytes,
-            },
-            outcome: {
-              kind: "rejected",
-              code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
-            },
-          });
-          didLogTerminalOutcome = true;
           return;
         }
         if (dataFrame.payloadKind !== PayloadKindRawBytes) {
-          await writeStreamReset(input.tunnelSocket, {
-            type: "stream.reset",
-            streamId: input.streamId,
+          await rejectUpload({
             code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
             message: "file upload stream only accepts raw byte payloads",
           });
-          logFileUploadTerminalEvent({
-            context: {
-              ...logContext,
-              receivedBytes,
-            },
-            outcome: {
-              kind: "rejected",
-              code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
-            },
-          });
-          didLogTerminalOutcome = true;
           return;
         }
 
         receivedBytes += dataFrame.payload.byteLength;
         if (receivedBytes > input.sizeBytes) {
-          await writeStreamReset(input.tunnelSocket, {
-            type: "stream.reset",
-            streamId: input.streamId,
+          await rejectUpload({
             code: FileUploadResetCodes.BYTE_COUNT_EXCEEDED,
             message: "Received more bytes than declared by the upload metadata.",
           });
-          logFileUploadTerminalEvent({
-            context: {
-              ...logContext,
-              receivedBytes,
-            },
-            outcome: {
-              kind: "rejected",
-              code: FileUploadResetCodes.BYTE_COUNT_EXCEEDED,
-            },
-          });
-          didLogTerminalOutcome = true;
           return;
         }
 
@@ -201,66 +206,27 @@ export async function handleFileUploadStream(input: {
 
       const controlMessageType = parseControlMessageType(message.payload);
       if (controlMessageType !== "stream.close") {
-        await writeStreamReset(input.tunnelSocket, {
-          type: "stream.reset",
-          streamId: input.streamId,
+        await rejectUpload({
           code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
           message: "file upload stream only accepts stream.close after open",
         });
-        logFileUploadTerminalEvent({
-          context: {
-            ...logContext,
-            receivedBytes,
-          },
-          outcome: {
-            kind: "rejected",
-            code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
-          },
-        });
-        didLogTerminalOutcome = true;
         return;
       }
 
       const closeMessage = parseStreamCloseMessage(message.payload);
       if (closeMessage.streamId !== input.streamId) {
-        await writeStreamReset(input.tunnelSocket, {
-          type: "stream.reset",
-          streamId: input.streamId,
+        await rejectUpload({
           code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
           message: `stream.close streamId ${String(closeMessage.streamId)} does not match active upload stream ${String(input.streamId)}`,
         });
-        logFileUploadTerminalEvent({
-          context: {
-            ...logContext,
-            receivedBytes,
-          },
-          outcome: {
-            kind: "rejected",
-            code: STREAM_RESET_CODE_INVALID_STREAM_DATA,
-          },
-        });
-        didLogTerminalOutcome = true;
         return;
       }
 
       if (receivedBytes !== input.sizeBytes) {
-        await writeStreamReset(input.tunnelSocket, {
-          type: "stream.reset",
-          streamId: input.streamId,
+        await rejectUpload({
           code: FileUploadResetCodes.BYTE_COUNT_MISMATCH,
           message: "Uploaded byte count did not match declared size.",
         });
-        logFileUploadTerminalEvent({
-          context: {
-            ...logContext,
-            receivedBytes,
-          },
-          outcome: {
-            kind: "rejected",
-            code: FileUploadResetCodes.BYTE_COUNT_MISMATCH,
-          },
-        });
-        didLogTerminalOutcome = true;
         return;
       }
 
@@ -270,23 +236,10 @@ export async function handleFileUploadStream(input: {
         tempPath,
       });
       if (!validationResult.ok) {
-        await writeStreamReset(input.tunnelSocket, {
-          type: "stream.reset",
-          streamId: input.streamId,
+        await rejectUpload({
           code: validationResult.code,
           message: validationResult.message,
         });
-        logFileUploadTerminalEvent({
-          context: {
-            ...logContext,
-            receivedBytes,
-          },
-          outcome: {
-            kind: "rejected",
-            code: validationResult.code,
-          },
-        });
-        didLogTerminalOutcome = true;
         return;
       }
 
@@ -307,44 +260,19 @@ export async function handleFileUploadStream(input: {
         },
       };
       await writeStreamEvent(input.tunnelSocket, completionEvent);
-      logFileUploadTerminalEvent({
-        context: {
-          ...logContext,
-          receivedBytes,
-        },
+      logTerminalOutcome({
+        context: createLogContext(),
         outcome: {
           kind: "completed",
           attachmentId,
         },
       });
-      didLogTerminalOutcome = true;
       return;
     }
-    logFileUploadTerminalEvent({
-      context: {
-        ...logContext,
-        receivedBytes,
-      },
-      outcome: {
-        kind: "interrupted",
-        reason: "upload signal aborted before stream completion",
-      },
-    });
-    didLogTerminalOutcome = true;
+    interruptUpload("upload signal aborted before stream completion");
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logFileUploadTerminalEvent({
-      context: {
-        ...logContext,
-        receivedBytes,
-      },
-      outcome: {
-        kind: "failed",
-        errorMessage,
-        failureClass: classifyUploadMetadataError(errorMessage),
-      },
-    });
-    didLogTerminalOutcome = true;
+    failUpload(errorMessage);
     throw error;
   } finally {
     await fileHandle?.close().catch(() => undefined);
@@ -352,16 +280,7 @@ export async function handleFileUploadStream(input: {
       await rm(tempPath ?? "", { force: true }).catch(() => undefined);
     }
     if (!didLogTerminalOutcome && input.signal.aborted) {
-      logFileUploadTerminalEvent({
-        context: {
-          ...logContext,
-          receivedBytes,
-        },
-        outcome: {
-          kind: "interrupted",
-          reason: "upload signal aborted during cleanup",
-        },
-      });
+      interruptUpload("upload signal aborted during cleanup");
     }
   }
 }
@@ -391,24 +310,18 @@ export async function handleFileUploadConnectRequest(input: {
     throw new Error("file upload stream.open request channel.kind must be 'fileUpload'");
   }
 
-  try {
-    assertUploadMetadata({
-      mimeType: connectRequest.channel.mimeType,
-      sizeBytes: connectRequest.channel.sizeBytes,
-      threadId: connectRequest.channel.threadId,
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+  const logContext = createFileUploadObservabilityContext({
+    declaredMimeType: connectRequest.channel.mimeType,
+    declaredSizeBytes: connectRequest.channel.sizeBytes,
+    receivedBytes: 0,
+    streamId: input.streamId,
+    threadId: connectRequest.channel.threadId,
+  });
+  const rejectUploadOpen = async (errorMessage: string): Promise<void> => {
     logFileUploadTerminalEvent({
-      context: {
-        declaredMimeType: connectRequest.channel.mimeType,
-        declaredSizeBytes: connectRequest.channel.sizeBytes,
-        receivedBytes: 0,
-        streamId: input.streamId,
-        threadId: connectRequest.channel.threadId,
-      },
+      context: logContext,
       outcome: {
-        kind: "failed",
+        kind: "rejected",
         errorMessage,
         failureClass: classifyUploadMetadataError(errorMessage),
       },
@@ -419,6 +332,17 @@ export async function handleFileUploadConnectRequest(input: {
       code: CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
       message: errorMessage,
     });
+  };
+
+  try {
+    assertUploadMetadata({
+      mimeType: connectRequest.channel.mimeType,
+      sizeBytes: connectRequest.channel.sizeBytes,
+      threadId: connectRequest.channel.threadId,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await rejectUploadOpen(errorMessage);
     return undefined;
   }
 
