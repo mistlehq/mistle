@@ -124,7 +124,6 @@ export interface paths {
             organizationId: string;
             runtimePlan: {
               agentRuntimes: {
-                adapterKey: string;
                 bindingId: string;
                 clientId: string;
                 endpointKey: string;

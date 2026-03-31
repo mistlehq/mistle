@@ -540,6 +540,7 @@ describe("handleAutomationRun integration", () => {
           createdById: webhookEventId,
           sandboxProfileId,
           integrationFamilyId: OpenAiApiKeyDefinition.familyId,
+          runtimeId: "codex",
           conversationKey: "issue-777",
           preview: "Handle @mistlebot prepare",
           status: AutomationConversationStatuses.PENDING,

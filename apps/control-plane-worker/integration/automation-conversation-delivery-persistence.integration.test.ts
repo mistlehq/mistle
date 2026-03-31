@@ -130,6 +130,7 @@ async function seedConversationDeliveryScope(input: {
       conversationKey: `conversation-${input.suffix}`,
       sandboxProfileId,
       integrationFamilyId: "openai",
+      runtimeId: "codex",
       preview: "AutomationConversation delivery test",
     },
   );

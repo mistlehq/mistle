@@ -3,7 +3,7 @@ import type {
   CompiledAgentRuntime,
   CompiledRuntimeClient,
 } from "@mistle/integrations-core";
-import { resolveAgentExecutionObserver } from "@mistle/integrations-definitions/agent";
+import { resolveAgentExecutionObserver } from "@mistle/integrations-definitions/agent-runtimes/server";
 import {
   decodeDataFrame,
   PayloadKindWebSocketBinary,
@@ -40,10 +40,10 @@ import {
 } from "./websocket.js";
 
 export type ResolvedAgentEndpoint = {
+  runtimeId: string;
   runtimeKey: string;
   clientId: string;
   endpointKey: string;
-  adapterKey: string;
   connectionMode: "dedicated" | "shared";
   transportUrl: string;
 };
@@ -88,10 +88,10 @@ export function resolveAgentEndpoint(
   }
 
   return {
+    runtimeId: agentRuntime.runtimeId,
     runtimeKey: agentRuntime.runtimeKey,
     clientId: runtimeClient.clientId,
     endpointKey: endpoint.endpointKey,
-    adapterKey: agentRuntime.adapterKey,
     connectionMode: endpoint.connectionMode,
     transportUrl: endpoint.transport.url,
   };
@@ -378,7 +378,7 @@ export async function handleAgentConnectRequest(input: {
 
   let observerSession: AgentExecutionObserverSession;
   try {
-    observerSession = resolveAgentExecutionObserver(agentEndpoint.adapterKey).createSession({
+    observerSession = resolveAgentExecutionObserver(agentEndpoint.runtimeId).createSession({
       transportUrl: agentEndpoint.transportUrl,
     });
   } catch (error) {

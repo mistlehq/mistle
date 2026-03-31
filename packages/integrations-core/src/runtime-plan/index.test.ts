@@ -59,7 +59,6 @@ describe("assembleCompiledRuntimePlan", () => {
               runtimeKey: "codex-app-server",
               clientId: "codex-cli",
               endpointKey: "app-server",
-              adapterKey: "openai-codex",
             },
           ],
         },
@@ -161,7 +160,6 @@ describe("assembleCompiledRuntimePlan", () => {
               runtimeKey: "github-app-server",
               clientId: "codex-cli",
               endpointKey: "app-server-b",
-              adapterKey: "github-agent",
             },
           ],
         },
@@ -254,7 +252,6 @@ describe("assembleCompiledRuntimePlan", () => {
               runtimeKey: "codex-app-server",
               clientId: "codex-cli",
               endpointKey: "app-server-a",
-              adapterKey: "openai-codex",
             },
           ],
         },
@@ -295,7 +292,6 @@ describe("assembleCompiledRuntimePlan", () => {
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server-a",
-        adapterKey: "openai-codex",
       },
       {
         bindingId: "bind_b",
@@ -303,7 +299,6 @@ describe("assembleCompiledRuntimePlan", () => {
         runtimeKey: "github-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server-b",
-        adapterKey: "github-agent",
       },
     ]);
   });

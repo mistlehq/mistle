@@ -58,7 +58,6 @@ export type CompileAgentRuntimeResult = {
     runtimeKey: string;
     clientId: string;
     endpointKey: string;
-    adapterKey: string;
   }>;
 };
 

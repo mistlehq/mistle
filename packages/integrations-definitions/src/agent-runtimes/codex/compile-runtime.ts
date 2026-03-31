@@ -5,7 +5,6 @@ import {
 } from "@mistle/integrations-core";
 import { stringify as stringifyToml } from "smol-toml";
 
-import { OpenAiAgentAdapterKeys } from "../../openai/variants/openai-default/adapter-keys.js";
 import {
   OpenAiCodexAppServerEndpointKey,
   OpenAiCodexAppServerListenUrl,
@@ -231,7 +230,6 @@ export function compileCodexRuntime(
         runtimeKey: OpenAiCodexAppServerProcessKey,
         clientId: "codex-cli",
         endpointKey: OpenAiCodexAppServerEndpointKey,
-        adapterKey: OpenAiAgentAdapterKeys.OPENAI_CODEX,
       },
     ],
   };

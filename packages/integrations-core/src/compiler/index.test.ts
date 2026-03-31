@@ -204,7 +204,6 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
-          adapterKey: "openai-codex",
         },
       ],
     }),
@@ -260,7 +259,6 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
           runtimeKey: "claude-code",
           clientId: "claude-code",
           endpointKey: "claude-code",
-          adapterKey: "claude-code",
         },
       ],
     }),
@@ -579,7 +577,6 @@ describe("compileRuntimePlan", () => {
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server",
-        adapterKey: "openai-codex",
       },
     ]);
   });
@@ -1784,7 +1781,6 @@ describe("compileRuntimePlan", () => {
             runtimeKey: "codex-app-server",
             clientId: "codex-cli",
             endpointKey: "app-server",
-            adapterKey: "openai-codex",
           },
         ],
       }),

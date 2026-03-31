@@ -559,10 +559,6 @@
                             "endpointKey": {
                               "type": "string",
                               "minLength": 1
-                            },
-                            "adapterKey": {
-                              "type": "string",
-                              "minLength": 1
                             }
                           },
                           "required": [
@@ -570,8 +566,7 @@
                             "runtimeId",
                             "runtimeKey",
                             "clientId",
-                            "endpointKey",
-                            "adapterKey"
+                            "endpointKey"
                           ],
                           "additionalProperties": false
                         }

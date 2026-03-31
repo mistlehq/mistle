@@ -4,6 +4,7 @@ import {
   AutomationConversationOwnerKinds,
   type AutomationConversationCreatedByKind,
   type AutomationConversationIntegrationFamilyId,
+  type AutomationConversationRuntimeId,
   type InsertAutomationConversation,
   type AutomationConversationOwnerKind,
   type ControlPlaneDatabase,
@@ -24,6 +25,7 @@ export type ClaimAutomationConversationInput = {
   conversationKey?: string;
   sandboxProfileId: string;
   integrationFamilyId: AutomationConversationIntegrationFamilyId;
+  runtimeId: AutomationConversationRuntimeId;
   title?: string | null;
   preview?: string | null;
 };
@@ -77,6 +79,7 @@ export async function claimAutomationConversation(
     conversationKey: resolvedConversationKey,
     sandboxProfileId: input.sandboxProfileId,
     integrationFamilyId: input.integrationFamilyId,
+    runtimeId: input.runtimeId,
     title: null,
     preview: input.preview == null ? null : input.preview.slice(0, 160),
     status: AutomationConversationStatuses.PENDING,

@@ -118,7 +118,7 @@ export async function deliverConversationAutomationPayload(
 
   const deliveryResult = await executeConversationProviderDelivery({
     conversationId: input.preparedAutomationRun.conversationId,
-    integrationFamilyId: input.resolvedAutomationConversationRoute.integrationFamilyId,
+    runtimeId: input.resolvedAutomationConversationRoute.runtimeId,
     connectionUrl: input.acquiredAutomationConnection.url,
     inputText: input.preparedAutomationRun.renderedInput,
     providerConversationId: route.providerConversationId,

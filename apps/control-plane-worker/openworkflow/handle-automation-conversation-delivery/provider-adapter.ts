@@ -1,5 +1,5 @@
 import type { AgentConversationProvider } from "@mistle/integrations-core";
-import { resolveAgentConversationProvider } from "@mistle/integrations-definitions/agent";
+import { resolveAgentConversationProvider } from "@mistle/integrations-definitions/agent-runtimes/server";
 
 export type ProviderAutomationConversationStatus = "idle" | "active" | "error";
 
@@ -92,10 +92,8 @@ export type ConversationProviderAdapter = {
   interruptExecution?: (input: ProviderInterruptExecutionInput) => Promise<void>;
 };
 
-export function getConversationProviderAdapter(
-  integrationFamilyId: string,
-): ConversationProviderAdapter {
-  return adaptConversationProvider(resolveAgentConversationProvider(integrationFamilyId));
+export function getConversationProviderAdapter(runtimeId: string): ConversationProviderAdapter {
+  return adaptConversationProvider(resolveAgentConversationProvider(runtimeId));
 }
 
 function adaptConversationProvider(

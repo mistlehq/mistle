@@ -107,7 +107,6 @@ function createAgentRuntime() {
     runtimeKey: "codex-app-server",
     clientId: "client_openai",
     endpointKey: "app-server",
-    adapterKey: "openai-codex",
   };
 }
 

@@ -32,7 +32,6 @@ function createAgentRuntime(overrides: Partial<CompiledAgentRuntime>): CompiledA
     runtimeKey: "codex-app-server",
     clientId: "client_openai",
     endpointKey: "app-server",
-    adapterKey: "openai-codex",
     ...overrides,
   };
 }
@@ -49,10 +48,10 @@ describe("resolveAgentEndpoint", () => {
     );
 
     expect(resolvedEndpoint).toEqual({
+      runtimeId: "codex",
       runtimeKey: "codex-app-server",
       clientId: "client_openai",
       endpointKey: "app-server",
-      adapterKey: "openai-codex",
       connectionMode: "dedicated",
       transportUrl: "ws://127.0.0.1:4020/app-server",
     });
