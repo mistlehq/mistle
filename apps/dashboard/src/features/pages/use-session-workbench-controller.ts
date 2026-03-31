@@ -140,7 +140,6 @@ export function useSessionWorkbenchController(input: {
   const codexConfig = sessionState.codexConfig;
   const serverRequests = sessionState.serverRequests;
   const sessionMessage = sessionState.sessionMessage;
-  const threads = sessionState.threads;
 
   const handoff = useSessionMainPanelHandoff({
     cliPtyState,

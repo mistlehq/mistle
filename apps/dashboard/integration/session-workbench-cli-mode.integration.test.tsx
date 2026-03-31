@@ -849,18 +849,6 @@ function expectCliPty(record: PtyOpenRecord): void {
   expect(record.channel.args).toEqual(["--remote", OpenAiCodexAppServerListenUrl]);
 }
 
-function expectCliResumePty(record: PtyOpenRecord, threadId: string): void {
-  expect(record.channel.session).toBe("create");
-  expect(record.channel.ptySessionId).toBe("cli");
-  expect(record.channel.command).toBe("codex");
-  expect(record.channel.args).toEqual([
-    "resume",
-    "--remote",
-    OpenAiCodexAppServerListenUrl,
-    threadId,
-  ]);
-}
-
 function expectTerminalPty(record: PtyOpenRecord): void {
   expect(record.channel.session).toBe("create");
   expect(record.channel.ptySessionId).toBe("terminal");
@@ -1012,16 +1000,12 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       const deferredCliCloseExit = tunnelServer.deferNextCliCloseExit();
       fireEvent.click(screen.getByRole("button", { name: "CLI" }));
 
-      await Promise.race([
-        controls.waitForConnectionTokenRequestCount(2),
-        new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            reject(
-              new Error("Chat restore did not start before the deferred CLI close completed."),
-            );
-          }, 250);
-        }),
-      ]);
+      await waitFor(
+        async () => {
+          await controls.waitForConnectionTokenRequestCount(2);
+        },
+        { timeout: 250 },
+      );
 
       deferredCliCloseExit.release();
 
