@@ -63,58 +63,16 @@ describe("resolvePostLoginPath", () => {
     expect(resolvePostLoginPath(undefined)).toBe("/");
   });
 
-  it("falls back to root when from is missing", () => {
-    expect(resolvePostLoginPath({})).toBe("/");
-  });
-
-  it("falls back to root when pathname is empty", () => {
-    expect(
-      resolvePostLoginPath({
-        from: {
-          pathname: "",
-        },
-      }),
-    ).toBe("/");
-  });
-
-  it("falls back to root for protocol-relative paths", () => {
-    expect(
-      resolvePostLoginPath({
-        from: {
-          pathname: "//evil.example/path",
-        },
-      }),
-    ).toBe("/");
-  });
-
-  it("falls back to root for auth login path", () => {
-    expect(
-      resolvePostLoginPath({
-        from: {
-          pathname: "/auth/login",
-        },
-      }),
-    ).toBe("/");
-  });
-
-  it("falls back to root for auth login path with trailing slash", () => {
-    expect(
-      resolvePostLoginPath({
-        from: {
-          pathname: "/auth/login/",
-        },
-      }),
-    ).toBe("/");
-  });
-
-  it("falls back to root for case-variant auth login paths", () => {
-    expect(
-      resolvePostLoginPath({
-        from: {
-          pathname: "/AUTH/LOGIN",
-        },
-      }),
-    ).toBe("/");
+  it.each([
+    ["from is missing", {}],
+    ["pathname is empty", { from: { pathname: "" } }],
+    ["path is protocol-relative", { from: { pathname: "//evil.example/path" } }],
+    ["path is /auth/login", { from: { pathname: "/auth/login" } }],
+    ["path is /auth/login/", { from: { pathname: "/auth/login/" } }],
+    ["path is a case variant of /auth/login", { from: { pathname: "/AUTH/LOGIN" } }],
+    ["path is /auth/login/callback", { from: { pathname: "/auth/login/callback" } }],
+  ])("falls back to root when %s", (_description, input) => {
+    expect(resolvePostLoginPath(input)).toBe("/");
   });
 
   it("ignores non-string search and hash values", () => {
@@ -127,16 +85,6 @@ describe("resolvePostLoginPath", () => {
         },
       }),
     ).toBe("/agents");
-  });
-
-  it("falls back to root for auth login callback paths", () => {
-    expect(
-      resolvePostLoginPath({
-        from: {
-          pathname: "/auth/login/callback",
-        },
-      }),
-    ).toBe("/");
   });
 });
 
@@ -151,14 +99,13 @@ describe("resolveSerializedPostLoginPath", () => {
     expect(resolveSerializedPostLoginPath(null)).toBe("/");
   });
 
-  it("falls back to root for auth infrastructure paths", () => {
-    expect(resolveSerializedPostLoginPath("/auth/login")).toBe("/");
-    expect(resolveSerializedPostLoginPath("/auth/login/callback")).toBe("/");
-  });
-
-  it("falls back to root for auth infrastructure paths with query params", () => {
-    expect(resolveSerializedPostLoginPath("/auth/login?foo=1")).toBe("/");
-    expect(resolveSerializedPostLoginPath("/auth/login/callback?redirectTo=%2Fsessions")).toBe("/");
+  it.each([
+    "/auth/login",
+    "/auth/login/callback",
+    "/auth/login?foo=1",
+    "/auth/login/callback?redirectTo=%2Fsessions",
+  ])("falls back to root for auth infrastructure redirect %s", (redirectTo) => {
+    expect(resolveSerializedPostLoginPath(redirectTo)).toBe("/");
   });
 });
 
@@ -195,41 +142,25 @@ describe("resolveOAuthCallbackError", () => {
     expect(resolveOAuthCallbackError(new URLSearchParams())).toBeNull();
   });
 
-  it("maps access_denied to a user-facing cancellation message", () => {
-    expect(resolveOAuthCallbackError(new URLSearchParams("error=access_denied"))).toBe(
-      "Google sign-in was cancelled.",
-    );
-  });
-
-  it("prefers an explicit error description when present", () => {
-    expect(
-      resolveOAuthCallbackError(
-        new URLSearchParams("error=server_error&error_description=OAuth%20state%20mismatch"),
-      ),
-    ).toBe("OAuth state mismatch");
-  });
-
-  it("falls back to a generic Google sign-in error message", () => {
-    expect(resolveOAuthCallbackError(new URLSearchParams("error=server_error"))).toBe(
-      "Unable to continue with Google.",
-    );
+  it.each([
+    ["error=access_denied", "Google sign-in was cancelled."],
+    ["error=server_error&error_description=OAuth%20state%20mismatch", "OAuth state mismatch"],
+    ["error=server_error", "Unable to continue with Google."],
+  ])("resolves %s to %s", (search, expectedMessage) => {
+    expect(resolveOAuthCallbackError(new URLSearchParams(search))).toBe(expectedMessage);
   });
 });
 
 describe("AuthScreen", () => {
-  it("shows the returned OAuth cancellation message from the login URL", async () => {
-    renderAuthScreen({
-      initialEntry: "/auth/login?error=access_denied",
-    });
+  it.each([
+    ["/auth/login?error=access_denied", "Google sign-in was cancelled."],
+    [
+      "/auth/login?error=server_error&error_description=OAuth%20state%20mismatch",
+      "OAuth state mismatch",
+    ],
+  ])("shows the returned OAuth error for %s", async (initialEntry, expectedMessage) => {
+    renderAuthScreen({ initialEntry });
 
-    expect(await screen.findByText("Google sign-in was cancelled.")).toBeTruthy();
-  });
-
-  it("shows the returned OAuth error description from the login URL", async () => {
-    renderAuthScreen({
-      initialEntry: "/auth/login?error=server_error&error_description=OAuth%20state%20mismatch",
-    });
-
-    expect(await screen.findByText("OAuth state mismatch")).toBeTruthy();
+    expect(await screen.findByText(expectedMessage)).toBeTruthy();
   });
 });
