@@ -2,8 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { SessionPrimaryPanelStatusCard } from "./session-primary-panel-status-card.js";
 import {
-  createStorySessionBottomPanel,
-  createStorySessionMainContent,
   renderSessionWorkbenchStory,
   SessionWorkbenchStoryChrome,
 } from "./session-story-support.js";
@@ -60,13 +58,5 @@ export const RestoreFailed: Story = {
         />
       ),
       primaryBottomPanel: null,
-    }),
-};
-
-export const StableChatReference: Story = {
-  render: () =>
-    renderSessionWorkbenchStory({
-      mainContent: createStorySessionMainContent(),
-      primaryBottomPanel: createStorySessionBottomPanel(),
     }),
 };

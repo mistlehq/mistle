@@ -154,12 +154,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const TerminalClosed: Story = {
-  args: {
-    initialTerminalVisible: false,
-  },
-};
-
 export const ActiveWithOutput: Story = {
   args: {
     initialOutput: [
