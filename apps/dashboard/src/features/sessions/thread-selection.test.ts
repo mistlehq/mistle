@@ -69,7 +69,7 @@ describe("selectPreferredThreadId", () => {
     expect(result).toBeNull();
   });
 
-  it("prefers the most recently updated available thread when newest is requested", () => {
+  it("prefers the most recently updated available thread when requested", () => {
     const result = selectPreferredThreadId({
       availableThreads: [
         {
@@ -88,17 +88,17 @@ describe("selectPreferredThreadId", () => {
         },
       ],
       loadedThreadIds: [],
-      selectionPolicy: "newest",
+      selectionPolicy: "most_recently_updated",
     });
 
     expect(result).toBe("thread_old_but_active");
   });
 
-  it("falls back to the last loaded-only thread when newest is requested", () => {
+  it("falls back to the last loaded-only thread when most recent update is requested", () => {
     const result = selectPreferredThreadId({
       availableThreads: [],
       loadedThreadIds: ["thread_old_loaded", "thread_new_loaded"],
-      selectionPolicy: "newest",
+      selectionPolicy: "most_recently_updated",
     });
 
     expect(result).toBe("thread_new_loaded");
@@ -130,7 +130,7 @@ describe("selectMostRecentlyUpdatedThreadId", () => {
     expect(result).toBe("thread_new");
   });
 
-  it("falls back to the newest loaded-only thread when details are missing", () => {
+  it("falls back to the latest loaded-only thread when details are missing", () => {
     const result = selectMostRecentlyUpdatedThreadId({
       availableThreads: [],
       loadedThreadIds: ["thread_old_loaded", "thread_new_loaded"],

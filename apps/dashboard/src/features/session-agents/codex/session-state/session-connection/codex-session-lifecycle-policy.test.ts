@@ -166,7 +166,7 @@ describe("codex session lifecycle policy", () => {
           },
         ],
         loadedThreadIds: [],
-        selectionPolicy: "newest",
+        selectionPolicy: "most_recently_updated",
       }),
     ).toEqual({
       type: "resume",

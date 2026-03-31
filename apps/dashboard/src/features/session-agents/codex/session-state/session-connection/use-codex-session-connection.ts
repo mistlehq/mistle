@@ -34,7 +34,7 @@ type CodexThreadCollectionsRefreshResult = {
   loadedThreadIds: readonly string[];
 };
 
-export type CodexConnectionThreadSelectionPolicy = "oldest" | "newest";
+export type CodexConnectionThreadSelectionPolicy = "oldest" | "most_recently_updated";
 
 export type CodexSessionConnectionLifecycleState = {
   step: StartSessionStep;

@@ -134,7 +134,7 @@ export function useSessionMainPanelHandoff(
       sandboxInstanceId: input.sandboxInstanceId,
       preferredThreadId: durableThreadId,
       ...(durableThreadId === null ? {} : { providerThreadId: durableThreadId }),
-      selectionPolicy: durableThreadId === null ? "newest" : "oldest",
+      selectionPolicy: durableThreadId === null ? "most_recently_updated" : "oldest",
     });
   }, [
     clearRestoreTimeout,

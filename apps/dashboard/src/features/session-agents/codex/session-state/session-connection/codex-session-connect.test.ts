@@ -103,7 +103,7 @@ describe("codex session connect", () => {
           },
         ],
         loadedThreadIds: [],
-        selectionPolicy: "newest",
+        selectionPolicy: "most_recently_updated",
       }),
     ).toEqual({
       type: "resume",

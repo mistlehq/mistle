@@ -1,6 +1,6 @@
 import type { CodexThreadSummary } from "@mistle/integrations-definitions/openai/agent/client";
 
-export type ThreadSelectionPolicy = "oldest" | "newest";
+export type ThreadSelectionPolicy = "oldest" | "most_recently_updated";
 
 function resolveThreadCreatedAt(thread: CodexThreadSummary): number {
   if (thread.createdAt !== null) {
@@ -51,7 +51,9 @@ export function selectPreferredThreadId(input: {
 }): string | null {
   const selectionPolicy = input.selectionPolicy ?? "oldest";
   const compareThread =
-    selectionPolicy === "newest" ? compareNewestThreadActivity : compareThreadCreation;
+    selectionPolicy === "most_recently_updated"
+      ? compareNewestThreadActivity
+      : compareThreadCreation;
   const loadedAvailableThreads = collectLoadedAvailableThreads(input);
 
   if (loadedAvailableThreads.length > 0) {
@@ -64,7 +66,7 @@ export function selectPreferredThreadId(input: {
   }
 
   if (input.loadedThreadIds.length > 0) {
-    return selectionPolicy === "newest"
+    return selectionPolicy === "most_recently_updated"
       ? (input.loadedThreadIds[input.loadedThreadIds.length - 1] ?? null)
       : (input.loadedThreadIds[0] ?? null);
   }
