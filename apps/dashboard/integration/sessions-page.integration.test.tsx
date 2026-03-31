@@ -339,6 +339,7 @@ describe("SessionsPage integration", () => {
               status: "starting",
               failureCode: null,
               failureMessage: null,
+              runtimePlan: null,
               automationConversation: null,
             }),
           );

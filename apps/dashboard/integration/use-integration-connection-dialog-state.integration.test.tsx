@@ -137,9 +137,7 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
       expect(capturedRequests[0]?.url).toBe("/v1/integration/connections/icn_123/form");
       expect(capturedRequests[0]?.body).toEqual({
         displayName: "Renamed connection",
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
+        config: {},
       });
     } finally {
       await new Promise<void>((resolve, reject) => {

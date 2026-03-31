@@ -2,7 +2,11 @@
 
 import { type IncomingMessage, type ServerResponse } from "node:http";
 
-import { CodexAppServerListenUrl } from "@mistle/integrations-definitions/agent-runtimes/codex/app-server";
+import {
+  CodexAppServerEndpointKey,
+  CodexAppServerListenUrl,
+  CodexAppServerProcessKey,
+} from "@mistle/integrations-definitions/agent-runtimes/codex/app-server";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -50,6 +54,50 @@ type SessionWorkbenchCliHarness = {
   renderedPage: DashboardPageHandle;
   tunnelServer: SessionWorkbenchTunnelServer;
 };
+
+const CodexPtyLaunchSpec = {
+  runtimeId: "codex",
+  displayName: "Codex",
+  newLaunch: {
+    ptySessionId: "cli",
+    cols: 120,
+    rows: 32,
+    command: "codex",
+    args: [
+      {
+        kind: "literal",
+        value: "--remote",
+      },
+      {
+        kind: "literal",
+        value: CodexAppServerListenUrl,
+      },
+    ],
+  },
+  resumeLaunch: {
+    ptySessionId: "cli",
+    cols: 120,
+    rows: 32,
+    command: "codex",
+    args: [
+      {
+        kind: "literal",
+        value: "resume",
+      },
+      {
+        kind: "literal",
+        value: "--remote",
+      },
+      {
+        kind: "literal",
+        value: CodexAppServerListenUrl,
+      },
+      {
+        kind: "threadId",
+      },
+    ],
+  },
+} as const;
 
 function toText(data: RawData): string {
   if (typeof data === "string") {
@@ -497,6 +545,28 @@ function createWorkbenchRequestHandler(
           status: "running",
           failureCode: null,
           failureMessage: null,
+          runtimePlan: {
+            sandboxProfileId: "sbp_cli_test",
+            version: 1,
+            image: {
+              source: "base",
+              imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+            },
+            egressRoutes: [],
+            artifacts: [],
+            workspaceSources: [],
+            runtimeClients: [],
+            agentRuntimes: [
+              {
+                bindingId: "bind_cli_test",
+                runtimeId: "codex",
+                runtimeKey: CodexAppServerProcessKey,
+                clientId: "codex-cli",
+                endpointKey: CodexAppServerEndpointKey,
+                ptyLaunch: CodexPtyLaunchSpec,
+              },
+            ],
+          },
           automationConversation: null,
         }),
       );

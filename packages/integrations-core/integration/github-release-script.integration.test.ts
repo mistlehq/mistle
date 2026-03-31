@@ -44,7 +44,7 @@ function createGithubBinaryInstallDefinition(): IntegrationDefinition<
   return {
     familyId: "test",
     variantId: "github-releases-install-binary",
-    kind: "agent",
+    kind: "connector",
     displayName: "Test",
     logoKey: "test",
     targetConfigSchema: EmptyTargetConfigSchema,
@@ -130,7 +130,7 @@ describe("renderInstallLatestGithubReleaseBinaryScript integration", () => {
           },
           binding: {
             id: "bind_123",
-            kind: "agent",
+            kind: "connector",
             connectionId: "conn_123",
             config: {},
           },
