@@ -118,7 +118,7 @@ export type UseCodexSessionStateResult = {
   threadAuthority: {
     providerThreadId: string | null;
     resolveCliLaunchTarget: () => Promise<CodexCliLaunchTarget>;
-    clearActiveThreadIdAfterCliLaunch: () => void;
+    clearActiveThreadIdAfterCliLaunch: (launchTarget: CodexCliLaunchTarget) => void;
   };
   threads: CodexSessionThreadState;
   chat: CodexSessionChatState;
@@ -661,24 +661,27 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       );
     }
 
-    if (launchTarget.type === "start_new" && launchTarget.shouldClearActiveThreadId) {
-      updateActiveThread(null);
-    }
-
     return launchTarget;
-  }, [lifecycle.sessionSnapshot?.providerThreadId, updateActiveThread]);
+  }, [lifecycle.sessionSnapshot?.providerThreadId]);
 
-  const clearActiveThreadIdAfterCliLaunch = useCallback((): void => {
-    if (lifecycle.sessionSnapshot?.providerThreadId !== null) {
-      return;
-    }
+  const clearActiveThreadIdAfterCliLaunch = useCallback(
+    (launchTarget: CodexCliLaunchTarget): void => {
+      if (lifecycle.sessionSnapshot?.providerThreadId !== null) {
+        return;
+      }
 
-    // Non-provider thread authority is intentionally ephemeral across CLI handoff.
-    // Returning from CLI reconnects local sessions using the
-    // "most_recently_updated" thread policy instead of trying to preserve the
-    // pre-CLI active thread id.
-    updateActiveThread(null);
-  }, [lifecycle.sessionSnapshot?.providerThreadId, updateActiveThread]);
+      if (launchTarget.type !== "start_new" || !launchTarget.shouldClearActiveThreadId) {
+        return;
+      }
+
+      // Non-provider thread authority is intentionally ephemeral across CLI handoff.
+      // Returning from CLI reconnects local sessions using the
+      // "most_recently_updated" thread policy instead of trying to preserve the
+      // pre-CLI active thread id.
+      updateActiveThread(null);
+    },
+    [lifecycle.sessionSnapshot?.providerThreadId, updateActiveThread],
+  );
 
   const threads = useMemo<CodexSessionThreadState>(() => {
     return {

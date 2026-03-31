@@ -203,7 +203,7 @@ export function useSessionMainPanelHandoff(
         return;
       }
 
-      input.threadAuthority.clearActiveThreadIdAfterCliLaunch();
+      input.threadAuthority.clearActiveThreadIdAfterCliLaunch(launchTarget);
       dispatch({
         type: "cli_handoff_succeeded",
       });

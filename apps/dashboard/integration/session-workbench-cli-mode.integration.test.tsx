@@ -110,6 +110,22 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       });
     });
 
+    it("preserves the active resumable thread when CLI launch fails before handoff completes", async () => {
+      await withSessionWorkbenchCliHarness(async ({ controls, tunnelServer }) => {
+        controls.failNextCliOpen("codex executable missing");
+
+        fireEvent.click(await waitForEnabledButton("CLI"));
+
+        expect(await screen.findByText("Could not start Codex CLI")).toBeDefined();
+        fireEvent.click(screen.getByRole("button", { name: "Return to chat" }));
+        await waitForChatReady();
+
+        fireEvent.click(await waitForEnabledButton("CLI"));
+        expectCliPty(await waitForPtySession(tunnelServer, "cli"));
+        await tunnelServer.waitForThreadResume("thread_cli_test");
+      });
+    });
+
     it("shows a restore failure surface without offering a retry action", async () => {
       await withSessionWorkbenchCliHarness(async ({ controls, tunnelServer }) => {
         fireEvent.click(await waitForEnabledButton("CLI"));
