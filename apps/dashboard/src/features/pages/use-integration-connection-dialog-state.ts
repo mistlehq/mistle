@@ -139,10 +139,15 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     });
 
     if (selectedMethod?.kind === "form") {
-      const normalizedSecrets = Object.fromEntries(
-        Object.entries(draft.secrets)
-          .map(([name, value]) => [name, value.trim()])
-          .filter(([, value]) => value.length > 0),
+      const normalizedSecrets = Object.entries(draft.secrets).reduce<Record<string, string>>(
+        (accumulator, [name, value]) => {
+          const trimmedValue = value.trim();
+          if (trimmedValue.length > 0) {
+            accumulator[name] = trimmedValue;
+          }
+          return accumulator;
+        },
+        {},
       );
 
       if (dialog.mode === "update") {
