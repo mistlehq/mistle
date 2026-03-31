@@ -68,6 +68,33 @@ describe("github binding config forms", () => {
           },
         },
       },
+      tools: {
+        "ui:widget": "checkboxes",
+        "ui:options": {
+          inline: false,
+        },
+      },
+    });
+    expect(resolvedForm.schema).toMatchObject({
+      properties: {
+        repositories: {
+          title: "Repositories",
+          default: [],
+        },
+        tools: {
+          title: "Tools",
+          default: [],
+          items: {
+            oneOf: [
+              {
+                const: "github-cli",
+                title: "GitHub CLI (gh)",
+              },
+            ],
+          },
+          uniqueItems: true,
+        },
+      },
     });
   });
 

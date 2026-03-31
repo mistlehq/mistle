@@ -212,6 +212,14 @@ describe("SandboxProfileBindingConfigEditor", () => {
 
     expect(resolvedUiModel).toMatchObject({
       mode: "form",
+      schema: {
+        properties: {
+          tools: {
+            title: "Tools",
+            default: [],
+          },
+        },
+      },
       uiSchema: {
         repositories: {
           "ui:widget": "integration-resource-string-array",
@@ -229,6 +237,12 @@ describe("SandboxProfileBindingConfigEditor", () => {
               syncState: "ready",
               lastSyncedAt: "2026-03-09T12:00:00.000Z",
             },
+          },
+        },
+        tools: {
+          "ui:widget": "checkboxes",
+          "ui:options": {
+            inline: false,
           },
         },
       },

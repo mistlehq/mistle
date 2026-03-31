@@ -2551,6 +2551,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
                 kind: "git",
                 config: {
                   repositories: [`${repository.owner}/${repository.repo}`],
+                  tools: ["github-cli"],
                 },
               },
             ],

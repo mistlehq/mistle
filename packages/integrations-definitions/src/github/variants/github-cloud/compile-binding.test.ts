@@ -92,6 +92,7 @@ describe("compileGitHubCloudBinding", () => {
         kind: "git",
         config: {
           repositories: ["acme/repo-b", "acme/repo-a", "acme/repo-a"],
+          tools: ["github-cli"],
         },
       },
       refs: {
@@ -197,6 +198,54 @@ describe("compileGitHubCloudBinding", () => {
     ]);
   });
 
+  it("omits the gh artifact when github-cli is not selected", () => {
+    const compiled = compileGitHubCloudBinding({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "github_cloud",
+      target: {
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        secrets: {},
+        config: {
+          apiBaseUrl: "https://api.github.com",
+          webBaseUrl: "https://github.com",
+        },
+      },
+      connection: {
+        id: "icn_123",
+        status: "active",
+        config: {
+          connection_method: "api-key",
+        },
+      },
+      binding: {
+        id: "ibd_123",
+        kind: "git",
+        config: {
+          repositories: ["acme/repo-a"],
+          tools: [],
+        },
+      },
+      refs: {
+        sandboxPaths: SandboxPaths,
+        artifactBinPath,
+      },
+    });
+
+    expect(compiled.artifacts).toEqual([]);
+    expect(compiled.workspaceSources).toEqual([
+      {
+        sourceKind: "git-clone",
+        resourceKind: "repository",
+        path: "/root/acme/repo-a",
+        originUrl: "https://github.com/acme/repo-a.git",
+      },
+    ]);
+  });
+
   it("preserves custom API base path for enterprise-style proxies", () => {
     const compiled = compileGitHubCloudBinding({
       organizationId: "org_123",
@@ -225,6 +274,7 @@ describe("compileGitHubCloudBinding", () => {
         kind: "git",
         config: {
           repositories: ["acme/repo"],
+          tools: ["github-cli"],
         },
       },
       refs: {
@@ -278,6 +328,7 @@ describe("compileGitHubCloudBinding", () => {
         kind: "git",
         config: {
           repositories: ["acme/repo"],
+          tools: [],
         },
       },
       refs: {
@@ -319,6 +370,7 @@ describe("compileGitHubCloudBinding", () => {
         kind: "git",
         config: {
           repositories: ["acme/repo"],
+          tools: [],
         },
       },
       refs: {
@@ -374,6 +426,7 @@ describe("compileGitHubCloudBinding", () => {
           kind: "git",
           config: {
             repositories: ["acme/repo"],
+            tools: [],
           },
         },
         refs: {

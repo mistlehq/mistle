@@ -820,6 +820,7 @@ describeIf("system github cli sandbox", () => {
                 kind: "git",
                 config: {
                   repositories: [`${repository.owner}/${repository.repo}`],
+                  tools: ["github-cli"],
                 },
               },
             ],

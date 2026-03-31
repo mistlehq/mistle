@@ -4,6 +4,8 @@ import type {
   ResolvedIntegrationForm,
 } from "@mistle/integrations-core";
 
+import { GitHubToolIds } from "./tool-ids.js";
+
 type GitHubBindingFormContext = IntegrationFormContext;
 
 function resolveRepositoryResourceSummary(
@@ -28,6 +30,19 @@ export function resolveGitHubBindingConfigForm(
         repositories: {
           title: "Repositories",
           default: [],
+        },
+        tools: {
+          title: "Tools",
+          default: [],
+          items: {
+            oneOf: [
+              {
+                const: GitHubToolIds.GITHUB_CLI,
+                title: "GitHub CLI (gh)",
+              },
+            ],
+          },
+          uniqueItems: true,
         },
       },
     },
@@ -54,6 +69,12 @@ export function resolveGitHubBindingConfigForm(
                     : { lastSyncedAt: repositoryResourceSummary.lastSyncedAt }),
                 },
               }),
+        },
+      },
+      tools: {
+        "ui:widget": "checkboxes",
+        "ui:options": {
+          inline: false,
         },
       },
     },

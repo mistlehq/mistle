@@ -10,6 +10,7 @@ describe("GitHubEnterpriseServerBindingConfigSchema", () => {
 
     expect(parsed).toEqual({
       repositories: ["acme/backend", "acme/frontend"],
+      tools: [],
     });
   });
 

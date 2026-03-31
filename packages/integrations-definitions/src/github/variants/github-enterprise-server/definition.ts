@@ -40,7 +40,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   variantId: "github-enterprise-server",
   kind: IntegrationKinds.GIT,
   displayName: "GitHub Enterprise Server",
-  description: "Enable webhooks, repository access, GitHub CLI in sandbox.",
+  description: "Enable webhooks, repository access, and optional GitHub CLI in sandbox.",
   logoKey: "github",
   targetConfigSchema: GitHubEnterpriseServerTargetConfigSchema,
   targetSecretSchema: GitHubTargetSecretSchema,

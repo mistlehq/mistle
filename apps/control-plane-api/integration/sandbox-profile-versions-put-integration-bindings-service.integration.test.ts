@@ -515,6 +515,22 @@ describe("sandbox profile version put integration bindings service integration",
     expect(result.bindings).toHaveLength(1);
     expect(result.bindings[0]?.config).toEqual({
       repositories: ["mistlehq/mistle", "mistlehq/platform"],
+      tools: [],
+    });
+
+    const persistedBinding =
+      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.sandboxProfileId, "sbp_put_bindings_github_accessible_001"),
+            eq(table.sandboxProfileVersion, 1),
+            eq(table.connectionId, "icn_put_bindings_github_accessible_001"),
+          ),
+      });
+
+    expect(persistedBinding?.config).toEqual({
+      repositories: ["mistlehq/mistle", "mistlehq/platform"],
+      tools: [],
     });
   });
 

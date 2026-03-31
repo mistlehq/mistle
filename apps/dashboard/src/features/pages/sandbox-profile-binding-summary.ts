@@ -66,6 +66,53 @@ function resolveScalarSummaryValue(input: {
   return String(input.value);
 }
 
+function resolveArraySummaryValue(input: {
+  schema: Record<string, unknown>;
+  propertyKey: string;
+  value: ReadonlyArray<unknown>;
+}): string {
+  if (input.value.length === 0) {
+    return "None";
+  }
+
+  const stringEntries = input.value.filter((entry): entry is string => typeof entry === "string");
+  const properties = input.schema.properties;
+  if (!isRecord(properties)) {
+    return stringEntries.join(", ");
+  }
+
+  const propertySchema = properties[input.propertyKey];
+  if (!isRecord(propertySchema)) {
+    return stringEntries.join(", ");
+  }
+
+  const items = propertySchema.items;
+  if (!isRecord(items)) {
+    return stringEntries.join(", ");
+  }
+
+  const oneOf = items.oneOf;
+  if (!Array.isArray(oneOf)) {
+    return stringEntries.join(", ");
+  }
+
+  return stringEntries
+    .map((entry) => {
+      for (const option of oneOf) {
+        if (!isRecord(option)) {
+          continue;
+        }
+
+        if (option.const === entry && typeof option.title === "string") {
+          return option.title;
+        }
+      }
+
+      return entry;
+    })
+    .join(", ");
+}
+
 export function formatSandboxProfileBindingSummaryItems(input: {
   row: SandboxProfileBindingEditorRow;
   availableConnections: readonly IntegrationConnectionSummary[];
@@ -90,10 +137,11 @@ export function formatSandboxProfileBindingSummaryItems(input: {
       if (Array.isArray(value)) {
         items.push({
           label,
-          value:
-            value.length === 0
-              ? "None"
-              : value.filter((entry): entry is string => typeof entry === "string").join(", "),
+          value: resolveArraySummaryValue({
+            schema: configUiModel.schema,
+            propertyKey,
+            value,
+          }),
         });
         continue;
       }
