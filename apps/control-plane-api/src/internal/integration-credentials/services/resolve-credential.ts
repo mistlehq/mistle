@@ -1138,6 +1138,55 @@ async function resolvePersistedCredential(
   }
 }
 
+async function resolveLinkedCredentialForCustomResolver(input: {
+  db: AppContext["var"]["db"];
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+  organizationId: string;
+  connectionId: string;
+  secretType: string;
+  purpose?: string;
+}): Promise<
+  | {
+      secretType: string;
+      purpose?: string;
+      value: string;
+      expiresAt?: string;
+    }
+  | undefined
+> {
+  if (parsePersistedSecretType(input.secretType) === undefined) {
+    return undefined;
+  }
+
+  if (input.purpose !== undefined && parsePersistedCredentialPurpose(input.purpose) === undefined) {
+    return undefined;
+  }
+
+  const resolvedCredential = await resolvePersistedCredential({
+    db: input.db,
+    integrationsConfig: input.integrationsConfig,
+    organizationId: input.organizationId,
+    connectionId: input.connectionId,
+    secretType: input.secretType,
+    ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+  });
+
+  if (resolvedCredential.kind !== "value") {
+    throw new Error(
+      `Expected persisted credential resolution to return 'value', received '${resolvedCredential.kind}'.`,
+    );
+  }
+
+  return {
+    secretType: input.secretType,
+    ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+    value: resolvedCredential.value,
+    ...(resolvedCredential.expiresAt === undefined
+      ? {}
+      : { expiresAt: resolvedCredential.expiresAt }),
+  };
+}
+
 export async function resolveIntegrationCredential(
   ctx: {
     db: AppContext["var"]["db"];
@@ -1264,6 +1313,14 @@ export async function resolveIntegrationCredential(
       definition,
       integrationsConfig,
     });
+    const linkedCredential = await resolveLinkedCredentialForCustomResolver({
+      db,
+      integrationsConfig,
+      organizationId: connection.organizationId,
+      connectionId: connection.id,
+      secretType: input.secretType,
+      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+    });
 
     return customResolver.resolve({
       organizationId: connection.organizationId,
@@ -1274,6 +1331,7 @@ export async function resolveIntegrationCredential(
       ...(bindingResolverContext === undefined ? {} : { binding: bindingResolverContext }),
       secretType: input.secretType,
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+      ...(linkedCredential === undefined ? {} : { linkedCredential }),
     });
   }
 

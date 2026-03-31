@@ -258,6 +258,7 @@ describe("internal integration credentials resolve", () => {
 
     expect(resolveResponse.status).toBe(200);
     await expect(resolveResponse.json()).resolves.toEqual({
+      kind: "value",
       value: "aws-secret-access-key-test-value",
     });
   });
@@ -316,6 +317,7 @@ describe("internal integration credentials resolve", () => {
 
     expect(resolveResponse.status).toBe(200);
     await expect(resolveResponse.json()).resolves.toEqual({
+      kind: "value",
       value: "sk-integration-test",
     });
   });
@@ -405,6 +407,7 @@ describe("internal integration credentials resolve", () => {
 
     expect(resolveResponse.status).toBe(200);
     await expect(resolveResponse.json()).resolves.toEqual({
+      kind: "value",
       value: "oauth2-access-token-value",
       expiresAt: "2030-01-01T00:00:00.000Z",
     });
@@ -490,6 +493,7 @@ describe("internal integration credentials resolve", () => {
     );
 
     expect(firstResolution).toEqual({
+      kind: "value",
       value: "access-token-for:client-secret-value",
       expiresAt: "2030-01-01T00:00:00.000Z",
     });

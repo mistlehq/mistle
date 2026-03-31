@@ -88,6 +88,7 @@ describe("integrations-definitions index", () => {
         },
       ],
     });
+    expect(awsDefinition?.credentialResolvers?.custom?.assume_role_session).toBeDefined();
     expect(openAiDefinition?.displayName).toBe("OpenAI");
     expect(openAiDefinition?.kind).toBe("agent");
     expect(githubCloudDefinition).toMatchObject({

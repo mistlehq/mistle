@@ -14,6 +14,10 @@ import { AwsBindingConfigForm } from "../../shared/binding-config-form.js";
 import { AwsBindingConfigSchema } from "../../shared/binding-config-schema.js";
 import { AwsAssumeRoleConnectionConfigForm } from "../../shared/connection-config-form.js";
 import { AwsDefaultVariantId, AwsFamilyId } from "../../shared/constants.js";
+import {
+  AwsAssumeRoleCredentialResolver,
+  AwsCredentialResolverKeys,
+} from "../../shared/credential-resolver.js";
 import { AwsTargetConfigSchema } from "../../shared/target-config-schema.js";
 import { compileAwsCliDefaultBinding } from "./compile-binding.js";
 
@@ -55,5 +59,10 @@ export const AwsCliDefaultDefinition: AwsCliDefaultIntegrationDefinition = {
       configForm: AwsAssumeRoleConnectionConfigForm,
     },
   ],
+  credentialResolvers: {
+    custom: {
+      [AwsCredentialResolverKeys.ASSUME_ROLE_SESSION]: AwsAssumeRoleCredentialResolver,
+    },
+  },
   compileBinding: compileAwsCliDefaultBinding,
 };

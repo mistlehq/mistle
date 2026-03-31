@@ -67,6 +67,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@aws-sdk/client-sts": "^3.1020.0",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/sandbox-session-client": "workspace:*",
     "@mistle/time": "workspace:*",

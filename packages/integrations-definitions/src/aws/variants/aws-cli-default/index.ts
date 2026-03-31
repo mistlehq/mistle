@@ -11,4 +11,10 @@ export {
   type AwsBindingConfig,
 } from "../../shared/binding-config-schema.js";
 export { AwsAssumeRoleConnectionConfigForm } from "../../shared/connection-config-form.js";
+export {
+  AwsAssumeRoleCredentialResolver,
+  AwsCredentialResolverKeys,
+  buildAwsAssumeRoleSessionName,
+  resolveAwsAssumeRoleCredentialContext,
+} from "../../shared/credential-resolver.js";
 export { AwsTargetConfigSchema, type AwsTargetConfig } from "../../shared/target-config-schema.js";
