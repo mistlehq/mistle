@@ -8,6 +8,7 @@ import { OtpStage } from "./otp-stage.js";
 type AuthScreenViewProps = {
   authError: string | null;
   authStep: AuthStep;
+  emailStageAfterForm?: React.ReactNode;
   email: string;
   footerError: string | null;
   isSendingOtp: boolean;
@@ -18,16 +19,18 @@ type AuthScreenViewProps = {
   onUseDifferentEmail: () => void;
   onVerifyOtp: (event: React.SyntheticEvent<HTMLFormElement>) => Promise<void>;
   otp: string;
+  title?: string | null;
 };
 
 export function AuthScreenView(props: AuthScreenViewProps): React.JSX.Element {
   return (
     <AuthPageShell
       maxWidthClass={AuthPageWidths.SM}
-      title={props.authStep === "email" ? "Log in with email" : null}
+      title={props.title ?? (props.authStep === "email" ? "Log in with email" : null)}
     >
       {props.authStep === "email" ? (
         <EmailStage
+          afterForm={props.emailStageAfterForm}
           authError={props.authError}
           email={props.email}
           footerError={props.footerError}

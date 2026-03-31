@@ -147,6 +147,14 @@ export function loadControlPlaneApiFromEnv(
   }
 
   const auth = loadAuthEnv(env);
+  const googleClientId = env.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID;
+  const googleClientSecret = env.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET;
+  if (googleClientId !== undefined || googleClientSecret !== undefined) {
+    auth.google = {
+      clientId: googleClientId ?? "",
+      clientSecret: googleClientSecret ?? "",
+    };
+  }
   if (hasEntries(auth)) {
     partialConfig.auth = auth;
   }
