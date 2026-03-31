@@ -1285,7 +1285,10 @@ export async function resolveIntegrationCredential(
   );
   if (
     connectionMethod?.kind === "form" &&
-    connectionMethod.secretType === IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET &&
+    connectionMethod.secretFields.some(
+      (secretField) =>
+        secretField.secretType === IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+    ) &&
     definition.oauth2ClientCredentials !== undefined &&
     input.secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN
   ) {

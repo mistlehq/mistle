@@ -203,11 +203,14 @@ describe("integration registry", () => {
           id: "oauth2-client-credentials-test",
           label: "OAuth2 client credentials",
           kind: "form",
-          secretField: {
-            label: "Client secret",
-            inputType: "password",
-          },
-          secretType: "oauth2_client_secret",
+          secretFields: [
+            {
+              name: "clientSecret",
+              label: "Client secret",
+              inputType: "password",
+              secretType: "oauth2_client_secret",
+            },
+          ],
         },
       ],
       oauth2ClientCredentials: {

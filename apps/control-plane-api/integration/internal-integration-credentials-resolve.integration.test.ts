@@ -58,11 +58,14 @@ function createClientCredentialsRegistry(): IntegrationRegistry {
         id: ClientCredentialsConnectionMethodId,
         label: "OAuth2 client credentials",
         kind: "form",
-        secretField: {
-          label: "Client secret",
-          inputType: "password",
-        },
-        secretType: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+        secretFields: [
+          {
+            name: "clientSecret",
+            label: "Client secret",
+            inputType: "password",
+            secretType: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+          },
+        ],
         configSchema: z
           .object({
             connection_method: z.literal(ClientCredentialsConnectionMethodId),
