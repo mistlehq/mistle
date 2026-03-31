@@ -1,8 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { SessionChatRestoreFailedPanel } from "./session-chat-restore-failed-panel.js";
-import { SessionChatRestoringPanel } from "./session-chat-restoring-panel.js";
-import { SessionCliConnectingPanel } from "./session-cli-connecting-panel.js";
 import { SessionCliEntryFailedPanel } from "./session-cli-entry-failed-panel.js";
 import {
   createStorySessionBottomPanel,
@@ -14,7 +12,7 @@ import {
 function noop(): void {}
 
 const meta = {
-  title: "Dashboard/Pages/SessionMainPanelHandoffPanels",
+  title: "Dashboard/Pages/SessionPrimaryPanelFailureStates",
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",
@@ -34,14 +32,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const SwitchingToCli: Story = {
-  render: () =>
-    renderSessionWorkbenchStory({
-      mainContent: <SessionCliConnectingPanel />,
-      primaryBottomPanel: null,
-    }),
-};
-
 export const CliEntryFailed: Story = {
   render: () =>
     renderSessionWorkbenchStory({
@@ -51,14 +41,6 @@ export const CliEntryFailed: Story = {
           onReturnToChat={noop}
         />
       ),
-      primaryBottomPanel: null,
-    }),
-};
-
-export const RestoringChat: Story = {
-  render: () =>
-    renderSessionWorkbenchStory({
-      mainContent: <SessionChatRestoringPanel />,
       primaryBottomPanel: null,
     }),
 };
