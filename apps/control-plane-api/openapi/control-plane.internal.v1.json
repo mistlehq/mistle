@@ -211,19 +211,60 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "value": {
-                      "type": "string",
-                      "minLength": 1
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["value"]
+                        },
+                        "value": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": ["kind", "value"],
+                      "additionalProperties": false
                     },
-                    "expiresAt": {
-                      "type": "string",
-                      "format": "date-time"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["aws_session"]
+                        },
+                        "accessKeyId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "secretAccessKey": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sessionToken": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "accessKeyId",
+                        "secretAccessKey",
+                        "sessionToken",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false
                     }
-                  },
-                  "required": ["value"],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }

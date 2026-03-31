@@ -166,6 +166,7 @@ describe("integration registry", () => {
         custom: {
           github_installation_token: {
             resolve: async (input) => ({
+              kind: "value",
               value: `${input.connectionId}:${input.secretType}`,
             }),
           },

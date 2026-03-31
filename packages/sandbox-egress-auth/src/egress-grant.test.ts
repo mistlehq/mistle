@@ -77,7 +77,7 @@ describe("egress-grant", () => {
       secretType: defaultClaims.secretType,
       upstreamBaseUrl: defaultClaims.upstreamBaseUrl,
       authInjectionType: defaultClaims.authInjectionType,
-      authInjectionTarget: defaultClaims.authInjectionTarget,
+      authInjectionTarget: "authorization",
     };
 
     const token = await mintEgressGrant({

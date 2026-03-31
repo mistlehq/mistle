@@ -143,18 +143,20 @@ export interface paths {
           content: {
             "application/json":
               | {
+                  /** Format: date-time */
+                  expiresAt?: string;
+                  /** @enum {string} */
+                  kind: "value";
+                  value: string;
+                }
+              | {
                   accessKeyId: string;
                   /** Format: date-time */
                   expiresAt: string;
+                  /** @enum {string} */
                   kind: "aws_session";
                   secretAccessKey: string;
                   sessionToken: string;
-                }
-              | {
-                  /** Format: date-time */
-                  expiresAt?: string;
-                  kind: "value";
-                  value: string;
                 };
           };
         };
