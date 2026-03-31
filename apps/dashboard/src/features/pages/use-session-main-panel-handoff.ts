@@ -129,7 +129,7 @@ export function useSessionMainPanelHandoff(
     }
 
     // Restore honors durable provider authority when one exists. Otherwise local
-    // sessions intentionally reconnect using the newest-thread selection policy.
+    // sessions intentionally reconnect using the most recently updated thread.
     input.lifecycle.connectSession({
       sandboxInstanceId: input.sandboxInstanceId,
       preferredThreadId: durableThreadId,

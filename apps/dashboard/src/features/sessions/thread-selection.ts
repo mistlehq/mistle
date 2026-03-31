@@ -19,13 +19,6 @@ function compareThreadCreation(left: CodexThreadSummary, right: CodexThreadSumma
   return left.id.localeCompare(right.id);
 }
 
-function compareThreadCreationDescending(
-  left: CodexThreadSummary,
-  right: CodexThreadSummary,
-): number {
-  return compareThreadCreation(right, left);
-}
-
 function resolveThreadUpdatedAt(thread: CodexThreadSummary): number {
   return thread.updatedAt ?? thread.createdAt ?? Number.NEGATIVE_INFINITY;
 }
@@ -58,7 +51,7 @@ export function selectPreferredThreadId(input: {
 }): string | null {
   const selectionPolicy = input.selectionPolicy ?? "oldest";
   const compareThread =
-    selectionPolicy === "newest" ? compareThreadCreationDescending : compareThreadCreation;
+    selectionPolicy === "newest" ? compareNewestThreadActivity : compareThreadCreation;
   const loadedAvailableThreads = collectLoadedAvailableThreads(input);
 
   if (loadedAvailableThreads.length > 0) {

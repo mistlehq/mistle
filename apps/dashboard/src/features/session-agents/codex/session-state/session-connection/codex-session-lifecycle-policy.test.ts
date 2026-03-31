@@ -145,20 +145,20 @@ describe("codex session lifecycle policy", () => {
     });
   });
 
-  it("resumes the newest available thread for post-cli restore selection", () => {
+  it("resumes the most recently updated available thread for post-cli restore selection", () => {
     expect(
       selectCodexConnectionThreadStrategy({
         preferredThreadId: null,
         availableThreads: [
           {
-            id: "thread_old",
+            id: "thread_old_but_active",
             name: null,
             preview: null,
             createdAt: 10,
-            updatedAt: 10,
+            updatedAt: 30,
           },
           {
-            id: "thread_new",
+            id: "thread_newer_but_stale",
             name: null,
             preview: null,
             createdAt: 20,
@@ -170,7 +170,7 @@ describe("codex session lifecycle policy", () => {
       }),
     ).toEqual({
       type: "resume",
-      threadId: "thread_new",
+      threadId: "thread_old_but_active",
     });
   });
 });

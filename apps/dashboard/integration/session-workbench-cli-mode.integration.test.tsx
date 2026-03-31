@@ -1034,7 +1034,7 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
   });
 
   describe("restore policy", () => {
-    it("restores non-provider sessions from the newest available CLI-created thread even when it is not loaded yet", async () => {
+    it("restores non-provider sessions from the most recently updated available thread even when it is not loaded yet", async () => {
       await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
         tunnelServer.omitLoadedThreadForNextCliOpen();
 
