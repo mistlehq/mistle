@@ -39,6 +39,7 @@ type PtyOpenWaiter = {
 type SessionWorkbenchTunnelServer = {
   close: () => Promise<void>;
   emitPtyExit: (streamId: number, exitCode?: number) => void;
+  failNextCliOpen: (message: string) => void;
   url: string;
   waitForPtyClose: (streamId: number) => Promise<number>;
   waitForPtyOpen: (predicate: (record: PtyOpenRecord) => boolean) => Promise<PtyOpenRecord>;
@@ -47,6 +48,10 @@ type SessionWorkbenchTunnelServer = {
 type DashboardPageHandle = Awaited<ReturnType<typeof renderDashboardPageIntegration>>;
 
 type SessionWorkbenchCliHarness = {
+  controls: {
+    failNextCliOpen: (message: string) => void;
+    setConnectionTokenFailure: (value: boolean) => void;
+  };
   renderedPage: DashboardPageHandle;
   tunnelServer: SessionWorkbenchTunnelServer;
 };
@@ -149,6 +154,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
   const ptySockets = new Map<number, WebSocket>();
   const sockets = new Set<WebSocket>();
   let knownThreadId: string | null = null;
+  let nextCliOpenFailureMessage: string | null = null;
 
   function dispatchPtyOpen(record: PtyOpenRecord): void {
     ptyOpenRecords.push(record);
@@ -208,6 +214,23 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
           }
 
           if (controlMessage.channel.kind === "pty") {
+            if (
+              controlMessage.channel.ptySessionId === "cli" &&
+              nextCliOpenFailureMessage !== null
+            ) {
+              const failureMessage = nextCliOpenFailureMessage;
+              nextCliOpenFailureMessage = null;
+              socket.send(
+                JSON.stringify({
+                  type: "stream.open.error",
+                  streamId: controlMessage.streamId,
+                  code: "pty_open_failed",
+                  message: failureMessage,
+                }),
+              );
+              return;
+            }
+
             streamKind = "pty";
             ptySockets.set(controlMessage.streamId, socket);
             dispatchPtyOpen({
@@ -270,7 +293,6 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
                         {
                           id: knownThreadId,
                           name: "CLI Test Thread",
-                          preview: null,
                           createdAt: 1,
                           updatedAt: 1,
                         },
@@ -412,6 +434,9 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
 
   return {
     emitPtyExit,
+    failNextCliOpen: (message) => {
+      nextCliOpenFailureMessage = message;
+    },
     url: `ws://127.0.0.1:${String(address.port)}`,
     waitForPtyClose: async (streamId) => {
       if (ptyCloseStreamIds.has(streamId)) {
@@ -473,6 +498,9 @@ function extractConnectionTokenSandboxInstanceId(pathname: string): string | nul
 
 function createWorkbenchRequestHandler(
   tunnelServer: SessionWorkbenchTunnelServer,
+  controls: {
+    getConnectionTokenFailure: () => boolean;
+  },
 ): (request: IncomingMessage, response: ServerResponse<IncomingMessage>) => void {
   return (request, response) => {
     const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -505,6 +533,12 @@ function createWorkbenchRequestHandler(
       requestUrl.pathname ===
         `/v1/sandbox/instances/${connectionTokenSandboxInstanceId}/connection-tokens`
     ) {
+      if (controls.getConnectionTokenFailure()) {
+        response.writeHead(500, { "content-type": "application/json" });
+        response.end(JSON.stringify({ message: "Could not mint connection token." }));
+        return;
+      }
+
       response.writeHead(200, { "content-type": "application/json" });
       response.end(
         JSON.stringify({
@@ -537,8 +571,11 @@ function HeaderActionsHost(input: { children: React.ReactNode }): React.JSX.Elem
 
 async function renderSessionWorkbenchCliHarness(): Promise<SessionWorkbenchCliHarness> {
   const tunnelServer = await startSessionWorkbenchTunnelServer();
+  let shouldFailConnectionTokens = false;
   const renderedPage = await renderDashboardPageIntegration({
-    handler: createWorkbenchRequestHandler(tunnelServer),
+    handler: createWorkbenchRequestHandler(tunnelServer, {
+      getConnectionTokenFailure: () => shouldFailConnectionTokens,
+    }),
     ui: (
       <HeaderActionsHost>
         <MemoryRouter initialEntries={["/sessions/sbi_cli_test"]}>
@@ -551,6 +588,14 @@ async function renderSessionWorkbenchCliHarness(): Promise<SessionWorkbenchCliHa
   });
 
   return {
+    controls: {
+      failNextCliOpen: (message) => {
+        tunnelServer.failNextCliOpen(message);
+      },
+      setConnectionTokenFailure: (value) => {
+        shouldFailConnectionTokens = value;
+      },
+    },
     renderedPage,
     tunnelServer,
   };
@@ -670,6 +715,49 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
         { timeout: 5_000 },
       );
       expect(screen.queryByText("Codex CLI connected")).toBeNull();
+    });
+  }, 15_000);
+
+  it("shows a dedicated CLI entry failure surface and lets the user return to chat", async () => {
+    await withSessionWorkbenchCliHarness(async ({ controls }) => {
+      controls.failNextCliOpen("codex executable missing");
+
+      fireEvent.click(await waitForEnabledButton("CLI"));
+
+      expect(await screen.findByText("Could not start Codex CLI")).toBeDefined();
+      expect(screen.getByText("codex executable missing")).toBeDefined();
+      expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: "Return to chat" }));
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
+      });
+    });
+  });
+
+  it("shows a restore failure surface and retries chat restoration explicitly", async () => {
+    await withSessionWorkbenchCliHarness(async ({ controls, tunnelServer }) => {
+      fireEvent.click(await waitForEnabledButton("CLI"));
+      const cliPty = await waitForPtySession(tunnelServer, "cli");
+      expectCliPty(cliPty);
+      expect(await screen.findByText("Codex CLI connected")).toBeDefined();
+
+      controls.setConnectionTokenFailure(true);
+      tunnelServer.emitPtyExit(cliPty.streamId);
+
+      expect(await screen.findByText("Could not restore chat")).toBeDefined();
+      expect(screen.getByRole("button", { name: "Retry restoring chat" })).toBeDefined();
+
+      controls.setConnectionTokenFailure(false);
+      fireEvent.click(screen.getByRole("button", { name: "Retry restoring chat" }));
+
+      await waitFor(
+        () => {
+          expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
+        },
+        { timeout: 5_000 },
+      );
     });
   }, 15_000);
 });

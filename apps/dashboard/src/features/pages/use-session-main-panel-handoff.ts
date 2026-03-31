@@ -1,0 +1,313 @@
+import { useCallback, useEffect, useReducer, useRef } from "react";
+
+import { OpenAiCodexAppServerListenUrl } from "../../../../../packages/integrations-definitions/src/openai/variants/openai-default/app-server.js";
+import type { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
+import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
+import {
+  InitialSessionMainPanelHandoffState,
+  isCliToggleActive,
+  reduceSessionMainPanelHandoffState,
+  shouldLifecycleAutoAttachChat,
+  type MainPanelTransitionState,
+} from "./session-main-panel-handoff-state.js";
+
+type UseSessionMainPanelHandoffInput = {
+  cliPtyState: ReturnType<typeof useSandboxPtyState>;
+  lifecycle: Pick<
+    ReturnType<typeof useCodexSessionState>["lifecycle"],
+    | "clearLifecycleErrorMessage"
+    | "connectSession"
+    | "detachSessionTransport"
+    | "lifecycleErrorMessage"
+    | "sessionSnapshot"
+    | "transportState"
+  >;
+  sandboxInstanceId: string | null;
+  serverRequests: Pick<
+    ReturnType<typeof useCodexSessionState>["serverRequests"],
+    "resetServerRequests"
+  >;
+  threadAuthority: {
+    activeThreadId: string | null;
+    ensureThreadExists: () => Promise<string>;
+  };
+  chat: Pick<ReturnType<typeof useCodexSessionState>["chat"], "hydrateChatFromThread">;
+};
+
+type SessionMainPanelHandoffResult = {
+  transitionState: MainPanelTransitionState;
+  errorMessage: string | null;
+  isCliToggleActive: boolean;
+  shouldLifecycleAutoAttachChat: boolean;
+  handoffToCli: () => Promise<void>;
+  handoffToChat: () => Promise<void>;
+  retryRestoreChat: () => Promise<void>;
+};
+
+async function closeAndDisconnectCliPty(
+  cliPtyState: ReturnType<typeof useSandboxPtyState>,
+): Promise<void> {
+  try {
+    await cliPtyState.actions.closePty();
+  } catch {
+    // Cleanup must be best-effort because the PTY may already be closed or exited.
+  }
+
+  try {
+    await cliPtyState.actions.disconnectPty();
+  } catch {
+    // Cleanup must be best-effort because the websocket may already be gone.
+  }
+}
+
+export type { SessionMainPanelHandoffResult, UseSessionMainPanelHandoffInput };
+
+export function useSessionMainPanelHandoff(
+  input: UseSessionMainPanelHandoffInput,
+): SessionMainPanelHandoffResult {
+  const [state, dispatch] = useReducer(
+    reduceSessionMainPanelHandoffState,
+    InitialSessionMainPanelHandoffState,
+  );
+  const generationRef = useRef(0);
+  const restoreGenerationRef = useRef<number | null>(null);
+  const restorePreferredThreadIdRef = useRef<string | null>(null);
+
+  const nextGeneration = useCallback((): number => {
+    generationRef.current += 1;
+    return generationRef.current;
+  }, []);
+
+  const isCurrentGeneration = useCallback((generation: number): boolean => {
+    return generationRef.current === generation;
+  }, []);
+
+  const resetToStableChat = useCallback((): void => {
+    restoreGenerationRef.current = null;
+    restorePreferredThreadIdRef.current = null;
+    dispatch({
+      type: "reset_to_stable_chat",
+    });
+  }, []);
+
+  const startChatRestore = useCallback((): void => {
+    const generation = nextGeneration();
+    const preferredThreadId =
+      input.threadAuthority.activeThreadId ??
+      input.lifecycle.sessionSnapshot?.threadId ??
+      restorePreferredThreadIdRef.current;
+
+    restoreGenerationRef.current = generation;
+    restorePreferredThreadIdRef.current = preferredThreadId;
+    input.lifecycle.clearLifecycleErrorMessage();
+    dispatch({
+      type: "chat_restore_requested",
+    });
+    input.serverRequests.resetServerRequests();
+
+    void (async () => {
+      await closeAndDisconnectCliPty(input.cliPtyState);
+
+      if (!isCurrentGeneration(generation)) {
+        return;
+      }
+
+      if (input.sandboxInstanceId === null || preferredThreadId === null) {
+        dispatch({
+          type: "chat_restore_failed",
+          errorMessage: "Could not restore chat because the current session thread is unavailable.",
+        });
+        return;
+      }
+
+      input.lifecycle.connectSession({
+        sandboxInstanceId: input.sandboxInstanceId,
+        preferredThreadId,
+      });
+    })();
+  }, [
+    input.cliPtyState,
+    input.lifecycle,
+    input.sandboxInstanceId,
+    input.serverRequests,
+    input.threadAuthority,
+    isCurrentGeneration,
+    nextGeneration,
+  ]);
+
+  const handoffToCli = useCallback(async (): Promise<void> => {
+    if (
+      input.sandboxInstanceId === null ||
+      input.lifecycle.sessionSnapshot === null ||
+      state.transitionState !== "stable_chat"
+    ) {
+      return;
+    }
+
+    const generation = nextGeneration();
+    dispatch({
+      type: "handoff_to_cli_requested",
+    });
+
+    try {
+      const threadId =
+        input.threadAuthority.activeThreadId ?? (await input.threadAuthority.ensureThreadExists());
+      if (!isCurrentGeneration(generation)) {
+        return;
+      }
+
+      input.lifecycle.detachSessionTransport();
+      input.serverRequests.resetServerRequests();
+
+      let cliOpened = false;
+      try {
+        await input.cliPtyState.actions.openPty({
+          sandboxInstanceId: input.sandboxInstanceId,
+          ptySessionId: "cli",
+          cols: 120,
+          rows: 32,
+          command: "codex",
+          args: ["resume", "--remote", OpenAiCodexAppServerListenUrl, threadId],
+        });
+        cliOpened = true;
+      } catch (error) {
+        if (cliOpened) {
+          await closeAndDisconnectCliPty(input.cliPtyState);
+        }
+        throw error;
+      }
+
+      if (!isCurrentGeneration(generation)) {
+        await closeAndDisconnectCliPty(input.cliPtyState);
+        return;
+      }
+
+      dispatch({
+        type: "cli_handoff_succeeded",
+      });
+    } catch (error) {
+      if (!isCurrentGeneration(generation)) {
+        return;
+      }
+
+      dispatch({
+        type: "cli_handoff_failed",
+        errorMessage: error instanceof Error ? error.message : "Could not start Codex CLI.",
+      });
+    }
+  }, [
+    input.cliPtyState,
+    input.lifecycle,
+    input.sandboxInstanceId,
+    input.serverRequests,
+    input.threadAuthority,
+    isCurrentGeneration,
+    nextGeneration,
+    state.transitionState,
+  ]);
+
+  const handoffToChat = useCallback(async (): Promise<void> => {
+    if (state.transitionState !== "stable_cli" && state.transitionState !== "cli_entry_failed") {
+      return;
+    }
+
+    startChatRestore();
+  }, [startChatRestore, state.transitionState]);
+
+  const retryRestoreChat = useCallback(async (): Promise<void> => {
+    if (state.transitionState !== "restore_failed") {
+      return;
+    }
+
+    startChatRestore();
+  }, [startChatRestore, state.transitionState]);
+
+  useEffect(() => {
+    const restoreGeneration = restoreGenerationRef.current;
+    if (state.transitionState !== "restoring_chat" || restoreGeneration === null) {
+      return;
+    }
+
+    if (input.lifecycle.lifecycleErrorMessage === null) {
+      return;
+    }
+
+    if (!isCurrentGeneration(restoreGeneration)) {
+      return;
+    }
+
+    dispatch({
+      type: "chat_restore_failed",
+      errorMessage: input.lifecycle.lifecycleErrorMessage,
+    });
+  }, [input.lifecycle.lifecycleErrorMessage, isCurrentGeneration, state.transitionState]);
+
+  useEffect(() => {
+    const restoreGeneration = restoreGenerationRef.current;
+    if (state.transitionState !== "restoring_chat" || restoreGeneration === null) {
+      return;
+    }
+
+    if (input.lifecycle.transportState !== "connected") {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        await input.chat.hydrateChatFromThread();
+        if (cancelled || !isCurrentGeneration(restoreGeneration)) {
+          return;
+        }
+
+        resetToStableChat();
+      } catch (error) {
+        if (cancelled || !isCurrentGeneration(restoreGeneration)) {
+          return;
+        }
+
+        dispatch({
+          type: "chat_restore_failed",
+          errorMessage: error instanceof Error ? error.message : "Could not restore chat.",
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    input.chat,
+    input.lifecycle.transportState,
+    isCurrentGeneration,
+    resetToStableChat,
+    state.transitionState,
+  ]);
+
+  useEffect(() => {
+    if (state.transitionState !== "stable_cli" || input.cliPtyState.lifecycle.exitInfo === null) {
+      return;
+    }
+
+    startChatRestore();
+  }, [input.cliPtyState.lifecycle.exitInfo, startChatRestore, state.transitionState]);
+
+  useEffect(() => {
+    generationRef.current += 1;
+    restoreGenerationRef.current = null;
+    dispatch({
+      type: "reset_to_stable_chat",
+    });
+  }, [input.sandboxInstanceId]);
+
+  return {
+    transitionState: state.transitionState,
+    errorMessage: state.errorMessage,
+    isCliToggleActive: isCliToggleActive(state.transitionState),
+    shouldLifecycleAutoAttachChat: shouldLifecycleAutoAttachChat(state.transitionState),
+    handoffToCli,
+    handoffToChat,
+    retryRestoreChat,
+  };
+}

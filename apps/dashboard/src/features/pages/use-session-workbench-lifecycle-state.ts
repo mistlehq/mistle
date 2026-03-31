@@ -11,6 +11,10 @@ import {
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
+  shouldLifecycleAutoAttachChat,
+  type MainPanelTransitionState,
+} from "./session-main-panel-handoff-state.js";
+import {
   hasSessionTopAlert,
   resolveSessionHeaderStatusUi,
 } from "./session-workbench-view-model.js";
@@ -450,7 +454,7 @@ export function seedSandboxInstanceStatusQuery(input: {
 
 export function useSessionWorkbenchLifecycleState(input: {
   sandboxInstanceId: string | null;
-  chatTransportPolicy: "auto_attach" | "detached_for_cli";
+  mainPanelTransitionState: MainPanelTransitionState;
   lifecycle: Pick<
     ReturnType<typeof useCodexSessionState>["lifecycle"],
     | "agentConnectionState"
@@ -677,10 +681,10 @@ export function useSessionWorkbenchLifecycleState(input: {
   }, [input.sandboxInstanceId]);
 
   useEffect(() => {
-    if (input.chatTransportPolicy === "auto_attach") {
+    if (shouldLifecycleAutoAttachChat(input.mainPanelTransitionState)) {
       setHasAttemptedAutoConnect(false);
     }
-  }, [input.chatTransportPolicy]);
+  }, [input.mainPanelTransitionState]);
 
   useEffect(() => {
     if (!isWaitingForAutomationThread) {
@@ -760,7 +764,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   useEffect(() => {
-    if (input.chatTransportPolicy !== "auto_attach") {
+    if (!shouldLifecycleAutoAttachChat(input.mainPanelTransitionState)) {
       return;
     }
 
@@ -793,7 +797,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   }, [
     automationConversation,
     connectSession,
-    input.chatTransportPolicy,
+    input.mainPanelTransitionState,
     connectionReadiness.canConnect,
     hasAttemptedAutoConnect,
     input.sandboxInstanceId,
@@ -804,7 +808,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   useEffect(() => {
-    if (input.chatTransportPolicy !== "auto_attach") {
+    if (!shouldLifecycleAutoAttachChat(input.mainPanelTransitionState)) {
       return;
     }
 
@@ -837,7 +841,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   }, [
     codexRecoveryState,
     connectSession,
-    input.chatTransportPolicy,
+    input.mainPanelTransitionState,
     input.sandboxInstanceId,
     recoverSession,
   ]);
@@ -872,7 +876,9 @@ export function useSessionWorkbenchLifecycleState(input: {
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: sandboxStatusQuery.isError,
     lifecycleErrorMessage: resolvedLifecycleErrorMessage,
-    reconnectMessage: input.chatTransportPolicy === "auto_attach" ? sessionReconnectMessage : null,
+    reconnectMessage: shouldLifecycleAutoAttachChat(input.mainPanelTransitionState)
+      ? sessionReconnectMessage
+      : null,
     sandboxFailureMessage,
     stoppedSessionMessage: stoppedSessionState.message,
   });
