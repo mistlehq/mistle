@@ -245,6 +245,10 @@ function SessionWorkbenchPageContent(input: {
   return (
     <SessionWorkbenchPageView
       alerts={workbench.hasTopAlert ? alerts : []}
+      isPrimaryPanelTransitioning={
+        workbench.primaryPanelState.transitionState === "switching_to_cli" ||
+        workbench.primaryPanelState.transitionState === "restoring_chat"
+      }
       isSecondaryPanelVisible={workbench.terminalPanelState.isVisible}
       mainContentLayout={
         workbench.primaryPanelState.transitionState === "stable_cli"

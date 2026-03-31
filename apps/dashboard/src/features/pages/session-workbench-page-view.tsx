@@ -20,6 +20,7 @@ type SessionWorkbenchMainContentLayout = {
 type SessionWorkbenchPageViewProps = {
   sandboxInstanceId: string | null;
   alerts: readonly SessionWorkbenchAlert[];
+  isPrimaryPanelTransitioning?: boolean;
   mainContentLayout?: SessionWorkbenchMainContentLayout;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
@@ -38,6 +39,7 @@ export type {
 export function SessionWorkbenchPageView({
   sandboxInstanceId,
   alerts,
+  isPrimaryPanelTransitioning = false,
   mainContentLayout = { scroll: "page", width: "chat" },
   mainContent,
   primaryBottomPanel,
@@ -63,6 +65,9 @@ export function SessionWorkbenchPageView({
     mainContentLayout.scroll === "contained"
       ? "min-h-0 flex-1 overflow-hidden"
       : "min-h-0 flex-1 overflow-y-auto";
+  const primaryPanelTransitionClassName = isPrimaryPanelTransitioning
+    ? "opacity-0 transition-opacity duration-200 ease-out"
+    : "opacity-100 transition-opacity duration-200 ease-in";
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -84,7 +89,9 @@ export function SessionWorkbenchPageView({
           orientation="vertical"
         >
           <ResizablePanel defaultSize={100 - secondaryPanelSize} minSize={25}>
-            <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <div
+              className={`flex h-full min-h-0 flex-col overflow-hidden ${primaryPanelTransitionClassName}`}
+            >
               <div
                 aria-label="Conversation chat"
                 className={mainContentRegionClassName}
@@ -118,7 +125,7 @@ export function SessionWorkbenchPageView({
         <>
           <div
             aria-label="Conversation chat"
-            className={mainContentRegionClassName}
+            className={`${mainContentRegionClassName} ${primaryPanelTransitionClassName}`}
             role="region"
             style={{ scrollbarGutter: "stable both-edges" }}
           >
@@ -126,7 +133,9 @@ export function SessionWorkbenchPageView({
           </div>
 
           {!hasPrimaryBottomPanel ? null : (
-            <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
+            <div
+              className={`bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm ${primaryPanelTransitionClassName}`}
+            >
               <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
             </div>
           )}
