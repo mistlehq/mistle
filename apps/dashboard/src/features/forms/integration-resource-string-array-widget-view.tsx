@@ -3,6 +3,7 @@ import { ArrowClockwiseIcon } from "@phosphor-icons/react";
 import { useCallback } from "react";
 
 import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
+import { StatusBox } from "../shared/status-box.js";
 import {
   buildIntegrationResourceWidgetViewModel,
   type IntegrationResourceListViewState,
@@ -37,29 +38,15 @@ function IntegrationResourceMessageSection(input: {
   children?: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="gap-1 p-3 flex flex-col">
-      <p
-        className={
-          input.tone === "destructive"
-            ? "text-destructive text-sm"
-            : "text-muted-foreground text-sm"
-        }
-      >
-        {input.message}
-      </p>
-      {input.detail === undefined ? null : (
-        <p
-          className={
-            input.tone === "destructive"
-              ? "text-destructive/80 text-sm"
-              : "text-muted-foreground text-sm"
-          }
-        >
-          {input.detail}
-        </p>
-      )}
-      {input.children}
-    </div>
+    <StatusBox
+      tone={input.tone === "destructive" ? "destructive" : "neutral"}
+      title={input.message}
+    >
+      <div className="flex flex-col gap-1">
+        {input.detail === undefined ? null : <p>{input.detail}</p>}
+        {input.children}
+      </div>
+    </StatusBox>
   );
 }
 
@@ -158,25 +145,23 @@ export function IntegrationResourceStringArrayWidgetView(
         </Button>
       </div>
       {viewModel.messageSections.length > 0 ? (
-        <div className="overflow-hidden rounded-md border">
-          <div className="divide-y">
-            {viewModel.messageSections.map((section) => (
-              <IntegrationResourceMessageSection
-                detail={section.detail}
-                key={`${section.tone}:${section.message}`}
-                message={section.message}
-                tone={section.tone}
-              >
-                {section.items === undefined ? null : (
-                  <ul className="text-destructive/80 list-disc pl-5 text-sm">
-                    {section.items.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                )}
-              </IntegrationResourceMessageSection>
-            ))}
-          </div>
+        <div className="flex flex-col gap-2">
+          {viewModel.messageSections.map((section) => (
+            <IntegrationResourceMessageSection
+              detail={section.detail}
+              key={`${section.tone}:${section.message}`}
+              message={section.message}
+              tone={section.tone}
+            >
+              {section.items === undefined ? null : (
+                <ul className="list-disc pl-5">
+                  {section.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              )}
+            </IntegrationResourceMessageSection>
+          ))}
         </div>
       ) : null}
 
