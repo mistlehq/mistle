@@ -1,6 +1,6 @@
 import type { AgentPtyLaunchSpec } from "@mistle/integrations-core";
 
-import { OpenAiCodexAppServerListenUrl } from "./app-server.js";
+import { CodexAppServerListenUrl } from "./app-server.js";
 
 export const CodexCliPtySessionId = "cli";
 export const CodexCliDefaultCols = 120;
@@ -21,7 +21,7 @@ export const CodexPtyLaunchSpec: AgentPtyLaunchSpec = {
       },
       {
         kind: "literal",
-        value: OpenAiCodexAppServerListenUrl,
+        value: CodexAppServerListenUrl,
       },
     ],
   },
@@ -41,7 +41,7 @@ export const CodexPtyLaunchSpec: AgentPtyLaunchSpec = {
       },
       {
         kind: "literal",
-        value: OpenAiCodexAppServerListenUrl,
+        value: CodexAppServerListenUrl,
       },
       {
         kind: "threadId",
