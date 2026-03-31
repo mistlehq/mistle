@@ -1,11 +1,6 @@
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@mistle/ui";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@mistle/ui";
+
+import { StatusBox } from "../shared/status-box.js";
 
 type SessionWorkbenchAlert = {
   title: string;
@@ -50,10 +45,9 @@ export function SessionWorkbenchPageView({
 }: SessionWorkbenchPageViewProps): React.JSX.Element {
   if (sandboxInstanceId === null) {
     return (
-      <Alert variant="destructive">
-        <AlertTitle>Session id is missing</AlertTitle>
-        <AlertDescription>Open a session from the Sessions page.</AlertDescription>
-      </Alert>
+      <StatusBox title="Session id is missing" tone="destructive">
+        Open a session from the Sessions page.
+      </StatusBox>
     );
   }
 
@@ -76,10 +70,13 @@ export function SessionWorkbenchPageView({
       {alerts.length === 0 ? null : (
         <div className="mx-auto flex w-full max-w-3xl flex-none flex-col gap-4 px-4 py-6">
           {alerts.map((alert) => (
-            <Alert key={`${alert.title}:${alert.description}`} variant="destructive">
-              <AlertTitle>{alert.title}</AlertTitle>
-              <AlertDescription>{alert.description}</AlertDescription>
-            </Alert>
+            <StatusBox
+              key={`${alert.title}:${alert.description}`}
+              title={alert.title}
+              tone="destructive"
+            >
+              {alert.description}
+            </StatusBox>
           ))}
         </div>
       )}

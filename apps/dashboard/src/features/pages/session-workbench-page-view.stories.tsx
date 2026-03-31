@@ -55,7 +55,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const WithAlerts: Story = {
+export const WithErrorStatusBoxes: Story = {
   args: {
     alerts: [
       {
@@ -70,12 +70,23 @@ export const WithAlerts: Story = {
   },
 };
 
-export const WithCliEntryFailureAlert: Story = {
+export const WithCliEntryFailureStatusBox: Story = {
   args: {
     alerts: [
       {
         title: "Could not start Codex CLI",
         description: "codex executable missing from the sandbox image",
+      },
+    ],
+  },
+};
+
+export const WithChatRestoreFailureStatusBox: Story = {
+  args: {
+    alerts: [
+      {
+        title: "Could not restore chat",
+        description: "Minting sandbox connection token failed: Could not mint connection token.",
       },
     ],
   },
@@ -98,7 +109,7 @@ export const WithNonImageCapableModelWarning: Story = {
   },
 };
 
-export const WithUnavailableModelAlert: Story = {
+export const WithUnavailableModelStatusBox: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
       composerViewModel: {
@@ -109,7 +120,7 @@ export const WithUnavailableModelAlert: Story = {
   },
 };
 
-export const WithLoadingSelectedModelAlert: Story = {
+export const WithLoadingSelectedModelStatusBox: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
       composerViewModel: {
