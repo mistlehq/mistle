@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { buildDashboardConfig, getDashboardGoogleAuthMethodEnabled } from "./config.js";
 
+function setDashboardGoogleAuthMethodFlag(value: string): void {
+  Object.assign(import.meta.env, {
+    VITE_AUTH_METHOD_GOOGLE: value,
+  });
+}
+
 describe("dashboard config", () => {
   it("accepts a valid control-plane API origin", () => {
     const config = buildDashboardConfig({
@@ -24,17 +30,13 @@ describe("dashboard config", () => {
   });
 
   it("parses the google auth method flag separately", () => {
-    Object.assign(import.meta.env, {
-      VITE_AUTH_METHOD_GOOGLE: "true",
-    });
+    setDashboardGoogleAuthMethodFlag("true");
 
     expect(getDashboardGoogleAuthMethodEnabled()).toBe(true);
   });
 
-  it("rejects an invalid google auth method flag", () => {
-    Object.assign(import.meta.env, {
-      VITE_AUTH_METHOD_GOOGLE: "yes",
-    });
+  it.each([["yes"], [""]])("rejects an invalid google auth method flag: %s", (value) => {
+    setDashboardGoogleAuthMethodFlag(value);
 
     expect(() => getDashboardGoogleAuthMethodEnabled()).toThrow(
       'VITE_AUTH_METHOD_GOOGLE must be either "true" or "false".',
