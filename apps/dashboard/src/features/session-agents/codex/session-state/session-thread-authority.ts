@@ -1,7 +1,3 @@
-import type { CodexThreadSummary } from "@mistle/integrations-definitions/openai/agent/client";
-
-import { selectMostRecentlyUpdatedThreadId } from "../../../sessions/thread-selection.js";
-
 export type CodexCliLaunchTarget =
   | {
       type: "resume";
@@ -38,19 +34,4 @@ export function resolveCodexCliLaunchTarget(input: {
     type: "start_new",
     shouldClearActiveThreadId: true,
   };
-}
-
-export function resolvePostCliPreferredThreadId(input: {
-  providerThreadId: string | null;
-  availableThreads: readonly CodexThreadSummary[];
-  loadedThreadIds: readonly string[];
-}): string | null {
-  if (input.providerThreadId !== null) {
-    return input.providerThreadId;
-  }
-
-  return selectMostRecentlyUpdatedThreadId({
-    availableThreads: input.availableThreads,
-    loadedThreadIds: input.loadedThreadIds,
-  });
 }

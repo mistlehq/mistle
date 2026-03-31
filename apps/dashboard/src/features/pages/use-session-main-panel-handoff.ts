@@ -275,6 +275,10 @@ export function useSessionMainPanelHandoff(
       return;
     }
 
+    if (input.lifecycle.sessionSnapshot?.activeThreadId === null) {
+      return;
+    }
+
     if (restoreExecutionGenerationRef.current === restoreGeneration) {
       return;
     }
@@ -283,11 +287,6 @@ export function useSessionMainPanelHandoff(
 
     void (async () => {
       try {
-        await input.threadAuthority.resolveRestoredThreadAuthorityAfterCli();
-        if (!isCurrentGeneration(restoreGeneration)) {
-          return;
-        }
-
         await input.chat.hydrateChatFromThread();
         if (!isCurrentGeneration(restoreGeneration)) {
           return;
@@ -311,6 +310,7 @@ export function useSessionMainPanelHandoff(
   }, [
     clearRestoreTimeout,
     input.chat,
+    input.lifecycle.sessionSnapshot?.activeThreadId,
     input.lifecycle.transportState,
     input.threadAuthority,
     isCurrentGeneration,

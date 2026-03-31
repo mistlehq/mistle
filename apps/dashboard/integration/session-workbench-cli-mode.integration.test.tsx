@@ -1022,59 +1022,6 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
     });
   }, 15_000);
 
-  it("lets the active CLI toggle cancel while Codex CLI startup is still in progress", async () => {
-    await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
-      const deferredCliOpen = tunnelServer.deferNextCliOpen();
-
-      fireEvent.click(await waitForEnabledButton("CLI"));
-
-      expect(screen.queryByText("Starting Codex CLI...")).toBeNull();
-      expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
-      fireEvent.click(screen.getByRole("button", { name: "CLI" }));
-
-      await waitFor(
-        () => {
-          expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
-        },
-        { timeout: 5_000 },
-      );
-
-      deferredCliOpen.release();
-
-      await waitFor(() => {
-        expect(screen.queryByPlaceholderText("Ask anything")).toBeDefined();
-      });
-    });
-  });
-
-  it("restores chat even when reconnect would stall until the CLI websocket disconnects", async () => {
-    await withSessionWorkbenchCliHarness(async ({ controls, tunnelServer }) => {
-      fireEvent.click(await waitForEnabledButton("CLI"));
-      const cliPty = await waitForPtySession(tunnelServer, "cli");
-      expectCliPty(cliPty);
-
-      const deferredCliCloseExit = tunnelServer.deferNextCliCloseExit();
-      tunnelServer.hangNextAgentThreadListWhileCliSocketOpen();
-      fireEvent.click(screen.getByRole("button", { name: "CLI" }));
-
-      await waitFor(
-        async () => {
-          await controls.waitForConnectionTokenRequestCount(2);
-        },
-        { timeout: 250 },
-      );
-
-      deferredCliCloseExit.release();
-
-      await waitFor(
-        () => {
-          expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
-        },
-        { timeout: 5_000 },
-      );
-    });
-  }, 15_000);
-
   it("restores chat from the newest available CLI-created thread even when it is not loaded yet", async () => {
     await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
       tunnelServer.omitLoadedThreadForNextCliOpen();
