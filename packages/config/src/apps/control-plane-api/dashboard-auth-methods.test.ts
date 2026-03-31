@@ -3,13 +3,8 @@ import { describe, expect, it } from "vitest";
 import { deriveDashboardAuthMethods } from "./dashboard-auth-methods.js";
 
 describe("deriveDashboardAuthMethods", () => {
-  it("always enables email OTP", () => {
-    expect(deriveDashboardAuthMethods({ google: undefined }).emailOtp).toBe(true);
-  });
-
   it("reports google as disabled when google auth config is absent", () => {
     expect(deriveDashboardAuthMethods({ google: undefined })).toEqual({
-      emailOtp: true,
       google: false,
     });
   });
@@ -23,7 +18,6 @@ describe("deriveDashboardAuthMethods", () => {
         },
       }),
     ).toEqual({
-      emailOtp: true,
       google: true,
     });
   });

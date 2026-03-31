@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Navigate, useLocation } from "react-router";
 
-import { getDashboardConfig } from "../../config.js";
+import { getDashboardGoogleAuthMethodEnabled } from "../../config.js";
 import { authClient } from "../../lib/auth/client.js";
 import { SESSION_QUERY_KEY, useSessionQuery } from "../shell/session-query.js";
 import {
@@ -19,12 +19,13 @@ import { GoogleSignInButton } from "./google-sign-in-button.js";
 import { resolveErrorMessage, resolveOAuthCallbackError } from "./messages.js";
 
 export function AuthScreen(): React.JSX.Element {
-  const dashboardConfig = getDashboardConfig();
   const queryClient = useQueryClient();
   const sessionQuery = useSessionQuery();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const authMethods = resolveEnabledAuthMethods(dashboardConfig.authMethods);
+  const authMethods = resolveEnabledAuthMethods({
+    google: getDashboardGoogleAuthMethodEnabled(),
+  });
   const hasGoogleAuthMethod = hasEnabledAuthMethod(authMethods, AuthMethodIds.GOOGLE);
   const initialAuthError = resolveOAuthCallbackError(searchParams);
 

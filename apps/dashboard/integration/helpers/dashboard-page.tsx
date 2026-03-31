@@ -69,7 +69,6 @@ export async function renderDashboardPageIntegration(input: {
 
   Object.assign(import.meta.env, {
     VITE_CONTROL_PLANE_API_ORIGIN: server.baseUrl,
-    VITE_AUTH_METHOD_EMAIL_OTP: "true",
     VITE_AUTH_METHOD_GOOGLE: "false",
   });
   resetDashboardConfigForTest();

@@ -12,7 +12,6 @@ export type AuthMethod = {
 };
 
 export type AuthMethodAvailability = {
-  emailOtp: boolean;
   google: boolean;
 };
 
@@ -32,7 +31,9 @@ const AuthMethodCatalog: readonly AuthMethod[] = [
 export function resolveEnabledAuthMethods(
   authMethodAvailability: AuthMethodAvailability,
 ): readonly AuthMethod[] {
-  return AuthMethodCatalog.filter((method) => authMethodAvailability[method.id]);
+  return AuthMethodCatalog.filter(
+    (method) => method.id === AuthMethodIds.EMAIL_OTP || authMethodAvailability[method.id] === true,
+  );
 }
 
 export function hasEnabledAuthMethod(

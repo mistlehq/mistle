@@ -67,7 +67,6 @@ describe("loadDashboardBuildConfig", () => {
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
     expect(config.authMethods).toEqual({
-      emailOtp: true,
       google: false,
     });
   });
@@ -91,7 +90,6 @@ describe("loadDashboardBuildConfig", () => {
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
     expect(config.authMethods).toEqual({
-      emailOtp: true,
       google: false,
     });
   });
@@ -122,7 +120,6 @@ describe("loadDashboardBuildConfig", () => {
     );
 
     expect(config.authMethods).toEqual({
-      emailOtp: true,
       google: true,
     });
   });
@@ -147,7 +144,6 @@ describe("loadDashboardBuildConfig", () => {
     );
 
     expect(config.authMethods).toEqual({
-      emailOtp: true,
       google: true,
     });
   });

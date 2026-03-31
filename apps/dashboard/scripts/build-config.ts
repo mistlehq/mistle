@@ -36,7 +36,6 @@ const DashboardBuildConfigSchema = z.object({
 export type DashboardBuildConfig = {
   controlPlaneApiOrigin: string;
   authMethods: {
-    emailOtp: boolean;
     google: boolean;
   };
 };
