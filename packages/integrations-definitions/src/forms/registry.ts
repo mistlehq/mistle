@@ -101,11 +101,14 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
         id: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
         label: "Service account OAuth client credentials",
         kind: "form",
-        secretField: {
-          label: "Client secret",
-          placeholder: "Enter service account OAuth client secret",
-          inputType: "password",
-        },
+        secretFields: [
+          {
+            name: "clientSecret",
+            label: "Client secret",
+            placeholder: "Enter service account OAuth client secret",
+            inputType: "password",
+          },
+        ],
         configSchema: AtlassianServiceAccountOauthClientCredentialsConnectionConfigSchema,
         configForm: AtlassianServiceAccountOauthClientCredentialsConnectionConfigForm,
       },

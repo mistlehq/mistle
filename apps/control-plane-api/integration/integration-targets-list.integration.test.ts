@@ -290,11 +290,14 @@ describe("integration targets discovery integration", () => {
           id: "atlassian-service-account-oauth-client-credentials",
           label: "Service account OAuth client credentials",
           kind: "form",
-          secretField: {
-            label: "Client secret",
-            placeholder: "Enter service account OAuth client secret",
-            inputType: "password",
-          },
+          secretFields: [
+            {
+              name: "clientSecret",
+              label: "Client secret",
+              placeholder: "Enter service account OAuth client secret",
+              inputType: "password",
+            },
+          ],
         },
       ],
       targetHealth: {

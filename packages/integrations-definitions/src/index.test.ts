@@ -50,7 +50,13 @@ describe("integrations-definitions index", () => {
           id: "atlassian-service-account-oauth-client-credentials",
           label: "Service account OAuth client credentials",
           kind: "form",
-          secretField: { label: "Client secret", inputType: "password" },
+          secretFields: [
+            {
+              name: "clientSecret",
+              label: "Client secret",
+              inputType: "password",
+            },
+          ],
         },
       ],
     });
