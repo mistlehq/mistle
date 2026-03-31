@@ -80,6 +80,25 @@ export const GoogleRedirecting: Story = {
   },
 };
 
+export const GoogleCallbackError: Story = {
+  args: {
+    authError: "Google sign-in was cancelled.",
+    emailStageAfterForm: (
+      <div className="gap-4 pt-1 flex flex-col">
+        <div className="items-center gap-4 flex">
+          <Separator className="flex-1" />
+          <div className="text-muted-foreground text-xs font-medium uppercase tracking-[0.2em]">
+            Or
+          </div>
+          <Separator className="flex-1" />
+        </div>
+        <GoogleSignInButton isPending={false} onClick={async () => {}} />
+      </div>
+    ),
+    title: "Log in",
+  },
+};
+
 export const EmailError: Story = {
   args: {
     authError: "Please enter a valid email address.",

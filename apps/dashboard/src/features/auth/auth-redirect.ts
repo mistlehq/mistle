@@ -52,8 +52,17 @@ export function resolveSerializedPostLoginPath(redirectTo: string | null | undef
     return "/";
   }
 
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(redirectTo, "http://localhost");
+  } catch {
+    return "/";
+  }
+
   return resolveSafePostLoginPath({
-    pathname: redirectTo,
+    pathname: parsedUrl.pathname,
+    search: parsedUrl.search,
+    hash: parsedUrl.hash,
   });
 }
 

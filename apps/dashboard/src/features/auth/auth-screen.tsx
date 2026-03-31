@@ -16,15 +16,17 @@ import { AuthMethodIds, hasEnabledAuthMethod, resolveEnabledAuthMethods } from "
 import { resolveRequestedPostLoginPath } from "./auth-redirect.js";
 import { AuthScreenView } from "./auth-screen-view.js";
 import { GoogleSignInButton } from "./google-sign-in-button.js";
-import { resolveErrorMessage } from "./messages.js";
+import { resolveErrorMessage, resolveOAuthCallbackError } from "./messages.js";
 
 export function AuthScreen(): React.JSX.Element {
   const queryClient = useQueryClient();
   const sessionQuery = useSessionQuery();
   const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
   const authCapabilities = parseAuthCapabilities(useLoaderData());
   const authMethods = resolveEnabledAuthMethods(authCapabilities);
   const hasGoogleAuthMethod = hasEnabledAuthMethod(authMethods, AuthMethodIds.GOOGLE);
+  const initialAuthError = resolveOAuthCallbackError(searchParams);
 
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -32,11 +34,11 @@ export function AuthScreen(): React.JSX.Element {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isSigningInWithGoogle, setIsSigningInWithGoogle] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(initialAuthError);
   const isSignedIn = (sessionQuery.data ?? null) !== null;
   const postLoginPath = resolveRequestedPostLoginPath({
     state: location.state,
-    redirectTo: new URLSearchParams(location.search).get("redirectTo"),
+    redirectTo: searchParams.get("redirectTo"),
   });
 
   async function handleSendOtp(event: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
