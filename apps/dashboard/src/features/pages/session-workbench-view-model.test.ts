@@ -2,17 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import {
   hasSessionTopAlert,
-  resolveSessionHeaderStatusUi,
+  resolveSandboxHeaderStatusUi,
   resolveStoppedSessionMessage,
   shouldShowResumeAction,
 } from "./session-workbench-view-model.js";
 
-describe("resolveSessionHeaderStatusUi", () => {
+describe("resolveSandboxHeaderStatusUi", () => {
   it.each([
     {
       description: "shows connected when the sandbox is running",
       input: {
-        sandboxStatus: "running",
+        sandboxLifecycleStatus: "running",
       } as const,
       expected: {
         label: "Connected",
@@ -23,7 +23,7 @@ describe("resolveSessionHeaderStatusUi", () => {
     {
       description: "prioritizes sandbox failures over connection state",
       input: {
-        sandboxStatus: "failed",
+        sandboxLifecycleStatus: "failed",
       } as const,
       expected: {
         label: "Sandbox failed",
@@ -33,7 +33,7 @@ describe("resolveSessionHeaderStatusUi", () => {
     {
       description: "shows starting while the sandbox is not yet running",
       input: {
-        sandboxStatus: "starting",
+        sandboxLifecycleStatus: "starting",
       } as const,
       expected: {
         label: "Starting sandbox",
@@ -43,7 +43,7 @@ describe("resolveSessionHeaderStatusUi", () => {
     {
       description: "shows resuming while a stopped sandbox resume is pending",
       input: {
-        sandboxStatus: "resuming",
+        sandboxLifecycleStatus: "resuming",
       } as const,
       expected: {
         label: "Resuming sandbox",
@@ -53,7 +53,7 @@ describe("resolveSessionHeaderStatusUi", () => {
     {
       description: "shows stopped when the sandbox is stopped even if chat state is stale",
       input: {
-        sandboxStatus: "stopped",
+        sandboxLifecycleStatus: "stopped",
       } as const,
       expected: {
         label: "Sandbox stopped",
@@ -63,7 +63,7 @@ describe("resolveSessionHeaderStatusUi", () => {
     {
       description: "ignores session recovery state while the sandbox is running",
       input: {
-        sandboxStatus: "running",
+        sandboxLifecycleStatus: "running",
       } as const,
       expected: {
         label: "Connected",
@@ -72,7 +72,7 @@ describe("resolveSessionHeaderStatusUi", () => {
       },
     },
   ])("$description", ({ input, expected }) => {
-    expect(resolveSessionHeaderStatusUi(input)).toEqual(expected);
+    expect(resolveSandboxHeaderStatusUi(input)).toEqual(expected);
   });
 });
 

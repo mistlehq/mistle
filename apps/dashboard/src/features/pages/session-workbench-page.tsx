@@ -54,10 +54,10 @@ function SessionWorkbenchPageContent(input: {
     () => (
       <div className="flex items-center gap-2">
         <Badge
-          className={workbench.sessionHeaderStatusUi.className}
-          variant={workbench.sessionHeaderStatusUi.variant}
+          className={workbench.sandboxHeaderStatusUi.className}
+          variant={workbench.sandboxHeaderStatusUi.variant}
         >
-          {workbench.sessionHeaderStatusUi.label}
+          {workbench.sandboxHeaderStatusUi.label}
         </Badge>
         <span aria-hidden className="h-5 w-px bg-stone-200" />
         {showResumeButton ? (
@@ -141,9 +141,9 @@ function SessionWorkbenchPageContent(input: {
       workbench.isResumingStoppedSandbox,
       workbench.ptyState.actions.disconnectPty,
       workbench.requestStoppedSandboxResume,
-      workbench.sessionHeaderStatusUi.className,
-      workbench.sessionHeaderStatusUi.label,
-      workbench.sessionHeaderStatusUi.variant,
+      workbench.sandboxHeaderStatusUi.className,
+      workbench.sandboxHeaderStatusUi.label,
+      workbench.sandboxHeaderStatusUi.variant,
       workbench.terminalPanelState.closePanel,
       workbench.terminalPanelState.isVisible,
       workbench.terminalPanelState.openPanel,

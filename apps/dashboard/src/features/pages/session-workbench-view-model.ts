@@ -1,20 +1,20 @@
-export type SessionHeaderStatusUi = {
+export type SandboxHeaderStatusUi = {
   label: string;
   variant: "secondary" | "outline" | "destructive";
   className?: string;
 };
 
-export function resolveSessionHeaderStatusUi(input: {
-  sandboxStatus: string;
-}): SessionHeaderStatusUi {
-  if (input.sandboxStatus === "failed") {
+export function resolveSandboxHeaderStatusUi(input: {
+  sandboxLifecycleStatus: string;
+}): SandboxHeaderStatusUi {
+  if (input.sandboxLifecycleStatus === "failed") {
     return {
       label: "Sandbox failed",
       variant: "destructive",
     };
   }
 
-  if (input.sandboxStatus === "running") {
+  if (input.sandboxLifecycleStatus === "running") {
     return {
       label: "Connected",
       variant: "secondary",
@@ -22,28 +22,28 @@ export function resolveSessionHeaderStatusUi(input: {
     };
   }
 
-  if (input.sandboxStatus === "stopped") {
+  if (input.sandboxLifecycleStatus === "stopped") {
     return {
       label: "Sandbox stopped",
       variant: "outline",
     };
   }
 
-  if (input.sandboxStatus === "resuming") {
+  if (input.sandboxLifecycleStatus === "resuming") {
     return {
       label: "Resuming sandbox",
       variant: "outline",
     };
   }
 
-  if (input.sandboxStatus !== "running") {
+  if (input.sandboxLifecycleStatus !== "running") {
     return {
       label: "Starting sandbox",
       variant: "outline",
     };
   }
 
-  throw new Error(`Unexpected sandbox status: ${input.sandboxStatus}`);
+  throw new Error(`Unexpected sandbox lifecycle status: ${input.sandboxLifecycleStatus}`);
 }
 
 export function hasSessionTopAlert(input: {

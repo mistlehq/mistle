@@ -16,7 +16,7 @@ import {
 } from "./session-main-panel-handoff-state.js";
 import {
   hasSessionTopAlert,
-  resolveSessionHeaderStatusUi,
+  resolveSandboxHeaderStatusUi,
 } from "./session-workbench-view-model.js";
 
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
@@ -862,8 +862,8 @@ export function useSessionWorkbenchLifecycleState(input: {
 
   const sandboxStatusLabel =
     effectiveSandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
-  const sessionHeaderStatusUi = resolveSessionHeaderStatusUi({
-    sandboxStatus: sandboxStatusLabel.toLowerCase(),
+  const sandboxHeaderStatusUi = resolveSandboxHeaderStatusUi({
+    sandboxLifecycleStatus: sandboxStatusLabel.toLowerCase(),
   });
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({
@@ -972,7 +972,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       isRecovering: codexRecoveryState.kind === "recovering",
       message: sessionReconnectMessage,
     },
-    sessionHeaderStatusUi,
+    sandboxHeaderStatusUi,
     shouldAutoResumeOnEntry:
       shouldAttemptInitialStoppedResume || shouldAttemptRecoverableStoppedResume,
     lifecycleErrorMessage: resolvedLifecycleErrorMessage,

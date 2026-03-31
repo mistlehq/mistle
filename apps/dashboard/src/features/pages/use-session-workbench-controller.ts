@@ -60,9 +60,9 @@ type SessionWorkbenchState = {
   sandboxLifecycleStatus: "resuming" | "starting" | "running" | "stopped" | "failed" | null;
   sandboxFailureMessage: string | null;
   sandboxStatusQuery: ReturnType<typeof useSessionWorkbenchLifecycleState>["sandboxStatusQuery"];
-  sessionHeaderStatusUi: ReturnType<
+  sandboxHeaderStatusUi: ReturnType<
     typeof useSessionWorkbenchLifecycleState
-  >["sessionHeaderStatusUi"];
+  >["sandboxHeaderStatusUi"];
   lifecycleStep: ReturnType<typeof useCodexSessionState>["lifecycle"]["step"];
   lifecycleErrorMessage: string | null;
   cliPtyState: ReturnType<typeof useSandboxPtyState>;
@@ -201,7 +201,7 @@ export function useSessionWorkbenchController(input: {
       sandboxLifecycleStatus: workbenchLifecycleState.sandboxLifecycleStatus,
       sandboxFailureMessage: workbenchLifecycleState.sandboxFailureMessage,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,
-      sessionHeaderStatusUi: workbenchLifecycleState.sessionHeaderStatusUi,
+      sandboxHeaderStatusUi: workbenchLifecycleState.sandboxHeaderStatusUi,
       lifecycleStep: lifecycle.step,
       lifecycleErrorMessage: workbenchLifecycleState.lifecycleErrorMessage,
       primaryPanelState: {
