@@ -24,7 +24,44 @@ export function normalizeAtlassianBaseUrl(input: string): string {
   return normalizedPathname === "/" ? parsedUrl.origin : parsedUrl.toString();
 }
 
-const AtlassianSiteUrlSchema = z.url();
+const AtlassianSiteUrlSchema = z.url().superRefine((value, ctx) => {
+  const parsedUrl = new URL(value);
+
+  if (parsedUrl.protocol !== "https:") {
+    ctx.addIssue({
+      code: "custom",
+      message: "Atlassian site URLs must use https.",
+    });
+  }
+
+  if (!parsedUrl.hostname.endsWith(".atlassian.net")) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Atlassian site URLs must use an *.atlassian.net hostname.",
+    });
+  }
+
+  if (parsedUrl.pathname !== "" && parsedUrl.pathname !== "/") {
+    ctx.addIssue({
+      code: "custom",
+      message: "Atlassian site URLs must not include a path.",
+    });
+  }
+
+  if (parsedUrl.search.length > 0 || parsedUrl.hash.length > 0) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Atlassian site URLs must not include a query string or hash.",
+    });
+  }
+
+  if (parsedUrl.username.length > 0 || parsedUrl.password.length > 0) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Atlassian site URLs must not include user info.",
+    });
+  }
+});
 
 export const AtlassianPersonalApiTokenConnectionConfigSchema = z
   .object({

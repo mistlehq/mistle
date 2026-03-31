@@ -22,6 +22,32 @@ describe("Atlassian auth", () => {
     });
   });
 
+  it("rejects personal api token site urls outside the supported atlassian cloud shape", () => {
+    expect(() =>
+      AtlassianConnectionConfigSchema.parse({
+        connection_method: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+        site_url: "http://mistle.atlassian.net",
+        email: "user@example.com",
+      }),
+    ).toThrow("Atlassian site URLs must use https.");
+
+    expect(() =>
+      AtlassianConnectionConfigSchema.parse({
+        connection_method: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+        site_url: "https://mistle.example.com",
+        email: "user@example.com",
+      }),
+    ).toThrow("Atlassian site URLs must use an *.atlassian.net hostname.");
+
+    expect(() =>
+      AtlassianConnectionConfigSchema.parse({
+        connection_method: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+        site_url: "https://mistle.atlassian.net/wiki",
+        email: "user@example.com",
+      }),
+    ).toThrow("Atlassian site URLs must not include a path.");
+  });
+
   it("normalizes site urls for upstream routing", () => {
     expect(normalizeAtlassianBaseUrl("https://mistle.atlassian.net/")).toBe(
       "https://mistle.atlassian.net",
