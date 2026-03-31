@@ -148,6 +148,7 @@ export function AppShell(): React.JSX.Element {
                 void handleSignOut();
               }}
               organizationErrorMessage={organizationSummary.organizationErrorMessage}
+              organizationLogoUrl={organizationSummary.organizationLogoUrl}
               organizationName={organizationSummary.organizationName}
             />
           )

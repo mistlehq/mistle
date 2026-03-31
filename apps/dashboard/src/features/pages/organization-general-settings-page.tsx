@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
+  deleteOrganizationLogo,
+  uploadOrganizationLogo,
+} from "../settings/media/avatar-media-service.js";
+import {
   getOrganizationGeneral,
   updateOrganizationGeneral,
 } from "../settings/organization/organization-general-service.js";
@@ -35,6 +39,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
   const organizationId = useRequiredOrganizationId();
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
 
   const organizationQuery = useQuery({
     queryKey: settingsOrganizationGeneralQueryKey(organizationId),
@@ -80,6 +85,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
       queryClient.setQueryData(organizationSummaryQueryKey(organizationId), {
         name: variables.name,
         slug: currentOrganization.slug,
+        logoUrl: currentOrganization.logoUrl,
       });
 
       const refetched = await organizationQuery.refetch();
@@ -88,6 +94,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         queryClient.setQueryData(organizationSummaryQueryKey(organizationId), {
           name: latest.name,
           slug: latest.slug,
+          logoUrl: latest.logoUrl,
         });
       }
 
@@ -109,13 +116,75 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
     },
   });
 
+  const uploadLogoMutation = useMutation({
+    mutationFn: async (file: File) =>
+      uploadOrganizationLogo({
+        organizationId,
+        file,
+      }),
+    onSuccess: async () => {
+      const refetched = await organizationQuery.refetch();
+      const latest = refetched.data;
+      if (latest !== undefined) {
+        queryClient.setQueryData(organizationSummaryQueryKey(organizationId), {
+          name: latest.name,
+          slug: latest.slug,
+          logoUrl: latest.logoUrl,
+        });
+      }
+      await queryClient.invalidateQueries({
+        queryKey: organizationSummaryQueryKey(organizationId),
+      });
+      setLogoError(null);
+    },
+    onError: (error: unknown) => {
+      setLogoError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not upload organization logo.",
+        }),
+      );
+    },
+  });
+
+  const deleteLogoMutation = useMutation({
+    mutationFn: async () =>
+      deleteOrganizationLogo({
+        organizationId,
+      }),
+    onSuccess: async () => {
+      const refetched = await organizationQuery.refetch();
+      const latest = refetched.data;
+      if (latest !== undefined) {
+        queryClient.setQueryData(organizationSummaryQueryKey(organizationId), {
+          name: latest.name,
+          slug: latest.slug,
+          logoUrl: latest.logoUrl,
+        });
+      }
+      await queryClient.invalidateQueries({
+        queryKey: organizationSummaryQueryKey(organizationId),
+      });
+      setLogoError(null);
+    },
+    onError: (error: unknown) => {
+      setLogoError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not remove organization logo.",
+        }),
+      );
+    },
+  });
+
   return (
     <OrganizationGeneralSettingsEditor
       key={
         organizationQuery.data === undefined
           ? "loading"
-          : `${organizationQuery.data.slug}:${organizationQuery.data.name}`
+          : `${organizationQuery.data.slug}:${organizationQuery.data.name}:${organizationQuery.data.logoUrl ?? "none"}`
       }
+      isLogoMutating={uploadLogoMutation.isPending || deleteLogoMutation.isPending}
       isLoading={organizationQuery.isPending}
       isSaving={saveMutation.isPending}
       loadErrorMessage={
@@ -130,6 +199,14 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         setSaveError(null);
         setShowSaveSuccess(false);
       }}
+      onLogoFileSelected={(file) => {
+        setLogoError(null);
+        void uploadLogoMutation.mutateAsync(file);
+      }}
+      onLogoRemove={() => {
+        setLogoError(null);
+        void deleteLogoMutation.mutateAsync();
+      }}
       onRetryLoad={() => {
         void organizationQuery.refetch();
       }}
@@ -141,6 +218,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         });
       }}
       organization={organizationQuery.data}
+      logoErrorMessage={logoError}
       saveErrorMessage={saveError}
       saveSuccess={showSaveSuccess}
     />
@@ -148,12 +226,16 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
 }
 
 function OrganizationGeneralSettingsEditor(input: {
-  organization: { name: string; slug: string } | undefined;
+  organization: { name: string; slug: string; logoUrl: string | null } | undefined;
+  isLogoMutating: boolean;
   isLoading: boolean;
   isSaving: boolean;
   loadErrorMessage: string | null;
+  logoErrorMessage: string | null;
   saveErrorMessage: string | null;
   saveSuccess: boolean;
+  onLogoFileSelected: (file: File) => void;
+  onLogoRemove: () => void;
   onRetryLoad: () => void;
   onSaveChanges: (name: string) => void;
   onResetFeedback: () => void;
@@ -167,15 +249,20 @@ function OrganizationGeneralSettingsEditor(input: {
   return (
     <OrganizationGeneralSettingsPageView
       hasDirtyChanges={hasDirtyChanges}
+      isLogoMutating={input.isLogoMutating}
       isLoading={input.isLoading}
       isSaving={input.isSaving}
       loadErrorMessage={input.loadErrorMessage}
+      logoErrorMessage={input.logoErrorMessage}
+      logoUrl={input.organization?.logoUrl ?? null}
       name={name}
       nameErrorMessage={hasNameError ? "Organization name is required." : null}
       onCancelChanges={() => {
         setName(persistedName);
         input.onResetFeedback();
       }}
+      onLogoFileSelected={input.onLogoFileSelected}
+      onLogoRemove={input.onLogoRemove}
       onNameChange={(nextValue) => {
         setName(nextValue);
         input.onResetFeedback();

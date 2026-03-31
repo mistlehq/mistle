@@ -7,6 +7,7 @@ import {
   ControlPlaneApiDataPlaneApiConfigSchema,
   ControlPlaneApiDatabaseConfigSchema,
   ControlPlaneApiIntegrationsConfigSchema,
+  ControlPlaneApiMediaConfigSchema,
   ControlPlaneApiServerConfigSchema,
   ControlPlaneApiWorkflowConfigSchema,
   PartialControlPlaneApiConfigSchema,
@@ -131,6 +132,21 @@ const loadIntegrationsEnv = createEnvLoader<typeof ControlPlaneApiIntegrationsCo
   },
 ]);
 
+const loadMediaEnv = createEnvLoader<typeof ControlPlaneApiMediaConfigSchema>([
+  {
+    key: "mediaBaseUrl",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_MEDIA_BASE_URL",
+  },
+  {
+    key: "bucket",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_MEDIA_BUCKET",
+  },
+  {
+    key: "provider",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_MEDIA_PROVIDER",
+  },
+]);
+
 export function loadControlPlaneApiFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialControlPlaneApiConfigInput {
@@ -177,6 +193,41 @@ export function loadControlPlaneApiFromEnv(
   const integrations = loadIntegrationsEnv(env);
   if (hasEntries(integrations)) {
     partialConfig.integrations = integrations;
+  }
+
+  const media = loadMediaEnv(env);
+  const mediaS3Region = env.MISTLE_APPS_CONTROL_PLANE_API_MEDIA_S3_REGION;
+  const mediaS3AccessKeyId = env.MISTLE_APPS_CONTROL_PLANE_API_MEDIA_S3_ACCESS_KEY_ID;
+  const mediaS3SecretAccessKey = env.MISTLE_APPS_CONTROL_PLANE_API_MEDIA_S3_SECRET_ACCESS_KEY;
+  const mediaS3ForcePathStyle = env.MISTLE_APPS_CONTROL_PLANE_API_MEDIA_S3_FORCE_PATH_STYLE;
+  const mediaS3Endpoint = env.MISTLE_APPS_CONTROL_PLANE_API_MEDIA_S3_ENDPOINT;
+  if (
+    mediaS3Region !== undefined ||
+    mediaS3AccessKeyId !== undefined ||
+    mediaS3SecretAccessKey !== undefined ||
+    mediaS3ForcePathStyle !== undefined ||
+    mediaS3Endpoint !== undefined
+  ) {
+    media.s3 = {
+      region: mediaS3Region ?? "",
+      accessKeyId: mediaS3AccessKeyId ?? "",
+      secretAccessKey: mediaS3SecretAccessKey ?? "",
+      forcePathStyle: mediaS3ForcePathStyle === "true",
+      ...(mediaS3Endpoint === undefined ? {} : { endpoint: mediaS3Endpoint }),
+    };
+  }
+
+  const mediaGcsProjectId = env.MISTLE_APPS_CONTROL_PLANE_API_MEDIA_GCS_PROJECT_ID;
+  const mediaGcsCredentialsJson = env.MISTLE_APPS_CONTROL_PLANE_API_MEDIA_GCS_CREDENTIALS_JSON;
+  if (mediaGcsProjectId !== undefined || mediaGcsCredentialsJson !== undefined) {
+    media.gcs = {
+      projectId: mediaGcsProjectId ?? "",
+      credentialsJson: mediaGcsCredentialsJson ?? "",
+    };
+  }
+
+  if (hasEntries(media)) {
+    partialConfig.media = media;
   }
 
   return PartialControlPlaneApiConfigSchema.parse(partialConfig);

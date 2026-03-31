@@ -8,6 +8,7 @@ import type { Context, Hono } from "hono";
 import type { OpenWorkflow } from "openworkflow";
 
 import type { ControlPlaneAuth } from "./auth/index.js";
+import type { MediaService } from "./media/service.js";
 
 type LoadControlPlaneApiConfigResult = ReturnType<
   typeof loadConfig<typeof AppIds.CONTROL_PLANE_API>
@@ -61,6 +62,7 @@ export type AppContextVariables = {
   connectionTokenConfig: ControlPlaneApiConnectionTokenConfig;
   openWorkflow: OpenWorkflow;
   auth: ControlPlaneAuth;
+  mediaService: MediaService;
   session: AppSession | null;
 };
 

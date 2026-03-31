@@ -43,6 +43,7 @@ const meta = {
         onNavigateToSettings={function onNavigateToSettings() {}}
         onSignOut={function onSignOut() {}}
         organizationErrorMessage={null}
+        organizationLogoUrl={null}
         organizationName="Mistle Labs"
       />
     ),

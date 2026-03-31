@@ -1,5 +1,10 @@
 export { accounts } from "./accounts.js";
 export {
+  avatarUploadSessions,
+  AvatarUploadSubjectKinds,
+  type AvatarUploadSubjectKind,
+} from "./avatar-upload-sessions.js";
+export {
   automations,
   AutomationKinds,
   type InsertAutomation,

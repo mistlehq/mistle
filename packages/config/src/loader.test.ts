@@ -68,6 +68,18 @@ describe("parseConfigRecord", () => {
           dashboard: {
             baseUrl: "http://127.0.0.1:5173",
           },
+          media: {
+            mediaBaseUrl: "http://127.0.0.1:5000",
+            bucket: "mistle-media",
+            provider: "s3",
+            s3: {
+              region: "us-east-1",
+              endpoint: "http://127.0.0.1:8333",
+              accessKeyId: "test-access-key",
+              secretAccessKey: "test-secret-key",
+              forcePathStyle: true,
+            },
+          },
           workflow: {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
@@ -252,6 +264,18 @@ describe("parseConfigRecord", () => {
           dashboard: {
             baseUrl: "http://127.0.0.1:5173",
           },
+          media: {
+            mediaBaseUrl: "http://127.0.0.1:5000",
+            bucket: "mistle-media",
+            provider: "s3",
+            s3: {
+              region: "us-east-1",
+              endpoint: "http://127.0.0.1:8333",
+              accessKeyId: "test-access-key",
+              secretAccessKey: "test-secret-key",
+              forcePathStyle: true,
+            },
+          },
           workflow: {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
@@ -435,6 +459,18 @@ describe("parseConfigRecord", () => {
           },
           dashboard: {
             baseUrl: "http://127.0.0.1:5173",
+          },
+          media: {
+            mediaBaseUrl: "http://127.0.0.1:5000",
+            bucket: "mistle-media",
+            provider: "s3",
+            s3: {
+              region: "us-east-1",
+              endpoint: "http://127.0.0.1:8333",
+              accessKeyId: "test-access-key",
+              secretAccessKey: "test-secret-key",
+              forcePathStyle: true,
+            },
           },
           workflow: {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",

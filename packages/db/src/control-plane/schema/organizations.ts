@@ -11,6 +11,7 @@ export const organizations = controlPlaneSchema.table(
       .$defaultFn(() => typeid("org").toString()),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
+    logoKey: text("logo_key"),
     logo: text("logo"),
     metadata: text("metadata"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

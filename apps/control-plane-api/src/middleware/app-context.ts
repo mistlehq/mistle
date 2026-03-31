@@ -17,6 +17,7 @@ export function createAppContextMiddleware(
     ctx.set("connectionTokenConfig", appContext.connectionTokenConfig);
     ctx.set("openWorkflow", appContext.openWorkflow);
     ctx.set("auth", appContext.auth);
+    ctx.set("mediaService", appContext.mediaService);
     ctx.set("session", null);
     await next();
   };

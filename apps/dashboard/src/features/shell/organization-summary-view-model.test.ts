@@ -9,10 +9,12 @@ describe("resolveOrganizationSummaryViewModel", () => {
       isError: false,
       error: null,
       organizationName: null,
+      organizationLogoUrl: null,
     });
 
     expect(result).toEqual({
       organizationName: "",
+      organizationLogoUrl: null,
       organizationErrorMessage: null,
     });
   });
@@ -23,10 +25,12 @@ describe("resolveOrganizationSummaryViewModel", () => {
       isError: true,
       error: new Error("Session expired."),
       organizationName: null,
+      organizationLogoUrl: null,
     });
 
     expect(result).toEqual({
       organizationName: "Organization unavailable",
+      organizationLogoUrl: null,
       organizationErrorMessage: "Session expired.",
     });
   });
@@ -37,10 +41,12 @@ describe("resolveOrganizationSummaryViewModel", () => {
       isError: true,
       error: null,
       organizationName: null,
+      organizationLogoUrl: null,
     });
 
     expect(result).toEqual({
       organizationName: "Organization unavailable",
+      organizationLogoUrl: null,
       organizationErrorMessage: "Could not load organization.",
     });
   });
@@ -51,10 +57,12 @@ describe("resolveOrganizationSummaryViewModel", () => {
       isError: false,
       error: null,
       organizationName: "Acme",
+      organizationLogoUrl: "https://control-plane.test/v1/media/organizations/org_123/logo",
     });
 
     expect(result).toEqual({
       organizationName: "Acme",
+      organizationLogoUrl: "https://control-plane.test/v1/media/organizations/org_123/logo",
       organizationErrorMessage: null,
     });
   });

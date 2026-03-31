@@ -85,11 +85,17 @@ export function createSettingsFixtureInviteMembersButton(): React.JSX.Element {
 export function createProfileSettingsFixtureContent(): React.JSX.Element {
   return (
     <ProfileSettingsPageView
+      avatarError={null}
+      avatarMutating={false}
+      avatarUrl={null}
       displayName="Mistle Developer"
       displayNameDraft="Mistle Developer"
       email="developer@mistle.so"
       fieldError={null}
       hasDirtyChanges={false}
+      hasAvatar={false}
+      onAvatarFileSelected={() => {}}
+      onAvatarRemove={() => {}}
       onCancelChanges={() => {}}
       onDisplayNameChange={() => {}}
       onSaveChanges={() => {}}
@@ -103,12 +109,17 @@ export function createOrganizationGeneralSettingsFixtureContent(): React.JSX.Ele
   return (
     <OrganizationGeneralSettingsPageView
       hasDirtyChanges={false}
+      isLogoMutating={false}
       isLoading={false}
       isSaving={false}
       loadErrorMessage={null}
+      logoErrorMessage={null}
+      logoUrl={null}
       name="Mistle Labs"
       nameErrorMessage={null}
       onCancelChanges={() => {}}
+      onLogoFileSelected={() => {}}
+      onLogoRemove={() => {}}
       onNameChange={() => {}}
       onRetryLoad={() => {}}
       onSaveChanges={() => {}}

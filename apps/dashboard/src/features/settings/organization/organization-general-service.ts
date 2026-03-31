@@ -25,7 +25,11 @@ function readString(record: UnknownRecord, key: string): string | null {
   return value;
 }
 
-function parseOrganizationGeneral(value: unknown): { name: string; slug: string } {
+function parseOrganizationGeneral(value: unknown): {
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+} {
   const organization = toRecord(value);
   if (organization === null) {
     throw new Error("Organization response was invalid.");
@@ -37,15 +41,21 @@ function parseOrganizationGeneral(value: unknown): { name: string; slug: string 
     throw new Error("Organization fields were missing.");
   }
 
+  const logoValue = organization["logo"];
+  if (logoValue !== null && logoValue !== undefined && typeof logoValue !== "string") {
+    throw new Error("Organization logo was invalid.");
+  }
+
   return {
     name,
     slug,
+    logoUrl: typeof logoValue === "string" ? logoValue : null,
   };
 }
 
 export async function getOrganizationGeneral(input: {
   organizationId: string;
-}): Promise<{ name: string; slug: string }> {
+}): Promise<{ name: string; slug: string; logoUrl: string | null }> {
   return executeMembersOperation("getOrganizationGeneral", async () => {
     const result = await authClient.$fetch("/organization/get-full-organization", {
       method: "GET",

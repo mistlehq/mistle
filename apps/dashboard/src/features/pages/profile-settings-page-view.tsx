@@ -1,15 +1,30 @@
-import { Field, FieldContent, FieldError, FieldHeader, FieldLabel, Input } from "@mistle/ui";
+import {
+  Button,
+  Field,
+  FieldContent,
+  FieldError,
+  FieldHeader,
+  FieldLabel,
+  Input,
+} from "@mistle/ui";
+import { useRef } from "react";
 
 import { UserIdentitySummary } from "../account/user-identity-summary.js";
 import { SaveActions } from "../settings/save-actions.js";
 import { FormPageSection, FormPageShell } from "../shared/form-page.js";
 
 export type ProfileSettingsPageViewProps = {
+  avatarError: string | null;
+  avatarMutating: boolean;
+  avatarUrl: string | null;
   displayName: string;
   displayNameDraft: string;
   email: string;
   fieldError: string | null;
   hasDirtyChanges: boolean;
+  hasAvatar: boolean;
+  onAvatarFileSelected: (file: File) => void;
+  onAvatarRemove: () => void;
   onCancelChanges: () => void;
   onDisplayNameChange: (nextValue: string) => void;
   onSaveChanges: () => void;
@@ -18,11 +33,57 @@ export type ProfileSettingsPageViewProps = {
 };
 
 export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): React.JSX.Element {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   return (
     <FormPageShell className="pt-0">
       <FormPageSection>
-        <div className="p-4">
-          <UserIdentitySummary email={props.email} name={props.displayName} />
+        <div className="flex flex-col gap-4 p-4">
+          <UserIdentitySummary
+            avatarUrl={props.avatarUrl}
+            email={props.email}
+            name={props.displayName}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              accept="image/jpeg,image/png,image/webp"
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = "";
+                if (file !== undefined) {
+                  props.onAvatarFileSelected(file);
+                }
+              }}
+              ref={fileInputRef}
+              type="file"
+            />
+            <Button
+              disabled={props.avatarMutating}
+              onClick={() => {
+                fileInputRef.current?.click();
+              }}
+              type="button"
+              variant="outline"
+            >
+              {props.avatarMutating
+                ? "Uploading..."
+                : props.hasAvatar
+                  ? "Replace avatar"
+                  : "Upload avatar"}
+            </Button>
+            {props.hasAvatar ? (
+              <Button
+                disabled={props.avatarMutating}
+                onClick={props.onAvatarRemove}
+                type="button"
+                variant="outline"
+              >
+                Remove avatar
+              </Button>
+            ) : null}
+          </div>
+          {props.avatarError ? <FieldError errors={[{ message: props.avatarError }]} /> : null}
         </div>
       </FormPageSection>
 

@@ -1,6 +1,7 @@
 import {
   Avatar,
   AvatarFallback,
+  AvatarImage,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,7 @@ function deriveInitials(input: { name: string; fallback: string }): string {
 
 export function OrganizationMenuTrigger(input: {
   organizationName: string;
+  organizationLogoUrl?: string | null;
   organizationErrorMessage: string | null;
   isSigningOut: boolean;
   onNavigateToSettings: () => void;
@@ -50,6 +52,9 @@ export function OrganizationMenuTrigger(input: {
       >
         <div className="flex w-full items-center gap-2">
           <Avatar className="h-8 w-8 shrink-0">
+            {input.organizationLogoUrl ? (
+              <AvatarImage alt={`${input.organizationName} logo`} src={input.organizationLogoUrl} />
+            ) : null}
             <AvatarFallback>
               {deriveInitials({ name: input.organizationName, fallback: "O" })}
             </AvatarFallback>

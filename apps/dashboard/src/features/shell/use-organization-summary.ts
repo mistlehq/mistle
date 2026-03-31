@@ -20,6 +20,7 @@ export function useOrganizationSummary() {
     isError: query.isError,
     error: query.error,
     organizationName: query.data?.name ?? null,
+    organizationLogoUrl: query.data?.logoUrl ?? null,
   });
 
   return {

@@ -12,6 +12,7 @@ const meta = {
   },
   args: {
     organizationName: "Mistle Labs",
+    organizationLogoUrl: null,
     organizationErrorMessage: null,
     isSigningOut: false,
     onNavigateToSettings: function onNavigateToSettings() {},

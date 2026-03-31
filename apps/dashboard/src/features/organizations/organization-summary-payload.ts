@@ -1,5 +1,6 @@
 export type OrganizationSummary = {
   name: string;
+  logoUrl: string | null;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -37,7 +38,13 @@ export function parseOrganizationSummary(value: unknown): OrganizationSummary {
     throw new Error("Organization name was missing.");
   }
 
+  const logoValue = organization["logo"];
+  if (logoValue !== null && logoValue !== undefined && typeof logoValue !== "string") {
+    throw new Error("Organization logo was invalid.");
+  }
+
   return {
     name,
+    logoUrl: typeof logoValue === "string" ? logoValue : null,
   };
 }

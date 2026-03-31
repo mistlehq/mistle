@@ -7,11 +7,13 @@ describe("parseOrganizationSummary", () => {
     const result = parseOrganizationSummary({
       id: "org_123",
       name: "Acme",
+      logo: "https://control-plane.test/v1/media/organizations/org_123/logo",
       slug: "acme",
     });
 
     expect(result).toEqual({
       name: "Acme",
+      logoUrl: "https://control-plane.test/v1/media/organizations/org_123/logo",
     });
   });
 
@@ -22,5 +24,18 @@ describe("parseOrganizationSummary", () => {
         slug: "acme",
       });
     }).toThrow("Organization name was missing.");
+  });
+
+  it("returns null logo when payload does not include one", () => {
+    const result = parseOrganizationSummary({
+      id: "org_123",
+      name: "Acme",
+      slug: "acme",
+    });
+
+    expect(result).toEqual({
+      name: "Acme",
+      logoUrl: null,
+    });
   });
 });

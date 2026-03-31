@@ -78,6 +78,53 @@ export const ControlPlaneApiIntegrationsConfigSchema =
     },
   );
 
+export const ControlPlaneApiMediaS3ConfigSchema = z
+  .object({
+    region: z.string().min(1),
+    endpoint: z.string().min(1).optional(),
+    accessKeyId: z.string().min(1),
+    secretAccessKey: z.string().min(1),
+    forcePathStyle: z.boolean(),
+  })
+  .strict();
+
+export const ControlPlaneApiMediaGcsConfigSchema = z
+  .object({
+    projectId: z.string().min(1),
+    credentialsJson: z.string().min(1),
+  })
+  .strict();
+
+const ControlPlaneApiMediaConfigObjectSchema = z
+  .object({
+    mediaBaseUrl: z.string().min(1),
+    bucket: z.string().min(1),
+    provider: z.enum(["s3", "gcs"]),
+    s3: ControlPlaneApiMediaS3ConfigSchema.optional(),
+    gcs: ControlPlaneApiMediaGcsConfigSchema.optional(),
+  })
+  .strict();
+
+export const ControlPlaneApiMediaConfigSchema = ControlPlaneApiMediaConfigObjectSchema.superRefine(
+  (config, ctx) => {
+    if (config.provider === "s3" && config.s3 === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["s3"],
+        message: "media.s3 is required when media.provider is 's3'.",
+      });
+    }
+
+    if (config.provider === "gcs" && config.gcs === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["gcs"],
+        message: "media.gcs is required when media.provider is 'gcs'.",
+      });
+    }
+  },
+);
+
 export const ControlPlaneApiConfigSchema = z
   .object({
     server: ControlPlaneApiServerConfigSchema,
@@ -87,6 +134,7 @@ export const ControlPlaneApiConfigSchema = z
     workflow: ControlPlaneApiWorkflowConfigSchema,
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema,
     integrations: ControlPlaneApiIntegrationsConfigSchema,
+    media: ControlPlaneApiMediaConfigSchema,
   })
   .strict();
 
@@ -99,6 +147,7 @@ export const PartialControlPlaneApiConfigSchema = z
     workflow: ControlPlaneApiWorkflowConfigSchema.partial().optional(),
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema.partial().optional(),
     integrations: ControlPlaneApiIntegrationsConfigObjectSchema.partial().optional(),
+    media: ControlPlaneApiMediaConfigObjectSchema.partial().optional(),
   })
   .strict();
 

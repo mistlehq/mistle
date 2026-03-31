@@ -1,9 +1,16 @@
-import { Avatar, AvatarFallback } from "@mistle/ui";
+import { Avatar, AvatarFallback, AvatarImage } from "@mistle/ui";
 
-export function UserIdentitySummary(input: { name: string; email: string }): React.JSX.Element {
+export function UserIdentitySummary(input: {
+  name: string;
+  email: string;
+  avatarUrl?: string | null;
+}): React.JSX.Element {
   return (
     <div className="flex min-w-0 items-center gap-3">
       <Avatar className="h-8 w-8">
+        {input.avatarUrl ? (
+          <AvatarImage alt={`${input.name} avatar`} src={input.avatarUrl} />
+        ) : null}
         <AvatarFallback>{deriveInitials({ name: input.name, fallback: "U" })}</AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">

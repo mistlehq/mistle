@@ -2,6 +2,7 @@ import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-intern
 
 import { createApp } from "./app.js";
 import { createControlPlaneAuth } from "./auth/index.js";
+import { createMediaService } from "./media/service.js";
 import { createAppResources, stopAppResources } from "./resources.js";
 import { startServer } from "./server.js";
 import type {
@@ -18,6 +19,9 @@ export async function createControlPlaneApiRuntime(
   const dataPlaneClient = createDataPlaneSandboxInstancesClient({
     baseUrl: runtimeConfig.app.dataPlaneApi.baseUrl,
     serviceToken: runtimeConfig.internalAuthServiceToken,
+  });
+  const mediaService = createMediaService({
+    config: resolveMediaConfig(runtimeConfig.app.media),
   });
   const { app: config } = runtimeConfig;
   let app: ControlPlaneApp;
@@ -51,6 +55,7 @@ export async function createControlPlaneApiRuntime(
       connectionTokenConfig: runtimeConfig.connectionToken,
       openWorkflow: resources.openWorkflow,
       auth,
+      mediaService,
     });
   } catch (error) {
     await stopAppResources(resources);
@@ -102,5 +107,33 @@ export async function createControlPlaneApiRuntime(
 
       await stopPromise;
     },
+  };
+}
+
+function resolveMediaConfig(
+  mediaConfig: ControlPlaneApiRuntimeConfig["app"]["media"],
+): Parameters<typeof createMediaService>[0]["config"] {
+  if (mediaConfig.provider === "s3") {
+    if (mediaConfig.s3 === undefined) {
+      throw new Error("Control plane media config requires media.s3 when provider is 's3'.");
+    }
+
+    return {
+      mediaBaseUrl: mediaConfig.mediaBaseUrl,
+      bucket: mediaConfig.bucket,
+      provider: "s3",
+      s3: mediaConfig.s3,
+    };
+  }
+
+  if (mediaConfig.gcs === undefined) {
+    throw new Error("Control plane media config requires media.gcs when provider is 'gcs'.");
+  }
+
+  return {
+    mediaBaseUrl: mediaConfig.mediaBaseUrl,
+    bucket: mediaConfig.bucket,
+    provider: "gcs",
+    gcs: mediaConfig.gcs,
   };
 }

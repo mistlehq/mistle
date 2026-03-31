@@ -15,6 +15,7 @@ import { createControlPlaneApiRuntime } from "../src/main.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
 import type { AuthenticatedSession } from "./helpers/auth-session.js";
 import { createAuthenticatedSession } from "./helpers/auth-session.js";
+import { startSeaweedfsS3 } from "./helpers/seaweedfs-s3.js";
 
 const RUNTIME_DATABASE_NAME_PREFIX = "mistle_control_plane_api_it_runtime";
 const TestContextId = "control-plane-api.integration";
@@ -185,6 +186,13 @@ export const it = vitestIt.extend<{
           port: sharedInfraConfig.databaseDirectPort,
           databaseName: runtimeDatabaseName,
         });
+        const mediaBucket = "integration-avatar-media";
+        const mediaStorage = await startSeaweedfsS3({
+          bucket: mediaBucket,
+        });
+        cleanupTasks.unshift(async () => {
+          await mediaStorage.stop();
+        });
         const dataPlaneHost = "127.0.0.1";
         const dataPlanePort = await reserveAvailablePort({ host: dataPlaneHost });
 
@@ -212,6 +220,18 @@ export const it = vitestIt.extend<{
           },
           dashboard: {
             baseUrl: "http://localhost:5173",
+          },
+          media: {
+            mediaBaseUrl: "http://localhost:3000",
+            bucket: mediaBucket,
+            provider: "s3",
+            s3: {
+              region: mediaStorage.region,
+              endpoint: mediaStorage.endpoint,
+              accessKeyId: mediaStorage.accessKeyId,
+              secretAccessKey: mediaStorage.secretAccessKey,
+              forcePathStyle: true,
+            },
           },
           auth: {
             baseUrl: "http://localhost:3000",
