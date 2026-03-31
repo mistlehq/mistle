@@ -86,9 +86,16 @@ describe("sandbox profile version put integration bindings service integration",
         connectionId: firstConnection.id,
         kind: IntegrationBindingKinds.AGENT,
         config: {
-          runtime: "codex-cli",
-          defaultModel: "gpt-5.3-codex",
-          reasoningEffort: "medium",
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {
+              reasoningEffort: "medium",
+            },
+          },
         },
       },
       {
@@ -117,19 +124,33 @@ describe("sandbox profile version put integration bindings service integration",
             connectionId: secondConnection.id,
             kind: IntegrationBindingKinds.AGENT,
             config: {
-              runtime: "codex-cli",
-              defaultModel: "gpt-5.3-codex",
-              reasoningEffort: "medium",
-              additionalInstructions: "Prefer concise answers.",
+              runtime: {
+                runtimeId: "codex",
+                config: {},
+              },
+              model: {
+                defaultModel: "gpt-5.3-codex",
+                options: {
+                  reasoningEffort: "medium",
+                  additionalInstructions: "Prefer concise answers.",
+                },
+              },
             },
           },
           {
             connectionId: firstConnection.id,
             kind: IntegrationBindingKinds.AGENT,
             config: {
-              runtime: "codex-cli",
-              defaultModel: "gpt-5.3-codex-spark",
-              reasoningEffort: "high",
+              runtime: {
+                runtimeId: "codex",
+                config: {},
+              },
+              model: {
+                defaultModel: "gpt-5.3-codex-spark",
+                options: {
+                  reasoningEffort: "high",
+                },
+              },
             },
           },
         ],
@@ -145,10 +166,17 @@ describe("sandbox profile version put integration bindings service integration",
     expect(updatedBinding?.connectionId).toBe(secondConnection.id);
     expect(updatedBinding?.kind).toBe(IntegrationBindingKinds.AGENT);
     expect(updatedBinding?.config).toEqual({
-      runtime: "codex-cli",
-      defaultModel: "gpt-5.3-codex",
-      reasoningEffort: "medium",
-      additionalInstructions: "Prefer concise answers.",
+      runtime: {
+        runtimeId: "codex",
+        config: {},
+      },
+      model: {
+        defaultModel: "gpt-5.3-codex",
+        options: {
+          reasoningEffort: "medium",
+          additionalInstructions: "Prefer concise answers.",
+        },
+      },
     });
 
     const persistedUpdatedBinding =
@@ -156,10 +184,17 @@ describe("sandbox profile version put integration bindings service integration",
         where: (table, { eq }) => eq(table.id, "ibd_put_bindings_existing_001"),
       });
     expect(persistedUpdatedBinding?.config).toEqual({
-      runtime: "codex-cli",
-      defaultModel: "gpt-5.3-codex",
-      reasoningEffort: "medium",
-      additionalInstructions: "Prefer concise answers.",
+      runtime: {
+        runtimeId: "codex",
+        config: {},
+      },
+      model: {
+        defaultModel: "gpt-5.3-codex",
+        options: {
+          reasoningEffort: "medium",
+          additionalInstructions: "Prefer concise answers.",
+        },
+      },
     });
 
     const insertedBinding = result.bindings.find(
@@ -171,9 +206,16 @@ describe("sandbox profile version put integration bindings service integration",
     expect(insertedBinding?.id).not.toBe("");
     expect(insertedBinding?.kind).toBe(IntegrationBindingKinds.AGENT);
     expect(insertedBinding?.config).toEqual({
-      runtime: "codex-cli",
-      defaultModel: "gpt-5.3-codex-spark",
-      reasoningEffort: "high",
+      runtime: {
+        runtimeId: "codex",
+        config: {},
+      },
+      model: {
+        defaultModel: "gpt-5.3-codex-spark",
+        options: {
+          reasoningEffort: "high",
+        },
+      },
     });
 
     const deletedBinding =
@@ -298,9 +340,16 @@ describe("sandbox profile version put integration bindings service integration",
               connectionId: secondOrgConnection.id,
               kind: IntegrationBindingKinds.AGENT,
               config: {
-                runtime: "codex-cli",
-                defaultModel: "gpt-5.3-codex",
-                reasoningEffort: "medium",
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "gpt-5.3-codex",
+                  options: {
+                    reasoningEffort: "medium",
+                  },
+                },
               },
             },
           ],
@@ -372,9 +421,16 @@ describe("sandbox profile version put integration bindings service integration",
               connectionId: connection.id,
               kind: IntegrationBindingKinds.AGENT,
               config: {
-                runtime: "codex-cli",
-                defaultModel: "gpt-5.3-codex",
-                reasoningEffort: "medium",
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "gpt-5.3-codex",
+                  options: {
+                    reasoningEffort: "medium",
+                  },
+                },
               },
             },
           ],

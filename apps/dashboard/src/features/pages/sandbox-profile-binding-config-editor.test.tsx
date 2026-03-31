@@ -111,10 +111,17 @@ describe("SandboxProfileBindingConfigEditor", () => {
       connectionId: connection.id,
       kind: "agent",
       config: {
-        runtime: "codex-cli",
-        defaultModel: "gpt-5.3-codex",
-        reasoningEffort: "medium",
-        additionalInstructions: "Prefer concise answers.",
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+            additionalInstructions: "Prefer concise answers.",
+          },
+        },
       },
     };
     const updates: Array<Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>> = [];
@@ -144,9 +151,16 @@ describe("SandboxProfileBindingConfigEditor", () => {
     });
 
     expect(updates.at(-1)?.config).toEqual({
-      runtime: "codex-cli",
-      defaultModel: "gpt-5.3-codex",
-      reasoningEffort: "medium",
+      runtime: {
+        runtimeId: "codex",
+        config: {},
+      },
+      model: {
+        defaultModel: "gpt-5.3-codex",
+        options: {
+          reasoningEffort: "medium",
+        },
+      },
     });
   });
 

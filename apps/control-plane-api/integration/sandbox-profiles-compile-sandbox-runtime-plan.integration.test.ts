@@ -70,9 +70,16 @@ describe("sandbox profile internal runtime plan compiler integration", () => {
       connectionId: "icn_compile_internal_missing_target_secrets_entry",
       kind: IntegrationBindingKinds.AGENT,
       config: {
-        runtime: "codex-cli",
-        defaultModel: "gpt-5.3-codex",
-        reasoningEffort: "medium",
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+          },
+        },
       },
     });
 

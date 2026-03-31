@@ -62,31 +62,34 @@ export function validateOpenAiBindingWriteContext(
     };
   }
 
-  if (!input.target.config.bindingCapabilities.models.includes(input.binding.config.defaultModel)) {
+  const defaultModel = input.binding.config.model.defaultModel;
+  const reasoningEffort = input.binding.config.model.options.reasoningEffort;
+
+  if (!input.target.config.bindingCapabilities.models.includes(defaultModel)) {
     return {
       ok: false,
       issues: [
         {
           code: "openai.unsupported_model_for_connection_method",
-          field: "config.defaultModel",
-          safeMessage: `Model '${input.binding.config.defaultModel}' is not supported for OpenAI connection method '${connectionMethod}'.`,
+          field: "config.model.defaultModel",
+          safeMessage: `Model '${defaultModel}' is not supported for OpenAI connection method '${connectionMethod}'.`,
         },
       ],
     };
   }
 
   if (
-    !input.target.config.bindingCapabilities.allowedReasoningByModel[
-      input.binding.config.defaultModel
-    ].includes(input.binding.config.reasoningEffort)
+    !input.target.config.bindingCapabilities.allowedReasoningByModel[defaultModel].includes(
+      reasoningEffort,
+    )
   ) {
     return {
       ok: false,
       issues: [
         {
           code: "openai.unsupported_reasoning_for_model",
-          field: "config.reasoningEffort",
-          safeMessage: `Reasoning effort '${input.binding.config.reasoningEffort}' is not supported for model '${input.binding.config.defaultModel}' under connection method '${connectionMethod}'.`,
+          field: "config.model.options.reasoningEffort",
+          safeMessage: `Reasoning effort '${reasoningEffort}' is not supported for model '${defaultModel}' under connection method '${connectionMethod}'.`,
         },
       ],
     };

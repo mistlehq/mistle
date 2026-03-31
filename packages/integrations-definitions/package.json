@@ -11,11 +11,27 @@
     },
     "./agent": {
       "types": "./src/agent.server.ts",
-      "node": "./dist/agent.server.js"
+      "node": "./dist/agent.server.js",
+      "import": "./src/agent.server.ts",
+      "default": "./src/agent.server.ts"
+    },
+    "./agent-runtimes/server": {
+      "types": "./src/agent-runtimes/server.ts",
+      "node": "./dist/agent-runtimes/server.js",
+      "import": "./src/agent-runtimes/server.ts",
+      "default": "./src/agent-runtimes/server.ts"
+    },
+    "./agent-runtimes/codex/client": {
+      "types": "./src/agent-runtimes/codex/client.ts",
+      "node": "./dist/agent-runtimes/codex/client.js",
+      "import": "./src/agent-runtimes/codex/client.ts",
+      "default": "./src/agent-runtimes/codex/client.ts"
     },
     "./openai/agent": {
       "types": "./src/openai/agent.server.ts",
-      "node": "./dist/openai/agent.server.js"
+      "node": "./dist/openai/agent.server.js",
+      "import": "./src/openai/agent.server.ts",
+      "default": "./src/openai/agent.server.ts"
     },
     "./openai/agent/client": {
       "types": "./src/openai/agent.client.ts",
@@ -31,7 +47,9 @@
     },
     "./openai/agent/server": {
       "types": "./src/openai/agent.server.ts",
-      "node": "./dist/openai/agent.server.js"
+      "node": "./dist/openai/agent.server.js",
+      "import": "./src/openai/agent.server.ts",
+      "default": "./src/openai/agent.server.ts"
     },
     "./forms": {
       "types": "./src/forms/index.ts",

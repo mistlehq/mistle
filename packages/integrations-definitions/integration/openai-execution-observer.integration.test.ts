@@ -7,7 +7,7 @@ import {
 import { describe, expect, it } from "vitest";
 import WebSocket, { WebSocketServer, type RawData } from "ws";
 
-import { createOpenAiExecutionObserver } from "../src/openai/variants/openai-default/agent/execution-observer.server.js";
+import { createOpenAiExecutionObserver } from "../src/agent-runtimes/codex/execution-observer.server.js";
 
 type CodexConnectionScript = (socket: WebSocket) => Promise<void>;
 

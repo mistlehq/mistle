@@ -32,7 +32,6 @@ import {
   createOpenAiRawBindingCapabilities,
   OpenAiApiKeyDefinition,
   OpenAiReasoningEfforts,
-  OpenAiRuntimes,
 } from "@mistle/integrations-definitions";
 import {
   HandleAutomationConversationDeliveryWorkflowSpec,
@@ -130,9 +129,16 @@ async function seedOpenAiAgentBinding(input: {
     connectionId,
     kind: IntegrationBindingKinds.AGENT,
     config: {
-      runtime: OpenAiRuntimes.CODEX_CLI,
-      defaultModel: "gpt-5.2",
-      reasoningEffort: OpenAiReasoningEfforts.MEDIUM,
+      runtime: {
+        runtimeId: "codex",
+        config: {},
+      },
+      model: {
+        defaultModel: "gpt-5.2",
+        options: {
+          reasoningEffort: OpenAiReasoningEfforts.MEDIUM,
+        },
+      },
     },
   });
 }

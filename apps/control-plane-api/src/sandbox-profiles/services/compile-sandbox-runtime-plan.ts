@@ -26,6 +26,9 @@ export const SandboxRuntimePlanCompilerErrorCodes = {
   INVALID_TARGET_CONFIG: "INVALID_TARGET_CONFIG",
   INVALID_TARGET_SECRETS: "INVALID_TARGET_SECRETS",
   INVALID_BINDING_CONFIG: "INVALID_BINDING_CONFIG",
+  AGENT_RUNTIME_NOT_FOUND: "AGENT_RUNTIME_NOT_FOUND",
+  INVALID_AGENT_RUNTIME_CONFIG: "INVALID_AGENT_RUNTIME_CONFIG",
+  MISSING_AGENT_PROVIDER_ACCESS: "MISSING_AGENT_PROVIDER_ACCESS",
   ROUTE_CONFLICT: "ROUTE_CONFLICT",
   ARTIFACT_CONFLICT: "ARTIFACT_CONFLICT",
   RUNTIME_CLIENT_SETUP_CONFLICT: "RUNTIME_CLIENT_SETUP_CONFLICT",
@@ -95,6 +98,12 @@ function mapCompilerErrorCodeToSandboxRuntimePlanCompilerErrorCode(
       return SandboxRuntimePlanCompilerErrorCodes.INVALID_TARGET_SECRETS;
     case CompilerErrorCodes.INVALID_BINDING_CONFIG:
       return SandboxRuntimePlanCompilerErrorCodes.INVALID_BINDING_CONFIG;
+    case CompilerErrorCodes.AGENT_RUNTIME_NOT_FOUND:
+      return SandboxRuntimePlanCompilerErrorCodes.AGENT_RUNTIME_NOT_FOUND;
+    case CompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG:
+      return SandboxRuntimePlanCompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG;
+    case CompilerErrorCodes.MISSING_AGENT_PROVIDER_ACCESS:
+      return SandboxRuntimePlanCompilerErrorCodes.MISSING_AGENT_PROVIDER_ACCESS;
     case CompilerErrorCodes.ROUTE_CONFLICT:
       return SandboxRuntimePlanCompilerErrorCodes.ROUTE_CONFLICT;
     case CompilerErrorCodes.ARTIFACT_CONFLICT:

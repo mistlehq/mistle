@@ -51,6 +51,12 @@ function mapCompilerErrorCodeToSandboxProfilesCompileErrorCode(
       return SandboxProfilesCompileErrorCodes.INVALID_TARGET_SECRETS;
     case SandboxRuntimePlanCompilerErrorCodes.INVALID_BINDING_CONFIG:
       return SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONFIG;
+    case SandboxRuntimePlanCompilerErrorCodes.AGENT_RUNTIME_NOT_FOUND:
+      return SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONFIG;
+    case SandboxRuntimePlanCompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG:
+      return SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONFIG;
+    case SandboxRuntimePlanCompilerErrorCodes.MISSING_AGENT_PROVIDER_ACCESS:
+      return SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONFIG;
     case SandboxRuntimePlanCompilerErrorCodes.ROUTE_CONFLICT:
       return SandboxProfilesCompileErrorCodes.ROUTE_CONFLICT;
     case SandboxRuntimePlanCompilerErrorCodes.ARTIFACT_CONFLICT:

@@ -85,9 +85,16 @@ describe("sandbox profile version start instance integration", () => {
       connectionId: "icn_missing_connection",
       kind: IntegrationBindingKinds.AGENT,
       config: {
-        runtime: "codex-cli",
-        defaultModel: "gpt-5.3-codex",
-        reasoningEffort: "medium",
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+          },
+        },
       },
     });
 

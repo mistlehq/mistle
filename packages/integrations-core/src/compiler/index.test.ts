@@ -13,7 +13,18 @@ const OpenAiTargetConfigSchema = z.object({
 
 const EmptyTargetSecretsSchema = z.object({});
 
-const OpenAiBindingConfigSchema = z.object({
+const AgentBindingConfigSchema = z.object({
+  runtime: z.object({
+    runtimeId: z.string().min(1),
+    config: z.record(z.string(), z.unknown()),
+  }),
+  model: z.object({
+    defaultModel: z.string().min(1),
+    options: z.record(z.string(), z.unknown()),
+  }),
+});
+
+const ConnectorBindingConfigSchema = z.object({
   defaultModel: z.string().min(1),
 });
 
@@ -33,55 +44,42 @@ const ApiKeyConnectionMethods = [
   },
 ] as const;
 
-function createDefinitionsBundle(registry: IntegrationRegistry) {
-  return {
-    integrationRegistry: registry,
-    agentRuntimeRegistry: new AgentRuntimeRegistry(),
-  };
-}
+const NoopConversationProvider = {
+  connect: async () => ({
+    request: async () => ({ ok: true }),
+    close: async () => {},
+  }),
+  inspectConversation: async () => ({
+    exists: true,
+    status: "idle" as const,
+    activeExecutionId: null,
+  }),
+  createConversation: async () => ({
+    providerConversationId: "thread_123",
+  }),
+  resumeConversation: async () => {},
+  startExecution: async () => ({
+    providerExecutionId: null,
+  }),
+};
 
-function createOpenAiDefinition(): IntegrationDefinition<
-  typeof OpenAiTargetConfigSchema,
-  typeof EmptyTargetSecretsSchema,
-  typeof OpenAiBindingConfigSchema
-> {
-  return {
-    familyId: "openai",
-    variantId: "openai-default",
-    kind: "agent",
-    displayName: "OpenAI",
-    logoKey: "openai",
-    targetConfigSchema: OpenAiTargetConfigSchema,
-    targetSecretSchema: EmptyTargetSecretsSchema,
-    bindingConfigSchema: OpenAiBindingConfigSchema,
-    connectionMethods: ApiKeyConnectionMethods,
-    agent: {
-      createConversationProvider: () => ({
-        connect: async () => ({
-          request: async () => ({ ok: true }),
-          close: async () => {},
-        }),
-        inspectConversation: async () => ({
-          exists: true,
-          status: "idle",
-          activeExecutionId: null,
-        }),
-        createConversation: async () => ({
-          providerConversationId: "thread_123",
-        }),
-        resumeConversation: async () => {},
-        startExecution: async () => ({
-          providerExecutionId: null,
-        }),
-      }),
-    },
-    mcpConfig: {
-      clientId: "codex-cli",
-      fileId: "codex_config",
-      format: "toml",
-      path: ["mcp_servers"],
-    },
-    compileBinding: (input) => ({
+const NoopExecutionObserver = {
+  createSession: () => ({
+    onOutboundMessage: () => {},
+    onInboundMessage: () => {},
+    drainObservations: () => [],
+  }),
+};
+
+function createDefinitionsBundle(registry: IntegrationRegistry) {
+  const agentRuntimeRegistry = new AgentRuntimeRegistry();
+  agentRuntimeRegistry.register({
+    runtimeId: "codex",
+    displayName: "Codex",
+    configSchema: z.object({}).strict(),
+    createConversationProvider: () => NoopConversationProvider,
+    createExecutionObserver: () => NoopExecutionObserver,
+    compileRuntime: (input) => ({
       egressRoutes: [
         {
           match: {
@@ -90,15 +88,15 @@ function createOpenAiDefinition(): IntegrationDefinition<
             pathPrefixes: ["/v1"],
           },
           upstream: {
-            baseUrl: "https://api.openai.com",
+            baseUrl: input.providerAccess.apiBaseUrl,
           },
           authInjection: {
             type: "bearer",
             target: "authorization",
           },
           credentialResolver: {
-            connectionId: input.connection.id,
-            secretType: "api_key",
+            connectionId: input.providerAccess.credentialResolver.connectionId,
+            secretType: input.providerAccess.credentialResolver.secretType,
           },
         },
       ],
@@ -123,7 +121,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
                     binaryPath: "codex-aarch64-unknown-linux-musl",
                   },
                 },
-                installPath: input.refs.artifactBinPath("codex"),
+                installPath: refs.artifactBinPath("codex"),
                 timeoutMs: 120_000,
               }),
               refs.command.exec({
@@ -138,8 +136,8 @@ function createOpenAiDefinition(): IntegrationDefinition<
           clientId: "codex-cli",
           setup: {
             env: {
-              OPENAI_BASE_URL: "https://api.openai.com",
-              OPENAI_MODEL: input.binding.config.defaultModel,
+              OPENAI_BASE_URL: input.providerAccess.apiBaseUrl,
+              OPENAI_MODEL: input.providerAccess.defaultModel,
             },
             files: [
               {
@@ -198,33 +196,14 @@ function createOpenAiDefinition(): IntegrationDefinition<
         },
       ],
     }),
-  };
-}
-
-function createJsonAgentDefinition(): IntegrationDefinition<
-  typeof OpenAiTargetConfigSchema,
-  typeof EmptyTargetSecretsSchema,
-  typeof OpenAiBindingConfigSchema
-> {
-  return {
-    familyId: "anthropic",
-    variantId: "claude-code-default",
-    kind: "agent",
+  });
+  agentRuntimeRegistry.register({
+    runtimeId: "claude-code",
     displayName: "Claude Code",
-    logoKey: "anthropic",
-    targetConfigSchema: OpenAiTargetConfigSchema,
-    targetSecretSchema: EmptyTargetSecretsSchema,
-    bindingConfigSchema: OpenAiBindingConfigSchema,
-    connectionMethods: ApiKeyConnectionMethods,
-    mcpConfig: {
-      clientId: "claude-code",
-      fileId: "claude_config",
-      format: "json",
-      path: ["mcpServers"],
-    },
-    compileBinding: () => ({
-      egressRoutes: [],
-      artifacts: [],
+    configSchema: z.object({}).strict(),
+    createConversationProvider: () => NoopConversationProvider,
+    createExecutionObserver: () => NoopExecutionObserver,
+    compileRuntime: () => ({
       runtimeClients: [
         {
           clientId: "claude-code",
@@ -243,9 +222,128 @@ function createJsonAgentDefinition(): IntegrationDefinition<
             ],
           },
           processes: [],
-          endpoints: [],
+          endpoints: [
+            {
+              endpointKey: "claude-code",
+              transport: {
+                type: "ws",
+                url: "ws://127.0.0.1:9001",
+              },
+              connectionMode: "dedicated",
+            },
+          ],
         },
       ],
+      agentRuntimes: [
+        {
+          runtimeId: "claude-code",
+          runtimeKey: "claude-code",
+          clientId: "claude-code",
+          endpointKey: "claude-code",
+          adapterKey: "claude-code",
+        },
+      ],
+    }),
+  });
+
+  return {
+    integrationRegistry: registry,
+    agentRuntimeRegistry,
+  };
+}
+
+function createOpenAiDefinition(): IntegrationDefinition<
+  typeof OpenAiTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
+  typeof AgentBindingConfigSchema
+> {
+  return {
+    familyId: "openai",
+    variantId: "openai-default",
+    kind: "agent",
+    displayName: "OpenAI",
+    logoKey: "openai",
+    targetConfigSchema: OpenAiTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
+    bindingConfigSchema: AgentBindingConfigSchema,
+    allowedRuntimeIds: ["codex"],
+    connectionMethods: ApiKeyConnectionMethods,
+    capabilities: {
+      resolveCapabilities: (input) => ({
+        agentProviderAccess: {
+          providerFamilyId: input.target.familyId,
+          providerVariantId: input.target.variantId,
+          apiBaseUrl: input.target.config.apiBaseUrl,
+          authScheme: "bearer",
+          credentialResolver: {
+            connectionId: input.connection.id,
+            secretType: "api_key",
+          },
+          allowedMethods: ["POST"],
+          allowedPathPrefixes: ["/v1"],
+          defaultModel: input.binding.config.model.defaultModel,
+          allowedModels: [input.binding.config.model.defaultModel],
+        },
+      }),
+    },
+    mcpConfig: {
+      clientId: "codex-cli",
+      fileId: "codex_config",
+      format: "toml",
+      path: ["mcp_servers"],
+    },
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [],
+      runtimeClients: [],
+    }),
+  };
+}
+
+function createJsonAgentDefinition(): IntegrationDefinition<
+  typeof OpenAiTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
+  typeof AgentBindingConfigSchema
+> {
+  return {
+    familyId: "anthropic",
+    variantId: "claude-code-default",
+    kind: "agent",
+    displayName: "Claude Code",
+    logoKey: "anthropic",
+    targetConfigSchema: OpenAiTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
+    bindingConfigSchema: AgentBindingConfigSchema,
+    allowedRuntimeIds: ["claude-code"],
+    connectionMethods: ApiKeyConnectionMethods,
+    capabilities: {
+      resolveCapabilities: (input) => ({
+        agentProviderAccess: {
+          providerFamilyId: input.target.familyId,
+          providerVariantId: input.target.variantId,
+          apiBaseUrl: input.target.config.apiBaseUrl,
+          authScheme: "bearer",
+          credentialResolver: {
+            connectionId: input.connection.id,
+            secretType: "api_key",
+          },
+          allowedMethods: ["POST"],
+          allowedPathPrefixes: ["/v1/messages"],
+          defaultModel: input.binding.config.model.defaultModel,
+          allowedModels: [input.binding.config.model.defaultModel],
+        },
+      }),
+    },
+    mcpConfig: {
+      clientId: "claude-code",
+      fileId: "claude_config",
+      format: "json",
+      path: ["mcpServers"],
+    },
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [],
+      runtimeClients: [],
     }),
   };
 }
@@ -253,7 +351,7 @@ function createJsonAgentDefinition(): IntegrationDefinition<
 function createLinearMcpDefinition(): IntegrationDefinition<
   typeof OpenAiTargetConfigSchema,
   typeof EmptyTargetSecretsSchema,
-  typeof OpenAiBindingConfigSchema
+  typeof ConnectorBindingConfigSchema
 > {
   return {
     familyId: "linear",
@@ -263,7 +361,7 @@ function createLinearMcpDefinition(): IntegrationDefinition<
     logoKey: "linear",
     targetConfigSchema: OpenAiTargetConfigSchema,
     targetSecretSchema: EmptyTargetSecretsSchema,
-    bindingConfigSchema: OpenAiBindingConfigSchema,
+    bindingConfigSchema: ConnectorBindingConfigSchema,
     connectionMethods: ApiKeyConnectionMethods,
     mcp: () => ({
       serverId: "linear-default",
@@ -301,7 +399,7 @@ function createLinearMcpDefinition(): IntegrationDefinition<
 function createLinearDuplicateNameMcpDefinition(): IntegrationDefinition<
   typeof OpenAiTargetConfigSchema,
   typeof EmptyTargetSecretsSchema,
-  typeof OpenAiBindingConfigSchema
+  typeof ConnectorBindingConfigSchema
 > {
   return {
     familyId: "linear",
@@ -311,7 +409,7 @@ function createLinearDuplicateNameMcpDefinition(): IntegrationDefinition<
     logoKey: "linear",
     targetConfigSchema: OpenAiTargetConfigSchema,
     targetSecretSchema: EmptyTargetSecretsSchema,
-    bindingConfigSchema: OpenAiBindingConfigSchema,
+    bindingConfigSchema: ConnectorBindingConfigSchema,
     connectionMethods: ApiKeyConnectionMethods,
     mcp: {
       serverId: "linear-duplicate-name",
@@ -330,17 +428,17 @@ function createLinearDuplicateNameMcpDefinition(): IntegrationDefinition<
 function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
   typeof OpenAiTargetConfigSchema,
   typeof EmptyTargetSecretsSchema,
-  typeof OpenAiBindingConfigSchema
+  typeof ConnectorBindingConfigSchema
 > {
   return {
     familyId: "openai",
     variantId: "openai-default",
-    kind: "agent",
+    kind: "connector",
     displayName: "OpenAI",
     logoKey: "openai",
     targetConfigSchema: OpenAiTargetConfigSchema,
     targetSecretSchema: EmptyTargetSecretsSchema,
-    bindingConfigSchema: OpenAiBindingConfigSchema,
+    bindingConfigSchema: ConnectorBindingConfigSchema,
     connectionMethods: ApiKeyConnectionMethods,
     compileBinding: () => ({
       egressRoutes: [],
@@ -410,7 +508,14 @@ describe("compileRuntimePlan", () => {
             kind: "agent",
             connectionId: "conn_openai_org_123",
             config: {
-              defaultModel: "gpt-5.3-codex",
+              runtime: {
+                runtimeId: "codex",
+                config: {},
+              },
+              model: {
+                defaultModel: "gpt-5.3-codex",
+                options: {},
+              },
             },
           },
         },
@@ -503,7 +608,7 @@ describe("compileRuntimePlan", () => {
           },
           binding: {
             id: "bind_openai_agent",
-            kind: "agent",
+            kind: "connector",
             connectionId: "conn_openai_org_123",
             config: {
               defaultModel: "gpt-5.3-codex",
@@ -566,7 +671,14 @@ describe("compileRuntimePlan", () => {
             kind: "agent",
             connectionId: "conn_openai_org_123",
             config: {
-              defaultModel: "gpt-5.3-codex",
+              runtime: {
+                runtimeId: "codex",
+                config: {},
+              },
+              model: {
+                defaultModel: "gpt-5.3-codex",
+                options: {},
+              },
             },
           },
         },
@@ -642,7 +754,14 @@ describe("compileRuntimePlan", () => {
             kind: "agent",
             connectionId: "conn_claude_org_123",
             config: {
-              defaultModel: "claude-sonnet",
+              runtime: {
+                runtimeId: "claude-code",
+                config: {},
+              },
+              model: {
+                defaultModel: "claude-sonnet",
+                options: {},
+              },
             },
           },
         },
@@ -720,7 +839,14 @@ describe("compileRuntimePlan", () => {
               kind: "agent",
               connectionId: "conn_openai_org_123",
               config: {
-                defaultModel: "gpt-5.3-codex",
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "gpt-5.3-codex",
+                  options: {},
+                },
               },
             },
           },
@@ -811,7 +937,14 @@ describe("compileRuntimePlan", () => {
               kind: "agent",
               connectionId: "conn_openai_org_123",
               config: {
-                defaultModel: "gpt-5.3-codex",
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "gpt-5.3-codex",
+                  options: {},
+                },
               },
             },
           },
@@ -1077,7 +1210,14 @@ describe("compileRuntimePlan", () => {
               kind: "agent",
               connectionId: "conn_openai_org_123",
               config: {
-                defaultModel: "gpt-5.3-codex",
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "gpt-5.3-codex",
+                  options: {},
+                },
               },
             },
           },
@@ -1118,7 +1258,14 @@ describe("compileRuntimePlan", () => {
               kind: "agent",
               connectionId: "conn_openai_org_123",
               config: {
-                defaultModel: "gpt-5.3-codex",
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "gpt-5.3-codex",
+                  options: {},
+                },
               },
             },
           },
@@ -1140,7 +1287,7 @@ describe("compileRuntimePlan", () => {
     const definition: IntegrationDefinition<
       typeof OpenAiTargetConfigSchema,
       typeof targetSecretSchema,
-      typeof OpenAiBindingConfigSchema
+      typeof AgentBindingConfigSchema
     > = {
       familyId: "openai",
       variantId: "openai-default",
@@ -1149,7 +1296,7 @@ describe("compileRuntimePlan", () => {
       logoKey: "openai",
       targetConfigSchema: OpenAiTargetConfigSchema,
       targetSecretSchema,
-      bindingConfigSchema: OpenAiBindingConfigSchema,
+      bindingConfigSchema: AgentBindingConfigSchema,
       connectionMethods: ApiKeyConnectionMethods,
       compileBinding: () => ({
         egressRoutes: [],
@@ -1193,7 +1340,14 @@ describe("compileRuntimePlan", () => {
               kind: "agent",
               connectionId: "conn_openai_org_123",
               config: {
-                defaultModel: "gpt-5.3-codex",
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "gpt-5.3-codex",
+                  options: {},
+                },
               },
             },
           },
@@ -1234,7 +1388,14 @@ describe("compileRuntimePlan", () => {
               kind: "agent",
               connectionId: "conn_openai_org_123",
               config: {
-                defaultModel: "gpt-5.3-codex",
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "gpt-5.3-codex",
+                  options: {},
+                },
               },
             },
           },
@@ -1284,7 +1445,14 @@ describe("compileRuntimePlan", () => {
               kind: "agent",
               connectionId: "conn_openai_org_123",
               config: {
-                defaultModel: "",
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "",
+                  options: {},
+                },
               },
             },
           },
@@ -1325,7 +1493,14 @@ describe("compileRuntimePlan", () => {
               kind: "agent",
               connectionId: "conn_openai_org_123",
               config: {
-                defaultModel: "",
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "",
+                  options: {},
+                },
               },
             },
           },
@@ -1337,6 +1512,215 @@ describe("compileRuntimePlan", () => {
 
     expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
     expect(caughtError).toMatchObject({ code: CompilerErrorCodes.INVALID_BINDING_CONFIG });
+  });
+
+  it("fails when the selected agent runtime is not registered", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createOpenAiDefinition());
+
+    let caughtError: unknown;
+    try {
+      compileRuntimePlan({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        definitions: {
+          integrationRegistry: registry,
+          agentRuntimeRegistry: new AgentRuntimeRegistry(),
+        },
+        bindings: [
+          {
+            targetKey: "openai-default",
+            target: {
+              familyId: "openai",
+              variantId: "openai-default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://api.openai.com",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_openai_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_openai_agent",
+              kind: "agent",
+              connectionId: "conn_openai_org_123",
+              config: {
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "gpt-5.3-codex",
+                  options: {},
+                },
+              },
+            },
+          },
+        ],
+      });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.AGENT_RUNTIME_NOT_FOUND });
+  });
+
+  it("fails when agent runtime config does not satisfy the runtime schema", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createOpenAiDefinition());
+    const agentRuntimeRegistry = new AgentRuntimeRegistry();
+    agentRuntimeRegistry.register({
+      runtimeId: "codex",
+      displayName: "Codex",
+      configSchema: z.object({
+        approvalPolicy: z.literal("never"),
+      }),
+      createConversationProvider: () => NoopConversationProvider,
+      createExecutionObserver: () => NoopExecutionObserver,
+      compileRuntime: () => ({
+        runtimeClients: [],
+        agentRuntimes: [],
+      }),
+    });
+
+    let caughtError: unknown;
+    try {
+      compileRuntimePlan({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        definitions: {
+          integrationRegistry: registry,
+          agentRuntimeRegistry,
+        },
+        bindings: [
+          {
+            targetKey: "openai-default",
+            target: {
+              familyId: "openai",
+              variantId: "openai-default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://api.openai.com",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_openai_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_openai_agent",
+              kind: "agent",
+              connectionId: "conn_openai_org_123",
+              config: {
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "gpt-5.3-codex",
+                  options: {},
+                },
+              },
+            },
+          },
+        ],
+      });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG });
+  });
+
+  it("fails when an agent provider does not resolve provider access", () => {
+    const registry = new IntegrationRegistry();
+    registry.register({
+      familyId: "openai",
+      variantId: "openai-default",
+      kind: "agent",
+      displayName: "OpenAI",
+      logoKey: "openai",
+      targetConfigSchema: OpenAiTargetConfigSchema,
+      targetSecretSchema: EmptyTargetSecretsSchema,
+      bindingConfigSchema: AgentBindingConfigSchema,
+      connectionMethods: ApiKeyConnectionMethods,
+      compileBinding: () => ({
+        egressRoutes: [],
+        artifacts: [],
+        runtimeClients: [],
+      }),
+    });
+
+    let caughtError: unknown;
+    try {
+      compileRuntimePlan({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        definitions: createDefinitionsBundle(registry),
+        bindings: [
+          {
+            targetKey: "openai-default",
+            target: {
+              familyId: "openai",
+              variantId: "openai-default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://api.openai.com",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_openai_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_openai_agent",
+              kind: "agent",
+              connectionId: "conn_openai_org_123",
+              config: {
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "gpt-5.3-codex",
+                  options: {},
+                },
+              },
+            },
+          },
+        ],
+      });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.MISSING_AGENT_PROVIDER_ACCESS });
   });
 
   it("passes parsed schema outputs into compileBinding", () => {
@@ -1362,7 +1746,7 @@ describe("compileRuntimePlan", () => {
     > = {
       familyId: "openai",
       variantId: "openai-default",
-      kind: "agent",
+      kind: "connector",
       displayName: "OpenAI",
       logoKey: "openai",
       targetConfigSchema,
@@ -1421,7 +1805,7 @@ describe("compileRuntimePlan", () => {
           },
           binding: {
             id: "bind_openai_agent",
-            kind: "agent",
+            kind: "connector",
             connectionId: "conn_openai_org_123",
             config: {
               defaultModel: " GPT-5.3-CODEX ",

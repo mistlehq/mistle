@@ -2,7 +2,7 @@ import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { OpenAiCodexAppServerListenUrl } from "../../../../../packages/integrations-definitions/src/openai/variants/openai-default/app-server.js";
+import { OpenAiCodexAppServerListenUrl } from "../../../../../packages/integrations-definitions/src/agent-runtimes/codex/app-server.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {

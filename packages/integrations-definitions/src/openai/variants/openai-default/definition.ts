@@ -2,17 +2,24 @@ import {
   IntegrationConnectionMethodIds,
   IntegrationKinds,
   IntegrationMcpConfigFormats,
+  type CompileBindingResult,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
-import { type OpenAiConnectionConfig, OpenAiConnectionConfigSchema } from "./auth.js";
+import {
+  resolveOpenAiCredentialSecretType,
+  type OpenAiConnectionConfig,
+  OpenAiConnectionConfigSchema,
+} from "./auth.js";
 import {
   OpenAiConnectionConfigForm,
   resolveOpenAiBindingConfigForm,
 } from "./binding-config-form.js";
-import { OpenAiApiKeyBindingConfigSchema } from "./binding-config-schema.js";
-import { compileOpenAiApiKeyBinding } from "./compile-binding.js";
+import {
+  OpenAiAllowedRuntimeIds,
+  OpenAiApiKeyBindingConfigSchema,
+} from "./binding-config-schema.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 import { validateOpenAiBindingWriteContext } from "./validate-binding-write-context.js";
 
@@ -25,6 +32,12 @@ type OpenAiApiKeyIntegrationDefinition = IntegrationDefinition<
 
 const OpenAiApiKeyTargetSecretSchema = z.object({}).strict();
 
+const EmptyCompileBindingResult: CompileBindingResult = {
+  egressRoutes: [],
+  artifacts: [],
+  runtimeClients: [],
+};
+
 export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   familyId: "openai",
   variantId: "openai-default",
@@ -36,6 +49,7 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   targetSecretSchema: OpenAiApiKeyTargetSecretSchema,
   bindingConfigSchema: OpenAiApiKeyBindingConfigSchema,
   bindingConfigForm: resolveOpenAiBindingConfigForm,
+  allowedRuntimeIds: OpenAiAllowedRuntimeIds,
   connectionMethods: [
     {
       id: IntegrationConnectionMethodIds.API_KEY,
@@ -55,11 +69,39 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
     },
   ],
   validateBindingWriteContext: validateOpenAiBindingWriteContext,
+  capabilities: {
+    resolveCapabilities: (input) => {
+      return {
+        agentProviderAccess: {
+          providerFamilyId: input.target.familyId,
+          providerVariantId: input.target.variantId,
+          apiBaseUrl: input.target.config.apiBaseUrl,
+          authScheme: "bearer",
+          credentialResolver: {
+            connectionId: input.connection.id,
+            secretType: resolveOpenAiCredentialSecretType(input.connection.config),
+          },
+          allowedMethods: ["GET", "POST"],
+          allowedPathPrefixes: ["/"],
+          defaultModel: input.binding.config.model.defaultModel,
+          allowedModels: [...input.target.config.bindingCapabilities.models],
+          providerMetadata: {
+            reasoningEffort: input.binding.config.model.options.reasoningEffort,
+            ...(input.binding.config.model.options.additionalInstructions === undefined
+              ? {}
+              : {
+                  additionalInstructions: input.binding.config.model.options.additionalInstructions,
+                }),
+          },
+        },
+      };
+    },
+  },
   mcpConfig: {
     clientId: "codex-cli",
     fileId: "codex_config",
     format: IntegrationMcpConfigFormats.TOML,
     path: ["mcp_servers"],
   },
-  compileBinding: compileOpenAiApiKeyBinding,
+  compileBinding: () => EmptyCompileBindingResult,
 };

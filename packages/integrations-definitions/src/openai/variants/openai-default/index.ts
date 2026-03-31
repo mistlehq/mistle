@@ -5,8 +5,8 @@ export {
 } from "./target-config-schema.js";
 export {
   OpenAiApiKeyBindingConfigSchema,
+  OpenAiAllowedRuntimeIds,
   OpenAiReasoningEfforts,
-  OpenAiRuntimes,
   type OpenAiApiKeyBindingConfig,
 } from "./binding-config-schema.js";
 export {
@@ -31,4 +31,4 @@ export {
   OpenAiCodexAppServerEndpointKey,
   OpenAiCodexAppServerListenUrl,
   OpenAiCodexAppServerProcessKey,
-} from "./app-server.js";
+} from "../../../agent-runtimes/codex/app-server.js";

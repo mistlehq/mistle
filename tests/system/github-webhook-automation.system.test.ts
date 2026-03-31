@@ -401,9 +401,16 @@ describeIf("system GitHub webhook automation", () => {
                 connectionId: openAiConnection.id,
                 kind: "agent",
                 config: {
-                  runtime: "codex-cli",
-                  defaultModel: "gpt-5.1-codex-mini",
-                  reasoningEffort: "medium",
+                  runtime: {
+                    runtimeId: "codex",
+                    config: {},
+                  },
+                  model: {
+                    defaultModel: "gpt-5.1-codex-mini",
+                    options: {
+                      reasoningEffort: "medium",
+                    },
+                  },
                 },
               },
             ],
