@@ -123,18 +123,6 @@ export const Connecting: Story = {
   },
 };
 
-export const Opening: Story = {
-  args: {
-    initialState: SandboxPtyStates.OPENING,
-  },
-};
-
-export const ConnectedEmpty: Story = {
-  args: {
-    initialState: SandboxPtyStates.OPEN,
-  },
-};
-
 export const ConnectedWithOutput: Story = {
   args: {
     initialOutput: [
@@ -152,38 +140,5 @@ export const ConnectedLongOutput: Story = {
   args: {
     initialOutput: createStoryLongCliOutput("log"),
     initialState: SandboxPtyStates.OPEN,
-  },
-};
-
-export const Disconnected: Story = {
-  args: {
-    initialState: SandboxPtyStates.CLOSED,
-  },
-};
-
-export const Exited: Story = {
-  args: {
-    initialOutput: [
-      "Resuming thread thread_storybook_123...",
-      "Connected to Codex remote session.",
-      "codex: session ended by remote peer",
-      "",
-    ].join("\n"),
-    initialState: SandboxPtyStates.EXITED,
-  },
-};
-
-export const ErrorState: Story = {
-  args: {
-    initialErrorMessage: "Sandbox PTY websocket connection failed.",
-    initialState: SandboxPtyStates.ERROR,
-  },
-};
-
-export const ErrorWithBufferedOutput: Story = {
-  args: {
-    initialErrorMessage: "Codex CLI exited before the session fully connected.",
-    initialOutput: ["Resuming thread thread_storybook_123...", "Handshake failed.", ""].join("\n"),
-    initialState: SandboxPtyStates.ERROR,
   },
 };
