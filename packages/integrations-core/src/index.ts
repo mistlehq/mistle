@@ -11,3 +11,5 @@ export * from "./compiler/index.js";
 export * from "./webhooks/index.js";
 export * from "./forms/index.js";
 export * from "./agent/index.js";
+export * from "./capabilities/index.js";
+export * from "./agent-runtimes/index.js";

@@ -752,6 +752,13 @@ function validateAgentRuntimes(input: {
       }
       runtimeKeys.add(agentRuntime.runtimeKey);
 
+      if (agentRuntime.runtimeId.trim().length === 0) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+          `Agent runtime '${agentRuntime.runtimeKey}' for binding '${agentRuntime.bindingId}' must define a non-empty runtimeId.`,
+        );
+      }
+
       if (agentRuntime.clientId.trim().length === 0) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,

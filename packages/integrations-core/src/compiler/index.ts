@@ -446,7 +446,7 @@ type CompileBindingsInput = {
   organizationId: string;
   sandboxProfileId: string;
   version: number;
-  registry: CompileRuntimePlanInput["registry"];
+  definitions: CompileRuntimePlanInput["definitions"];
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
   enforceRuntimeEligibility: boolean;
 };
@@ -479,7 +479,7 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
       );
     }
 
-    const definition = input.registry.getDefinitionOrThrow({
+    const definition = input.definitions.integrationRegistry.getDefinitionOrThrow({
       familyId: bindingInput.target.familyId,
       variantId: bindingInput.target.variantId,
     });
@@ -621,7 +621,7 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
     organizationId: input.organizationId,
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
-    registry: input.registry,
+    definitions: input.definitions,
     bindings: input.bindings,
     enforceRuntimeEligibility: true,
   });

@@ -2,6 +2,7 @@ import { GenericContainer, type StartedTestContainer } from "testcontainers";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { AgentRuntimeRegistry } from "../src/agent-runtimes/index.js";
 import { compileRuntimePlan } from "../src/compiler/index.js";
 import { IntegrationRegistry } from "../src/registry/index.js";
 import { IntegrationConnectionMethodIds, type IntegrationDefinition } from "../src/types/index.js";
@@ -27,6 +28,13 @@ const ApiKeyConnectionMethods = [
     ],
   },
 ] as const;
+
+function createDefinitionsBundle(registry: IntegrationRegistry) {
+  return {
+    integrationRegistry: registry,
+    agentRuntimeRegistry: new AgentRuntimeRegistry(),
+  };
+}
 
 function createGithubBinaryInstallDefinition(): IntegrationDefinition<
   typeof EmptyTargetConfigSchema,
@@ -104,7 +112,7 @@ describe("renderInstallLatestGithubReleaseBinaryScript integration", () => {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
       },
-      registry,
+      definitions: createDefinitionsBundle(registry),
       bindings: [
         {
           targetKey: "test_target",

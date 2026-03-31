@@ -1,5 +1,5 @@
 import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions";
 
 import { resolveIntegrationTargetSecrets } from "../lib/integration-target-secrets.js";
 import {
@@ -23,7 +23,7 @@ type CompileProfileVersionRuntimePlanInput = {
   image: ResolvedSandboxImage;
 };
 
-const registry = createIntegrationRegistry();
+const Definitions = createDefinitionsBundle();
 
 function mapCompilerErrorCodeToSandboxProfilesCompileErrorCode(
   code: Exclude<
@@ -71,7 +71,7 @@ export async function compileProfileVersionRuntimePlan(
   try {
     return await compileSandboxRuntimePlan({
       db,
-      integrationRegistry: registry,
+      definitions: Definitions,
       resolveTargetSecrets: async ({ targets }) => {
         return targets.map((target) => {
           try {

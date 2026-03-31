@@ -4,7 +4,7 @@ import type {
 } from "@mistle/db/control-plane";
 import { sandboxProfileVersionIntegrationBindings } from "@mistle/db/control-plane";
 import { IntegrationKinds, runDefinitionBindingWriteValidation } from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import {
@@ -33,7 +33,8 @@ type PutProfileVersionIntegrationBindingsResult = {
   bindings: SandboxProfileVersionIntegrationBinding[];
 };
 
-const IntegrationRegistry = createIntegrationRegistry();
+const Definitions = createDefinitionsBundle();
+const IntegrationRegistry = Definitions.integrationRegistry;
 
 function toRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {

@@ -193,6 +193,7 @@ export function compileOpenAiApiKeyBinding(
     ],
     agentRuntimes: [
       {
+        runtimeId: "codex",
         runtimeKey: OpenAiCodexAppServerProcessKey,
         clientId: input.binding.config.runtime,
         endpointKey: OpenAiCodexAppServerEndpointKey,

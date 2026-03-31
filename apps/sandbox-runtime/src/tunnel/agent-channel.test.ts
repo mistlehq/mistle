@@ -28,6 +28,7 @@ function createRuntimeClient(overrides: Partial<CompiledRuntimeClient>): Compile
 function createAgentRuntime(overrides: Partial<CompiledAgentRuntime>): CompiledAgentRuntime {
   return {
     bindingId: "binding_openai",
+    runtimeId: "codex",
     runtimeKey: "codex-app-server",
     clientId: "client_openai",
     endpointKey: "app-server",

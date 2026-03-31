@@ -788,6 +788,7 @@ describe("validateCompiledBindingResults", () => {
       ],
       agentRuntimes: [
         {
+          runtimeId: "codex",
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
@@ -813,6 +814,7 @@ describe("validateCompiledBindingResults", () => {
       artifactKey: "codex-cli",
       agentRuntimes: [
         {
+          runtimeId: "codex",
           runtimeKey: "codex-app-server",
           clientId: "missing-client",
           endpointKey: "app-server",
@@ -865,6 +867,7 @@ describe("validateCompiledBindingResults", () => {
       ],
       agentRuntimes: [
         {
+          runtimeId: "codex",
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
@@ -917,6 +920,7 @@ describe("validateCompiledBindingResults", () => {
       ],
       agentRuntimes: [
         {
+          runtimeId: "codex",
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",

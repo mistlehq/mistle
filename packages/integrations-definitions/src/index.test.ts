@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { createIntegrationRegistry, listIntegrationDefinitions } from "./index.js";
+import {
+  createDefinitionsBundle,
+  createIntegrationRegistry,
+  listIntegrationDefinitions,
+} from "./index.js";
 
 describe("integrations-definitions index", () => {
   it("registers built-in integration definitions in a registry", () => {
@@ -186,5 +190,17 @@ describe("integrations-definitions index", () => {
       "linear::linear-default",
       "openai::openai-default",
     ]);
+  });
+
+  it("builds the integration definitions bundle with an agent runtime registry", () => {
+    const definitions = createDefinitionsBundle();
+
+    expect(
+      definitions.integrationRegistry.getDefinition({
+        familyId: "openai",
+        variantId: "openai-default",
+      }),
+    ).toBeDefined();
+    expect(definitions.agentRuntimeRegistry.listRuntimes()).toEqual([]);
   });
 });

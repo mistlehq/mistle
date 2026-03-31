@@ -56,6 +56,7 @@ function createRuntimePlan() {
         agentRuntimes: [
           {
             bindingId: "ibd_123",
+            runtimeId: "test-agent",
             runtimeKey: "runtime_123",
             clientId: "client_123",
             endpointKey: "endpoint_123",

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { AgentRuntimeRegistry } from "../agent-runtimes/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { IntegrationRegistry } from "../registry/index.js";
 import { IntegrationConnectionMethodIds, type IntegrationDefinition } from "../types/index.js";
@@ -31,6 +32,13 @@ const ApiKeyConnectionMethods = [
     ],
   },
 ] as const;
+
+function createDefinitionsBundle(registry: IntegrationRegistry) {
+  return {
+    integrationRegistry: registry,
+    agentRuntimeRegistry: new AgentRuntimeRegistry(),
+  };
+}
 
 function createOpenAiDefinition(): IntegrationDefinition<
   typeof OpenAiTargetConfigSchema,
@@ -182,6 +190,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
       ],
       agentRuntimes: [
         {
+          runtimeId: "codex",
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
@@ -378,7 +387,7 @@ describe("compileRuntimePlan", () => {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
       },
-      registry,
+      definitions: createDefinitionsBundle(registry),
       bindings: [
         {
           targetKey: "openai-default",
@@ -453,6 +462,7 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.agentRuntimes).toEqual([
       {
         bindingId: "bind_openai_agent",
+        runtimeId: "codex",
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server",
@@ -473,7 +483,7 @@ describe("compileRuntimePlan", () => {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
       },
-      registry,
+      definitions: createDefinitionsBundle(registry),
       bindings: [
         {
           targetKey: "openai-default",
@@ -533,7 +543,7 @@ describe("compileRuntimePlan", () => {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
       },
-      registry,
+      definitions: createDefinitionsBundle(registry),
       bindings: [
         {
           targetKey: "openai-default",
@@ -609,7 +619,7 @@ describe("compileRuntimePlan", () => {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
       },
-      registry,
+      definitions: createDefinitionsBundle(registry),
       bindings: [
         {
           targetKey: "claude-code-default",
@@ -687,7 +697,7 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        registry,
+        definitions: createDefinitionsBundle(registry),
         bindings: [
           {
             targetKey: "openai-default",
@@ -778,7 +788,7 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        registry,
+        definitions: createDefinitionsBundle(registry),
         bindings: [
           {
             targetKey: "openai-default",
@@ -878,7 +888,7 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        registry,
+        definitions: createDefinitionsBundle(registry),
         bindings: [
           {
             targetKey: "openai-default",
@@ -915,7 +925,7 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        registry,
+        definitions: createDefinitionsBundle(registry),
         bindings: [
           {
             targetKey: "openai-default",
@@ -961,7 +971,7 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        registry,
+        definitions: createDefinitionsBundle(registry),
         bindings: [
           {
             targetKey: "openai-default",
@@ -998,7 +1008,7 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        registry,
+        definitions: createDefinitionsBundle(registry),
         bindings: [
           {
             targetKey: "openai-default",
@@ -1044,7 +1054,7 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        registry,
+        definitions: createDefinitionsBundle(registry),
         bindings: [
           {
             targetKey: "openai-default",
@@ -1085,7 +1095,7 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        registry,
+        definitions: createDefinitionsBundle(registry),
         bindings: [
           {
             targetKey: "openai-default",
@@ -1160,7 +1170,7 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        registry,
+        definitions: createDefinitionsBundle(registry),
         bindings: [
           {
             targetKey: "openai-default",
@@ -1201,7 +1211,7 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        registry,
+        definitions: createDefinitionsBundle(registry),
         bindings: [
           {
             targetKey: "openai-default",
@@ -1251,7 +1261,7 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        registry,
+        definitions: createDefinitionsBundle(registry),
         bindings: [
           {
             targetKey: "openai-default",
@@ -1292,7 +1302,7 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        registry,
+        definitions: createDefinitionsBundle(registry),
         bindings: [
           {
             targetKey: "openai-default",
@@ -1391,7 +1401,7 @@ describe("compileRuntimePlan", () => {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
       },
-      registry,
+      definitions: createDefinitionsBundle(registry),
       bindings: [
         {
           targetKey: "openai-default",

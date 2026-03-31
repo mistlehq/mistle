@@ -103,6 +103,7 @@ function createRuntimeClient() {
 function createAgentRuntime() {
   return {
     bindingId: "binding_openai",
+    runtimeId: "codex",
     runtimeKey: "codex-app-server",
     clientId: "client_openai",
     endpointKey: "app-server",

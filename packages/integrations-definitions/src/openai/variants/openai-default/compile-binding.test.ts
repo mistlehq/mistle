@@ -215,6 +215,7 @@ describe("compileOpenAiApiKeyBinding", () => {
     ]);
     expect(compiled.agentRuntimes).toEqual([
       {
+        runtimeId: "codex",
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server",

@@ -1,6 +1,9 @@
 import type { z } from "zod";
 
+import type { AgentRuntimeRegistry } from "../agent-runtimes/index.js";
 import type { AgentIntegrationHooks } from "../agent/index.js";
+import type { ConnectionCapabilitySet } from "../capabilities/index.js";
+import type { IntegrationRegistry } from "../registry/index.js";
 
 export type IntegrationKind = "agent" | "git" | "connector";
 
@@ -226,6 +229,7 @@ export type IntegrationFormContext<
   TBindingConfig = Record<string, unknown>,
   TConnectionConfig = Record<string, unknown>,
 > = {
+  definitions?: IntegrationDefinitionsBundle;
   familyId: string;
   variantId: string;
   kind: IntegrationKind;
@@ -970,6 +974,7 @@ export type RuntimeClient = RuntimeClientBase<string>;
 export type CompileBindingEgressRoute = Omit<EgressCredentialRoute, "egressRuleId" | "bindingId">;
 
 export type CompileBindingAgentRuntime = {
+  runtimeId: string;
   runtimeKey: string;
   clientId: string;
   endpointKey: string;
@@ -1145,6 +1150,7 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TBindingConfigSchema>,
     TConnectionConfig
   >;
+  allowedRuntimeIds?: ReadonlyArray<string>;
   connectionMethods: ReadonlyArray<
     IntegrationConnectionMethodDefinition<
       ParsedSchemaOutput<TTargetConfigSchema>,
@@ -1176,6 +1182,11 @@ export type IntegrationDefinition<
   >;
   resourceDefinitions?: ReadonlyArray<IntegrationResourceDefinition>;
   resourceSyncTriggers?: ReadonlyArray<IntegrationResourceSyncTrigger>;
+  capabilities?: IntegrationCapabilityContributor<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TBindingConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>
+  >;
   listConnectionResources?(
     input: ListConnectionResourcesInput<
       ParsedSchemaOutput<TTargetConfigSchema>,
@@ -1211,6 +1222,16 @@ export type AnyIntegrationDefinition = IntegrationDefinition<
   IntegrationConfigSchema<unknown>,
   Record<string, unknown>
 >;
+
+export type IntegrationCapabilityContributor<
+  TTargetConfig = Record<string, unknown>,
+  TBindingConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
+  resolveCapabilities(
+    input: CompileBindingInput<TTargetConfig, TBindingConfig, TTargetSecrets>,
+  ): ConnectionCapabilitySet;
+};
 
 export type IntegrationBrowserSafeFormConnectionMethodDefinition<
   TTargetConfig = Record<string, unknown>,
@@ -1336,6 +1357,11 @@ export interface IntegrationDefinitionResolver extends IntegrationDefinitionRead
   getDefinitionOrThrow(input: IntegrationDefinitionLocator): AnyIntegrationDefinition;
 }
 
+export type IntegrationDefinitionsBundle = {
+  integrationRegistry: IntegrationRegistry;
+  agentRuntimeRegistry: AgentRuntimeRegistry;
+};
+
 export type CompileRuntimePlanBindingInput = {
   targetKey: string;
   target: IntegrationTarget;
@@ -1349,5 +1375,5 @@ export type CompileRuntimePlanInput = {
   version: number;
   image: ResolvedSandboxImage;
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
-  registry: IntegrationDefinitionResolver;
+  definitions: IntegrationDefinitionsBundle;
 };

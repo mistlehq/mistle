@@ -4,7 +4,7 @@ import {
   IntegrationCompilerError,
   compileRuntimePlan,
   type CompiledRuntimePlan,
-  type IntegrationRegistry,
+  type IntegrationDefinitionsBundle,
   type ResolvedSandboxImage,
 } from "@mistle/integrations-core";
 
@@ -69,7 +69,7 @@ export type ResolveIntegrationTargetSecrets = (
 
 export type CompileSandboxRuntimePlanInput = {
   db: ControlPlaneDatabase;
-  integrationRegistry: IntegrationRegistry;
+  definitions: IntegrationDefinitionsBundle;
   resolveTargetSecrets: ResolveIntegrationTargetSecrets;
   organizationId: string;
   profileId: string;
@@ -298,7 +298,7 @@ export async function compileSandboxRuntimePlan(
       version: input.profileVersion,
       image: input.image,
       bindings: compileBindings,
-      registry: input.integrationRegistry,
+      definitions: input.definitions,
     });
   } catch (error) {
     if (error instanceof IntegrationCompilerError) {
