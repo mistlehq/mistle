@@ -1,7 +1,6 @@
 export type MainPanelTransitionState =
   | "stable_chat"
   | "switching_to_cli"
-  | "cli_entry_failed"
   | "stable_cli"
   | "restoring_chat"
   | "restore_failed";
@@ -33,11 +32,7 @@ export type SessionMainPanelHandoffAction =
       type: "reset_to_stable_chat";
     };
 
-const CliToggleActiveStates = new Set<MainPanelTransitionState>([
-  "switching_to_cli",
-  "cli_entry_failed",
-  "stable_cli",
-]);
+const CliToggleActiveStates = new Set<MainPanelTransitionState>(["switching_to_cli", "stable_cli"]);
 
 function createHandoffState(
   transitionState: MainPanelTransitionState,
@@ -65,7 +60,7 @@ export function reduceSessionMainPanelHandoffState(
     }
 
     case "cli_handoff_failed": {
-      return createHandoffState("cli_entry_failed", action.errorMessage);
+      return createHandoffState("stable_chat", action.errorMessage);
     }
 
     case "chat_restore_requested": {

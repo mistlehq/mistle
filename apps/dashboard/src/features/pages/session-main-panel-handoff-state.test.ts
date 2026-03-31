@@ -8,7 +8,7 @@ import {
 } from "./session-main-panel-handoff-state.js";
 
 describe("session main panel handoff state", () => {
-  it("moves through the CLI entry and restore failure states explicitly", () => {
+  it("returns to stable chat when CLI handoff fails and still enters restore failure explicitly", () => {
     const switchingToCli = reduceSessionMainPanelHandoffState(InitialSessionMainPanelHandoffState, {
       type: "handoff_to_cli_requested",
     });
@@ -24,7 +24,7 @@ describe("session main panel handoff state", () => {
     });
 
     expect(cliEntryFailed).toEqual({
-      transitionState: "cli_entry_failed",
+      transitionState: "stable_chat",
       errorMessage: "codex executable missing",
     });
 
@@ -60,14 +60,12 @@ describe("session main panel handoff state", () => {
   it("derives CLI activity and stable-chat detection from transition state", () => {
     expect(isCliToggleActive("stable_chat")).toBe(false);
     expect(isCliToggleActive("switching_to_cli")).toBe(true);
-    expect(isCliToggleActive("cli_entry_failed")).toBe(true);
     expect(isCliToggleActive("stable_cli")).toBe(true);
     expect(isCliToggleActive("restoring_chat")).toBe(false);
     expect(isCliToggleActive("restore_failed")).toBe(false);
 
     expect(isStableChatTransitionState("stable_chat")).toBe(true);
     expect(isStableChatTransitionState("switching_to_cli")).toBe(false);
-    expect(isStableChatTransitionState("cli_entry_failed")).toBe(false);
     expect(isStableChatTransitionState("stable_cli")).toBe(false);
     expect(isStableChatTransitionState("restoring_chat")).toBe(false);
     expect(isStableChatTransitionState("restore_failed")).toBe(false);

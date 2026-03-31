@@ -211,6 +211,15 @@ function SessionWorkbenchPageContent(input: {
       description: workbench.sandboxFailureMessage,
     });
   }
+  if (
+    workbench.primaryPanelState.transitionState === "stable_chat" &&
+    workbench.primaryPanelState.errorMessage !== null
+  ) {
+    alerts.push({
+      title: "Could not start Codex CLI",
+      description: workbench.primaryPanelState.errorMessage,
+    });
+  }
   if (input.sandboxInstanceId === null) {
     return (
       <SessionWorkbenchPageView
@@ -243,7 +252,13 @@ function SessionWorkbenchPageContent(input: {
 
   return (
     <SessionWorkbenchPageView
-      alerts={workbench.hasTopAlert ? alerts : []}
+      alerts={
+        workbench.hasTopAlert ||
+        (workbench.primaryPanelState.transitionState === "stable_chat" &&
+          workbench.primaryPanelState.errorMessage !== null)
+          ? alerts
+          : []
+      }
       isPrimaryPanelTransitioning={
         workbench.primaryPanelState.transitionState === "switching_to_cli" ||
         workbench.primaryPanelState.transitionState === "restoring_chat"
@@ -267,7 +282,6 @@ function SessionWorkbenchPageContent(input: {
           refitKey: workbench.terminalPanelState.isVisible ? "cli:split" : "cli:solo",
         },
         errorMessage: workbench.primaryPanelState.errorMessage,
-        onReturnToChat: workbench.primaryPanelState.exitCliMode,
         transitionState: workbench.primaryPanelState.transitionState,
       })}
       onSecondaryPanelResize={workbench.terminalPanelState.setPanelSize}
@@ -332,7 +346,6 @@ function renderPrimaryPanelMainContent(input: {
   cli: PrimaryPanelCliContent;
   conversation: PrimaryPanelConversationContent;
   errorMessage: string | null;
-  onReturnToChat: () => Promise<void>;
   transitionState: ReturnType<
     typeof useSessionWorkbenchController
   >["workbench"]["primaryPanelState"]["transitionState"];
@@ -341,8 +354,6 @@ function renderPrimaryPanelMainContent(input: {
     case "switching_to_cli":
     case "restoring_chat":
       return <></>;
-    case "cli_entry_failed":
-      return renderCliEntryFailure(input.errorMessage, input.onReturnToChat);
     case "stable_cli":
       return (
         <SessionCliPanel
@@ -355,28 +366,6 @@ function renderPrimaryPanelMainContent(input: {
     case "stable_chat":
       return <SessionConversationMainContent {...input.conversation} />;
   }
-}
-
-function renderCliEntryFailure(
-  errorMessage: string | null,
-  onReturnToChat: () => Promise<void>,
-): React.JSX.Element {
-  return (
-    <SessionPrimaryPanelStatusCard
-      action={{
-        label: "Return to chat",
-        onClick: () => {
-          void onReturnToChat();
-        },
-      }}
-      description={
-        errorMessage ??
-        "Codex CLI could not be started for this session. Return to chat to keep using the workbench."
-      }
-      title="Could not start Codex CLI"
-      tone="destructive"
-    />
-  );
 }
 
 function renderChatRestoreFailure(errorMessage: string | null): React.JSX.Element {

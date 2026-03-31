@@ -94,7 +94,7 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       });
     }, 15_000);
 
-    it("shows a dedicated CLI entry failure surface and lets the user return to chat", async () => {
+    it("shows a CLI entry failure alert in the chat view and leaves chat active", async () => {
       await withSessionWorkbenchCliHarness(async ({ controls }) => {
         controls.failNextCliOpen("codex executable missing");
 
@@ -102,11 +102,8 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
 
         expect(await screen.findByText("Could not start Codex CLI")).toBeDefined();
         expect(screen.getByText("codex executable missing")).toBeDefined();
-        expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
-
-        fireEvent.click(screen.getByRole("button", { name: "Return to chat" }));
-
-        await waitForChatReady();
+        expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
+        expect(screen.queryByRole("button", { name: "Return to chat" })).toBeNull();
       });
     });
 
@@ -117,7 +114,6 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
         fireEvent.click(await waitForEnabledButton("CLI"));
 
         expect(await screen.findByText("Could not start Codex CLI")).toBeDefined();
-        fireEvent.click(screen.getByRole("button", { name: "Return to chat" }));
         await waitForChatReady();
 
         fireEvent.click(await waitForEnabledButton("CLI"));
