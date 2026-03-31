@@ -33,17 +33,11 @@ type CreateControlPlaneAuthOptions = {
   openWorkflow: OpenWorkflow;
 };
 
-export function createAccountOptions(
-  config: Pick<ControlPlaneAuthConfig, "authGoogleClientId" | "authGoogleClientSecret">,
-): NonNullable<Parameters<typeof betterAuth>[0]["account"]> {
-  const googleEnabled =
-    config.authGoogleClientId !== null && config.authGoogleClientSecret !== null;
-
+export function createAccountOptions(): NonNullable<Parameters<typeof betterAuth>[0]["account"]> {
   return {
     modelName: "accounts",
     accountLinking: {
       enabled: true,
-      trustedProviders: googleEnabled ? ["google"] : [],
     },
   };
 }
@@ -97,7 +91,7 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
     session: {
       modelName: "sessions",
     },
-    account: createAccountOptions(config),
+    account: createAccountOptions(),
     verification: {
       modelName: "verifications",
     },

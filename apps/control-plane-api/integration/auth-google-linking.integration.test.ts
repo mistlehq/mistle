@@ -350,4 +350,123 @@ describe("auth google linking integration", () => {
       await workflowBackend.stop();
     }
   });
+
+  it("does not link an unverified google email to an existing OTP user", async ({ fixture }) => {
+    const email = "google-linking-unverified@example.com";
+
+    const sendResponse = await sendOTPRequest({
+      fixture,
+      recipient: email,
+    });
+    expect(sendResponse.status).toBe(200);
+
+    const otp = await readIssuedOtp({
+      fixture,
+      recipient: email,
+    });
+    const signInResponse = await signInWithOTP({
+      fixture,
+      recipient: email,
+      otp,
+    });
+    expect(signInResponse.status).toBe(200);
+
+    const existingUser = await fixture.db.query.users.findFirst({
+      columns: {
+        id: true,
+        email: true,
+        emailVerified: true,
+      },
+      where: (users, { eq }) => eq(users.email, email),
+    });
+    expect(existingUser).toBeDefined();
+    if (existingUser === undefined) {
+      throw new Error("Expected OTP sign-in to create a user.");
+    }
+    expect(existingUser.emailVerified).toBe(true);
+
+    const workflowBackend = await createControlPlaneBackend({
+      url: fixture.databaseStack.directUrl,
+      namespaceId: fixture.config.workflow.namespaceId,
+      runMigrations: false,
+    });
+    const openWorkflow = createControlPlaneOpenWorkflow({
+      backend: workflowBackend,
+    });
+
+    try {
+      const auth = createControlPlaneAuth({
+        config: {
+          authBaseUrl: fixture.config.auth.baseUrl,
+          dashboardBaseUrl: fixture.config.dashboard.baseUrl,
+          authSecret: fixture.config.auth.secret,
+          authTrustedOrigins: fixture.config.auth.trustedOrigins,
+          authOTPLength: fixture.config.auth.otpLength,
+          authOTPExpiresInSeconds: fixture.config.auth.otpExpiresInSeconds,
+          authOTPAllowedAttempts: fixture.config.auth.otpAllowedAttempts,
+          authGoogleClientId: "integration-google-client-id",
+          authGoogleClientSecret: "integration-google-client-secret",
+          activeMasterEncryptionKeyVersion:
+            fixture.config.integrations.activeMasterEncryptionKeyVersion,
+          masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+        },
+        db: fixture.db,
+        openWorkflow,
+      });
+      const endpointContext = createOAuthEndpointContext(await auth.$context);
+
+      // Better Auth narrows AuthContext by options, but this runtime context provides
+      // the shared fields handleOAuthUserInfo uses for real linking behavior.
+      // @ts-expect-error External Better Auth type variance rejects narrower auth options here.
+      const result = await handleOAuthUserInfo(endpointContext, {
+        userInfo: {
+          id: "google-user-id-unverified",
+          email,
+          emailVerified: false,
+          name: "Unverified Google User",
+          image: "https://example.com/avatar-unverified.png",
+        },
+        account: {
+          providerId: "google",
+          accountId: "google-user-id-unverified",
+          accessToken: "google-access-token-unverified",
+          refreshToken: "google-refresh-token-unverified",
+          idToken: "google-id-token-unverified",
+          accessTokenExpiresAt: new Date("2026-03-31T03:00:00.000Z"),
+          refreshTokenExpiresAt: new Date("2026-04-01T03:00:00.000Z"),
+          scope: "openid email profile",
+        },
+        callbackURL: "http://localhost:5173/auth/login/callback?redirectTo=%2F",
+      });
+
+      expect(result.error).not.toBeNull();
+      expect(result.data).toBeNull();
+
+      const users = await fixture.db.query.users.findMany({
+        columns: {
+          id: true,
+          email: true,
+        },
+        where: (users, { eq }) => eq(users.email, email),
+      });
+      expect(users).toHaveLength(1);
+      expect(users[0]?.id).toBe(existingUser.id);
+
+      const linkedGoogleAccount = await fixture.db.query.accounts.findFirst({
+        columns: {
+          userId: true,
+          providerId: true,
+          accountId: true,
+        },
+        where: (accounts, { and, eq }) =>
+          and(
+            eq(accounts.providerId, "google"),
+            eq(accounts.accountId, "google-user-id-unverified"),
+          ),
+      });
+      expect(linkedGoogleAccount).toBeUndefined();
+    } finally {
+      await workflowBackend.stop();
+    }
+  });
 });
