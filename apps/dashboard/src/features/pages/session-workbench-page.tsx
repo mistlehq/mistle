@@ -6,8 +6,6 @@ import { useLocation, useParams } from "react-router";
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import { SessionChatRestoreFailedPanel } from "./session-chat-restore-failed-panel.js";
-import { SessionChatRestoringPanel } from "./session-chat-restoring-panel.js";
-import { SessionCliConnectingPanel } from "./session-cli-connecting-panel.js";
 import { SessionCliEntryFailedPanel } from "./session-cli-entry-failed-panel.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
@@ -335,7 +333,7 @@ function resolvePrimaryPanelMainContent(input: {
 
   switch (input.transitionState) {
     case "switching_to_cli":
-      return <SessionCliConnectingPanel />;
+      return <></>;
     case "cli_entry_failed":
       return (
         <SessionCliEntryFailedPanel
@@ -348,7 +346,7 @@ function resolvePrimaryPanelMainContent(input: {
     case "stable_cli":
       return <SessionCliPanel ptyState={input.cliPtyState} {...cliRefitKeyProps} />;
     case "restoring_chat":
-      return <SessionChatRestoringPanel />;
+      return <></>;
     case "restore_failed":
       return (
         <SessionChatRestoreFailedPanel

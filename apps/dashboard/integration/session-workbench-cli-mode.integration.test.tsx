@@ -1028,7 +1028,8 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
 
       fireEvent.click(await waitForEnabledButton("CLI"));
 
-      expect(await screen.findByText("Starting Codex CLI...")).toBeDefined();
+      expect(screen.queryByText("Starting Codex CLI...")).toBeNull();
+      expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "CLI" }));
 
       await waitFor(
@@ -1089,7 +1090,6 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
         },
         { timeout: 5_000 },
       );
-      expect(screen.queryByText("Restoring chat...")).toBeNull();
     });
   }, 15_000);
 
