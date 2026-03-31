@@ -35,7 +35,13 @@ function toOptionalNonEmptyStringArray(
 }
 
 export function parseAuthInjectionType(value: unknown): EgressGrantAuthInjectionType | undefined {
-  if (value === "bearer" || value === "basic" || value === "header" || value === "query") {
+  if (
+    value === "bearer" ||
+    value === "basic" ||
+    value === "header" ||
+    value === "query" ||
+    value === "aws_sigv4"
+  ) {
     return value;
   }
 
@@ -91,6 +97,37 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
 
   const purpose = toNonEmptyString(input.purpose);
   const resolverKey = toNonEmptyString(input.resolverKey);
+  const authInjectionTarget = toNonEmptyString(input.authInjectionTarget);
+  const authInjectionService = toNonEmptyString(input.authInjectionService);
+  const authInjectionRegion = toNonEmptyString(input.authInjectionRegion);
+
+  if (authInjectionType === "aws_sigv4") {
+    if (authInjectionTarget !== undefined) {
+      throw new EgressGrantError({
+        code: EgressGrantErrorCode.AUTH_INJECTION_TARGET_REQUIRED,
+        message: "Egress grant authInjectionTarget is invalid for aws_sigv4 auth injection.",
+      });
+    }
+
+    if (authInjectionService === undefined) {
+      throw missingClaimError(
+        EgressGrantErrorCode.AUTH_INJECTION_SERVICE_REQUIRED,
+        "authInjectionService",
+      );
+    }
+
+    if (authInjectionRegion === undefined) {
+      throw missingClaimError(
+        EgressGrantErrorCode.AUTH_INJECTION_REGION_REQUIRED,
+        "authInjectionRegion",
+      );
+    }
+  } else if (authInjectionTarget === undefined) {
+    throw missingClaimError(
+      EgressGrantErrorCode.AUTH_INJECTION_TARGET_REQUIRED,
+      "authInjectionTarget",
+    );
+  }
 
   return {
     sub: requireClaim(input.sub, EgressGrantErrorCode.SUBJECT_REQUIRED, "sub"),
@@ -112,12 +149,10 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
       "upstreamBaseUrl",
     ),
     authInjectionType,
-    authInjectionTarget: requireClaim(
-      input.authInjectionTarget,
-      EgressGrantErrorCode.AUTH_INJECTION_TARGET_REQUIRED,
-      "authInjectionTarget",
-    ),
+    ...(authInjectionTarget === undefined ? {} : { authInjectionTarget }),
     ...(authInjectionUsername === undefined ? {} : { authInjectionUsername }),
+    ...(authInjectionService === undefined ? {} : { authInjectionService }),
+    ...(authInjectionRegion === undefined ? {} : { authInjectionRegion }),
     ...(purpose === undefined ? {} : { purpose }),
     ...(resolverKey === undefined ? {} : { resolverKey }),
     ...(allowedMethods === undefined ? {} : { allowedMethods }),

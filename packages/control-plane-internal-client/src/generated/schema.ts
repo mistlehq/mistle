@@ -141,11 +141,21 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": {
-              /** Format: date-time */
-              expiresAt?: string;
-              value: string;
-            };
+            "application/json":
+              | {
+                  accessKeyId: string;
+                  /** Format: date-time */
+                  expiresAt: string;
+                  kind: "aws_session";
+                  secretAccessKey: string;
+                  sessionToken: string;
+                }
+              | {
+                  /** Format: date-time */
+                  expiresAt?: string;
+                  kind: "value";
+                  value: string;
+                };
           };
         };
         /** @description Invalid resolve request. */

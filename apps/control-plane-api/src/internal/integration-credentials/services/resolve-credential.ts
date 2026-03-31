@@ -42,10 +42,21 @@ export type ResolveIntegrationCredentialInput = {
   resolverKey?: string | undefined;
 };
 
-export type ResolvedIntegrationCredential = {
-  value: string;
-  expiresAt?: string;
-};
+export type ResolvedIntegrationCredential =
+  | {
+      kind: "value";
+      value: string;
+      expiresAt?: string;
+    }
+  | {
+      kind: "aws_session";
+      accessKeyId: string;
+      secretAccessKey: string;
+      sessionToken: string;
+      expiresAt: string;
+    };
+
+type ResolvedValueCredential = Extract<ResolvedIntegrationCredential, { kind: "value" }>;
 
 type ResolvePersistedCredentialInput = {
   db: AppContext["var"]["db"];
@@ -340,7 +351,7 @@ async function decryptLinkedActiveCredential(
     integrationsConfig: AppContext["var"]["config"]["integrations"];
     credential: LinkedActiveCredential;
   },
-): Promise<ResolvedIntegrationCredential> {
+): Promise<ResolvedValueCredential> {
   const organizationCredentialKey = await db.query.organizationCredentialKeys.findFirst({
     where: (table, { and, eq }) =>
       and(
@@ -372,6 +383,7 @@ async function decryptLinkedActiveCredential(
     });
 
     return {
+      kind: "value",
       value,
       ...(input.credential.expiresAt === null
         ? {}
@@ -724,6 +736,7 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
       return {
         kind: "resolved",
         credential: {
+          kind: "value",
           value: refreshedAccessToken.accessToken,
           ...(refreshedAccessToken.accessTokenExpiresAt === undefined
             ? {}
@@ -976,6 +989,7 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
 
       return {
         credential: {
+          kind: "value",
           value: exchangedAccessToken.accessToken,
           ...(exchangedAccessToken.accessTokenExpiresAt
             ? { expiresAt: exchangedAccessToken.accessTokenExpiresAt }
@@ -1113,6 +1127,7 @@ async function resolvePersistedCredential(
     });
 
     return {
+      kind: "value",
       value,
       ...(credential.expiresAt === null
         ? {}

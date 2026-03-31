@@ -2,22 +2,10 @@ import {
   EgressGrantError,
   verifyEgressGrant,
   type EgressGrantConfig,
+  type EgressGrantClaims,
 } from "@mistle/sandbox-egress-auth";
 
-export type AuthorizedEgressGrant = {
-  sub: string;
-  jti: string;
-  bindingId: string;
-  connectionId: string;
-  secretType: string;
-  upstreamBaseUrl: string;
-  authInjectionType: "bearer" | "basic" | "header" | "query";
-  authInjectionTarget: string;
-  authInjectionUsername?: string;
-  purpose?: string;
-  resolverKey?: string;
-  allowedMethods?: ReadonlyArray<string>;
-  allowedPathPrefixes?: ReadonlyArray<string>;
+export type AuthorizedEgressGrant = EgressGrantClaims & {
   egressRuleId: string;
 };
 

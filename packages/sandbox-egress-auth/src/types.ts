@@ -4,7 +4,7 @@ export type EgressGrantConfig = {
   tokenAudience: string;
 };
 
-export type EgressGrantAuthInjectionType = "bearer" | "basic" | "header" | "query";
+export type EgressGrantAuthInjectionType = "bearer" | "basic" | "header" | "query" | "aws_sigv4";
 
 export type EgressGrantClaims = {
   sub: string;
@@ -14,8 +14,10 @@ export type EgressGrantClaims = {
   secretType: string;
   upstreamBaseUrl: string;
   authInjectionType: EgressGrantAuthInjectionType;
-  authInjectionTarget: string;
+  authInjectionTarget?: string;
   authInjectionUsername?: string;
+  authInjectionService?: string;
+  authInjectionRegion?: string;
   purpose?: string;
   resolverKey?: string;
   allowedMethods?: ReadonlyArray<string>;
@@ -30,8 +32,10 @@ export type EgressGrantClaimsInput = {
   secretType: string | undefined;
   upstreamBaseUrl: string | undefined;
   authInjectionType: unknown;
-  authInjectionTarget: string | undefined;
+  authInjectionTarget?: string | undefined;
   authInjectionUsername?: string | undefined;
+  authInjectionService?: string | undefined;
+  authInjectionRegion?: string | undefined;
   purpose?: string | undefined;
   resolverKey?: string | undefined;
   allowedMethods?: ReadonlyArray<string> | undefined;

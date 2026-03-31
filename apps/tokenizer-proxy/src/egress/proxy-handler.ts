@@ -1,4 +1,7 @@
-import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import {
+  ControlPlaneInternalClient,
+  type ResolveIntegrationCredentialOutput,
+} from "@mistle/control-plane-internal-client";
 import type { EgressGrantConfig } from "@mistle/sandbox-egress-auth";
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 import type { Context } from "hono";
@@ -150,7 +153,7 @@ function applyAuthInjection(input: {
   upstreamUrl: URL;
   outgoingHeaders: Headers;
   authInjectionType: AuthorizedEgressGrant["authInjectionType"];
-  authInjectionTarget: string;
+  authInjectionTarget?: string;
   authInjectionUsername?: string;
   secretValue: string;
 }): void {
@@ -158,12 +161,18 @@ function applyAuthInjection(input: {
   // and query-based auth schemes share the same forwarding pipeline.
   switch (input.authInjectionType) {
     case "bearer":
+      if (input.authInjectionTarget === undefined) {
+        throw new Error("Bearer auth injection target is required.");
+      }
       input.outgoingHeaders.set(
         input.authInjectionTarget,
         toBearerAuthorizationValue(input.secretValue),
       );
       return;
     case "basic":
+      if (input.authInjectionTarget === undefined) {
+        throw new Error("Basic auth injection target is required.");
+      }
       input.outgoingHeaders.set(
         input.authInjectionTarget,
         toBasicAuthorizationValue({
@@ -175,12 +184,37 @@ function applyAuthInjection(input: {
       );
       return;
     case "header":
+      if (input.authInjectionTarget === undefined) {
+        throw new Error("Header auth injection target is required.");
+      }
       input.outgoingHeaders.set(input.authInjectionTarget, input.secretValue);
       return;
     case "query":
+      if (input.authInjectionTarget === undefined) {
+        throw new Error("Query auth injection target is required.");
+      }
       input.upstreamUrl.searchParams.set(input.authInjectionTarget, input.secretValue);
       return;
+    case "aws_sigv4":
+      throw new Error("AWS SigV4 auth injection is not implemented.");
   }
+}
+
+function requireValueCredential(input: {
+  credential: ResolveIntegrationCredentialOutput;
+  authInjectionType: AuthorizedEgressGrant["authInjectionType"];
+}): string {
+  if (input.authInjectionType === "aws_sigv4") {
+    throw new Error("AWS SigV4 auth injection is not implemented.");
+  }
+
+  if (input.credential.kind !== "value") {
+    throw new Error(
+      `Credential kind '${input.credential.kind}' is not supported for auth injection type '${input.authInjectionType}'.`,
+    );
+  }
+
+  return input.credential.value;
 }
 
 function removeHopByHopHeaders(headers: Headers): void {
@@ -327,14 +361,14 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             : { resolverKey: egressGrant.resolverKey }),
         };
 
-        let resolvedCredentialValue = input.credentialCache.get(cacheKey);
-        span.setAttribute("mistle.credential.cache_hit", resolvedCredentialValue !== undefined);
+        let resolvedCredential = input.credentialCache.get(cacheKey);
+        span.setAttribute("mistle.credential.cache_hit", resolvedCredential !== undefined);
 
-        if (resolvedCredentialValue === undefined) {
+        if (resolvedCredential === undefined) {
           try {
-            const resolvedCredentialValueFromControlPlane = await EgressTracer.startActiveSpan(
+            const resolvedCredentialFromControlPlane = await EgressTracer.startActiveSpan(
               "tokenizer_proxy.egress.resolve_credential",
-              async (credentialSpan) => {
+              async (credentialSpan): Promise<ResolveIntegrationCredentialOutput> => {
                 credentialSpan.setAttributes(
                   createEgressTelemetryBaseAttributes({
                     egressRuleId: egressGrant.egressRuleId,
@@ -359,7 +393,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                     });
 
                   input.credentialCache.set(cacheKey, resolvedCredential);
-                  return resolvedCredential.value;
+                  return resolvedCredential;
                 } catch (error) {
                   credentialSpan.recordException(
                     error instanceof Error ? error : new Error(String(error)),
@@ -374,7 +408,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                 }
               },
             );
-            resolvedCredentialValue = resolvedCredentialValueFromControlPlane;
+            resolvedCredential = resolvedCredentialFromControlPlane;
           } catch (error) {
             logger.error(
               {
@@ -397,6 +431,10 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             );
           }
         }
+        const resolvedCredentialValue = requireValueCredential({
+          credential: resolvedCredential,
+          authInjectionType: egressGrant.authInjectionType,
+        });
 
         const upstreamUrl = createUpstreamUrl({
           requestUrl: ctx.req.url,
@@ -410,7 +448,9 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           upstreamUrl,
           outgoingHeaders,
           authInjectionType: egressGrant.authInjectionType,
-          authInjectionTarget: egressGrant.authInjectionTarget,
+          ...(egressGrant.authInjectionTarget === undefined
+            ? {}
+            : { authInjectionTarget: egressGrant.authInjectionTarget }),
           ...(egressGrant.authInjectionUsername === undefined
             ? {}
             : { authInjectionUsername: egressGrant.authInjectionUsername }),

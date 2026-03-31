@@ -2,7 +2,10 @@ import { request as httpRequest, type IncomingHttpHeaders, type IncomingMessage 
 import { request as httpsRequest } from "node:https";
 import { Socket } from "node:net";
 
-import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import {
+  ControlPlaneInternalClient,
+  type ResolveIntegrationCredentialOutput,
+} from "@mistle/control-plane-internal-client";
 import type { EgressGrantConfig } from "@mistle/sandbox-egress-auth";
 
 import { logger } from "../logger.js";
@@ -126,18 +129,24 @@ function applyAuthInjection(input: {
   upstreamUrl: URL;
   outgoingHeaders: Headers;
   authInjectionType: AuthorizedEgressGrant["authInjectionType"];
-  authInjectionTarget: string;
+  authInjectionTarget?: string;
   authInjectionUsername?: string;
   secretValue: string;
 }): void {
   switch (input.authInjectionType) {
     case "bearer":
+      if (input.authInjectionTarget === undefined) {
+        throw new Error("Bearer auth injection target is required.");
+      }
       input.outgoingHeaders.set(
         input.authInjectionTarget,
         toBearerAuthorizationValue(input.secretValue),
       );
       return;
     case "basic":
+      if (input.authInjectionTarget === undefined) {
+        throw new Error("Basic auth injection target is required.");
+      }
       input.outgoingHeaders.set(
         input.authInjectionTarget,
         toBasicAuthorizationValue({
@@ -149,12 +158,37 @@ function applyAuthInjection(input: {
       );
       return;
     case "header":
+      if (input.authInjectionTarget === undefined) {
+        throw new Error("Header auth injection target is required.");
+      }
       input.outgoingHeaders.set(input.authInjectionTarget, input.secretValue);
       return;
     case "query":
+      if (input.authInjectionTarget === undefined) {
+        throw new Error("Query auth injection target is required.");
+      }
       input.upstreamUrl.searchParams.set(input.authInjectionTarget, input.secretValue);
       return;
+    case "aws_sigv4":
+      throw new Error("AWS SigV4 auth injection is not supported for websocket upgrades.");
   }
+}
+
+function requireValueCredential(input: {
+  credential: ResolveIntegrationCredentialOutput;
+  authInjectionType: AuthorizedEgressGrant["authInjectionType"];
+}): string {
+  if (input.authInjectionType === "aws_sigv4") {
+    throw new Error("AWS SigV4 auth injection is not supported for websocket upgrades.");
+  }
+
+  if (input.credential.kind !== "value") {
+    throw new Error(
+      `Credential kind '${input.credential.kind}' is not supported for auth injection type '${input.authInjectionType}'.`,
+    );
+  }
+
+  return input.credential.value;
 }
 
 function appendHeader(headers: Headers, headerName: string, headerValue: string | string[]): void {
@@ -270,9 +304,12 @@ async function resolveCredentialValue(input: {
       : { resolverKey: input.egressGrant.resolverKey }),
   };
 
-  const cachedCredentialValue = input.credentialCache.get(cacheKey);
-  if (cachedCredentialValue !== undefined) {
-    return cachedCredentialValue;
+  const cachedCredential = input.credentialCache.get(cacheKey);
+  if (cachedCredential !== undefined) {
+    return requireValueCredential({
+      credential: cachedCredential,
+      authInjectionType: input.egressGrant.authInjectionType,
+    });
   }
 
   const resolvedCredential = await input.controlPlaneInternalClient.resolveIntegrationCredential({
@@ -286,7 +323,10 @@ async function resolveCredentialValue(input: {
   });
 
   input.credentialCache.set(cacheKey, resolvedCredential);
-  return resolvedCredential.value;
+  return requireValueCredential({
+    credential: resolvedCredential,
+    authInjectionType: input.egressGrant.authInjectionType,
+  });
 }
 
 export function createEgressProxyUpgradeHandler(input: CreateEgressProxyUpgradeHandlerInput) {
@@ -376,7 +416,9 @@ export function createEgressProxyUpgradeHandler(input: CreateEgressProxyUpgradeH
         upstreamUrl,
         outgoingHeaders,
         authInjectionType: egressGrant.authInjectionType,
-        authInjectionTarget: egressGrant.authInjectionTarget,
+        ...(egressGrant.authInjectionTarget === undefined
+          ? {}
+          : { authInjectionTarget: egressGrant.authInjectionTarget }),
         ...(egressGrant.authInjectionUsername === undefined
           ? {}
           : { authInjectionUsername: egressGrant.authInjectionUsername }),

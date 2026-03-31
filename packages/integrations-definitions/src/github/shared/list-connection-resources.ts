@@ -360,6 +360,9 @@ export async function listGitHubConnectionResources(
   if (input.credential === undefined) {
     throw new Error(`GitHub ${input.kind} resource listing requires a resolved credential.`);
   }
+  if (input.credential.kind !== "value") {
+    throw new Error(`GitHub ${input.kind} resource listing requires a value credential.`);
+  }
 
   const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(input.connection.config);
   const repositories = await listGitHubRepositories({

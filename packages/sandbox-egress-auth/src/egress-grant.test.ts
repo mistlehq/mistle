@@ -116,6 +116,33 @@ describe("egress-grant", () => {
     });
   });
 
+  it("round-trips aws_sigv4 grants with service and region claims", async () => {
+    const claims: EgressGrantClaims = {
+      sub: defaultClaims.sub,
+      jti: "egress_rule_aws",
+      bindingId: "ibd_aws",
+      connectionId: "icn_aws",
+      secretType: "aws_secret_access_key",
+      upstreamBaseUrl: "https://sts.us-east-1.amazonaws.com",
+      authInjectionType: "aws_sigv4",
+      authInjectionService: "sts",
+      authInjectionRegion: "us-east-1",
+    };
+
+    const token = await mintEgressGrant({
+      config: defaultConfig,
+      claims,
+      ttlSeconds: 60,
+    });
+
+    await expect(
+      verifyEgressGrant({
+        config: defaultConfig,
+        token,
+      }),
+    ).resolves.toEqual(claims);
+  });
+
   it("rejects authInjectionUsername outside basic auth grants", async () => {
     await expect(
       mintEgressGrant({
@@ -128,6 +155,27 @@ describe("egress-grant", () => {
       }),
     ).rejects.toMatchObject({
       code: EgressGrantErrorCode.AUTH_INJECTION_USERNAME_INVALID,
+    });
+  });
+
+  it("rejects aws_sigv4 grants that omit authInjectionService", async () => {
+    await expect(
+      mintEgressGrant({
+        config: defaultConfig,
+        claims: {
+          sub: defaultClaims.sub,
+          jti: "egress_rule_aws",
+          bindingId: "ibd_aws",
+          connectionId: "icn_aws",
+          secretType: "aws_secret_access_key",
+          upstreamBaseUrl: "https://sts.us-east-1.amazonaws.com",
+          authInjectionType: "aws_sigv4",
+          authInjectionRegion: "us-east-1",
+        },
+        ttlSeconds: 60,
+      }),
+    ).rejects.toMatchObject({
+      code: EgressGrantErrorCode.AUTH_INJECTION_SERVICE_REQUIRED,
     });
   });
 

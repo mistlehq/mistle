@@ -1,3 +1,5 @@
+import type { ResolveIntegrationCredentialOutput } from "@mistle/control-plane-internal-client";
+
 export type CredentialCacheKeyInput = {
   bindingId: string;
   connectionId: string;
@@ -6,13 +8,10 @@ export type CredentialCacheKeyInput = {
   resolverKey?: string;
 };
 
-export type CachedCredential = {
-  value: string;
-  expiresAt?: string;
-};
+export type CachedCredential = ResolveIntegrationCredentialOutput;
 
 type CredentialCacheEntry = {
-  value: string;
+  credential: CachedCredential;
   expiresAtMs: number;
 };
 
@@ -64,7 +63,7 @@ export class CredentialCache {
     this.#now = input.now;
   }
 
-  get(input: CredentialCacheKeyInput): string | undefined {
+  get(input: CredentialCacheKeyInput): CachedCredential | undefined {
     const key = toCacheKey(input);
     const entry = this.#entries.get(key);
     if (entry === undefined) {
@@ -78,7 +77,7 @@ export class CredentialCache {
       return undefined;
     }
 
-    return entry.value;
+    return entry.credential;
   }
 
   set(input: CredentialCacheKeyInput, credential: CachedCredential): void {
@@ -103,7 +102,7 @@ export class CredentialCache {
     }
 
     this.#entries.set(key, {
-      value: credential.value,
+      credential,
       expiresAtMs,
     });
   }

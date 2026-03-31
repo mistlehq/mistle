@@ -52,10 +52,18 @@ export async function mintEgressGrant(input: {
       secretType: claims.secretType,
       upstreamBaseUrl: claims.upstreamBaseUrl,
       authInjectionType: claims.authInjectionType,
-      authInjectionTarget: claims.authInjectionTarget,
+      ...(claims.authInjectionTarget === undefined
+        ? {}
+        : { authInjectionTarget: claims.authInjectionTarget }),
       ...(claims.authInjectionUsername === undefined
         ? {}
         : { authInjectionUsername: claims.authInjectionUsername }),
+      ...(claims.authInjectionService === undefined
+        ? {}
+        : { authInjectionService: claims.authInjectionService }),
+      ...(claims.authInjectionRegion === undefined
+        ? {}
+        : { authInjectionRegion: claims.authInjectionRegion }),
       ...(claims.purpose === undefined ? {} : { purpose: claims.purpose }),
       ...(claims.resolverKey === undefined ? {} : { resolverKey: claims.resolverKey }),
       ...(claims.allowedMethods === undefined ? {} : { allowedMethods: claims.allowedMethods }),
@@ -124,12 +132,17 @@ export async function verifyEgressGrant(input: {
           ? verificationResult.payload.upstreamBaseUrl
           : "",
       authInjectionType: verificationResult.payload.authInjectionType,
-      authInjectionTarget:
-        typeof verificationResult.payload.authInjectionTarget === "string"
-          ? verificationResult.payload.authInjectionTarget
-          : "",
+      ...(typeof verificationResult.payload.authInjectionTarget === "string"
+        ? { authInjectionTarget: verificationResult.payload.authInjectionTarget }
+        : {}),
       ...(typeof verificationResult.payload.authInjectionUsername === "string"
         ? { authInjectionUsername: verificationResult.payload.authInjectionUsername }
+        : {}),
+      ...(typeof verificationResult.payload.authInjectionService === "string"
+        ? { authInjectionService: verificationResult.payload.authInjectionService }
+        : {}),
+      ...(typeof verificationResult.payload.authInjectionRegion === "string"
+        ? { authInjectionRegion: verificationResult.payload.authInjectionRegion }
         : {}),
       ...(typeof verificationResult.payload.purpose === "string"
         ? { purpose: verificationResult.payload.purpose }

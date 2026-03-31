@@ -433,12 +433,31 @@ export type IntegrationCredentialResolverInput = {
   binding?: Pick<IntegrationBinding, "id" | "kind"> & { config: Record<string, unknown> };
   secretType: string;
   purpose?: string;
+  linkedCredential?: {
+    secretType: string;
+    purpose?: string;
+    value: string;
+    expiresAt?: string;
+  };
 };
 
-export type IntegrationCredentialResolverResult = {
+export type IntegrationValueCredentialResolverResult = {
+  kind: "value";
   value: string;
   expiresAt?: string;
 };
+
+export type IntegrationAwsSessionCredentialResolverResult = {
+  kind: "aws_session";
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken: string;
+  expiresAt: string;
+};
+
+export type IntegrationCredentialResolverResult =
+  | IntegrationValueCredentialResolverResult
+  | IntegrationAwsSessionCredentialResolverResult;
 
 export type IntegrationCredentialResolver = {
   resolve(
@@ -802,15 +821,21 @@ export type EgressCredentialRoute = {
   upstream: {
     baseUrl: string;
   };
-  authInjection: {
-    type: "bearer" | "basic" | "header" | "query";
-    target: string;
-    /**
-     * Optional fixed username used when the upstream expects Basic auth in the
-     * form of username:secret rather than just a secret value.
-     */
-    username?: string;
-  };
+  authInjection:
+    | {
+        type: "bearer" | "basic" | "header" | "query";
+        target: string;
+        /**
+         * Optional fixed username used when the upstream expects Basic auth in the
+         * form of username:secret rather than just a secret value.
+         */
+        username?: string;
+      }
+    | {
+        type: "aws_sigv4";
+        service: string;
+        region: string;
+      };
   credentialResolver: EgressCredentialResolverRef;
 };
 
