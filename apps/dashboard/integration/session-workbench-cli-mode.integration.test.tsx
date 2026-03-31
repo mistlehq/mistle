@@ -1022,7 +1022,7 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
     });
   }, 15_000);
 
-  it("restores chat from the newest available CLI-created thread even when it is not loaded yet", async () => {
+  it("restores non-provider sessions from the newest available CLI-created thread even when it is not loaded yet", async () => {
     await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
       tunnelServer.omitLoadedThreadForNextCliOpen();
 
@@ -1058,7 +1058,7 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
     });
   }, 15_000);
 
-  it("fails restore explicitly instead of hanging forever when post-CLI thread resolution does not respond", async () => {
+  it("fails restore explicitly instead of hanging forever when reconnect never establishes an active thread", async () => {
     await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
       fireEvent.click(await waitForEnabledButton("CLI"));
       const cliPty = await waitForPtySession(tunnelServer, "cli");

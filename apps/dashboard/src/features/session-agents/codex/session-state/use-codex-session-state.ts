@@ -666,6 +666,9 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       return;
     }
 
+    // Non-provider thread authority is intentionally ephemeral across CLI handoff.
+    // Returning from CLI reconnects local sessions using the "newest" thread policy
+    // instead of trying to preserve the pre-CLI active thread id.
     updateActiveThread(null);
   }, [lifecycle.sessionSnapshot?.providerThreadId, updateActiveThread]);
 
