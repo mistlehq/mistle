@@ -534,6 +534,46 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
   };
 }
 
+function createTaggedGithubReleaseArtifactDefinition(): IntegrationDefinition<
+  typeof OpenAiTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
+  typeof ConnectorBindingConfigSchema
+> {
+  return {
+    familyId: "openai",
+    variantId: "openai-default",
+    kind: "connector",
+    displayName: "OpenAI",
+    logoKey: "openai",
+    targetConfigSchema: OpenAiTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
+    bindingConfigSchema: ConnectorBindingConfigSchema,
+    connectionMethods: ApiKeyConnectionMethods,
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [
+        {
+          artifactKey: "jira-cli",
+          name: "Jira CLI",
+          lifecycle: {
+            install: ({ refs }) => [
+              refs.githubReleases.installLatestTaggedAsset({
+                repository: "mistlehq/tools",
+                releaseTagPrefix: "jira/",
+                assetName: "jira-linux-amd64",
+                installPath: "/usr/local/bin/jira",
+                format: "binary",
+                timeoutMs: 120_000,
+              }),
+            ],
+          },
+        },
+      ],
+      runtimeClients: [],
+    }),
+  };
+}
+
 describe("compileRuntimePlan", () => {
   it("compiles bindings into a deterministic runtime plan", () => {
     const registry = new IntegrationRegistry();
@@ -720,6 +760,66 @@ describe("compileRuntimePlan", () => {
     expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("/usr/local/bin/codex");
+  });
+
+  it("supports tagged github release asset install refs in artifact lifecycle hooks", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createTaggedGithubReleaseArtifactDefinition());
+
+    const runtimePlan = compileRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 12,
+      image: {
+        source: "base",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      },
+      definitions: createDefinitionsBundle(registry),
+      bindings: [
+        {
+          targetKey: "openai-default",
+          target: {
+            familyId: "openai",
+            variantId: "openai-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://api.openai.com",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_openai_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_openai_agent",
+            kind: "connector",
+            connectionId: "conn_openai_org_123",
+            config: {
+              defaultModel: "gpt-5.3-codex",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(runtimePlan.artifacts).toHaveLength(1);
+    expect(runtimePlan.artifacts[0]?.lifecycle.install).toHaveLength(1);
+    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[0]).toBe("sh");
+    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[1]).toBe("-euc");
+    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.timeoutMs).toBe(120_000);
+
+    const installScript = runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[2];
+    expect(typeof installScript).toBe("string");
+    expect(installScript).toContain(
+      "https://api.github.com/repos/$repo/releases?per_page=100&page=$page",
+    );
+    expect(installScript).toContain('jq -cer --arg prefix "$release_tag_prefix"');
+    expect(installScript).toContain("mistlehq/tools");
+    expect(installScript).toContain("jira/");
+    expect(installScript).toContain("jira-linux-amd64");
+    expect(installScript).toContain("/usr/local/bin/jira");
   });
 
   it("collects MCP servers from connectors and maps them into agent runtime files", () => {

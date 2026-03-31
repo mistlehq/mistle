@@ -16,6 +16,7 @@ RUN apt-get update \
     less \
     lsof \
     ripgrep \
+    tar \
     tini \
     unzip \
   && rm -rf /var/lib/apt/lists/*

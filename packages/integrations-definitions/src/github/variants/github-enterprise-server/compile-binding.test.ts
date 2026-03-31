@@ -39,6 +39,11 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
           args: ["github-releases.installLatestBinary"],
         };
       },
+      installLatestTaggedAsset() {
+        return {
+          args: ["github-releases.installLatestTaggedAsset"],
+        };
+      },
     },
     compileContext: {
       organizationId: "org_123",

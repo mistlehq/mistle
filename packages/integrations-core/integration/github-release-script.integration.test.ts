@@ -85,11 +85,51 @@ function createGithubBinaryInstallDefinition(): IntegrationDefinition<
   };
 }
 
+function createTaggedGithubBinaryInstallDefinition(): IntegrationDefinition<
+  typeof EmptyTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
+  typeof EmptyBindingConfigSchema
+> {
+  return {
+    familyId: "test",
+    variantId: "github-releases-install-tagged-binary",
+    kind: "connector",
+    displayName: "Test",
+    logoKey: "test",
+    targetConfigSchema: EmptyTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
+    bindingConfigSchema: EmptyBindingConfigSchema,
+    connectionMethods: ApiKeyConnectionMethods,
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [
+        {
+          artifactKey: "jq",
+          name: "jq",
+          lifecycle: {
+            install: ({ refs }) => [
+              refs.githubReleases.installLatestTaggedAsset({
+                repository: "jqlang/jq",
+                releaseTagPrefix: "jq-",
+                assetName: "jq-linux-amd64",
+                installPath: InstallPath,
+                format: "binary",
+                timeoutMs: 120_000,
+              }),
+            ],
+          },
+        },
+      ],
+      runtimeClients: [],
+    }),
+  };
+}
+
 async function prepareContainer(container: StartedTestContainer): Promise<void> {
   const installDependenciesResult = await container.exec([
     "sh",
     "-euc",
-    "apk add --no-cache curl ca-certificates coreutils tar",
+    "apk add --no-cache curl ca-certificates coreutils jq tar",
   ]);
 
   if (installDependenciesResult.exitCode !== 0) {
@@ -146,6 +186,77 @@ describe("renderInstallLatestGithubReleaseBinaryScript integration", () => {
     const script = installCommand?.args[2];
     if (typeof script !== "string") {
       throw new Error("Expected generated github release install script.");
+    }
+    let container: StartedTestContainer | undefined;
+
+    try {
+      container = await new GenericContainer(TestContainerImage)
+        .withCommand(["sh", "-euc", "sleep infinity"])
+        .start();
+
+      await prepareContainer(container);
+
+      const installResult = await container.exec(["sh", "-euc", script]);
+      if (installResult.exitCode !== 0) {
+        throw new Error(`Install script failed. Output: ${installResult.output}`);
+      }
+
+      const versionResult = await container.exec([InstallPath, "--version"]);
+      expect(versionResult.exitCode).toBe(0);
+      expect(versionResult.stdout.trim().startsWith("jq-")).toBe(true);
+    } finally {
+      if (container !== undefined) {
+        await container.stop();
+      }
+    }
+  }, 240_000);
+
+  it("downloads and installs the latest tagged release asset that can be executed in linux", async () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createTaggedGithubBinaryInstallDefinition());
+
+    const runtimePlan = compileRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      image: {
+        source: "base",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      },
+      definitions: createDefinitionsBundle(registry),
+      bindings: [
+        {
+          targetKey: "test_target",
+          target: {
+            familyId: "test",
+            variantId: "github-releases-install-tagged-binary",
+            enabled: true,
+            config: {},
+            secrets: {},
+          },
+          connection: {
+            id: "conn_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_123",
+            kind: "connector",
+            connectionId: "conn_123",
+            config: {},
+          },
+        },
+      ],
+    });
+
+    const installCommand = runtimePlan.artifacts[0]?.lifecycle.install[0];
+    expect(installCommand?.args[0]).toBe("sh");
+    expect(installCommand?.args[1]).toBe("-euc");
+    expect(typeof installCommand?.args[2]).toBe("string");
+
+    const script = installCommand?.args[2];
+    if (typeof script !== "string") {
+      throw new Error("Expected generated tagged github release install script.");
     }
     let container: StartedTestContainer | undefined;
 

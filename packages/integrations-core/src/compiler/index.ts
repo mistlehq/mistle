@@ -22,6 +22,7 @@ import {
   type CompiledRuntimePlan,
   type RuntimeArtifactCommand,
   type RuntimeArtifactGithubReleaseInstallInput,
+  type RuntimeArtifactGithubReleaseTaggedAssetInstallInput,
   type RuntimeArtifactLifecycleBuilder,
   type RuntimeArtifactRefs,
   type RuntimeArtifactSpec,
@@ -96,6 +97,74 @@ function renderInstallLatestGithubReleaseBinaryScript(
   ].join("\n");
 }
 
+function renderInstallLatestTaggedGithubReleaseAssetScript(
+  input: RuntimeArtifactGithubReleaseTaggedAssetInstallInput,
+): string {
+  const assetFormat = input.format ?? "binary";
+  const binaryPathAssignments =
+    "binaryPath" in input ? ["binary_path=" + quote([input.binaryPath])] : [];
+
+  return [
+    "repo=" + quote([input.repository]),
+    "release_tag_prefix=" + quote([input.releaseTagPrefix]),
+    "asset_name=" + quote([input.assetName]),
+    "install_path=" + quote([input.installPath]),
+    "asset_format=" + quote([assetFormat]),
+    ...binaryPathAssignments,
+    "",
+    'temp_dir="$(mktemp -d)"',
+    "trap 'rm -rf \"$temp_dir\"' EXIT",
+    "",
+    "page=1",
+    'release_json=""',
+    "while :; do",
+    '  releases_json="$(curl --noproxy "*" -fsSL "https://api.github.com/repos/$repo/releases?per_page=100&page=$page")"',
+    '  if ! printf "%s" "$releases_json" | jq -e \'type == "array"\' >/dev/null; then',
+    '    echo "GitHub releases API returned invalid JSON for $repo." >&2',
+    "    exit 1",
+    "  fi",
+    "",
+    '  if [ "$(printf "%s" "$releases_json" | jq "length")" -eq 0 ]; then',
+    "    break",
+    "  fi",
+    "",
+    '  release_json="$(printf "%s" "$releases_json" | jq -cer --arg prefix "$release_tag_prefix" \'[.[] | select((.draft | not) and (.prerelease | not) and (.tag_name | startswith($prefix)))] | .[0] // empty\')"',
+    '  if [ -n "$release_json" ]; then',
+    "    break",
+    "  fi",
+    "",
+    "  page=$((page + 1))",
+    "done",
+    "",
+    'if [ -z "$release_json" ]; then',
+    '  echo "Failed to find a matching GitHub release for $repo with tag prefix $release_tag_prefix." >&2',
+    "  exit 1",
+    "fi",
+    "",
+    'download_url="$(printf "%s" "$release_json" | jq -r --arg asset_name "$asset_name" \'.assets[] | select(.name == $asset_name) | .browser_download_url\' | head -n1)"',
+    'if [ -z "$download_url" ]; then',
+    '  release_tag="$(printf "%s" "$release_json" | jq -r ".tag_name")"',
+    '  echo "Release $release_tag for $repo does not contain asset $asset_name." >&2',
+    "  exit 1",
+    "fi",
+    "",
+    'curl --noproxy "*" -fsSL "$download_url" -o "$temp_dir/artifact"',
+    'case "$asset_format" in',
+    "  tar.gz)",
+    '    tar -xzf "$temp_dir/artifact" -C "$temp_dir"',
+    '    install -m 0755 "$temp_dir/$binary_path" "$install_path"',
+    "    ;;",
+    "  binary)",
+    '    install -m 0755 "$temp_dir/artifact" "$install_path"',
+    "    ;;",
+    "  *)",
+    '    echo "Unsupported asset format: $asset_format" >&2',
+    "    exit 1",
+    "    ;;",
+    "esac",
+  ].join("\n");
+}
+
 function createRuntimeArtifactRefs(input: {
   organizationId: string;
   sandboxProfileId: string;
@@ -139,6 +208,11 @@ function createRuntimeArtifactRefs(input: {
       installLatestBinary: (installInput) =>
         exec({
           args: ["sh", "-euc", renderInstallLatestGithubReleaseBinaryScript(installInput)],
+          ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
+        }),
+      installLatestTaggedAsset: (installInput) =>
+        exec({
+          args: ["sh", "-euc", renderInstallLatestTaggedGithubReleaseAssetScript(installInput)],
           ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
         }),
     },
