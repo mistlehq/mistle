@@ -164,6 +164,37 @@ describe("integrations page view model", () => {
     expect(item?.resources[0]?.lastErrorMessage).toBe("Resource sync failed.");
   });
 
+  it("formats AWS assume-role connections as editable detail items", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_aws_123",
+          targetKey: "aws-cli-default",
+          displayName: "AWS sandbox role",
+          status: "active",
+          config: {
+            connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+          },
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.authMethodId).toBe(IntegrationConnectionMethodIds.AWS_ASSUME_ROLE);
+    expect(item?.authMethodLabel).toBe("Access key + AssumeRole");
+    expect(
+      resolveEditableConnectionMethodId({
+        id: "icn_aws_123",
+        targetKey: "aws-cli-default",
+        config: {
+          connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+        },
+      }),
+    ).toBe(IntegrationConnectionMethodIds.AWS_ASSUME_ROLE);
+  });
+
   it("marks syncing resources as refreshing even without a local pending refresh", () => {
     const [item] = buildIntegrationConnectionDetailItems({
       connections: [

@@ -33,6 +33,13 @@ describe("integration targets discovery integration", () => {
           config: {},
         },
         {
+          targetKey: "aws-cli-default-it",
+          familyId: "aws",
+          variantId: "aws-cli-default",
+          enabled: true,
+          config: {},
+        },
+        {
           targetKey: "github_cloud_it",
           familyId: "github",
           variantId: "github-cloud",
@@ -86,7 +93,7 @@ describe("integration targets discovery integration", () => {
     expect(firstPageResponse.status).toBe(200);
     const firstPage = ListIntegrationTargetsResponseSchema.parse(await firstPageResponse.json());
 
-    expect(firstPage.totalResults).toBe(baselinePage.totalResults + 4);
+    expect(firstPage.totalResults).toBe(baselinePage.totalResults + 5);
     expect(firstPage.previousPage).toBeNull();
     expect(firstPage.nextPage).not.toBeNull();
 
@@ -104,7 +111,7 @@ describe("integration targets discovery integration", () => {
     );
     expect(secondPageResponse.status).toBe(200);
     const secondPage = ListIntegrationTargetsResponseSchema.parse(await secondPageResponse.json());
-    expect(secondPage.totalResults).toBe(baselinePage.totalResults + 4);
+    expect(secondPage.totalResults).toBe(baselinePage.totalResults + 5);
     expect(secondPage.previousPage).not.toBeNull();
 
     if (secondPage.previousPage === null) {
@@ -123,7 +130,7 @@ describe("integration targets discovery integration", () => {
     const previousPage = ListIntegrationTargetsResponseSchema.parse(
       await previousPageResponse.json(),
     );
-    expect(previousPage.totalResults).toBe(baselinePage.totalResults + 4);
+    expect(previousPage.totalResults).toBe(baselinePage.totalResults + 5);
 
     const allTargetsResponse = await fixture.request("/v1/integration/targets?limit=100", {
       headers: {
@@ -246,6 +253,38 @@ describe("integration targets discovery integration", () => {
       },
     });
     expect(insertedOpenAiTarget?.config.api_base_url).toBe("https://api.openai.com");
+
+    const insertedAwsTarget = allTargets.items.find(
+      (item) => item.targetKey === "aws-cli-default-it",
+    );
+    expect(insertedAwsTarget).toMatchObject({
+      targetKey: "aws-cli-default-it",
+      familyId: "aws",
+      variantId: "aws-cli-default",
+      enabled: true,
+      config: {},
+      displayName: "AWS",
+      description: "Enable AWS CLI access with assume-role and proxy-side SigV4 signing.",
+      logoKey: "aws",
+      connectionMethods: [
+        {
+          id: "aws-assume-role",
+          label: "Access key + AssumeRole",
+          kind: "form",
+          secretFields: [
+            {
+              name: "secretAccessKey",
+              label: "Secret access key",
+              placeholder: "Enter secret access key",
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    });
 
     const insertedAtlassianTarget = allTargets.items.find(
       (item) => item.targetKey === "atlassian-default-it",

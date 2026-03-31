@@ -145,6 +145,71 @@ describe("IntegrationConnectionDialog", () => {
     expect(screen.getByPlaceholderText("Paste token")).toBeTruthy();
   });
 
+  it("renders AWS assume-role fields from the integration definition", () => {
+    const dialog: IntegrationConnectionDialogState = {
+      methods: [
+        {
+          id: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+          label: "Access key + AssumeRole",
+          kind: "form",
+          secretFields: [
+            {
+              name: "secretAccessKey",
+              label: "Secret access key",
+              placeholder: "Enter secret access key",
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+      mode: "create",
+      targetConfig: {},
+      targetDisplayName: "AWS",
+      targetFamilyId: "aws",
+      targetKey: "aws-cli-default",
+      targetVariantId: "aws-cli-default",
+    };
+
+    const configForm = resolveConnectionMethodFormUiModel({
+      dialog,
+      methodId: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+      currentValue: {},
+    });
+
+    render(
+      <IntegrationConnectionDialog
+        configForm={configForm}
+        configValue={{}}
+        connectionDisplayNamePlaceholder="AWS connection"
+        connectionDisplayNameValue=""
+        connectError={null}
+        dialog={dialog}
+        hasChanges={true}
+        isConnectionDisplayNameChanged={false}
+        isSecretChanged={false}
+        methodId={IntegrationConnectionMethodIds.AWS_ASSUME_ROLE}
+        onClose={() => {}}
+        onConfigChange={() => {}}
+        onConnectionDisplayNameChange={() => {}}
+        onMethodChange={() => {}}
+        onSecretChange={() => {}}
+        onSubmit={() => {}}
+        pending={false}
+        secrets={{}}
+      />,
+    );
+
+    expect(screen.getByText("Access key ID")).toBeTruthy();
+    expect(screen.getByText("Role ARN")).toBeTruthy();
+    expect(screen.getByText("External ID")).toBeTruthy();
+    expect(screen.getByText("Duration seconds")).toBeTruthy();
+    expect(screen.getByPlaceholderText("AKIA...")).toBeTruthy();
+    expect(
+      screen.getByPlaceholderText("arn:aws:iam::123456789012:role/mistle-sandbox"),
+    ).toBeTruthy();
+    expect(screen.getByPlaceholderText("Enter secret access key")).toBeTruthy();
+  });
+
   it("does not render auth method selection in update mode", () => {
     render(
       <IntegrationConnectionDialog

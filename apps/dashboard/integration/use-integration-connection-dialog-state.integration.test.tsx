@@ -151,4 +151,125 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
       });
     }
   });
+
+  it("submits AWS assume-role form connections with config and secret payloads", async () => {
+    const capturedRequests: CapturedRequest[] = [];
+    const server = createServer((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on("data", (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+      request.on("end", () => {
+        const bodyText = Buffer.concat(chunks).toString("utf8");
+        capturedRequests.push({
+          method: request.method ?? "",
+          url: request.url ?? "",
+          body: readJsonBody(bodyText),
+        });
+
+        response.writeHead(201, {
+          "content-type": "application/json",
+        });
+        response.end(JSON.stringify(createConnectionResponse()));
+      });
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      server.listen(0, "127.0.0.1", (error?: Error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+
+    try {
+      const address = server.address();
+      if (address === null || typeof address === "string") {
+        throw new Error("Test server did not return an address.");
+      }
+
+      Object.assign(import.meta.env, {
+        VITE_CONTROL_PLANE_API_ORIGIN: `http://127.0.0.1:${address.port}`,
+      });
+
+      const queryClient = createTestQueryClient();
+      const wrapper = ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      );
+      const { result } = renderHook(
+        () => useIntegrationConnectionDialogState({ queryKey: ["integration-directory"] }),
+        { wrapper },
+      );
+
+      act(() => {
+        result.current.openDialog({
+          mode: "create",
+          methods: [
+            {
+              id: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+              label: "Access key + AssumeRole",
+              kind: "form",
+              secretFields: [
+                {
+                  name: "secretAccessKey",
+                  label: "Secret access key",
+                  inputType: "password",
+                },
+              ],
+            },
+          ],
+          targetConfig: {},
+          targetDisplayName: "AWS",
+          targetFamilyId: "aws",
+          targetKey: "aws-cli-default",
+          targetVariantId: "aws-cli-default",
+        });
+        result.current.onConnectionDisplayNameChange("AWS sandbox role");
+        result.current.onConfigChange({
+          connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+          accessKeyId: "AKIAAWSBOOTSTRAP123",
+          roleArn: "arn:aws:iam::123456789012:role/mistle-sandbox",
+          externalId: "external-aws-123",
+          durationSeconds: 3600,
+        });
+        result.current.onSecretChange("secretAccessKey", "bootstrap-secret-access-key");
+      });
+
+      act(() => {
+        result.current.submitDialog();
+      });
+
+      await waitFor(() => {
+        expect(capturedRequests.length).toBe(1);
+      });
+      expect(capturedRequests[0]?.method).toBe("POST");
+      expect(capturedRequests[0]?.url).toBe("/v1/integration/connections/aws-cli-default/form");
+      expect(capturedRequests[0]?.body).toEqual({
+        displayName: "AWS sandbox role",
+        methodId: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+          accessKeyId: "AKIAAWSBOOTSTRAP123",
+          roleArn: "arn:aws:iam::123456789012:role/mistle-sandbox",
+          externalId: "external-aws-123",
+          durationSeconds: 3600,
+        },
+        secrets: {
+          secretAccessKey: "bootstrap-secret-access-key",
+        },
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error?: Error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      });
+    }
+  });
 });

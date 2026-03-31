@@ -679,6 +679,146 @@ describe("integration connections update form integration", () => {
       message: `Connection config for method '${AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN}' is invalid.`,
     });
   });
+
+  it("updates AWS assume-role connections", async ({ fixture }) => {
+    await upsertAwsTarget({ fixture, targetKey: "aws-cli-default" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-update-aws-assume-role@example.com",
+    });
+
+    const createResponse = await fixture.request(
+      "/v1/integration/connections/aws-cli-default/form",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "AWS sandbox role",
+          methodId: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+          config: {
+            connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+            accessKeyId: "AKIAAWSBOOTSTRAP123",
+            roleArn: "arn:aws:iam::123456789012:role/mistle-sandbox",
+            externalId: "external-aws-123",
+            durationSeconds: 3600,
+          },
+          secrets: {
+            secretAccessKey: "bootstrap-secret-access-key",
+          },
+        }),
+      },
+    );
+
+    expect(createResponse.status).toBe(201);
+    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+
+    const previousLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.connectionId, createdConnection.id),
+          eq(table.purpose, "aws_secret_access_key"),
+        ),
+    });
+    expect(previousLink).toBeDefined();
+
+    if (previousLink === undefined) {
+      throw new Error("Expected an existing form credential link.");
+    }
+
+    const updateResponse = await fixture.request(
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/form`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "AWS sandbox role rotated",
+          config: {
+            connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+            accessKeyId: "AKIAAWSBOOTSTRAP456",
+            roleArn: "arn:aws:iam::123456789012:role/mistle-sandbox-rotated",
+            externalId: "external-aws-456",
+            durationSeconds: 1800,
+          },
+          secrets: {
+            secretAccessKey: "rotated-bootstrap-secret-access-key",
+          },
+        }),
+      },
+    );
+
+    expect(updateResponse.status).toBe(200);
+    const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
+    expect(updatedConnection.displayName).toBe("AWS sandbox role rotated");
+    expect(updatedConnection.config).toEqual({
+      connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+      accessKeyId: "AKIAAWSBOOTSTRAP456",
+      roleArn: "arn:aws:iam::123456789012:role/mistle-sandbox-rotated",
+      externalId: "external-aws-456",
+      durationSeconds: 1800,
+    });
+
+    const updatedLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.connectionId, createdConnection.id),
+          eq(table.purpose, "aws_secret_access_key"),
+        ),
+    });
+    expect(updatedLink).toBeDefined();
+
+    if (updatedLink === undefined) {
+      throw new Error("Expected updated form credential link.");
+    }
+
+    expect(updatedLink.credentialId).not.toBe(previousLink.credentialId);
+
+    const updatedCredential = await fixture.db.query.integrationCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.id, updatedLink.credentialId),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+    });
+    expect(updatedCredential).toBeDefined();
+
+    if (updatedCredential === undefined) {
+      throw new Error("Expected updated integration credential.");
+    }
+
+    expect(updatedCredential.secretKind).toBe(
+      IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+    );
+    expect(updatedCredential.intendedFamilyId).toBe("aws");
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.version, updatedCredential.organizationCredentialKeyVersion),
+        ),
+    });
+    expect(organizationCredentialKey).toBeDefined();
+
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    const decryptedClientSecret = decryptStoredApiKey({
+      wrappedOrganizationKeyCiphertext: organizationCredentialKey.ciphertext,
+      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+      nonce: updatedCredential.nonce,
+      ciphertext: updatedCredential.ciphertext,
+    });
+
+    expect(decryptedClientSecret).toBe("rotated-bootstrap-secret-access-key");
+  });
 });
 
 async function upsertOpenAiTarget(input: {
@@ -727,6 +867,30 @@ async function upsertAtlassianTarget(input: {
       set: {
         familyId: "atlassian",
         variantId: "atlassian-default",
+        enabled: true,
+        config: {},
+      },
+    });
+}
+
+async function upsertAwsTarget(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  targetKey: string;
+}) {
+  await input.fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "aws",
+      variantId: "aws-cli-default",
+      enabled: true,
+      config: {},
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "aws",
+        variantId: "aws-cli-default",
         enabled: true,
         config: {},
       },

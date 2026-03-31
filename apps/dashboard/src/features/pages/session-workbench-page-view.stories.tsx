@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { JSX } from "react";
 
 import { noop } from "../chat/components/chat-story-support.js";
 import {
@@ -35,7 +36,7 @@ const meta = {
     onSecondaryPanelResize: noop,
   },
   decorators: [
-    function StoryDecorator(Story): React.JSX.Element {
+    function StoryDecorator(Story): JSX.Element {
       return (
         <SessionWorkbenchStoryChrome>
           <Story />

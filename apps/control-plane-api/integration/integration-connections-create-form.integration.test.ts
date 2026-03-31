@@ -396,6 +396,99 @@ describe("integration connections create form integration", () => {
     ).toBe("atlassian-client-secret");
   });
 
+  it("creates AWS assume-role connections", async ({ fixture }) => {
+    await upsertAwsTarget({ fixture, targetKey: "aws-cli-default" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-create-aws-assume-role@example.com",
+    });
+
+    const response = await fixture.request("/v1/integration/connections/aws-cli-default/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "AWS sandbox role",
+        methodId: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+          accessKeyId: "AKIAAWSBOOTSTRAP123",
+          roleArn: "arn:aws:iam::123456789012:role/mistle-sandbox",
+          externalId: "external-aws-123",
+          durationSeconds: 3600,
+        },
+        secrets: {
+          secretAccessKey: "bootstrap-secret-access-key",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    expect(responseBody.config).toEqual({
+      connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+      accessKeyId: "AKIAAWSBOOTSTRAP123",
+      roleArn: "arn:aws:iam::123456789012:role/mistle-sandbox",
+      externalId: "external-aws-123",
+      durationSeconds: 3600,
+    });
+    expect(responseBody.targetSnapshotConfig).toEqual({});
+
+    const createdConnectionCredential =
+      await fixture.db.query.integrationConnectionCredentials.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.connectionId, responseBody.id), eq(table.purpose, "aws_secret_access_key")),
+      });
+    expect(createdConnectionCredential).toBeDefined();
+
+    if (createdConnectionCredential === undefined) {
+      throw new Error("Expected integration connection credential link.");
+    }
+
+    const createdCredential = await fixture.db.query.integrationCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.id, createdConnectionCredential.credentialId),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+    });
+    expect(createdCredential).toBeDefined();
+
+    if (createdCredential === undefined) {
+      throw new Error("Expected integration credential.");
+    }
+
+    expect(createdCredential.secretKind).toBe(
+      IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+    );
+    expect(createdCredential.intendedFamilyId).toBe("aws");
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.version, createdCredential.organizationCredentialKeyVersion),
+        ),
+    });
+    expect(organizationCredentialKey).toBeDefined();
+
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    expect(
+      decryptStoredApiKey({
+        wrappedOrganizationKeyCiphertext: organizationCredentialKey.ciphertext,
+        masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+        masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+        nonce: createdCredential.nonce,
+        ciphertext: createdCredential.ciphertext,
+      }),
+    ).toBe("bootstrap-secret-access-key");
+  });
+
   it("returns 400 when Atlassian personal token config is missing site_url", async ({
     fixture,
   }) => {
@@ -655,6 +748,30 @@ async function upsertAtlassianTarget(input: {
       set: {
         familyId: "atlassian",
         variantId: "atlassian-default",
+        enabled: true,
+        config: {},
+      },
+    });
+}
+
+async function upsertAwsTarget(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  targetKey: string;
+}) {
+  await input.fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "aws",
+      variantId: "aws-cli-default",
+      enabled: true,
+      config: {},
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "aws",
+        variantId: "aws-cli-default",
         enabled: true,
         config: {},
       },
