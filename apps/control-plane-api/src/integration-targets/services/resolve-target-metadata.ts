@@ -95,7 +95,7 @@ export type ResolvedIntegrationTargetMetadata = {
   supportedWebhookEvents?: ResolvedWebhookEvent[];
 };
 
-function cloneConnectionMethod(
+function resolveConnectionMethod(
   method: IntegrationConnectionMethodDefinition,
 ): NonNullable<ResolvedIntegrationTargetMetadata["connectionMethods"]>[number] {
   if (method.kind === "form") {
@@ -236,7 +236,7 @@ export function resolveTargetMetadata(input: {
         description: input.descriptionOverride,
         logoKey: definition.logoKey,
         connectionMethods: definition.connectionMethods.map((method) =>
-          cloneConnectionMethod(method),
+          resolveConnectionMethod(method),
         ),
         ...(definition.supportedWebhookEvents === undefined
           ? {}
@@ -255,7 +255,9 @@ export function resolveTargetMetadata(input: {
     displayName: input.displayNameOverride ?? definition.displayName,
     description: input.descriptionOverride ?? definition.description,
     logoKey: definition.logoKey,
-    connectionMethods: definition.connectionMethods.map((method) => cloneConnectionMethod(method)),
+    connectionMethods: definition.connectionMethods.map((method) =>
+      resolveConnectionMethod(method),
+    ),
     ...(definition.supportedWebhookEvents === undefined
       ? {}
       : {
