@@ -4,6 +4,9 @@ import {
 } from "@mistle/control-plane-internal-client";
 import type { EgressGrantConfig } from "@mistle/sandbox-egress-auth";
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
+import { Hash } from "@smithy/hash-node";
+import { HttpRequest } from "@smithy/protocol-http";
+import { SignatureV4 } from "@smithy/signature-v4";
 import type { Context } from "hono";
 
 import { logger } from "../logger.js";
@@ -149,7 +152,7 @@ function toBearerAuthorizationValue(secretValue: string): string {
   return `Bearer ${secretValue}`;
 }
 
-function applyAuthInjection(input: {
+function applyStaticAuthInjection(input: {
   upstreamUrl: URL;
   outgoingHeaders: Headers;
   authInjectionType: AuthorizedEgressGrant["authInjectionType"];
@@ -215,6 +218,123 @@ function requireValueCredential(input: {
   }
 
   return input.credential.value;
+}
+
+function requireAwsSessionCredential(input: {
+  credential: ResolveIntegrationCredentialOutput;
+  authInjectionType: AuthorizedEgressGrant["authInjectionType"];
+}): Extract<ResolveIntegrationCredentialOutput, { kind: "aws_session" }> {
+  if (input.authInjectionType !== "aws_sigv4") {
+    throw new Error(
+      `Credential kind 'aws_session' is not supported for auth injection type '${input.authInjectionType}'.`,
+    );
+  }
+
+  if (input.credential.kind !== "aws_session") {
+    throw new Error(
+      `Credential kind '${input.credential.kind}' is not supported for auth injection type '${input.authInjectionType}'.`,
+    );
+  }
+
+  return input.credential;
+}
+
+function requireAwsSigV4GrantSigningContext(input: { egressGrant: AuthorizedEgressGrant }): {
+  service: string;
+  region: string;
+} {
+  if (input.egressGrant.authInjectionType !== "aws_sigv4") {
+    throw new Error(
+      `AWS SigV4 signing context is not supported for auth injection type '${input.egressGrant.authInjectionType}'.`,
+    );
+  }
+
+  if (input.egressGrant.authInjectionService === undefined) {
+    throw new Error("AWS SigV4 auth injection service is required.");
+  }
+
+  if (input.egressGrant.authInjectionRegion === undefined) {
+    throw new Error("AWS SigV4 auth injection region is required.");
+  }
+
+  return {
+    service: input.egressGrant.authInjectionService,
+    region: input.egressGrant.authInjectionRegion,
+  };
+}
+
+function toAwsQueryParameters(url: URL): Record<string, string | string[]> {
+  const queryParameters: Record<string, string | string[]> = {};
+
+  for (const [key, value] of url.searchParams.entries()) {
+    const existingValue = queryParameters[key];
+    if (existingValue === undefined) {
+      queryParameters[key] = value;
+      continue;
+    }
+
+    if (typeof existingValue === "string") {
+      queryParameters[key] = [existingValue, value];
+      continue;
+    }
+
+    existingValue.push(value);
+  }
+
+  return queryParameters;
+}
+
+function toAwsHeaders(headers: Headers, upstreamUrl: URL): Record<string, string> {
+  const awsHeaders: Record<string, string> = {};
+  for (const [headerName, headerValue] of headers.entries()) {
+    awsHeaders[headerName] = headerValue;
+  }
+
+  awsHeaders.host = upstreamUrl.host;
+  return awsHeaders;
+}
+
+function shouldUriEscapePath(service: string): boolean {
+  return service !== "s3";
+}
+
+async function applyAwsSigV4AuthInjection(input: {
+  upstreamUrl: URL;
+  outgoingHeaders: Headers;
+  method: string;
+  outgoingBody: ArrayBuffer | undefined;
+  service: string;
+  region: string;
+  credential: Extract<ResolveIntegrationCredentialOutput, { kind: "aws_session" }>;
+}): Promise<void> {
+  const signer = new SignatureV4({
+    service: input.service,
+    region: input.region,
+    credentials: {
+      accessKeyId: input.credential.accessKeyId,
+      secretAccessKey: input.credential.secretAccessKey,
+      sessionToken: input.credential.sessionToken,
+    },
+    sha256: Hash.bind(undefined, "sha256"),
+    uriEscapePath: shouldUriEscapePath(input.service),
+  });
+
+  const signedRequest = await signer.sign(
+    new HttpRequest({
+      method: input.method,
+      protocol: input.upstreamUrl.protocol,
+      hostname: input.upstreamUrl.hostname,
+      ...(input.upstreamUrl.port === "" ? {} : { port: Number(input.upstreamUrl.port) }),
+      path: input.upstreamUrl.pathname === "" ? "/" : input.upstreamUrl.pathname,
+      query: toAwsQueryParameters(input.upstreamUrl),
+      headers: toAwsHeaders(input.outgoingHeaders, input.upstreamUrl),
+      ...(input.outgoingBody === undefined ? {} : { body: input.outgoingBody }),
+    }),
+  );
+
+  for (const [headerName, headerValue] of Object.entries(signedRequest.headers)) {
+    input.outgoingHeaders.set(headerName, headerValue);
+  }
 }
 
 function removeHopByHopHeaders(headers: Headers): void {
@@ -431,11 +551,6 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             );
           }
         }
-        const resolvedCredentialValue = requireValueCredential({
-          credential: resolvedCredential,
-          authInjectionType: egressGrant.authInjectionType,
-        });
-
         const upstreamUrl = createUpstreamUrl({
           requestUrl: ctx.req.url,
           targetPath,
@@ -443,21 +558,44 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
         });
         span.setAttributes(createUpstreamTelemetryAttributes({ upstreamUrl }));
         const outgoingHeaders = buildOutgoingRequestHeaders(ctx);
-
-        applyAuthInjection({
-          upstreamUrl,
-          outgoingHeaders,
-          authInjectionType: egressGrant.authInjectionType,
-          ...(egressGrant.authInjectionTarget === undefined
-            ? {}
-            : { authInjectionTarget: egressGrant.authInjectionTarget }),
-          ...(egressGrant.authInjectionUsername === undefined
-            ? {}
-            : { authInjectionUsername: egressGrant.authInjectionUsername }),
-          secretValue: resolvedCredentialValue,
-        });
-
         const outgoingBody = await readOutgoingRequestBody(ctx);
+        if (egressGrant.authInjectionType === "aws_sigv4") {
+          const resolvedAwsSessionCredential = requireAwsSessionCredential({
+            credential: resolvedCredential,
+            authInjectionType: egressGrant.authInjectionType,
+          });
+          const awsSigV4SigningContext = requireAwsSigV4GrantSigningContext({
+            egressGrant,
+          });
+
+          await applyAwsSigV4AuthInjection({
+            upstreamUrl,
+            outgoingHeaders,
+            method: ctx.req.method,
+            outgoingBody,
+            service: awsSigV4SigningContext.service,
+            region: awsSigV4SigningContext.region,
+            credential: resolvedAwsSessionCredential,
+          });
+        } else {
+          const resolvedCredentialValue = requireValueCredential({
+            credential: resolvedCredential,
+            authInjectionType: egressGrant.authInjectionType,
+          });
+
+          applyStaticAuthInjection({
+            upstreamUrl,
+            outgoingHeaders,
+            authInjectionType: egressGrant.authInjectionType,
+            ...(egressGrant.authInjectionTarget === undefined
+              ? {}
+              : { authInjectionTarget: egressGrant.authInjectionTarget }),
+            ...(egressGrant.authInjectionUsername === undefined
+              ? {}
+              : { authInjectionUsername: egressGrant.authInjectionUsername }),
+            secretValue: resolvedCredentialValue,
+          });
+        }
 
         let upstreamResponse: Response;
         try {

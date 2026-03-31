@@ -26,6 +26,13 @@ type StartedControlPlaneCredentialServer = {
   stop: () => Promise<void>;
 };
 
+type CapturedHttpRequest = {
+  method: string;
+  path: string;
+  headers: Record<string, string | string[] | undefined>;
+  body: string;
+};
+
 const IntegrationEgressGrantConfig = {
   tokenSecret: "integration-egress-grant-secret",
   tokenIssuer: "mistle-tokenizer-proxy-integration",
@@ -36,8 +43,10 @@ async function mintIntegrationEgressGrant(input: {
   egressRuleId: string;
   upstreamBaseUrl: string;
   bindingId: string;
-  authInjectionType: "bearer" | "basic" | "header" | "query";
-  authInjectionTarget: string;
+  authInjectionType: "bearer" | "basic" | "header" | "query" | "aws_sigv4";
+  authInjectionTarget?: string;
+  authInjectionService?: string;
+  authInjectionRegion?: string;
   authInjectionUsername?: string;
   connectionId: string;
   secretType: string;
@@ -56,7 +65,15 @@ async function mintIntegrationEgressGrant(input: {
       secretType: input.secretType,
       upstreamBaseUrl: input.upstreamBaseUrl,
       authInjectionType: input.authInjectionType,
-      authInjectionTarget: input.authInjectionTarget,
+      ...(input.authInjectionTarget === undefined
+        ? {}
+        : { authInjectionTarget: input.authInjectionTarget }),
+      ...(input.authInjectionService === undefined
+        ? {}
+        : { authInjectionService: input.authInjectionService }),
+      ...(input.authInjectionRegion === undefined
+        ? {}
+        : { authInjectionRegion: input.authInjectionRegion }),
       ...(input.authInjectionUsername === undefined
         ? {}
         : { authInjectionUsername: input.authInjectionUsername }),
@@ -137,6 +154,7 @@ async function startControlPlaneCredentialServer(input: {
       response,
       input.statusCode ?? 200,
       input.responseBody ?? {
+        kind: "value",
         value: input.credentialValue,
       },
     );
@@ -153,6 +171,63 @@ async function startControlPlaneCredentialServer(input: {
   return {
     baseUrl: `http://${input.host}:${String(port)}`,
     requests,
+    stop: async () => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error !== undefined) {
+            reject(error);
+            return;
+          }
+
+          resolve();
+        });
+      });
+    },
+  };
+}
+
+async function startRequestCaptureServer(input: { host: string }): Promise<{
+  baseUrl: string;
+  capturedRequests: ReadonlyArray<CapturedHttpRequest>;
+  stop: () => Promise<void>;
+}> {
+  const port = await reserveAvailablePort({ host: input.host });
+  const capturedRequests: CapturedHttpRequest[] = [];
+
+  const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of request) {
+      if (typeof chunk === "string") {
+        chunks.push(Buffer.from(chunk));
+        continue;
+      }
+
+      chunks.push(chunk);
+    }
+
+    capturedRequests.push({
+      method: request.method ?? "GET",
+      path: request.url ?? "/",
+      headers: request.headers,
+      body: Buffer.concat(chunks).toString("utf8"),
+    });
+
+    writeJson(response, 200, {
+      ok: true,
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, input.host, () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  return {
+    baseUrl: `http://${input.host}:${String(port)}`,
+    capturedRequests,
     stop: async () => {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {
@@ -633,6 +708,108 @@ describe("tokenizer proxy integration", () => {
       await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
     }
   }, 15_000);
+
+  it("signs AWS SigV4 requests with the resolved session credential and forwarded body", async () => {
+    const upstreamCaptureService = await startRequestCaptureServer({
+      host: "127.0.0.1",
+    });
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "unused",
+      responseBody: {
+        kind: "aws_session",
+        accessKeyId: "ASIATESTACCESSKEY123",
+        secretAccessKey: "test-secret-access-key",
+        sessionToken: "test-session-token",
+        expiresAt: "2030-01-01T00:00:00.000Z",
+      },
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_aws",
+      upstreamBaseUrl: upstreamCaptureService.baseUrl,
+      bindingId: "ibd_aws",
+      authInjectionType: "aws_sigv4",
+      authInjectionService: "sts",
+      authInjectionRegion: "us-east-1",
+      connectionId: "icn_aws",
+      secretType: "aws_secret_access_key",
+      purpose: "aws_secret_access_key",
+      resolverKey: "assume_role_session",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/"],
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/?Action=GetCallerIdentity&Version=2011-06-15`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            hello: "world",
+          }),
+        },
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({
+        ok: true,
+      });
+      expect(upstreamCaptureService.capturedRequests).toHaveLength(1);
+
+      const capturedRequest = upstreamCaptureService.capturedRequests[0];
+      if (capturedRequest === undefined) {
+        throw new Error("Expected one captured upstream request.");
+      }
+
+      expect(capturedRequest.method).toBe("POST");
+      expect(capturedRequest.path).toBe("/?Action=GetCallerIdentity&Version=2011-06-15");
+      expect(capturedRequest.body).toBe(JSON.stringify({ hello: "world" }));
+      expect(readHeaderValue(capturedRequest.headers, "x-amz-security-token")).toBe(
+        "test-session-token",
+      );
+      expect(readHeaderValue(capturedRequest.headers, "x-amz-content-sha256")).toMatch(
+        /^[a-f0-9]{64}$/u,
+      );
+      expect(readHeaderValue(capturedRequest.headers, "x-amz-date")).toMatch(/^\d{8}T\d{6}Z$/u);
+      expect(readHeaderValue(capturedRequest.headers, "authorization")).toMatch(
+        /^AWS4-HMAC-SHA256 Credential=ASIATESTACCESSKEY123\/\d{8}\/us-east-1\/sts\/aws4_request, SignedHeaders=.*x-amz-security-token.*, Signature=[a-f0-9]{64}$/u,
+      );
+      expect(controlPlaneServer.requests).toEqual([
+        {
+          bindingId: "ibd_aws",
+          connectionId: "icn_aws",
+          purpose: "aws_secret_access_key",
+          resolverKey: "assume_role_session",
+          secretType: "aws_secret_access_key",
+        },
+      ]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamCaptureService.stop()]);
+    }
+  });
 
   it("supports the grant-authorized egress endpoint", async () => {
     const upstreamEchoService = await startHttpEcho();
