@@ -457,7 +457,6 @@ export function useSessionWorkbenchLifecycleState(input: {
   mainPanelTransitionState: MainPanelTransitionState;
   lifecycle: Pick<
     ReturnType<typeof useCodexSessionState>["lifecycle"],
-    | "agentConnectionState"
     | "clearLifecycleErrorMessage"
     | "connectSession"
     | "detachSessionTransport"
@@ -467,7 +466,6 @@ export function useSessionWorkbenchLifecycleState(input: {
     | "recoverSession"
     | "recoverableDisconnect"
     | "sessionSnapshot"
-    | "step"
     | "transportState"
   >;
   ptyState: ReturnType<typeof useSandboxPtyState>;
@@ -494,7 +492,6 @@ export function useSessionWorkbenchLifecycleState(input: {
   const lastRecoverableDisconnectIdRef = useRef<number | null>(null);
 
   const {
-    agentConnectionState,
     clearLifecycleErrorMessage,
     connectSession,
     sessionSnapshot,
@@ -503,7 +500,6 @@ export function useSessionWorkbenchLifecycleState(input: {
     lifecycleErrorMessage,
     recoverSession,
     recoverableDisconnect,
-    step,
     transportState,
   } = input.lifecycle;
   const { disconnectPty } = input.ptyState.actions;
