@@ -42,12 +42,15 @@ export const AtlassianDefinition: AtlassianIntegrationDefinition = {
       id: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
       label: "Personal API token",
       kind: "form",
-      secretField: {
-        label: "Personal API token",
-        placeholder: "Enter personal API token",
-        inputType: "password",
-      },
-      secretType: AtlassianCredentialSecretTypes.API_KEY,
+      secretFields: [
+        {
+          name: "apiKey",
+          label: "Personal API token",
+          placeholder: "Enter personal API token",
+          inputType: "password",
+          secretType: AtlassianCredentialSecretTypes.API_KEY,
+        },
+      ],
       configSchema: AtlassianPersonalApiTokenConnectionConfigSchema,
       configForm: AtlassianPersonalApiTokenConnectionConfigForm,
     },
@@ -55,12 +58,15 @@ export const AtlassianDefinition: AtlassianIntegrationDefinition = {
       id: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
       label: "Service account API token",
       kind: "form",
-      secretField: {
-        label: "Service account API token",
-        placeholder: "Enter service account API token",
-        inputType: "password",
-      },
-      secretType: AtlassianCredentialSecretTypes.API_KEY,
+      secretFields: [
+        {
+          name: "apiKey",
+          label: "Service account API token",
+          placeholder: "Enter service account API token",
+          inputType: "password",
+          secretType: AtlassianCredentialSecretTypes.API_KEY,
+        },
+      ],
       configSchema: AtlassianServiceAccountApiTokenConnectionConfigSchema,
       configForm: AtlassianServiceAccountApiTokenConnectionConfigForm,
     },

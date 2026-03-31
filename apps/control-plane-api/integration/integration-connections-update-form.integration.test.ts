@@ -393,7 +393,9 @@ describe("integration connections update form integration", () => {
             connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
             cloud_id: "cloud-id-123",
           },
-          secret: "original-atlassian-service-token",
+          secrets: {
+            apiKey: "original-atlassian-service-token",
+          },
         }),
       },
     );
@@ -415,7 +417,9 @@ describe("integration connections update form integration", () => {
             connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
             cloud_id: "cloud-id-456",
           },
-          secret: "rotated-atlassian-service-token",
+          secrets: {
+            apiKey: "rotated-atlassian-service-token",
+          },
         }),
       },
     );

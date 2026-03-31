@@ -69,11 +69,14 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
         id: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
         label: "Personal API token",
         kind: "form",
-        secretField: {
-          label: "Personal API token",
-          placeholder: "Enter personal API token",
-          inputType: "password",
-        },
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "Personal API token",
+            placeholder: "Enter personal API token",
+            inputType: "password",
+          },
+        ],
         configSchema: AtlassianPersonalApiTokenConnectionConfigSchema,
         configForm: AtlassianPersonalApiTokenConnectionConfigForm,
       },
@@ -81,11 +84,14 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
         id: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
         label: "Service account API token",
         kind: "form",
-        secretField: {
-          label: "Service account API token",
-          placeholder: "Enter service account API token",
-          inputType: "password",
-        },
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "Service account API token",
+            placeholder: "Enter service account API token",
+            inputType: "password",
+          },
+        ],
         configSchema: AtlassianServiceAccountApiTokenConnectionConfigSchema,
         configForm: AtlassianServiceAccountApiTokenConnectionConfigForm,
       },

@@ -209,7 +209,9 @@ describe("integration connections create form integration", () => {
           site_url: "https://mistle.atlassian.net",
           email: "user@example.com",
         },
-        secret: "atlassian-personal-token",
+        secrets: {
+          apiKey: "atlassian-personal-token",
+        },
       }),
     });
 
@@ -289,7 +291,9 @@ describe("integration connections create form integration", () => {
           connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
           cloud_id: "cloud-id-123",
         },
-        secret: "atlassian-service-account-token",
+        secrets: {
+          apiKey: "atlassian-service-account-token",
+        },
       }),
     });
 

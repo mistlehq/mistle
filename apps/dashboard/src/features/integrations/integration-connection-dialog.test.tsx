@@ -313,11 +313,14 @@ describe("IntegrationConnectionDialog", () => {
           id: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
           label: "Personal API token",
           kind: "form",
-          secretField: {
-            label: "Personal API token",
-            placeholder: "Enter personal API token",
-            inputType: "password",
-          },
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "Personal API token",
+              placeholder: "Enter personal API token",
+              inputType: "password",
+            },
+          ],
         },
       ],
       mode: "create",
@@ -353,7 +356,7 @@ describe("IntegrationConnectionDialog", () => {
         onSecretChange={() => {}}
         onSubmit={() => {}}
         pending={false}
-        secretValue=""
+        secrets={{}}
       />,
     );
 
@@ -369,11 +372,14 @@ describe("IntegrationConnectionDialog", () => {
           id: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
           label: "Service account API token",
           kind: "form",
-          secretField: {
-            label: "Service account API token",
-            placeholder: "Enter service account API token",
-            inputType: "password",
-          },
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "Service account API token",
+              placeholder: "Enter service account API token",
+              inputType: "password",
+            },
+          ],
         },
       ],
       mode: "create",
@@ -409,7 +415,7 @@ describe("IntegrationConnectionDialog", () => {
         onSecretChange={() => {}}
         onSubmit={() => {}}
         pending={false}
-        secretValue=""
+        secrets={{}}
       />,
     );
 

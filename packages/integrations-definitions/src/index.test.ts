@@ -36,13 +36,15 @@ describe("integrations-definitions index", () => {
           id: "atlassian-personal-api-token",
           label: "Personal API token",
           kind: "form",
-          secretField: { label: "Personal API token", inputType: "password" },
+          secretFields: [{ name: "apiKey", label: "Personal API token", inputType: "password" }],
         },
         {
           id: "atlassian-service-account-api-token",
           label: "Service account API token",
           kind: "form",
-          secretField: { label: "Service account API token", inputType: "password" },
+          secretFields: [
+            { name: "apiKey", label: "Service account API token", inputType: "password" },
+          ],
         },
       ],
     });
