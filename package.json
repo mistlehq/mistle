@@ -79,5 +79,10 @@
     "node": "^25.0.0",
     "pnpm": "10.30.2"
   },
-  "packageManager": "pnpm@10.30.2"
+  "packageManager": "pnpm@10.30.2",
+  "pnpm": {
+    "overrides": {
+      "axios": "1.13.6"
+    }
+  }
 }
