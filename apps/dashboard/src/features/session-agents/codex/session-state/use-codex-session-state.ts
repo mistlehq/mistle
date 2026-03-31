@@ -2,6 +2,7 @@ import {
   archiveCodexThread,
   compactCodexThread,
   forkCodexThread,
+  readCodexThread,
   rollbackCodexThread,
   resumeCodexThread,
   startCodexThread,
@@ -37,6 +38,10 @@ import {
   useCodexSessionConnection,
   type CodexSessionConnectionLifecycleState,
 } from "./session-connection/index.js";
+import {
+  resolveCodexCliLaunchTarget,
+  type CodexCliLaunchTarget,
+} from "./session-thread-authority.js";
 import { useCodexChatController, type CodexChatState } from "./use-codex-chat-controller.js";
 import { useCodexThreadCollections } from "./use-codex-thread-collections.js";
 
@@ -110,6 +115,10 @@ type CodexSessionMessageState = {
 
 export type UseCodexSessionStateResult = {
   lifecycle: CodexSessionConnectionLifecycleState;
+  threadAuthority: {
+    persistedThreadId: string | null;
+    resolveCliLaunchTarget: () => Promise<CodexCliLaunchTarget>;
+  };
   threads: CodexSessionThreadState;
   chat: CodexSessionChatState;
   bootstrap: SessionBootstrapResult;
@@ -621,6 +630,36 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     });
   }, []);
 
+  const resolveCliLaunchTarget = useCallback(async (): Promise<CodexCliLaunchTarget> => {
+    const persistedThreadId = threadIdRef.current;
+    if (persistedThreadId === null) {
+      return {
+        type: "start_new",
+        shouldClearPersistedThreadId: false,
+      };
+    }
+
+    const rpcClient = rpcClientRef.current;
+    if (rpcClient === null) {
+      throw new Error("Connect to a sandbox session before starting Codex CLI.");
+    }
+
+    const thread = await readCodexThread({
+      rpcClient,
+      threadId: persistedThreadId,
+    });
+    const launchTarget = resolveCodexCliLaunchTarget({
+      persistedThreadId,
+      turnCount: thread.turns.length,
+    });
+
+    if (launchTarget.type === "start_new" && launchTarget.shouldClearPersistedThreadId) {
+      updateActiveThread(null);
+    }
+
+    return launchTarget;
+  }, [updateActiveThread]);
+
   const threads = useMemo<CodexSessionThreadState>(() => {
     return {
       availableThreads,
@@ -676,6 +715,13 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     unarchiveThread,
     unsubscribeThread,
   ]);
+
+  const threadAuthority = useMemo(() => {
+    return {
+      persistedThreadId: lifecycle.sessionSnapshot?.threadId ?? null,
+      resolveCliLaunchTarget,
+    };
+  }, [lifecycle.sessionSnapshot?.threadId, resolveCliLaunchTarget]);
 
   const chat = useMemo<CodexSessionChatState>(() => {
     return {
@@ -766,6 +812,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
 
   return {
     lifecycle,
+    threadAuthority,
     threads,
     chat,
     bootstrap,

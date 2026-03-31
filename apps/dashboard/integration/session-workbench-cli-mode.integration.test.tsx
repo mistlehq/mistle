@@ -38,9 +38,12 @@ type PtyOpenWaiter = {
 
 type SessionWorkbenchTunnelServer = {
   close: () => Promise<void>;
+  deferNextCliCloseExit: () => { release: () => void };
+  deferNextCliOpen: () => { release: () => void };
   emitPtyExit: (streamId: number, exitCode?: number) => void;
   failNextCliOpen: (message: string) => void;
   url: string;
+  waitForThreadResume: (threadId: string) => Promise<string>;
   waitForPtyClose: (streamId: number) => Promise<number>;
   waitForPtyOpen: (predicate: (record: PtyOpenRecord) => boolean) => Promise<PtyOpenRecord>;
 };
@@ -51,9 +54,16 @@ type SessionWorkbenchCliHarness = {
   controls: {
     failNextCliOpen: (message: string) => void;
     setConnectionTokenFailure: (value: boolean) => void;
+    waitForConnectionTokenRequestCount: (count: number) => Promise<void>;
   };
   renderedPage: DashboardPageHandle;
   tunnelServer: SessionWorkbenchTunnelServer;
+};
+
+type ThreadResumeWaiter = {
+  reject: (reason?: unknown) => void;
+  resolve: (value: string) => void;
+  threadId: string;
 };
 
 function toText(data: RawData): string {
@@ -136,6 +146,28 @@ function installNodeWebSocket(): () => void {
   };
 }
 
+function createDeferredSignal(): {
+  promise: Promise<void>;
+  release: () => void;
+} {
+  let isReleased = false;
+  let resolvePromise: (() => void) | null = null;
+
+  return {
+    promise: new Promise<void>((resolve) => {
+      resolvePromise = resolve;
+    }),
+    release: () => {
+      if (isReleased) {
+        return;
+      }
+
+      isReleased = true;
+      resolvePromise?.();
+    },
+  };
+}
+
 async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunnelServer> {
   const wsServer = new WebSocketServer({
     host: "127.0.0.1",
@@ -151,10 +183,30 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
   const ptyOpenWaiters: PtyOpenWaiter[] = [];
   const ptyCloseStreamIds = new Set<number>();
   const ptyCloseWaiters = new Map<number, Array<(streamId: number) => void>>();
+  const ptyChannels = new Map<number, PTYStreamChannel>();
   const ptySockets = new Map<number, WebSocket>();
+  const threadResumeRequests: string[] = [];
+  const threadResumeWaiters: ThreadResumeWaiter[] = [];
+  const threadsById = new Map<
+    string,
+    {
+      summary: {
+        createdAt: number;
+        id: string;
+        name: string;
+        updatedAt: number;
+      };
+      turnCount: number;
+    }
+  >();
+  const loadedThreadIds = new Set<string>();
   const sockets = new Set<WebSocket>();
   let knownThreadId: string | null = null;
+  let nextCreatedThreadNumber = 0;
   let nextCliOpenFailureMessage: string | null = null;
+  let nextCliOpenGate: ReturnType<typeof createDeferredSignal> | null = null;
+  let nextCliCloseExitGate: ReturnType<typeof createDeferredSignal> | null = null;
+  const deferredCliCloseStreamIds = new Set<number>();
 
   function dispatchPtyOpen(record: PtyOpenRecord): void {
     ptyOpenRecords.push(record);
@@ -183,6 +235,46 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
     }
   }
 
+  function dispatchThreadResume(threadId: string): void {
+    threadResumeRequests.push(threadId);
+    const waiterIndex = threadResumeWaiters.findIndex((waiter) => waiter.threadId === threadId);
+    if (waiterIndex === -1) {
+      return;
+    }
+
+    const waiter = threadResumeWaiters.splice(waiterIndex, 1)[0];
+    if (waiter === undefined) {
+      throw new Error("Expected thread resume waiter to be present.");
+    }
+    waiter.resolve(threadId);
+  }
+
+  function ensureThreadRecord(input: { createdAt?: number; id: string; turnCount?: number }): void {
+    const existingThread = threadsById.get(input.id);
+    if (existingThread !== undefined) {
+      threadsById.set(input.id, {
+        summary: {
+          ...existingThread.summary,
+          updatedAt: input.createdAt ?? existingThread.summary.updatedAt,
+        },
+        turnCount: input.turnCount ?? existingThread.turnCount,
+      });
+      return;
+    }
+
+    const createdAt = input.createdAt ?? nextCreatedThreadNumber + 1;
+    nextCreatedThreadNumber = Math.max(nextCreatedThreadNumber, createdAt);
+    threadsById.set(input.id, {
+      summary: {
+        createdAt,
+        id: input.id,
+        name: "CLI Test Thread",
+        updatedAt: createdAt,
+      },
+      turnCount: input.turnCount ?? 0,
+    });
+  }
+
   function emitPtyExit(streamId: number, exitCode = 0): void {
     const socket = ptySockets.get(streamId);
     if (socket === undefined) {
@@ -205,7 +297,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
     sockets.add(socket);
     let streamKind: "agent" | "pty" | null = null;
 
-    socket.on("message", (data, isBinary) => {
+    socket.on("message", async (data, isBinary) => {
       if (!isBinary) {
         const controlMessage = parseStreamControlMessage(toText(data));
         if (controlMessage?.type === "stream.open") {
@@ -233,10 +325,29 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
 
             streamKind = "pty";
             ptySockets.set(controlMessage.streamId, socket);
+            ptyChannels.set(controlMessage.streamId, controlMessage.channel);
             dispatchPtyOpen({
               streamId: controlMessage.streamId,
               channel: controlMessage.channel,
             });
+
+            if (
+              controlMessage.channel.ptySessionId === "cli" &&
+              controlMessage.channel.args?.includes("resume") !== true
+            ) {
+              knownThreadId = "thread_cli_from_cli";
+              ensureThreadRecord({
+                id: knownThreadId,
+                turnCount: 1,
+              });
+              loadedThreadIds.add(knownThreadId);
+            }
+
+            if (controlMessage.channel.ptySessionId === "cli" && nextCliOpenGate !== null) {
+              const openGate = nextCliOpenGate;
+              nextCliOpenGate = null;
+              await openGate.promise;
+            }
           }
 
           socket.send(
@@ -250,6 +361,12 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
 
         if (controlMessage?.type === "stream.close") {
           dispatchPtyClose(controlMessage.streamId);
+          const channel = ptyChannels.get(controlMessage.streamId);
+          if (channel?.ptySessionId === "cli" && nextCliCloseExitGate !== null) {
+            deferredCliCloseStreamIds.add(controlMessage.streamId);
+            return;
+          }
+
           emitPtyExit(controlMessage.streamId);
           return;
         }
@@ -286,17 +403,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
             JSON.stringify({
               id: requestId,
               result: {
-                data:
-                  knownThreadId === null
-                    ? []
-                    : [
-                        {
-                          id: knownThreadId,
-                          name: "CLI Test Thread",
-                          createdAt: 1,
-                          updatedAt: 1,
-                        },
-                      ],
+                data: [...threadsById.values()].map((thread) => thread.summary),
                 nextCursor: null,
               },
             }),
@@ -309,7 +416,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
             JSON.stringify({
               id: requestId,
               result: {
-                data: [],
+                data: [...loadedThreadIds],
               },
             }),
           );
@@ -318,6 +425,10 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
 
         case "thread/start": {
           knownThreadId ??= "thread_cli_test";
+          ensureThreadRecord({
+            id: knownThreadId,
+            turnCount: 0,
+          });
           socket.send(
             JSON.stringify({
               id: requestId,
@@ -347,6 +458,11 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
           }
 
           knownThreadId = requestedThreadId;
+          ensureThreadRecord({
+            id: requestedThreadId,
+          });
+          loadedThreadIds.add(requestedThreadId);
+          dispatchThreadResume(requestedThreadId);
           socket.send(
             JSON.stringify({
               id: requestId,
@@ -357,13 +473,36 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
         }
 
         case "thread/read": {
+          const params =
+            typeof request.params === "object" &&
+            request.params !== null &&
+            !Array.isArray(request.params)
+              ? request.params
+              : null;
+          const requestedThreadId =
+            params !== null &&
+            "threadId" in params &&
+            typeof params.threadId === "string" &&
+            params.threadId.length > 0
+              ? params.threadId
+              : (knownThreadId ?? "thread_cli_test");
+          const threadRecord = threadsById.get(requestedThreadId);
           socket.send(
             JSON.stringify({
               id: requestId,
               result: {
                 thread: {
-                  id: knownThreadId ?? "thread_cli_test",
-                  turns: [],
+                  id: requestedThreadId,
+                  turns:
+                    threadRecord === undefined || threadRecord.turnCount === 0
+                      ? []
+                      : [
+                          {
+                            id: `${requestedThreadId}_turn_1`,
+                            items: [],
+                            status: "completed",
+                          },
+                        ],
                 },
               },
             }),
@@ -422,6 +561,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
       for (const [streamId, candidateSocket] of ptySockets.entries()) {
         if (candidateSocket === socket) {
           ptySockets.delete(streamId);
+          ptyChannels.delete(streamId);
         }
       }
     });
@@ -433,11 +573,47 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
   }
 
   return {
+    deferNextCliCloseExit: () => {
+      const gate = createDeferredSignal();
+      nextCliCloseExitGate = gate;
+
+      return {
+        release: () => {
+          gate.release();
+          nextCliCloseExitGate = null;
+          for (const streamId of deferredCliCloseStreamIds) {
+            emitPtyExit(streamId);
+            deferredCliCloseStreamIds.delete(streamId);
+          }
+        },
+      };
+    },
+    deferNextCliOpen: () => {
+      const gate = createDeferredSignal();
+      nextCliOpenGate = gate;
+
+      return {
+        release: gate.release,
+      };
+    },
     emitPtyExit,
     failNextCliOpen: (message) => {
       nextCliOpenFailureMessage = message;
     },
     url: `ws://127.0.0.1:${String(address.port)}`,
+    waitForThreadResume: async (threadId) => {
+      if (threadResumeRequests.includes(threadId)) {
+        return threadId;
+      }
+
+      return await new Promise<string>((resolve, reject) => {
+        threadResumeWaiters.push({
+          threadId,
+          resolve,
+          reject,
+        });
+      });
+    },
     waitForPtyClose: async (streamId) => {
       if (ptyCloseStreamIds.has(streamId)) {
         return streamId;
@@ -466,6 +642,11 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
     close: async () => {
       for (const waiter of ptyOpenWaiters.splice(0, ptyOpenWaiters.length)) {
         waiter.reject(new Error("PTY open waiter was canceled while closing the test server."));
+      }
+      for (const waiter of threadResumeWaiters.splice(0, threadResumeWaiters.length)) {
+        waiter.reject(
+          new Error("Thread resume waiter was canceled while closing the test server."),
+        );
       }
 
       for (const socket of sockets) {
@@ -500,6 +681,7 @@ function createWorkbenchRequestHandler(
   tunnelServer: SessionWorkbenchTunnelServer,
   controls: {
     getConnectionTokenFailure: () => boolean;
+    onConnectionTokenMinted: () => void;
   },
 ): (request: IncomingMessage, response: ServerResponse<IncomingMessage>) => void {
   return (request, response) => {
@@ -533,6 +715,8 @@ function createWorkbenchRequestHandler(
       requestUrl.pathname ===
         `/v1/sandbox/instances/${connectionTokenSandboxInstanceId}/connection-tokens`
     ) {
+      controls.onConnectionTokenMinted();
+
       if (controls.getConnectionTokenFailure()) {
         response.writeHead(500, { "content-type": "application/json" });
         response.end(JSON.stringify({ message: "Could not mint connection token." }));
@@ -572,9 +756,22 @@ function HeaderActionsHost(input: { children: React.ReactNode }): React.JSX.Elem
 async function renderSessionWorkbenchCliHarness(): Promise<SessionWorkbenchCliHarness> {
   const tunnelServer = await startSessionWorkbenchTunnelServer();
   let shouldFailConnectionTokens = false;
+  let connectionTokenRequestCount = 0;
+  const connectionTokenCountWaiters = new Map<number, Array<() => void>>();
   const renderedPage = await renderDashboardPageIntegration({
     handler: createWorkbenchRequestHandler(tunnelServer, {
       getConnectionTokenFailure: () => shouldFailConnectionTokens,
+      onConnectionTokenMinted: () => {
+        connectionTokenRequestCount += 1;
+        for (const [count, waiters] of connectionTokenCountWaiters.entries()) {
+          if (connectionTokenRequestCount >= count) {
+            connectionTokenCountWaiters.delete(count);
+            for (const resolve of waiters) {
+              resolve();
+            }
+          }
+        }
+      },
     }),
     ui: (
       <HeaderActionsHost>
@@ -594,6 +791,17 @@ async function renderSessionWorkbenchCliHarness(): Promise<SessionWorkbenchCliHa
       },
       setConnectionTokenFailure: (value) => {
         shouldFailConnectionTokens = value;
+      },
+      waitForConnectionTokenRequestCount: async (count) => {
+        if (connectionTokenRequestCount >= count) {
+          return;
+        }
+
+        await new Promise<void>((resolve) => {
+          const currentWaiters = connectionTokenCountWaiters.get(count) ?? [];
+          currentWaiters.push(resolve);
+          connectionTokenCountWaiters.set(count, currentWaiters);
+        });
       },
     },
     renderedPage,
@@ -638,11 +846,18 @@ function expectCliPty(record: PtyOpenRecord): void {
   expect(record.channel.session).toBe("create");
   expect(record.channel.ptySessionId).toBe("cli");
   expect(record.channel.command).toBe("codex");
+  expect(record.channel.args).toEqual(["--remote", OpenAiCodexAppServerListenUrl]);
+}
+
+function expectCliResumePty(record: PtyOpenRecord, threadId: string): void {
+  expect(record.channel.session).toBe("create");
+  expect(record.channel.ptySessionId).toBe("cli");
+  expect(record.channel.command).toBe("codex");
   expect(record.channel.args).toEqual([
     "resume",
     "--remote",
     OpenAiCodexAppServerListenUrl,
-    "thread_cli_test",
+    threadId,
   ]);
 }
 
@@ -672,6 +887,7 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "CLI" }));
       await tunnelServer.waitForPtyClose(cliPty.streamId);
+      await tunnelServer.waitForThreadResume("thread_cli_from_cli");
 
       await waitFor(
         () => {
@@ -707,6 +923,7 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       expect(await screen.findByText("Codex CLI connected")).toBeDefined();
 
       tunnelServer.emitPtyExit(cliPty.streamId);
+      await tunnelServer.waitForThreadResume("thread_cli_from_cli");
 
       await waitFor(
         () => {
@@ -751,6 +968,62 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
 
       controls.setConnectionTokenFailure(false);
       fireEvent.click(screen.getByRole("button", { name: "Retry restoring chat" }));
+
+      await waitFor(
+        () => {
+          expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
+        },
+        { timeout: 5_000 },
+      );
+    });
+  }, 15_000);
+
+  it("lets the active CLI toggle cancel while Codex CLI startup is still in progress", async () => {
+    await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+      const deferredCliOpen = tunnelServer.deferNextCliOpen();
+
+      fireEvent.click(await waitForEnabledButton("CLI"));
+
+      expect(await screen.findByText("Starting Codex CLI...")).toBeDefined();
+      fireEvent.click(screen.getByRole("button", { name: "CLI" }));
+
+      await waitFor(
+        () => {
+          expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
+        },
+        { timeout: 5_000 },
+      );
+
+      deferredCliOpen.release();
+
+      await waitFor(() => {
+        expect(screen.queryByText("Codex CLI connected")).toBeNull();
+      });
+    });
+  });
+
+  it("restores chat without waiting for the CLI PTY close handshake to finish", async () => {
+    await withSessionWorkbenchCliHarness(async ({ controls, tunnelServer }) => {
+      fireEvent.click(await waitForEnabledButton("CLI"));
+      const cliPty = await waitForPtySession(tunnelServer, "cli");
+      expectCliPty(cliPty);
+      expect(await screen.findByText("Codex CLI connected")).toBeDefined();
+
+      const deferredCliCloseExit = tunnelServer.deferNextCliCloseExit();
+      fireEvent.click(screen.getByRole("button", { name: "CLI" }));
+
+      await Promise.race([
+        controls.waitForConnectionTokenRequestCount(2),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(
+              new Error("Chat restore did not start before the deferred CLI close completed."),
+            );
+          }, 250);
+        }),
+      ]);
+
+      deferredCliCloseExit.release();
 
       await waitFor(
         () => {

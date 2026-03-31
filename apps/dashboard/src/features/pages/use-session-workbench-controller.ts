@@ -148,10 +148,7 @@ export function useSessionWorkbenchController(input: {
     lifecycle,
     sandboxInstanceId: input.sandboxInstanceId,
     serverRequests,
-    threadAuthority: {
-      activeThreadId: lifecycle.sessionSnapshot?.threadId ?? null,
-      ensureThreadExists: threads.startNewThread,
-    },
+    threadAuthority: sessionState.threadAuthority,
   });
 
   const workbenchLifecycleState = useSessionWorkbenchLifecycleState({

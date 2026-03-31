@@ -27,10 +27,7 @@ type UseSessionMainPanelHandoffInput = {
     ReturnType<typeof useCodexSessionState>["serverRequests"],
     "resetServerRequests"
   >;
-  threadAuthority: {
-    activeThreadId: string | null;
-    ensureThreadExists: () => Promise<string>;
-  };
+  threadAuthority: ReturnType<typeof useCodexSessionState>["threadAuthority"];
   chat: Pick<ReturnType<typeof useCodexSessionState>["chat"], "hydrateChatFromThread">;
 };
 
@@ -93,9 +90,7 @@ export function useSessionMainPanelHandoff(
   const startChatRestore = useCallback((): void => {
     const generation = nextGeneration();
     const preferredThreadId =
-      input.threadAuthority.activeThreadId ??
-      input.lifecycle.sessionSnapshot?.threadId ??
-      restorePreferredThreadIdRef.current;
+      input.threadAuthority.persistedThreadId ?? restorePreferredThreadIdRef.current;
 
     restoreGenerationRef.current = generation;
     restorePreferredThreadIdRef.current = preferredThreadId;
@@ -105,26 +100,20 @@ export function useSessionMainPanelHandoff(
     });
     input.serverRequests.resetServerRequests();
 
-    void (async () => {
-      await closeAndDisconnectCliPty(input.cliPtyState);
+    void closeAndDisconnectCliPty(input.cliPtyState);
 
-      if (!isCurrentGeneration(generation)) {
-        return;
-      }
-
-      if (input.sandboxInstanceId === null || preferredThreadId === null) {
-        dispatch({
-          type: "chat_restore_failed",
-          errorMessage: "Could not restore chat because the current session thread is unavailable.",
-        });
-        return;
-      }
-
-      input.lifecycle.connectSession({
-        sandboxInstanceId: input.sandboxInstanceId,
-        preferredThreadId,
+    if (input.sandboxInstanceId === null) {
+      dispatch({
+        type: "chat_restore_failed",
+        errorMessage: "Could not restore chat because the current session thread is unavailable.",
       });
-    })();
+      return;
+    }
+
+    input.lifecycle.connectSession({
+      sandboxInstanceId: input.sandboxInstanceId,
+      preferredThreadId,
+    });
   }, [
     input.cliPtyState,
     input.lifecycle,
@@ -150,8 +139,7 @@ export function useSessionMainPanelHandoff(
     });
 
     try {
-      const threadId =
-        input.threadAuthority.activeThreadId ?? (await input.threadAuthority.ensureThreadExists());
+      const launchTarget = await input.threadAuthority.resolveCliLaunchTarget();
       if (!isCurrentGeneration(generation)) {
         return;
       }
@@ -167,7 +155,10 @@ export function useSessionMainPanelHandoff(
           cols: 120,
           rows: 32,
           command: "codex",
-          args: ["resume", "--remote", OpenAiCodexAppServerListenUrl, threadId],
+          args:
+            launchTarget.type === "resume"
+              ? ["resume", "--remote", OpenAiCodexAppServerListenUrl, launchTarget.threadId]
+              : ["--remote", OpenAiCodexAppServerListenUrl],
         });
         cliOpened = true;
       } catch (error) {
@@ -207,7 +198,11 @@ export function useSessionMainPanelHandoff(
   ]);
 
   const handoffToChat = useCallback(async (): Promise<void> => {
-    if (state.transitionState !== "stable_cli" && state.transitionState !== "cli_entry_failed") {
+    if (
+      state.transitionState !== "switching_to_cli" &&
+      state.transitionState !== "stable_cli" &&
+      state.transitionState !== "cli_entry_failed"
+    ) {
       return;
     }
 
