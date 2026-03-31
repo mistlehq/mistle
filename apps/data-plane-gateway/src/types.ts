@@ -13,6 +13,7 @@ export type DataPlaneGatewayConfig = LoadDataPlaneGatewayConfigResult["app"];
 export type DataPlaneGatewayGlobalConfig = NonNullable<LoadDataPlaneGatewayConfigResult["global"]>;
 export type DataPlaneGatewayRuntimeConfig = {
   app: DataPlaneGatewayConfig;
+  environment: DataPlaneGatewayGlobalConfig["env"];
   internalAuth: DataPlaneGatewayGlobalConfig["internalAuth"];
   sandbox: DataPlaneGatewayGlobalConfig["sandbox"];
 };

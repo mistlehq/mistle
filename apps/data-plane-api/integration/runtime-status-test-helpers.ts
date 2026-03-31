@@ -17,6 +17,11 @@ export const IntegrationBootstrapTokenSecret = "integration-bootstrap-token-secr
 export const IntegrationBootstrapTokenIssuer = "integration-data-plane-worker";
 export const IntegrationBootstrapTokenAudience = "integration-data-plane-gateway";
 export const IntegrationConnectTokenSecret = "integration-connect-token-secret";
+export const IntegrationPublishedTargetBaseDomain = "mistle.localhost";
+export const IntegrationPublishedTargetAccessTokenSecret = "integration-publish-token-secret";
+export const IntegrationPublishedTargetAccessTokenIssuer = "integration-control-plane-api";
+export const IntegrationPublishedTargetSessionCookieSigningSecret =
+  "integration-publish-cookie-secret";
 
 export type StartedGatewayProcess = {
   baseUrl: string;
@@ -52,6 +57,12 @@ function createGatewayEnvironment(input: {
     MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_SECRET: "integration-egress-token-secret",
     MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_ISSUER: "integration-data-plane-worker",
     MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE: "integration-tokenizer-proxy",
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_BASE_DOMAIN: IntegrationPublishedTargetBaseDomain,
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: IntegrationPublishedTargetAccessTokenSecret,
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER: IntegrationPublishedTargetAccessTokenIssuer,
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE: IntegrationBootstrapTokenAudience,
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET:
+      IntegrationPublishedTargetSessionCookieSigningSecret,
     MISTLE_APPS_DATA_PLANE_GATEWAY_HOST: host,
     MISTLE_APPS_DATA_PLANE_GATEWAY_PORT: String(input.port),
     MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL: input.databaseUrl,

@@ -15,6 +15,7 @@ export function createAppContextMiddleware(
     ctx.set("integrationRegistry", appContext.integrationRegistry);
     ctx.set("dataPlaneClient", appContext.dataPlaneClient);
     ctx.set("connectionTokenConfig", appContext.connectionTokenConfig);
+    ctx.set("publishedTargetConfig", appContext.publishedTargetConfig);
     ctx.set("openWorkflow", appContext.openWorkflow);
     ctx.set("auth", appContext.auth);
     ctx.set("session", null);

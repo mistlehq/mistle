@@ -4,6 +4,10 @@ import { AppIds, type loadConfig } from "@mistle/config";
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
+import type {
+  PublishedTargetAccessTokenConfig,
+  PublishedTargetShareTokenConfig,
+} from "@mistle/published-target-auth";
 import type { Context, Hono } from "hono";
 import type { OpenWorkflow } from "openworkflow";
 
@@ -20,6 +24,12 @@ export type ControlPlaneApiConnectionTokenConfig = {
   issuer: ControlPlaneApiGlobalConfig["sandbox"]["connect"]["tokenIssuer"];
   audience: ControlPlaneApiGlobalConfig["sandbox"]["connect"]["tokenAudience"];
 };
+export type ControlPlaneApiPublishedTargetConfig = {
+  environment: ControlPlaneApiGlobalConfig["env"];
+  baseDomain: ControlPlaneApiGlobalConfig["sandbox"]["publish"]["baseDomain"];
+  accessToken: PublishedTargetAccessTokenConfig;
+  shareToken: PublishedTargetShareTokenConfig;
+};
 export type ControlPlaneApiSandboxRuntimeConfig = {
   defaultBaseImage: ControlPlaneApiGlobalConfig["sandbox"]["defaultBaseImage"];
   gatewayWsUrl: ControlPlaneApiGlobalConfig["sandbox"]["gatewayWsUrl"];
@@ -28,6 +38,7 @@ export type ControlPlaneApiRuntimeConfig = {
   app: ControlPlaneApiConfig;
   internalAuthServiceToken: ControlPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
   connectionToken: ControlPlaneApiConnectionTokenConfig;
+  publishedTarget: ControlPlaneApiPublishedTargetConfig;
   sandbox: ControlPlaneApiSandboxRuntimeConfig;
 };
 
@@ -59,6 +70,7 @@ export type AppContextVariables = {
   integrationRegistry: IntegrationRegistry;
   dataPlaneClient: DataPlaneSandboxInstancesClient;
   connectionTokenConfig: ControlPlaneApiConnectionTokenConfig;
+  publishedTargetConfig: ControlPlaneApiPublishedTargetConfig;
   openWorkflow: OpenWorkflow;
   auth: ControlPlaneAuth;
   session: AppSession | null;

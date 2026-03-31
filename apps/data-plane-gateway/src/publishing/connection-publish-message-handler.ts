@@ -1,6 +1,7 @@
 import {
   type PublishListenersGet,
   type PublishListenersSnapshot,
+  type PublishTargetAuthorizeResult,
   type PublishControlMessage,
 } from "@mistle/sandbox-session-protocol";
 
@@ -8,6 +9,7 @@ import { TunnelProtocolViolationError } from "../tunnel/protocol/tunnel-protocol
 import type { TunnelProtocolTranslation } from "../tunnel/protocol/tunnel-protocol-translator.js";
 import type { TunnelSessionRegistry } from "../tunnel/tunnel-session/index.js";
 import type { RelayPeerSide } from "../tunnel/types.js";
+import type { BootstrapPublishControlRequestCoordinator } from "./bootstrap-publish-control-request-coordinator.js";
 import {
   ConnectionPublishRequestCoordinator,
   DuplicateConnectionPublishRequestIdError,
@@ -39,6 +41,7 @@ export class ConnectionPublishMessageHandler {
   public constructor(
     private readonly tunnelSessionRegistry: TunnelSessionRegistry,
     private readonly requestCoordinator: ConnectionPublishRequestCoordinator,
+    private readonly bootstrapPublishControlRequestCoordinator: BootstrapPublishControlRequestCoordinator,
   ) {}
 
   public handleControlMessage(input: {
@@ -62,6 +65,10 @@ export class ConnectionPublishMessageHandler {
 
   public releaseClientSession(input: { clientSessionId: string }): void {
     this.requestCoordinator.releaseClientSession(input);
+  }
+
+  public releaseBootstrapPeer(input: { sandboxInstanceId: string }): void {
+    this.bootstrapPublishControlRequestCoordinator.rejectSandboxInstanceRequests(input);
   }
 
   #handleConnectionMessage(input: {
@@ -112,6 +119,12 @@ export class ConnectionPublishMessageHandler {
   #handleBootstrapMessage(input: {
     controlMessage: PublishControlMessage;
   }): TunnelProtocolTranslation {
+    if (input.controlMessage.type === "publish.target.authorize.result") {
+      return this.#handleAuthorizeResult({
+        controlMessage: input.controlMessage,
+      });
+    }
+
     if (input.controlMessage.type !== "publish.listeners.snapshot") {
       throw new TunnelProtocolViolationError(
         `Bootstrap websocket cannot send publish control message type '${input.controlMessage.type}'.`,
@@ -136,6 +149,24 @@ export class ConnectionPublishMessageHandler {
         }),
       ),
       targetConnectionSessionId: resolvedRequest.clientSessionId,
+    });
+  }
+
+  #handleAuthorizeResult(input: {
+    controlMessage: PublishTargetAuthorizeResult;
+  }): TunnelProtocolTranslation {
+    this.bootstrapPublishControlRequestCoordinator.resolveAuthorizeRequest({
+      requestId: input.controlMessage.requestId,
+      authorized: input.controlMessage.authorized,
+      ...(input.controlMessage.reason === undefined
+        ? {}
+        : {
+            reason: input.controlMessage.reason,
+          }),
+    });
+
+    return createTranslation({
+      kind: "drop",
     });
   }
 }

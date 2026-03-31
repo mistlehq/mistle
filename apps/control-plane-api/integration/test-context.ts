@@ -231,6 +231,20 @@ export const it = vitestIt.extend<{
             issuer: "integration-issuer",
             audience: "integration-audience",
           },
+          publishedTarget: {
+            environment: "development",
+            baseDomain: "mistle.localhost",
+            accessToken: {
+              tokenSecret: "integration-publish-token-secret",
+              tokenIssuer: "integration-control-plane-api",
+              tokenAudience: "integration-data-plane-gateway",
+            },
+            shareToken: {
+              tokenSecret: "integration-publish-token-secret",
+              tokenIssuer: "integration-control-plane-api",
+              tokenAudience: "integration-data-plane-gateway",
+            },
+          },
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
             gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",

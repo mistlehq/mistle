@@ -29,11 +29,40 @@ export const sandboxInstanceIdParamsSchema = z
   })
   .strict();
 
+const sandboxInstancePortParamSchema = z
+  .string()
+  .regex(/^[0-9]+$/, {
+    message: "`port` must be a TCP port number.",
+  })
+  .transform((value) => Number.parseInt(value, 10))
+  .pipe(z.number().int().min(1).max(65_535));
+
+export const sandboxInstancePortParamsSchema = sandboxInstanceIdParamsSchema
+  .extend({
+    port: sandboxInstancePortParamSchema,
+  })
+  .strict();
+
 export const sandboxInstanceConnectionTokenSchema = z
   .object({
     instanceId: z.string().min(1),
     url: z.url(),
     token: z.string().min(1),
+    expiresAt: z.string().min(1),
+  })
+  .strict();
+
+export const sandboxInstancePortPublishSchema = z
+  .object({
+    host: z.string().min(1),
+    token: z.string().min(1),
+    expiresAt: z.string().min(1),
+  })
+  .strict();
+
+export const sandboxInstanceShareLinkSchema = z
+  .object({
+    shareUrl: z.url(),
     expiresAt: z.string().min(1),
   })
   .strict();

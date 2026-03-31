@@ -3,7 +3,7 @@ import { parsePublishControlMessage } from "@mistle/sandbox-session-protocol";
 import { systemScheduler } from "@mistle/time";
 import type WebSocket from "ws";
 
-import { readLiveListenersSnapshot } from "../runtime/live-listeners/read-live-listeners-snapshot.js";
+import { handlePublishControlMessage } from "../publishing/handle-publish-control-message.js";
 import { logSandboxRuntimeEvent } from "../runtime/logger.js";
 import { createAbortRace, ignorePromiseRejectionAfterAbort } from "./abortable-race.js";
 import {
@@ -232,28 +232,13 @@ async function handleTunnelConnection(input: {
       if (message.kind === "text") {
         const publishControlMessage = parsePublishControlMessage(message.payload);
         if (publishControlMessage !== undefined) {
-          switch (publishControlMessage.type) {
-            case "publish.listeners.get": {
-              const snapshot = await readLiveListenersSnapshot({
-                runtimeClients: input.runtimeClients,
-                runtimeListenAddr: input.runtimeListenAddr,
-              });
-              await sendTextPayload(
-                input.tunnelSocket,
-                JSON.stringify({
-                  type: "publish.listeners.snapshot",
-                  requestId: publishControlMessage.requestId,
-                  observedAt: snapshot.observedAt,
-                  listeners: snapshot.listeners,
-                }),
-              );
-              continue;
-            }
-            default:
-              throw new Error(
-                `unsupported publish control message type '${publishControlMessage.type}' on bootstrap tunnel`,
-              );
-          }
+          const responseMessage = await handlePublishControlMessage({
+            controlMessage: publishControlMessage,
+            runtimeClients: input.runtimeClients,
+            runtimeListenAddr: input.runtimeListenAddr,
+          });
+          await sendTextPayload(input.tunnelSocket, JSON.stringify(responseMessage));
+          continue;
         }
       }
 

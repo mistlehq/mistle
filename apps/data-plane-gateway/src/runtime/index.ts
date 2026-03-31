@@ -10,6 +10,7 @@ import { createApp, stopApp } from "../app.js";
 import { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { LocalSandboxIdleController } from "../idle/sandbox-idle-controller.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
+import { BootstrapPublishControlRequestCoordinator } from "../publishing/bootstrap-publish-control-request-coordinator.js";
 import { ConnectionPublishMessageHandler } from "../publishing/connection-publish-message-handler.js";
 import { ConnectionPublishRequestCoordinator } from "../publishing/connection-publish-request-coordinator.js";
 import { registerPublishedTargetRoutes } from "../publishing/register-published-target-routes.js";
@@ -125,6 +126,10 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerResolver,
     gatewayForwardingClient,
   );
+  const bootstrapPublishControlRequestCoordinator = new BootstrapPublishControlRequestCoordinator(
+    systemScheduler,
+    PublishRequestTimeoutMs,
+  );
   const connectionPublishRequestCoordinator = new ConnectionPublishRequestCoordinator(
     systemScheduler,
     PublishRequestTimeoutMs,
@@ -132,6 +137,7 @@ export function createDataPlaneGatewayRuntime(
   const connectionPublishMessageHandler = new ConnectionPublishMessageHandler(
     tunnelSessionRegistry,
     connectionPublishRequestCoordinator,
+    bootstrapPublishControlRequestCoordinator,
   );
   const sandboxOwnerLeaseHeartbeat = new SandboxOwnerLeaseHeartbeat(
     sandboxOwnerStore,
@@ -170,6 +176,11 @@ export function createDataPlaneGatewayRuntime(
   });
   registerPublishedTargetRoutes({
     app,
+    bootstrapPublishControlRequestCoordinator,
+    environment: config.environment,
+    publishConfig: config.sandbox.publish,
+    relayCoordinator,
+    tunnelSessionRegistry,
   });
 
   registerSandboxTunnelRoute({

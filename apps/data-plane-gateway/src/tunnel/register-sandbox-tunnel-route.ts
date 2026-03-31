@@ -313,6 +313,9 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
           onClose: (event) => {
             if (attachedPeer !== undefined) {
               if (admittedRequest.kind === "bootstrap") {
+                input.connectionPublishMessageHandler.releaseBootstrapPeer({
+                  sandboxInstanceId,
+                });
                 void tunnelSessionService.detachBootstrapPeer({
                   attachedPeer,
                   leaseId: admittedRequest.ownerLeaseId,

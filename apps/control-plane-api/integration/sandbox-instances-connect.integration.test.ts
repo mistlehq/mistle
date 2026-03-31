@@ -29,6 +29,20 @@ type WorkflowRunRow = {
 const ResumeWorkflowName = "data-plane.sandbox-instances.resume";
 const WorkflowQueuePollIntervalMs = 100;
 const WorkflowQueueWaitTimeoutMs = 10_000;
+const IntegrationPublishedTargetConfig = {
+  environment: "development",
+  baseDomain: "mistle.localhost",
+  accessToken: {
+    tokenSecret: "integration-publish-token-secret",
+    tokenIssuer: "integration-control-plane-api",
+    tokenAudience: "integration-data-plane-gateway",
+  },
+  shareToken: {
+    tokenSecret: "integration-publish-token-secret",
+    tokenIssuer: "integration-control-plane-api",
+    tokenAudience: "integration-data-plane-gateway",
+  },
+} as const;
 
 const startedDataPlaneFixtures: DisposableDataPlaneRuntime[] = [];
 const startedSandboxContainerIds: string[] = [];
@@ -178,6 +192,7 @@ describe("sandbox instance connect integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      publishedTarget: IntegrationPublishedTargetConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -248,6 +263,7 @@ describe("sandbox instance connect integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      publishedTarget: IntegrationPublishedTargetConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -317,6 +333,7 @@ describe("sandbox instance connect integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      publishedTarget: IntegrationPublishedTargetConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -394,6 +411,7 @@ describe("sandbox instance connect integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      publishedTarget: IntegrationPublishedTargetConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -476,6 +494,7 @@ describe("sandbox instance connect integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      publishedTarget: IntegrationPublishedTargetConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",

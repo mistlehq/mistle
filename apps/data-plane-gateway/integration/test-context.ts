@@ -237,6 +237,7 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
                 baseUrl: "http://127.0.0.1:5300",
               },
             },
+            environment: "development",
             internalAuth: {
               serviceToken: "integration-service-token",
             },
@@ -261,7 +262,7 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
                 tokenAudience: "integration-tokenizer-proxy",
               },
               publish: {
-                baseDomain: "mistle.example.test",
+                baseDomain: "mistle.localhost",
                 access: {
                   tokenSecret: "integration-publish-token-secret",
                   tokenIssuer: "integration-control-plane-api",

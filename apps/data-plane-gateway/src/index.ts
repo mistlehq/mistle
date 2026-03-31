@@ -6,6 +6,7 @@ import { createDataPlaneGatewayRuntime } from "./runtime/index.js";
 
 const runtime = createDataPlaneGatewayRuntime({
   app: appConfig,
+  environment: globalConfig.env,
   internalAuth: globalConfig.internalAuth,
   sandbox: globalConfig.sandbox,
 });
