@@ -127,6 +127,31 @@ describe("loadDashboardBuildConfig", () => {
     });
   });
 
+  it("derives google auth availability from env-only control-plane auth config", () => {
+    const directory = createTempDirectory();
+    const configPath = join(directory, "config.toml");
+
+    writeFileSync(
+      configPath,
+      '[apps.dashboard]\ncontrol_plane_api_origin = "http://127.0.0.1:5100"\n',
+      "utf8",
+    );
+
+    const config = loadDashboardBuildConfig(
+      {
+        MISTLE_CONFIG_PATH: configPath,
+        MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID: "google-client-id",
+        MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET: "google-client-secret",
+      },
+      "development",
+    );
+
+    expect(config.authMethods).toEqual({
+      emailOtp: true,
+      google: true,
+    });
+  });
+
   it("fails when apps.dashboard.control_plane_api_origin is missing", () => {
     const directory = createTempDirectory();
     const configPath = join(directory, "config.toml");

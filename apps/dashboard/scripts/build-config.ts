@@ -41,6 +41,30 @@ export type DashboardBuildConfig = {
   };
 };
 
+function resolveGoogleAuthConfig(
+  environment: NodeJS.ProcessEnv,
+  parsedConfig: z.infer<typeof DashboardBuildConfigSchema>,
+): { clientId: string; clientSecret: string } | undefined {
+  const googleClientId = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID;
+  const googleClientSecret = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET;
+
+  if (googleClientId !== undefined || googleClientSecret !== undefined) {
+    return {
+      clientId: googleClientId ?? "",
+      clientSecret: googleClientSecret ?? "",
+    };
+  }
+
+  if (parsedConfig.apps.control_plane_api?.auth?.google === undefined) {
+    return undefined;
+  }
+
+  return {
+    clientId: parsedConfig.apps.control_plane_api.auth.google.client_id,
+    clientSecret: parsedConfig.apps.control_plane_api.auth.google.client_secret,
+  };
+}
+
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -118,13 +142,7 @@ export function loadDashboardBuildConfig(
     "apps.dashboard.control_plane_api_origin",
   );
   const authMethods = deriveDashboardAuthMethods({
-    google:
-      parsedConfig.apps.control_plane_api?.auth?.google === undefined
-        ? undefined
-        : {
-            clientId: parsedConfig.apps.control_plane_api.auth.google.client_id,
-            clientSecret: parsedConfig.apps.control_plane_api.auth.google.client_secret,
-          },
+    google: resolveGoogleAuthConfig(environment, parsedConfig),
   });
 
   return {
