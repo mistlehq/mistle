@@ -21,7 +21,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "smol-toml": "^1.6.0",
+    "smol-toml": "^1.6.1",
     "zod": "^4.1.12"
   }
 }

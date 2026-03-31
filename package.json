@@ -68,7 +68,7 @@
     "oxfmt": "^0.42.0",
     "oxlint": "^1.56.0",
     "oxlint-tsgolint": "^0.18.1",
-    "smol-toml": "^1.6.0",
+    "smol-toml": "^1.6.1",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.20.6",
     "turbo": "^2.8.16",
