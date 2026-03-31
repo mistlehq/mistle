@@ -181,7 +181,10 @@ function createRuntimeStateConfig(input: {
   };
 }
 
-function createIntegrationIt(backend: RuntimeStateBackend) {
+function createIntegrationIt(
+  backend: RuntimeStateBackend,
+  environment: DataPlaneGatewayRuntimeConfig["environment"] = "development",
+) {
   return vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture }>({
     fixture: [
       async ({}, use) => {
@@ -237,7 +240,7 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
                 baseUrl: "http://127.0.0.1:5300",
               },
             },
-            environment: "development",
+            environment,
             internalAuth: {
               serviceToken: "integration-service-token",
             },
@@ -317,3 +320,4 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
 
 export const it = createIntegrationIt("valkey");
 export const itMemory = createIntegrationIt("memory");
+export const itProduction = createIntegrationIt("valkey", "production");

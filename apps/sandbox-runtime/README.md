@@ -27,6 +27,22 @@ TypeScript owns:
 - tunnel protocol handling
 - provider/runtime integration logic
 
+## Published Targets
+
+`sandboxd` is the source of truth for published-target discovery and authorization.
+
+It owns:
+
+- live localhost listener discovery inside the sandbox
+- listener visibility classification (`internal` vs `user_selectable`)
+- on-demand authorization for one exact published port
+- HTTP and WebSocket proxy forwarding from the bootstrap tunnel to sandbox-local upstreams
+
+The gateway owns the browser-facing host and cookie semantics, but it does not keep a semantic
+port registry. Published-target routing is host-based and uses flat first-level subdomains such as
+`p-5173--sbi_123.mistle.localhost` locally and `p-5173--sbi_123.<base-domain>` in deployed
+environments.
+
 ## Layout
 
 - `src/`: runtime and bootstrap application code
