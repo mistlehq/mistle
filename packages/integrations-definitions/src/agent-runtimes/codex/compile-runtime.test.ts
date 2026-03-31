@@ -87,6 +87,31 @@ describe("compileCodexRuntime", () => {
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server",
+        ptyLaunch: {
+          runtimeId: "codex",
+          displayName: "Codex",
+          ptySessionId: "cli",
+          cols: 120,
+          rows: 32,
+          command: "codex",
+          args: [
+            {
+              kind: "literal",
+              value: "resume",
+            },
+            {
+              kind: "literal",
+              value: "--remote",
+            },
+            {
+              kind: "literal",
+              value: "ws://127.0.0.1:4500",
+            },
+            {
+              kind: "threadId",
+            },
+          ],
+        },
       },
     ]);
   });

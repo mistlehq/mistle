@@ -60,6 +60,23 @@ function createRuntimePlan() {
             runtimeKey: "runtime_123",
             clientId: "client_123",
             endpointKey: "endpoint_123",
+            ptyLaunch: {
+              runtimeId: "test-agent",
+              displayName: "Test Agent",
+              ptySessionId: "cli",
+              cols: 120,
+              rows: 32,
+              command: "agent",
+              args: [
+                {
+                  kind: "literal",
+                  value: "resume",
+                },
+                {
+                  kind: "threadId",
+                },
+              ],
+            },
           },
         ],
       },

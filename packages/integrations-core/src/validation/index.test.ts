@@ -11,6 +11,26 @@ import type {
 } from "../types/index.js";
 import { validateCompiledBindingResults } from "./index.js";
 
+function createPtyLaunch(input: { runtimeId: string; displayName?: string; command?: string }) {
+  return {
+    runtimeId: input.runtimeId,
+    displayName: input.displayName ?? input.runtimeId,
+    ptySessionId: "cli",
+    cols: 120,
+    rows: 32,
+    command: input.command ?? input.runtimeId,
+    args: [
+      {
+        kind: "literal" as const,
+        value: "resume",
+      },
+      {
+        kind: "threadId" as const,
+      },
+    ],
+  };
+}
+
 function createRoute(input: {
   egressRuleId: string;
   bindingId: string;
@@ -792,6 +812,11 @@ describe("validateCompiledBindingResults", () => {
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
+          ptyLaunch: createPtyLaunch({
+            runtimeId: "codex",
+            displayName: "Codex",
+            command: "codex",
+          }),
         },
       ],
     });
@@ -817,6 +842,11 @@ describe("validateCompiledBindingResults", () => {
           runtimeKey: "codex-app-server",
           clientId: "missing-client",
           endpointKey: "app-server",
+          ptyLaunch: createPtyLaunch({
+            runtimeId: "codex",
+            displayName: "Codex",
+            command: "codex",
+          }),
         },
       ],
     });
@@ -869,6 +899,11 @@ describe("validateCompiledBindingResults", () => {
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
+          ptyLaunch: createPtyLaunch({
+            runtimeId: "codex",
+            displayName: "Codex",
+            command: "codex",
+          }),
         },
       ],
     });

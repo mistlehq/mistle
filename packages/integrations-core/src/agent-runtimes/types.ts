@@ -58,6 +58,7 @@ export type CompileAgentRuntimeResult = {
     runtimeKey: string;
     clientId: string;
     endpointKey: string;
+    ptyLaunch: AgentPtyLaunchSpec;
   }>;
 };
 

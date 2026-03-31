@@ -1,6 +1,7 @@
 import type { z } from "zod";
 
 import type { AgentRuntimeRegistry } from "../agent-runtimes/index.js";
+import type { AgentPtyLaunchSpec } from "../agent-runtimes/types.js";
 import type { AgentIntegrationHooks } from "../agent/index.js";
 import type { ConnectionCapabilitySet } from "../capabilities/index.js";
 import type { IntegrationRegistry } from "../registry/index.js";
@@ -978,6 +979,7 @@ export type CompileBindingAgentRuntime = {
   runtimeKey: string;
   clientId: string;
   endpointKey: string;
+  ptyLaunch: AgentPtyLaunchSpec;
 };
 
 export type CompiledAgentRuntime = CompileBindingAgentRuntime & {

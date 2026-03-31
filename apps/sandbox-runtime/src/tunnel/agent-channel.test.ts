@@ -32,6 +32,23 @@ function createAgentRuntime(overrides: Partial<CompiledAgentRuntime>): CompiledA
     runtimeKey: "codex-app-server",
     clientId: "client_openai",
     endpointKey: "app-server",
+    ptyLaunch: {
+      runtimeId: "codex",
+      displayName: "Codex",
+      ptySessionId: "cli",
+      cols: 120,
+      rows: 32,
+      command: "codex",
+      args: [
+        {
+          kind: "literal",
+          value: "resume",
+        },
+        {
+          kind: "threadId",
+        },
+      ],
+    },
     ...overrides,
   };
 }

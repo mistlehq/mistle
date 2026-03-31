@@ -3,6 +3,26 @@ import { describe, expect, it } from "vitest";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { assembleCompiledRuntimePlan, CompiledRuntimePlanSchema } from "./index.js";
 
+function createPtyLaunch(input: { runtimeId: string; displayName?: string; command?: string }) {
+  return {
+    runtimeId: input.runtimeId,
+    displayName: input.displayName ?? input.runtimeId,
+    ptySessionId: "cli",
+    cols: 120,
+    rows: 32,
+    command: input.command ?? input.runtimeId,
+    args: [
+      {
+        kind: "literal" as const,
+        value: "resume",
+      },
+      {
+        kind: "threadId" as const,
+      },
+    ],
+  };
+}
+
 describe("assembleCompiledRuntimePlan", () => {
   it("produces runtime plans accepted by the shared runtime-plan schema", () => {
     const plan = assembleCompiledRuntimePlan({
@@ -59,6 +79,11 @@ describe("assembleCompiledRuntimePlan", () => {
               runtimeKey: "codex-app-server",
               clientId: "codex-cli",
               endpointKey: "app-server",
+              ptyLaunch: createPtyLaunch({
+                runtimeId: "codex",
+                displayName: "Codex",
+                command: "codex",
+              }),
             },
           ],
         },
@@ -160,6 +185,11 @@ describe("assembleCompiledRuntimePlan", () => {
               runtimeKey: "github-app-server",
               clientId: "codex-cli",
               endpointKey: "app-server-b",
+              ptyLaunch: createPtyLaunch({
+                runtimeId: "github-agent",
+                displayName: "GitHub Agent",
+                command: "github-agent",
+              }),
             },
           ],
         },
@@ -252,6 +282,11 @@ describe("assembleCompiledRuntimePlan", () => {
               runtimeKey: "codex-app-server",
               clientId: "codex-cli",
               endpointKey: "app-server-a",
+              ptyLaunch: createPtyLaunch({
+                runtimeId: "codex",
+                displayName: "Codex",
+                command: "codex",
+              }),
             },
           ],
         },
@@ -292,6 +327,11 @@ describe("assembleCompiledRuntimePlan", () => {
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server-a",
+        ptyLaunch: createPtyLaunch({
+          runtimeId: "codex",
+          displayName: "Codex",
+          command: "codex",
+        }),
       },
       {
         bindingId: "bind_b",
@@ -299,6 +339,11 @@ describe("assembleCompiledRuntimePlan", () => {
         runtimeKey: "github-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server-b",
+        ptyLaunch: createPtyLaunch({
+          runtimeId: "github-agent",
+          displayName: "GitHub Agent",
+          command: "github-agent",
+        }),
       },
     ]);
   });

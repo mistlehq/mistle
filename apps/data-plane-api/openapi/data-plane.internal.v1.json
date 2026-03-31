@@ -559,6 +559,82 @@
                             "endpointKey": {
                               "type": "string",
                               "minLength": 1
+                            },
+                            "ptyLaunch": {
+                              "type": "object",
+                              "properties": {
+                                "runtimeId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "displayName": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "ptySessionId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "cols": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0
+                                },
+                                "rows": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0
+                                },
+                                "cwd": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "command": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "args": {
+                                  "type": "array",
+                                  "items": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["literal"]
+                                          },
+                                          "value": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": ["kind", "value"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["threadId"]
+                                          }
+                                        },
+                                        "required": ["kind"],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "runtimeId",
+                                "displayName",
+                                "ptySessionId",
+                                "cols",
+                                "rows",
+                                "command",
+                                "args"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
@@ -566,7 +642,8 @@
                             "runtimeId",
                             "runtimeKey",
                             "clientId",
-                            "endpointKey"
+                            "endpointKey",
+                            "ptyLaunch"
                           ],
                           "additionalProperties": false
                         }

@@ -183,6 +183,33 @@ const RuntimeClientSchema = z
   })
   .strict();
 
+const AgentPtyLaunchArgumentSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("literal"),
+      value: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("threadId"),
+    })
+    .strict(),
+]);
+
+const AgentPtyLaunchSpecSchema = z
+  .object({
+    runtimeId: z.string().min(1),
+    displayName: z.string().min(1),
+    ptySessionId: z.string().min(1),
+    cols: z.int().positive(),
+    rows: z.int().positive(),
+    cwd: z.string().min(1).optional(),
+    command: z.string().min(1),
+    args: z.array(AgentPtyLaunchArgumentSchema).readonly(),
+  })
+  .strict();
+
 const CompiledAgentRuntimeSchema = z
   .object({
     bindingId: z.string().min(1),
@@ -190,6 +217,7 @@ const CompiledAgentRuntimeSchema = z
     runtimeKey: z.string().min(1),
     clientId: z.string().min(1),
     endpointKey: z.string().min(1),
+    ptyLaunch: AgentPtyLaunchSpecSchema,
   })
   .strict();
 
@@ -380,6 +408,16 @@ function normalizeAgentRuntime(
     runtimeKey: agentRuntime.runtimeKey,
     clientId: agentRuntime.clientId,
     endpointKey: agentRuntime.endpointKey,
+    ptyLaunch: {
+      runtimeId: agentRuntime.ptyLaunch.runtimeId,
+      displayName: agentRuntime.ptyLaunch.displayName,
+      ptySessionId: agentRuntime.ptyLaunch.ptySessionId,
+      cols: agentRuntime.ptyLaunch.cols,
+      rows: agentRuntime.ptyLaunch.rows,
+      ...(agentRuntime.ptyLaunch.cwd === undefined ? {} : { cwd: agentRuntime.ptyLaunch.cwd }),
+      command: agentRuntime.ptyLaunch.command,
+      args: agentRuntime.ptyLaunch.args,
+    },
   };
 }
 
