@@ -18,6 +18,7 @@ import {
   SessionWorkbenchStoryChrome,
   StorySandboxInstanceId,
 } from "./session-story-support.js";
+import { SessionTerminalPanel } from "./session-terminal-panel.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 const meta = {
@@ -114,18 +115,6 @@ export const MissingSessionId: Story = {
   },
 };
 
-export const CliFullHeight: Story = {
-  args: {
-    mainContent: (
-      <SessionCliPanel
-        ptyState={createStoryWorkbenchCliPtyState(createStoryLongCliOutput("task"))}
-      />
-    ),
-    mainContentLayout: { scroll: "contained", width: "full" },
-    primaryBottomPanel: null,
-  },
-};
-
 export const CliSplitWithTerminal: Story = {
   args: {
     isSecondaryPanelVisible: true,
@@ -136,5 +125,28 @@ export const CliSplitWithTerminal: Story = {
     ),
     mainContentLayout: { scroll: "contained", width: "full" },
     primaryBottomPanel: null,
+    secondaryPanel: (
+      <SessionTerminalPanel
+        isConnectionReady={true}
+        isResumingSandbox={false}
+        isVisible={true}
+        onDisconnectTerminal={noop}
+        onHide={noop}
+        onRequestSandboxResume={async () => {
+          return;
+        }}
+        ptyState={createStoryWorkbenchCliPtyState(
+          [
+            "root@sandbox:~# pwd",
+            "/root",
+            "root@sandbox:~# ls",
+            "apps  packages  README.md",
+            "",
+          ].join("\n"),
+        )}
+        sandboxInstanceId={StorySandboxInstanceId}
+        sandboxStatus="running"
+      />
+    ),
   },
 };
