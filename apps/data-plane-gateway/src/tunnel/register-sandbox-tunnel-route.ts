@@ -6,6 +6,7 @@ import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 
 import type { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { logger } from "../logger.js";
+import type { BootstrapPublishRouter } from "../publishing/bootstrap-publish-router.js";
 import type { ConnectionPublishMessageHandler } from "../publishing/connection-publish-message-handler.js";
 import { OWNER_LEASE_TTL_MS } from "../runtime-state/durations.js";
 import type { SandboxActivityStore } from "../runtime-state/sandbox-activity-store.js";
@@ -42,6 +43,7 @@ type RegisterSandboxTunnelRouteInput = {
   interactiveStreamRouter: InteractiveStreamRouter;
   relayCoordinator: TunnelRelayCoordinator;
   tunnelSessionRegistry: TunnelSessionRegistry;
+  bootstrapPublishRouter: BootstrapPublishRouter;
   connectionPublishMessageHandler: ConnectionPublishMessageHandler;
   sandboxOwnerStore: SandboxOwnerStore;
   sandboxOwnerResolver: SandboxOwnerResolver;
@@ -80,6 +82,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
   const tunnelProtocolTranslator = new TunnelProtocolTranslator(
     input.interactiveStreamRouter,
     input.connectionPublishMessageHandler,
+    input.bootstrapPublishRouter,
   );
   const executionLeaseRepository = new ExecutionLeaseRepository(
     input.sandboxActivityStore,
@@ -314,6 +317,9 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             if (attachedPeer !== undefined) {
               if (admittedRequest.kind === "bootstrap") {
                 input.connectionPublishMessageHandler.releaseBootstrapPeer({
+                  sandboxInstanceId,
+                });
+                input.bootstrapPublishRouter.releaseSandboxStreams({
                   sandboxInstanceId,
                 });
                 void tunnelSessionService.detachBootstrapPeer({

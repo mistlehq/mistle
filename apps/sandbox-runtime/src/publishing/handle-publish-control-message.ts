@@ -23,7 +23,7 @@ export async function handlePublishControlMessage(input: {
   controlMessage: PublishControlMessage;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
   runtimeListenAddr: string;
-}): Promise<PublishControlMessage> {
+}): Promise<PublishControlMessage | undefined> {
   switch (input.controlMessage.type) {
     case "publish.listeners.get": {
       const snapshot = await readLiveListenersSnapshot({
@@ -68,8 +68,6 @@ export async function handlePublishControlMessage(input: {
       });
     }
     default:
-      throw new Error(
-        `unsupported publish control message type '${input.controlMessage.type}' on bootstrap tunnel`,
-      );
+      return undefined;
   }
 }

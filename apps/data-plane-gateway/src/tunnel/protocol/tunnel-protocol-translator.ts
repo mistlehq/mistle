@@ -11,6 +11,7 @@ import {
   type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
 
+import type { BootstrapPublishRouter } from "../../publishing/bootstrap-publish-router.js";
 import type { ConnectionPublishMessageHandler } from "../../publishing/connection-publish-message-handler.js";
 import { BootstrapTunnelNotConnectedError } from "../bootstrap-tunnel-not-connected-error.js";
 import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
@@ -344,6 +345,7 @@ export class TunnelProtocolTranslator {
   public constructor(
     private readonly interactiveStreamRouter: InteractiveStreamRouter,
     private readonly connectionPublishMessageHandler: ConnectionPublishMessageHandler,
+    private readonly bootstrapPublishRouter: BootstrapPublishRouter,
     private readonly frameCodec: FrameCodec = new FrameCodec(),
   ) {}
 
@@ -516,12 +518,30 @@ export class TunnelProtocolTranslator {
   ): Promise<TunnelProtocolTranslation> {
     const publishControlMessage = parsePublishControlMessage(input.payload);
     if (publishControlMessage !== undefined) {
-      return this.translatePublishControlMessage({
-        clientSessionId: input.clientSessionId,
-        controlMessage: publishControlMessage,
-        sandboxInstanceId: input.sandboxInstanceId,
-        sourcePeerSide: "bootstrap",
-      });
+      if (
+        publishControlMessage.type === "publish.listeners.snapshot" ||
+        publishControlMessage.type === "publish.target.authorize.result"
+      ) {
+        return this.translatePublishControlMessage({
+          clientSessionId: input.clientSessionId,
+          controlMessage: publishControlMessage,
+          sandboxInstanceId: input.sandboxInstanceId,
+          sourcePeerSide: "bootstrap",
+        });
+      }
+
+      if (
+        this.bootstrapPublishRouter.handleBootstrapMessage({
+          payload: input.payload,
+          sandboxInstanceId: input.sandboxInstanceId,
+        })
+      ) {
+        return createTranslation({
+          delivery: {
+            kind: "drop",
+          },
+        });
+      }
     }
 
     const controlMessage = parseBootstrapControlMessage(input.payload);

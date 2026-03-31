@@ -1,3 +1,8 @@
+import {
+  parsePublishedTargetHost,
+  PublishedTargetHostError,
+  type ParsedPublishedTargetHost,
+} from "@mistle/gateway-published-target-auth";
 import type { PublishTargetAuthorizeResult } from "@mistle/sandbox-session-protocol";
 
 import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
@@ -8,18 +13,24 @@ import {
   verifyOwnedPublishedTargetBootstrapRequest,
   verifySharedPublishedTargetBootstrapRequest,
 } from "./auth/published-target-bootstrap.js";
-import { mintPublishedTargetSessionSetCookieHeader } from "./auth/published-target-session-cookie.js";
+import {
+  mintPublishedTargetSessionSetCookieHeader,
+  PublishedTargetRequestCookieError,
+  verifyPublishedTargetSessionFromCookieHeader,
+} from "./auth/published-target-session-cookie.js";
 import {
   BootstrapPublishControlBootstrapDisconnectedError,
   BootstrapPublishControlRequestCoordinator,
   BootstrapPublishControlRequestTimeoutError,
 } from "./bootstrap-publish-control-request-coordinator.js";
+import { BootstrapPublishRouter, PublishedHttpRequestError } from "./bootstrap-publish-router.js";
 
 type RegisterPublishedTargetRoutesInput = {
   app: DataPlaneGatewayApp;
   bootstrapPublishControlRequestCoordinator: BootstrapPublishControlRequestCoordinator;
   environment: DataPlaneGatewayRuntimeConfig["environment"];
   publishConfig: DataPlaneGatewayRuntimeConfig["sandbox"]["publish"];
+  publishRouter: BootstrapPublishRouter;
   relayCoordinator: TunnelRelayCoordinator;
   tunnelSessionRegistry: TunnelSessionRegistry;
 };
@@ -140,6 +151,65 @@ function createBootstrapErrorResponse(error: unknown): Response {
   throw error;
 }
 
+function resolvePublishedBaseDomain(input: {
+  baseDomain: string;
+  environment: DataPlaneGatewayRuntimeConfig["environment"];
+  localBaseDomain: string;
+}): string {
+  return input.environment === "development" ? input.localBaseDomain : input.baseDomain;
+}
+
+type ParsedPublishedPortHost = ParsedPublishedTargetHost & {
+  target: {
+    kind: "port";
+    port: number;
+  };
+};
+
+function parsePublishedPortHost(input: {
+  baseDomain: string;
+  environment: DataPlaneGatewayRuntimeConfig["environment"];
+  host: string | undefined;
+  localBaseDomain: string;
+}): ParsedPublishedPortHost | undefined {
+  if (input.host === undefined) {
+    return undefined;
+  }
+
+  try {
+    const parsedHost = parsePublishedTargetHost({
+      baseDomain: resolvePublishedBaseDomain(input),
+      host: input.host,
+    });
+    if (parsedHost.target.kind !== "port") {
+      return undefined;
+    }
+
+    return {
+      ...parsedHost,
+      target: {
+        kind: "port",
+        port: parsedHost.target.port,
+      },
+    };
+  } catch (error) {
+    if (error instanceof PublishedTargetHostError) {
+      return undefined;
+    }
+
+    throw error;
+  }
+}
+
+function createTextErrorResponse(status: number, message: string): Response {
+  return new Response(message, {
+    status,
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+    },
+  });
+}
+
 export function registerPublishedTargetRoutes(input: RegisterPublishedTargetRoutesInput): void {
   input.app.get("/_mistle/bootstrap", async (ctx) => {
     try {
@@ -216,6 +286,65 @@ export function registerPublishedTargetRoutes(input: RegisterPublishedTargetRout
       return ctx.redirect("/", 302);
     } catch (error) {
       return createBootstrapErrorResponse(error);
+    }
+  });
+
+  input.app.all("*", async (ctx, next) => {
+    const parsedHost = parsePublishedPortHost({
+      baseDomain: input.publishConfig.baseDomain,
+      environment: input.environment,
+      host: ctx.req.header("host"),
+      localBaseDomain: input.publishConfig.localBaseDomain,
+    });
+    if (parsedHost === undefined) {
+      await next();
+      return;
+    }
+
+    if (ctx.req.path === "/_mistle/bootstrap" || ctx.req.path === "/_mistle/share") {
+      await next();
+      return;
+    }
+
+    let session;
+    try {
+      session = verifyPublishedTargetSessionFromCookieHeader({
+        config: input.publishConfig.session,
+        cookieHeader: ctx.req.header("cookie"),
+        expectedHost: parsedHost.host,
+      });
+    } catch (error) {
+      if (error instanceof PublishedTargetRequestCookieError) {
+        return createTextErrorResponse(401, error.message);
+      }
+
+      throw error;
+    }
+
+    if (
+      session.sandboxInstanceId !== parsedHost.sandboxInstanceId ||
+      session.targetKind !== "port" ||
+      session.targetId !== String(parsedHost.target.port)
+    ) {
+      return createTextErrorResponse(
+        403,
+        "Published target session does not match the requested host target.",
+      );
+    }
+
+    try {
+      return await input.publishRouter.proxyPublishedHttpRequest({
+        host: parsedHost.host,
+        request: ctx.req.raw,
+        sandboxInstanceId: parsedHost.sandboxInstanceId,
+        targetPort: parsedHost.target.port,
+      });
+    } catch (error) {
+      if (error instanceof PublishedHttpRequestError) {
+        return createTextErrorResponse(error.status, error.message);
+      }
+
+      throw error;
     }
   });
 }

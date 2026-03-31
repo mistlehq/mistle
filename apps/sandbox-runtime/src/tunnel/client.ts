@@ -1,9 +1,17 @@
 import type { CompiledAgentRuntime, CompiledRuntimeClient } from "@mistle/integrations-core";
-import { parsePublishControlMessage } from "@mistle/sandbox-session-protocol";
+import {
+  parsePublishControlMessage,
+  type PublishControlMessage,
+} from "@mistle/sandbox-session-protocol";
 import { systemScheduler } from "@mistle/time";
 import type WebSocket from "ws";
 
 import { handlePublishControlMessage } from "../publishing/handle-publish-control-message.js";
+import {
+  closeAllPublishStreams,
+  handleHttpProxyControlMessage,
+} from "../publishing/http-proxy-channel.js";
+import { createPublishStreamState } from "../publishing/publish-stream-state.js";
 import { logSandboxRuntimeEvent } from "../runtime/logger.js";
 import { createAbortRace, ignorePromiseRejectionAfterAbort } from "./abortable-race.js";
 import {
@@ -75,7 +83,7 @@ export type StartTunnelClientInput = {
 function sendTextPayload(socket: WebSocket, payload: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     socket.send(payload, (error) => {
-      if (error === undefined) {
+      if (error == null) {
         resolve();
         return;
       }
@@ -83,6 +91,13 @@ function sendTextPayload(socket: WebSocket, payload: string): Promise<void> {
       reject(error);
     });
   });
+}
+
+async function sendPublishControlMessage(
+  socket: WebSocket,
+  message: PublishControlMessage,
+): Promise<void> {
+  await sendTextPayload(socket, JSON.stringify(message));
 }
 
 function describeUnknownError(error: unknown): string {
@@ -168,6 +183,7 @@ async function handleTunnelConnection(input: {
   const activeRelaysByStreamId = new Map<number, ActiveTunnelStreamRelay>();
   const activePtyRelaysBySessionId = new Map<string, ActiveTunnelStreamRelay>();
   const activePtySessionsBySessionId = new Map<string, PtySession>();
+  const publishStreamState = createPublishStreamState();
 
   try {
     while (!input.signal.aborted) {
@@ -237,7 +253,25 @@ async function handleTunnelConnection(input: {
             runtimeClients: input.runtimeClients,
             runtimeListenAddr: input.runtimeListenAddr,
           });
-          await sendTextPayload(input.tunnelSocket, JSON.stringify(responseMessage));
+          if (responseMessage !== undefined) {
+            await sendPublishControlMessage(input.tunnelSocket, responseMessage);
+            continue;
+          }
+
+          const handledHttpPublishMessage = await handleHttpProxyControlMessage({
+            controlMessage: publishControlMessage,
+            publishStreamState,
+            runtimeClients: input.runtimeClients,
+            runtimeListenAddr: input.runtimeListenAddr,
+            sendControlMessage: async (publishMessage) => {
+              await sendPublishControlMessage(input.tunnelSocket, publishMessage);
+            },
+          });
+          if (!handledHttpPublishMessage) {
+            throw new Error(
+              `unsupported publish control message type '${publishControlMessage.type}' on bootstrap tunnel`,
+            );
+          }
           continue;
         }
       }
@@ -364,6 +398,9 @@ async function handleTunnelConnection(input: {
       }
     }
   } finally {
+    closeAllPublishStreams({
+      state: publishStreamState,
+    });
     connectionAbortController.abort();
     input.signal.removeEventListener("abort", abortConnection);
   }
