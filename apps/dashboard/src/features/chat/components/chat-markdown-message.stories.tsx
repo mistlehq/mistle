@@ -88,20 +88,6 @@ export const FormatGallery: Story = {
   },
 };
 
-export const MermaidDiagram: Story = {
-  args: {
-    isStreaming: false,
-    text: [
-      "```mermaid",
-      "flowchart LR",
-      "  UI[packages/ui stories] --> SB[packages/storybook]",
-      "  Dashboard[dashboard view stories] --> SB",
-      "  SB --> Review[component review]",
-      "```",
-    ].join("\n"),
-  },
-};
-
 export const Streaming: Story = {
   args: {
     isStreaming: true,
