@@ -28,10 +28,36 @@ function createRuntimeClient(overrides: Partial<CompiledRuntimeClient>): Compile
 function createAgentRuntime(overrides: Partial<CompiledAgentRuntime>): CompiledAgentRuntime {
   return {
     bindingId: "binding_openai",
+    runtimeId: "codex",
     runtimeKey: "codex-app-server",
     clientId: "client_openai",
     endpointKey: "app-server",
-    adapterKey: "openai-codex",
+    ptyLaunch: {
+      runtimeId: "codex",
+      displayName: "Codex",
+      newLaunch: {
+        ptySessionId: "cli",
+        cols: 120,
+        rows: 32,
+        command: "codex",
+        args: [],
+      },
+      resumeLaunch: {
+        ptySessionId: "cli",
+        cols: 120,
+        rows: 32,
+        command: "codex",
+        args: [
+          {
+            kind: "literal",
+            value: "resume",
+          },
+          {
+            kind: "threadId",
+          },
+        ],
+      },
+    },
     ...overrides,
   };
 }
@@ -48,10 +74,10 @@ describe("resolveAgentEndpoint", () => {
     );
 
     expect(resolvedEndpoint).toEqual({
+      runtimeId: "codex",
       runtimeKey: "codex-app-server",
       clientId: "client_openai",
       endpointKey: "app-server",
-      adapterKey: "openai-codex",
       connectionMode: "dedicated",
       transportUrl: "ws://127.0.0.1:4020/app-server",
     });

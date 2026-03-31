@@ -42,7 +42,9 @@ describe("openai binding config forms", () => {
           config: connectionConfig,
         },
         currentValue: {
-          defaultModel: "gpt-5.1-codex-mini",
+          model: {
+            defaultModel: "gpt-5.1-codex-mini",
+          },
         },
       },
     });
@@ -50,61 +52,95 @@ describe("openai binding config forms", () => {
     expect(resolvedForm.schema).toMatchObject({
       properties: {
         runtime: {
-          const: "codex-cli",
-          default: "codex-cli",
+          default: {
+            runtimeId: "codex",
+            config: {},
+          },
+          properties: {
+            runtimeId: {
+              const: "codex",
+              default: "codex",
+            },
+            config: {
+              default: {},
+            },
+          },
         },
-        defaultModel: {
-          title: "Default model",
-          default: "gpt-5.1-codex-mini",
-          oneOf: expect.arrayContaining([
-            {
-              const: "gpt-5.4",
-              title: "gpt-5.4",
+        model: {
+          default: {
+            defaultModel: "gpt-5.1-codex-mini",
+            options: {
+              reasoningEffort: "medium",
             },
-            {
-              const: "gpt-5.4-mini",
-              title: "gpt-5.4-mini",
+          },
+          properties: {
+            defaultModel: {
+              title: "Default model",
+              default: "gpt-5.1-codex-mini",
+              oneOf: expect.arrayContaining([
+                {
+                  const: "gpt-5.4",
+                  title: "gpt-5.4",
+                },
+                {
+                  const: "gpt-5.4-mini",
+                  title: "gpt-5.4-mini",
+                },
+              ]),
             },
-          ]),
-        },
-        reasoningEffort: {
-          title: "Reasoning effort",
-          default: "medium",
-          oneOf: [
-            {
-              const: "medium",
-              title: "Medium",
+            options: {
+              properties: {
+                reasoningEffort: {
+                  title: "Reasoning effort",
+                  default: "medium",
+                  oneOf: [
+                    {
+                      const: "medium",
+                      title: "Medium",
+                    },
+                    {
+                      const: "high",
+                      title: "High",
+                    },
+                  ],
+                },
+                additionalInstructions: {
+                  title: "Additional instructions",
+                  description: "Appended after Mistle-managed runtime instructions.",
+                },
+              },
             },
-            {
-              const: "high",
-              title: "High",
-            },
-          ],
-        },
-        additionalInstructions: {
-          title: "Additional instructions",
-          description: "Appended after Mistle-managed runtime instructions.",
+          },
         },
       },
     });
     expect(resolvedForm.uiSchema).toEqual({
-      additionalInstructions: {
-        "ui:widget": "TextareaWidget",
-        "ui:options": createStackedFieldUiOptions({
-          rows: 8,
-        }),
-      },
-      defaultModel: {
-        "ui:widget": "SelectWidget",
-        "ui:options": {
-          fitContent: true,
+      runtime: {
+        runtimeId: {
+          "ui:widget": "hidden",
+        },
+        config: {
+          "ui:widget": "hidden",
         },
       },
-      reasoningEffort: {
-        "ui:widget": "SelectWidget",
-      },
-      runtime: {
-        "ui:widget": "hidden",
+      model: {
+        defaultModel: {
+          "ui:widget": "SelectWidget",
+          "ui:options": {
+            fitContent: true,
+          },
+        },
+        options: {
+          reasoningEffort: {
+            "ui:widget": "SelectWidget",
+          },
+          additionalInstructions: {
+            "ui:widget": "TextareaWidget",
+            "ui:options": createStackedFieldUiOptions({
+              rows: 8,
+            }),
+          },
+        },
       },
     });
   });

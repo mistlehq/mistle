@@ -60,6 +60,11 @@ otp_length = 6
 otp_expires_in_seconds = 300
 otp_allowed_attempts = 3
 
+# Optional Google login support. Leave this block out to disable Google login.
+#[apps.control_plane_api.auth.google]
+#client_id = "replace-with-google-client-id"
+#client_secret = "replace-with-google-client-secret"
+
 [apps.control_plane_api.dashboard]
 base_url = "https://app.mistle.example"
 

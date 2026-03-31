@@ -118,6 +118,7 @@ describe("internal sandbox instances auth integration", () => {
       failureCode: null,
       failureMessage: null,
       id: sandboxInstanceId,
+      runtimePlan: null,
       status: "stopped",
     });
   }, 60_000);

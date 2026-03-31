@@ -3,6 +3,35 @@ import { describe, expect, it } from "vitest";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { assembleCompiledRuntimePlan, CompiledRuntimePlanSchema } from "./index.js";
 
+function createPtyLaunch(input: { runtimeId: string; displayName?: string; command?: string }) {
+  return {
+    runtimeId: input.runtimeId,
+    displayName: input.displayName ?? input.runtimeId,
+    newLaunch: {
+      ptySessionId: "cli",
+      cols: 120,
+      rows: 32,
+      command: input.command ?? input.runtimeId,
+      args: [],
+    },
+    resumeLaunch: {
+      ptySessionId: "cli",
+      cols: 120,
+      rows: 32,
+      command: input.command ?? input.runtimeId,
+      args: [
+        {
+          kind: "literal" as const,
+          value: "resume",
+        },
+        {
+          kind: "threadId" as const,
+        },
+      ],
+    },
+  };
+}
+
 describe("assembleCompiledRuntimePlan", () => {
   it("produces runtime plans accepted by the shared runtime-plan schema", () => {
     const plan = assembleCompiledRuntimePlan({
@@ -55,10 +84,15 @@ describe("assembleCompiledRuntimePlan", () => {
           agentRuntimes: [
             {
               bindingId: "ibd_123",
+              runtimeId: "codex",
               runtimeKey: "codex-app-server",
               clientId: "codex-cli",
               endpointKey: "app-server",
-              adapterKey: "openai-codex",
+              ptyLaunch: createPtyLaunch({
+                runtimeId: "codex",
+                displayName: "Codex",
+                command: "codex",
+              }),
             },
           ],
         },
@@ -156,10 +190,15 @@ describe("assembleCompiledRuntimePlan", () => {
           agentRuntimes: [
             {
               bindingId: "bind_b",
+              runtimeId: "github-agent",
               runtimeKey: "github-app-server",
               clientId: "codex-cli",
               endpointKey: "app-server-b",
-              adapterKey: "github-agent",
+              ptyLaunch: createPtyLaunch({
+                runtimeId: "github-agent",
+                displayName: "GitHub Agent",
+                command: "github-agent",
+              }),
             },
           ],
         },
@@ -248,10 +287,15 @@ describe("assembleCompiledRuntimePlan", () => {
           agentRuntimes: [
             {
               bindingId: "bind_a",
+              runtimeId: "codex",
               runtimeKey: "codex-app-server",
               clientId: "codex-cli",
               endpointKey: "app-server-a",
-              adapterKey: "openai-codex",
+              ptyLaunch: createPtyLaunch({
+                runtimeId: "codex",
+                displayName: "Codex",
+                command: "codex",
+              }),
             },
           ],
         },
@@ -288,17 +332,27 @@ describe("assembleCompiledRuntimePlan", () => {
     expect(plan.agentRuntimes).toEqual([
       {
         bindingId: "bind_a",
+        runtimeId: "codex",
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server-a",
-        adapterKey: "openai-codex",
+        ptyLaunch: createPtyLaunch({
+          runtimeId: "codex",
+          displayName: "Codex",
+          command: "codex",
+        }),
       },
       {
         bindingId: "bind_b",
+        runtimeId: "github-agent",
         runtimeKey: "github-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server-b",
-        adapterKey: "github-agent",
+        ptyLaunch: createPtyLaunch({
+          runtimeId: "github-agent",
+          displayName: "GitHub Agent",
+          command: "github-agent",
+        }),
       },
     ]);
   });

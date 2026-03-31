@@ -2,9 +2,9 @@ import type React from "react";
 
 import { StatusBox } from "../shared/status-box.js";
 import { EmailStepForm } from "./email-step-form.js";
-import { ErrorNotice } from "./error-notice.js";
 
 type EmailStageProps = {
+  afterForm?: React.ReactNode;
   authError: string | null;
   beforeForm?: React.ReactNode;
   email: string;
@@ -33,7 +33,10 @@ export function EmailStage(props: EmailStageProps): React.JSX.Element {
         {...(props.isEmailHidden === undefined ? {} : { isEmailHidden: props.isEmailHidden })}
         {...(props.submitLabel === undefined ? {} : { submitLabel: props.submitLabel })}
       />
-      <ErrorNotice message={props.footerError} />
+      {props.afterForm === undefined ? null : props.afterForm}
+      {props.footerError === null ? null : (
+        <StatusBox tone="destructive">{props.footerError}</StatusBox>
+      )}
     </div>
   );
 }

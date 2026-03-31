@@ -15,7 +15,7 @@
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/test-harness": "workspace:*",
     "@mistle/time": "workspace:*",
-    "@types/pg": "^8.18.0",
+    "@types/pg": "^8.20.0",
     "openapi-fetch": "^0.17.0",
     "pg": "^8.20.0",
     "zod": "^4.1.12"

@@ -33,9 +33,16 @@ describe("validateOpenAiBindingWriteContext", () => {
       binding: {
         kind: "agent",
         config: {
-          runtime: "codex-cli",
-          defaultModel: "gpt-5.3-codex",
-          reasoningEffort: "medium",
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {
+              reasoningEffort: "medium",
+            },
+          },
         },
       },
     });
@@ -65,9 +72,16 @@ describe("validateOpenAiBindingWriteContext", () => {
       binding: {
         kind: "agent",
         config: {
-          runtime: "codex-cli",
-          defaultModel: "gpt-5.3-codex",
-          reasoningEffort: "xhigh",
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {
+              reasoningEffort: "xhigh",
+            },
+          },
         },
       },
     });
@@ -90,9 +104,16 @@ describe("validateOpenAiBindingWriteContext", () => {
       binding: {
         kind: "agent",
         config: {
-          runtime: "codex-cli",
-          defaultModel: "gpt-5.1-codex-mini",
-          reasoningEffort: "low",
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.1-codex-mini",
+            options: {
+              reasoningEffort: "low",
+            },
+          },
         },
       },
     });
@@ -134,9 +155,16 @@ describe("validateOpenAiBindingWriteContext", () => {
       binding: {
         kind: "agent",
         config: {
-          runtime: "codex-cli",
-          defaultModel: "gpt-5.3-codex",
-          reasoningEffort: "medium",
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {
+              reasoningEffort: "medium",
+            },
+          },
         },
       },
     });

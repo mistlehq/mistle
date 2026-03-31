@@ -22,7 +22,6 @@ export const AutomationConversationCreatedByKinds = {
 
 export type AutomationConversationCreatedByKind =
   (typeof AutomationConversationCreatedByKinds)[keyof typeof AutomationConversationCreatedByKinds];
-export type AutomationConversationIntegrationFamilyId = string;
 
 export const AutomationConversationStatuses = {
   PENDING: "pending",
@@ -49,9 +48,8 @@ export const automationConversations = controlPlaneSchema.table(
     sandboxProfileId: text("sandbox_profile_id")
       .notNull()
       .references(() => sandboxProfiles.id, { onDelete: "cascade" }),
-    integrationFamilyId: text("integration_family_id")
-      .notNull()
-      .$type<AutomationConversationIntegrationFamilyId>(),
+    integrationFamilyId: text("integration_family_id").notNull(),
+    runtimeId: text("runtime_id").notNull(),
     conversationKey: text("conversation_key").notNull(),
     title: text("title"),
     preview: text("preview"),

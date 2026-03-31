@@ -41,7 +41,6 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
         ]}
         isLoading={false}
         loadErrorMessage={null}
-        onRetryLoad={() => {}}
       />,
     );
 
@@ -51,23 +50,18 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
     expect(screen.getByText("Connected")).toBeTruthy();
   });
 
-  it("renders load errors with a retry action", () => {
-    let retried = false;
-
+  it("renders load errors without a retry action", () => {
     render(
       <OrganizationIntegrationsSettingsPageView
         availableCards={[]}
         connectedCards={[]}
         isLoading={false}
         loadErrorMessage="Could not load integrations."
-        onRetryLoad={() => {
-          retried = true;
-        }}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(retried).toBe(true);
+    expect(screen.getByText("Could not load integrations. Please try again later.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
 
   it("hides integration directory sections when rendering a detail surface", () => {
@@ -96,7 +90,6 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
         detailSurface={<div>GitHub connection detail</div>}
         isLoading={false}
         loadErrorMessage={null}
-        onRetryLoad={() => {}}
       />,
     );
 

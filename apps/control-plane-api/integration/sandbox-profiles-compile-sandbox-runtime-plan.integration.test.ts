@@ -9,7 +9,7 @@ import {
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
-  createIntegrationRegistry,
+  createDefinitionsBundle,
   createOpenAiRawBindingCapabilities,
 } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
@@ -20,7 +20,7 @@ import {
 } from "../src/sandbox-profiles/services/compile-sandbox-runtime-plan.js";
 import { it } from "./test-context.js";
 
-const integrationRegistry = createIntegrationRegistry();
+const Definitions = createDefinitionsBundle();
 
 describe("sandbox profile internal runtime plan compiler integration", () => {
   it("fails when the resolved target secrets omit an existing target entry", async ({
@@ -70,16 +70,23 @@ describe("sandbox profile internal runtime plan compiler integration", () => {
       connectionId: "icn_compile_internal_missing_target_secrets_entry",
       kind: IntegrationBindingKinds.AGENT,
       config: {
-        runtime: "codex-cli",
-        defaultModel: "gpt-5.3-codex",
-        reasoningEffort: "medium",
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+          },
+        },
       },
     });
 
     await expect(
       compileSandboxRuntimePlan({
         db: fixture.db,
-        integrationRegistry,
+        integrationDefinitions: Definitions,
         resolveTargetSecrets: async () => [],
         organizationId: authenticatedSession.organizationId,
         profileId: "sbp_compile_internal_missing_target_secrets_entry",

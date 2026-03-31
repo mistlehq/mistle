@@ -2048,9 +2048,16 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
                 connectionId,
                 kind: "agent",
                 config: {
-                  runtime: "codex-cli",
-                  defaultModel: "gpt-5.3-codex",
-                  reasoningEffort: "medium",
+                  runtime: {
+                    runtimeId: "codex",
+                    config: {},
+                  },
+                  model: {
+                    defaultModel: "gpt-5.3-codex",
+                    options: {
+                      reasoningEffort: "medium",
+                    },
+                  },
                 },
               },
             ],
@@ -2202,9 +2209,16 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
                 connectionId,
                 kind: "agent",
                 config: {
-                  runtime: "codex-cli",
-                  defaultModel: "gpt-5.3-codex",
-                  reasoningEffort: "medium",
+                  runtime: {
+                    runtimeId: "codex",
+                    config: {},
+                  },
+                  model: {
+                    defaultModel: "gpt-5.3-codex",
+                    options: {
+                      reasoningEffort: "medium",
+                    },
+                  },
                 },
               },
             ],
@@ -2520,9 +2534,16 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
                 connectionId: openAiConnectionId,
                 kind: "agent",
                 config: {
-                  runtime: "codex-cli",
-                  defaultModel: "gpt-5.3-codex",
-                  reasoningEffort: "medium",
+                  runtime: {
+                    runtimeId: "codex",
+                    config: {},
+                  },
+                  model: {
+                    defaultModel: "gpt-5.3-codex",
+                    options: {
+                      reasoningEffort: "medium",
+                    },
+                  },
                 },
               },
               {

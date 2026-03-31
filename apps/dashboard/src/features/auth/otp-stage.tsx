@@ -1,5 +1,4 @@
 import { StatusBox } from "../shared/status-box.js";
-import { ErrorNotice } from "./error-notice.js";
 import { OtpStepForm } from "./otp-step-form.js";
 
 type OtpStageProps = {
@@ -29,7 +28,9 @@ export function OtpStage(props: OtpStageProps): React.JSX.Element {
           ? {}
           : { onUseDifferentEmail: props.onUseDifferentEmail })}
       />
-      <ErrorNotice message={props.footerError} />
+      {props.footerError === null ? null : (
+        <StatusBox tone="destructive">{props.footerError}</StatusBox>
+      )}
     </div>
   );
 }

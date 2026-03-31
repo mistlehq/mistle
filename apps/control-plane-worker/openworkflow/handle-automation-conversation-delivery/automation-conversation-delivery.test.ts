@@ -109,7 +109,11 @@ describe("conversation delivery plans", () => {
             activeExecutionId: null,
           },
           providerExecutionId: null,
-          adapter: {},
+          adapter: {
+            steerExecution: async () => ({
+              providerExecutionId: "turn_123",
+            }),
+          },
         }),
       ).toBe(AutomationConversationExecutionActions.FAIL_MISSING_CONVERSATION);
     });
@@ -123,7 +127,11 @@ describe("conversation delivery plans", () => {
             activeExecutionId: null,
           },
           providerExecutionId: null,
-          adapter: {},
+          adapter: {
+            steerExecution: async () => ({
+              providerExecutionId: "turn_123",
+            }),
+          },
         }),
       ).toBe(AutomationConversationExecutionActions.FAIL_PROVIDER_ERROR);
     });
@@ -137,7 +145,11 @@ describe("conversation delivery plans", () => {
             activeExecutionId: null,
           },
           providerExecutionId: null,
-          adapter: {},
+          adapter: {
+            steerExecution: async () => ({
+              providerExecutionId: "turn_123",
+            }),
+          },
         }),
       ).toBe(AutomationConversationExecutionActions.START);
     });
@@ -158,20 +170,6 @@ describe("conversation delivery plans", () => {
           },
         }),
       ).toBe(AutomationConversationExecutionActions.FAIL_MISSING_EXECUTION);
-    });
-
-    it("fails when steering is unsupported for an active provider conversation", () => {
-      expect(
-        resolveAutomationConversationExecutionAction({
-          inspectAutomationConversation: {
-            exists: true,
-            status: "active",
-            activeExecutionId: null,
-          },
-          providerExecutionId: "turn_123",
-          adapter: {},
-        }),
-      ).toBe(AutomationConversationExecutionActions.FAIL_STEER_NOT_SUPPORTED);
     });
 
     it("steers the active execution when provider state is consistent", () => {

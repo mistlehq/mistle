@@ -3,11 +3,7 @@ import { z } from "zod";
 import { OpenAiModelIds, OpenAiReasoningEfforts } from "./model-capabilities.js";
 export { OpenAiReasoningEfforts } from "./model-capabilities.js";
 
-export const OpenAiRuntimes: {
-  CODEX_CLI: "codex-cli";
-} = {
-  CODEX_CLI: "codex-cli",
-};
+export const OpenAiAllowedRuntimeIds = ["codex"] as const;
 
 const OpenAiAdditionalInstructionsSchema = z.preprocess((value) => {
   if (typeof value !== "string") {
@@ -19,15 +15,28 @@ const OpenAiAdditionalInstructionsSchema = z.preprocess((value) => {
 
 export const OpenAiApiKeyBindingConfigSchema = z
   .object({
-    runtime: z.literal(OpenAiRuntimes.CODEX_CLI),
-    defaultModel: z.enum(OpenAiModelIds),
-    reasoningEffort: z.enum([
-      OpenAiReasoningEfforts.LOW,
-      OpenAiReasoningEfforts.MEDIUM,
-      OpenAiReasoningEfforts.HIGH,
-      OpenAiReasoningEfforts.XHIGH,
-    ]),
-    additionalInstructions: OpenAiAdditionalInstructionsSchema,
+    runtime: z
+      .object({
+        runtimeId: z.enum(OpenAiAllowedRuntimeIds),
+        config: z.record(z.string(), z.unknown()),
+      })
+      .strict(),
+    model: z
+      .object({
+        defaultModel: z.enum(OpenAiModelIds),
+        options: z
+          .object({
+            reasoningEffort: z.enum([
+              OpenAiReasoningEfforts.LOW,
+              OpenAiReasoningEfforts.MEDIUM,
+              OpenAiReasoningEfforts.HIGH,
+              OpenAiReasoningEfforts.XHIGH,
+            ]),
+            additionalInstructions: OpenAiAdditionalInstructionsSchema,
+          })
+          .strict(),
+      })
+      .strict(),
   })
   .strict();
 

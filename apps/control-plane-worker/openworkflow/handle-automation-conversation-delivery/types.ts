@@ -9,6 +9,7 @@ export type ActiveAutomationConversationDeliveryTask = {
 export type ResolvedAutomationConversationDeliveryRoute = {
   conversationId: string;
   integrationFamilyId: string;
+  runtimeId: string;
   routeId: string | null;
   sandboxInstanceId: string | null;
   providerConversationId: string | null;
@@ -29,7 +30,7 @@ export type AutomationConversationDeliveryTaskAction = "deliver" | "ignore";
 
 export type ExecuteConversationProviderDeliveryInput = {
   conversationId: string;
-  integrationFamilyId: string;
+  runtimeId: string;
   connectionUrl: string;
   inputText: string;
   providerConversationId: string | null;

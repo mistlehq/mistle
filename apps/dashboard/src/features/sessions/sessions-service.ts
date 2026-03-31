@@ -1,3 +1,4 @@
+import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import { z } from "zod";
 
 import { getControlPlaneApiClient } from "../../lib/control-plane-api/client.js";
@@ -20,6 +21,7 @@ const SandboxInstanceStatusResponseSchema = z
     status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    runtimePlan: CompiledRuntimePlanSchema.nullable(),
     automationConversation: z
       .object({
         conversationId: z.string().min(1),
@@ -49,6 +51,7 @@ export type SandboxInstanceStatusResult = {
   status: "pending" | "starting" | "running" | "stopped" | "failed";
   failureCode: string | null;
   failureMessage: string | null;
+  runtimePlan: z.output<typeof CompiledRuntimePlanSchema> | null;
   automationConversation: {
     conversationId: string;
     routeId: string | null;

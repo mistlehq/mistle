@@ -52,6 +52,40 @@ afterEach(() => {
   }
 });
 
+function createDashboardConfigFile(input?: {
+  dashboardOrigin?: string;
+  googleTomlBlock?: string;
+}): string {
+  const directory = createTempDirectory();
+  const configPath = join(directory, "config.toml");
+  const dashboardOrigin = input?.dashboardOrigin ?? "http://127.0.0.1:5100";
+  const googleTomlBlock = input?.googleTomlBlock ?? "";
+
+  writeFileSync(
+    configPath,
+    [`[apps.dashboard]`, `control_plane_api_origin = "${dashboardOrigin}"`, "", googleTomlBlock]
+      .filter((line) => line.length > 0)
+      .join("\n"),
+    "utf8",
+  );
+
+  return configPath;
+}
+
+function loadDashboardBuildConfigForTest(input?: {
+  env?: NodeJS.ProcessEnv;
+  configPath?: string;
+  environment?: "development" | "production";
+}) {
+  return loadDashboardBuildConfig(
+    {
+      MISTLE_CONFIG_PATH: input?.configPath,
+      ...input?.env,
+    },
+    input?.environment ?? "development",
+  );
+}
+
 describe("loadDashboardBuildConfig", () => {
   it("falls back to config/config.development.toml when MISTLE_CONFIG_PATH is unset", () => {
     writeWorkspaceConfigFile({
@@ -66,61 +100,84 @@ describe("loadDashboardBuildConfig", () => {
     const config = loadDashboardBuildConfig({}, "production");
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
+    expect(config.authMethods).toEqual({
+      google: false,
+    });
   });
 
   it("loads dashboard origin from MISTLE_CONFIG_PATH", () => {
-    const directory = createTempDirectory();
-    const configPath = join(directory, "config.toml");
-
-    writeFileSync(
-      configPath,
-      '[apps.dashboard]\ncontrol_plane_api_origin = "http://127.0.0.1:5100"\n',
-      "utf8",
-    );
-
-    const config = loadDashboardBuildConfig(
-      {
-        MISTLE_CONFIG_PATH: configPath,
-      },
-      "development",
-    );
+    const config = loadDashboardBuildConfigForTest({
+      configPath: createDashboardConfigFile(),
+    });
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
+    expect(config.authMethods).toEqual({
+      google: false,
+    });
+  });
+
+  it("derives google auth availability from control-plane auth config", () => {
+    const config = loadDashboardBuildConfigForTest({
+      configPath: createDashboardConfigFile({
+        googleTomlBlock: [
+          "[apps.control_plane_api.auth.google]",
+          'client_id = "google-client-id"',
+          'client_secret = "google-client-secret"',
+        ].join("\n"),
+      }),
+    });
+
+    expect(config.authMethods).toEqual({
+      google: true,
+    });
+  });
+
+  it("derives google auth availability from env-only control-plane auth config", () => {
+    const config = loadDashboardBuildConfigForTest({
+      configPath: createDashboardConfigFile(),
+      env: {
+        MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID: "google-client-id",
+        MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET: "google-client-secret",
+      },
+    });
+
+    expect(config.authMethods).toEqual({
+      google: true,
+    });
+  });
+
+  it.each([
+    [{ MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID: "google-client-id" }],
+    [{ MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET: "google-client-secret" }],
+  ])("fails when google env config is partial: %j", (env) => {
+    expect(() =>
+      loadDashboardBuildConfigForTest({
+        configPath: createDashboardConfigFile(),
+        env,
+      }),
+    ).toThrow(
+      "Dashboard build config requires both MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
+    );
   });
 
   it("fails when apps.dashboard.control_plane_api_origin is missing", () => {
-    const directory = createTempDirectory();
-    const configPath = join(directory, "config.toml");
-
-    writeFileSync(configPath, "[apps.dashboard]\n", "utf8");
-
     expect(() =>
-      loadDashboardBuildConfig(
-        {
-          MISTLE_CONFIG_PATH: configPath,
-        },
-        "development",
-      ),
-    ).toThrow("Invalid input");
+      loadDashboardBuildConfigForTest({
+        configPath: createDashboardConfigFile({
+          dashboardOrigin: "",
+        }),
+      }),
+    ).toThrow("Too small: expected string to have >=1 characters");
   });
 
   it("fails when apps.dashboard.control_plane_api_origin is not an absolute URL origin", () => {
-    const directory = createTempDirectory();
-    const configPath = join(directory, "config.toml");
-
-    writeFileSync(
-      configPath,
-      '[apps.dashboard]\ncontrol_plane_api_origin = "localhost:5100"\n',
-      "utf8",
-    );
-
     expect(() =>
-      loadDashboardBuildConfig(
-        {
-          MISTLE_CONFIG_PATH: configPath,
-        },
-        "production",
-      ),
+      loadDashboardBuildConfigForTest({
+        configPath: createDashboardConfigFile({
+          dashboardOrigin: "localhost:5100",
+        }),
+        environment: "production",
+      }),
     ).toThrow("apps.dashboard.control_plane_api_origin must use http:// or https://.");
   });
 });

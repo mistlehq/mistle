@@ -160,6 +160,7 @@ async function inspectStartingSandboxInstance(
       status: SandboxInstanceStatuses.FAILED,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
+      runtimePlan: null,
     };
   }
 
@@ -177,6 +178,7 @@ async function inspectStartingSandboxInstance(
       ),
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
+      runtimePlan: null,
     };
   }
 
@@ -191,6 +193,7 @@ async function inspectStartingSandboxInstance(
     status: SandboxInstanceStatuses.FAILED,
     failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_STOPPED_DURING_STARTUP,
     failureMessage: "Sandbox runtime was not running at the provider during startup inspection.",
+    runtimePlan: null,
   };
 }
 
@@ -204,6 +207,7 @@ function readPendingSandboxInstance(sandboxInstance: {
     status: SandboxInstanceStatuses.PENDING,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
+    runtimePlan: null,
   };
 }
 
@@ -234,6 +238,7 @@ async function inspectRunningSandboxInstance(
       status: SandboxInstanceStatuses.FAILED,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
+      runtimePlan: null,
     };
   }
 
@@ -251,6 +256,7 @@ async function inspectRunningSandboxInstance(
       ),
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
+      runtimePlan: null,
     };
   }
 
@@ -263,6 +269,7 @@ async function inspectRunningSandboxInstance(
     status: SandboxInstanceStatuses.STOPPED,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
+    runtimePlan: null,
   };
 }
 
@@ -316,6 +323,7 @@ export async function getSandboxInstanceByInspection(
         status: SandboxInstanceStatuses.FAILED,
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,
+        runtimePlan: null,
       };
     case SandboxInstanceStatuses.STOPPED:
       return {
@@ -323,6 +331,7 @@ export async function getSandboxInstanceByInspection(
         status: SandboxInstanceStatuses.STOPPED,
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,
+        runtimePlan: null,
       };
     case SandboxInstanceStatuses.PENDING:
       return readPendingSandboxInstance(sandboxInstance);

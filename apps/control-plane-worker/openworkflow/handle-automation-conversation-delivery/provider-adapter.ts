@@ -1,5 +1,5 @@
 import type { AgentConversationProvider } from "@mistle/integrations-core";
-import { resolveAgentConversationProvider } from "@mistle/integrations-definitions/agent";
+import { resolveAgentConversationProvider } from "@mistle/integrations-definitions/agent-runtimes/server";
 
 export type ProviderAutomationConversationStatus = "idle" | "active" | "error";
 
@@ -85,25 +85,21 @@ export type ConversationProviderAdapter = {
   ) => Promise<ProviderCreateConversationOutput>;
   resumeAutomationConversation: (input: ProviderResumeConversationInput) => Promise<void>;
   startExecution: (input: ProviderStartExecutionInput) => Promise<ProviderStartExecutionOutput>;
-  steerExecution?: (input: ProviderSteerExecutionInput) => Promise<ProviderSteerExecutionOutput>;
+  steerExecution: (input: ProviderSteerExecutionInput) => Promise<ProviderSteerExecutionOutput>;
   recoverLateSteer?: (
     input: ProviderRecoverLateSteerInput,
   ) => Promise<ProviderStartExecutionOutput>;
-  interruptExecution?: (input: ProviderInterruptExecutionInput) => Promise<void>;
+  interruptExecution: (input: ProviderInterruptExecutionInput) => Promise<void>;
 };
 
-export function getConversationProviderAdapter(
-  integrationFamilyId: string,
-): ConversationProviderAdapter {
-  return adaptConversationProvider(resolveAgentConversationProvider(integrationFamilyId));
+export function getConversationProviderAdapter(runtimeId: string): ConversationProviderAdapter {
+  return adaptConversationProvider(resolveAgentConversationProvider(runtimeId));
 }
 
 function adaptConversationProvider(
   provider: AgentConversationProvider,
 ): ConversationProviderAdapter {
-  const steerExecution = provider.steerExecution;
   const recoverLateSteer = provider.recoverLateSteer;
-  const interruptExecution = provider.interruptExecution;
 
   return {
     connect: async (input) => await provider.connect(input),
@@ -111,20 +107,12 @@ function adaptConversationProvider(
     createAutomationConversation: async (input) => await provider.createConversation(input),
     resumeAutomationConversation: async (input) => await provider.resumeConversation(input),
     startExecution: async (input) => await provider.startExecution(input),
-    ...(steerExecution === undefined
-      ? {}
-      : {
-          steerExecution: async (input) => await steerExecution(input),
-        }),
+    steerExecution: async (input) => await provider.steerExecution(input),
     ...(recoverLateSteer === undefined
       ? {}
       : {
           recoverLateSteer: async (input) => await recoverLateSteer(input),
         }),
-    ...(interruptExecution === undefined
-      ? {}
-      : {
-          interruptExecution: async (input) => await interruptExecution(input),
-        }),
+    interruptExecution: async (input) => await provider.interruptExecution(input),
   };
 }

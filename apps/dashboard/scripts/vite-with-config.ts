@@ -34,6 +34,7 @@ function main(): void {
     env: {
       ...process.env,
       VITE_CONTROL_PLANE_API_ORIGIN: config.controlPlaneApiOrigin,
+      VITE_AUTH_METHOD_GOOGLE: String(config.authMethods.google),
     },
   });
 

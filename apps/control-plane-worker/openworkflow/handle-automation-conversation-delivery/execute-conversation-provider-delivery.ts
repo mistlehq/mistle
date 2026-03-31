@@ -17,6 +17,7 @@ async function steerConversationExecution(input: {
   adapter: ReturnType<typeof getConversationProviderAdapter>;
   connection: Awaited<ReturnType<ReturnType<typeof getConversationProviderAdapter>["connect"]>>;
   conversationId: string;
+  runtimeId: string;
   providerConversationId: string | null;
   providerExecutionId: string | null;
   inputText: string;
@@ -29,11 +30,6 @@ async function steerConversationExecution(input: {
   if (input.providerExecutionId === null) {
     throw new ConversationDeliveryExecutionError(
       `AutomationConversation '${input.conversationId}' is missing provider execution id while attempting to steer execution.`,
-    );
-  }
-  if (input.adapter.steerExecution === undefined) {
-    throw new ConversationDeliveryExecutionError(
-      `AutomationConversation integration family does not support steering execution for conversation '${input.conversationId}'.`,
     );
   }
 
@@ -95,7 +91,7 @@ async function recoverLateSteerExecution(input: {
 export async function executeConversationProviderDelivery(
   input: ExecuteConversationProviderDeliveryInput,
 ): Promise<ExecutedConversationProviderDelivery> {
-  const adapter = getConversationProviderAdapter(input.integrationFamilyId);
+  const adapter = getConversationProviderAdapter(input.runtimeId);
   const connection = await adapter.connect({
     connectionUrl: input.connectionUrl,
   });
@@ -142,6 +138,7 @@ export async function executeConversationProviderDelivery(
             adapter,
             connection,
             conversationId: input.conversationId,
+            runtimeId: input.runtimeId,
             providerConversationId,
             providerExecutionId: input.providerExecutionId,
             inputText: input.inputText,
@@ -172,10 +169,6 @@ export async function executeConversationProviderDelivery(
       case AutomationConversationExecutionActions.FAIL_MISSING_EXECUTION:
         throw new ConversationDeliveryExecutionError(
           `AutomationConversation '${input.conversationId}' is missing provider execution id while provider conversation '${providerConversationId}' is active.`,
-        );
-      case AutomationConversationExecutionActions.FAIL_STEER_NOT_SUPPORTED:
-        throw new ConversationDeliveryExecutionError(
-          `AutomationConversation integration family '${input.integrationFamilyId}' does not support steering active execution for conversation '${input.conversationId}'.`,
         );
     }
 

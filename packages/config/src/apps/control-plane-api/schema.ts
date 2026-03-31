@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+const ControlPlaneApiAuthGoogleConfigSchema = z
+  .object({
+    clientId: z.string().min(1),
+    clientSecret: z.string().min(1),
+  })
+  .strict();
+
 export const ControlPlaneApiServerConfigSchema = z
   .object({
     host: z.string().min(1),
@@ -22,6 +29,7 @@ export const ControlPlaneApiAuthConfigSchema = z
     otpLength: z.number().int().min(4).max(12),
     otpExpiresInSeconds: z.number().int().min(30),
     otpAllowedAttempts: z.number().int().min(1).max(10),
+    google: ControlPlaneApiAuthGoogleConfigSchema.optional(),
   })
   .strict();
 

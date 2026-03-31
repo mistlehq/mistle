@@ -1,6 +1,1 @@
-@import "../../../node_modules/.pnpm/node_modules/streamdown/styles.css";
-@import "@mistle/ui/styles.css";
-
-@source "../../../node_modules/.pnpm/node_modules/@streamdown/code/dist/*.js";
-@source "../../../node_modules/.pnpm/node_modules/streamdown/dist/*.js";
-@source "../../../apps/dashboard/src/**/*.{ts,tsx}";
+@import "../../../apps/dashboard/src/index.css";

@@ -1,5 +1,5 @@
 import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions";
 
 import { resolveIntegrationTargetSecrets } from "../lib/integration-target-secrets.js";
 import {
@@ -23,7 +23,7 @@ type CompileProfileVersionRuntimePlanInput = {
   image: ResolvedSandboxImage;
 };
 
-const registry = createIntegrationRegistry();
+const Definitions = createDefinitionsBundle();
 
 function mapCompilerErrorCodeToSandboxProfilesCompileErrorCode(
   code: Exclude<
@@ -51,6 +51,12 @@ function mapCompilerErrorCodeToSandboxProfilesCompileErrorCode(
       return SandboxProfilesCompileErrorCodes.INVALID_TARGET_SECRETS;
     case SandboxRuntimePlanCompilerErrorCodes.INVALID_BINDING_CONFIG:
       return SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONFIG;
+    case SandboxRuntimePlanCompilerErrorCodes.AGENT_RUNTIME_NOT_FOUND:
+      return SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONFIG;
+    case SandboxRuntimePlanCompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG:
+      return SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONFIG;
+    case SandboxRuntimePlanCompilerErrorCodes.MISSING_AGENT_PROVIDER_ACCESS:
+      return SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONFIG;
     case SandboxRuntimePlanCompilerErrorCodes.ROUTE_CONFLICT:
       return SandboxProfilesCompileErrorCodes.ROUTE_CONFLICT;
     case SandboxRuntimePlanCompilerErrorCodes.ARTIFACT_CONFLICT:
@@ -71,7 +77,7 @@ export async function compileProfileVersionRuntimePlan(
   try {
     return await compileSandboxRuntimePlan({
       db,
-      integrationRegistry: registry,
+      integrationDefinitions: Definitions,
       resolveTargetSecrets: async ({ targets }) => {
         return targets.map((target) => {
           try {

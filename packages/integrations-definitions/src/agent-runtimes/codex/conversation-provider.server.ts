@@ -16,6 +16,7 @@ const CodexMethodNames = {
   THREAD_READ: "thread/read",
   THREAD_RESUME: "thread/resume",
   THREAD_START: "thread/start",
+  TURN_INTERRUPT: "turn/interrupt",
   TURN_START: "turn/start",
   TURN_STEER: "turn/steer",
 } as const;
@@ -25,6 +26,7 @@ const ConversationProviderErrorCodes = {
   PROVIDER_CREATE_CONVERSATION_FAILED: "provider_create_conversation_failed",
   PROVIDER_EXECUTION_MISSING: "provider_execution_missing",
   PROVIDER_INSPECT_FAILED: "provider_inspect_failed",
+  PROVIDER_INTERRUPT_EXECUTION_FAILED: "provider_interrupt_execution_failed",
   PROVIDER_REQUEST_FAILED: "provider_request_failed",
   PROVIDER_RESUME_FAILED: "provider_resume_failed",
   PROVIDER_START_EXECUTION_FAILED: "provider_start_execution_failed",
@@ -677,6 +679,46 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
       return {
         providerExecutionId: extractTurnSteerExecutionId(steerResult),
       };
+    },
+    interruptExecution: async (input) => {
+      try {
+        await input.connection.request({
+          method: CodexMethodNames.TURN_INTERRUPT,
+          params: {
+            threadId: input.providerConversationId,
+            expectedTurnId: input.providerExecutionId,
+          },
+        });
+      } catch (error) {
+        if (isProviderConversationMissingError(error)) {
+          throw new ConversationProviderError({
+            code: ConversationProviderErrorCodes.PROVIDER_CONVERSATION_MISSING,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Codex interrupt execution failed with non-error exception.",
+            cause: error,
+          });
+        }
+        if (isProviderExecutionMissingError(error)) {
+          throw new ConversationProviderError({
+            code: ConversationProviderErrorCodes.PROVIDER_EXECUTION_MISSING,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Codex interrupt execution failed with non-error exception.",
+            cause: error,
+          });
+        }
+        throw new ConversationProviderError({
+          code: ConversationProviderErrorCodes.PROVIDER_INTERRUPT_EXECUTION_FAILED,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Codex interrupt execution failed with non-error exception.",
+          cause: error,
+        });
+      }
     },
   };
 }

@@ -5,8 +5,8 @@ export {
 } from "./target-config-schema.js";
 export {
   OpenAiApiKeyBindingConfigSchema,
+  OpenAiAllowedRuntimeIds,
   OpenAiReasoningEfforts,
-  OpenAiRuntimes,
   type OpenAiApiKeyBindingConfig,
 } from "./binding-config-schema.js";
 export {
@@ -25,10 +25,4 @@ export {
   isOpenAiReasoningEffortSupported,
   resolveOpenAiDefaultReasoningEffort,
 } from "./model-capabilities.js";
-export { compileOpenAiApiKeyBinding } from "./compile-binding.js";
 export { OpenAiApiKeyCredentialSecretTypes } from "./auth.js";
-export {
-  OpenAiCodexAppServerEndpointKey,
-  OpenAiCodexAppServerListenUrl,
-  OpenAiCodexAppServerProcessKey,
-} from "./app-server.js";

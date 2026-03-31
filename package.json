@@ -68,16 +68,21 @@
     "oxfmt": "^0.42.0",
     "oxlint": "^1.56.0",
     "oxlint-tsgolint": "^0.18.1",
-    "smol-toml": "^1.6.0",
+    "smol-toml": "^1.6.1",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.20.6",
     "turbo": "^2.8.16",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.1"
+    "vitest": "^4.1.2"
   },
   "engines": {
     "node": "^25.0.0",
     "pnpm": "10.30.2"
   },
-  "packageManager": "pnpm@10.30.2"
+  "packageManager": "pnpm@10.30.2",
+  "pnpm": {
+    "overrides": {
+      "axios": "1.13.6"
+    }
+  }
 }

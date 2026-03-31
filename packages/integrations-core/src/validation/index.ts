@@ -279,6 +279,146 @@ function stringRecordEquals(
   return true;
 }
 
+function validateAgentPtyLaunch(input: {
+  bindingId: string;
+  runtimeKey: string;
+  runtimeId: string;
+  ptyLaunch: {
+    runtimeId: string;
+    displayName: string;
+    newLaunch: {
+      ptySessionId: string;
+      cols: number;
+      rows: number;
+      cwd?: string;
+      command: string;
+      args: ReadonlyArray<
+        | {
+            kind: "literal";
+            value: string;
+          }
+        | {
+            kind: "threadId";
+          }
+      >;
+    };
+    resumeLaunch: {
+      ptySessionId: string;
+      cols: number;
+      rows: number;
+      cwd?: string;
+      command: string;
+      args: ReadonlyArray<
+        | {
+            kind: "literal";
+            value: string;
+          }
+        | {
+            kind: "threadId";
+          }
+      >;
+    };
+  };
+}): void {
+  function validateLaunchTemplate(templateInput: {
+    templateName: "newLaunch" | "resumeLaunch";
+    template: {
+      ptySessionId: string;
+      cols: number;
+      rows: number;
+      cwd?: string;
+      command: string;
+      args: ReadonlyArray<
+        | {
+            kind: "literal";
+            value: string;
+          }
+        | {
+            kind: "threadId";
+          }
+      >;
+    };
+  }): void {
+    if (templateInput.template.ptySessionId.trim().length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+        `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must define a non-empty ptyLaunch.${templateInput.templateName}.ptySessionId.`,
+      );
+    }
+    if (templateInput.template.cols <= 0 || templateInput.template.rows <= 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+        `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must define positive ptyLaunch.${templateInput.templateName} dimensions.`,
+      );
+    }
+    if (
+      templateInput.template.cwd !== undefined &&
+      templateInput.template.cwd.trim().length === 0
+    ) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+        `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must not define an empty ptyLaunch.${templateInput.templateName}.cwd.`,
+      );
+    }
+    if (templateInput.template.command.trim().length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+        `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must define a non-empty ptyLaunch.${templateInput.templateName}.command.`,
+      );
+    }
+
+    let threadIdArgumentCount = 0;
+    for (const [index, argument] of templateInput.template.args.entries()) {
+      if (argument.kind === "literal" && argument.value.trim().length === 0) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+          `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' contains an empty literal ptyLaunch.${templateInput.templateName} arg at index ${index}.`,
+        );
+      }
+
+      if (argument.kind === "threadId") {
+        threadIdArgumentCount += 1;
+      }
+    }
+
+    if (templateInput.templateName === "newLaunch" && threadIdArgumentCount !== 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+        `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must not define threadId placeholders in ptyLaunch.newLaunch.`,
+      );
+    }
+
+    if (templateInput.templateName === "resumeLaunch" && threadIdArgumentCount === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+        `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must define at least one threadId placeholder in ptyLaunch.resumeLaunch.`,
+      );
+    }
+  }
+
+  if (input.ptyLaunch.runtimeId !== input.runtimeId) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+      `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must declare a ptyLaunch.runtimeId matching '${input.runtimeId}'.`,
+    );
+  }
+  if (input.ptyLaunch.displayName.trim().length === 0) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+      `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must define a non-empty ptyLaunch.displayName.`,
+    );
+  }
+
+  validateLaunchTemplate({
+    templateName: "newLaunch",
+    template: input.ptyLaunch.newLaunch,
+  });
+  validateLaunchTemplate({
+    templateName: "resumeLaunch",
+    template: input.ptyLaunch.resumeLaunch,
+  });
+}
+
 function artifactLifecycleEquals(
   left: CompiledRuntimeArtifactSpec["lifecycle"],
   right: CompiledRuntimeArtifactSpec["lifecycle"],
@@ -752,6 +892,13 @@ function validateAgentRuntimes(input: {
       }
       runtimeKeys.add(agentRuntime.runtimeKey);
 
+      if (agentRuntime.runtimeId.trim().length === 0) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+          `Agent runtime '${agentRuntime.runtimeKey}' for binding '${agentRuntime.bindingId}' must define a non-empty runtimeId.`,
+        );
+      }
+
       if (agentRuntime.clientId.trim().length === 0) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
@@ -774,19 +921,19 @@ function validateAgentRuntimes(input: {
         );
       }
 
-      if (agentRuntime.adapterKey.trim().length === 0) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
-          `Agent runtime '${agentRuntime.runtimeKey}' for binding '${agentRuntime.bindingId}' must define a non-empty adapterKey.`,
-        );
-      }
-
       if (!endpointKeys.has(agentRuntime.endpointKey)) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
           `Agent runtime '${agentRuntime.runtimeKey}' for binding '${agentRuntime.bindingId}' references missing endpoint '${agentRuntime.endpointKey}' on client '${agentRuntime.clientId}'.`,
         );
       }
+
+      validateAgentPtyLaunch({
+        bindingId: agentRuntime.bindingId,
+        runtimeKey: agentRuntime.runtimeKey,
+        runtimeId: agentRuntime.runtimeId,
+        ptyLaunch: agentRuntime.ptyLaunch,
+      });
     }
   }
 }

@@ -1,4 +1,5 @@
 import { applySchemaDefaultsToFormData, resolveIntegrationForm } from "@mistle/integrations-core";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions";
 import { createIntegrationFormRegistry } from "@mistle/integrations-definitions/forms";
 import { Alert, AlertDescription, AlertTitle, Button } from "@mistle/ui";
 import Form, { type IChangeEvent } from "@rjsf/core";
@@ -14,7 +15,8 @@ import type { IntegrationConnectionResourceSummary } from "../integrations/integ
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { isRecord } from "../shared/is-record.js";
 
-const IntegrationRegistry = createIntegrationFormRegistry();
+const Definitions = createDefinitionsBundle();
+const IntegrationRegistry = createIntegrationFormRegistry(Definitions);
 
 type JsonObject = Record<string, unknown>;
 type IntegrationDefinition = NonNullable<ReturnType<typeof IntegrationRegistry.getDefinition>>;
@@ -246,7 +248,7 @@ function resolveBindingDefinitionContext(input: {
       definition,
       connection,
       target,
-      parsedTargetConfig: targetConfigResult.data,
+      parsedTargetConfig: resolveRecord(targetConfigResult.data),
       parsedConnectionConfig,
     },
   };
@@ -280,6 +282,7 @@ function resolveFormModelFromContext(input: {
             : { resources: input.context.connection.resources }),
         },
         currentValue: input.row.config,
+        definitions: Definitions,
         ...(parsedCurrentValue.success ? { parsedCurrentValue: parsedCurrentValue.data } : {}),
       },
     });

@@ -1,4 +1,4 @@
-import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/openai/agent/client";
+import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useCallback, useMemo, useState } from "react";
 
 import type { ChatComposerViewModel } from "../../chat/components/chat-composer.js";

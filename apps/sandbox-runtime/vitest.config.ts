@@ -12,9 +12,12 @@ export default defineConfig({
         ),
       },
       {
-        find: "@mistle/integrations-definitions/agent",
+        find: "@mistle/integrations-definitions/agent-runtimes/server",
         replacement: fileURLToPath(
-          new URL("../../packages/integrations-definitions/src/agent.server.ts", import.meta.url),
+          new URL(
+            "../../packages/integrations-definitions/src/agent-runtimes/server.ts",
+            import.meta.url,
+          ),
         ),
       },
       {

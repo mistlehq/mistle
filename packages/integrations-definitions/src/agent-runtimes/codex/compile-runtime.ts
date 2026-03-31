@@ -1,20 +1,16 @@
-import { type CompileBindingInput, type CompileBindingResult } from "@mistle/integrations-core";
+import {
+  type AgentProviderAccess,
+  type CompileAgentRuntimeInput,
+  type CompileAgentRuntimeResult,
+} from "@mistle/integrations-core";
 import { stringify as stringifyToml } from "smol-toml";
 
-import { OpenAiAgentAdapterKeys } from "./adapter-keys.js";
 import {
-  OpenAiCodexAppServerEndpointKey,
-  OpenAiCodexAppServerListenUrl,
-  OpenAiCodexAppServerProcessKey,
+  CodexAppServerEndpointKey,
+  CodexAppServerListenUrl,
+  CodexAppServerProcessKey,
 } from "./app-server.js";
-import { resolveOpenAiCredentialSecretType } from "./auth.js";
-import type { OpenAiApiKeyBindingConfig } from "./binding-config-schema.js";
-import type { OpenAiApiKeyTargetConfig } from "./target-config-schema.js";
-
-export type OpenAiApiKeyCompileBindingInput = CompileBindingInput<
-  OpenAiApiKeyTargetConfig,
-  OpenAiApiKeyBindingConfig
->;
+import { CodexPtyLaunchSpec } from "./pty-launch.js";
 
 const CodexCliArtifactKey = "codex-cli";
 const ProxyModelProviderKey = "proxy";
@@ -34,7 +30,6 @@ const ArtifactCommandTimeoutMs = 120_000;
 const RuntimeClientProcessReadinessTimeoutMs = 5_000;
 const RuntimeClientProcessStopTimeoutMs = 10_000;
 const RuntimeClientProcessStopGracePeriodMs = 2_000;
-const OpenAiAllowedPathPrefix = "/";
 const ManagedSandboxContext = [
   "Mistle-managed sandbox context:",
   "",
@@ -45,6 +40,41 @@ const ManagedSandboxContext = [
   "- Prefer debugging request behavior and proxy-mediated access before treating missing in-process credentials as the root cause.",
   "- Do not modify proxy-related environment variables unless explicitly instructed.",
 ].join("\n");
+
+type CodexProviderMetadata = {
+  reasoningEffort: string;
+  additionalInstructions?: string;
+};
+
+function resolveCodexProviderMetadata(
+  providerAccess: AgentProviderAccess,
+): CodexProviderMetadata | null {
+  const providerMetadata = providerAccess.providerMetadata;
+  if (providerMetadata === undefined) {
+    return null;
+  }
+
+  const reasoningEffort = providerMetadata["reasoningEffort"];
+  if (typeof reasoningEffort !== "string" || reasoningEffort.trim().length === 0) {
+    return null;
+  }
+
+  const additionalInstructions = providerMetadata["additionalInstructions"];
+  if (additionalInstructions === undefined) {
+    return {
+      reasoningEffort,
+    };
+  }
+
+  if (typeof additionalInstructions !== "string") {
+    return null;
+  }
+
+  return {
+    reasoningEffort,
+    additionalInstructions,
+  };
+}
 
 function composeDeveloperInstructions(additionalInstructions?: string): string {
   if (additionalInstructions === undefined) {
@@ -90,31 +120,35 @@ function renderCodexConfig(input: {
   });
 }
 
-export function compileOpenAiApiKeyBinding(
-  input: OpenAiApiKeyCompileBindingInput,
-): CompileBindingResult {
-  const routeHost = new URL(input.target.config.apiBaseUrl).host;
-  const credentialSecretType = resolveOpenAiCredentialSecretType(input.connection.config);
+export function compileCodexRuntime(
+  input: CompileAgentRuntimeInput<Record<string, never>>,
+): CompileAgentRuntimeResult {
+  const routeHost = new URL(input.providerAccess.apiBaseUrl).host;
   const codexCliInstallPath = input.refs.artifactBinPath("codex");
+  const providerMetadata = resolveCodexProviderMetadata(input.providerAccess);
+
+  if (providerMetadata === null) {
+    throw new Error("Codex runtime requires provider reasoning metadata.");
+  }
 
   return {
     egressRoutes: [
       {
         match: {
           hosts: [routeHost],
-          pathPrefixes: [OpenAiAllowedPathPrefix],
-          methods: ["GET", "POST"],
+          pathPrefixes: [...input.providerAccess.allowedPathPrefixes],
+          methods: [...input.providerAccess.allowedMethods],
         },
         upstream: {
-          baseUrl: input.target.config.apiBaseUrl,
+          baseUrl: input.providerAccess.apiBaseUrl,
         },
         authInjection: {
-          type: "bearer",
+          type: input.providerAccess.authScheme,
           target: "authorization",
         },
         credentialResolver: {
-          connectionId: input.connection.id,
-          secretType: credentialSecretType,
+          connectionId: input.providerAccess.credentialResolver.connectionId,
+          secretType: input.providerAccess.credentialResolver.secretType,
         },
       },
     ],
@@ -136,11 +170,11 @@ export function compileOpenAiApiKeyBinding(
     ],
     runtimeClients: [
       {
-        clientId: input.binding.config.runtime,
+        clientId: "codex-cli",
         setup: {
           env: {
-            OPENAI_MODEL: input.binding.config.defaultModel,
-            OPENAI_REASONING_EFFORT: input.binding.config.reasoningEffort,
+            OPENAI_MODEL: input.providerAccess.defaultModel,
+            OPENAI_REASONING_EFFORT: providerMetadata.reasoningEffort,
           },
           files: [
             {
@@ -148,13 +182,13 @@ export function compileOpenAiApiKeyBinding(
               path: "/etc/codex/config.toml",
               mode: 384,
               content: renderCodexConfig({
-                model: input.binding.config.defaultModel,
-                reasoningEffort: input.binding.config.reasoningEffort,
-                apiBaseUrl: input.target.config.apiBaseUrl,
-                ...(input.binding.config.additionalInstructions === undefined
+                model: input.providerAccess.defaultModel,
+                reasoningEffort: providerMetadata.reasoningEffort,
+                apiBaseUrl: input.providerAccess.apiBaseUrl,
+                ...(providerMetadata.additionalInstructions === undefined
                   ? {}
                   : {
-                      additionalInstructions: input.binding.config.additionalInstructions,
+                      additionalInstructions: providerMetadata.additionalInstructions,
                     }),
               }),
             },
@@ -162,13 +196,13 @@ export function compileOpenAiApiKeyBinding(
         },
         processes: [
           {
-            processKey: OpenAiCodexAppServerProcessKey,
+            processKey: CodexAppServerProcessKey,
             command: {
-              args: [codexCliInstallPath, "app-server", "--listen", OpenAiCodexAppServerListenUrl],
+              args: [codexCliInstallPath, "app-server", "--listen", CodexAppServerListenUrl],
             },
             readiness: {
               type: "ws",
-              url: OpenAiCodexAppServerListenUrl,
+              url: CodexAppServerListenUrl,
               timeoutMs: RuntimeClientProcessReadinessTimeoutMs,
             },
             stop: {
@@ -180,11 +214,11 @@ export function compileOpenAiApiKeyBinding(
         ],
         endpoints: [
           {
-            endpointKey: OpenAiCodexAppServerEndpointKey,
-            processKey: OpenAiCodexAppServerProcessKey,
+            endpointKey: CodexAppServerEndpointKey,
+            processKey: CodexAppServerProcessKey,
             transport: {
               type: "ws",
-              url: OpenAiCodexAppServerListenUrl,
+              url: CodexAppServerListenUrl,
             },
             connectionMode: "dedicated",
           },
@@ -193,10 +227,11 @@ export function compileOpenAiApiKeyBinding(
     ],
     agentRuntimes: [
       {
-        runtimeKey: OpenAiCodexAppServerProcessKey,
-        clientId: input.binding.config.runtime,
-        endpointKey: OpenAiCodexAppServerEndpointKey,
-        adapterKey: OpenAiAgentAdapterKeys.OPENAI_CODEX,
+        runtimeId: "codex",
+        runtimeKey: CodexAppServerProcessKey,
+        clientId: "codex-cli",
+        endpointKey: CodexAppServerEndpointKey,
+        ptyLaunch: CodexPtyLaunchSpec,
       },
     ],
   };

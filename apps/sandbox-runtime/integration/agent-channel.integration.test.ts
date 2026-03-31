@@ -1,5 +1,6 @@
 import { once } from "node:events";
 
+import type { CompiledAgentRuntime } from "@mistle/integrations-core";
 import {
   PayloadKindWebSocketText,
   decodeDataFrame,
@@ -100,13 +101,39 @@ function createRuntimeClient() {
   };
 }
 
-function createAgentRuntime() {
+function createAgentRuntime(): CompiledAgentRuntime {
   return {
     bindingId: "binding_openai",
+    runtimeId: "codex",
     runtimeKey: "codex-app-server",
     clientId: "client_openai",
     endpointKey: "app-server",
-    adapterKey: "openai-codex",
+    ptyLaunch: {
+      runtimeId: "codex",
+      displayName: "Codex",
+      newLaunch: {
+        ptySessionId: "cli",
+        cols: 120,
+        rows: 32,
+        command: "codex",
+        args: [],
+      },
+      resumeLaunch: {
+        ptySessionId: "cli",
+        cols: 120,
+        rows: 32,
+        command: "codex",
+        args: [
+          {
+            kind: "literal",
+            value: "resume",
+          },
+          {
+            kind: "threadId",
+          },
+        ],
+      },
+    },
   };
 }
 

@@ -1,8 +1,9 @@
-import { Alert, AlertDescription, Badge, Button } from "@mistle/ui";
+import { Badge, Button } from "@mistle/ui";
 import { ArrowClockwiseIcon, PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { EditableHeading } from "../shared/editable-heading.js";
+import { StatusBox } from "../shared/status-box.js";
 import {
   formatConnectionStatusLabel,
   formatResourceHeading,
@@ -136,7 +137,7 @@ function ConnectionCard(input: {
               }}
               size="icon-sm"
               type="button"
-              variant="destructive"
+              variant="outline"
               title="Delete connection"
             >
               <TrashIcon aria-hidden className="size-4" />
@@ -347,9 +348,7 @@ function ResourceSection(input: {
         ) : null}
       </div>
       {input.resource.lastErrorMessage ? (
-        <Alert variant="destructive">
-          <AlertDescription>{input.resource.lastErrorMessage}</AlertDescription>
-        </Alert>
+        <StatusBox tone="destructive">{input.resource.lastErrorMessage}</StatusBox>
       ) : null}
       <ResourceItemsPreview
         errorMessage={input.resourceItems?.errorMessage ?? null}
@@ -372,7 +371,7 @@ function ResourceItemsPreview(input: {
   }
 
   if (input.errorMessage !== null) {
-    return <p className="text-destructive text-sm">{input.errorMessage}</p>;
+    return <StatusBox tone="destructive">{input.errorMessage}</StatusBox>;
   }
 
   if (input.items.length === 0) {

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { buildDashboardConfig } from "./config.js";
+import { buildDashboardConfig, getDashboardGoogleAuthMethodEnabled } from "./config.js";
+
+function setDashboardGoogleAuthMethodFlag(value: string): void {
+  Object.assign(import.meta.env, {
+    VITE_AUTH_METHOD_GOOGLE: value,
+  });
+}
 
 describe("dashboard config", () => {
   it("accepts a valid control-plane API origin", () => {
@@ -21,5 +27,19 @@ describe("dashboard config", () => {
 
   it("requires control-plane API origin", () => {
     expect(() => buildDashboardConfig({})).toThrow("VITE_CONTROL_PLANE_API_ORIGIN is required.");
+  });
+
+  it("parses the google auth method flag separately", () => {
+    setDashboardGoogleAuthMethodFlag("true");
+
+    expect(getDashboardGoogleAuthMethodEnabled()).toBe(true);
+  });
+
+  it.each([["yes"], [""]])("rejects an invalid google auth method flag: %s", (value) => {
+    setDashboardGoogleAuthMethodFlag(value);
+
+    expect(() => getDashboardGoogleAuthMethodEnabled()).toThrow(
+      'VITE_AUTH_METHOD_GOOGLE must be either "true" or "false".',
+    );
   });
 });

@@ -31,6 +31,7 @@ export async function resolveAutomationConversationDeliveryRoute(
   return {
     conversationId: conversation.id,
     integrationFamilyId: conversation.integrationFamilyId,
+    runtimeId: conversation.runtimeId,
     routeId: route?.id ?? null,
     sandboxInstanceId: route?.sandboxInstanceId ?? null,
     providerConversationId: route?.providerConversationId ?? null,

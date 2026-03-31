@@ -387,8 +387,8 @@
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "automation_runs_automation_conversation_id_automation_conversations_id_fk": {
-          "name": "automation_runs_automation_conversation_id_automation_conversations_id_fk",
+        "automation_runs_conversation_id_automation_conversations_id_fk": {
+          "name": "automation_runs_conversation_id_automation_conversations_id_fk",
           "tableFrom": "automation_runs",
           "tableTo": "automation_conversations",
           "schemaTo": "control_plane",
@@ -681,8 +681,8 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "automation_conversation_delivery_processors_automation_conversation_id_automation_conversations_id_fk": {
-          "name": "automation_conversation_delivery_processors_automation_conversation_id_automation_conversations_id_fk",
+        "automation_conversation_delivery_processors_conversation_id_automation_conversations_id_fk": {
+          "name": "automation_conversation_delivery_processors_conversation_id_automation_conversations_id_fk",
           "tableFrom": "automation_conversation_delivery_processors",
           "tableTo": "automation_conversations",
           "schemaTo": "control_plane",
@@ -750,7 +750,7 @@
           "type": "bigint",
           "primaryKey": false,
           "notNull": true,
-          "default": "0"
+          "default": 0
         },
         "failure_code": {
           "name": "failure_code",
@@ -899,8 +899,8 @@
         }
       },
       "foreignKeys": {
-        "automation_conversation_delivery_tasks_automation_conversation_id_automation_conversations_id_fk": {
-          "name": "automation_conversation_delivery_tasks_automation_conversation_id_automation_conversations_id_fk",
+        "automation_conversation_delivery_tasks_conversation_id_automation_conversations_id_fk": {
+          "name": "automation_conversation_delivery_tasks_conversation_id_automation_conversations_id_fk",
           "tableFrom": "automation_conversation_delivery_tasks",
           "tableTo": "automation_conversations",
           "schemaTo": "control_plane",
@@ -1045,8 +1045,8 @@
         }
       },
       "foreignKeys": {
-        "automation_conversation_routes_automation_conversation_id_automation_conversations_id_fk": {
-          "name": "automation_conversation_routes_automation_conversation_id_automation_conversations_id_fk",
+        "automation_conversation_routes_conversation_id_automation_conversations_id_fk": {
+          "name": "automation_conversation_routes_conversation_id_automation_conversations_id_fk",
           "tableFrom": "automation_conversation_routes",
           "tableTo": "automation_conversations",
           "schemaTo": "control_plane",
@@ -1110,6 +1110,12 @@
         },
         "integration_family_id": {
           "name": "integration_family_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "runtime_id": {
+          "name": "runtime_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true

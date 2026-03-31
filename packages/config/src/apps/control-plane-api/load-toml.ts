@@ -34,6 +34,14 @@ export function loadControlPlaneApiFromToml(
       otpLength: auth.otp_length,
       otpExpiresInSeconds: auth.otp_expires_in_seconds,
       otpAllowedAttempts: auth.otp_allowed_attempts,
+      ...(auth.google === undefined
+        ? {}
+        : {
+            google: {
+              clientId: asObjectRecord(auth.google).client_id,
+              clientSecret: asObjectRecord(auth.google).client_secret,
+            },
+          }),
     },
     dashboard: {
       baseUrl: dashboard.base_url,

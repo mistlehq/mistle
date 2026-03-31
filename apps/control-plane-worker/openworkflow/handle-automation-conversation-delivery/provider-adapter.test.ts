@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { getConversationProviderAdapter } from "./provider-adapter.js";
 
 describe("conversation provider adapter registry", () => {
-  it("throws for unsupported integration families", () => {
+  it("throws for unsupported runtimes", () => {
     expect(() => getConversationProviderAdapter("unsupported")).toThrow(
-      "Unsupported conversation integration family 'unsupported'.",
+      "Agent runtime 'unsupported' was not found.",
     );
   });
 });

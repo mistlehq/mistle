@@ -1,7 +1,9 @@
+import { Separator } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardMemoryRouter } from "../../storybook/decorators.js";
 import { AuthScreenView } from "./auth-screen-view.js";
+import { GoogleSignInButton } from "./google-sign-in-button.js";
 
 const meta = {
   title: "Dashboard/Auth/AuthScreenView",
@@ -39,6 +41,61 @@ export const EmailEntry: Story = {
 export const SendingOtp: Story = {
   args: {
     isSendingOtp: true,
+  },
+};
+
+export const GoogleEnabled: Story = {
+  args: {
+    emailStageAfterForm: (
+      <div className="gap-4 pt-1 flex flex-col">
+        <div className="items-center gap-4 flex">
+          <Separator className="flex-1" />
+          <div className="text-muted-foreground text-xs font-medium uppercase tracking-[0.2em]">
+            Or
+          </div>
+          <Separator className="flex-1" />
+        </div>
+        <GoogleSignInButton isPending={false} onClick={async () => {}} />
+      </div>
+    ),
+    title: "Log in",
+  },
+};
+
+export const GoogleRedirecting: Story = {
+  args: {
+    emailStageAfterForm: (
+      <div className="gap-4 pt-1 flex flex-col">
+        <div className="items-center gap-4 flex">
+          <Separator className="flex-1" />
+          <div className="text-muted-foreground text-xs font-medium uppercase tracking-[0.2em]">
+            Or
+          </div>
+          <Separator className="flex-1" />
+        </div>
+        <GoogleSignInButton isPending={true} onClick={async () => {}} />
+      </div>
+    ),
+    title: "Log in",
+  },
+};
+
+export const GoogleCallbackError: Story = {
+  args: {
+    authError: "Google sign-in was cancelled.",
+    emailStageAfterForm: (
+      <div className="gap-4 pt-1 flex flex-col">
+        <div className="items-center gap-4 flex">
+          <Separator className="flex-1" />
+          <div className="text-muted-foreground text-xs font-medium uppercase tracking-[0.2em]">
+            Or
+          </div>
+          <Separator className="flex-1" />
+        </div>
+        <GoogleSignInButton isPending={false} onClick={async () => {}} />
+      </div>
+    ),
+    title: "Log in",
   },
 };
 

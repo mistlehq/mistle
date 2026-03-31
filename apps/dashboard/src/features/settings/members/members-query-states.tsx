@@ -1,14 +1,6 @@
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Skeleton,
-} from "@mistle/ui";
+import { Card, CardContent, CardHeader, CardTitle, Skeleton } from "@mistle/ui";
+
+import { StatusBox } from "../../shared/status-box.js";
 
 export function MembersLoadingState(): React.JSX.Element {
   return (
@@ -42,25 +34,14 @@ export function MembersLoadingState(): React.JSX.Element {
   );
 }
 
-export function MembersLoadErrorState(input: {
-  message: string;
-  onRetry: () => void;
-}): React.JSX.Element {
+export function MembersLoadErrorState(input: { message: string }): React.JSX.Element {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Members</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <Alert variant="destructive">
-          <AlertTitle>Failed to load members settings</AlertTitle>
-          <AlertDescription>{input.message}</AlertDescription>
-        </Alert>
-        <div>
-          <Button onClick={input.onRetry} type="button" variant="outline">
-            Retry
-          </Button>
-        </div>
+        <StatusBox tone="destructive">{input.message} Please try again later.</StatusBox>
       </CardContent>
     </Card>
   );

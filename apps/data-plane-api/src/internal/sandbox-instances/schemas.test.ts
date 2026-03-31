@@ -56,10 +56,36 @@ function createRuntimePlan() {
         agentRuntimes: [
           {
             bindingId: "ibd_123",
+            runtimeId: "test-agent",
             runtimeKey: "runtime_123",
             clientId: "client_123",
             endpointKey: "endpoint_123",
-            adapterKey: "test-agent",
+            ptyLaunch: {
+              runtimeId: "test-agent",
+              displayName: "Test Agent",
+              newLaunch: {
+                ptySessionId: "cli",
+                cols: 120,
+                rows: 32,
+                command: "agent",
+                args: [],
+              },
+              resumeLaunch: {
+                ptySessionId: "cli",
+                cols: 120,
+                rows: 32,
+                command: "agent",
+                args: [
+                  {
+                    kind: "literal",
+                    value: "resume",
+                  },
+                  {
+                    kind: "threadId",
+                  },
+                ],
+              },
+            },
           },
         ],
       },

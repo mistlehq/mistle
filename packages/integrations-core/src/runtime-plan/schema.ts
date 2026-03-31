@@ -183,13 +183,48 @@ const RuntimeClientSchema = z
   })
   .strict();
 
+const AgentPtyLaunchArgumentSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("literal"),
+      value: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("threadId"),
+    })
+    .strict(),
+]);
+
+const AgentPtyLaunchTemplateSchema = z
+  .object({
+    ptySessionId: z.string().min(1),
+    cols: z.int().positive(),
+    rows: z.int().positive(),
+    cwd: z.string().min(1).optional(),
+    command: z.string().min(1),
+    args: z.array(AgentPtyLaunchArgumentSchema).readonly(),
+  })
+  .strict();
+
+const AgentPtyLaunchSpecSchema = z
+  .object({
+    runtimeId: z.string().min(1),
+    displayName: z.string().min(1),
+    newLaunch: AgentPtyLaunchTemplateSchema,
+    resumeLaunch: AgentPtyLaunchTemplateSchema,
+  })
+  .strict();
+
 const CompiledAgentRuntimeSchema = z
   .object({
     bindingId: z.string().min(1),
+    runtimeId: z.string().min(1),
     runtimeKey: z.string().min(1),
     clientId: z.string().min(1),
     endpointKey: z.string().min(1),
-    adapterKey: z.string().min(1),
+    ptyLaunch: AgentPtyLaunchSpecSchema,
   })
   .strict();
 
@@ -376,10 +411,34 @@ function normalizeAgentRuntime(
 ): RuntimePlanAgentRuntime {
   return {
     bindingId: agentRuntime.bindingId,
+    runtimeId: agentRuntime.runtimeId,
     runtimeKey: agentRuntime.runtimeKey,
     clientId: agentRuntime.clientId,
     endpointKey: agentRuntime.endpointKey,
-    adapterKey: agentRuntime.adapterKey,
+    ptyLaunch: {
+      runtimeId: agentRuntime.ptyLaunch.runtimeId,
+      displayName: agentRuntime.ptyLaunch.displayName,
+      newLaunch: {
+        ptySessionId: agentRuntime.ptyLaunch.newLaunch.ptySessionId,
+        cols: agentRuntime.ptyLaunch.newLaunch.cols,
+        rows: agentRuntime.ptyLaunch.newLaunch.rows,
+        ...(agentRuntime.ptyLaunch.newLaunch.cwd === undefined
+          ? {}
+          : { cwd: agentRuntime.ptyLaunch.newLaunch.cwd }),
+        command: agentRuntime.ptyLaunch.newLaunch.command,
+        args: agentRuntime.ptyLaunch.newLaunch.args,
+      },
+      resumeLaunch: {
+        ptySessionId: agentRuntime.ptyLaunch.resumeLaunch.ptySessionId,
+        cols: agentRuntime.ptyLaunch.resumeLaunch.cols,
+        rows: agentRuntime.ptyLaunch.resumeLaunch.rows,
+        ...(agentRuntime.ptyLaunch.resumeLaunch.cwd === undefined
+          ? {}
+          : { cwd: agentRuntime.ptyLaunch.resumeLaunch.cwd }),
+        command: agentRuntime.ptyLaunch.resumeLaunch.command,
+        args: agentRuntime.ptyLaunch.resumeLaunch.args,
+      },
+    },
   };
 }
 

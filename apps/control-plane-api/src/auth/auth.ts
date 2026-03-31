@@ -2,11 +2,12 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { ControlPlaneDbSchema } from "@mistle/db/control-plane";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { emailOTP, organization } from "better-auth/plugins";
+import { organization } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 import type { OpenWorkflow } from "openworkflow";
 
 import { AUTH_ROUTE_BASE_PATH } from "./constants.js";
+import { createAuthProviders } from "./providers/index.js";
 import { applyActiveOrganizationToSession } from "./services/apply-active-organization-to-session.js";
 import { createInitialOrganizationCredentialKey } from "./services/create-initial-organization-credential-key.js";
 import { createSendOrganizationInvitationService } from "./services/create-send-organization-invitation.js";
@@ -20,6 +21,8 @@ export type ControlPlaneAuthConfig = {
   authOTPLength: number;
   authOTPExpiresInSeconds: number;
   authOTPAllowedAttempts: number;
+  authGoogleClientId: string | null;
+  authGoogleClientSecret: string | null;
   activeMasterEncryptionKeyVersion: number;
   masterEncryptionKeys: Record<string, string>;
 };
@@ -29,6 +32,15 @@ type CreateControlPlaneAuthOptions = {
   db: ControlPlaneDatabase;
   openWorkflow: OpenWorkflow;
 };
+
+export function createAccountOptions(): NonNullable<Parameters<typeof betterAuth>[0]["account"]> {
+  return {
+    modelName: "accounts",
+    accountLinking: {
+      enabled: true,
+    },
+  };
+}
 
 export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
   const { config, db, openWorkflow } = options;
@@ -40,8 +52,26 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
     openWorkflow,
     dashboardBaseUrl: config.dashboardBaseUrl,
   });
+  const googleConfig =
+    config.authGoogleClientId === null || config.authGoogleClientSecret === null
+      ? null
+      : {
+          clientId: config.authGoogleClientId,
+          clientSecret: config.authGoogleClientSecret,
+        };
+  const providers = createAuthProviders({
+    config: {
+      emailOtp: {
+        otpLength: config.authOTPLength,
+        otpExpiresInSeconds: config.authOTPExpiresInSeconds,
+        otpAllowedAttempts: config.authOTPAllowedAttempts,
+      },
+      google: googleConfig,
+    },
+    sendVerificationOTP,
+  });
 
-  return betterAuth({
+  const auth = betterAuth({
     advanced: {
       database: {
         generateId: false,
@@ -61,12 +91,11 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
     session: {
       modelName: "sessions",
     },
-    account: {
-      modelName: "accounts",
-    },
+    account: createAccountOptions(),
     verification: {
       modelName: "verifications",
     },
+    socialProviders: providers.options.socialProviders,
     databaseHooks: {
       session: {
         create: {
@@ -141,14 +170,11 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
           },
         },
       }),
-      emailOTP({
-        otpLength: config.authOTPLength,
-        expiresIn: config.authOTPExpiresInSeconds,
-        allowedAttempts: config.authOTPAllowedAttempts,
-        sendVerificationOTP,
-      }),
+      ...providers.options.plugins,
     ],
   });
+
+  return auth;
 }
 
 export type ControlPlaneAuth = ReturnType<typeof createControlPlaneAuth>;

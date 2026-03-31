@@ -73,7 +73,6 @@ export {
   AutomationConversationStatuses,
   type AutomationConversation,
   type AutomationConversationCreatedByKind,
-  type AutomationConversationIntegrationFamilyId,
   type AutomationConversationOwnerKind,
   type AutomationConversationStatus,
   type InsertAutomationConversation,

@@ -1,6 +1,3 @@
-import type { AgentConversationProvider } from "./conversation-provider.js";
-import type { AgentExecutionObserver } from "./execution-observer.js";
-
 export type AgentConversationStatus = "idle" | "active" | "error";
 
 export const AgentConversationStatuses: {
@@ -66,8 +63,3 @@ export type AgentExecutionObservation =
       lease: AgentExecutionLease;
       poll(): Promise<AgentExecutionState>;
     };
-
-export type AgentIntegrationHooks = {
-  createConversationProvider?(): AgentConversationProvider;
-  createExecutionObserver?(): AgentExecutionObserver;
-};

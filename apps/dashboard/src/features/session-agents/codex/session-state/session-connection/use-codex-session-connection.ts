@@ -5,12 +5,12 @@ import type {
   CodexSessionClient,
   CodexSessionConnectionState,
   CodexThreadSummary,
-} from "@mistle/integrations-definitions/openai/agent/client";
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import {
   createBrowserCodexSessionRuntime,
   CodexJsonRpcClient as CodexJsonRpcClientConstructor,
   CodexSessionClient as CodexSessionClientConstructor,
-} from "@mistle/integrations-definitions/openai/agent/client";
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 

@@ -69,10 +69,17 @@ describe("sandbox profile compile runtime plan integration", () => {
       connectionId: "icn_compile_success",
       kind: IntegrationBindingKinds.AGENT,
       config: {
-        runtime: "codex-cli",
-        defaultModel: "gpt-5.3-codex",
-        reasoningEffort: "medium",
-        additionalInstructions: "Prefer concise answers.\nAlways explain tradeoffs.",
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+            additionalInstructions: "Prefer concise answers.\nAlways explain tradeoffs.",
+          },
+        },
       },
     });
 
@@ -299,9 +306,16 @@ describe("sandbox profile compile runtime plan integration", () => {
       connectionId: "icn_missing",
       kind: IntegrationBindingKinds.AGENT,
       config: {
-        runtime: "codex-cli",
-        defaultModel: "gpt-5.3-codex",
-        reasoningEffort: "medium",
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+          },
+        },
       },
     });
 
@@ -379,9 +393,16 @@ describe("sandbox profile compile runtime plan integration", () => {
       connectionId: "icn_compile_invalid_target_secrets",
       kind: IntegrationBindingKinds.AGENT,
       config: {
-        runtime: "codex-cli",
-        defaultModel: "gpt-5.3-codex",
-        reasoningEffort: "medium",
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+          },
+        },
       },
     });
 

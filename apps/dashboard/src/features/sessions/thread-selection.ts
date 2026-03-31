@@ -1,4 +1,4 @@
-import type { CodexThreadSummary } from "@mistle/integrations-definitions/openai/agent/client";
+import type { CodexThreadSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
 export type ThreadSelectionPolicy = "oldest" | "most_recently_updated";
 

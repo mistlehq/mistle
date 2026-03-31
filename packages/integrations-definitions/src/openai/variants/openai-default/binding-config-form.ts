@@ -5,11 +5,21 @@ import {
 } from "@mistle/integrations-core";
 
 import { createStackedFieldUiOptions } from "../../../forms/ui-options.js";
-import { OpenAiRuntimes } from "./binding-config-schema.js";
+import { OpenAiAllowedRuntimeIds } from "./binding-config-schema.js";
 import { OpenAiReasoningEffortLabelByValue, type OpenAiModelId } from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 
 type OpenAiBindingFormContext = IntegrationFormContext;
+
+function hasSelectedModelValue(value: unknown): value is { defaultModel: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    "defaultModel" in value &&
+    typeof value.defaultModel === "string"
+  );
+}
 
 function createChoiceList(
   values: readonly string[],
@@ -25,7 +35,8 @@ function resolveSelectedModel(input: {
   models: readonly OpenAiModelId[];
   currentValue: Record<string, unknown> | undefined;
 }): OpenAiModelId {
-  const currentModel = input.currentValue?.defaultModel;
+  const modelValue = input.currentValue?.model;
+  const currentModel = hasSelectedModelValue(modelValue) ? modelValue.defaultModel : undefined;
   if (typeof currentModel === "string") {
     const matchingModel = input.models.find((model) => model === currentModel);
     if (matchingModel !== undefined) {
@@ -73,42 +84,77 @@ export function resolveOpenAiBindingConfigForm(
     schema: {
       properties: {
         runtime: {
-          default: OpenAiRuntimes.CODEX_CLI,
+          default: {
+            runtimeId: OpenAiAllowedRuntimeIds[0],
+            config: {},
+          },
+          properties: {
+            runtimeId: {
+              const: OpenAiAllowedRuntimeIds[0],
+              default: OpenAiAllowedRuntimeIds[0],
+            },
+            config: {
+              default: {},
+            },
+          },
         },
-        defaultModel: {
-          title: "Default model",
-          oneOf: createChoiceList(capabilitySet.models),
-          default: selectedModel,
-        },
-        reasoningEffort: {
-          title: "Reasoning effort",
-          oneOf: createChoiceList(reasoningOptions, OpenAiReasoningEffortLabelByValue),
-          default: defaultReasoning,
-        },
-        additionalInstructions: {
-          title: "Additional instructions",
-          description: "Appended after Mistle-managed runtime instructions.",
+        model: {
+          default: {
+            defaultModel: selectedModel,
+            options: {
+              reasoningEffort: defaultReasoning,
+            },
+          },
+          properties: {
+            defaultModel: {
+              title: "Default model",
+              oneOf: createChoiceList(capabilitySet.models),
+              default: selectedModel,
+            },
+            options: {
+              properties: {
+                reasoningEffort: {
+                  title: "Reasoning effort",
+                  oneOf: createChoiceList(reasoningOptions, OpenAiReasoningEffortLabelByValue),
+                  default: defaultReasoning,
+                },
+                additionalInstructions: {
+                  title: "Additional instructions",
+                  description: "Appended after Mistle-managed runtime instructions.",
+                },
+              },
+            },
+          },
         },
       },
     },
     uiSchema: {
       runtime: {
-        "ui:widget": "hidden",
-      },
-      defaultModel: {
-        "ui:widget": "SelectWidget",
-        "ui:options": {
-          fitContent: true,
+        runtimeId: {
+          "ui:widget": "hidden",
+        },
+        config: {
+          "ui:widget": "hidden",
         },
       },
-      reasoningEffort: {
-        "ui:widget": "SelectWidget",
-      },
-      additionalInstructions: {
-        "ui:widget": "TextareaWidget",
-        "ui:options": createStackedFieldUiOptions({
-          rows: 8,
-        }),
+      model: {
+        defaultModel: {
+          "ui:widget": "SelectWidget",
+          "ui:options": {
+            fitContent: true,
+          },
+        },
+        options: {
+          reasoningEffort: {
+            "ui:widget": "SelectWidget",
+          },
+          additionalInstructions: {
+            "ui:widget": "TextareaWidget",
+            "ui:options": createStackedFieldUiOptions({
+              rows: 8,
+            }),
+          },
+        },
       },
     },
   };

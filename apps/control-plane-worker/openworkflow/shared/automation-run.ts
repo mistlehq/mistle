@@ -48,6 +48,7 @@ export const AutomationRunFailureCodes = {
   AGENT_BINDING_AMBIGUOUS: "agent_binding_ambiguous",
   AGENT_BINDING_CONNECTION_NOT_FOUND: "agent_binding_connection_not_found",
   AGENT_BINDING_TARGET_NOT_FOUND: "agent_binding_target_not_found",
+  AGENT_BINDING_RUNTIME_INVALID: "agent_binding_runtime_invalid",
   WEBHOOK_EVENT_SOURCE_ORDER_KEY_MISSING: "webhook_event_source_order_key_missing",
   TEMPLATE_RENDER_FAILED: "template_render_failed",
   AUTOMATION_RUN_EXECUTION_FAILED: "automation_run_execution_failed",
@@ -176,6 +177,16 @@ function compileTemplates(input: {
   };
 }
 
+function hasRuntimeIdValue(input: unknown): input is { runtimeId: string } {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    !Array.isArray(input) &&
+    "runtimeId" in input &&
+    typeof input.runtimeId === "string"
+  );
+}
+
 function resolvePersistedPreparedAutomationRunSnapshot(input: {
   automationRun: {
     id: string;
@@ -246,7 +257,23 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
   };
 }
 
-async function resolveAutomationConversationIntegrationFamilyId(
+function readAgentBindingRuntimeId(input: {
+  automationRunId: string;
+  bindingId: string;
+  bindingConfig: Record<string, unknown>;
+}): string {
+  const runtime = input.bindingConfig["runtime"];
+  if (!hasRuntimeIdValue(runtime) || runtime.runtimeId.trim().length === 0) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AGENT_BINDING_RUNTIME_INVALID,
+      message: `Automation run '${input.automationRunId}' references AGENT binding '${input.bindingId}' with invalid runtimeId.`,
+    });
+  }
+
+  return runtime.runtimeId;
+}
+
+async function resolveAutomationConversationBindingContext(
   db: ControlPlaneDatabase | ControlPlaneTransaction,
   input: {
     automationRunId: string;
@@ -254,7 +281,10 @@ async function resolveAutomationConversationIntegrationFamilyId(
     sandboxProfileId: string;
     sandboxProfileVersion: number;
   },
-): Promise<string> {
+): Promise<{
+  integrationFamilyId: string;
+  runtimeId: string;
+}> {
   const agentBindings = await db.query.sandboxProfileVersionIntegrationBindings.findMany({
     where: (table, { and: whereAnd, eq: whereEq }) =>
       whereAnd(
@@ -303,7 +333,14 @@ async function resolveAutomationConversationIntegrationFamilyId(
     });
   }
 
-  return agentTarget.familyId;
+  return {
+    integrationFamilyId: agentTarget.familyId,
+    runtimeId: readAgentBindingRuntimeId({
+      automationRunId: input.automationRunId,
+      bindingId: agentBinding.id,
+      bindingConfig: agentBinding.config,
+    }),
+  };
 }
 
 export async function prepareAutomationRun(
@@ -465,7 +502,7 @@ export async function prepareAutomationRun(
   }
 
   const claimedConversationId = await ctx.db.transaction(async (tx) => {
-    const integrationFamilyId = await resolveAutomationConversationIntegrationFamilyId(tx, {
+    const bindingContext = await resolveAutomationConversationBindingContext(tx, {
       automationRunId: automationRun.id,
       organizationId: automation.organizationId,
       sandboxProfileId: automationTarget.sandboxProfileId,
@@ -484,7 +521,8 @@ export async function prepareAutomationRun(
         createdById: webhookEvent.id,
         conversationKey: compiledTemplates.renderedConversationKey,
         sandboxProfileId: automationTarget.sandboxProfileId,
-        integrationFamilyId,
+        integrationFamilyId: bindingContext.integrationFamilyId,
+        runtimeId: bindingContext.runtimeId,
         preview: compiledTemplates.renderedInput,
       },
     );

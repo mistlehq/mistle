@@ -1,20 +1,44 @@
-export type SandboxHeaderStatusUi = {
+import type { CodexSessionConnectionState } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+
+import type { StartSessionStep } from "../session-agents/codex/session-state/index.js";
+
+export type SessionHeaderStatusUi = {
   label: string;
   variant: "secondary" | "outline" | "destructive";
   className?: string;
 };
 
-export function resolveSandboxHeaderStatusUi(input: {
-  sandboxLifecycleStatus: string;
-}): SandboxHeaderStatusUi {
-  if (input.sandboxLifecycleStatus === "failed") {
+export type SandboxHeaderStatusUi = SessionHeaderStatusUi;
+
+export function resolveSessionHeaderStatusUi(input: {
+  sandboxStatus: string;
+  agentConnectionState: CodexSessionConnectionState;
+  step: StartSessionStep;
+  hasConnectionError: boolean;
+  isRecoveringSession: boolean;
+}): SessionHeaderStatusUi {
+  if (input.sandboxStatus === "failed") {
     return {
       label: "Sandbox failed",
       variant: "destructive",
     };
   }
 
-  if (input.sandboxLifecycleStatus === "running") {
+  if (input.hasConnectionError || input.agentConnectionState === "error") {
+    return {
+      label: "Connection failed",
+      variant: "destructive",
+    };
+  }
+
+  if (input.isRecoveringSession && input.sandboxStatus === "running") {
+    return {
+      label: "Reconnecting session",
+      variant: "outline",
+    };
+  }
+
+  if (input.agentConnectionState === "ready") {
     return {
       label: "Connected",
       variant: "secondary",
@@ -22,28 +46,69 @@ export function resolveSandboxHeaderStatusUi(input: {
     };
   }
 
-  if (input.sandboxLifecycleStatus === "stopped") {
+  if (input.sandboxStatus === "stopped" && input.step === "idle") {
     return {
       label: "Sandbox stopped",
       variant: "outline",
     };
   }
 
-  if (input.sandboxLifecycleStatus === "resuming") {
+  if (input.sandboxStatus === "resuming") {
     return {
       label: "Resuming sandbox",
       variant: "outline",
     };
   }
 
-  if (input.sandboxLifecycleStatus !== "running") {
+  if (input.sandboxStatus !== "running") {
     return {
       label: "Starting sandbox",
       variant: "outline",
     };
   }
 
-  throw new Error(`Unexpected sandbox lifecycle status: ${input.sandboxLifecycleStatus}`);
+  if (input.agentConnectionState === "opening_agent_stream") {
+    return {
+      label: "Connecting",
+      variant: "outline",
+    };
+  }
+
+  if (input.agentConnectionState === "initializing") {
+    return {
+      label: "Initializing",
+      variant: "outline",
+    };
+  }
+
+  if (
+    input.agentConnectionState === "connecting_socket" ||
+    input.agentConnectionState === "connected_socket" ||
+    input.step === "securing" ||
+    input.step === "connecting"
+  ) {
+    return {
+      label: "Connecting",
+      variant: "outline",
+    };
+  }
+
+  return {
+    label: "Session idle",
+    variant: "outline",
+  };
+}
+
+export function resolveSandboxHeaderStatusUi(input: {
+  sandboxLifecycleStatus: string;
+}): SandboxHeaderStatusUi {
+  return resolveSessionHeaderStatusUi({
+    sandboxStatus: input.sandboxLifecycleStatus,
+    agentConnectionState: "ready",
+    step: "idle",
+    hasConnectionError: false,
+    isRecoveringSession: false,
+  });
 }
 
 export function hasSessionTopAlert(input: {

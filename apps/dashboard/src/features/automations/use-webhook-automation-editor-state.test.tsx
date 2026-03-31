@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import {
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionsQueryKey,
@@ -76,14 +77,7 @@ function createBinding() {
 
 describe("useLoadedWebhookAutomationEditorState", () => {
   it("renders in create mode with loaded prerequisites", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: Number.POSITIVE_INFINITY,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
 
     const { result } = renderHook(
       () =>
@@ -156,14 +150,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   });
 
   it("preserves selected triggers when the sandbox profile changes", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: Number.POSITIVE_INFINITY,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     const triggerId = createWebhookAutomationTriggerId({
       connectionId: "conn_linear",
       eventType: "linear.issue.created",
@@ -233,14 +220,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   });
 
   it("applies explicit invocation defaults when a trigger is selected", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: Number.POSITIVE_INFINITY,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     const triggerId = createWebhookAutomationTriggerId({
       connectionId: "conn_linear",
       eventType: "linear.issue_comment.created",
@@ -316,14 +296,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   });
 
   it("preserves explicit invocation opt-out when trigger selections change", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: Number.POSITIVE_INFINITY,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     const firstTriggerId = createWebhookAutomationTriggerId({
       connectionId: "conn_linear",
       eventType: "linear.issue_comment.created",
@@ -422,14 +395,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   });
 
   it("does not auto-enable explicit invocation when editing an existing automation", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: Number.POSITIVE_INFINITY,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     const firstTriggerId = createWebhookAutomationTriggerId({
       connectionId: "conn_linear",
       eventType: "linear.issue_comment.created",
@@ -527,14 +493,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   });
 
   it("shows a required-fields summary on submit when basic required fields are missing", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: Number.POSITIVE_INFINITY,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
 
     const { result } = renderHook(
       () =>
@@ -582,14 +541,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   });
 
   it("shows a required-fields summary when the only missing field is triggers", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: Number.POSITIVE_INFINITY,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
 
     const { result } = renderHook(
       () =>
@@ -631,14 +583,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   });
 
   it("clears stale trigger validation errors when the sandbox profile changes", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: Number.POSITIVE_INFINITY,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     const triggerId = createWebhookAutomationTriggerId({
       connectionId: "conn_linear",
       eventType: "linear.issue.created",

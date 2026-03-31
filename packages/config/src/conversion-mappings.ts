@@ -170,6 +170,16 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_ALLOWED_ATTEMPTS",
   },
   {
+    configPath: ["apps", "control_plane_api", "auth", "google", "clientId"],
+    tomlPath: ["apps", "control_plane_api", "auth", "google", "client_id"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "auth", "google", "clientSecret"],
+    tomlPath: ["apps", "control_plane_api", "auth", "google", "client_secret"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET",
+  },
+  {
     configPath: ["apps", "control_plane_api", "workflow", "databaseUrl"],
     tomlPath: ["apps", "control_plane_api", "workflow", "database_url"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL",

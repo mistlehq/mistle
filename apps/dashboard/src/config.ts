@@ -1,5 +1,6 @@
 type DashboardEnv = {
   readonly VITE_CONTROL_PLANE_API_ORIGIN?: string;
+  readonly VITE_AUTH_METHOD_GOOGLE?: string;
 };
 
 export type DashboardConfig = {
@@ -21,6 +22,22 @@ function parseRequiredUrlOrigin(value: string, key: string): string {
   } catch {
     throw new Error(`${key} must be a valid absolute URL origin.`);
   }
+}
+
+function parseRequiredBoolean(value: string | undefined, key: string): boolean {
+  if (value === undefined) {
+    throw new Error(`${key} is required.`);
+  }
+
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  throw new Error(`${key} must be either "true" or "false".`);
 }
 
 export function buildDashboardConfig(env: DashboardEnv): DashboardConfig {
@@ -54,4 +71,8 @@ export function getDashboardConfig(): DashboardConfig {
 
 export function resetDashboardConfigForTest(): void {
   cachedDashboardConfig = undefined;
+}
+
+export function getDashboardGoogleAuthMethodEnabled(): boolean {
+  return parseRequiredBoolean(import.meta.env.VITE_AUTH_METHOD_GOOGLE, "VITE_AUTH_METHOD_GOOGLE");
 }

@@ -6,16 +6,19 @@ const TimeSourcePath = fileURLToPath(new URL("../packages/time/src/index.ts", im
 const TimeTestingSourcePath = fileURLToPath(
   new URL("../packages/time/src/testing/index.ts", import.meta.url),
 );
-const IntegrationsDefinitionsOpenAiAgentServerPath = fileURLToPath(
-  new URL("../packages/integrations-definitions/src/openai/agent.server.ts", import.meta.url),
+const IntegrationsDefinitionsCodexServerPath = fileURLToPath(
+  new URL(
+    "../packages/integrations-definitions/src/agent-runtimes/codex/server.ts",
+    import.meta.url,
+  ),
 );
 
 export default defineConfig({
   resolve: {
     tsconfigPaths: true,
     alias: {
-      "@mistle/integrations-definitions/openai/agent/server":
-        IntegrationsDefinitionsOpenAiAgentServerPath,
+      "@mistle/integrations-definitions/agent-runtimes/codex/server":
+        IntegrationsDefinitionsCodexServerPath,
       "@mistle/time": TimeSourcePath,
       "@mistle/time/testing": TimeTestingSourcePath,
     },

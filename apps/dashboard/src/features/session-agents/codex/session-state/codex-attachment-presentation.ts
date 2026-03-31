@@ -1,4 +1,4 @@
-import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/openai/agent/client";
+import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
 export const AttachedImagesHeader = "Attached images:";
 

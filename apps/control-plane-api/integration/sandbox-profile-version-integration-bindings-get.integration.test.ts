@@ -70,10 +70,17 @@ describe("sandbox profile version integration bindings get integration", () => {
         kind: IntegrationBindingKinds.AGENT,
       }),
       config: {
-        runtime: "codex-cli",
-        defaultModel: "gpt-5.3-codex",
-        reasoningEffort: "medium",
-        additionalInstructions: "Prefer concise answers.",
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+            additionalInstructions: "Prefer concise answers.",
+          },
+        },
       },
     });
 
@@ -94,10 +101,17 @@ describe("sandbox profile version integration bindings get integration", () => {
     expect(responseBody.bindings[0]).toMatchObject({
       id: "ibd_bindings_get_001",
       config: {
-        runtime: "codex-cli",
-        defaultModel: "gpt-5.3-codex",
-        reasoningEffort: "medium",
-        additionalInstructions: "Prefer concise answers.",
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+            additionalInstructions: "Prefer concise answers.",
+          },
+        },
       },
     });
   }, 60_000);
