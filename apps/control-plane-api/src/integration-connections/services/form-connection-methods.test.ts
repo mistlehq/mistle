@@ -164,6 +164,18 @@ describe("resolvePersistedSecretRefOrThrow", () => {
     });
   });
 
+  it("maps aws_secret_access_key to persisted secret kind and purpose", () => {
+    expect(
+      resolvePersistedSecretRefOrThrow({
+        secretType: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+        invalidInputCode: "INVALID_CREATE_CONNECTION_INPUT",
+      }),
+    ).toEqual({
+      secretKind: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+      purpose: IntegrationConnectionCredentialPurposes.AWS_SECRET_ACCESS_KEY,
+    });
+  });
+
   it("maps oauth2_client_secret to persisted secret kind and purpose", () => {
     expect(
       resolvePersistedSecretRefOrThrow({

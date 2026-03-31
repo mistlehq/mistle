@@ -217,6 +217,10 @@ function parsePersistedSecretType(secretType: string): IntegrationCredentialSecr
     return IntegrationCredentialSecretKinds.API_KEY;
   }
 
+  if (secretType === IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY) {
+    return IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY;
+  }
+
   if (secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN) {
     return IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN;
   }
@@ -241,6 +245,10 @@ function parsePersistedCredentialPurpose(
 
   if (purpose === IntegrationConnectionCredentialPurposes.API_KEY) {
     return IntegrationConnectionCredentialPurposes.API_KEY;
+  }
+
+  if (purpose === IntegrationConnectionCredentialPurposes.AWS_SECRET_ACCESS_KEY) {
+    return IntegrationConnectionCredentialPurposes.AWS_SECRET_ACCESS_KEY;
   }
 
   if (purpose === IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN) {
