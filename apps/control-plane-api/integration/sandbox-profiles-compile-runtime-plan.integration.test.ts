@@ -162,8 +162,17 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(configContent).toContain('model_reasoning_effort = "medium"');
     expect(configContent).toContain('approval_policy = "never"');
     expect(configContent).toContain('sandbox_mode = "danger-full-access"');
-    expect(configContent).toContain(
-      'developer_instructions = "Prefer concise answers.\\nAlways explain tradeoffs."',
+    expect(configContent).toContain("developer_instructions");
+    expect(configContent).toContain("Mistle-managed sandbox context:");
+    expect(configContent).toContain("managed outbound proxy");
+    expect(configContent).toContain("User-provided additional instructions:");
+    expect(configContent).toContain("Prefer concise answers.");
+    expect(configContent).toContain("Always explain tradeoffs.");
+    expect(configContent?.indexOf("Mistle-managed sandbox context:")).toBeLessThan(
+      configContent?.indexOf("User-provided additional instructions:") ?? 0,
+    );
+    expect(configContent?.indexOf("User-provided additional instructions:")).toBeLessThan(
+      configContent?.indexOf("Prefer concise answers.") ?? 0,
     );
     expect(configContent).toContain("[model_providers.proxy]");
     expect(configContent).toContain('name = "Proxy"');
