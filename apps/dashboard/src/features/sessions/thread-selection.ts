@@ -1,5 +1,7 @@
 import type { CodexThreadSummary } from "@mistle/integrations-definitions/openai/agent/client";
 
+export type ThreadSelectionPolicy = "oldest" | "newest";
+
 function resolveThreadCreatedAt(thread: CodexThreadSummary): number {
   if (thread.createdAt !== null) {
     return thread.createdAt;
@@ -17,37 +19,101 @@ function compareThreadCreation(left: CodexThreadSummary, right: CodexThreadSumma
   return left.id.localeCompare(right.id);
 }
 
-export function selectPreferredThreadId(input: {
+function compareThreadCreationDescending(
+  left: CodexThreadSummary,
+  right: CodexThreadSummary,
+): number {
+  return compareThreadCreation(right, left);
+}
+
+function resolveThreadUpdatedAt(thread: CodexThreadSummary): number {
+  return thread.updatedAt ?? thread.createdAt ?? Number.NEGATIVE_INFINITY;
+}
+
+function compareNewestThreadActivity(left: CodexThreadSummary, right: CodexThreadSummary): number {
+  const updatedDifference = resolveThreadUpdatedAt(right) - resolveThreadUpdatedAt(left);
+  if (updatedDifference !== 0) {
+    return updatedDifference;
+  }
+
+  return right.id.localeCompare(left.id);
+}
+
+function collectLoadedAvailableThreads(input: {
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
-}): string | null {
+}): readonly CodexThreadSummary[] {
   const availableThreadsById = new Map(input.availableThreads.map((thread) => [thread.id, thread]));
-  const loadedAvailableThreads = input.loadedThreadIds.flatMap((threadId) => {
+
+  return input.loadedThreadIds.flatMap((threadId) => {
     const thread = availableThreadsById.get(threadId);
     return thread === undefined ? [] : [thread];
   });
+}
+
+export function selectPreferredThreadId(input: {
+  availableThreads: readonly CodexThreadSummary[];
+  loadedThreadIds: readonly string[];
+  selectionPolicy?: ThreadSelectionPolicy;
+}): string | null {
+  const selectionPolicy = input.selectionPolicy ?? "oldest";
+  const compareThread =
+    selectionPolicy === "newest" ? compareThreadCreationDescending : compareThreadCreation;
+  const loadedAvailableThreads = collectLoadedAvailableThreads(input);
 
   if (loadedAvailableThreads.length > 0) {
-    const oldestLoadedThread = [...loadedAvailableThreads].sort(compareThreadCreation)[0];
-    if (oldestLoadedThread === undefined) {
+    const selectedLoadedThread = [...loadedAvailableThreads].sort(compareThread)[0];
+    if (selectedLoadedThread === undefined) {
       throw new Error("Loaded thread selection requires at least one thread.");
     }
 
-    return oldestLoadedThread.id;
+    return selectedLoadedThread.id;
   }
 
   if (input.loadedThreadIds.length > 0) {
-    return input.loadedThreadIds[0] ?? null;
+    return selectionPolicy === "newest"
+      ? (input.loadedThreadIds[input.loadedThreadIds.length - 1] ?? null)
+      : (input.loadedThreadIds[0] ?? null);
   }
 
   if (input.availableThreads.length === 0) {
     return null;
   }
 
-  const oldestThread = [...input.availableThreads].sort(compareThreadCreation)[0];
-  if (oldestThread === undefined) {
+  const selectedAvailableThread = [...input.availableThreads].sort(compareThread)[0];
+  if (selectedAvailableThread === undefined) {
     throw new Error("Available thread selection requires at least one thread.");
   }
 
-  return oldestThread.id;
+  return selectedAvailableThread.id;
+}
+
+export function selectMostRecentlyUpdatedThreadId(input: {
+  availableThreads: readonly CodexThreadSummary[];
+  loadedThreadIds: readonly string[];
+}): string | null {
+  const loadedAvailableThreads = collectLoadedAvailableThreads(input);
+  if (loadedAvailableThreads.length > 0) {
+    const selectedLoadedThread = [...loadedAvailableThreads].sort(compareNewestThreadActivity)[0];
+    if (selectedLoadedThread === undefined) {
+      throw new Error("Loaded thread selection requires at least one thread.");
+    }
+
+    return selectedLoadedThread.id;
+  }
+
+  if (input.loadedThreadIds.length > 0) {
+    return input.loadedThreadIds[input.loadedThreadIds.length - 1] ?? null;
+  }
+
+  if (input.availableThreads.length === 0) {
+    return null;
+  }
+
+  const selectedAvailableThread = [...input.availableThreads].sort(compareNewestThreadActivity)[0];
+  if (selectedAvailableThread === undefined) {
+    throw new Error("Available thread selection requires at least one thread.");
+  }
+
+  return selectedAvailableThread.id;
 }

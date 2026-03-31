@@ -72,7 +72,6 @@ type SessionWorkbenchState = {
     disabledReason: string | null;
     errorMessage: string | null;
     isCliToggleActive: boolean;
-    restoreStep: ReturnType<typeof useSessionMainPanelHandoff>["restoreStep"];
     showsChatComposer: boolean;
     enterCliMode: () => Promise<void>;
     exitCliMode: () => Promise<void>;
@@ -180,10 +179,10 @@ export function useSessionWorkbenchController(input: {
     attachmentTarget:
       input.sandboxInstanceId !== null &&
       sessionSnapshot !== null &&
-      sessionSnapshot.threadId !== null
+      sessionSnapshot.activeThreadId !== null
         ? {
             sandboxInstanceId: input.sandboxInstanceId,
-            threadId: sessionSnapshot.threadId,
+            threadId: sessionSnapshot.activeThreadId,
           }
         : null,
   });
@@ -211,7 +210,6 @@ export function useSessionWorkbenchController(input: {
         disabledReason: enterCliDisabledReason,
         errorMessage: handoff.errorMessage,
         isCliToggleActive: handoff.isCliToggleActive,
-        restoreStep: handoff.restoreStep,
         showsChatComposer: canRenderChatComposer(handoff.transitionState),
         enterCliMode: handoff.handoffToCli,
         exitCliMode: handoff.handoffToChat,

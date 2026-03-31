@@ -116,7 +116,7 @@ export function useCodexSessionConnection(input: {
 
         return {
           ...currentSession,
-          threadId,
+          activeThreadId: threadId,
         };
       });
     },
@@ -381,7 +381,7 @@ export function useCodexSessionConnection(input: {
         connectedAtIso: new Date().toISOString(),
         mintedConnection: result.mintedConnection,
         providerThreadId: result.providerThreadId,
-        threadId: result.threadId,
+        activeThreadId: result.threadId,
       });
       lastConnectedSessionRef.current = nextConnectedSession;
       setSessionSnapshot(nextConnectedSession);
@@ -472,7 +472,7 @@ export function useCodexSessionConnection(input: {
       const nextConnectedSession = {
         ...result.previousConnectedSession,
         connectedAtIso: new Date().toISOString(),
-        threadId: result.recoveredThread.threadId,
+        activeThreadId: result.recoveredThread.threadId,
       };
       lastConnectedSessionRef.current = nextConnectedSession;
       setSessionSnapshot(nextConnectedSession);

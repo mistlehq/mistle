@@ -187,7 +187,7 @@ export function createConnectedCodexSession(input: {
   connectedAtIso: string;
   mintedConnection: MintSandboxConnectionTokenResult;
   providerThreadId: string | null;
-  threadId: string;
+  activeThreadId: string;
 }): ConnectedCodexSession {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
@@ -195,6 +195,6 @@ export function createConnectedCodexSession(input: {
     expiresAtIso: input.mintedConnection.connectionExpiresAt,
     connectionUrl: input.mintedConnection.connectionUrl,
     providerThreadId: input.providerThreadId,
-    threadId: input.threadId,
+    activeThreadId: input.activeThreadId,
   };
 }

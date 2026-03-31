@@ -26,7 +26,7 @@ describe("session thread authority", () => {
       }),
     ).toEqual({
       type: "start_new",
-      shouldClearPersistedThreadId: true,
+      shouldClearActiveThreadId: true,
     });
   });
 
@@ -38,7 +38,7 @@ describe("session thread authority", () => {
       }),
     ).toEqual({
       type: "start_new",
-      shouldClearPersistedThreadId: false,
+      shouldClearActiveThreadId: false,
     });
   });
 

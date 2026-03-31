@@ -3,7 +3,10 @@ import type {
   CodexThreadSummary,
 } from "@mistle/integrations-definitions/openai/agent/client";
 
-import { selectPreferredThreadId } from "../../../../sessions/thread-selection.js";
+import {
+  selectPreferredThreadId,
+  type ThreadSelectionPolicy,
+} from "../../../../sessions/thread-selection.js";
 
 export type CodexConnectionThreadStrategy =
   | {
@@ -46,6 +49,7 @@ export function selectCodexConnectionThreadStrategy(input: {
   preferredThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  selectionPolicy?: ThreadSelectionPolicy;
 }): CodexConnectionThreadStrategy {
   if (input.preferredThreadId !== null) {
     return {
@@ -57,6 +61,7 @@ export function selectCodexConnectionThreadStrategy(input: {
   const preferredThreadId = selectPreferredThreadId({
     availableThreads: input.availableThreads,
     loadedThreadIds: input.loadedThreadIds,
+    ...(input.selectionPolicy === undefined ? {} : { selectionPolicy: input.selectionPolicy }),
   });
 
   if (preferredThreadId !== null) {

@@ -183,7 +183,7 @@ describe("codex session connect", () => {
           connectionExpiresAt: "2026-03-20T01:00:00.000Z",
         },
         providerThreadId: null,
-        threadId: "thread_123",
+        activeThreadId: "thread_123",
       }),
     ).toEqual({
       sandboxInstanceId: "sandbox_123",
@@ -191,7 +191,7 @@ describe("codex session connect", () => {
       expiresAtIso: "2026-03-20T01:00:00.000Z",
       connectionUrl: "wss://example.test/codex",
       providerThreadId: null,
-      threadId: "thread_123",
+      activeThreadId: "thread_123",
     });
   });
 });

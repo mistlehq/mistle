@@ -20,7 +20,7 @@ describe("bootstrap connection context", () => {
         connectionCandidate: {
           sandboxInstanceId: "sandbox_123",
           connectedAtIso: "2026-03-27T00:00:00.000Z",
-          threadId: null,
+          activeThreadId: null,
         },
       }),
     ).toBeNull();
@@ -32,12 +32,12 @@ describe("bootstrap connection context", () => {
         connectionCandidate: {
           sandboxInstanceId: "sandbox_123",
           connectedAtIso: "2026-03-27T00:00:00.000Z",
-          threadId: "thread_123",
+          activeThreadId: "thread_123",
         },
       }),
     ).toEqual({
       connectionKey: "sandbox_123:2026-03-27T00:00:00.000Z",
-      threadId: "thread_123",
+      activeThreadId: "thread_123",
     });
   });
 });
@@ -74,7 +74,7 @@ describe("session bootstrap plan", () => {
       resolveSessionBootstrapPlan({
         bootstrapConnectionContext: {
           connectionKey: "sandbox_123:2026-03-27T00:00:00.000Z",
-          threadId: "thread_123",
+          activeThreadId: "thread_123",
         },
         establishedConnectionKey: null,
       }),
@@ -90,7 +90,7 @@ describe("session bootstrap plan", () => {
       resolveSessionBootstrapPlan({
         bootstrapConnectionContext: {
           connectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
-          threadId: "thread_123",
+          activeThreadId: "thread_123",
         },
         establishedConnectionKey: "sandbox_123:2026-03-27T00:00:00.000Z",
       }),
@@ -106,7 +106,7 @@ describe("session bootstrap plan", () => {
       resolveSessionBootstrapPlan({
         bootstrapConnectionContext: {
           connectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
-          threadId: "thread_123",
+          activeThreadId: "thread_123",
         },
         establishedConnectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
       }),
@@ -122,7 +122,7 @@ describe("session bootstrap plan", () => {
       resolveSessionBootstrapPlan({
         bootstrapConnectionContext: {
           connectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
-          threadId: "thread_456",
+          activeThreadId: "thread_456",
         },
         establishedConnectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
       }),

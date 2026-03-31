@@ -144,4 +144,33 @@ describe("codex session lifecycle policy", () => {
       type: "start_new",
     });
   });
+
+  it("resumes the newest available thread for post-cli restore selection", () => {
+    expect(
+      selectCodexConnectionThreadStrategy({
+        preferredThreadId: null,
+        availableThreads: [
+          {
+            id: "thread_old",
+            name: null,
+            preview: null,
+            createdAt: 10,
+            updatedAt: 10,
+          },
+          {
+            id: "thread_new",
+            name: null,
+            preview: null,
+            createdAt: 20,
+            updatedAt: 20,
+          },
+        ],
+        loadedThreadIds: [],
+        selectionPolicy: "newest",
+      }),
+    ).toEqual({
+      type: "resume",
+      threadId: "thread_new",
+    });
+  });
 });

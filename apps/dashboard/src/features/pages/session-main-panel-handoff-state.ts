@@ -6,12 +6,9 @@ export type MainPanelTransitionState =
   | "restoring_chat"
   | "restore_failed";
 
-export type ChatRestoreStep = "connecting_transport" | "resolving_thread" | "hydrating_chat";
-
 export type SessionMainPanelHandoffState = {
   transitionState: MainPanelTransitionState;
   errorMessage: string | null;
-  restoreStep: ChatRestoreStep | null;
 };
 
 export type SessionMainPanelHandoffAction =
@@ -29,13 +26,6 @@ export type SessionMainPanelHandoffAction =
       type: "chat_restore_requested";
     }
   | {
-      type: "chat_restore_step_changed";
-      restoreStep: ChatRestoreStep;
-    }
-  | {
-      type: "chat_restore_succeeded";
-    }
-  | {
       type: "chat_restore_failed";
       errorMessage: string | null;
     }
@@ -46,11 +36,10 @@ export type SessionMainPanelHandoffAction =
 export const InitialSessionMainPanelHandoffState: SessionMainPanelHandoffState = {
   transitionState: "stable_chat",
   errorMessage: null,
-  restoreStep: null,
 };
 
 export function reduceSessionMainPanelHandoffState(
-  state: SessionMainPanelHandoffState,
+  _state: SessionMainPanelHandoffState,
   action: SessionMainPanelHandoffAction,
 ): SessionMainPanelHandoffState {
   switch (action.type) {
@@ -58,7 +47,6 @@ export function reduceSessionMainPanelHandoffState(
       return {
         transitionState: "switching_to_cli",
         errorMessage: null,
-        restoreStep: null,
       };
     }
 
@@ -66,7 +54,6 @@ export function reduceSessionMainPanelHandoffState(
       return {
         transitionState: "stable_cli",
         errorMessage: null,
-        restoreStep: null,
       };
     }
 
@@ -74,7 +61,6 @@ export function reduceSessionMainPanelHandoffState(
       return {
         transitionState: "cli_entry_failed",
         errorMessage: action.errorMessage,
-        restoreStep: null,
       };
     }
 
@@ -82,23 +68,13 @@ export function reduceSessionMainPanelHandoffState(
       return {
         transitionState: "restoring_chat",
         errorMessage: null,
-        restoreStep: "connecting_transport",
       };
     }
 
-    case "chat_restore_step_changed": {
-      return {
-        ...state,
-        restoreStep: action.restoreStep,
-      };
-    }
-
-    case "chat_restore_succeeded":
     case "reset_to_stable_chat": {
       return {
         transitionState: "stable_chat",
         errorMessage: null,
-        restoreStep: null,
       };
     }
 
@@ -106,40 +82,8 @@ export function reduceSessionMainPanelHandoffState(
       return {
         transitionState: "restore_failed",
         errorMessage: action.errorMessage,
-        restoreStep: state.restoreStep,
       };
     }
-  }
-}
-
-export function getChatRestoreStepLabel(step: ChatRestoreStep): string {
-  switch (step) {
-    case "connecting_transport":
-      return "Reconnecting session transport";
-    case "resolving_thread":
-      return "Resolving chat thread";
-    case "hydrating_chat":
-      return "Hydrating chat transcript";
-  }
-}
-
-export function getChatRestorePendingDetail(input: {
-  restoreStep: ChatRestoreStep;
-  lifecycleStep: "idle" | "securing" | "connecting" | "connected";
-}): string | null {
-  if (input.restoreStep !== "connecting_transport") {
-    return null;
-  }
-
-  switch (input.lifecycleStep) {
-    case "securing":
-      return "Minting sandbox connection token.";
-    case "connecting":
-      return "Opening the sandbox agent channel and initializing JSON-RPC.";
-    case "connected":
-      return "Waiting for the restored transport to become usable.";
-    case "idle":
-      return "Preparing a fresh chat transport after leaving CLI.";
   }
 }
 

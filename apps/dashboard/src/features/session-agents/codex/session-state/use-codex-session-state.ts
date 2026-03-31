@@ -119,7 +119,7 @@ export type UseCodexSessionStateResult = {
   threadAuthority: {
     providerThreadId: string | null;
     resolveCliLaunchTarget: () => Promise<CodexCliLaunchTarget>;
-    clearEphemeralActiveThreadIdAfterCliLaunch: () => void;
+    clearActiveThreadIdAfterCliLaunch: () => void;
     resolveRestoredThreadAuthorityAfterCli: () => Promise<string>;
   };
   threads: CodexSessionThreadState;
@@ -242,7 +242,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     return {
       sandboxInstanceId: sessionSnapshot.sandboxInstanceId,
       connectedAtIso: sessionSnapshot.connectedAtIso,
-      threadId: sessionSnapshot.threadId,
+      activeThreadId: sessionSnapshot.activeThreadId,
     };
   }, [sessionSnapshot]);
   const bootstrapConnectionContext = useMemo(
@@ -638,7 +638,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     if (activeThreadId === null) {
       return {
         type: "start_new",
-        shouldClearPersistedThreadId: false,
+        shouldClearActiveThreadId: false,
       };
     }
 
@@ -656,14 +656,14 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       turnCount: thread.turns.length,
     });
 
-    if (launchTarget.type === "start_new" && launchTarget.shouldClearPersistedThreadId) {
+    if (launchTarget.type === "start_new" && launchTarget.shouldClearActiveThreadId) {
       updateActiveThread(null);
     }
 
     return launchTarget;
   }, [updateActiveThread]);
 
-  const clearEphemeralActiveThreadIdAfterCliLaunch = useCallback((): void => {
+  const clearActiveThreadIdAfterCliLaunch = useCallback((): void => {
     if (lifecycle.sessionSnapshot?.providerThreadId !== null) {
       return;
     }
@@ -757,11 +757,11 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     return {
       providerThreadId: lifecycle.sessionSnapshot?.providerThreadId ?? null,
       resolveCliLaunchTarget,
-      clearEphemeralActiveThreadIdAfterCliLaunch,
+      clearActiveThreadIdAfterCliLaunch,
       resolveRestoredThreadAuthorityAfterCli,
     };
   }, [
-    clearEphemeralActiveThreadIdAfterCliLaunch,
+    clearActiveThreadIdAfterCliLaunch,
     lifecycle.sessionSnapshot?.providerThreadId,
     resolveCliLaunchTarget,
     resolveRestoredThreadAuthorityAfterCli,
