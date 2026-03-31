@@ -40,7 +40,7 @@ type ResumeRequestGuard = {
 type RecoverableCodexDisconnect = {
   id: number;
   message: string;
-  preferredThreadId: string | null;
+  targetThreadId: string | null;
   recoveryStrategy: "reconnect_transport" | "reopen_stream";
 };
 
@@ -64,7 +64,7 @@ export type CodexRecoveryState =
       kind: "recovering";
       baseMessage: string;
       errorMessage: string | null;
-      preferredThreadId: string | null;
+      targetThreadId: string | null;
       recoveryStrategy: "reconnect_transport" | "reopen_stream";
       reconnectAttemptCount: number;
       reconnectCommand: CodexRecoveryReconnectCommand;
@@ -97,7 +97,7 @@ function createCodexRecoveryStateFromDisconnect(
     kind: "recovering",
     baseMessage: disconnect.message,
     errorMessage: null,
-    preferredThreadId: disconnect.preferredThreadId,
+    targetThreadId: disconnect.targetThreadId,
     recoveryStrategy: disconnect.recoveryStrategy,
     reconnectAttemptCount: 0,
     reconnectCommand: "none",
@@ -125,7 +125,7 @@ export function reduceCodexRecoveryState(
             return {
               ...state,
               baseMessage: event.disconnect.message,
-              preferredThreadId: event.disconnect.preferredThreadId,
+              targetThreadId: event.disconnect.targetThreadId,
               recoveryStrategy: event.disconnect.recoveryStrategy,
             };
           }
@@ -788,7 +788,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     setHasAttemptedAutoConnect(true);
     connectSession({
       sandboxInstanceId: input.sandboxInstanceId,
-      preferredThreadId: automationConversation?.providerConversationId ?? null,
+      targetThreadId: automationConversation?.providerConversationId ?? null,
       providerThreadId: automationConversation?.providerConversationId ?? null,
     });
   }, [
@@ -826,7 +826,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     });
     const recoveryInput = {
       sandboxInstanceId: input.sandboxInstanceId,
-      preferredThreadId: codexRecoveryState.preferredThreadId,
+      targetThreadId: codexRecoveryState.targetThreadId,
     };
 
     if (codexRecoveryState.reconnectCommand === "reopen_stream") {

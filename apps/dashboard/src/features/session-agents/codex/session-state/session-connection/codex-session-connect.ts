@@ -40,12 +40,12 @@ export type ReconnectResumeFailureAction = "error_broken_persisted" | "start_new
 
 export function resolveReconnectResumeFailureAction(input: {
   error: unknown;
-  preferredThreadId: string | null;
+  targetThreadId: string | null;
   selectedThreadId: string;
 }): ReconnectResumeFailureAction {
   if (
-    input.preferredThreadId !== null &&
-    input.selectedThreadId === input.preferredThreadId &&
+    input.targetThreadId !== null &&
+    input.selectedThreadId === input.targetThreadId &&
     (isMissingPersistedThreadError(input.error) || isNoRolloutPersistedThreadError(input.error))
   ) {
     return "error_broken_persisted";
@@ -62,23 +62,25 @@ export type CodexConnectionBootstrapResult = {
   generation: number;
   sandboxInstanceId: string;
   mintedConnection: MintSandboxConnectionTokenResult;
+  resolvedThreadId: string | null;
   threadId: string;
 };
 
 export type EstablishedCodexThreadResult = {
   generation: number;
   sandboxInstanceId: string;
+  resolvedThreadId: string | null;
   threadId: string;
 };
 
 export function resolveInitialCodexThreadAction(input: {
-  preferredThreadId: string | null;
+  targetThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
   selectionPolicy?: ThreadSelectionPolicy;
 }) {
   return selectCodexConnectionThreadStrategy({
-    preferredThreadId: input.preferredThreadId,
+    targetThreadId: input.targetThreadId,
     availableThreads: input.availableThreads,
     loadedThreadIds: input.loadedThreadIds,
     ...(input.selectionPolicy === undefined ? {} : { selectionPolicy: input.selectionPolicy }),
@@ -87,7 +89,7 @@ export function resolveInitialCodexThreadAction(input: {
 
 export async function establishCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
-  preferredThreadId: string | null;
+  targetThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
   selectionPolicy?: ThreadSelectionPolicy;
@@ -96,11 +98,12 @@ export async function establishCodexThread(input: {
   ensureCurrentGeneration: (generation: number) => void;
 }): Promise<EstablishedCodexThreadResult> {
   const action = resolveInitialCodexThreadAction({
-    preferredThreadId: input.preferredThreadId,
+    targetThreadId: input.targetThreadId,
     availableThreads: input.availableThreads,
     loadedThreadIds: input.loadedThreadIds,
     ...(input.selectionPolicy === undefined ? {} : { selectionPolicy: input.selectionPolicy }),
   });
+  const resolvedThreadId = action.type === "resume" ? action.threadId : null;
 
   if (action.type === "resume") {
     let resumedThread;
@@ -112,7 +115,7 @@ export async function establishCodexThread(input: {
     } catch (error) {
       const failureAction = resolveReconnectResumeFailureAction({
         error,
-        preferredThreadId: input.preferredThreadId,
+        targetThreadId: input.targetThreadId,
         selectedThreadId: action.threadId,
       });
 
@@ -120,7 +123,7 @@ export async function establishCodexThread(input: {
         throw describeCodexSessionStepError(
           "Resuming persisted chat session",
           new Error(
-            `This chat session could not be resumed because the linked persisted session '${input.preferredThreadId}' is no longer resumable.`,
+            `This chat session could not be resumed because the linked persisted session '${input.targetThreadId}' is no longer resumable.`,
           ),
         );
       }
@@ -135,6 +138,7 @@ export async function establishCodexThread(input: {
         return {
           generation: input.generation,
           sandboxInstanceId: input.sandboxInstanceId,
+          resolvedThreadId,
           threadId: startedThread.threadId,
         };
       }
@@ -146,6 +150,7 @@ export async function establishCodexThread(input: {
     return {
       generation: input.generation,
       sandboxInstanceId: input.sandboxInstanceId,
+      resolvedThreadId,
       threadId: resumedThread.threadId,
     };
   }
@@ -159,13 +164,14 @@ export async function establishCodexThread(input: {
   return {
     generation: input.generation,
     sandboxInstanceId: input.sandboxInstanceId,
+    resolvedThreadId,
     threadId: startedThread.threadId,
   };
 }
 
 export async function establishInitialCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
-  preferredThreadId: string | null;
+  targetThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
   selectionPolicy?: ThreadSelectionPolicy;

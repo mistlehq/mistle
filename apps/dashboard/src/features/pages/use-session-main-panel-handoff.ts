@@ -139,7 +139,7 @@ export function useSessionMainPanelHandoff(
     // sessions intentionally reconnect using the most recently updated thread.
     input.lifecycle.connectSession({
       sandboxInstanceId: input.sandboxInstanceId,
-      preferredThreadId: durableThreadId,
+      targetThreadId: durableThreadId,
       ...(durableThreadId === null ? {} : { providerThreadId: durableThreadId }),
       selectionPolicy: durableThreadId === null ? "most_recently_updated" : "oldest",
     });
@@ -229,11 +229,7 @@ export function useSessionMainPanelHandoff(
   ]);
 
   const handoffToChat = useCallback(async (): Promise<void> => {
-    if (
-      state.transitionState !== "switching_to_cli" &&
-      state.transitionState !== "stable_cli" &&
-      state.transitionState !== "cli_entry_failed"
-    ) {
+    if (state.transitionState !== "switching_to_cli" && state.transitionState !== "stable_cli") {
       return;
     }
 

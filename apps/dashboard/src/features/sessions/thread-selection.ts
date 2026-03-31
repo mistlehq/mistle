@@ -82,33 +82,3 @@ export function selectPreferredThreadId(input: {
 
   return selectedAvailableThread.id;
 }
-
-export function selectMostRecentlyUpdatedThreadId(input: {
-  availableThreads: readonly CodexThreadSummary[];
-  loadedThreadIds: readonly string[];
-}): string | null {
-  const loadedAvailableThreads = collectLoadedAvailableThreads(input);
-  if (loadedAvailableThreads.length > 0) {
-    const selectedLoadedThread = [...loadedAvailableThreads].sort(compareNewestThreadActivity)[0];
-    if (selectedLoadedThread === undefined) {
-      throw new Error("Loaded thread selection requires at least one thread.");
-    }
-
-    return selectedLoadedThread.id;
-  }
-
-  if (input.loadedThreadIds.length > 0) {
-    return input.loadedThreadIds[input.loadedThreadIds.length - 1] ?? null;
-  }
-
-  if (input.availableThreads.length === 0) {
-    return null;
-  }
-
-  const selectedAvailableThread = [...input.availableThreads].sort(compareNewestThreadActivity)[0];
-  if (selectedAvailableThread === undefined) {
-    throw new Error("Available thread selection requires at least one thread.");
-  }
-
-  return selectedAvailableThread.id;
-}

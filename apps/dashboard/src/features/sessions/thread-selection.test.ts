@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { selectMostRecentlyUpdatedThreadId, selectPreferredThreadId } from "./thread-selection.js";
+import { selectPreferredThreadId } from "./thread-selection.js";
 
 describe("selectPreferredThreadId", () => {
   it("prefers the oldest created loaded thread when details are available", () => {
@@ -102,64 +102,5 @@ describe("selectPreferredThreadId", () => {
     });
 
     expect(result).toBe("thread_new_loaded");
-  });
-});
-
-describe("selectMostRecentlyUpdatedThreadId", () => {
-  it("prefers the most recently updated loaded thread when details are available", () => {
-    const result = selectMostRecentlyUpdatedThreadId({
-      availableThreads: [
-        {
-          id: "thread_old",
-          name: null,
-          preview: null,
-          updatedAt: 10,
-          createdAt: 1,
-        },
-        {
-          id: "thread_new",
-          name: null,
-          preview: null,
-          updatedAt: 20,
-          createdAt: 2,
-        },
-      ],
-      loadedThreadIds: ["thread_old", "thread_new"],
-    });
-
-    expect(result).toBe("thread_new");
-  });
-
-  it("falls back to the latest loaded-only thread when details are missing", () => {
-    const result = selectMostRecentlyUpdatedThreadId({
-      availableThreads: [],
-      loadedThreadIds: ["thread_old_loaded", "thread_new_loaded"],
-    });
-
-    expect(result).toBe("thread_new_loaded");
-  });
-
-  it("prefers the most recently updated available thread when none are loaded", () => {
-    const result = selectMostRecentlyUpdatedThreadId({
-      availableThreads: [
-        {
-          id: "thread_old",
-          name: null,
-          preview: null,
-          updatedAt: 10,
-          createdAt: 1,
-        },
-        {
-          id: "thread_new",
-          name: null,
-          preview: null,
-          updatedAt: 20,
-          createdAt: 2,
-        },
-      ],
-      loadedThreadIds: [],
-    });
-
-    expect(result).toBe("thread_new");
   });
 });
