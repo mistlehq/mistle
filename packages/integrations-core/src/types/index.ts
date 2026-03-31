@@ -14,15 +14,18 @@ export const IntegrationKinds: {
   CONNECTOR: "connector",
 };
 
-export type IntegrationConnectionMethodId = "api-key" | "oauth2" | "github-app-installation";
+export type IntegrationConnectionMethodId =
+  | "api-key"
+  | "oauth2-authorization-code"
+  | "github-app-installation";
 
 export const IntegrationConnectionMethodIds: {
   API_KEY: IntegrationConnectionMethodId;
-  OAUTH2: IntegrationConnectionMethodId;
+  OAUTH2_AUTHORIZATION_CODE: IntegrationConnectionMethodId;
   GITHUB_APP_INSTALLATION: IntegrationConnectionMethodId;
 } = {
   API_KEY: "api-key",
-  OAUTH2: "oauth2",
+  OAUTH2_AUTHORIZATION_CODE: "oauth2-authorization-code",
   GITHUB_APP_INSTALLATION: "github-app-installation",
 };
 
@@ -436,7 +439,7 @@ export type IntegrationRedirectHandler<
   ): MaybePromise<IntegrationRedirectCompleteResult>;
 };
 
-export type IntegrationOAuth2StartAuthorizationInput<
+export type IntegrationOAuth2AuthorizationCodeStartAuthorizationInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
 > = {
@@ -451,11 +454,11 @@ export type IntegrationOAuth2StartAuthorizationInput<
   };
 };
 
-export type IntegrationOAuth2StartAuthorizationResult = {
+export type IntegrationOAuth2AuthorizationCodeStartAuthorizationResult = {
   authorizationUrl: string;
 };
 
-export type IntegrationOAuth2CompleteAuthorizationCodeGrantInput<
+export type IntegrationOAuth2AuthorizationCodeCompleteGrantInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
 > = {
@@ -467,7 +470,7 @@ export type IntegrationOAuth2CompleteAuthorizationCodeGrantInput<
   pkceVerifier?: string;
 };
 
-export type IntegrationOAuth2CompleteAuthorizationCodeGrantResult = {
+export type IntegrationOAuth2AuthorizationCodeCompleteGrantResult = {
   externalSubjectId?: string;
   connectionConfig: Record<string, unknown>;
   accessToken: string;
@@ -477,7 +480,7 @@ export type IntegrationOAuth2CompleteAuthorizationCodeGrantResult = {
   credentialMetadata?: Record<string, unknown>;
 };
 
-export type IntegrationOAuth2RefreshAccessTokenInput<
+export type IntegrationOAuth2AuthorizationCodeRefreshAccessTokenInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TConnectionConfig = Record<string, unknown>,
@@ -491,7 +494,7 @@ export type IntegrationOAuth2RefreshAccessTokenInput<
   refreshToken: string;
 };
 
-export type IntegrationOAuth2RefreshAccessTokenResult = {
+export type IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult = {
   accessToken: string;
   accessTokenExpiresAt?: string;
   refreshToken?: string;
@@ -499,50 +502,52 @@ export type IntegrationOAuth2RefreshAccessTokenResult = {
   credentialMetadata?: Record<string, unknown>;
 };
 
-export type IntegrationOAuth2RefreshAccessTokenErrorClassification = "temporary" | "permanent";
+export type IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification =
+  | "temporary"
+  | "permanent";
 
-export const IntegrationOAuth2RefreshAccessTokenErrorClassifications: {
-  TEMPORARY: IntegrationOAuth2RefreshAccessTokenErrorClassification;
-  PERMANENT: IntegrationOAuth2RefreshAccessTokenErrorClassification;
+export const IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications: {
+  TEMPORARY: IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification;
+  PERMANENT: IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification;
 } = {
   TEMPORARY: "temporary",
   PERMANENT: "permanent",
 };
 
-export class IntegrationOAuth2RefreshAccessTokenError extends Error {
-  readonly classification: IntegrationOAuth2RefreshAccessTokenErrorClassification;
+export class IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError extends Error {
+  readonly classification: IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification;
   readonly code: string | undefined;
 
   constructor(input: {
     message: string;
-    classification: IntegrationOAuth2RefreshAccessTokenErrorClassification;
+    classification: IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification;
     code?: string;
   }) {
     super(input.message);
-    this.name = "IntegrationOAuth2RefreshAccessTokenError";
+    this.name = "IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError";
     this.classification = input.classification;
     this.code = input.code;
   }
 }
 
-export type IntegrationOAuth2Capability<
+export type IntegrationOAuth2AuthorizationCodeCapability<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TConnectionConfig = Record<string, unknown>,
 > = {
   startAuthorization(
-    input: IntegrationOAuth2StartAuthorizationInput<TTargetConfig, TTargetSecrets>,
-  ): MaybePromise<IntegrationOAuth2StartAuthorizationResult>;
+    input: IntegrationOAuth2AuthorizationCodeStartAuthorizationInput<TTargetConfig, TTargetSecrets>,
+  ): MaybePromise<IntegrationOAuth2AuthorizationCodeStartAuthorizationResult>;
   completeAuthorizationCodeGrant(
-    input: IntegrationOAuth2CompleteAuthorizationCodeGrantInput<TTargetConfig, TTargetSecrets>,
-  ): MaybePromise<IntegrationOAuth2CompleteAuthorizationCodeGrantResult>;
+    input: IntegrationOAuth2AuthorizationCodeCompleteGrantInput<TTargetConfig, TTargetSecrets>,
+  ): MaybePromise<IntegrationOAuth2AuthorizationCodeCompleteGrantResult>;
   refreshAccessToken(
-    input: IntegrationOAuth2RefreshAccessTokenInput<
+    input: IntegrationOAuth2AuthorizationCodeRefreshAccessTokenInput<
       TTargetConfig,
       TTargetSecrets,
       TConnectionConfig
     >,
-  ): MaybePromise<IntegrationOAuth2RefreshAccessTokenResult>;
+  ): MaybePromise<IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult>;
 };
 
 export type IntegrationWebhookHeaders = Readonly<Record<string, string>>;
@@ -1058,7 +1063,7 @@ export type IntegrationDefinition<
     >
   >;
   credentialResolvers?: IntegrationCredentialResolvers;
-  oauth2?: IntegrationOAuth2Capability<
+  oauth2AuthorizationCode?: IntegrationOAuth2AuthorizationCodeCapability<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig

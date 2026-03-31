@@ -16,24 +16,27 @@ import {
   createRedirectState,
   encodeRedirectStateMetadata,
 } from "./redirect-flow.js";
-import { resolveOAuth2CapabilityTargetOrThrow } from "./resolve-oauth2-capability-target.js";
+import { resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow } from "./resolve-oauth2-authorization-code-capability-target.js";
 
 const PKCE_CHALLENGE_METHOD = "S256" as const;
 
-export type StartOAuth2ConnectionInput = {
+export type StartOAuth2AuthorizationCodeConnectionInput = {
   organizationId: string;
   targetKey: string;
   displayName?: string;
   controlPlaneBaseUrl: string;
 };
 
-type StartedOAuth2Connection = {
+type StartedOAuth2AuthorizationCodeConnection = {
   authorizationUrl: string;
 };
 
-function buildOAuth2CompleteUrl(input: { controlPlaneBaseUrl: string; targetKey: string }): string {
+function buildOAuth2AuthorizationCodeCompleteUrl(input: {
+  controlPlaneBaseUrl: string;
+  targetKey: string;
+}): string {
   return new URL(
-    `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth2/complete`,
+    `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth2-authorization-code/complete`,
     input.controlPlaneBaseUrl,
   ).toString();
 }
@@ -67,11 +70,11 @@ async function persistRedirectSession(input: {
     });
 
   if (insertedRows.length !== 1) {
-    throw new Error("Failed to persist OAuth2 redirect session state.");
+    throw new Error("Failed to persist OAuth 2.0 (Authorization Code) redirect session state.");
   }
 }
 
-export async function startOAuth2Connection(
+export async function startOAuth2AuthorizationCodeConnection(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
@@ -80,11 +83,11 @@ export async function startOAuth2Connection(
       masterEncryptionKeys: Record<string, string>;
     };
   },
-  input: StartOAuth2ConnectionInput,
-): Promise<StartedOAuth2Connection> {
+  input: StartOAuth2AuthorizationCodeConnectionInput,
+): Promise<StartedOAuth2AuthorizationCodeConnection> {
   const { db, integrationRegistry, integrationsConfig } = ctx;
 
-  const resolved = await resolveOAuth2CapabilityTargetOrThrow(
+  const resolved = await resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow(
     {
       db,
       integrationRegistry,
@@ -110,22 +113,23 @@ export async function startOAuth2Connection(
     masterKeyVersion: integrationsConfig.activeMasterEncryptionKeyVersion,
     masterEncryptionKeyMaterial,
   });
-  const redirectUrl = buildOAuth2CompleteUrl({
+  const redirectUrl = buildOAuth2AuthorizationCodeCompleteUrl({
     controlPlaneBaseUrl: input.controlPlaneBaseUrl,
     targetKey: input.targetKey,
   });
 
-  const startedOAuth2Connection = await resolved.oauth2.startAuthorization({
-    organizationId: input.organizationId,
-    targetKey: input.targetKey,
-    target: resolved.target,
-    state,
-    redirectUrl,
-    pkce: {
-      challenge: createPkceChallenge(pkceVerifier),
-      challengeMethod: PKCE_CHALLENGE_METHOD,
-    },
-  });
+  const startedOAuth2AuthorizationCodeConnection =
+    await resolved.oauth2AuthorizationCode.startAuthorization({
+      organizationId: input.organizationId,
+      targetKey: input.targetKey,
+      target: resolved.target,
+      state,
+      redirectUrl,
+      pkce: {
+        challenge: createPkceChallenge(pkceVerifier),
+        challengeMethod: PKCE_CHALLENGE_METHOD,
+      },
+    });
 
   await persistRedirectSession({
     db,
@@ -136,5 +140,5 @@ export async function startOAuth2Connection(
     expiresAt: createRedirectSessionExpiryTimestamp(),
   });
 
-  return startedOAuth2Connection;
+  return startedOAuth2AuthorizationCodeConnection;
 }

@@ -185,7 +185,7 @@ describe("internal integration credentials resolve", () => {
       displayName: "Stored OAuth2 token",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
-        connection_method: "oauth2",
+        connection_method: "oauth2-authorization-code",
       },
     });
 

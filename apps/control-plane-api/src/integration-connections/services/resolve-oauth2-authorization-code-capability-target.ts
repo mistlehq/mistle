@@ -4,7 +4,7 @@ import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationConnectionMethodIds,
   type IntegrationRegistry,
-  type IntegrationOAuth2Capability,
+  type IntegrationOAuth2AuthorizationCodeCapability,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
@@ -62,7 +62,7 @@ async function resolveEnabledTargetOrThrow(
   return target;
 }
 
-export type ResolvedOAuth2CapabilityTarget = {
+export type ResolvedOAuth2AuthorizationCodeCapabilityTarget = {
   target: {
     targetKey: string;
     familyId: string;
@@ -71,14 +71,14 @@ export type ResolvedOAuth2CapabilityTarget = {
     config: Record<string, unknown>;
     secrets: Record<string, string>;
   };
-  oauth2: IntegrationOAuth2Capability<
+  oauth2AuthorizationCode: IntegrationOAuth2AuthorizationCodeCapability<
     Record<string, unknown>,
     Record<string, string>,
     Record<string, unknown>
   >;
 };
 
-export async function resolveOAuth2CapabilityTargetOrThrow(
+export async function resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
@@ -91,7 +91,7 @@ export async function resolveOAuth2CapabilityTargetOrThrow(
     targetKey: string;
     invalidInputCode: "INVALID_OAUTH2_START_INPUT" | "INVALID_OAUTH2_COMPLETE_INPUT";
   },
-): Promise<ResolvedOAuth2CapabilityTarget> {
+): Promise<ResolvedOAuth2AuthorizationCodeCapabilityTarget> {
   const { db, integrationRegistry, integrationsConfig } = ctx;
 
   const target = await resolveEnabledTargetOrThrow(db, input.targetKey);
@@ -109,20 +109,20 @@ export async function resolveOAuth2CapabilityTargetOrThrow(
 
   if (
     !definition.connectionMethods.some(
-      (method) => method.id === IntegrationConnectionMethodIds.OAUTH2,
+      (method) => method.id === IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
     )
   ) {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.OAUTH2_NOT_SUPPORTED,
-      `Integration target '${input.targetKey}' does not support OAuth2.`,
+      `Integration target '${input.targetKey}' does not support OAuth 2.0 (Authorization Code).`,
     );
   }
 
-  const oauth2 = definition.oauth2;
-  if (oauth2 === undefined) {
+  const oauth2AuthorizationCode = definition.oauth2AuthorizationCode;
+  if (oauth2AuthorizationCode === undefined) {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.OAUTH2_CAPABILITY_NOT_CONFIGURED,
-      `Integration target '${input.targetKey}' does not define an OAuth2 capability.`,
+      `Integration target '${input.targetKey}' does not define an OAuth 2.0 (Authorization Code) capability.`,
     );
   }
 
@@ -181,6 +181,6 @@ export async function resolveOAuth2CapabilityTargetOrThrow(
       config: parsedConfig,
       secrets: parsedSecrets,
     },
-    oauth2,
+    oauth2AuthorizationCode,
   };
 }

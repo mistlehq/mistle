@@ -98,7 +98,7 @@ Key fields and what they drive:
 | `bindingConfigForm` (optional)          | Rendering metadata for per-binding config                         | Dashboard binding editor                             |
 | `connectionMethods`                     | Declares supported connection methods                             | Connection creation and method gating                |
 | `credentialResolvers` (optional)        | Dynamic credential generation/lookup                              | Internal credential resolution endpoint              |
-| `oauth2` (optional)                     | OAuth2 authorization-code and refresh behavior                    | OAuth2 connection flows                              |
+| `oauth2AuthorizationCode` (optional)    | OAuth 2.0 authorization-code and refresh behavior                 | OAuth 2.0 authorization-code connection flows        |
 | `redirectHandler` (optional)            | Non-OAuth redirect start/complete behavior                        | Redirect-based connection flows                      |
 | `webhookHandler` (optional)             | Resolve inbound webhook requests to events or immediate responses | Webhook ingest                                       |
 | `mcp` (optional)                        | Declare one or more MCP servers for this binding                  | MCP collection during compile                        |
@@ -139,7 +139,7 @@ flowchart TD
 ### 2) Connection creation
 
 - API key flow: validates target + method support; stores encrypted credentials and connection config.
-- OAuth2 flow: uses `oauth2.startAuthorization` and `oauth2.completeAuthorizationCodeGrant`; stores connection config and any returned credential materials.
+- OAuth 2.0 authorization-code flow: uses `oauth2AuthorizationCode.startAuthorization` and `oauth2AuthorizationCode.completeAuthorizationCodeGrant`; stores connection config and any returned credential materials.
 - Redirect flow: uses `redirectHandler.start` and `redirectHandler.complete`; stores connection config and any returned credential materials.
 
 ### 3) Binding to sandbox profile version
@@ -215,7 +215,7 @@ This is the recommended workflow.
 4. Define connection and auth behavior.
 
 - Set `connectionMethods`.
-- If OAuth2 is needed, implement `oauth2`.
+- If OAuth 2.0 authorization-code is needed, implement `oauth2AuthorizationCode`.
 - If a non-OAuth redirect flow is needed, implement `redirectHandler`.
 - If credential material is dynamic, implement `credentialResolvers`.
 

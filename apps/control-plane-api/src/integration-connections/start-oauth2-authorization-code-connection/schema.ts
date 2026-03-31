@@ -9,25 +9,25 @@ import {
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
 
-export const StartOAuth2ConnectionParamsSchema = z
+export const StartOAuth2AuthorizationCodeConnectionParamsSchema = z
   .object({
     targetKey: z.string().min(1),
   })
   .strict();
 
-export const StartOAuth2ConnectionBodySchema = z
+export const StartOAuth2AuthorizationCodeConnectionBodySchema = z
   .object({
     displayName: z.string().min(1).optional(),
   })
   .strict();
 
-export const StartOAuth2ConnectionResponseSchema = z
+export const StartOAuth2AuthorizationCodeConnectionResponseSchema = z
   .object({
     authorizationUrl: z.url(),
   })
   .strict();
 
-export const StartOAuth2ConnectionBadRequestResponseSchema = z.union([
+export const StartOAuth2AuthorizationCodeConnectionBadRequestResponseSchema = z.union([
   createCodeMessageErrorSchema(
     z.enum([
       IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_START_INPUT,
@@ -38,6 +38,5 @@ export const StartOAuth2ConnectionBadRequestResponseSchema = z.union([
   ValidationErrorResponseSchema,
 ]);
 
-export const StartOAuth2ConnectionNotFoundResponseSchema = createCodeMessageErrorSchema(
-  z.literal(IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND),
-);
+export const StartOAuth2AuthorizationCodeConnectionNotFoundResponseSchema =
+  createCodeMessageErrorSchema(z.literal(IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND));

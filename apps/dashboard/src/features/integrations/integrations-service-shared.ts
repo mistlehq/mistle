@@ -23,7 +23,7 @@ export const IntegrationTargetSchema = z
       .array(
         z
           .object({
-            id: z.enum(["api-key", "oauth2", "github-app-installation"]),
+            id: z.enum(["api-key", "oauth2-authorization-code", "github-app-installation"]),
             label: z.string().min(1),
             kind: z.enum(["api-key", "oauth2", "redirect"]),
           })

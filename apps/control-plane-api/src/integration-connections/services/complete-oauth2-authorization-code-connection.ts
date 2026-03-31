@@ -21,9 +21,9 @@ import {
 } from "../../lib/crypto.js";
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import { createRedirectQueryParams, resolveRedirectDisplayName } from "./redirect-flow.js";
-import { resolveOAuth2CapabilityTargetOrThrow } from "./resolve-oauth2-capability-target.js";
+import { resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow } from "./resolve-oauth2-authorization-code-capability-target.js";
 
-type CompleteOAuth2ConnectionInput = {
+type CompleteOAuth2AuthorizationCodeConnectionInput = {
   targetKey: string;
   query: Record<string, string>;
   controlPlaneBaseUrl: string;
@@ -41,9 +41,12 @@ type CompletedConnection = {
   updatedAt: string;
 };
 
-function buildOAuth2CompleteUrl(input: { controlPlaneBaseUrl: string; targetKey: string }): string {
+function buildOAuth2AuthorizationCodeCompleteUrl(input: {
+  controlPlaneBaseUrl: string;
+  targetKey: string;
+}): string {
   return new URL(
-    `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth2/complete`,
+    `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth2-authorization-code/complete`,
     input.controlPlaneBaseUrl,
   ).toString();
 }
@@ -53,7 +56,7 @@ function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   if (state === null || state.length === 0) {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_COMPLETE_INPUT,
-      "OAuth2 callback query must include `state`.",
+      "OAuth 2.0 (Authorization Code) callback query must include `state`.",
     );
   }
 
@@ -74,7 +77,7 @@ function resolvePkceVerifier(input: {
   });
 }
 
-export async function completeOAuth2Connection(
+export async function completeOAuth2AuthorizationCodeConnection(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
@@ -83,11 +86,11 @@ export async function completeOAuth2Connection(
       masterEncryptionKeys: Record<string, string>;
     };
   },
-  input: CompleteOAuth2ConnectionInput,
+  input: CompleteOAuth2AuthorizationCodeConnectionInput,
 ): Promise<CompletedConnection> {
   const { db, integrationRegistry, integrationsConfig } = ctx;
 
-  const resolved = await resolveOAuth2CapabilityTargetOrThrow(
+  const resolved = await resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow(
     {
       db,
       integrationRegistry,
@@ -136,7 +139,7 @@ export async function completeOAuth2Connection(
     );
   }
 
-  const redirectUrl = buildOAuth2CompleteUrl({
+  const redirectUrl = buildOAuth2AuthorizationCodeCompleteUrl({
     controlPlaneBaseUrl: input.controlPlaneBaseUrl,
     targetKey: input.targetKey,
   });
@@ -144,14 +147,15 @@ export async function completeOAuth2Connection(
     pkceVerifierEncrypted: redirectSession.pkceVerifierEncrypted,
     masterEncryptionKeys: integrationsConfig.masterEncryptionKeys,
   });
-  const completedOAuth2Connection = await resolved.oauth2.completeAuthorizationCodeGrant({
-    organizationId: redirectSession.organizationId,
-    targetKey: input.targetKey,
-    target: resolved.target,
-    query: queryParams,
-    redirectUrl,
-    ...(pkceVerifier === undefined ? {} : { pkceVerifier }),
-  });
+  const completedOAuth2AuthorizationCodeConnection =
+    await resolved.oauth2AuthorizationCode.completeAuthorizationCodeGrant({
+      organizationId: redirectSession.organizationId,
+      targetKey: input.targetKey,
+      target: resolved.target,
+      query: queryParams,
+      redirectUrl,
+      ...(pkceVerifier === undefined ? {} : { pkceVerifier }),
+    });
 
   return db.transaction(async (tx) => {
     const usedAtTimestamp = new Date().toISOString();
@@ -183,21 +187,27 @@ export async function completeOAuth2Connection(
         organizationId: redirectSession.organizationId,
         targetKey: input.targetKey,
         displayName:
-          requestedDisplayName ?? completedOAuth2Connection.externalSubjectId ?? input.targetKey,
+          requestedDisplayName ??
+          completedOAuth2AuthorizationCodeConnection.externalSubjectId ??
+          input.targetKey,
         status: IntegrationConnectionStatuses.ACTIVE,
-        ...(completedOAuth2Connection.externalSubjectId === undefined
+        ...(completedOAuth2AuthorizationCodeConnection.externalSubjectId === undefined
           ? {}
-          : { externalSubjectId: completedOAuth2Connection.externalSubjectId }),
+          : {
+              externalSubjectId: completedOAuth2AuthorizationCodeConnection.externalSubjectId,
+            }),
         config: {
-          ...completedOAuth2Connection.connectionConfig,
-          connection_method: IntegrationConnectionMethodIds.OAUTH2,
+          ...completedOAuth2AuthorizationCodeConnection.connectionConfig,
+          connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
         },
         targetSnapshotConfig: resolved.target.config,
       })
       .returning();
 
     if (createdConnection === undefined) {
-      throw new Error("Failed to create integration connection from OAuth2 callback.");
+      throw new Error(
+        "Failed to create integration connection from OAuth 2.0 (Authorization Code) callback.",
+      );
     }
 
     const organizationCredentialKey = await tx.query.organizationCredentialKeys.findFirst({
@@ -222,7 +232,7 @@ export async function completeOAuth2Connection(
 
     try {
       const encryptedAccessToken = encryptCredentialUtf8({
-        plaintext: completedOAuth2Connection.accessToken,
+        plaintext: completedOAuth2AuthorizationCodeConnection.accessToken,
         organizationCredentialKey: unwrappedOrganizationCredentialKey,
       });
       const [createdAccessTokenCredential] = await tx
@@ -234,19 +244,21 @@ export async function completeOAuth2Connection(
           nonce: encryptedAccessToken.nonce,
           organizationCredentialKeyVersion: organizationCredentialKey.version,
           intendedFamilyId: resolved.target.familyId,
-          ...(completedOAuth2Connection.credentialMetadata === undefined
+          ...(completedOAuth2AuthorizationCodeConnection.credentialMetadata === undefined
             ? {}
-            : { metadata: completedOAuth2Connection.credentialMetadata }),
-          ...(completedOAuth2Connection.accessTokenExpiresAt === undefined
+            : { metadata: completedOAuth2AuthorizationCodeConnection.credentialMetadata }),
+          ...(completedOAuth2AuthorizationCodeConnection.accessTokenExpiresAt === undefined
             ? {}
-            : { expiresAt: completedOAuth2Connection.accessTokenExpiresAt }),
+            : {
+                expiresAt: completedOAuth2AuthorizationCodeConnection.accessTokenExpiresAt,
+              }),
         })
         .returning({
           id: integrationCredentials.id,
         });
 
       if (createdAccessTokenCredential === undefined) {
-        throw new Error("Failed to create OAuth2 access token credential.");
+        throw new Error("Failed to create OAuth 2.0 (Authorization Code) access token credential.");
       }
 
       await tx.insert(integrationConnectionCredentials).values({
@@ -255,9 +267,9 @@ export async function completeOAuth2Connection(
         purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
       });
 
-      if (completedOAuth2Connection.refreshToken !== undefined) {
+      if (completedOAuth2AuthorizationCodeConnection.refreshToken !== undefined) {
         const encryptedRefreshToken = encryptCredentialUtf8({
-          plaintext: completedOAuth2Connection.refreshToken,
+          plaintext: completedOAuth2AuthorizationCodeConnection.refreshToken,
           organizationCredentialKey: unwrappedOrganizationCredentialKey,
         });
         const [createdRefreshTokenCredential] = await tx
@@ -269,19 +281,23 @@ export async function completeOAuth2Connection(
             nonce: encryptedRefreshToken.nonce,
             organizationCredentialKeyVersion: organizationCredentialKey.version,
             intendedFamilyId: resolved.target.familyId,
-            ...(completedOAuth2Connection.credentialMetadata === undefined
+            ...(completedOAuth2AuthorizationCodeConnection.credentialMetadata === undefined
               ? {}
-              : { metadata: completedOAuth2Connection.credentialMetadata }),
-            ...(completedOAuth2Connection.refreshTokenExpiresAt === undefined
+              : { metadata: completedOAuth2AuthorizationCodeConnection.credentialMetadata }),
+            ...(completedOAuth2AuthorizationCodeConnection.refreshTokenExpiresAt === undefined
               ? {}
-              : { expiresAt: completedOAuth2Connection.refreshTokenExpiresAt }),
+              : {
+                  expiresAt: completedOAuth2AuthorizationCodeConnection.refreshTokenExpiresAt,
+                }),
           })
           .returning({
             id: integrationCredentials.id,
           });
 
         if (createdRefreshTokenCredential === undefined) {
-          throw new Error("Failed to create OAuth2 refresh token credential.");
+          throw new Error(
+            "Failed to create OAuth 2.0 (Authorization Code) refresh token credential.",
+          );
         }
 
         await tx.insert(integrationConnectionCredentials).values({

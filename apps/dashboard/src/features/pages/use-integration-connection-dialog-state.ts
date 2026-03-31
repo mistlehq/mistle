@@ -24,9 +24,9 @@ import {
 
 function isRedirectConnectionMethodId(
   methodId: IntegrationConnectionMethodId,
-): methodId is "oauth2" | "github-app-installation" {
+): methodId is "oauth2-authorization-code" | "github-app-installation" {
   return (
-    methodId === IntegrationConnectionMethodIds.OAUTH2 ||
+    methodId === IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE ||
     methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
   );
 }
@@ -46,7 +46,7 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
   const startRedirectMutation = useMutation({
     mutationFn: async (mutationInput: {
       targetKey: string;
-      methodId: "oauth2" | "github-app-installation";
+      methodId: "oauth2-authorization-code" | "github-app-installation";
       displayName?: string;
     }) => startRedirectIntegrationConnection(mutationInput),
   });

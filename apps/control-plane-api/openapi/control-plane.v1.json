@@ -2904,7 +2904,7 @@
         }
       }
     },
-    "/v1/integration/connections/:targetKey/oauth2/start": {
+    "/v1/integration/connections/:targetKey/oauth2-authorization-code/start": {
       "post": {
         "tags": ["Integrations"],
         "parameters": [
@@ -2937,7 +2937,7 @@
         },
         "responses": {
           "200": {
-            "description": "Create an OAuth2 authorization URL for an integration target.",
+            "description": "Create an OAuth 2.0 (Authorization Code) authorization URL for an integration target.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3231,7 +3231,7 @@
         }
       }
     },
-    "/v1/integration/connections/:targetKey/oauth2/complete": {
+    "/v1/integration/connections/:targetKey/oauth2-authorization-code/complete": {
       "get": {
         "tags": ["Integrations"],
         "parameters": [
@@ -3292,7 +3292,7 @@
         ],
         "responses": {
           "302": {
-            "description": "Complete OAuth2 connection creation and redirect to dashboard integrations.",
+            "description": "Complete OAuth 2.0 (Authorization Code) connection creation and redirect to dashboard integrations.",
             "headers": {
               "Location": {
                 "schema": {
@@ -3465,7 +3465,11 @@
                               "properties": {
                                 "id": {
                                   "type": "string",
-                                  "enum": ["api-key", "oauth2", "github-app-installation"]
+                                  "enum": [
+                                    "api-key",
+                                    "oauth2-authorization-code",
+                                    "github-app-installation"
+                                  ]
                                 },
                                 "label": {
                                   "type": "string",

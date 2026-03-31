@@ -10,14 +10,17 @@ import {
   RadioGroupItem,
 } from "@mistle/ui";
 
-export type IntegrationConnectionMethodId = "api-key" | "oauth2" | "github-app-installation";
+export type IntegrationConnectionMethodId =
+  | "api-key"
+  | "oauth2-authorization-code"
+  | "github-app-installation";
 export const IntegrationConnectionMethodIds: {
   API_KEY: IntegrationConnectionMethodId;
-  OAUTH2: IntegrationConnectionMethodId;
+  OAUTH2_AUTHORIZATION_CODE: IntegrationConnectionMethodId;
   GITHUB_APP_INSTALLATION: IntegrationConnectionMethodId;
 } = {
   API_KEY: "api-key",
-  OAUTH2: "oauth2",
+  OAUTH2_AUTHORIZATION_CODE: "oauth2-authorization-code",
   GITHUB_APP_INSTALLATION: "github-app-installation",
 };
 
@@ -115,7 +118,7 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
                 onValueChange={(nextValue) => {
                   if (
                     nextValue === IntegrationConnectionMethodIds.API_KEY ||
-                    nextValue === IntegrationConnectionMethodIds.OAUTH2 ||
+                    nextValue === IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE ||
                     nextValue === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
                   ) {
                     props.onMethodChange(nextValue);

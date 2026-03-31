@@ -2,34 +2,35 @@ import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
 import {
-  StartOAuth2ConnectionBadRequestResponseSchema,
-  StartOAuth2ConnectionBodySchema,
-  StartOAuth2ConnectionNotFoundResponseSchema,
-  StartOAuth2ConnectionParamsSchema,
-  StartOAuth2ConnectionResponseSchema,
+  StartOAuth2AuthorizationCodeConnectionBadRequestResponseSchema,
+  StartOAuth2AuthorizationCodeConnectionBodySchema,
+  StartOAuth2AuthorizationCodeConnectionNotFoundResponseSchema,
+  StartOAuth2AuthorizationCodeConnectionParamsSchema,
+  StartOAuth2AuthorizationCodeConnectionResponseSchema,
 } from "./schema.js";
 
 export const route = createRoute({
   method: "post",
-  path: "/:targetKey/oauth2/start",
+  path: "/:targetKey/oauth2-authorization-code/start",
   tags: ["Integrations"],
   request: {
-    params: StartOAuth2ConnectionParamsSchema,
+    params: StartOAuth2AuthorizationCodeConnectionParamsSchema,
     body: {
       required: false,
       content: {
         "application/json": {
-          schema: StartOAuth2ConnectionBodySchema,
+          schema: StartOAuth2AuthorizationCodeConnectionBodySchema,
         },
       },
     },
   },
   responses: {
     200: {
-      description: "Create an OAuth2 authorization URL for an integration target.",
+      description:
+        "Create an OAuth 2.0 (Authorization Code) authorization URL for an integration target.",
       content: {
         "application/json": {
-          schema: StartOAuth2ConnectionResponseSchema,
+          schema: StartOAuth2AuthorizationCodeConnectionResponseSchema,
         },
       },
     },
@@ -37,7 +38,7 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: StartOAuth2ConnectionBadRequestResponseSchema,
+          schema: StartOAuth2AuthorizationCodeConnectionBadRequestResponseSchema,
         },
       },
     },
@@ -61,7 +62,7 @@ export const route = createRoute({
       description: "Integration target was not found.",
       content: {
         "application/json": {
-          schema: StartOAuth2ConnectionNotFoundResponseSchema,
+          schema: StartOAuth2AuthorizationCodeConnectionNotFoundResponseSchema,
         },
       },
     },

@@ -342,7 +342,7 @@ function createCard(input: {
   connections?: readonly IntegrationConnection[];
   connectionStatuses?: readonly IntegrationConnection["status"][];
   connectionMethods?: readonly {
-    id: "api-key" | "oauth2" | "github-app-installation";
+    id: "api-key" | "oauth2-authorization-code" | "github-app-installation";
     label: string;
     kind: "api-key" | "oauth2" | "redirect";
   }[];

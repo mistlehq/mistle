@@ -29,7 +29,7 @@ describe("assertApiKeyConnectionMethodSupportedOrThrow", () => {
         targetKey: "oauth2-only-target",
         connectionMethods: [
           {
-            id: IntegrationConnectionMethodIds.OAUTH2,
+            id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
           },
         ],
       });
