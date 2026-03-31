@@ -110,7 +110,6 @@ export function createOrganizationGeneralSettingsFixtureContent(): React.JSX.Ele
       nameErrorMessage={null}
       onCancelChanges={() => {}}
       onNameChange={() => {}}
-      onRetryLoad={() => {}}
       onSaveChanges={() => {}}
       saveErrorMessage={null}
       saveSuccess={false}
@@ -136,8 +135,6 @@ export function createOrganizationMembersSettingsFixtureContent(): React.JSX.Ele
       onInviteDialogOpenChange={() => {}}
       onRemoveMember={() => {}}
       onResendInvite={() => {}}
-      onRetryCapabilities={() => {}}
-      onRetryLoad={() => {}}
       onRevokeInvite={() => {}}
       onRoleDialogCancel={() => {}}
       onRoleDialogOpenChange={() => {}}

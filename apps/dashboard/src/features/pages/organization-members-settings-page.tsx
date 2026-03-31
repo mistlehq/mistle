@@ -63,8 +63,6 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
       onInviteDialogOpenChange={membersState.setInviteDialogOpen}
       onRemoveMember={membersState.onRemoveMember}
       onResendInvite={membersState.onResendInvite}
-      onRetryCapabilities={membersState.onRetryCapabilities}
-      onRetryLoad={membersState.retryMembersAndInvitations}
       onRevokeInvite={membersState.onRevokeInvite}
       onRoleDialogCancel={() => membersState.onRoleDialogOpenChange(false)}
       onRoleDialogOpenChange={membersState.onRoleDialogOpenChange}

@@ -16,7 +16,6 @@ const meta = {
     nameErrorMessage: null,
     onCancelChanges: () => {},
     onNameChange: () => {},
-    onRetryLoad: () => {},
     onSaveChanges: () => {},
     saveErrorMessage: null,
     saveSuccess: false,

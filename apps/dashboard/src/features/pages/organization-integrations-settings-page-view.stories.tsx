@@ -66,7 +66,6 @@ const meta = {
     connectedCards: ConnectedCards,
     isLoading: false,
     loadErrorMessage: null,
-    onRetryLoad: () => {},
   },
 } satisfies Meta<typeof OrganizationIntegrationsSettingsPageView>;
 

@@ -130,9 +130,6 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         setSaveError(null);
         setShowSaveSuccess(false);
       }}
-      onRetryLoad={() => {
-        void organizationQuery.refetch();
-      }}
       onSaveChanges={(name) => {
         setSaveError(null);
         setShowSaveSuccess(false);
@@ -154,7 +151,6 @@ function OrganizationGeneralSettingsEditor(input: {
   loadErrorMessage: string | null;
   saveErrorMessage: string | null;
   saveSuccess: boolean;
-  onRetryLoad: () => void;
   onSaveChanges: (name: string) => void;
   onResetFeedback: () => void;
 }): React.JSX.Element {
@@ -180,7 +176,6 @@ function OrganizationGeneralSettingsEditor(input: {
         setName(nextValue);
         input.onResetFeedback();
       }}
-      onRetryLoad={input.onRetryLoad}
       onSaveChanges={() => {
         input.onSaveChanges(name);
       }}
