@@ -84,14 +84,29 @@ export function useSessionMainPanelHandoff(
     restoreTimeoutIdRef.current = null;
   }, []);
 
-  const resetToStableChat = useCallback((): void => {
+  const resetRestoreState = useCallback((): void => {
     clearRestoreTimeout();
     restoreGenerationRef.current = null;
     restoreExecutionGenerationRef.current = null;
+  }, [clearRestoreTimeout]);
+
+  const failRestore = useCallback(
+    (errorMessage: string): void => {
+      resetRestoreState();
+      dispatch({
+        type: "chat_restore_failed",
+        errorMessage,
+      });
+    },
+    [resetRestoreState],
+  );
+
+  const resetToStableChat = useCallback((): void => {
+    resetRestoreState();
     dispatch({
       type: "reset_to_stable_chat",
     });
-  }, [clearRestoreTimeout]);
+  }, [resetRestoreState]);
 
   const startChatRestore = useCallback((): void => {
     const generation = nextGeneration();
@@ -105,11 +120,7 @@ export function useSessionMainPanelHandoff(
         return;
       }
 
-      restoreTimeoutIdRef.current = null;
-      dispatch({
-        type: "chat_restore_failed",
-        errorMessage: "Timed out while restoring chat.",
-      });
+      failRestore("Timed out while restoring chat.");
     }, ChatRestoreTimeoutMs);
     input.lifecycle.clearLifecycleErrorMessage();
     dispatch({
@@ -120,10 +131,7 @@ export function useSessionMainPanelHandoff(
     void closeAndDisconnectCliPty(input.cliPtyState);
 
     if (input.sandboxInstanceId === null) {
-      dispatch({
-        type: "chat_restore_failed",
-        errorMessage: "Could not restore chat because the current session thread is unavailable.",
-      });
+      failRestore("Could not restore chat because the current session thread is unavailable.");
       return;
     }
 
@@ -247,12 +255,9 @@ export function useSessionMainPanelHandoff(
     }
 
     clearRestoreTimeout();
-    dispatch({
-      type: "chat_restore_failed",
-      errorMessage: input.lifecycle.lifecycleErrorMessage,
-    });
+    failRestore(input.lifecycle.lifecycleErrorMessage);
   }, [
-    clearRestoreTimeout,
+    failRestore,
     input.lifecycle.lifecycleErrorMessage,
     isCurrentGeneration,
     state.transitionState,
@@ -285,27 +290,21 @@ export function useSessionMainPanelHandoff(
           return;
         }
 
-        clearRestoreTimeout();
         resetToStableChat();
       } catch (error) {
         if (!isCurrentGeneration(restoreGeneration)) {
           return;
         }
 
-        clearRestoreTimeout();
         restoreExecutionGenerationRef.current = null;
-        dispatch({
-          type: "chat_restore_failed",
-          errorMessage: error instanceof Error ? error.message : "Could not restore chat.",
-        });
+        failRestore(error instanceof Error ? error.message : "Could not restore chat.");
       }
     })();
   }, [
-    clearRestoreTimeout,
+    failRestore,
     input.chat,
     input.lifecycle.sessionSnapshot?.activeThreadId,
     input.lifecycle.transportState,
-    input.threadAuthority,
     isCurrentGeneration,
     resetToStableChat,
     state.transitionState,
@@ -321,13 +320,11 @@ export function useSessionMainPanelHandoff(
 
   useEffect(() => {
     generationRef.current += 1;
-    clearRestoreTimeout();
-    restoreGenerationRef.current = null;
-    restoreExecutionGenerationRef.current = null;
+    resetRestoreState();
     dispatch({
       type: "reset_to_stable_chat",
     });
-  }, [clearRestoreTimeout, input.sandboxInstanceId]);
+  }, [input.sandboxInstanceId, resetRestoreState]);
 
   return {
     transitionState: state.transitionState,

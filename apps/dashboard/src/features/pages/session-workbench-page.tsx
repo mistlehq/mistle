@@ -5,14 +5,13 @@ import { useLocation, useParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
-import { SessionChatRestoreFailedPanel } from "./session-chat-restore-failed-panel.js";
-import { SessionCliEntryFailedPanel } from "./session-cli-entry-failed-panel.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
   SessionConversationBottomPanel,
   SessionConversationBottomPanelController,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
+import { SessionPrimaryPanelStatusCard } from "./session-primary-panel-status-card.js";
 import { SessionTerminalPanel } from "./session-terminal-panel.js";
 import {
   SessionWorkbenchPageView,
@@ -255,16 +254,20 @@ function SessionWorkbenchPageContent(input: {
           ? { scroll: "contained", width: "full" }
           : { scroll: "page", width: "chat" }
       }
-      mainContent={resolvePrimaryPanelMainContent({
-        chatEntries: conversationPane.chatState.entries,
-        cliRefitKey: workbench.terminalPanelState.isVisible ? "cli:split" : "cli:solo",
-        cliPtyState: workbench.cliPtyState,
+      mainContent={renderPrimaryPanelMainContent({
+        conversation: {
+          chatEntries: conversationPane.chatState.entries,
+          isRespondingToServerRequest:
+            conversationPane.serverRequestsState.isRespondingToServerRequest,
+          onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
+          serverRequestPanelEntries: unmatchedServerRequests,
+        },
+        cli: {
+          ptyState: workbench.cliPtyState,
+          refitKey: workbench.terminalPanelState.isVisible ? "cli:split" : "cli:solo",
+        },
         errorMessage: workbench.primaryPanelState.errorMessage,
-        isRespondingToServerRequest:
-          conversationPane.serverRequestsState.isRespondingToServerRequest,
-        onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
         onReturnToChat: workbench.primaryPanelState.exitCliMode,
-        serverRequestPanelEntries: unmatchedServerRequests,
         transitionState: workbench.primaryPanelState.transitionState,
       })}
       onSecondaryPanelResize={workbench.terminalPanelState.setPanelSize}
@@ -312,55 +315,81 @@ function SessionWorkbenchPageContent(input: {
   );
 }
 
-function resolvePrimaryPanelMainContent(input: {
-  chatEntries: React.ComponentProps<typeof SessionConversationMainContent>["chatEntries"];
-  cliRefitKey: React.ComponentProps<typeof SessionCliPanel>["refitKey"];
-  cliPtyState: React.ComponentProps<typeof SessionCliPanel>["ptyState"];
+type PrimaryPanelConversationContent = Pick<
+  React.ComponentProps<typeof SessionConversationMainContent>,
+  | "chatEntries"
+  | "isRespondingToServerRequest"
+  | "onRespondToServerRequest"
+  | "serverRequestPanelEntries"
+>;
+
+type PrimaryPanelCliContent = Pick<
+  React.ComponentProps<typeof SessionCliPanel>,
+  "ptyState" | "refitKey"
+>;
+
+function renderPrimaryPanelMainContent(input: {
+  cli: PrimaryPanelCliContent;
+  conversation: PrimaryPanelConversationContent;
   errorMessage: string | null;
-  isRespondingToServerRequest: React.ComponentProps<
-    typeof SessionConversationMainContent
-  >["isRespondingToServerRequest"];
-  onRespondToServerRequest: React.ComponentProps<
-    typeof SessionConversationMainContent
-  >["onRespondToServerRequest"];
   onReturnToChat: () => Promise<void>;
-  serverRequestPanelEntries: React.ComponentProps<
-    typeof SessionConversationMainContent
-  >["serverRequestPanelEntries"];
   transitionState: ReturnType<
     typeof useSessionWorkbenchController
   >["workbench"]["primaryPanelState"]["transitionState"];
 }): React.JSX.Element {
-  const cliRefitKeyProps = input.cliRefitKey === undefined ? {} : { refitKey: input.cliRefitKey };
-
   switch (input.transitionState) {
     case "switching_to_cli":
-      return <></>;
-    case "cli_entry_failed":
-      return (
-        <SessionCliEntryFailedPanel
-          errorMessage={input.errorMessage}
-          onReturnToChat={() => {
-            void input.onReturnToChat();
-          }}
-        />
-      );
-    case "stable_cli":
-      return <SessionCliPanel ptyState={input.cliPtyState} {...cliRefitKeyProps} />;
     case "restoring_chat":
       return <></>;
-    case "restore_failed":
-      return <SessionChatRestoreFailedPanel errorMessage={input.errorMessage} />;
-    case "stable_chat":
+    case "cli_entry_failed":
+      return renderCliEntryFailure(input.errorMessage, input.onReturnToChat);
+    case "stable_cli":
       return (
-        <SessionConversationMainContent
-          chatEntries={input.chatEntries}
-          isRespondingToServerRequest={input.isRespondingToServerRequest}
-          onRespondToServerRequest={input.onRespondToServerRequest}
-          serverRequestPanelEntries={input.serverRequestPanelEntries}
+        <SessionCliPanel
+          ptyState={input.cli.ptyState}
+          {...(input.cli.refitKey === undefined ? {} : { refitKey: input.cli.refitKey })}
         />
       );
+    case "restore_failed":
+      return renderChatRestoreFailure(input.errorMessage);
+    case "stable_chat":
+      return <SessionConversationMainContent {...input.conversation} />;
   }
+}
+
+function renderCliEntryFailure(
+  errorMessage: string | null,
+  onReturnToChat: () => Promise<void>,
+): React.JSX.Element {
+  return (
+    <SessionPrimaryPanelStatusCard
+      action={{
+        label: "Return to chat",
+        onClick: () => {
+          void onReturnToChat();
+        },
+      }}
+      description={
+        errorMessage ??
+        "Codex CLI could not be started for this session. Return to chat to keep using the workbench."
+      }
+      title="Could not start Codex CLI"
+      tone="destructive"
+    />
+  );
+}
+
+function renderChatRestoreFailure(errorMessage: string | null): React.JSX.Element {
+  return (
+    <SessionPrimaryPanelStatusCard
+      description={
+        errorMessage ??
+        "The workbench could not reconnect chat automatically. Please try again later or contact support if the problem continues."
+      }
+      title="Could not restore chat"
+      tone="destructive"
+    />
+  );
 }
 
 function SessionWorkbenchAutoResumeOnEntry(input: {

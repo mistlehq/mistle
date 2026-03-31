@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { SessionChatRestoreFailedPanel } from "./session-chat-restore-failed-panel.js";
-import { SessionCliEntryFailedPanel } from "./session-cli-entry-failed-panel.js";
+import { SessionPrimaryPanelStatusCard } from "./session-primary-panel-status-card.js";
 import {
   createStorySessionBottomPanel,
   createStorySessionMainContent,
@@ -36,9 +35,14 @@ export const CliEntryFailed: Story = {
   render: () =>
     renderSessionWorkbenchStory({
       mainContent: (
-        <SessionCliEntryFailedPanel
-          errorMessage="codex executable missing from the sandbox image"
-          onReturnToChat={noop}
+        <SessionPrimaryPanelStatusCard
+          action={{
+            label: "Return to chat",
+            onClick: noop,
+          }}
+          description="codex executable missing from the sandbox image"
+          title="Could not start Codex CLI"
+          tone="destructive"
         />
       ),
       primaryBottomPanel: null,
@@ -49,7 +53,11 @@ export const RestoreFailed: Story = {
   render: () =>
     renderSessionWorkbenchStory({
       mainContent: (
-        <SessionChatRestoreFailedPanel errorMessage="Minting sandbox connection token failed: Could not mint connection token." />
+        <SessionPrimaryPanelStatusCard
+          description="Minting sandbox connection token failed: Could not mint connection token."
+          title="Could not restore chat"
+          tone="destructive"
+        />
       ),
       primaryBottomPanel: null,
     }),
