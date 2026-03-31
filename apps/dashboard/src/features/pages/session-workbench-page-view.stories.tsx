@@ -70,6 +70,17 @@ export const WithAlerts: Story = {
   },
 };
 
+export const WithCliEntryFailureAlert: Story = {
+  args: {
+    alerts: [
+      {
+        title: "Could not start Codex CLI",
+        description: "codex executable missing from the sandbox image",
+      },
+    ],
+  },
+};
+
 export const WithSecondaryPane: Story = {
   args: {
     isSecondaryPanelVisible: true,
