@@ -3,8 +3,6 @@ import {
   AutomationConversationStatuses,
   AutomationConversationOwnerKinds,
   type AutomationConversationCreatedByKind,
-  type AutomationConversationIntegrationFamilyId,
-  type AutomationConversationRuntimeId,
   type InsertAutomationConversation,
   type AutomationConversationOwnerKind,
   type ControlPlaneDatabase,
@@ -24,8 +22,8 @@ export type ClaimAutomationConversationInput = {
   createdById: string;
   conversationKey?: string;
   sandboxProfileId: string;
-  integrationFamilyId: AutomationConversationIntegrationFamilyId;
-  runtimeId: AutomationConversationRuntimeId;
+  integrationFamilyId: string;
+  runtimeId: string;
   title?: string | null;
   preview?: string | null;
 };

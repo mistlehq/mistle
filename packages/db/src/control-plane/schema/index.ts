@@ -73,9 +73,7 @@ export {
   AutomationConversationStatuses,
   type AutomationConversation,
   type AutomationConversationCreatedByKind,
-  type AutomationConversationIntegrationFamilyId,
   type AutomationConversationOwnerKind,
-  type AutomationConversationRuntimeId,
   type AutomationConversationStatus,
   type InsertAutomationConversation,
 } from "./automation-conversations.js";
