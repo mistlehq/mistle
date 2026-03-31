@@ -33,10 +33,23 @@ export type SessionMainPanelHandoffAction =
       type: "reset_to_stable_chat";
     };
 
-export const InitialSessionMainPanelHandoffState: SessionMainPanelHandoffState = {
-  transitionState: "stable_chat",
-  errorMessage: null,
-};
+const CliToggleActiveStates = new Set<MainPanelTransitionState>([
+  "switching_to_cli",
+  "cli_entry_failed",
+  "stable_cli",
+]);
+
+function createHandoffState(
+  transitionState: MainPanelTransitionState,
+  errorMessage: string | null = null,
+): SessionMainPanelHandoffState {
+  return {
+    transitionState,
+    errorMessage,
+  };
+}
+
+export const InitialSessionMainPanelHandoffState = createHandoffState("stable_chat");
 
 export function reduceSessionMainPanelHandoffState(
   _state: SessionMainPanelHandoffState,
@@ -44,61 +57,45 @@ export function reduceSessionMainPanelHandoffState(
 ): SessionMainPanelHandoffState {
   switch (action.type) {
     case "handoff_to_cli_requested": {
-      return {
-        transitionState: "switching_to_cli",
-        errorMessage: null,
-      };
+      return createHandoffState("switching_to_cli");
     }
 
     case "cli_handoff_succeeded": {
-      return {
-        transitionState: "stable_cli",
-        errorMessage: null,
-      };
+      return createHandoffState("stable_cli");
     }
 
     case "cli_handoff_failed": {
-      return {
-        transitionState: "cli_entry_failed",
-        errorMessage: action.errorMessage,
-      };
+      return createHandoffState("cli_entry_failed", action.errorMessage);
     }
 
     case "chat_restore_requested": {
-      return {
-        transitionState: "restoring_chat",
-        errorMessage: null,
-      };
+      return createHandoffState("restoring_chat");
     }
 
     case "reset_to_stable_chat": {
-      return {
-        transitionState: "stable_chat",
-        errorMessage: null,
-      };
+      return InitialSessionMainPanelHandoffState;
     }
 
     case "chat_restore_failed": {
-      return {
-        transitionState: "restore_failed",
-        errorMessage: action.errorMessage,
-      };
+      return createHandoffState("restore_failed", action.errorMessage);
     }
   }
 }
 
 export function isCliToggleActive(transitionState: MainPanelTransitionState): boolean {
-  return (
-    transitionState === "switching_to_cli" ||
-    transitionState === "cli_entry_failed" ||
-    transitionState === "stable_cli"
-  );
+  return CliToggleActiveStates.has(transitionState);
+}
+
+export function isStableChatTransitionState(
+  transitionState: MainPanelTransitionState,
+): transitionState is "stable_chat" {
+  return transitionState === "stable_chat";
 }
 
 export function canRenderChatComposer(transitionState: MainPanelTransitionState): boolean {
-  return transitionState === "stable_chat";
+  return isStableChatTransitionState(transitionState);
 }
 
 export function shouldLifecycleAutoAttachChat(transitionState: MainPanelTransitionState): boolean {
-  return transitionState === "stable_chat";
+  return isStableChatTransitionState(transitionState);
 }
