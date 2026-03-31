@@ -821,8 +821,10 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
         purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
         secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
       });
+      const accessCredentialIsExpired =
+        accessCredential === undefined ? false : isCredentialExpired(accessCredential.expiresAt);
 
-      if (accessCredential !== undefined && !isCredentialExpired(accessCredential.expiresAt)) {
+      if (accessCredential !== undefined && !accessCredentialIsExpired) {
         return {
           credential: await decryptLinkedActiveCredential(tx, {
             organizationId: lockedConnection.organizationId,
@@ -845,8 +847,9 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
           `OAuth 2.0 client secret for connection '${lockedConnection.id}' was not found.`,
         );
       }
+      const clientSecretCredentialIsExpired = isCredentialExpired(clientSecretCredential.expiresAt);
 
-      if (isCredentialExpired(clientSecretCredential.expiresAt)) {
+      if (clientSecretCredentialIsExpired) {
         throw new InternalIntegrationCredentialsError(
           InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND,
           404,
@@ -913,9 +916,9 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
             ...(exchangedAccessToken.credentialMetadata === undefined
               ? {}
               : { metadata: exchangedAccessToken.credentialMetadata }),
-            ...(exchangedAccessToken.accessTokenExpiresAt === undefined
-              ? {}
-              : { expiresAt: exchangedAccessToken.accessTokenExpiresAt }),
+            ...(exchangedAccessToken.accessTokenExpiresAt
+              ? { expiresAt: exchangedAccessToken.accessTokenExpiresAt }
+              : {}),
           })
           .returning({
             id: integrationCredentials.id,
@@ -966,9 +969,9 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
       return {
         credential: {
           value: exchangedAccessToken.accessToken,
-          ...(exchangedAccessToken.accessTokenExpiresAt === undefined
-            ? {}
-            : { expiresAt: exchangedAccessToken.accessTokenExpiresAt }),
+          ...(exchangedAccessToken.accessTokenExpiresAt
+            ? { expiresAt: exchangedAccessToken.accessTokenExpiresAt }
+            : {}),
         },
       };
     },
