@@ -1,5 +1,5 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
-import type { CompiledRuntimePlan } from "@mistle/integrations-core";
+import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "@mistle/integrations-core";
 import type { SandboxImageHandle } from "@mistle/sandbox";
 import type { Client } from "openapi-fetch";
 import createClient from "openapi-fetch";
@@ -66,8 +66,17 @@ export type GetSandboxInstanceInput = {
   organizationId: string;
   instanceId: string;
 };
-export type GetSandboxInstanceResponse =
-  paths["/internal/sandbox/instances/:id"]["get"]["responses"]["200"]["content"]["application/json"];
+const GetSandboxInstanceResponseSchema = z
+  .object({
+    id: z.string().min(1),
+    status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+    failureCode: z.string().min(1).nullable(),
+    failureMessage: z.string().min(1).nullable(),
+    runtimePlan: CompiledRuntimePlanSchema.nullable(),
+  })
+  .strict()
+  .nullable();
+export type GetSandboxInstanceResponse = z.infer<typeof GetSandboxInstanceResponseSchema>;
 export type ListSandboxInstancesInput =
   paths["/internal/sandbox/instances"]["get"]["parameters"]["query"];
 export type ListSandboxInstancesResponse =
@@ -357,9 +366,10 @@ export function createDataPlaneSandboxInstancesClient(
       );
 
       if (response.status === 200) {
-        const responseBody: GetSandboxInstanceResponse = await response.json();
+        const responseBody = await response.json();
+        const parsedResponse = GetSandboxInstanceResponseSchema.parse(responseBody);
 
-        return responseBody;
+        return parsedResponse;
       }
 
       const errorBody = await readResponseBody(response);

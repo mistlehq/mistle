@@ -4,6 +4,7 @@ import {
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
 } from "@mistle/http/pagination";
+import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 
 import { SandboxInstancesNotFoundCodes } from "./constants.js";
 
@@ -43,6 +44,7 @@ export const sandboxInstanceStatusResponseSchema = z
     status: sandboxInstanceStatusSchema,
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    runtimePlan: CompiledRuntimePlanSchema.nullable(),
     automationConversation: z
       .object({
         conversationId: z.string().min(1),

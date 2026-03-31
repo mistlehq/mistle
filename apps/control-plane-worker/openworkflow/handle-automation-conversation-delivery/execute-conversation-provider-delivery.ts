@@ -32,11 +32,6 @@ async function steerConversationExecution(input: {
       `AutomationConversation '${input.conversationId}' is missing provider execution id while attempting to steer execution.`,
     );
   }
-  if (input.adapter.steerExecution === undefined) {
-    throw new ConversationDeliveryExecutionError(
-      `AutomationConversation runtime '${input.runtimeId}' does not support steering execution for conversation '${input.conversationId}'.`,
-    );
-  }
 
   return input.adapter.steerExecution({
     connection: input.connection,
@@ -174,10 +169,6 @@ export async function executeConversationProviderDelivery(
       case AutomationConversationExecutionActions.FAIL_MISSING_EXECUTION:
         throw new ConversationDeliveryExecutionError(
           `AutomationConversation '${input.conversationId}' is missing provider execution id while provider conversation '${providerConversationId}' is active.`,
-        );
-      case AutomationConversationExecutionActions.FAIL_STEER_NOT_SUPPORTED:
-        throw new ConversationDeliveryExecutionError(
-          `AutomationConversation runtime '${input.runtimeId}' does not support steering active execution for conversation '${input.conversationId}'.`,
         );
     }
 

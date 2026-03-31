@@ -1,10 +1,10 @@
-import { resolveAgentPtyLaunchTemplate } from "@mistle/integrations-core";
-import { CodexPtyLaunchSpec } from "@mistle/integrations-definitions/agent-runtimes/codex";
+import { resolveAgentPtyLaunchTemplate, type AgentPtyLaunchSpec } from "@mistle/integrations-core";
 import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
+import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   useSessionComposerAttachmentControl,
@@ -99,6 +99,26 @@ type UseSessionWorkbenchControllerResult = {
   conversationPane: SessionConversationPaneState;
 };
 
+function resolveCompiledAgentPtyLaunch(input: {
+  sandboxStatus: SandboxInstanceStatusResult | undefined;
+}): AgentPtyLaunchSpec | null {
+  const runtimePlan = input.sandboxStatus?.runtimePlan;
+  if (runtimePlan === undefined || runtimePlan === null) {
+    return null;
+  }
+
+  const agentRuntime = runtimePlan.agentRuntimes[0];
+  if (agentRuntime === undefined) {
+    return null;
+  }
+
+  if (runtimePlan.agentRuntimes[1] !== undefined) {
+    throw new Error("Expected at most one compiled agent runtime for session CLI launch.");
+  }
+
+  return agentRuntime.ptyLaunch;
+}
+
 export {
   getSandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
@@ -155,15 +175,20 @@ export function useSessionWorkbenchController(input: {
     codexConfig,
   });
   const sessionSnapshot = workbenchLifecycleState.sessionSnapshot;
+  const cliPtyLaunch = resolveCompiledAgentPtyLaunch({
+    sandboxStatus: workbenchLifecycleState.sandboxStatusQuery.data,
+  });
   const enterCliDisabledReason =
     input.sandboxInstanceId === null
       ? "Session id is required."
       : sessionSnapshot === null
         ? "CLI is available after the session is connected."
-        : !workbenchLifecycleState.connectionReadiness.canConnect
-          ? (workbenchLifecycleState.stoppedSessionState.message ??
-            "CLI is available only when the sandbox is running.")
-          : null;
+        : cliPtyLaunch === null
+          ? "CLI is unavailable because this sandbox does not expose a PTY launch template."
+          : !workbenchLifecycleState.connectionReadiness.canConnect
+            ? (workbenchLifecycleState.stoppedSessionState.message ??
+              "CLI is available only when the sandbox is running.")
+            : null;
   const canEnterCli = enterCliDisabledReason === null && !isSwitchingPrimaryPanel;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
@@ -181,6 +206,7 @@ export function useSessionWorkbenchController(input: {
     if (
       input.sandboxInstanceId === null ||
       sessionSnapshot === null ||
+      cliPtyLaunch === null ||
       !workbenchLifecycleState.connectionReadiness.canConnect ||
       isSwitchingPrimaryPanel
     ) {
@@ -190,7 +216,7 @@ export function useSessionWorkbenchController(input: {
     setIsSwitchingPrimaryPanel(true);
     try {
       const resolvedCliLaunch = resolveAgentPtyLaunchTemplate({
-        launch: CodexPtyLaunchSpec,
+        launch: cliPtyLaunch,
         threadId: sessionSnapshot.threadId,
       });
       setPrimaryPanelMode("cli");
@@ -214,6 +240,7 @@ export function useSessionWorkbenchController(input: {
     isSwitchingPrimaryPanel,
     lifecycle,
     serverRequests,
+    cliPtyLaunch,
     sessionSnapshot,
     workbenchLifecycleState.connectionReadiness.canConnect,
   ]);

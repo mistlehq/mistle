@@ -515,6 +515,7 @@ describe("useSessionWorkbenchController", () => {
         status: "starting",
         failureCode: null,
         failureMessage: null,
+        runtimePlan: null,
         automationConversation: null,
       },
     });
@@ -524,6 +525,7 @@ describe("useSessionWorkbenchController", () => {
       status: "starting",
       failureCode: null,
       failureMessage: null,
+      runtimePlan: null,
       automationConversation: null,
     });
   });
@@ -773,6 +775,7 @@ describe("useSessionWorkbenchController", () => {
         status: "stopped",
         failureCode: null,
         failureMessage: null,
+        runtimePlan: null,
         automationConversation: null,
       },
     });

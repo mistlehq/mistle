@@ -2,7 +2,6 @@ import type { z } from "zod";
 
 import type { AgentRuntimeRegistry } from "../agent-runtimes/index.js";
 import type { AgentPtyLaunchSpec } from "../agent-runtimes/types.js";
-import type { AgentIntegrationHooks } from "../agent/index.js";
 import type { ConnectionCapabilitySet } from "../capabilities/index.js";
 import type { IntegrationRegistry } from "../registry/index.js";
 
@@ -1126,7 +1125,6 @@ export type IntegrationDefinition<
   familyId: string;
   variantId: string;
   kind: IntegrationKind;
-  agent?: AgentIntegrationHooks;
   displayName: string;
   description?: string;
   logoKey: string;

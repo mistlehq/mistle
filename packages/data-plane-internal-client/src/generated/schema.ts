@@ -410,6 +410,194 @@ export interface paths {
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
+              runtimePlan: {
+                agentRuntimes: {
+                  bindingId: string;
+                  clientId: string;
+                  endpointKey: string;
+                  ptyLaunch: {
+                    displayName: string;
+                    newLaunch: {
+                      args: (
+                        | {
+                            /** @enum {string} */
+                            kind: "literal";
+                            value: string;
+                          }
+                        | {
+                            /** @enum {string} */
+                            kind: "threadId";
+                          }
+                      )[];
+                      cols: number;
+                      command: string;
+                      cwd?: string;
+                      ptySessionId: string;
+                      rows: number;
+                    };
+                    resumeLaunch: {
+                      args: (
+                        | {
+                            /** @enum {string} */
+                            kind: "literal";
+                            value: string;
+                          }
+                        | {
+                            /** @enum {string} */
+                            kind: "threadId";
+                          }
+                      )[];
+                      cols: number;
+                      command: string;
+                      cwd?: string;
+                      ptySessionId: string;
+                      rows: number;
+                    };
+                    runtimeId: string;
+                  };
+                  runtimeId: string;
+                  runtimeKey: string;
+                }[];
+                artifacts: {
+                  artifactKey: string;
+                  description?: string;
+                  env?: {
+                    [key: string]: string;
+                  };
+                  lifecycle: {
+                    install: {
+                      args: string[];
+                      cwd?: string;
+                      env?: {
+                        [key: string]: string;
+                      };
+                      timeoutMs?: number;
+                    }[];
+                  };
+                  name: string;
+                }[];
+                egressRoutes: {
+                  authInjection: {
+                    target: string;
+                    /** @enum {string} */
+                    type: "bearer" | "basic" | "header" | "query";
+                    username?: string;
+                  };
+                  bindingId: string;
+                  credentialResolver: {
+                    connectionId: string;
+                    purpose?: string;
+                    resolverKey?: string;
+                    secretType: string;
+                  };
+                  egressRuleId: string;
+                  match: {
+                    hosts: string[];
+                    methods?: string[];
+                    pathPrefixes?: string[];
+                  };
+                  upstream: {
+                    baseUrl: string;
+                  };
+                }[];
+                image:
+                  | {
+                      imageRef: string;
+                      sandboxProfileId: string;
+                      /** @enum {string} */
+                      source: "profile-base";
+                      version: number;
+                    }
+                  | {
+                      imageRef: string;
+                      /** @enum {string} */
+                      source: "base";
+                    };
+                runtimeClients: {
+                  clientId: string;
+                  endpoints: {
+                    /** @enum {string} */
+                    connectionMode: "dedicated" | "shared";
+                    endpointKey: string;
+                    processKey?: string;
+                    transport: {
+                      /** @enum {string} */
+                      type: "ws";
+                      /** Format: uri */
+                      url: string;
+                    };
+                  }[];
+                  processes: {
+                    command: {
+                      args: string[];
+                      cwd?: string;
+                      env?: {
+                        [key: string]: string;
+                      };
+                      timeoutMs?: number;
+                    };
+                    processKey: string;
+                    readiness:
+                      | {
+                          /** @enum {string} */
+                          type: "none";
+                        }
+                      | {
+                          host: string;
+                          port: number;
+                          timeoutMs: number;
+                          /** @enum {string} */
+                          type: "tcp";
+                        }
+                      | {
+                          expectedStatus: number;
+                          timeoutMs: number;
+                          /** @enum {string} */
+                          type: "http";
+                          /** Format: uri */
+                          url: string;
+                        }
+                      | {
+                          timeoutMs: number;
+                          /** @enum {string} */
+                          type: "ws";
+                          /** Format: uri */
+                          url: string;
+                        };
+                    stop: {
+                      gracePeriodMs?: number;
+                      /** @enum {string} */
+                      signal: "sigterm" | "sigkill";
+                      timeoutMs: number;
+                    };
+                  }[];
+                  setup: {
+                    env: {
+                      [key: string]: string;
+                    };
+                    files: {
+                      content: string;
+                      fileId: string;
+                      mode: number;
+                      path: string;
+                      /** @enum {string} */
+                      writeMode?: "overwrite" | "if-absent";
+                    }[];
+                    launchArgs?: string[];
+                  };
+                }[];
+                sandboxProfileId: string;
+                version: number;
+                workspaceSources: {
+                  /** Format: uri */
+                  originUrl: string;
+                  path: string;
+                  /** @enum {string} */
+                  resourceKind: "repository";
+                  /** @enum {string} */
+                  sourceKind: "git-clone";
+                }[];
+              } | null;
               /** @enum {string} */
               status: "pending" | "starting" | "running" | "stopped" | "failed";
             } | null;

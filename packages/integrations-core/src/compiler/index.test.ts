@@ -65,6 +65,10 @@ const NoopConversationProvider = {
   startExecution: async () => ({
     providerExecutionId: null,
   }),
+  steerExecution: async () => ({
+    providerExecutionId: "turn_123",
+  }),
+  interruptExecution: async () => {},
 };
 
 const NoopExecutionObserver = {

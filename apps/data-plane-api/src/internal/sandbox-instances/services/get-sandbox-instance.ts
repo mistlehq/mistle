@@ -1,4 +1,7 @@
 import type { DataPlaneDatabase } from "@mistle/db/data-plane";
+import { sandboxInstanceRuntimePlans, sandboxInstances } from "@mistle/db/data-plane";
+import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
+import { and, eq, isNull } from "drizzle-orm";
 
 import type { AppRuntimeResources } from "../../../resources.js";
 import type {
@@ -16,16 +19,29 @@ export async function getSandboxInstance(
   ctx: GetSandboxInstanceContext,
   input: GetSandboxInstanceInput,
 ): Promise<GetSandboxInstanceResponse> {
-  const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
-    columns: {
-      id: true,
-      status: true,
-      failureCode: true,
-      failureMessage: true,
-    },
-    where: (table, { and, eq }) =>
-      and(eq(table.id, input.instanceId), eq(table.organizationId, input.organizationId)),
-  });
+  const [sandboxInstance] = await ctx.db
+    .select({
+      id: sandboxInstances.id,
+      status: sandboxInstances.status,
+      failureCode: sandboxInstances.failureCode,
+      failureMessage: sandboxInstances.failureMessage,
+      compiledRuntimePlan: sandboxInstanceRuntimePlans.compiledRuntimePlan,
+    })
+    .from(sandboxInstances)
+    .leftJoin(
+      sandboxInstanceRuntimePlans,
+      and(
+        eq(sandboxInstanceRuntimePlans.sandboxInstanceId, sandboxInstances.id),
+        isNull(sandboxInstanceRuntimePlans.supersededAt),
+      ),
+    )
+    .where(
+      and(
+        eq(sandboxInstances.id, input.instanceId),
+        eq(sandboxInstances.organizationId, input.organizationId),
+      ),
+    )
+    .limit(1);
 
   if (sandboxInstance === undefined) {
     return null;
@@ -44,5 +60,9 @@ export async function getSandboxInstance(
     ),
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
+    runtimePlan:
+      sandboxInstance.compiledRuntimePlan === null
+        ? null
+        : CompiledRuntimePlanSchema.parse(sandboxInstance.compiledRuntimePlan),
   };
 }

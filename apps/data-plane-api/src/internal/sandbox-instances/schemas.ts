@@ -1,5 +1,6 @@
 import { z } from "@hono/zod-openapi";
 import { createKeysetPaginationEnvelopeSchema } from "@mistle/http/pagination";
+import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 
 export const DataPlaneSandboxInstanceStatuses = Object.freeze({
   PENDING: "pending",
@@ -32,6 +33,7 @@ export const GetSandboxInstanceResponseSchema = z
     status: DataPlaneSandboxInstanceStatusSchema,
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    runtimePlan: CompiledRuntimePlanSchema.nullable(),
   })
   .strict()
   .nullable();
