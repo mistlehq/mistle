@@ -18,7 +18,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     isStreaming: false,
-    text: "The session is healthy and the latest plan completed successfully.",
+    text: "I reviewed the current setup and identified the next changes to make.",
   },
 };
 

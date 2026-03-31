@@ -1,14 +1,6 @@
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  Button,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@mistle/ui";
+import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@mistle/ui";
+
+import { StatusBox } from "../shared/status-box.js";
 
 type DeleteWebhookAutomationDialogProps = {
   automationName: string;
@@ -40,10 +32,9 @@ export function DeleteWebhookAutomationDialog(
           </p>
 
           {input.errorMessage === null ? null : (
-            <Alert variant="destructive">
-              <AlertTitle>Delete failed</AlertTitle>
-              <AlertDescription>{input.errorMessage}</AlertDescription>
-            </Alert>
+            <StatusBox title="Delete failed" tone="destructive">
+              {input.errorMessage}
+            </StatusBox>
           )}
         </div>
 
