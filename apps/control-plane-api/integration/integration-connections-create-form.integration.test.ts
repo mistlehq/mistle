@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import {
+  CreateFormConnectionBadRequestResponseSchema,
   CreateFormConnectionBodySchema,
   CreateFormConnectionNotFoundResponseSchema,
 } from "../src/integration-connections/create-form-connection/schema.js";
@@ -304,6 +305,77 @@ describe("integration connections create form integration", () => {
       cloud_id: "cloud-id-123",
     });
     expect(responseBody.targetSnapshotConfig).toEqual({});
+  });
+
+  it("returns 400 when Atlassian personal token config is missing site_url", async ({
+    fixture,
+  }) => {
+    await upsertAtlassianTarget({ fixture, targetKey: "atlassian-default" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-create-atlassian-personal-missing-site-url@example.com",
+    });
+
+    const response = await fixture.request("/v1/integration/connections/atlassian-default/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Atlassian personal token",
+        methodId: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+        config: {
+          connection_method: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+          email: "user@example.com",
+        },
+        secrets: {
+          apiKey: "atlassian-personal-token",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const responseBody = CreateFormConnectionBadRequestResponseSchema.parse(await response.json());
+    expect(responseBody).toEqual({
+      code: "INVALID_CREATE_CONNECTION_INPUT",
+      message: `Connection config for method '${AtlassianConnectionMethodIds.PERSONAL_API_TOKEN}' is invalid.`,
+    });
+  });
+
+  it("returns 400 when Atlassian service account token config is missing cloud_id", async ({
+    fixture,
+  }) => {
+    await upsertAtlassianTarget({ fixture, targetKey: "atlassian-default" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-create-atlassian-service-missing-cloud-id@example.com",
+    });
+
+    const response = await fixture.request("/v1/integration/connections/atlassian-default/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Atlassian service account token",
+        methodId: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+        config: {
+          connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+        },
+        secrets: {
+          apiKey: "atlassian-service-account-token",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const responseBody = CreateFormConnectionBadRequestResponseSchema.parse(await response.json());
+    expect(responseBody).toEqual({
+      code: "INVALID_CREATE_CONNECTION_INPUT",
+      message: `Connection config for method '${AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN}' is invalid.`,
+    });
   });
 
   it("returns 404 when target exists but is disabled", async ({ fixture }) => {

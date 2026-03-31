@@ -199,7 +199,9 @@ describe("internal integration credentials resolve", () => {
           config: {
             connection_method: "api-key",
           },
-          secret: "sk-integration-test",
+          secrets: {
+            apiKey: "sk-integration-test",
+          },
         }),
       },
     );
