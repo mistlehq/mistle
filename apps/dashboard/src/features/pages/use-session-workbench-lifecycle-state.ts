@@ -11,7 +11,7 @@ import {
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
-  shouldLifecycleAutoAttachChat,
+  isStableChatTransitionState,
   type MainPanelTransitionState,
 } from "./session-main-panel-handoff-state.js";
 import {
@@ -677,7 +677,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   }, [input.sandboxInstanceId]);
 
   useEffect(() => {
-    if (shouldLifecycleAutoAttachChat(input.mainPanelTransitionState)) {
+    if (isStableChatTransitionState(input.mainPanelTransitionState)) {
       setHasAttemptedAutoConnect(false);
     }
   }, [input.mainPanelTransitionState]);
@@ -760,7 +760,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   useEffect(() => {
-    if (!shouldLifecycleAutoAttachChat(input.mainPanelTransitionState)) {
+    if (!isStableChatTransitionState(input.mainPanelTransitionState)) {
       return;
     }
 
@@ -805,7 +805,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   useEffect(() => {
-    if (!shouldLifecycleAutoAttachChat(input.mainPanelTransitionState)) {
+    if (!isStableChatTransitionState(input.mainPanelTransitionState)) {
       return;
     }
 
@@ -869,7 +869,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: sandboxStatusQuery.isError,
     lifecycleErrorMessage: resolvedLifecycleErrorMessage,
-    reconnectMessage: shouldLifecycleAutoAttachChat(input.mainPanelTransitionState)
+    reconnectMessage: isStableChatTransitionState(input.mainPanelTransitionState)
       ? sessionReconnectMessage
       : null,
     sandboxFailureMessage,

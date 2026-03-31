@@ -48,6 +48,25 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       });
     });
 
+    it("fails CLI entry for an unmaterialized provider-backed thread instead of starting a new CLI thread", async () => {
+      await withSessionWorkbenchCliHarness(
+        {
+          providerConversationId: "thread_provider_empty",
+          providerThreadTurnCount: 0,
+        },
+        async () => {
+          fireEvent.click(await waitForEnabledButton("CLI"));
+
+          expect(await screen.findByText("Could not start Codex CLI")).toBeDefined();
+          expect(
+            screen.getByText(
+              "The linked provider conversation 'thread_provider_empty' is not resumable for Codex CLI.",
+            ),
+          ).toBeDefined();
+        },
+      );
+    });
+
     it("opens the CLI after the side terminal without PTY session collisions", async () => {
       await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
         fireEvent.click(await waitForEnabledButton("Open terminal"));

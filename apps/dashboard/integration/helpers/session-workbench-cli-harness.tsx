@@ -41,6 +41,7 @@ type SessionWorkbenchTunnelServer = {
   hangNextThreadList: () => void;
   hangResumeForThread: (threadId: string) => void;
   omitLoadedThreadForNextCliOpen: () => void;
+  seedThread: (input: { loaded?: boolean; threadId: string; turnCount?: number }) => void;
   url: string;
   waitForThreadResume: (threadId: string) => Promise<string>;
   waitForPtyClose: (streamId: number) => Promise<number>;
@@ -56,6 +57,11 @@ type SessionWorkbenchCliHarness = {
   };
   renderedPage: DashboardPageHandle;
   tunnelServer: SessionWorkbenchTunnelServer;
+};
+
+type SessionWorkbenchCliHarnessOptions = {
+  providerConversationId?: string | null;
+  providerThreadTurnCount?: number;
 };
 
 type ThreadResumeWaiter = {
@@ -573,6 +579,15 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
     omitLoadedThreadForNextCliOpen: () => {
       shouldOmitLoadedThreadForNextCliOpen = true;
     },
+    seedThread: ({ loaded = false, threadId, turnCount = 0 }) => {
+      ensureThreadRecord({
+        id: threadId,
+        turnCount,
+      });
+      if (loaded) {
+        loadedThreadIds.add(threadId);
+      }
+    },
     url: `ws://127.0.0.1:${String(address.port)}`,
     waitForThreadResume: async (threadId) => {
       if (threadResumeRequests.includes(threadId)) {
@@ -655,6 +670,7 @@ function createWorkbenchRequestHandler(
   controls: {
     getConnectionTokenFailure: () => boolean;
   },
+  options: SessionWorkbenchCliHarnessOptions,
 ): (request: IncomingMessage, response: ServerResponse<IncomingMessage>) => void {
   return (request, response) => {
     const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -675,7 +691,14 @@ function createWorkbenchRequestHandler(
           status: "running",
           failureCode: null,
           failureMessage: null,
-          automationConversation: null,
+          automationConversation:
+            options.providerConversationId === null || options.providerConversationId === undefined
+              ? null
+              : {
+                  conversationId: "automation_cli_test",
+                  routeId: null,
+                  providerConversationId: options.providerConversationId,
+                },
         }),
       );
       return;
@@ -723,13 +746,26 @@ function HeaderActionsHost(input: { children: ReactNode }): React.JSX.Element {
   );
 }
 
-async function renderSessionWorkbenchCliHarness(): Promise<SessionWorkbenchCliHarness> {
+async function renderSessionWorkbenchCliHarness(
+  options: SessionWorkbenchCliHarnessOptions = {},
+): Promise<SessionWorkbenchCliHarness> {
   const tunnelServer = await startSessionWorkbenchTunnelServer();
+  if (options.providerConversationId !== null && options.providerConversationId !== undefined) {
+    tunnelServer.seedThread({
+      threadId: options.providerConversationId,
+      turnCount: options.providerThreadTurnCount ?? 0,
+      loaded: true,
+    });
+  }
   let shouldFailConnectionTokens = false;
   const renderedPage = await renderDashboardPageIntegration({
-    handler: createWorkbenchRequestHandler(tunnelServer, {
-      getConnectionTokenFailure: () => shouldFailConnectionTokens,
-    }),
+    handler: createWorkbenchRequestHandler(
+      tunnelServer,
+      {
+        getConnectionTokenFailure: () => shouldFailConnectionTokens,
+      },
+      options,
+    ),
     ui: (
       <HeaderActionsHost>
         <MemoryRouter initialEntries={["/sessions/sbi_cli_test"]}>
@@ -756,13 +792,31 @@ async function renderSessionWorkbenchCliHarness(): Promise<SessionWorkbenchCliHa
 }
 
 async function withSessionWorkbenchCliHarness(
+  options: SessionWorkbenchCliHarnessOptions,
   run: (harness: SessionWorkbenchCliHarness) => Promise<void>,
+): Promise<void>;
+async function withSessionWorkbenchCliHarness(
+  run: (harness: SessionWorkbenchCliHarness) => Promise<void>,
+): Promise<void>;
+async function withSessionWorkbenchCliHarness(
+  optionsOrRun:
+    | SessionWorkbenchCliHarnessOptions
+    | ((harness: SessionWorkbenchCliHarness) => Promise<void>),
+  maybeRun?: (harness: SessionWorkbenchCliHarness) => Promise<void>,
 ): Promise<void> {
   const restoreWebSocket = installNodeWebSocket();
-  const harness = await renderSessionWorkbenchCliHarness();
+  const options =
+    typeof optionsOrRun === "function"
+      ? ({} satisfies SessionWorkbenchCliHarnessOptions)
+      : optionsOrRun;
+  const runner = typeof optionsOrRun === "function" ? optionsOrRun : maybeRun;
+  if (runner === undefined) {
+    throw new Error("Expected CLI harness runner to be provided.");
+  }
+  const harness = await renderSessionWorkbenchCliHarness(options);
 
   try {
-    await run(harness);
+    await runner(harness);
   } finally {
     await harness.renderedPage.close();
     await harness.tunnelServer.close();

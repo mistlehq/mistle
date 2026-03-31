@@ -91,11 +91,3 @@ export function isStableChatTransitionState(
 ): transitionState is "stable_chat" {
   return transitionState === "stable_chat";
 }
-
-export function canRenderChatComposer(transitionState: MainPanelTransitionState): boolean {
-  return isStableChatTransitionState(transitionState);
-}
-
-export function shouldLifecycleAutoAttachChat(transitionState: MainPanelTransitionState): boolean {
-  return isStableChatTransitionState(transitionState);
-}

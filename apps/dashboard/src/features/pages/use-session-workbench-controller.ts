@@ -8,7 +8,7 @@ import {
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
 import {
-  canRenderChatComposer,
+  isStableChatTransitionState,
   type MainPanelTransitionState,
 } from "./session-main-panel-handoff-state.js";
 import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
@@ -209,7 +209,7 @@ export function useSessionWorkbenchController(input: {
         disabledReason: enterCliDisabledReason,
         errorMessage: handoff.errorMessage,
         isCliToggleActive: handoff.isCliToggleActive,
-        showsChatComposer: canRenderChatComposer(handoff.transitionState),
+        showsChatComposer: isStableChatTransitionState(handoff.transitionState),
         enterCliMode: handoff.handoffToCli,
         exitCliMode: handoff.handoffToChat,
       },
