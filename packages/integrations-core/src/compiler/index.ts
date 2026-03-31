@@ -466,21 +466,62 @@ function collectResolvedMcpServers(input: {
 }
 
 function applyMcpMappings(input: {
+  definitions: CompileBindingsInput["definitions"];
   preparedBindings: ReadonlyArray<PreparedBindingContext>;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): ReadonlyArray<CompiledBindingResult> {
   return input.preparedBindings.map((preparedBinding) => {
-    const mcpConfig = preparedBinding.definition.mcpConfig;
+    const runtimeOwnedMcpConfigs =
+      preparedBinding.definition.kind !== "agent"
+        ? []
+        : preparedBinding.compiledBindingResult.agentRuntimes.flatMap((agentRuntime) => {
+            const runtimeDefinition = input.definitions.agentRuntimeRegistry.getRuntime({
+              runtimeId: agentRuntime.runtimeId,
+            });
 
-    if (mcpConfig === undefined) {
+            return runtimeDefinition?.materializeMcpConfig?.() ?? [];
+          });
+    const providerOwnedMcpConfig =
+      preparedBinding.definition.kind === "agent"
+        ? undefined
+        : preparedBinding.definition.mcpConfig;
+
+    if (providerOwnedMcpConfig === undefined && runtimeOwnedMcpConfigs.length === 0) {
       return preparedBinding.compiledBindingResult;
+    }
+
+    let runtimeClients = preparedBinding.compiledBindingResult.runtimeClients;
+    for (const mcpConfig of runtimeOwnedMcpConfigs) {
+      const targetClient = runtimeClients.find(
+        (runtimeClient) => runtimeClient.clientId === mcpConfig.clientId,
+      );
+      const targetFile = targetClient?.setup.files.find((file) => file.fileId === mcpConfig.fileId);
+      if (targetClient === undefined || targetFile === undefined) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.AGENT_RUNTIME_MCP_TARGET_CLIENT_MISSING,
+          `Agent runtime MCP config target '${mcpConfig.clientId}::${mcpConfig.fileId}' was not found for binding '${preparedBinding.compileBindingInput.binding.id}'.`,
+        );
+      }
+
+      runtimeClients = applyMcpConfigToRuntimeClients({
+        runtimeClients,
+        mcpConfig,
+        mcpServers: input.mcpServers,
+      });
+    }
+
+    if (providerOwnedMcpConfig === undefined) {
+      return {
+        ...preparedBinding.compiledBindingResult,
+        runtimeClients,
+      };
     }
 
     return {
       ...preparedBinding.compiledBindingResult,
       runtimeClients: applyMcpConfigToRuntimeClients({
-        runtimeClients: preparedBinding.compiledBindingResult.runtimeClients,
-        mcpConfig,
+        runtimeClients,
+        mcpConfig: providerOwnedMcpConfig,
         mcpServers: input.mcpServers,
       }),
     };
@@ -736,6 +777,7 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
   });
 
   return applyMcpMappings({
+    definitions: input.definitions,
     preparedBindings,
     mcpServers: resolvedMcpServers,
   });

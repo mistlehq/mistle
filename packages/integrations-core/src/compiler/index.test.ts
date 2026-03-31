@@ -4,7 +4,11 @@ import { z } from "zod";
 import { AgentRuntimeRegistry } from "../agent-runtimes/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { IntegrationRegistry } from "../registry/index.js";
-import { IntegrationConnectionMethodIds, type IntegrationDefinition } from "../types/index.js";
+import {
+  IntegrationConnectionMethodIds,
+  IntegrationMcpConfigFormats,
+  type IntegrationDefinition,
+} from "../types/index.js";
 import { compileRuntimePlan } from "./index.js";
 
 const OpenAiTargetConfigSchema = z.object({
@@ -79,6 +83,14 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
     configSchema: z.object({}).strict(),
     createConversationProvider: () => NoopConversationProvider,
     createExecutionObserver: () => NoopExecutionObserver,
+    materializeMcpConfig: () => [
+      {
+        clientId: "codex-cli",
+        fileId: "codex_config",
+        format: IntegrationMcpConfigFormats.TOML,
+        path: ["mcp_servers"],
+      },
+    ],
     compileRuntime: (input) => ({
       egressRoutes: [
         {
@@ -203,6 +215,14 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
     configSchema: z.object({}).strict(),
     createConversationProvider: () => NoopConversationProvider,
     createExecutionObserver: () => NoopExecutionObserver,
+    materializeMcpConfig: () => [
+      {
+        clientId: "claude-code",
+        fileId: "claude_config",
+        format: IntegrationMcpConfigFormats.JSON,
+        path: ["mcpServers"],
+      },
+    ],
     compileRuntime: () => ({
       runtimeClients: [
         {
@@ -286,12 +306,6 @@ function createOpenAiDefinition(): IntegrationDefinition<
         },
       }),
     },
-    mcpConfig: {
-      clientId: "codex-cli",
-      fileId: "codex_config",
-      format: "toml",
-      path: ["mcp_servers"],
-    },
     compileBinding: () => ({
       egressRoutes: [],
       artifacts: [],
@@ -333,12 +347,6 @@ function createJsonAgentDefinition(): IntegrationDefinition<
           allowedModels: [input.binding.config.model.defaultModel],
         },
       }),
-    },
-    mcpConfig: {
-      clientId: "claude-code",
-      fileId: "claude_config",
-      format: "json",
-      path: ["mcpServers"],
     },
     compileBinding: () => ({
       egressRoutes: [],
@@ -1721,6 +1729,149 @@ describe("compileRuntimePlan", () => {
 
     expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
     expect(caughtError).toMatchObject({ code: CompilerErrorCodes.MISSING_AGENT_PROVIDER_ACCESS });
+  });
+
+  it("fails when runtime-owned MCP materialization targets a missing client file", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createOpenAiDefinition());
+    registry.register(createLinearMcpDefinition());
+    const agentRuntimeRegistry = new AgentRuntimeRegistry();
+    agentRuntimeRegistry.register({
+      runtimeId: "codex",
+      displayName: "Codex",
+      configSchema: z.object({}).strict(),
+      createConversationProvider: () => NoopConversationProvider,
+      createExecutionObserver: () => NoopExecutionObserver,
+      materializeMcpConfig: () => [
+        {
+          clientId: "missing-client",
+          fileId: "missing-file",
+          format: IntegrationMcpConfigFormats.TOML,
+          path: ["mcp_servers"],
+        },
+      ],
+      compileRuntime: () => ({
+        runtimeClients: [
+          {
+            clientId: "codex-cli",
+            setup: {
+              env: {},
+              files: [
+                {
+                  fileId: "codex_config",
+                  path: "/root/.codex/config.toml",
+                  mode: 384,
+                  content: "",
+                },
+              ],
+            },
+            processes: [],
+            endpoints: [
+              {
+                endpointKey: "app-server",
+                transport: {
+                  type: "ws",
+                  url: "ws://127.0.0.1:4747",
+                },
+                connectionMode: "dedicated",
+              },
+            ],
+          },
+        ],
+        agentRuntimes: [
+          {
+            runtimeId: "codex",
+            runtimeKey: "codex-app-server",
+            clientId: "codex-cli",
+            endpointKey: "app-server",
+            adapterKey: "openai-codex",
+          },
+        ],
+      }),
+    });
+
+    let caughtError: unknown;
+    try {
+      compileRuntimePlan({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        definitions: {
+          integrationRegistry: registry,
+          agentRuntimeRegistry,
+        },
+        bindings: [
+          {
+            targetKey: "openai-default",
+            target: {
+              familyId: "openai",
+              variantId: "openai-default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://api.openai.com",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_openai_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_openai_agent",
+              kind: "agent",
+              connectionId: "conn_openai_org_123",
+              config: {
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "gpt-5.3-codex",
+                  options: {},
+                },
+              },
+            },
+          },
+          {
+            targetKey: "linear-default",
+            target: {
+              familyId: "linear",
+              variantId: "linear-default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://linear.app",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_linear_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_linear_connector",
+              kind: "connector",
+              connectionId: "conn_linear_org_123",
+              config: {
+                defaultModel: "unused",
+              },
+            },
+          },
+        ],
+      });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
+    expect(caughtError).toMatchObject({
+      code: CompilerErrorCodes.AGENT_RUNTIME_MCP_TARGET_CLIENT_MISSING,
+    });
   });
 
   it("passes parsed schema outputs into compileBinding", () => {

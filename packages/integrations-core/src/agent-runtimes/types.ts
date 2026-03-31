@@ -8,11 +8,11 @@ import type {
   CompileBindingRefs,
   CompileBindingWorkspaceSource,
   IntegrationConfigSchema,
+  IntegrationMcpConfig,
   IntegrationFormDefinition,
   ResolvedIntegrationMcpServer,
   RuntimeArtifactSpec,
   RuntimeClient,
-  RuntimeClientSetupFile,
 } from "../types/index.js";
 
 export type AgentPtyLaunchArgument =
@@ -76,12 +76,7 @@ export type AgentRuntimeDefinition<
   ): CompileAgentRuntimeResult;
   createConversationProvider?(): AgentConversationProvider;
   createExecutionObserver?(): AgentExecutionObserver;
-  materializeMcpConfig?(input: {
-    mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
-  }): readonly {
-    clientId: string;
-    files: readonly RuntimeClientSetupFile[];
-  }[];
+  materializeMcpConfig?(): ReadonlyArray<IntegrationMcpConfig>;
 };
 
 export type AnyAgentRuntimeDefinition = AgentRuntimeDefinition<IntegrationConfigSchema<unknown>>;

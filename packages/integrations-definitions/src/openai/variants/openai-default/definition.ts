@@ -1,7 +1,6 @@
 import {
   IntegrationConnectionMethodIds,
   IntegrationKinds,
-  IntegrationMcpConfigFormats,
   type CompileBindingResult,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
@@ -96,12 +95,6 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
         },
       };
     },
-  },
-  mcpConfig: {
-    clientId: "codex-cli",
-    fileId: "codex_config",
-    format: IntegrationMcpConfigFormats.TOML,
-    path: ["mcp_servers"],
   },
   compileBinding: () => EmptyCompileBindingResult,
 };
