@@ -79,7 +79,7 @@ describe("sandbox profile internal runtime plan compiler integration", () => {
     await expect(
       compileSandboxRuntimePlan({
         db: fixture.db,
-        definitions: Definitions,
+        integrationDefinitions: Definitions,
         resolveTargetSecrets: async () => [],
         organizationId: authenticatedSession.organizationId,
         profileId: "sbp_compile_internal_missing_target_secrets_entry",

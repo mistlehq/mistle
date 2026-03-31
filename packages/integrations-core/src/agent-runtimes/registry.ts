@@ -8,10 +8,6 @@ import type {
   AnyAgentRuntimeDefinition,
 } from "./types.js";
 
-function createRuntimeKey(input: AgentRuntimeLocator): string {
-  return input.runtimeId;
-}
-
 function validateRuntimeDefinition(input: AnyAgentRuntimeDefinition): void {
   if (input.runtimeId.trim().length === 0) {
     throw new IntegrationDefinitionRegistryError(
@@ -48,18 +44,14 @@ export class AgentRuntimeRegistry implements AgentRuntimeResolver {
   register(input: AnyAgentRuntimeDefinition): void {
     validateRuntimeDefinition(input);
 
-    const key = createRuntimeKey({
-      runtimeId: input.runtimeId,
-    });
-
-    if (this.#definitionsByKey.has(key)) {
+    if (this.#definitionsByKey.has(input.runtimeId)) {
       throw new IntegrationDefinitionRegistryError(
         DefinitionRegistryErrorCodes.DUPLICATE_DEFINITION,
-        `Agent runtime '${key}' is already registered.`,
+        `Agent runtime '${input.runtimeId}' is already registered.`,
       );
     }
 
-    this.#definitionsByKey.set(key, input);
+    this.#definitionsByKey.set(input.runtimeId, input);
   }
 
   registerMany(input: ReadonlyArray<AnyAgentRuntimeDefinition>): void {
@@ -69,7 +61,7 @@ export class AgentRuntimeRegistry implements AgentRuntimeResolver {
   }
 
   getRuntime(input: AgentRuntimeLocator): AnyAgentRuntimeDefinition | undefined {
-    return this.#definitionsByKey.get(createRuntimeKey(input));
+    return this.#definitionsByKey.get(input.runtimeId);
   }
 
   getRuntimeOrThrow(input: AgentRuntimeLocator): AnyAgentRuntimeDefinition {
@@ -78,7 +70,7 @@ export class AgentRuntimeRegistry implements AgentRuntimeResolver {
     if (definition === undefined) {
       throw new IntegrationDefinitionRegistryError(
         DefinitionRegistryErrorCodes.DEFINITION_NOT_FOUND,
-        `Agent runtime '${createRuntimeKey(input)}' was not found.`,
+        `Agent runtime '${input.runtimeId}' was not found.`,
       );
     }
 

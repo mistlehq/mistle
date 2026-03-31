@@ -69,7 +69,7 @@ export type ResolveIntegrationTargetSecrets = (
 
 export type CompileSandboxRuntimePlanInput = {
   db: ControlPlaneDatabase;
-  definitions: IntegrationDefinitionsBundle;
+  integrationDefinitions: IntegrationDefinitionsBundle;
   resolveTargetSecrets: ResolveIntegrationTargetSecrets;
   organizationId: string;
   profileId: string;
@@ -298,7 +298,7 @@ export async function compileSandboxRuntimePlan(
       version: input.profileVersion,
       image: input.image,
       bindings: compileBindings,
-      definitions: input.definitions,
+      definitions: input.integrationDefinitions,
     });
   } catch (error) {
     if (error instanceof IntegrationCompilerError) {

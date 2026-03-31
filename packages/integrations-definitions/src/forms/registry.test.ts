@@ -104,10 +104,6 @@ describe("integration form registry", () => {
       runtimeId: "codex",
       displayName: "Codex",
     });
-    registerRuntime(agentRuntimeRegistry, {
-      runtimeId: "opencode",
-      displayName: "OpenCode",
-    });
 
     const registry = createIntegrationFormRegistry({
       integrationRegistry,

@@ -71,7 +71,7 @@ export async function compileProfileVersionRuntimePlan(
   try {
     return await compileSandboxRuntimePlan({
       db,
-      definitions: Definitions,
+      integrationDefinitions: Definitions,
       resolveTargetSecrets: async ({ targets }) => {
         return targets.map((target) => {
           try {
