@@ -175,22 +175,42 @@ const RuntimePlanSchema = z.object({
       ptyLaunch: z.object({
         runtimeId: z.string().min(1),
         displayName: z.string().min(1),
-        ptySessionId: z.string().min(1),
-        cols: z.int().positive(),
-        rows: z.int().positive(),
-        cwd: z.string().min(1).optional(),
-        command: z.string().min(1),
-        args: z.array(
-          z.discriminatedUnion("kind", [
-            z.object({
-              kind: z.literal("literal"),
-              value: z.string().min(1),
-            }),
-            z.object({
-              kind: z.literal("threadId"),
-            }),
-          ]),
-        ),
+        newLaunch: z.object({
+          ptySessionId: z.string().min(1),
+          cols: z.int().positive(),
+          rows: z.int().positive(),
+          cwd: z.string().min(1).optional(),
+          command: z.string().min(1),
+          args: z.array(
+            z.discriminatedUnion("kind", [
+              z.object({
+                kind: z.literal("literal"),
+                value: z.string().min(1),
+              }),
+              z.object({
+                kind: z.literal("threadId"),
+              }),
+            ]),
+          ),
+        }),
+        resumeLaunch: z.object({
+          ptySessionId: z.string().min(1),
+          cols: z.int().positive(),
+          rows: z.int().positive(),
+          cwd: z.string().min(1).optional(),
+          command: z.string().min(1),
+          args: z.array(
+            z.discriminatedUnion("kind", [
+              z.object({
+                kind: z.literal("literal"),
+                value: z.string().min(1),
+              }),
+              z.object({
+                kind: z.literal("threadId"),
+              }),
+            ]),
+          ),
+        }),
       }),
     }),
   ),

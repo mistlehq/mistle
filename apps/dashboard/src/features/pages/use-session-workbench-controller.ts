@@ -1,8 +1,9 @@
+import { resolveAgentPtyLaunchTemplate } from "@mistle/integrations-core";
 import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { OpenAiCodexAppServerListenUrl } from "../../../../../packages/integrations-definitions/src/agent-runtimes/codex/app-server.js";
+import { CodexPtyLaunchSpec } from "../../../../../packages/integrations-definitions/src/agent-runtimes/codex/index.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
@@ -140,7 +141,6 @@ export function useSessionWorkbenchController(input: {
   const codexConfig = sessionState.codexConfig;
   const serverRequests = sessionState.serverRequests;
   const sessionMessage = sessionState.sessionMessage;
-  const threads = sessionState.threads;
 
   const workbenchLifecycleState = useSessionWorkbenchLifecycleState({
     sandboxInstanceId: input.sandboxInstanceId,
@@ -189,17 +189,21 @@ export function useSessionWorkbenchController(input: {
 
     setIsSwitchingPrimaryPanel(true);
     try {
-      const ensuredThreadId = sessionSnapshot.threadId ?? (await threads.startNewThread());
+      const resolvedCliLaunch = resolveAgentPtyLaunchTemplate({
+        launch: CodexPtyLaunchSpec,
+        threadId: sessionSnapshot.threadId,
+      });
       setPrimaryPanelMode("cli");
       lifecycle.detachSessionTransport();
       serverRequests.resetServerRequests();
       await cliPtyState.actions.openPty({
         sandboxInstanceId: input.sandboxInstanceId,
-        ptySessionId: "cli",
-        cols: 120,
-        rows: 32,
-        command: "codex",
-        args: ["resume", "--remote", OpenAiCodexAppServerListenUrl, ensuredThreadId],
+        ptySessionId: resolvedCliLaunch.ptySessionId,
+        cols: resolvedCliLaunch.cols,
+        rows: resolvedCliLaunch.rows,
+        ...(resolvedCliLaunch.cwd === undefined ? {} : { cwd: resolvedCliLaunch.cwd }),
+        command: resolvedCliLaunch.command,
+        args: resolvedCliLaunch.args,
       });
     } finally {
       setIsSwitchingPrimaryPanel(false);
@@ -212,7 +216,6 @@ export function useSessionWorkbenchController(input: {
     serverRequests,
     sessionSnapshot,
     workbenchLifecycleState.connectionReadiness.canConnect,
-    threads,
   ]);
 
   const exitCliMode = useCallback(async (): Promise<void> => {

@@ -131,7 +131,9 @@ function installNodeWebSocket(): () => void {
   };
 }
 
-async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunnelServer> {
+async function startSessionWorkbenchTunnelServer(input?: {
+  initialThreadId?: string | null;
+}): Promise<SessionWorkbenchTunnelServer> {
   const wsServer = new WebSocketServer({
     host: "127.0.0.1",
     port: 0,
@@ -148,7 +150,10 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
   const ptyCloseWaiters = new Map<number, Array<(streamId: number) => void>>();
   const ptySockets = new Map<number, WebSocket>();
   const sockets = new Set<WebSocket>();
-  let knownThreadId: string | null = null;
+  let knownThreadId =
+    input !== undefined && "initialThreadId" in input
+      ? (input.initialThreadId ?? null)
+      : "thread_cli_test";
 
   function dispatchPtyOpen(record: PtyOpenRecord): void {
     ptyOpenRecords.push(record);
@@ -270,7 +275,6 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
                         {
                           id: knownThreadId,
                           name: "CLI Test Thread",
-                          preview: null,
                           createdAt: 1,
                           updatedAt: 1,
                         },
@@ -535,8 +539,10 @@ function HeaderActionsHost(input: { children: React.ReactNode }): React.JSX.Elem
   );
 }
 
-async function renderSessionWorkbenchCliHarness(): Promise<SessionWorkbenchCliHarness> {
-  const tunnelServer = await startSessionWorkbenchTunnelServer();
+async function renderSessionWorkbenchCliHarness(input?: {
+  initialThreadId?: string | null;
+}): Promise<SessionWorkbenchCliHarness> {
+  const tunnelServer = await startSessionWorkbenchTunnelServer(input);
   const renderedPage = await renderDashboardPageIntegration({
     handler: createWorkbenchRequestHandler(tunnelServer),
     ui: (
@@ -558,9 +564,24 @@ async function renderSessionWorkbenchCliHarness(): Promise<SessionWorkbenchCliHa
 
 async function withSessionWorkbenchCliHarness(
   run: (harness: SessionWorkbenchCliHarness) => Promise<void>,
+): Promise<void>;
+async function withSessionWorkbenchCliHarness(
+  input: { initialThreadId?: string | null },
+  run: (harness: SessionWorkbenchCliHarness) => Promise<void>,
+): Promise<void>;
+async function withSessionWorkbenchCliHarness(
+  inputOrRun:
+    | { initialThreadId?: string | null }
+    | ((harness: SessionWorkbenchCliHarness) => Promise<void>),
+  maybeRun?: (harness: SessionWorkbenchCliHarness) => Promise<void>,
 ): Promise<void> {
   const restoreWebSocket = installNodeWebSocket();
-  const harness = await renderSessionWorkbenchCliHarness();
+  const input = typeof inputOrRun === "function" ? {} : inputOrRun;
+  const run = typeof inputOrRun === "function" ? inputOrRun : maybeRun;
+  if (run === undefined) {
+    throw new Error("Expected a session workbench CLI harness callback.");
+  }
+  const harness = await renderSessionWorkbenchCliHarness(input);
 
   try {
     await run(harness);
@@ -589,16 +610,15 @@ async function waitForPtySession(
   );
 }
 
-function expectCliPty(record: PtyOpenRecord): void {
+function expectCliPty(record: PtyOpenRecord, input?: { threadId?: string | null }): void {
   expect(record.channel.session).toBe("create");
   expect(record.channel.ptySessionId).toBe("cli");
   expect(record.channel.command).toBe("codex");
-  expect(record.channel.args).toEqual([
-    "resume",
-    "--remote",
-    OpenAiCodexAppServerListenUrl,
-    "thread_cli_test",
-  ]);
+  expect(record.channel.args).toEqual(
+    input?.threadId === null
+      ? ["--remote", OpenAiCodexAppServerListenUrl]
+      : ["resume", "--remote", OpenAiCodexAppServerListenUrl, input?.threadId ?? "thread_cli_test"],
+  );
 }
 
 function expectTerminalPty(record: PtyOpenRecord): void {

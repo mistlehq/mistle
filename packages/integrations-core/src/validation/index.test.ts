@@ -15,19 +15,28 @@ function createPtyLaunch(input: { runtimeId: string; displayName?: string; comma
   return {
     runtimeId: input.runtimeId,
     displayName: input.displayName ?? input.runtimeId,
-    ptySessionId: "cli",
-    cols: 120,
-    rows: 32,
-    command: input.command ?? input.runtimeId,
-    args: [
-      {
-        kind: "literal" as const,
-        value: "resume",
-      },
-      {
-        kind: "threadId" as const,
-      },
-    ],
+    newLaunch: {
+      ptySessionId: "cli",
+      cols: 120,
+      rows: 32,
+      command: input.command ?? input.runtimeId,
+      args: [],
+    },
+    resumeLaunch: {
+      ptySessionId: "cli",
+      cols: 120,
+      rows: 32,
+      command: input.command ?? input.runtimeId,
+      args: [
+        {
+          kind: "literal" as const,
+          value: "resume",
+        },
+        {
+          kind: "threadId" as const,
+        },
+      ],
+    },
   };
 }
 
@@ -925,5 +934,117 @@ describe("validateCompiledBindingResults", () => {
 
     expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
     expect(caughtError).toMatchObject({ code: CompilerErrorCodes.AGENT_RUNTIME_CONFLICT });
+  });
+
+  it("fails when an agent runtime new launch template includes a thread id placeholder", () => {
+    const basePtyLaunch = createPtyLaunch({
+      runtimeId: "codex",
+      displayName: "Codex",
+      command: "codex",
+    });
+    const ptyLaunch = {
+      ...basePtyLaunch,
+      newLaunch: {
+        ...basePtyLaunch.newLaunch,
+        args: [
+          {
+            kind: "threadId" as const,
+          },
+        ],
+      },
+    };
+
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        egressRuleId: "egress_rule_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      runtimeClientSetup: {
+        clientId: "codex-cli",
+        env: {},
+        files: [],
+      },
+      runtimeClientEndpoints: [
+        {
+          endpointKey: "app-server",
+          transport: {
+            type: "ws",
+            url: "ws://127.0.0.1:4747",
+          },
+          connectionMode: "dedicated",
+        },
+      ],
+      agentRuntimes: [
+        {
+          runtimeId: "codex",
+          runtimeKey: "codex-app-server",
+          clientId: "codex-cli",
+          endpointKey: "app-server",
+          ptyLaunch,
+        },
+      ],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrow("must not define threadId placeholders in ptyLaunch.newLaunch");
+  });
+
+  it("fails when an agent runtime resume launch template omits a thread id placeholder", () => {
+    const basePtyLaunch = createPtyLaunch({
+      runtimeId: "codex",
+      displayName: "Codex",
+      command: "codex",
+    });
+    const ptyLaunch = {
+      ...basePtyLaunch,
+      resumeLaunch: {
+        ...basePtyLaunch.resumeLaunch,
+        args: [],
+      },
+    };
+
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        egressRuleId: "egress_rule_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      runtimeClientSetup: {
+        clientId: "codex-cli",
+        env: {},
+        files: [],
+      },
+      runtimeClientEndpoints: [
+        {
+          endpointKey: "app-server",
+          transport: {
+            type: "ws",
+            url: "ws://127.0.0.1:4747",
+          },
+          connectionMode: "dedicated",
+        },
+      ],
+      agentRuntimes: [
+        {
+          runtimeId: "codex",
+          runtimeKey: "codex-app-server",
+          clientId: "codex-cli",
+          endpointKey: "app-server",
+          ptyLaunch,
+        },
+      ],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrow("must define at least one threadId placeholder in ptyLaunch.resumeLaunch");
   });
 });

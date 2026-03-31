@@ -197,16 +197,23 @@ const AgentPtyLaunchArgumentSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 
-const AgentPtyLaunchSpecSchema = z
+const AgentPtyLaunchTemplateSchema = z
   .object({
-    runtimeId: z.string().min(1),
-    displayName: z.string().min(1),
     ptySessionId: z.string().min(1),
     cols: z.int().positive(),
     rows: z.int().positive(),
     cwd: z.string().min(1).optional(),
     command: z.string().min(1),
     args: z.array(AgentPtyLaunchArgumentSchema).readonly(),
+  })
+  .strict();
+
+const AgentPtyLaunchSpecSchema = z
+  .object({
+    runtimeId: z.string().min(1),
+    displayName: z.string().min(1),
+    newLaunch: AgentPtyLaunchTemplateSchema,
+    resumeLaunch: AgentPtyLaunchTemplateSchema,
   })
   .strict();
 
@@ -411,12 +418,26 @@ function normalizeAgentRuntime(
     ptyLaunch: {
       runtimeId: agentRuntime.ptyLaunch.runtimeId,
       displayName: agentRuntime.ptyLaunch.displayName,
-      ptySessionId: agentRuntime.ptyLaunch.ptySessionId,
-      cols: agentRuntime.ptyLaunch.cols,
-      rows: agentRuntime.ptyLaunch.rows,
-      ...(agentRuntime.ptyLaunch.cwd === undefined ? {} : { cwd: agentRuntime.ptyLaunch.cwd }),
-      command: agentRuntime.ptyLaunch.command,
-      args: agentRuntime.ptyLaunch.args,
+      newLaunch: {
+        ptySessionId: agentRuntime.ptyLaunch.newLaunch.ptySessionId,
+        cols: agentRuntime.ptyLaunch.newLaunch.cols,
+        rows: agentRuntime.ptyLaunch.newLaunch.rows,
+        ...(agentRuntime.ptyLaunch.newLaunch.cwd === undefined
+          ? {}
+          : { cwd: agentRuntime.ptyLaunch.newLaunch.cwd }),
+        command: agentRuntime.ptyLaunch.newLaunch.command,
+        args: agentRuntime.ptyLaunch.newLaunch.args,
+      },
+      resumeLaunch: {
+        ptySessionId: agentRuntime.ptyLaunch.resumeLaunch.ptySessionId,
+        cols: agentRuntime.ptyLaunch.resumeLaunch.cols,
+        rows: agentRuntime.ptyLaunch.resumeLaunch.rows,
+        ...(agentRuntime.ptyLaunch.resumeLaunch.cwd === undefined
+          ? {}
+          : { cwd: agentRuntime.ptyLaunch.resumeLaunch.cwd }),
+        command: agentRuntime.ptyLaunch.resumeLaunch.command,
+        args: agentRuntime.ptyLaunch.resumeLaunch.args,
+      },
     },
   };
 }

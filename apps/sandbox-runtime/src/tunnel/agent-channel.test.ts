@@ -35,19 +35,28 @@ function createAgentRuntime(overrides: Partial<CompiledAgentRuntime>): CompiledA
     ptyLaunch: {
       runtimeId: "codex",
       displayName: "Codex",
-      ptySessionId: "cli",
-      cols: 120,
-      rows: 32,
-      command: "codex",
-      args: [
-        {
-          kind: "literal",
-          value: "resume",
-        },
-        {
-          kind: "threadId",
-        },
-      ],
+      newLaunch: {
+        ptySessionId: "cli",
+        cols: 120,
+        rows: 32,
+        command: "codex",
+        args: [],
+      },
+      resumeLaunch: {
+        ptySessionId: "cli",
+        cols: 120,
+        rows: 32,
+        command: "codex",
+        args: [
+          {
+            kind: "literal",
+            value: "resume",
+          },
+          {
+            kind: "threadId",
+          },
+        ],
+      },
     },
     ...overrides,
   };

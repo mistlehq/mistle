@@ -207,19 +207,28 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
           ptyLaunch: {
             runtimeId: "codex",
             displayName: "Codex",
-            ptySessionId: "cli",
-            cols: 120,
-            rows: 32,
-            command: "codex",
-            args: [
-              {
-                kind: "literal",
-                value: "resume",
-              },
-              {
-                kind: "threadId",
-              },
-            ],
+            newLaunch: {
+              ptySessionId: "cli",
+              cols: 120,
+              rows: 32,
+              command: "codex",
+              args: [],
+            },
+            resumeLaunch: {
+              ptySessionId: "cli",
+              cols: 120,
+              rows: 32,
+              command: "codex",
+              args: [
+                {
+                  kind: "literal",
+                  value: "resume",
+                },
+                {
+                  kind: "threadId",
+                },
+              ],
+            },
           },
         },
       ],
@@ -279,19 +288,28 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
           ptyLaunch: {
             runtimeId: "claude-code",
             displayName: "Claude Code",
-            ptySessionId: "cli",
-            cols: 120,
-            rows: 32,
-            command: "claude",
-            args: [
-              {
-                kind: "literal",
-                value: "resume",
-              },
-              {
-                kind: "threadId",
-              },
-            ],
+            newLaunch: {
+              ptySessionId: "cli",
+              cols: 120,
+              rows: 32,
+              command: "claude",
+              args: [],
+            },
+            resumeLaunch: {
+              ptySessionId: "cli",
+              cols: 120,
+              rows: 32,
+              command: "claude",
+              args: [
+                {
+                  kind: "literal",
+                  value: "resume",
+                },
+                {
+                  kind: "threadId",
+                },
+              ],
+            },
           },
         },
       ],
@@ -614,19 +632,28 @@ describe("compileRuntimePlan", () => {
         ptyLaunch: {
           runtimeId: "codex",
           displayName: "Codex",
-          ptySessionId: "cli",
-          cols: 120,
-          rows: 32,
-          command: "codex",
-          args: [
-            {
-              kind: "literal",
-              value: "resume",
-            },
-            {
-              kind: "threadId",
-            },
-          ],
+          newLaunch: {
+            ptySessionId: "cli",
+            cols: 120,
+            rows: 32,
+            command: "codex",
+            args: [],
+          },
+          resumeLaunch: {
+            ptySessionId: "cli",
+            cols: 120,
+            rows: 32,
+            command: "codex",
+            args: [
+              {
+                kind: "literal",
+                value: "resume",
+              },
+              {
+                kind: "threadId",
+              },
+            ],
+          },
         },
       },
     ]);
@@ -1835,19 +1862,28 @@ describe("compileRuntimePlan", () => {
             ptyLaunch: {
               runtimeId: "codex",
               displayName: "Codex",
-              ptySessionId: "cli",
-              cols: 120,
-              rows: 32,
-              command: "codex",
-              args: [
-                {
-                  kind: "literal",
-                  value: "resume",
-                },
-                {
-                  kind: "threadId",
-                },
-              ],
+              newLaunch: {
+                ptySessionId: "cli",
+                cols: 120,
+                rows: 32,
+                command: "codex",
+                args: [],
+              },
+              resumeLaunch: {
+                ptySessionId: "cli",
+                cols: 120,
+                rows: 32,
+                command: "codex",
+                args: [
+                  {
+                    kind: "literal",
+                    value: "resume",
+                  },
+                  {
+                    kind: "threadId",
+                  },
+                ],
+              },
             },
           },
         ],

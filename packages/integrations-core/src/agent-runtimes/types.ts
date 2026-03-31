@@ -24,15 +24,20 @@ export type AgentPtyLaunchArgument =
       kind: "threadId";
     };
 
-export type AgentPtyLaunchSpec = {
-  runtimeId: string;
-  displayName: string;
+export type AgentPtyLaunchTemplate = {
   ptySessionId: string;
   cols: number;
   rows: number;
   cwd?: string;
   command: string;
   args: readonly AgentPtyLaunchArgument[];
+};
+
+export type AgentPtyLaunchSpec = {
+  runtimeId: string;
+  displayName: string;
+  newLaunch: AgentPtyLaunchTemplate;
+  resumeLaunch: AgentPtyLaunchTemplate;
 };
 
 export type CompileAgentRuntimeInput<TRuntimeConfig = Record<string, unknown>> = {

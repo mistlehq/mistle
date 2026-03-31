@@ -10,6 +10,7 @@ import {
   OpenAiCodexAppServerListenUrl,
   OpenAiCodexAppServerProcessKey,
 } from "./app-server.js";
+import { CodexPtyLaunchSpec } from "./pty-launch.js";
 
 const CodexCliArtifactKey = "codex-cli";
 const ProxyModelProviderKey = "proxy";
@@ -29,9 +30,6 @@ const ArtifactCommandTimeoutMs = 120_000;
 const RuntimeClientProcessReadinessTimeoutMs = 5_000;
 const RuntimeClientProcessStopTimeoutMs = 10_000;
 const RuntimeClientProcessStopGracePeriodMs = 2_000;
-const CodexCliPtySessionId = "cli";
-const CodexCliDefaultCols = 120;
-const CodexCliDefaultRows = 32;
 const ManagedSandboxContext = [
   "Mistle-managed sandbox context:",
   "",
@@ -233,31 +231,7 @@ export function compileCodexRuntime(
         runtimeKey: OpenAiCodexAppServerProcessKey,
         clientId: "codex-cli",
         endpointKey: OpenAiCodexAppServerEndpointKey,
-        ptyLaunch: {
-          runtimeId: "codex",
-          displayName: "Codex",
-          ptySessionId: CodexCliPtySessionId,
-          cols: CodexCliDefaultCols,
-          rows: CodexCliDefaultRows,
-          command: "codex",
-          args: [
-            {
-              kind: "literal",
-              value: "resume",
-            },
-            {
-              kind: "literal",
-              value: "--remote",
-            },
-            {
-              kind: "literal",
-              value: OpenAiCodexAppServerListenUrl,
-            },
-            {
-              kind: "threadId",
-            },
-          ],
-        },
+        ptyLaunch: CodexPtyLaunchSpec,
       },
     ],
   };

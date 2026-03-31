@@ -128,23 +128,43 @@ export interface paths {
                 clientId: string;
                 endpointKey: string;
                 ptyLaunch: {
-                  args: (
-                    | {
-                        /** @enum {string} */
-                        kind: "literal";
-                        value: string;
-                      }
-                    | {
-                        /** @enum {string} */
-                        kind: "threadId";
-                      }
-                  )[];
-                  cols: number;
-                  command: string;
-                  cwd?: string;
                   displayName: string;
-                  ptySessionId: string;
-                  rows: number;
+                  newLaunch: {
+                    args: (
+                      | {
+                          /** @enum {string} */
+                          kind: "literal";
+                          value: string;
+                        }
+                      | {
+                          /** @enum {string} */
+                          kind: "threadId";
+                        }
+                    )[];
+                    cols: number;
+                    command: string;
+                    cwd?: string;
+                    ptySessionId: string;
+                    rows: number;
+                  };
+                  resumeLaunch: {
+                    args: (
+                      | {
+                          /** @enum {string} */
+                          kind: "literal";
+                          value: string;
+                        }
+                      | {
+                          /** @enum {string} */
+                          kind: "threadId";
+                        }
+                    )[];
+                    cols: number;
+                    command: string;
+                    cwd?: string;
+                    ptySessionId: string;
+                    rows: number;
+                  };
                   runtimeId: string;
                 };
                 runtimeId: string;

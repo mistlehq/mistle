@@ -7,19 +7,28 @@ function createPtyLaunch(input: { runtimeId: string; displayName?: string; comma
   return {
     runtimeId: input.runtimeId,
     displayName: input.displayName ?? input.runtimeId,
-    ptySessionId: "cli",
-    cols: 120,
-    rows: 32,
-    command: input.command ?? input.runtimeId,
-    args: [
-      {
-        kind: "literal" as const,
-        value: "resume",
-      },
-      {
-        kind: "threadId" as const,
-      },
-    ],
+    newLaunch: {
+      ptySessionId: "cli",
+      cols: 120,
+      rows: 32,
+      command: input.command ?? input.runtimeId,
+      args: [],
+    },
+    resumeLaunch: {
+      ptySessionId: "cli",
+      cols: 120,
+      rows: 32,
+      command: input.command ?? input.runtimeId,
+      args: [
+        {
+          kind: "literal" as const,
+          value: "resume",
+        },
+        {
+          kind: "threadId" as const,
+        },
+      ],
+    },
   };
 }
 
