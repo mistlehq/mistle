@@ -867,10 +867,6 @@ export function useSessionWorkbenchLifecycleState(input: {
     effectiveSandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
   const sessionHeaderStatusUi = resolveSessionHeaderStatusUi({
     sandboxStatus: sandboxStatusLabel.toLowerCase(),
-    agentConnectionState,
-    step,
-    hasConnectionError: resolvedLifecycleErrorMessage !== null,
-    isRecoveringSession: codexRecoveryState.kind === "recovering",
   });
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({

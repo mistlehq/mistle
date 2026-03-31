@@ -1,7 +1,3 @@
-import type { CodexSessionConnectionState } from "@mistle/integrations-definitions/openai/agent/client";
-
-import type { StartSessionStep } from "../session-agents/codex/session-state/index.js";
-
 export type SessionHeaderStatusUi = {
   label: string;
   variant: "secondary" | "outline" | "destructive";
@@ -10,10 +6,6 @@ export type SessionHeaderStatusUi = {
 
 export function resolveSessionHeaderStatusUi(input: {
   sandboxStatus: string;
-  agentConnectionState: CodexSessionConnectionState;
-  step: StartSessionStep;
-  hasConnectionError: boolean;
-  isRecoveringSession: boolean;
 }): SessionHeaderStatusUi {
   if (input.sandboxStatus === "failed") {
     return {

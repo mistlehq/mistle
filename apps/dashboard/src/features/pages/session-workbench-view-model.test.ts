@@ -13,10 +13,6 @@ describe("resolveSessionHeaderStatusUi", () => {
       description: "shows connected when the sandbox is running",
       input: {
         sandboxStatus: "running",
-        agentConnectionState: "idle",
-        step: "idle",
-        hasConnectionError: true,
-        isRecoveringSession: true,
       } as const,
       expected: {
         label: "Connected",
@@ -28,10 +24,6 @@ describe("resolveSessionHeaderStatusUi", () => {
       description: "prioritizes sandbox failures over connection state",
       input: {
         sandboxStatus: "failed",
-        agentConnectionState: "ready",
-        step: "connected",
-        hasConnectionError: false,
-        isRecoveringSession: false,
       } as const,
       expected: {
         label: "Sandbox failed",
@@ -42,10 +34,6 @@ describe("resolveSessionHeaderStatusUi", () => {
       description: "shows starting while the sandbox is not yet running",
       input: {
         sandboxStatus: "starting",
-        agentConnectionState: "opening_agent_stream",
-        step: "connecting",
-        hasConnectionError: false,
-        isRecoveringSession: false,
       } as const,
       expected: {
         label: "Starting sandbox",
@@ -56,10 +44,6 @@ describe("resolveSessionHeaderStatusUi", () => {
       description: "shows resuming while a stopped sandbox resume is pending",
       input: {
         sandboxStatus: "resuming",
-        agentConnectionState: "idle",
-        step: "securing",
-        hasConnectionError: false,
-        isRecoveringSession: false,
       } as const,
       expected: {
         label: "Resuming sandbox",
@@ -70,10 +54,6 @@ describe("resolveSessionHeaderStatusUi", () => {
       description: "shows stopped when the sandbox is stopped even if chat state is stale",
       input: {
         sandboxStatus: "stopped",
-        agentConnectionState: "ready",
-        step: "connected",
-        hasConnectionError: false,
-        isRecoveringSession: false,
       } as const,
       expected: {
         label: "Sandbox stopped",
@@ -84,10 +64,6 @@ describe("resolveSessionHeaderStatusUi", () => {
       description: "ignores session recovery state while the sandbox is running",
       input: {
         sandboxStatus: "running",
-        agentConnectionState: "idle",
-        step: "idle",
-        hasConnectionError: false,
-        isRecoveringSession: true,
       } as const,
       expected: {
         label: "Connected",
