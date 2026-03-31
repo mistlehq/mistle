@@ -127,6 +127,26 @@ export interface paths {
                 bindingId: string;
                 clientId: string;
                 endpointKey: string;
+                ptyLaunch: {
+                  args: (
+                    | {
+                        /** @enum {string} */
+                        kind: "literal";
+                        value: string;
+                      }
+                    | {
+                        /** @enum {string} */
+                        kind: "threadId";
+                      }
+                  )[];
+                  cols: number;
+                  command: string;
+                  cwd?: string;
+                  displayName: string;
+                  ptySessionId: string;
+                  rows: number;
+                  runtimeId: string;
+                };
                 runtimeId: string;
                 runtimeKey: string;
               }[];
