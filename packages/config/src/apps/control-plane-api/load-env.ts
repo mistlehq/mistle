@@ -217,15 +217,6 @@ export function loadControlPlaneApiFromEnv(
     };
   }
 
-  const mediaGcsProjectId = env.MISTLE_APPS_CONTROL_PLANE_API_MEDIA_GCS_PROJECT_ID;
-  const mediaGcsCredentialsJson = env.MISTLE_APPS_CONTROL_PLANE_API_MEDIA_GCS_CREDENTIALS_JSON;
-  if (mediaGcsProjectId !== undefined || mediaGcsCredentialsJson !== undefined) {
-    media.gcs = {
-      projectId: mediaGcsProjectId ?? "",
-      credentialsJson: mediaGcsCredentialsJson ?? "",
-    };
-  }
-
   if (hasEntries(media)) {
     partialConfig.media = media;
   }

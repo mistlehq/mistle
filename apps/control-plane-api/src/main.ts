@@ -113,27 +113,14 @@ export async function createControlPlaneApiRuntime(
 function resolveMediaConfig(
   mediaConfig: ControlPlaneApiRuntimeConfig["app"]["media"],
 ): Parameters<typeof createMediaService>[0]["config"] {
-  if (mediaConfig.provider === "s3") {
-    if (mediaConfig.s3 === undefined) {
-      throw new Error("Control plane media config requires media.s3 when provider is 's3'.");
-    }
-
-    return {
-      mediaBaseUrl: mediaConfig.mediaBaseUrl,
-      bucket: mediaConfig.bucket,
-      provider: "s3",
-      s3: mediaConfig.s3,
-    };
-  }
-
-  if (mediaConfig.gcs === undefined) {
-    throw new Error("Control plane media config requires media.gcs when provider is 'gcs'.");
+  if (mediaConfig.s3 === undefined) {
+    throw new Error("Control plane media config requires media.s3 when provider is 's3'.");
   }
 
   return {
     mediaBaseUrl: mediaConfig.mediaBaseUrl,
     bucket: mediaConfig.bucket,
-    provider: "gcs",
-    gcs: mediaConfig.gcs,
+    provider: "s3",
+    s3: mediaConfig.s3,
   };
 }

@@ -7,7 +7,6 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl as getS3SignedUrl } from "@aws-sdk/s3-request-presigner";
-import { Storage } from "@google-cloud/storage";
 
 type S3MediaConfig = {
   mediaBaseUrl: string;
@@ -22,17 +21,7 @@ type S3MediaConfig = {
   };
 };
 
-type GcsMediaConfig = {
-  mediaBaseUrl: string;
-  bucket: string;
-  provider: "gcs";
-  gcs: {
-    projectId: string;
-    credentialsJson: string;
-  };
-};
-
-export type MediaConfig = S3MediaConfig | GcsMediaConfig;
+export type MediaConfig = S3MediaConfig;
 
 export type StableMediaSubject =
   | {
@@ -176,85 +165,6 @@ class S3CompatibleStorage implements ObjectStorage {
   }
 }
 
-class GcsStorage implements ObjectStorage {
-  readonly #bucket: string;
-  readonly #storage: Storage;
-
-  constructor(input: { bucket: string; config: GcsMediaConfig["gcs"] }) {
-    this.#bucket = input.bucket;
-    this.#storage = new Storage({
-      projectId: input.config.projectId,
-      credentials: parseGcsCredentialsJson(input.config.credentialsJson),
-    });
-  }
-
-  async createDirectUpload(input: {
-    objectKey: string;
-    contentType: string;
-    expiresAt: Date;
-  }): Promise<CreateDirectUploadResult> {
-    const [url] = await this.#storage.bucket(this.#bucket).file(input.objectKey).getSignedUrl({
-      version: "v4",
-      action: "write",
-      expires: input.expiresAt,
-      contentType: input.contentType,
-    });
-
-    return {
-      method: "PUT",
-      url,
-      headers: {
-        "Content-Type": input.contentType,
-      },
-    };
-  }
-
-  async readObject(input: { objectKey: string }): Promise<StoredObject> {
-    const file = this.#storage.bucket(this.#bucket).file(input.objectKey);
-    const [bytes] = await file.download();
-    const [metadata] = await file.getMetadata();
-
-    return {
-      bytes,
-      contentType: metadata.contentType ?? null,
-    };
-  }
-
-  async putObject(input: {
-    objectKey: string;
-    body: Buffer;
-    contentType: string;
-    cacheControl?: string | undefined;
-  }): Promise<void> {
-    await this.#storage
-      .bucket(this.#bucket)
-      .file(input.objectKey)
-      .save(input.body, {
-        resumable: false,
-        metadata: {
-          contentType: input.contentType,
-          ...(input.cacheControl === undefined ? {} : { cacheControl: input.cacheControl }),
-        },
-      });
-  }
-
-  async deleteObject(input: { objectKey: string }): Promise<void> {
-    await this.#storage.bucket(this.#bucket).file(input.objectKey).delete({
-      ignoreNotFound: true,
-    });
-  }
-
-  async getSignedReadUrl(input: { objectKey: string; expiresAt: Date }): Promise<string> {
-    const [url] = await this.#storage.bucket(this.#bucket).file(input.objectKey).getSignedUrl({
-      version: "v4",
-      action: "read",
-      expires: input.expiresAt,
-    });
-
-    return url;
-  }
-}
-
 export type MediaService = {
   createDirectUpload(input: {
     objectKey: string;
@@ -317,16 +227,9 @@ export function createMediaService(input: { config: MediaConfig }): MediaService
 }
 
 function createObjectStorage(config: MediaConfig): ObjectStorage {
-  if (config.provider === "s3") {
-    return new S3CompatibleStorage({
-      bucket: config.bucket,
-      config: config.s3,
-    });
-  }
-
-  return new GcsStorage({
+  return new S3CompatibleStorage({
     bucket: config.bucket,
-    config: config.gcs,
+    config: config.s3,
   });
 }
 
@@ -342,20 +245,4 @@ function normalizeFilename(filename: string): string {
   }
 
   return trimmed.replace(/[^A-Za-z0-9._-]/g, "_");
-}
-
-function parseGcsCredentialsJson(value: string): { client_email?: string; private_key?: string } {
-  const parsed = JSON.parse(value);
-  if (typeof parsed !== "object" || parsed === null) {
-    throw new Error("media.gcs.credentialsJson must be a JSON object.");
-  }
-
-  const parsedRecord = Object.fromEntries(Object.entries(parsed));
-  const clientEmail = parsedRecord.client_email;
-  const privateKey = parsedRecord.private_key;
-
-  return {
-    ...(typeof clientEmail === "string" ? { client_email: clientEmail } : {}),
-    ...(typeof privateKey === "string" ? { private_key: privateKey } : {}),
-  };
 }

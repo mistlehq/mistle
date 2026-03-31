@@ -71,11 +71,14 @@ base_url = "https://app.mistle.example"
 [apps.control_plane_api.media]
 media_base_url = "https://api.mistle.example"
 bucket = "replace-with-media-bucket"
-provider = "gcs"
+provider = "s3"
 
-[apps.control_plane_api.media.gcs]
-project_id = "replace-with-gcp-project-id"
-credentials_json = '{"client_email":"replace-with-service-account-email","private_key":"replace-with-service-account-private-key"}'
+[apps.control_plane_api.media.s3]
+region = "us-east-1"
+endpoint = "https://replace-with-s3-compatible-endpoint"
+access_key_id = "replace-with-s3-access-key-id"
+secret_access_key = "replace-with-s3-secret-access-key"
+force_path_style = false
 
 [apps.control_plane_api.workflow]
 database_url = "postgresql://mistle:replace-with-password@db:6432/mistle"

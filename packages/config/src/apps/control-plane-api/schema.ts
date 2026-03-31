@@ -88,42 +88,16 @@ export const ControlPlaneApiMediaS3ConfigSchema = z
   })
   .strict();
 
-export const ControlPlaneApiMediaGcsConfigSchema = z
-  .object({
-    projectId: z.string().min(1),
-    credentialsJson: z.string().min(1),
-  })
-  .strict();
-
 const ControlPlaneApiMediaConfigObjectSchema = z
   .object({
     mediaBaseUrl: z.string().min(1),
     bucket: z.string().min(1),
-    provider: z.enum(["s3", "gcs"]),
-    s3: ControlPlaneApiMediaS3ConfigSchema.optional(),
-    gcs: ControlPlaneApiMediaGcsConfigSchema.optional(),
+    provider: z.literal("s3"),
+    s3: ControlPlaneApiMediaS3ConfigSchema,
   })
   .strict();
 
-export const ControlPlaneApiMediaConfigSchema = ControlPlaneApiMediaConfigObjectSchema.superRefine(
-  (config, ctx) => {
-    if (config.provider === "s3" && config.s3 === undefined) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["s3"],
-        message: "media.s3 is required when media.provider is 's3'.",
-      });
-    }
-
-    if (config.provider === "gcs" && config.gcs === undefined) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["gcs"],
-        message: "media.gcs is required when media.provider is 'gcs'.",
-      });
-    }
-  },
-);
+export const ControlPlaneApiMediaConfigSchema = ControlPlaneApiMediaConfigObjectSchema;
 
 export const ControlPlaneApiConfigSchema = z
   .object({

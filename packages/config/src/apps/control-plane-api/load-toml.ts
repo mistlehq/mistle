@@ -18,6 +18,7 @@ export function loadControlPlaneApiFromToml(
   const dataPlaneApi = asObjectRecord(controlPlaneApi.data_plane_api);
   const integrations = asObjectRecord(controlPlaneApi.integrations);
   const media = asObjectRecord(controlPlaneApi.media);
+  const mediaS3 = asObjectRecord(media.s3);
 
   let partialConfig: Record<string, unknown> = {
     server: {
@@ -54,30 +55,26 @@ export function loadControlPlaneApiFromToml(
     dataPlaneApi: {
       baseUrl: dataPlaneApi.base_url,
     },
-    media: {
-      mediaBaseUrl: media.media_base_url,
-      bucket: media.bucket,
-      provider: media.provider,
-      ...(media.s3 === undefined
-        ? {}
-        : {
-            s3: {
-              region: asObjectRecord(media.s3).region,
-              endpoint: asObjectRecord(media.s3).endpoint,
-              accessKeyId: asObjectRecord(media.s3).access_key_id,
-              secretAccessKey: asObjectRecord(media.s3).secret_access_key,
-              forcePathStyle: asObjectRecord(media.s3).force_path_style,
-            },
-          }),
-      ...(media.gcs === undefined
-        ? {}
-        : {
-            gcs: {
-              projectId: asObjectRecord(media.gcs).project_id,
-              credentialsJson: asObjectRecord(media.gcs).credentials_json,
-            },
-          }),
-    },
+    ...(hasEntries(media)
+      ? {
+          media: {
+            mediaBaseUrl: media.media_base_url,
+            bucket: media.bucket,
+            provider: media.provider,
+            ...(hasEntries(mediaS3)
+              ? {
+                  s3: {
+                    region: mediaS3.region,
+                    endpoint: mediaS3.endpoint,
+                    accessKeyId: mediaS3.access_key_id,
+                    secretAccessKey: mediaS3.secret_access_key,
+                    forcePathStyle: mediaS3.force_path_style,
+                  },
+                }
+              : {}),
+          },
+        }
+      : {}),
   };
 
   if (hasEntries(integrations)) {
