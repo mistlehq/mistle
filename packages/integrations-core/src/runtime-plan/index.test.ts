@@ -357,6 +357,68 @@ describe("assembleCompiledRuntimePlan", () => {
     ]);
   });
 
+  it("dedupes equivalent artifacts with the same artifact key", () => {
+    const plan = assembleCompiledRuntimePlan({
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      image: {
+        source: "base",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      },
+      compiledBindingResults: [
+        {
+          egressRoutes: [],
+          artifacts: [
+            {
+              artifactKey: "gh-cli",
+              name: "GitHub CLI",
+              env: {
+                GH_TOKEN: "dummy-value",
+              },
+              lifecycle: {
+                install: [{ args: ["sh", "-euc", "install-gh"] }],
+              },
+            },
+          ],
+          runtimeClients: [],
+          workspaceSources: [],
+          agentRuntimes: [],
+        },
+        {
+          egressRoutes: [],
+          artifacts: [
+            {
+              artifactKey: "gh-cli",
+              name: "GitHub CLI",
+              env: {
+                GH_TOKEN: "dummy-value",
+              },
+              lifecycle: {
+                install: [{ args: ["sh", "-euc", "install-gh"] }],
+              },
+            },
+            {
+              artifactKey: "jira-cli",
+              name: "Jira CLI",
+              lifecycle: {
+                install: [{ args: ["sh", "-euc", "install-jira"] }],
+              },
+            },
+          ],
+          runtimeClients: [],
+          workspaceSources: [],
+          agentRuntimes: [],
+        },
+      ],
+    });
+
+    expect(plan.artifacts).toHaveLength(2);
+    expect(plan.artifacts.map((artifact) => artifact.artifactKey)).toEqual(["gh-cli", "jira-cli"]);
+    expect(plan.artifacts[0]?.env).toEqual({
+      GH_TOKEN: "dummy-value",
+    });
+  });
+
   it("fails on runtime client merge conflicts", () => {
     expect(() =>
       assembleCompiledRuntimePlan({

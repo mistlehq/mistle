@@ -414,6 +414,20 @@ function sortArtifacts(
     .sort((left, right) => left.artifactKey.localeCompare(right.artifactKey));
 }
 
+function dedupeArtifacts(
+  input: ReadonlyArray<CompiledRuntimeArtifactSpec>,
+): ReadonlyArray<CompiledRuntimeArtifactSpec> {
+  const artifactsByKey = new Map<string, CompiledRuntimeArtifactSpec>();
+
+  for (const artifact of input) {
+    if (!artifactsByKey.has(artifact.artifactKey)) {
+      artifactsByKey.set(artifact.artifactKey, artifact);
+    }
+  }
+
+  return [...artifactsByKey.values()];
+}
+
 export function assembleCompiledRuntimePlan(
   input: AssembleCompiledRuntimePlanInput,
 ): CompiledRuntimePlan {
@@ -422,7 +436,7 @@ export function assembleCompiledRuntimePlan(
       (compiledBindingResult) => compiledBindingResult.egressRoutes,
     ),
   );
-  const artifacts = sortArtifacts(flattenArtifacts(input.compiledBindingResults));
+  const artifacts = sortArtifacts(dedupeArtifacts(flattenArtifacts(input.compiledBindingResults)));
   const runtimeClients = mergeRuntimeClients(
     resolveRuntimeClients({
       runtimeClients: flattenRuntimeClients(input.compiledBindingResults),
