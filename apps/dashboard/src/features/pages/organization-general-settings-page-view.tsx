@@ -1,4 +1,4 @@
-import { Button, Field, FieldContent, FieldHeader, FieldLabel, Input, Skeleton } from "@mistle/ui";
+import { Field, FieldContent, FieldHeader, FieldLabel, Input, Skeleton } from "@mistle/ui";
 
 import { SaveActions } from "../settings/save-actions.js";
 import { FormPageSection, FormPageShell } from "../shared/form-page.js";
@@ -13,7 +13,6 @@ export type OrganizationGeneralSettingsPageViewProps = {
   nameErrorMessage: string | null;
   onCancelChanges: () => void;
   onNameChange: (nextValue: string) => void;
-  onRetryLoad: () => void;
   onSaveChanges: () => void;
   saveErrorMessage: string | null;
   saveSuccess: boolean;
@@ -22,9 +21,6 @@ export type OrganizationGeneralSettingsPageViewProps = {
 export function OrganizationGeneralSettingsPageView(
   props: OrganizationGeneralSettingsPageViewProps,
 ): React.JSX.Element {
-  const topErrorTitle =
-    props.saveErrorMessage !== null ? "Could not save organization settings" : undefined;
-
   if (props.isLoading) {
     return (
       <FormPageShell className="pt-0">
@@ -54,15 +50,9 @@ export function OrganizationGeneralSettingsPageView(
       <FormPageShell className="pt-0">
         <FormPageSection>
           <div className="flex flex-col gap-3 p-4">
-            <StatusBox title="Could not load organization settings" tone="destructive">
-              <p>{props.loadErrorMessage}</p>
-              <p>Please try again later.</p>
+            <StatusBox tone="destructive">
+              {props.loadErrorMessage} Please try again later.
             </StatusBox>
-            <div>
-              <Button onClick={props.onRetryLoad} type="button" variant="outline">
-                Retry
-              </Button>
-            </div>
           </div>
         </FormPageSection>
       </FormPageShell>
@@ -78,15 +68,10 @@ export function OrganizationGeneralSettingsPageView(
           </p>
 
           {props.saveErrorMessage !== null || props.nameErrorMessage !== null ? (
-            <StatusBox title={topErrorTitle} tone="destructive">
-              {props.saveErrorMessage !== null ? (
-                <>
-                  <p>{props.saveErrorMessage}</p>
-                  <p>Please try again later.</p>
-                </>
-              ) : (
-                props.nameErrorMessage
-              )}
+            <StatusBox tone="destructive">
+              {props.saveErrorMessage !== null
+                ? `${props.saveErrorMessage} Please try again later.`
+                : props.nameErrorMessage}
             </StatusBox>
           ) : null}
 

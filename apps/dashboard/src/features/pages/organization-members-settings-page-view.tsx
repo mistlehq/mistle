@@ -1,5 +1,3 @@
-import { Button } from "@mistle/ui";
-
 import { MemberInviteDialog } from "../settings/members/member-invite-dialog.js";
 import { MemberRoleChangeDialog } from "../settings/members/member-role-change-dialog.js";
 import type {
@@ -45,8 +43,6 @@ export type OrganizationMembersSettingsPageViewProps = {
   onInviteDialogOpenChange: (nextOpen: boolean) => void;
   onRemoveMember: (member: SettingsMember) => void;
   onResendInvite: (invitation: SettingsInvitation) => void;
-  onRetryCapabilities: () => void;
-  onRetryLoad: () => void;
   onRevokeInvite: (invitation: SettingsInvitation) => void;
   onRoleDialogCancel: () => void;
   onRoleDialogOpenChange: (nextOpen: boolean) => void;
@@ -67,7 +63,7 @@ export function OrganizationMembersSettingsPageView(
   }
 
   if (props.loadErrorMessage) {
-    return <MembersLoadErrorState message={props.loadErrorMessage} onRetry={props.onRetryLoad} />;
+    return <MembersLoadErrorState message={props.loadErrorMessage} />;
   }
 
   return (
@@ -75,15 +71,9 @@ export function OrganizationMembersSettingsPageView(
       {props.capabilitiesErrorMessage ? (
         <div className="flex flex-col gap-3">
           <StatusBox title="Could not load membership permissions" tone="destructive">
-            <p>{props.capabilitiesErrorMessage}</p>
-            <p>Invite and role management actions are unavailable until this loads.</p>
-            <p>Please try again later.</p>
+            Invite and role management actions are unavailable until this loads. Please try again
+            later.
           </StatusBox>
-          <div>
-            <Button onClick={props.onRetryCapabilities} type="button" variant="outline">
-              Retry
-            </Button>
-          </div>
         </div>
       ) : null}
 

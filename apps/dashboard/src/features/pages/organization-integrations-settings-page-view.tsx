@@ -1,4 +1,4 @@
-import { Button, Skeleton } from "@mistle/ui";
+import { Skeleton } from "@mistle/ui";
 import type { ReactNode } from "react";
 
 import { IntegrationSection } from "../integrations/integration-section.js";
@@ -23,7 +23,6 @@ export type OrganizationIntegrationsSettingsPageViewProps = {
   detailSurface?: ReactNode;
   isLoading: boolean;
   loadErrorMessage: string | null;
-  onRetryLoad: () => void;
 };
 
 export function OrganizationIntegrationsSettingsPageView(
@@ -44,15 +43,7 @@ export function OrganizationIntegrationsSettingsPageView(
   if (props.loadErrorMessage !== null) {
     return (
       <div className="flex flex-col gap-3">
-        <StatusBox title="Could not load integrations" tone="destructive">
-          <p>{props.loadErrorMessage}</p>
-          <p>Please try again later.</p>
-        </StatusBox>
-        <div>
-          <Button onClick={props.onRetryLoad} type="button" variant="outline">
-            Retry
-          </Button>
-        </div>
+        <StatusBox tone="destructive">{props.loadErrorMessage} Please try again later.</StatusBox>
       </div>
     );
   }
