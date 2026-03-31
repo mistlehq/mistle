@@ -117,12 +117,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Connecting: Story = {
-  args: {
-    initialState: SandboxPtyStates.CONNECTING,
-  },
-};
-
 export const ConnectedWithOutput: Story = {
   args: {
     initialOutput: [

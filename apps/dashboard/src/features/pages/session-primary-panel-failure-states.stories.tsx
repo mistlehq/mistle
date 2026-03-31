@@ -6,8 +6,6 @@ import {
   SessionWorkbenchStoryChrome,
 } from "./session-story-support.js";
 
-function noop(): void {}
-
 const meta = {
   title: "Dashboard/Pages/SessionPrimaryPanelFailureStates",
   tags: ["autodocs"],
@@ -28,24 +26,6 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
-
-export const CliEntryFailed: Story = {
-  render: () =>
-    renderSessionWorkbenchStory({
-      mainContent: (
-        <SessionPrimaryPanelStatusCard
-          action={{
-            label: "Return to chat",
-            onClick: noop,
-          }}
-          description="codex executable missing from the sandbox image"
-          title="Could not start Codex CLI"
-          tone="destructive"
-        />
-      ),
-      primaryBottomPanel: null,
-    }),
-};
 
 export const RestoreFailed: Story = {
   render: () =>
