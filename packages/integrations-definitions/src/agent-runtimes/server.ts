@@ -1,8 +1,8 @@
 import type { AgentConversationProvider, AgentExecutionObserver } from "@mistle/integrations-core";
 
-import { createAgentRuntimeRegistry } from "../registry/agent-runtimes.js";
+import { createAgentRuntimeServerRegistry } from "../registry/agent-runtimes.server.js";
 
-const AgentRuntimeRegistry = createAgentRuntimeRegistry();
+const AgentRuntimeRegistry = createAgentRuntimeServerRegistry();
 
 export function resolveAgentConversationProvider(runtimeId: string): AgentConversationProvider {
   const runtimeDefinition = AgentRuntimeRegistry.getRuntimeOrThrow({

@@ -22,20 +22,6 @@ function validateRuntimeDefinition(input: AnyAgentRuntimeDefinition): void {
       "Agent runtime definition displayName must be non-empty.",
     );
   }
-
-  if (input.createConversationProvider === undefined) {
-    throw new IntegrationDefinitionRegistryError(
-      DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-      `Agent runtime '${input.runtimeId}' must define createConversationProvider().`,
-    );
-  }
-
-  if (input.createExecutionObserver === undefined) {
-    throw new IntegrationDefinitionRegistryError(
-      DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-      `Agent runtime '${input.runtimeId}' must define createExecutionObserver().`,
-    );
-  }
 }
 
 export class AgentRuntimeRegistry implements AgentRuntimeResolver {
