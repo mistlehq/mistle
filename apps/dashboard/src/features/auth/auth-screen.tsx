@@ -12,6 +12,7 @@ import {
   resolveOtpValidationError,
   type AuthStep,
 } from "./auth-flow.js";
+import { AuthMethodIds, hasEnabledAuthMethod, resolveEnabledAuthMethods } from "./auth-methods.js";
 import { resolveRequestedPostLoginPath } from "./auth-redirect.js";
 import { AuthScreenView } from "./auth-screen-view.js";
 import { GoogleSignInButton } from "./google-sign-in-button.js";
@@ -22,6 +23,8 @@ export function AuthScreen(): React.JSX.Element {
   const sessionQuery = useSessionQuery();
   const location = useLocation();
   const authCapabilities = parseAuthCapabilities(useLoaderData());
+  const authMethods = resolveEnabledAuthMethods(authCapabilities);
+  const hasGoogleAuthMethod = hasEnabledAuthMethod(authMethods, AuthMethodIds.GOOGLE);
 
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -131,7 +134,7 @@ export function AuthScreen(): React.JSX.Element {
     setAuthStep(nextState.authStep);
   }
 
-  const emailStageAfterForm = authCapabilities.methods.google ? (
+  const emailStageAfterForm = hasGoogleAuthMethod ? (
     <div className="gap-4 pt-1 flex flex-col">
       <div className="items-center gap-4 flex">
         <Separator className="flex-1" />
@@ -144,7 +147,7 @@ export function AuthScreen(): React.JSX.Element {
 
   const authScreenViewOptionalProps = {
     ...(emailStageAfterForm === undefined ? {} : { emailStageAfterForm }),
-    ...(authStep === "email" && authCapabilities.methods.google ? { title: "Log in" } : {}),
+    ...(authStep === "email" && hasGoogleAuthMethod ? { title: "Log in" } : {}),
   };
 
   if (isSignedIn) {
