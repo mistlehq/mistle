@@ -17,6 +17,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "aws-cli-default",
+        familyId: "aws",
+        variantId: "aws-cli-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "github-cloud",
         familyId: "github",
         variantId: "github-cloud",
