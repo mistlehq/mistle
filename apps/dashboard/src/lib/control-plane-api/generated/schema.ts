@@ -887,7 +887,9 @@ export interface paths {
               [key: string]: unknown;
             };
             displayName: string;
-            secret?: string;
+            secrets?: {
+              [key: string]: string;
+            };
           };
         };
       };
@@ -1271,7 +1273,9 @@ export interface paths {
             };
             displayName: string;
             methodId: string;
-            secret: string;
+            secrets: {
+              [key: string]: string;
+            };
           };
         };
       };

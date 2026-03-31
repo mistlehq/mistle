@@ -1913,13 +1913,14 @@
                     "type": "object",
                     "additionalProperties": {}
                   },
-                  "secret": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "\\S"
+                  "secrets": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
                   }
                 },
-                "required": ["displayName", "methodId", "config", "secret"],
+                "required": ["displayName", "methodId", "config", "secrets"],
                 "additionalProperties": false
               }
             }
@@ -2534,10 +2535,11 @@
                     "type": "object",
                     "additionalProperties": {}
                   },
-                  "secret": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "\\S"
+                  "secrets": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
                   }
                 },
                 "required": ["displayName", "config"],
