@@ -1,3 +1,6 @@
+import type { WSContext } from "hono/ws";
+import type WebSocket from "ws";
+
 import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
 import type { TunnelSessionRegistry } from "../tunnel/tunnel-session/index.js";
 import { type RelayPayload } from "../tunnel/types.js";
@@ -32,6 +35,19 @@ type PendingResponseEvent =
     }
   | {
       kind: "end";
+    };
+
+type PendingWebSocketEvent =
+  | {
+      kind: "close";
+      code?: number;
+      reason?: string;
+      abrupt: boolean;
+    }
+  | {
+      kind: "frame";
+      bytes: Uint8Array;
+      opcode: "binary" | "text";
     };
 
 class AsyncQueue<T> {
@@ -220,6 +236,47 @@ function buildForwardHeaders(input: {
   return headers;
 }
 
+function buildForwardWebSocketHeaders(input: {
+  host: string;
+  request: Request;
+  targetPort: number;
+}): HeaderMap {
+  const headers: HeaderMap = {};
+  for (const [name, value] of input.request.headers.entries()) {
+    const normalizedName = name.toLowerCase();
+    if (
+      HopByHopHeaderNames.has(normalizedName) ||
+      normalizedName === "host" ||
+      normalizedName === "origin" ||
+      normalizedName === "sec-websocket-accept" ||
+      normalizedName === "sec-websocket-extensions" ||
+      normalizedName === "sec-websocket-key" ||
+      normalizedName === "sec-websocket-version"
+    ) {
+      continue;
+    }
+
+    if (normalizedName === "cookie") {
+      const forwardedCookieHeader = createForwardedCookieHeader(value);
+      if (forwardedCookieHeader !== undefined) {
+        appendHeaderValue(headers, normalizedName, forwardedCookieHeader);
+      }
+      continue;
+    }
+
+    appendHeaderValue(headers, normalizedName, value);
+  }
+
+  const requestUrl = new URL(input.request.url);
+  headers.host = [`localhost:${String(input.targetPort)}`];
+  headers.origin = [`${requestUrl.protocol}//localhost:${String(input.targetPort)}`];
+  headers["x-forwarded-host"] = [input.host];
+  headers["x-forwarded-proto"] = [requestUrl.protocol.slice(0, -1)];
+  headers["x-forwarded-port"] = [inferForwardedPort(requestUrl)];
+
+  return headers;
+}
+
 function toResponseHeaders(headerMap: HeaderMap): Headers {
   const headers = new Headers();
   for (const [name, values] of Object.entries(headerMap)) {
@@ -245,6 +302,45 @@ function chunkBytes(bytes: Uint8Array): Uint8Array[] {
   }
 
   return chunks;
+}
+
+function isSendableWebSocketCloseCode(code: number): boolean {
+  return (
+    code === 1000 ||
+    code === 1001 ||
+    code === 1002 ||
+    code === 1003 ||
+    code === 1007 ||
+    code === 1008 ||
+    code === 1009 ||
+    code === 1010 ||
+    code === 1011 ||
+    code === 1012 ||
+    code === 1013 ||
+    code === 1014 ||
+    (code >= 3000 && code <= 4999)
+  );
+}
+
+function decodeTextFrame(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString("utf8");
+}
+
+function encodeBodyFrame(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString("base64");
+}
+
+function decodeBodyFrame(bytes: string): Uint8Array {
+  return new Uint8Array(Buffer.from(bytes, "base64"));
+}
+
+function normalizeCloseReason(reason: string | undefined): string | undefined {
+  if (reason === undefined || reason.length === 0) {
+    return undefined;
+  }
+
+  const normalizedReason = Buffer.from(reason, "utf8").subarray(0, 123).toString("utf8");
+  return normalizedReason.length === 0 ? undefined : normalizedReason;
 }
 
 class PendingHttpPublishStream {
@@ -354,7 +450,167 @@ class PendingHttpPublishStream {
   }
 }
 
+class PendingWebSocketPublishStream {
+  readonly #pendingEvents: PendingWebSocketEvent[] = [];
+  readonly #acceptPromise: Promise<void>;
+  #accepted = false;
+  #browserSocket: WSContext<WebSocket> | undefined;
+  #released = false;
+  #rejectAccept!: (reason: unknown) => void;
+  #resolveAccept!: () => void;
+  #terminalEvent: PendingWebSocketEvent | undefined;
+
+  public constructor(
+    public readonly sandboxInstanceId: string,
+    public readonly streamId: number,
+  ) {
+    this.#acceptPromise = new Promise<void>((resolve, reject) => {
+      this.#resolveAccept = resolve;
+      this.#rejectAccept = reject;
+    });
+  }
+
+  public awaitAccept(): Promise<void> {
+    return this.#acceptPromise;
+  }
+
+  public accept(): void {
+    if (this.#released || this.#accepted) {
+      return;
+    }
+
+    this.#accepted = true;
+    this.#resolveAccept();
+  }
+
+  public bindBrowserSocket(socket: WSContext<WebSocket>): void {
+    if (this.#released) {
+      socket.raw?.terminate();
+      return;
+    }
+
+    this.#browserSocket = socket;
+    while (this.#pendingEvents.length > 0) {
+      const nextEvent = this.#pendingEvents.shift();
+      if (nextEvent === undefined) {
+        throw new Error("Pending websocket event is required.");
+      }
+
+      this.#deliverEvent(nextEvent);
+      if (nextEvent.kind === "close") {
+        break;
+      }
+    }
+  }
+
+  public hasAccepted(): boolean {
+    return this.#accepted;
+  }
+
+  public hasBoundBrowserSocket(): boolean {
+    return this.#browserSocket !== undefined;
+  }
+
+  public pushResponseFrame(input: { bytes: Uint8Array; opcode: "binary" | "text" }): void {
+    if (this.#released || this.#terminalEvent !== undefined) {
+      return;
+    }
+
+    const event: PendingWebSocketEvent = {
+      kind: "frame",
+      bytes: input.bytes,
+      opcode: input.opcode,
+    };
+    if (this.#browserSocket === undefined) {
+      this.#pendingEvents.push(event);
+      return;
+    }
+
+    this.#deliverEvent(event);
+  }
+
+  public pushResponseClose(input: { abrupt: boolean; code?: number; reason?: string }): void {
+    if (this.#released || this.#terminalEvent !== undefined) {
+      return;
+    }
+
+    const event: PendingWebSocketEvent = {
+      abrupt: input.abrupt,
+      kind: "close",
+      ...(input.code === undefined ? {} : { code: input.code }),
+      ...(input.reason === undefined ? {} : { reason: input.reason }),
+    };
+    this.#terminalEvent = event;
+
+    if (this.#browserSocket === undefined) {
+      this.#pendingEvents.push(event);
+      return;
+    }
+
+    this.#deliverEvent(event);
+  }
+
+  public fail(error: unknown): void {
+    if (this.#released) {
+      return;
+    }
+
+    if (!this.#accepted) {
+      this.#rejectAccept(error);
+      return;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    const normalizedReason = normalizeCloseReason(message);
+    this.pushResponseClose({
+      abrupt: false,
+      code: 1011,
+      ...(normalizedReason === undefined
+        ? {}
+        : {
+            reason: normalizedReason,
+          }),
+    });
+  }
+
+  public release(): void {
+    this.#released = true;
+    this.#pendingEvents.length = 0;
+    this.#browserSocket = undefined;
+  }
+
+  #deliverEvent(event: PendingWebSocketEvent): void {
+    if (this.#browserSocket === undefined) {
+      return;
+    }
+
+    if (event.kind === "frame") {
+      if (event.opcode === "text") {
+        this.#browserSocket.send(decodeTextFrame(event.bytes));
+        return;
+      }
+
+      this.#browserSocket.send(Buffer.from(event.bytes));
+      return;
+    }
+
+    if (event.abrupt) {
+      this.#browserSocket.raw?.terminate();
+      return;
+    }
+
+    this.#browserSocket.close(event.code, event.reason);
+  }
+}
+
 type ProxyPublishedHttpRequestInput = {
+  host: string;
+  request: Request;
+  sandboxInstanceId: string;
+  targetPort: number;
+};
+
+type OpenPublishedWebSocketInput = {
   host: string;
   request: Request;
   sandboxInstanceId: string;
@@ -364,6 +620,10 @@ type ProxyPublishedHttpRequestInput = {
 export class BootstrapPublishRouter {
   readonly #nextStreamIdBySandbox = new Map<string, number>();
   readonly #pendingHttpStreamsBySandbox = new Map<string, Map<number, PendingHttpPublishStream>>();
+  readonly #pendingWebSocketStreamsBySandbox = new Map<
+    string,
+    Map<number, PendingWebSocketPublishStream>
+  >();
 
   public constructor(
     private readonly relayCoordinator: TunnelRelayCoordinator,
@@ -458,6 +718,166 @@ export class BootstrapPublishRouter {
     );
   }
 
+  public async openPublishedWebSocket(input: OpenPublishedWebSocketInput): Promise<number> {
+    const bootstrapTarget = this.tunnelSessionRegistry.getBootstrapTarget({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    if (bootstrapTarget === undefined) {
+      throw new PublishedHttpRequestError(
+        503,
+        `Sandbox bootstrap tunnel is not connected for '${input.sandboxInstanceId}'.`,
+      );
+    }
+
+    const pendingStream = this.#createPendingWebSocketStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    const requestUrl = new URL(input.request.url);
+
+    await this.#forwardPublishMessage({
+      sandboxInstanceId: input.sandboxInstanceId,
+      payload: createPayload({
+        type: "publish.ws.open",
+        request: {
+          headers: buildForwardWebSocketHeaders({
+            host: input.host,
+            request: input.request,
+            targetPort: input.targetPort,
+          }),
+          path: requestUrl.pathname,
+          ...(requestUrl.search.length <= 1
+            ? {}
+            : {
+                query: requestUrl.search.slice(1),
+              }),
+        },
+        streamId: pendingStream.streamId,
+        target: {
+          kind: "port",
+          port: input.targetPort,
+        },
+      }),
+    }).catch((error) => {
+      this.#releasePendingWebSocketStream(pendingStream);
+      throw error;
+    });
+
+    await pendingStream.awaitAccept().catch((error: unknown) => {
+      this.#releasePendingWebSocketStream(pendingStream);
+      throw error;
+    });
+
+    return pendingStream.streamId;
+  }
+
+  public bindPublishedWebSocket(input: {
+    browserSocket: WSContext<WebSocket>;
+    sandboxInstanceId: string;
+    streamId: number;
+  }): void {
+    this.#findPendingWebSocketStream(input)?.bindBrowserSocket(input.browserSocket);
+  }
+
+  public async forwardBrowserWebSocketFrame(input: {
+    data: ArrayBufferLike | ArrayBufferView | Blob | string;
+    sandboxInstanceId: string;
+    streamId: number;
+  }): Promise<void> {
+    const pendingStream = this.#findPendingWebSocketStream(input);
+    if (pendingStream === undefined) {
+      return;
+    }
+
+    let bytes: Uint8Array;
+    let opcode: "binary" | "text";
+    if (typeof input.data === "string") {
+      opcode = "text";
+      bytes = new Uint8Array(Buffer.from(input.data, "utf8"));
+    } else if (input.data instanceof Blob) {
+      opcode = "binary";
+      bytes = new Uint8Array(await input.data.arrayBuffer());
+    } else if (ArrayBuffer.isView(input.data)) {
+      opcode = "binary";
+      bytes = new Uint8Array(input.data.buffer, input.data.byteOffset, input.data.byteLength);
+    } else {
+      opcode = "binary";
+      bytes = new Uint8Array(input.data);
+    }
+
+    await this.#forwardPublishMessage({
+      sandboxInstanceId: input.sandboxInstanceId,
+      payload: createPayload({
+        type: "publish.ws.frame",
+        bytes: encodeBodyFrame(bytes),
+        direction: "request",
+        encoding: "base64",
+        opcode,
+        streamId: input.streamId,
+      }),
+    }).catch((error: unknown) => {
+      pendingStream.fail(error);
+    });
+  }
+
+  public async closePublishedWebSocket(input: {
+    code: number;
+    reason?: string;
+    sandboxInstanceId: string;
+    streamId: number;
+  }): Promise<void> {
+    const pendingStream = this.#findPendingWebSocketStream(input);
+    if (pendingStream === undefined) {
+      return;
+    }
+
+    this.#releasePendingWebSocketStream(pendingStream);
+    if (isSendableWebSocketCloseCode(input.code)) {
+      const normalizedReason = normalizeCloseReason(input.reason);
+      await this.#forwardPublishMessage({
+        sandboxInstanceId: input.sandboxInstanceId,
+        payload: createPayload({
+          type: "publish.ws.close",
+          code: input.code,
+          direction: "request",
+          ...(normalizedReason === undefined
+            ? {}
+            : {
+                reason: normalizedReason,
+              }),
+          streamId: input.streamId,
+        }),
+      }).catch(() => undefined);
+      return;
+    }
+
+    await this.#forwardPublishMessage({
+      sandboxInstanceId: input.sandboxInstanceId,
+      payload: createPayload({
+        type: "publish.stream.close",
+        streamId: input.streamId,
+      }),
+    }).catch(() => undefined);
+  }
+
+  public async failPublishedWebSocket(input: {
+    sandboxInstanceId: string;
+    streamId: number;
+  }): Promise<void> {
+    const pendingStream = this.#findPendingWebSocketStream(input);
+    if (pendingStream === undefined) {
+      return;
+    }
+
+    this.#releasePendingWebSocketStream(pendingStream);
+    await this.#forwardPublishMessage({
+      sandboxInstanceId: input.sandboxInstanceId,
+      payload: createPayload({
+        type: "publish.stream.close",
+        streamId: input.streamId,
+      }),
+    }).catch(() => undefined);
+  }
+
   public handleBootstrapMessage(input: { payload: string; sandboxInstanceId: string }): boolean {
     let parsedPayload: unknown;
     try {
@@ -482,6 +902,12 @@ export class BootstrapPublishRouter {
         return this.#handleResponseChunk(input.sandboxInstanceId, parsedPayload);
       case "publish.http.body.end":
         return this.#handleResponseEnd(input.sandboxInstanceId, parsedPayload);
+      case "publish.ws.accept":
+        return this.#handleWebSocketAccept(input.sandboxInstanceId, parsedPayload);
+      case "publish.ws.frame":
+        return this.#handleWebSocketFrame(input.sandboxInstanceId, parsedPayload);
+      case "publish.ws.close":
+        return this.#handleWebSocketClose(input.sandboxInstanceId, parsedPayload);
       case "publish.stream.error":
         return this.#handleStreamError(input.sandboxInstanceId, parsedPayload);
       case "publish.stream.close":
@@ -492,21 +918,34 @@ export class BootstrapPublishRouter {
   }
 
   public releaseSandboxStreams(input: { sandboxInstanceId: string }): void {
-    const pendingStreams = this.#pendingHttpStreamsBySandbox.get(input.sandboxInstanceId);
-    if (pendingStreams === undefined) {
-      return;
-    }
-
+    const pendingHttpStreams = this.#pendingHttpStreamsBySandbox.get(input.sandboxInstanceId);
+    const pendingWebSocketStreams = this.#pendingWebSocketStreamsBySandbox.get(
+      input.sandboxInstanceId,
+    );
     this.#pendingHttpStreamsBySandbox.delete(input.sandboxInstanceId);
+    this.#pendingWebSocketStreamsBySandbox.delete(input.sandboxInstanceId);
     this.#nextStreamIdBySandbox.delete(input.sandboxInstanceId);
-    for (const pendingStream of pendingStreams.values()) {
-      pendingStream.fail(
-        new PublishedHttpRequestError(
-          503,
-          `Sandbox bootstrap tunnel disconnected while streaming published target '${input.sandboxInstanceId}'.`,
-        ),
-      );
-      pendingStream.release();
+    if (pendingHttpStreams !== undefined) {
+      for (const pendingStream of pendingHttpStreams.values()) {
+        pendingStream.fail(
+          new PublishedHttpRequestError(
+            503,
+            `Sandbox bootstrap tunnel disconnected while streaming published target '${input.sandboxInstanceId}'.`,
+          ),
+        );
+        pendingStream.release();
+      }
+    }
+    if (pendingWebSocketStreams !== undefined) {
+      for (const pendingStream of pendingWebSocketStreams.values()) {
+        pendingStream.fail(
+          new PublishedHttpRequestError(
+            503,
+            `Sandbox bootstrap tunnel disconnected while streaming published target '${input.sandboxInstanceId}'.`,
+          ),
+        );
+        pendingStream.release();
+      }
     }
   }
 
@@ -525,11 +964,35 @@ export class BootstrapPublishRouter {
     return pendingStream;
   }
 
+  #createPendingWebSocketStream(input: {
+    sandboxInstanceId: string;
+  }): PendingWebSocketPublishStream {
+    const nextStreamId = (this.#nextStreamIdBySandbox.get(input.sandboxInstanceId) ?? 0) + 1;
+    this.#nextStreamIdBySandbox.set(input.sandboxInstanceId, nextStreamId);
+
+    const pendingStream = new PendingWebSocketPublishStream(input.sandboxInstanceId, nextStreamId);
+    let sandboxStreams = this.#pendingWebSocketStreamsBySandbox.get(input.sandboxInstanceId);
+    if (sandboxStreams === undefined) {
+      sandboxStreams = new Map<number, PendingWebSocketPublishStream>();
+      this.#pendingWebSocketStreamsBySandbox.set(input.sandboxInstanceId, sandboxStreams);
+    }
+    sandboxStreams.set(nextStreamId, pendingStream);
+
+    return pendingStream;
+  }
+
   #findPendingHttpStream(input: {
     sandboxInstanceId: string;
     streamId: number;
   }): PendingHttpPublishStream | undefined {
     return this.#pendingHttpStreamsBySandbox.get(input.sandboxInstanceId)?.get(input.streamId);
+  }
+
+  #findPendingWebSocketStream(input: {
+    sandboxInstanceId: string;
+    streamId: number;
+  }): PendingWebSocketPublishStream | undefined {
+    return this.#pendingWebSocketStreamsBySandbox.get(input.sandboxInstanceId)?.get(input.streamId);
   }
 
   #releasePendingHttpStream(input: PendingHttpPublishStream): PendingHttpPublishStream | undefined {
@@ -541,6 +1004,22 @@ export class BootstrapPublishRouter {
     input.release();
     if (sandboxStreams.size === 0) {
       this.#pendingHttpStreamsBySandbox.delete(input.sandboxInstanceId);
+    }
+
+    return input;
+  }
+
+  #releasePendingWebSocketStream(
+    input: PendingWebSocketPublishStream,
+  ): PendingWebSocketPublishStream | undefined {
+    const sandboxStreams = this.#pendingWebSocketStreamsBySandbox.get(input.sandboxInstanceId);
+    if (sandboxStreams?.delete(input.streamId) !== true) {
+      return undefined;
+    }
+
+    input.release();
+    if (sandboxStreams.size === 0) {
+      this.#pendingWebSocketStreamsBySandbox.delete(input.sandboxInstanceId);
     }
 
     return input;
@@ -715,6 +1194,91 @@ export class BootstrapPublishRouter {
     return true;
   }
 
+  #handleWebSocketAccept(sandboxInstanceId: string, payload: object): boolean {
+    const streamId = Reflect.get(payload, "streamId");
+    if (typeof streamId !== "number" || !Number.isInteger(streamId)) {
+      return false;
+    }
+
+    this.#findPendingWebSocketStream({
+      sandboxInstanceId,
+      streamId,
+    })?.accept();
+    return true;
+  }
+
+  #handleWebSocketFrame(sandboxInstanceId: string, payload: object): boolean {
+    const streamId = Reflect.get(payload, "streamId");
+    const direction = Reflect.get(payload, "direction");
+    const opcode = Reflect.get(payload, "opcode");
+    const bytes = Reflect.get(payload, "bytes");
+    const encoding = Reflect.get(payload, "encoding");
+    if (
+      typeof streamId !== "number" ||
+      !Number.isInteger(streamId) ||
+      direction !== "response" ||
+      (opcode !== "binary" && opcode !== "text") ||
+      typeof bytes !== "string" ||
+      encoding !== "base64"
+    ) {
+      return false;
+    }
+
+    this.#findPendingWebSocketStream({
+      sandboxInstanceId,
+      streamId,
+    })?.pushResponseFrame({
+      bytes: decodeBodyFrame(bytes),
+      opcode,
+    });
+    return true;
+  }
+
+  #handleWebSocketClose(sandboxInstanceId: string, payload: object): boolean {
+    const streamId = Reflect.get(payload, "streamId");
+    const direction = Reflect.get(payload, "direction");
+    const code = Reflect.get(payload, "code");
+    const reason = Reflect.get(payload, "reason");
+    if (
+      typeof streamId !== "number" ||
+      !Number.isInteger(streamId) ||
+      direction !== "response" ||
+      typeof code !== "number" ||
+      !Number.isInteger(code) ||
+      (reason !== undefined && typeof reason !== "string")
+    ) {
+      return false;
+    }
+
+    const pendingStream = this.#findPendingWebSocketStream({
+      sandboxInstanceId,
+      streamId,
+    });
+    if (pendingStream === undefined) {
+      return true;
+    }
+
+    const normalizedReason = normalizeCloseReason(reason);
+    pendingStream.pushResponseClose({
+      abrupt: false,
+      ...(isSendableWebSocketCloseCode(code)
+        ? {
+            code,
+          }
+        : {}),
+      ...(normalizedReason === undefined
+        ? {}
+        : {
+            reason: normalizedReason,
+          }),
+    });
+    if (pendingStream.hasBoundBrowserSocket()) {
+      this.#releasePendingWebSocketStream(pendingStream);
+    }
+
+    return true;
+  }
+
   #handleStreamError(sandboxInstanceId: string, payload: object): boolean {
     const streamId = Reflect.get(payload, "streamId");
     const code = Reflect.get(payload, "code");
@@ -733,6 +1297,20 @@ export class BootstrapPublishRouter {
       streamId,
     });
     if (pendingStream === undefined) {
+      const pendingWebSocketStream = this.#findPendingWebSocketStream({
+        sandboxInstanceId,
+        streamId,
+      });
+      if (pendingWebSocketStream === undefined) {
+        return true;
+      }
+
+      pendingWebSocketStream.fail(
+        new PublishedHttpRequestError(this.#statusForStreamErrorCode(code), message),
+      );
+      if (pendingWebSocketStream.hasBoundBrowserSocket()) {
+        this.#releasePendingWebSocketStream(pendingWebSocketStream);
+      }
       return true;
     }
 
@@ -754,6 +1332,20 @@ export class BootstrapPublishRouter {
       streamId,
     });
     if (pendingStream === undefined) {
+      const pendingWebSocketStream = this.#findPendingWebSocketStream({
+        sandboxInstanceId,
+        streamId,
+      });
+      if (pendingWebSocketStream === undefined) {
+        return true;
+      }
+
+      pendingWebSocketStream.pushResponseClose({
+        abrupt: true,
+      });
+      if (pendingWebSocketStream.hasBoundBrowserSocket()) {
+        this.#releasePendingWebSocketStream(pendingWebSocketStream);
+      }
       return true;
     }
 

@@ -7,11 +7,12 @@ import { systemScheduler } from "@mistle/time";
 import type WebSocket from "ws";
 
 import { handlePublishControlMessage } from "../publishing/handle-publish-control-message.js";
+import { handleHttpProxyControlMessage } from "../publishing/http-proxy-channel.js";
 import {
   closeAllPublishStreams,
-  handleHttpProxyControlMessage,
-} from "../publishing/http-proxy-channel.js";
-import { createPublishStreamState } from "../publishing/publish-stream-state.js";
+  createPublishStreamState,
+} from "../publishing/publish-stream-state.js";
+import { handleWsProxyControlMessage } from "../publishing/ws-proxy-channel.js";
 import { logSandboxRuntimeEvent } from "../runtime/logger.js";
 import { createAbortRace, ignorePromiseRejectionAfterAbort } from "./abortable-race.js";
 import {
@@ -268,6 +269,19 @@ async function handleTunnelConnection(input: {
             },
           });
           if (!handledHttpPublishMessage) {
+            const handledWsPublishMessage = await handleWsProxyControlMessage({
+              controlMessage: publishControlMessage,
+              publishStreamState,
+              runtimeClients: input.runtimeClients,
+              runtimeListenAddr: input.runtimeListenAddr,
+              sendControlMessage: async (publishMessage) => {
+                await sendPublishControlMessage(input.tunnelSocket, publishMessage);
+              },
+            });
+            if (handledWsPublishMessage) {
+              continue;
+            }
+
             throw new Error(
               `unsupported publish control message type '${publishControlMessage.type}' on bootstrap tunnel`,
             );

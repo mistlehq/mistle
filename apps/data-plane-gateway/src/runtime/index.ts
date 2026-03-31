@@ -179,15 +179,6 @@ export function createDataPlaneGatewayRuntime(
     sandboxRuntimeAttachmentStore,
     sandboxOwnerStore,
   });
-  registerPublishedTargetRoutes({
-    app,
-    bootstrapPublishControlRequestCoordinator,
-    environment: config.environment,
-    publishRouter: bootstrapPublishRouter,
-    publishConfig: config.sandbox.publish,
-    relayCoordinator,
-    tunnelSessionRegistry,
-  });
 
   registerSandboxTunnelRoute({
     app,
@@ -230,6 +221,16 @@ export function createDataPlaneGatewayRuntime(
       tokenIssuer: config.sandbox.bootstrap.tokenIssuer,
       tokenAudience: config.sandbox.bootstrap.tokenAudience,
     },
+  });
+  registerPublishedTargetRoutes({
+    app,
+    bootstrapPublishControlRequestCoordinator,
+    environment: config.environment,
+    publishConfig: config.sandbox.publish,
+    publishRouter: bootstrapPublishRouter,
+    relayCoordinator,
+    tunnelSessionRegistry,
+    upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
   });
 
   let startedServer: StartedServer | undefined;

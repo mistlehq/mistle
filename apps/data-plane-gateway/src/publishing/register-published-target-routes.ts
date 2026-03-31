@@ -1,3 +1,4 @@
+import type { NodeWebSocket } from "@hono/node-ws";
 import {
   parsePublishedTargetHost,
   PublishedTargetHostError,
@@ -33,6 +34,7 @@ type RegisterPublishedTargetRoutesInput = {
   publishRouter: BootstrapPublishRouter;
   relayCoordinator: TunnelRelayCoordinator;
   tunnelSessionRegistry: TunnelSessionRegistry;
+  upgradeWebSocket: NodeWebSocket["upgradeWebSocket"];
 };
 
 class PublishedTargetAuthorizationError extends Error {
@@ -200,6 +202,55 @@ function createTextErrorResponse(status: number, message: string): Response {
   });
 }
 
+function verifyPublishedPortSession(input: {
+  cookieHeader: string | undefined;
+  parsedHost: ParsedPublishedPortHost;
+  publishConfig: DataPlaneGatewayRuntimeConfig["sandbox"]["publish"];
+}):
+  | {
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+      status: number;
+    } {
+  let session;
+  try {
+    session = verifyPublishedTargetSessionFromCookieHeader({
+      config: input.publishConfig.session,
+      cookieHeader: input.cookieHeader,
+      expectedHost: input.parsedHost.host,
+    });
+  } catch (error) {
+    if (error instanceof PublishedTargetRequestCookieError) {
+      return {
+        message: error.message,
+        ok: false,
+        status: 401,
+      };
+    }
+
+    throw error;
+  }
+
+  if (
+    session.sandboxInstanceId !== input.parsedHost.sandboxInstanceId ||
+    session.targetKind !== "port" ||
+    session.targetId !== String(input.parsedHost.target.port)
+  ) {
+    return {
+      message: "Published target session does not match the requested host target.",
+      ok: false,
+      status: 403,
+    };
+  }
+
+  return {
+    ok: true,
+  };
+}
+
 export function registerPublishedTargetRoutes(input: RegisterPublishedTargetRoutesInput): void {
   input.app.get("/_mistle/bootstrap", async (ctx) => {
     try {
@@ -279,6 +330,92 @@ export function registerPublishedTargetRoutes(input: RegisterPublishedTargetRout
     }
   });
 
+  input.app.get("*", async (ctx, next) => {
+    if (ctx.req.header("upgrade")?.toLowerCase() !== "websocket") {
+      await next();
+      return;
+    }
+
+    const parsedHost = parsePublishedPortHost({
+      baseDomain: input.publishConfig.baseDomain,
+      environment: input.environment,
+      host: ctx.req.header("host"),
+      localBaseDomain: input.publishConfig.localBaseDomain,
+    });
+    if (parsedHost === undefined) {
+      await next();
+      return;
+    }
+
+    if (ctx.req.path === "/_mistle/bootstrap" || ctx.req.path === "/_mistle/share") {
+      await next();
+      return;
+    }
+
+    const sessionResult = verifyPublishedPortSession({
+      cookieHeader: ctx.req.header("cookie"),
+      parsedHost,
+      publishConfig: input.publishConfig,
+    });
+    if (!sessionResult.ok) {
+      return createTextErrorResponse(sessionResult.status, sessionResult.message);
+    }
+
+    try {
+      const admittedWebSocket = {
+        sandboxInstanceId: parsedHost.sandboxInstanceId,
+        streamId: await input.publishRouter.openPublishedWebSocket({
+          host: parsedHost.host,
+          request: ctx.req.raw,
+          sandboxInstanceId: parsedHost.sandboxInstanceId,
+          targetPort: parsedHost.target.port,
+        }),
+      };
+
+      return input.upgradeWebSocket(ctx, {
+        onClose: (event) => {
+          void input.publishRouter.closePublishedWebSocket({
+            code: event.code,
+            ...(event.reason.length === 0
+              ? {}
+              : {
+                  reason: event.reason,
+                }),
+            sandboxInstanceId: admittedWebSocket.sandboxInstanceId,
+            streamId: admittedWebSocket.streamId,
+          });
+        },
+        onError: (_event, ws) => {
+          ws.raw?.terminate();
+          void input.publishRouter.failPublishedWebSocket({
+            sandboxInstanceId: admittedWebSocket.sandboxInstanceId,
+            streamId: admittedWebSocket.streamId,
+          });
+        },
+        onMessage: (event) => {
+          void input.publishRouter.forwardBrowserWebSocketFrame({
+            data: event.data,
+            sandboxInstanceId: admittedWebSocket.sandboxInstanceId,
+            streamId: admittedWebSocket.streamId,
+          });
+        },
+        onOpen: (_event, ws) => {
+          input.publishRouter.bindPublishedWebSocket({
+            browserSocket: ws,
+            sandboxInstanceId: admittedWebSocket.sandboxInstanceId,
+            streamId: admittedWebSocket.streamId,
+          });
+        },
+      });
+    } catch (error) {
+      if (error instanceof PublishedHttpRequestError) {
+        return createTextErrorResponse(error.status, error.message);
+      }
+
+      throw error;
+    }
+  });
+
   input.app.all("*", async (ctx, next) => {
     const parsedHost = parsePublishedPortHost({
       baseDomain: input.publishConfig.baseDomain,
@@ -294,30 +431,13 @@ export function registerPublishedTargetRoutes(input: RegisterPublishedTargetRout
       return;
     }
 
-    let session;
-    try {
-      session = verifyPublishedTargetSessionFromCookieHeader({
-        config: input.publishConfig.session,
-        cookieHeader: ctx.req.header("cookie"),
-        expectedHost: parsedHost.host,
-      });
-    } catch (error) {
-      if (error instanceof PublishedTargetRequestCookieError) {
-        return createTextErrorResponse(401, error.message);
-      }
-
-      throw error;
-    }
-
-    if (
-      session.sandboxInstanceId !== parsedHost.sandboxInstanceId ||
-      session.targetKind !== "port" ||
-      session.targetId !== String(parsedHost.target.port)
-    ) {
-      return createTextErrorResponse(
-        403,
-        "Published target session does not match the requested host target.",
-      );
+    const sessionResult = verifyPublishedPortSession({
+      cookieHeader: ctx.req.header("cookie"),
+      parsedHost,
+      publishConfig: input.publishConfig,
+    });
+    if (!sessionResult.ok) {
+      return createTextErrorResponse(sessionResult.status, sessionResult.message);
     }
 
     try {
