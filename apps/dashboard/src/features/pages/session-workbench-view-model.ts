@@ -102,13 +102,39 @@ export function resolveSessionHeaderStatusUi(input: {
 export function resolveSandboxHeaderStatusUi(input: {
   sandboxLifecycleStatus: string;
 }): SandboxHeaderStatusUi {
-  return resolveSessionHeaderStatusUi({
-    sandboxStatus: input.sandboxLifecycleStatus,
-    agentConnectionState: "ready",
-    step: "idle",
-    hasConnectionError: false,
-    isRecoveringSession: false,
-  });
+  if (input.sandboxLifecycleStatus === "failed") {
+    return {
+      label: "Sandbox failed",
+      variant: "destructive",
+    };
+  }
+
+  if (input.sandboxLifecycleStatus === "running") {
+    return {
+      label: "Connected",
+      variant: "secondary",
+      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+    };
+  }
+
+  if (input.sandboxLifecycleStatus === "stopped") {
+    return {
+      label: "Sandbox stopped",
+      variant: "outline",
+    };
+  }
+
+  if (input.sandboxLifecycleStatus === "resuming") {
+    return {
+      label: "Resuming sandbox",
+      variant: "outline",
+    };
+  }
+
+  return {
+    label: "Starting sandbox",
+    variant: "outline",
+  };
 }
 
 export function hasSessionTopAlert(input: {

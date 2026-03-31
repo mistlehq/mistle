@@ -2,7 +2,7 @@ import {
   readCodexThread,
   type CodexJsonRpcClient,
   type CodexThreadReadTurn,
-} from "@mistle/integrations-definitions/openai/agent/client";
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
 type MaterializedCodexThreadReadState = {
   threadId: string;

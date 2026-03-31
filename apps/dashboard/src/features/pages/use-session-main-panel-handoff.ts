@@ -1,7 +1,7 @@
+import { CodexAppServerListenUrl } from "@mistle/integrations-definitions/agent-runtimes/codex/app-server";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 
-import { OpenAiCodexAppServerListenUrl } from "../../../../../packages/integrations-definitions/src/openai/variants/openai-default/app-server.js";
 import type { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
@@ -187,8 +187,8 @@ export function useSessionMainPanelHandoff(
           command: "codex",
           args:
             launchTarget.type === "resume"
-              ? ["resume", "--remote", OpenAiCodexAppServerListenUrl, launchTarget.threadId]
-              : ["--remote", OpenAiCodexAppServerListenUrl],
+              ? ["resume", "--remote", CodexAppServerListenUrl, launchTarget.threadId]
+              : ["--remote", CodexAppServerListenUrl],
         });
         cliOpened = true;
       } catch (error) {
