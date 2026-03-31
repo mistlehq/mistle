@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
   getSandboxInstanceStatusQueryKey,
@@ -29,17 +30,7 @@ function createControllerQueryClient(input?: {
   retry?: boolean;
   staleTime?: number;
 }): QueryClient {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        ...(input?.gcTime === undefined ? {} : { gcTime: input.gcTime }),
-        ...(input?.refetchOnMount === undefined ? {} : { refetchOnMount: input.refetchOnMount }),
-        ...(input?.retry === undefined ? {} : { retry: input.retry }),
-        ...(input?.staleTime === undefined ? {} : { staleTime: input.staleTime }),
-      },
-    },
-  });
+  return createTestQueryClient(input);
 }
 
 function createControllerWrapper(queryClient: QueryClient) {
