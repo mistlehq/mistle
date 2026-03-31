@@ -14,7 +14,6 @@ import type { OpenIntegrationConnectionDialogInput } from "./integration-connect
 const IntegrationRegistry = createIntegrationFormRegistry();
 
 type JsonObject = Record<string, unknown>;
-type IntegrationDefinition = NonNullable<ReturnType<typeof IntegrationRegistry.getDefinition>>;
 
 export type ConnectionMethodFormUiModel =
   | {
@@ -99,27 +98,16 @@ function resolveSelectedMethod(input: {
   return input.dialog.methods.find((method) => method.id === input.methodId) ?? null;
 }
 
-function resolveDefinition(input: {
-  familyId: string;
-  variantId: string;
-}): IntegrationDefinition | null {
-  return (
-    IntegrationRegistry.getDefinition({
-      familyId: input.familyId,
-      variantId: input.variantId,
-    }) ?? null
-  );
-}
-
 export function resolveConnectionMethodFormUiModel(input: {
   dialog: IntegrationConnectionDialogState;
   methodId: IntegrationConnectionMethodId;
   currentValue: Record<string, unknown>;
 }): ConnectionMethodFormUiModel {
-  const definition = resolveDefinition({
-    familyId: input.dialog.targetFamilyId,
-    variantId: input.dialog.targetVariantId,
-  });
+  const definition =
+    IntegrationRegistry.getDefinition({
+      familyId: input.dialog.targetFamilyId,
+      variantId: input.dialog.targetVariantId,
+    }) ?? null;
   if (definition === null) {
     return {
       mode: "unsupported",
