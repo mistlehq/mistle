@@ -177,8 +177,14 @@ function compileTemplates(input: {
   };
 }
 
-function isRecord(input: unknown): input is Record<string, unknown> {
-  return typeof input === "object" && input !== null && !Array.isArray(input);
+function hasRuntimeIdValue(input: unknown): input is { runtimeId: string } {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    !Array.isArray(input) &&
+    "runtimeId" in input &&
+    typeof input.runtimeId === "string"
+  );
 }
 
 function resolvePersistedPreparedAutomationRunSnapshot(input: {
@@ -257,22 +263,14 @@ function readAgentBindingRuntimeId(input: {
   bindingConfig: Record<string, unknown>;
 }): string {
   const runtime = input.bindingConfig["runtime"];
-  if (!isRecord(runtime)) {
-    throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.AGENT_BINDING_RUNTIME_INVALID,
-      message: `Automation run '${input.automationRunId}' references AGENT binding '${input.bindingId}' with invalid runtime selection.`,
-    });
-  }
-
-  const runtimeId = runtime["runtimeId"];
-  if (typeof runtimeId !== "string" || runtimeId.trim().length === 0) {
+  if (!hasRuntimeIdValue(runtime) || runtime.runtimeId.trim().length === 0) {
     throw new AutomationRunExecutionError({
       code: AutomationRunFailureCodes.AGENT_BINDING_RUNTIME_INVALID,
       message: `Automation run '${input.automationRunId}' references AGENT binding '${input.bindingId}' with invalid runtimeId.`,
     });
   }
 
-  return runtimeId;
+  return runtime.runtimeId;
 }
 
 async function resolveAutomationConversationBindingContext(
