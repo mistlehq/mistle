@@ -70,4 +70,49 @@ describe("formatSandboxProfileBindingSummaryItems", () => {
       },
     ]);
   });
+
+  it("renders Atlassian tool selections with human-readable labels", () => {
+    const target: IntegrationTargetSummary = {
+      targetKey: "target-atlassian",
+      displayName: "Atlassian",
+      familyId: "atlassian",
+      variantId: "atlassian-default",
+      config: {},
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+    const connection: IntegrationConnectionSummary = {
+      id: "connection-atlassian",
+      displayName: "Atlassian Production",
+      targetKey: target.targetKey,
+      status: "active",
+      config: {
+        connection_method: "atlassian-personal-api-token",
+        site_url: "https://mistle.atlassian.net",
+        email: "user@example.com",
+      },
+    };
+    const row: SandboxProfileBindingEditorRow = {
+      clientId: "row-atlassian",
+      connectionId: connection.id,
+      kind: "connector",
+      config: {
+        tools: ["jira-cli"],
+      },
+    };
+
+    expect(
+      formatSandboxProfileBindingSummaryItems({
+        row,
+        availableConnections: [connection],
+        availableTargets: [target],
+      }),
+    ).toEqual([
+      {
+        label: "Tools",
+        value: "Jira CLI (jira)",
+      },
+    ]);
+  });
 });

@@ -13,11 +13,16 @@ import {
 } from "./auth.js";
 import type { AtlassianBindingConfig } from "./binding-config-schema.js";
 import type { AtlassianTargetConfig } from "./target-config-schema.js";
+import { AtlassianToolIds } from "./tool-ids.js";
 
 export type AtlassianCompileBindingInput = CompileBindingInput<
   AtlassianTargetConfig,
   AtlassianBindingConfig
 >;
+
+const JiraCliArtifactKey = "jira-cli";
+const JiraCliArtifactName = "Jira CLI";
+const ArtifactCommandTimeoutMs = 120_000;
 
 function resolveMatchFromBaseUrl(baseUrl: string): {
   hosts: string[];
@@ -41,6 +46,27 @@ function resolveMatchFromBaseUrl(baseUrl: string): {
 export function compileAtlassianBinding(input: AtlassianCompileBindingInput): CompileBindingResult {
   const parsedConnectionConfig = AtlassianConnectionConfigSchema.parse(input.connection.config);
   const credentialSecretType = resolveAtlassianCredentialSecretType(input.connection.config);
+  const includesJiraCli = input.binding.config.tools.includes(AtlassianToolIds.JIRA_CLI);
+  const artifacts: CompileBindingResult["artifacts"] = includesJiraCli
+    ? [
+        {
+          artifactKey: JiraCliArtifactKey,
+          name: JiraCliArtifactName,
+          lifecycle: {
+            install: ({ refs }) => [
+              refs.githubReleases.installLatestTaggedAsset({
+                repository: "mistlehq/tools",
+                releaseTagPrefix: "jira/",
+                assetName: "jira-linux-amd64",
+                installPath: refs.artifactBinPath("jira"),
+                format: "binary",
+                timeoutMs: ArtifactCommandTimeoutMs,
+              }),
+            ],
+          },
+        },
+      ]
+    : [];
 
   if (
     parsedConnectionConfig.connection_method === AtlassianConnectionMethodIds.PERSONAL_API_TOKEN
@@ -65,7 +91,7 @@ export function compileAtlassianBinding(input: AtlassianCompileBindingInput): Co
           },
         },
       ],
-      artifacts: [],
+      artifacts,
       runtimeClients: [],
     };
   }
@@ -94,7 +120,7 @@ export function compileAtlassianBinding(input: AtlassianCompileBindingInput): Co
           },
         },
       ],
-      artifacts: [],
+      artifacts,
       runtimeClients: [],
     };
   }
@@ -116,7 +142,7 @@ export function compileAtlassianBinding(input: AtlassianCompileBindingInput): Co
         },
       },
     ],
-    artifacts: [],
+    artifacts,
     runtimeClients: [],
   };
 }

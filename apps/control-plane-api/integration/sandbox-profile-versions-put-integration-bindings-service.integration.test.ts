@@ -534,6 +534,60 @@ describe("sandbox profile version put integration bindings service integration",
     });
   });
 
+  it("defaults Atlassian binding tool selections to an empty array on write", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-atlassian@example.com",
+    });
+
+    await insertAtlassianBindingValidationFixture({
+      fixture,
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_put_bindings_atlassian_001",
+      profileVersion: 1,
+      connectionId: "icn_put_bindings_atlassian_001",
+      targetKey: "atlassian-default-put-bindings-accessible",
+    });
+
+    const result = await putProfileVersionIntegrationBindings(
+      {
+        db: fixture.db,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_put_bindings_atlassian_001",
+        profileVersion: 1,
+        bindings: [
+          {
+            connectionId: "icn_put_bindings_atlassian_001",
+            kind: IntegrationBindingKinds.CONNECTOR,
+            config: {},
+          },
+        ],
+      },
+    );
+
+    expect(result.bindings).toHaveLength(1);
+    expect(result.bindings[0]?.config).toEqual({
+      tools: [],
+    });
+
+    const persistedBinding =
+      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.sandboxProfileId, "sbp_put_bindings_atlassian_001"),
+            eq(table.sandboxProfileVersion, 1),
+            eq(table.connectionId, "icn_put_bindings_atlassian_001"),
+          ),
+      });
+
+    expect(persistedBinding?.config).toEqual({
+      tools: [],
+    });
+  });
+
   it("rejects a github binding when the selected repositories are not accessible in the synced snapshot", async ({
     fixture,
   }) => {
@@ -773,6 +827,54 @@ async function insertGitHubBindingValidationFixture(input: {
     displayName: "GitHub Connection",
     config: {
       connection_method: "api-key",
+    },
+  });
+}
+
+async function insertAtlassianBindingValidationFixture(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  organizationId: string;
+  profileId: string;
+  profileVersion: number;
+  connectionId: string;
+  targetKey: string;
+}): Promise<void> {
+  await input.fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "atlassian",
+      variantId: "atlassian-default",
+      enabled: true,
+      config: {},
+    })
+    .onConflictDoNothing();
+
+  await input.fixture.db
+    .insert(sandboxProfiles)
+    .values({
+      id: input.profileId,
+      organizationId: input.organizationId,
+      displayName: "Atlassian Binding Validation",
+      status: IntegrationConnectionStatuses.ACTIVE,
+    })
+    .onConflictDoNothing();
+  await input.fixture.db
+    .insert(sandboxProfileVersions)
+    .values({
+      sandboxProfileId: input.profileId,
+      version: input.profileVersion,
+    })
+    .onConflictDoNothing();
+  await input.fixture.db.insert(integrationConnections).values({
+    id: input.connectionId,
+    organizationId: input.organizationId,
+    targetKey: input.targetKey,
+    displayName: "Atlassian Connection",
+    config: {
+      connection_method: "atlassian-personal-api-token",
+      site_url: "https://mistle.atlassian.net",
+      email: "user@example.com",
     },
   });
 }

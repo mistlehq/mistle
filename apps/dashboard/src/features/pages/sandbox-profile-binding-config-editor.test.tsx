@@ -248,4 +248,60 @@ describe("SandboxProfileBindingConfigEditor", () => {
       },
     });
   });
+
+  it("resolves Atlassian binding config to an optional tools checkbox list", () => {
+    const target: IntegrationTargetSummary = {
+      targetKey: "target-atlassian",
+      displayName: "Atlassian",
+      familyId: "atlassian",
+      variantId: "atlassian-default",
+      config: {},
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+    const connection: IntegrationConnectionSummary = {
+      id: "connection-atlassian",
+      displayName: "Atlassian Production",
+      targetKey: target.targetKey,
+      status: "active",
+      config: {
+        connection_method: "atlassian-personal-api-token",
+        site_url: "https://mistle.atlassian.net",
+        email: "user@example.com",
+      },
+    };
+    const row: SandboxProfileBindingEditorRow = {
+      clientId: "row-atlassian",
+      connectionId: connection.id,
+      kind: "connector",
+      config: {},
+    };
+
+    const resolvedUiModel = resolveBindingConfigUiModel({
+      row,
+      connections: [connection],
+      targets: [target],
+    });
+
+    expect(resolvedUiModel).toMatchObject({
+      mode: "form",
+      schema: {
+        properties: {
+          tools: {
+            title: "Tools",
+            default: [],
+          },
+        },
+      },
+      uiSchema: {
+        tools: {
+          "ui:widget": "checkboxes",
+          "ui:options": {
+            inline: false,
+          },
+        },
+      },
+    });
+  });
 });

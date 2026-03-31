@@ -191,6 +191,259 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(configContent).toContain('trust_level = "trusted"');
   });
 
+  it("omits optional github and jira cli artifacts when bindings do not select tools", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-compile-no-optional-tools@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_compile_optional_tools_none",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Compile Optional Tools None Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_compile_optional_tools_none",
+      version: 1,
+    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values([
+        {
+          targetKey: "github-cloud-compile-no-tools",
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
+          },
+        },
+        {
+          targetKey: "atlassian-default-compile-no-tools",
+          familyId: "atlassian",
+          variantId: "atlassian-default",
+          enabled: true,
+          config: {},
+        },
+      ])
+      .onConflictDoNothing();
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_compile_no_tools_github",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "github-cloud-compile-no-tools",
+        displayName: "Compile No Tools GitHub Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      },
+      {
+        id: "icn_compile_no_tools_atlassian",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "atlassian-default-compile-no-tools",
+        displayName: "Compile No Tools Atlassian Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: "atlassian-personal-api-token",
+          site_url: "https://mistle.atlassian.net",
+          email: "user@example.com",
+        },
+      },
+    ]);
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
+      {
+        id: "ibd_compile_no_tools_github",
+        sandboxProfileId: "sbp_compile_optional_tools_none",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_compile_no_tools_github",
+        kind: IntegrationBindingKinds.GIT,
+        config: {
+          repositories: ["mistlehq/mistle"],
+          tools: [],
+        },
+      },
+      {
+        id: "ibd_compile_no_tools_atlassian",
+        sandboxProfileId: "sbp_compile_optional_tools_none",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_compile_no_tools_atlassian",
+        kind: IntegrationBindingKinds.CONNECTOR,
+        config: {
+          tools: [],
+        },
+      },
+    ]);
+
+    const runtimePlan = await compileProfileVersionRuntimePlan(
+      {
+        db: fixture.db,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_compile_optional_tools_none",
+        profileVersion: 1,
+        image: {
+          source: "base",
+          imageRef: "mistle/sandbox-base:dev",
+        },
+      },
+    );
+
+    expect(runtimePlan.artifacts).toEqual([]);
+  });
+
+  it("installs selected github and jira cli artifacts once each in the compiled runtime plan", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-compile-selected-tools@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_compile_selected_tools",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Compile Selected Tools Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_compile_selected_tools",
+      version: 1,
+    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values([
+        {
+          targetKey: "github-cloud-compile-selected-tools",
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
+          },
+        },
+        {
+          targetKey: "atlassian-default-compile-selected-tools",
+          familyId: "atlassian",
+          variantId: "atlassian-default",
+          enabled: true,
+          config: {},
+        },
+      ])
+      .onConflictDoNothing();
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_compile_selected_tools_github",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "github-cloud-compile-selected-tools",
+        displayName: "Compile Selected Tools GitHub Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      },
+      {
+        id: "icn_compile_selected_tools_atlassian_a",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "atlassian-default-compile-selected-tools",
+        displayName: "Compile Selected Tools Atlassian Connection A",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: "atlassian-personal-api-token",
+          site_url: "https://mistle.atlassian.net",
+          email: "user@example.com",
+        },
+      },
+      {
+        id: "icn_compile_selected_tools_atlassian_b",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "atlassian-default-compile-selected-tools",
+        displayName: "Compile Selected Tools Atlassian Connection B",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: "atlassian-personal-api-token",
+          site_url: "https://mistle-dev.atlassian.net",
+          email: "user+dev@example.com",
+        },
+      },
+    ]);
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
+      {
+        id: "ibd_compile_selected_tools_github",
+        sandboxProfileId: "sbp_compile_selected_tools",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_compile_selected_tools_github",
+        kind: IntegrationBindingKinds.GIT,
+        config: {
+          repositories: ["mistlehq/mistle"],
+          tools: ["github-cli"],
+        },
+      },
+      {
+        id: "ibd_compile_selected_tools_atlassian_a",
+        sandboxProfileId: "sbp_compile_selected_tools",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_compile_selected_tools_atlassian_a",
+        kind: IntegrationBindingKinds.CONNECTOR,
+        config: {
+          tools: ["jira-cli"],
+        },
+      },
+      {
+        id: "ibd_compile_selected_tools_atlassian_b",
+        sandboxProfileId: "sbp_compile_selected_tools",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_compile_selected_tools_atlassian_b",
+        kind: IntegrationBindingKinds.CONNECTOR,
+        config: {
+          tools: ["jira-cli"],
+        },
+      },
+    ]);
+
+    const runtimePlan = await compileProfileVersionRuntimePlan(
+      {
+        db: fixture.db,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_compile_selected_tools",
+        profileVersion: 1,
+        image: {
+          source: "base",
+          imageRef: "mistle/sandbox-base:dev",
+        },
+      },
+    );
+
+    expect(runtimePlan.artifacts).toHaveLength(2);
+    expect(runtimePlan.artifacts.map((artifact) => artifact.artifactKey)).toEqual([
+      "gh-cli",
+      "jira-cli",
+    ]);
+    expect(runtimePlan.artifacts[0]?.env).toEqual({
+      GH_TOKEN: "dummy-value",
+    });
+    const ghInstallCommand = runtimePlan.artifacts[0]?.lifecycle.install[0];
+    expect(ghInstallCommand?.args.slice(0, 2)).toEqual(["sh", "-euc"]);
+    expect(ghInstallCommand?.timeoutMs).toBe(120_000);
+    expect(ghInstallCommand?.args[2]).toContain("https://github.com/cli/cli/releases/latest");
+
+    const jiraInstallCommand = runtimePlan.artifacts[1]?.lifecycle.install[0];
+    expect(jiraInstallCommand?.args.slice(0, 2)).toEqual(["sh", "-euc"]);
+    expect(jiraInstallCommand?.timeoutMs).toBe(120_000);
+    expect(jiraInstallCommand?.args[2]).toContain("repo=mistlehq/tools");
+    expect(jiraInstallCommand?.args[2]).toContain("release_tag_prefix=jira/");
+    expect(jiraInstallCommand?.args[2]).toContain("asset_name=jira-linux-amd64");
+    expect(jiraInstallCommand?.args[2]).toContain("/usr/local/bin/jira");
+  });
+
   it("returns profile not found when the sandbox profile does not exist", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
       email: "integration-sandbox-profile-compile-missing-profile@example.com",
