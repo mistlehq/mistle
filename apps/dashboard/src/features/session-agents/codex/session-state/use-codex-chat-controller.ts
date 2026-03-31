@@ -1,7 +1,6 @@
 import {
   buildCodexTurnInputItems,
   interruptCodexTurn,
-  readCodexThread,
   startCodexTurn,
   steerCodexTurn,
   type CodexTurnInputLocalImageItem,
@@ -15,14 +14,7 @@ import {
   reduceCodexChatState,
   type CodexChatState,
 } from "./codex-chat-state.js";
-
-function isThreadNotMaterializedError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  return error.message.includes("includeTurns is unavailable before first user message");
-}
+import { readCodexThreadState } from "./codex-thread-read-state.js";
 
 function createPendingTurnId(): string {
   return `pending:${crypto.randomUUID()}`;
@@ -96,32 +88,28 @@ export function useCodexChatController(input: {
         return "empty";
       }
 
-      try {
-        const thread = await readCodexThread({
-          rpcClient,
-          threadId,
-        });
-        if (
-          hydrateInput?.generation !== undefined &&
-          hydrateInput.ensureCurrentGeneration !== undefined
-        ) {
-          hydrateInput.ensureCurrentGeneration(hydrateInput.generation);
-        }
-
-        dispatchChatAction({
-          type: "hydrate_from_thread_read",
-          turns: thread.turns,
-        });
-        return "hydrated";
-      } catch (error) {
-        if (isThreadNotMaterializedError(error)) {
-          dispatchChatAction({ type: "reset" });
-          input.setSessionErrorMessage(null);
-          return "empty";
-        }
-
-        throw error;
+      const thread = await readCodexThreadState({
+        rpcClient,
+        threadId,
+      });
+      if (thread.status === "unmaterialized") {
+        dispatchChatAction({ type: "reset" });
+        input.setSessionErrorMessage(null);
+        return "empty";
       }
+
+      if (
+        hydrateInput?.generation !== undefined &&
+        hydrateInput.ensureCurrentGeneration !== undefined
+      ) {
+        hydrateInput.ensureCurrentGeneration(hydrateInput.generation);
+      }
+
+      dispatchChatAction({
+        type: "hydrate_from_thread_read",
+        turns: thread.turns,
+      });
+      return "hydrated";
     },
     [input.rpcClientRef, input.setSessionErrorMessage, input.threadIdRef],
   );

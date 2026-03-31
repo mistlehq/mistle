@@ -2,7 +2,6 @@ import {
   archiveCodexThread,
   compactCodexThread,
   forkCodexThread,
-  readCodexThread,
   rollbackCodexThread,
   resumeCodexThread,
   startCodexThread,
@@ -24,6 +23,7 @@ import {
   type CodexApprovalRequestEntry,
 } from "../approvals/codex-approval-requests-state.js";
 import { type ConnectedCodexSession, type StartSessionStep } from "./codex-session-types.js";
+import { readCodexThreadState } from "./codex-thread-read-state.js";
 import {
   useCodexSessionBootstrapData,
   useSessionBootstrap,
@@ -40,6 +40,7 @@ import {
 } from "./session-connection/index.js";
 import {
   resolveCodexCliLaunchTarget,
+  resolvePostCliPreferredThreadId,
   type CodexCliLaunchTarget,
 } from "./session-thread-authority.js";
 import { useCodexChatController, type CodexChatState } from "./use-codex-chat-controller.js";
@@ -118,6 +119,7 @@ export type UseCodexSessionStateResult = {
   threadAuthority: {
     persistedThreadId: string | null;
     resolveCliLaunchTarget: () => Promise<CodexCliLaunchTarget>;
+    resolveRestoredThreadAuthorityAfterCli: () => Promise<string>;
   };
   threads: CodexSessionThreadState;
   chat: CodexSessionChatState;
@@ -644,7 +646,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       throw new Error("Connect to a sandbox session before starting Codex CLI.");
     }
 
-    const thread = await readCodexThread({
+    const thread = await readCodexThreadState({
       rpcClient,
       threadId: persistedThreadId,
     });
@@ -659,6 +661,26 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
 
     return launchTarget;
   }, [updateActiveThread]);
+
+  const resolveRestoredThreadAuthorityAfterCli = useCallback(async (): Promise<string> => {
+    const persistedThreadId = threadIdRef.current;
+    if (persistedThreadId !== null) {
+      return persistedThreadId;
+    }
+
+    const threadCollections = await refreshThreadCollections();
+    const resolvedThreadId = resolvePostCliPreferredThreadId({
+      persistedThreadId: threadIdRef.current,
+      availableThreads: threadCollections.availableThreads,
+      loadedThreadIds: threadCollections.loadedThreadIds,
+    });
+    if (resolvedThreadId === null) {
+      throw new Error("Could not resolve a thread to restore after leaving Codex CLI.");
+    }
+
+    updateActiveThread(resolvedThreadId);
+    return resolvedThreadId;
+  }, [refreshThreadCollections, updateActiveThread]);
 
   const threads = useMemo<CodexSessionThreadState>(() => {
     return {
@@ -720,8 +742,13 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     return {
       persistedThreadId: lifecycle.sessionSnapshot?.threadId ?? null,
       resolveCliLaunchTarget,
+      resolveRestoredThreadAuthorityAfterCli,
     };
-  }, [lifecycle.sessionSnapshot?.threadId, resolveCliLaunchTarget]);
+  }, [
+    lifecycle.sessionSnapshot?.threadId,
+    resolveCliLaunchTarget,
+    resolveRestoredThreadAuthorityAfterCli,
+  ]);
 
   const chat = useMemo<CodexSessionChatState>(() => {
     return {

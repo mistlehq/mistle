@@ -42,6 +42,10 @@ type SessionWorkbenchTunnelServer = {
   deferNextCliOpen: () => { release: () => void };
   emitPtyExit: (streamId: number, exitCode?: number) => void;
   failNextCliOpen: (message: string) => void;
+  hangNextThreadList: () => void;
+  hangResumeForThread: (threadId: string) => void;
+  hangNextAgentThreadListWhileCliSocketOpen: () => void;
+  omitLoadedThreadForNextCliOpen: () => void;
   url: string;
   waitForThreadResume: (threadId: string) => Promise<string>;
   waitForPtyClose: (streamId: number) => Promise<number>;
@@ -206,6 +210,10 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
   let nextCliOpenFailureMessage: string | null = null;
   let nextCliOpenGate: ReturnType<typeof createDeferredSignal> | null = null;
   let nextCliCloseExitGate: ReturnType<typeof createDeferredSignal> | null = null;
+  let shouldHangNextThreadList = false;
+  let shouldHangNextAgentThreadListWhileCliSocketOpen = false;
+  let shouldOmitLoadedThreadForNextCliOpen = false;
+  const hangingResumeThreadIds = new Set<string>();
   const deferredCliCloseStreamIds = new Set<number>();
 
   function dispatchPtyOpen(record: PtyOpenRecord): void {
@@ -340,7 +348,10 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
                 id: knownThreadId,
                 turnCount: 1,
               });
-              loadedThreadIds.add(knownThreadId);
+              if (!shouldOmitLoadedThreadForNextCliOpen) {
+                loadedThreadIds.add(knownThreadId);
+              }
+              shouldOmitLoadedThreadForNextCliOpen = false;
             }
 
             if (controlMessage.channel.ptySessionId === "cli" && nextCliOpenGate !== null) {
@@ -399,6 +410,20 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
         }
 
         case "thread/list": {
+          const hasOpenCliSocket = [...ptyChannels.entries()].some(
+            ([streamId, channel]) =>
+              channel.ptySessionId === "cli" && ptySockets.get(streamId) !== undefined,
+          );
+          if (shouldHangNextAgentThreadListWhileCliSocketOpen && hasOpenCliSocket) {
+            shouldHangNextAgentThreadListWhileCliSocketOpen = false;
+            return;
+          }
+
+          if (shouldHangNextThreadList) {
+            shouldHangNextThreadList = false;
+            return;
+          }
+
           socket.send(
             JSON.stringify({
               id: requestId,
@@ -457,6 +482,11 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
             throw new Error("Expected thread/resume to provide a thread id.");
           }
 
+          if (hangingResumeThreadIds.has(requestedThreadId)) {
+            hangingResumeThreadIds.delete(requestedThreadId);
+            return;
+          }
+
           knownThreadId = requestedThreadId;
           ensureThreadRecord({
             id: requestedThreadId,
@@ -487,22 +517,32 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
               ? params.threadId
               : (knownThreadId ?? "thread_cli_test");
           const threadRecord = threadsById.get(requestedThreadId);
+          if (threadRecord === undefined || threadRecord.turnCount === 0) {
+            socket.send(
+              JSON.stringify({
+                id: requestId,
+                error: {
+                  code: -32600,
+                  message: `thread ${requestedThreadId} is not materialized yet; includeTurns is unavailable before first user message`,
+                },
+              }),
+            );
+            return;
+          }
+
           socket.send(
             JSON.stringify({
               id: requestId,
               result: {
                 thread: {
                   id: requestedThreadId,
-                  turns:
-                    threadRecord === undefined || threadRecord.turnCount === 0
-                      ? []
-                      : [
-                          {
-                            id: `${requestedThreadId}_turn_1`,
-                            items: [],
-                            status: "completed",
-                          },
-                        ],
+                  turns: [
+                    {
+                      id: `${requestedThreadId}_turn_1`,
+                      items: [],
+                      status: "completed",
+                    },
+                  ],
                 },
               },
             }),
@@ -599,6 +639,18 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
     emitPtyExit,
     failNextCliOpen: (message) => {
       nextCliOpenFailureMessage = message;
+    },
+    hangNextThreadList: () => {
+      shouldHangNextThreadList = true;
+    },
+    hangResumeForThread: (threadId) => {
+      hangingResumeThreadIds.add(threadId);
+    },
+    hangNextAgentThreadListWhileCliSocketOpen: () => {
+      shouldHangNextAgentThreadListWhileCliSocketOpen = true;
+    },
+    omitLoadedThreadForNextCliOpen: () => {
+      shouldOmitLoadedThreadForNextCliOpen = true;
     },
     url: `ws://127.0.0.1:${String(address.port)}`,
     waitForThreadResume: async (threadId) => {
@@ -867,7 +919,6 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       const cliPty = await waitForPtySession(tunnelServer, "cli");
       expectCliPty(cliPty);
 
-      expect(await screen.findByText("Codex CLI connected")).toBeDefined();
       expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
 
       fireEvent.click(await waitForEnabledButton("Open terminal"));
@@ -883,7 +934,17 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
         },
         { timeout: 5_000 },
       );
-      expect(screen.queryByText("Codex CLI connected")).toBeNull();
+      expect(screen.queryByTitle("Codex CLI")).toBeNull();
+    });
+  });
+
+  it("starts a new CLI session when the connected chat thread is not materialized yet", async () => {
+    await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+      fireEvent.click(await waitForEnabledButton("CLI"));
+      const cliPty = await waitForPtySession(tunnelServer, "cli");
+
+      expectCliPty(cliPty);
+      expect(screen.queryByText("Could not start Codex CLI")).toBeNull();
     });
   });
 
@@ -895,7 +956,6 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       fireEvent.click(await waitForEnabledButton("CLI"));
       expectCliPty(await waitForPtySession(tunnelServer, "cli"));
 
-      expect(await screen.findByText("Codex CLI connected")).toBeDefined();
       expect(screen.getByRole("button", { name: "Terminal" }).getAttribute("aria-pressed")).toBe(
         "true",
       );
@@ -908,8 +968,6 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       fireEvent.click(await waitForEnabledButton("CLI"));
       const cliPty = await waitForPtySession(tunnelServer, "cli");
       expectCliPty(cliPty);
-      expect(await screen.findByText("Codex CLI connected")).toBeDefined();
-
       tunnelServer.emitPtyExit(cliPty.streamId);
       await tunnelServer.waitForThreadResume("thread_cli_from_cli");
 
@@ -919,7 +977,7 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
         },
         { timeout: 5_000 },
       );
-      expect(screen.queryByText("Codex CLI connected")).toBeNull();
+      expect(screen.queryByPlaceholderText("Ask anything")).toBeDefined();
     });
   }, 15_000);
 
@@ -946,8 +1004,6 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       fireEvent.click(await waitForEnabledButton("CLI"));
       const cliPty = await waitForPtySession(tunnelServer, "cli");
       expectCliPty(cliPty);
-      expect(await screen.findByText("Codex CLI connected")).toBeDefined();
-
       controls.setConnectionTokenFailure(true);
       tunnelServer.emitPtyExit(cliPty.streamId);
 
@@ -985,19 +1041,19 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       deferredCliOpen.release();
 
       await waitFor(() => {
-        expect(screen.queryByText("Codex CLI connected")).toBeNull();
+        expect(screen.queryByPlaceholderText("Ask anything")).toBeDefined();
       });
     });
   });
 
-  it("restores chat without waiting for the CLI PTY close handshake to finish", async () => {
+  it("restores chat even when reconnect would stall until the CLI websocket disconnects", async () => {
     await withSessionWorkbenchCliHarness(async ({ controls, tunnelServer }) => {
       fireEvent.click(await waitForEnabledButton("CLI"));
       const cliPty = await waitForPtySession(tunnelServer, "cli");
       expectCliPty(cliPty);
-      expect(await screen.findByText("Codex CLI connected")).toBeDefined();
 
       const deferredCliCloseExit = tunnelServer.deferNextCliCloseExit();
+      tunnelServer.hangNextAgentThreadListWhileCliSocketOpen();
       fireEvent.click(screen.getByRole("button", { name: "CLI" }));
 
       await waitFor(
@@ -1017,4 +1073,59 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       );
     });
   }, 15_000);
+
+  it("restores chat from the newest available CLI-created thread even when it is not loaded yet", async () => {
+    await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+      tunnelServer.omitLoadedThreadForNextCliOpen();
+
+      fireEvent.click(await waitForEnabledButton("CLI"));
+      const cliPty = await waitForPtySession(tunnelServer, "cli");
+      expectCliPty(cliPty);
+      fireEvent.click(screen.getByRole("button", { name: "CLI" }));
+
+      await waitFor(
+        () => {
+          expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
+        },
+        { timeout: 5_000 },
+      );
+      expect(screen.queryByText("Restoring chat...")).toBeNull();
+    });
+  }, 15_000);
+
+  it("does not try to reconnect chat through the provisional empty thread after leaving CLI", async () => {
+    await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+      fireEvent.click(await waitForEnabledButton("CLI"));
+      const cliPty = await waitForPtySession(tunnelServer, "cli");
+      expectCliPty(cliPty);
+      tunnelServer.hangResumeForThread("thread_cli_test");
+      fireEvent.click(screen.getByRole("button", { name: "CLI" }));
+
+      await tunnelServer.waitForThreadResume("thread_cli_from_cli");
+      await waitFor(
+        () => {
+          expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
+        },
+        { timeout: 5_000 },
+      );
+    });
+  }, 15_000);
+
+  it("fails restore explicitly instead of hanging forever when post-CLI thread resolution does not respond", async () => {
+    await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+      fireEvent.click(await waitForEnabledButton("CLI"));
+      const cliPty = await waitForPtySession(tunnelServer, "cli");
+      expectCliPty(cliPty);
+      tunnelServer.hangNextThreadList();
+      fireEvent.click(screen.getByRole("button", { name: "CLI" }));
+
+      await waitFor(
+        () => {
+          expect(screen.getByText("Could not restore chat")).toBeDefined();
+          expect(screen.getByText("Timed out while restoring chat.")).toBeDefined();
+        },
+        { timeout: 35_000 },
+      );
+    });
+  }, 45_000);
 });
