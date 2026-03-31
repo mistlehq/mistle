@@ -23,10 +23,12 @@ export const IntegrationConnectionMethodIds: {
   API_KEY: IntegrationConnectionMethodId;
   OAUTH2_AUTHORIZATION_CODE: IntegrationConnectionMethodId;
   GITHUB_APP_INSTALLATION: IntegrationConnectionMethodId;
+  AWS_ASSUME_ROLE: IntegrationConnectionMethodId;
 } = {
   API_KEY: "api-key",
   OAUTH2_AUTHORIZATION_CODE: "oauth2-authorization-code",
   GITHUB_APP_INSTALLATION: "github-app-installation",
+  AWS_ASSUME_ROLE: "aws-assume-role",
 };
 
 export type IntegrationConnectionMethodKind = "form" | "redirect";

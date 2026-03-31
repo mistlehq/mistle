@@ -13,6 +13,10 @@ describe("integrations-definitions index", () => {
       familyId: "atlassian",
       variantId: "atlassian-default",
     });
+    const awsDefinition = registry.getDefinition({
+      familyId: "aws",
+      variantId: "aws-cli-default",
+    });
     const openAiDefinition = registry.getDefinition({
       familyId: "openai",
       variantId: "openai-default",
@@ -58,6 +62,26 @@ describe("integrations-definitions index", () => {
             {
               name: "clientSecret",
               label: "Client secret",
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+    });
+    expect(awsDefinition).toMatchObject({
+      familyId: "aws",
+      variantId: "aws-cli-default",
+      kind: "agent",
+      displayName: "AWS",
+      connectionMethods: [
+        {
+          id: "aws-assume-role",
+          label: "Access key + AssumeRole",
+          kind: "form",
+          secretFields: [
+            {
+              name: "secretAccessKey",
+              label: "Secret access key",
               inputType: "password",
             },
           ],
@@ -180,11 +204,12 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(5);
+    expect(definitions).toHaveLength(6);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
       "atlassian::atlassian-default",
+      "aws::aws-cli-default",
       "github::github-cloud",
       "github::github-enterprise-server",
       "linear::linear-default",
