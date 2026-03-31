@@ -65,6 +65,8 @@ export function SessionWorkbenchPageView({
     mainContentLayout.scroll === "contained"
       ? "min-h-0 flex-1 overflow-hidden"
       : "min-h-0 flex-1 overflow-y-auto";
+  const mainContentScrollbarGutterStyle =
+    mainContentLayout.width === "full" ? undefined : { scrollbarGutter: "stable both-edges" };
   const primaryPanelTransitionClassName = isPrimaryPanelTransitioning
     ? "opacity-0 transition-opacity duration-200 ease-out"
     : "opacity-100 transition-opacity duration-200 ease-in";
@@ -96,7 +98,7 @@ export function SessionWorkbenchPageView({
                 aria-label="Conversation chat"
                 className={mainContentRegionClassName}
                 role="region"
-                style={{ scrollbarGutter: "stable both-edges" }}
+                style={mainContentScrollbarGutterStyle}
               >
                 <div className={mainContentContainerClassName}>{mainContent}</div>
               </div>
@@ -127,7 +129,7 @@ export function SessionWorkbenchPageView({
             aria-label="Conversation chat"
             className={`${mainContentRegionClassName} ${primaryPanelTransitionClassName}`}
             role="region"
-            style={{ scrollbarGutter: "stable both-edges" }}
+            style={mainContentScrollbarGutterStyle}
           >
             <div className={mainContentContainerClassName}>{mainContent}</div>
           </div>
