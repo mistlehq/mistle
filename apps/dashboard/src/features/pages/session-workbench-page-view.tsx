@@ -12,7 +12,10 @@ type SessionWorkbenchAlert = {
   description: string;
 };
 
-type SessionWorkbenchMainContentLayout = "chat" | "full";
+type SessionWorkbenchMainContentLayout = {
+  scroll: "contained" | "page";
+  width: "chat" | "full";
+};
 
 type SessionWorkbenchPageViewProps = {
   sandboxInstanceId: string | null;
@@ -35,7 +38,7 @@ export type {
 export function SessionWorkbenchPageView({
   sandboxInstanceId,
   alerts,
-  mainContentLayout = "chat",
+  mainContentLayout = { scroll: "page", width: "chat" },
   mainContent,
   primaryBottomPanel,
   secondaryPanel,
@@ -55,7 +58,11 @@ export function SessionWorkbenchPageView({
   const hasPrimaryBottomPanel =
     primaryBottomPanel !== null && primaryBottomPanel !== undefined && primaryBottomPanel !== false;
   const mainContentContainerClassName =
-    mainContentLayout === "full" ? "h-full w-full" : "mx-auto w-full max-w-3xl px-4 pb-4";
+    mainContentLayout.width === "full" ? "h-full w-full" : "mx-auto w-full max-w-3xl px-4 pb-4";
+  const mainContentRegionClassName =
+    mainContentLayout.scroll === "contained"
+      ? "min-h-0 flex-1 overflow-hidden"
+      : "min-h-0 flex-1 overflow-y-auto";
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -80,7 +87,7 @@ export function SessionWorkbenchPageView({
             <div className="flex h-full min-h-0 flex-col overflow-hidden">
               <div
                 aria-label="Conversation chat"
-                className="min-h-0 flex-1 overflow-y-auto"
+                className={mainContentRegionClassName}
                 role="region"
                 style={{ scrollbarGutter: "stable both-edges" }}
               >
@@ -111,7 +118,7 @@ export function SessionWorkbenchPageView({
         <>
           <div
             aria-label="Conversation chat"
-            className="min-h-0 flex-1 overflow-y-auto"
+            className={mainContentRegionClassName}
             role="region"
             style={{ scrollbarGutter: "stable both-edges" }}
           >

@@ -85,6 +85,7 @@ function resolveTerminalFontFamily(): string {
 
 type SessionTerminalSurfaceProps = {
   isVisible: boolean;
+  layoutKey?: string;
   lifecycleState: string;
   outputChunks: readonly Uint8Array[];
   onResize: (dimensions: { cols: number; rows: number }) => Promise<void>;
@@ -108,6 +109,7 @@ function resolveTerminalDimensions(fitAddon: FitAddon | null): { cols: number; r
 
 export function SessionTerminalSurface({
   isVisible,
+  layoutKey,
   lifecycleState,
   outputChunks,
   onResize,
@@ -279,6 +281,30 @@ export function SessionTerminalSurface({
       terminal.options.cursorInactiveStyle = "none";
     }
   }, [fitTerminal, isVisible, lifecycleState, resizePtyToTerminal]);
+
+  useEffect(() => {
+    if (!isVisible) {
+      return;
+    }
+
+    let animationFrameId = 0;
+    let nestedAnimationFrameId = 0;
+
+    animationFrameId = window.requestAnimationFrame(() => {
+      nestedAnimationFrameId = window.requestAnimationFrame(() => {
+        fitTerminal();
+
+        if (lifecycleStateRef.current === SandboxPtyStates.OPEN) {
+          resizePtyToTerminal();
+        }
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      window.cancelAnimationFrame(nestedAnimationFrameId);
+    };
+  }, [fitTerminal, isVisible, layoutKey, resizePtyToTerminal]);
 
   if (!isVisible) {
     return null;

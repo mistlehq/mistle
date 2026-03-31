@@ -249,10 +249,13 @@ function SessionWorkbenchPageContent(input: {
       alerts={workbench.hasTopAlert ? alerts : []}
       isSecondaryPanelVisible={workbench.terminalPanelState.isVisible}
       mainContentLayout={
-        workbench.primaryPanelState.transitionState === "stable_cli" ? "full" : "chat"
+        workbench.primaryPanelState.transitionState === "stable_cli"
+          ? { scroll: "contained", width: "full" }
+          : { scroll: "page", width: "chat" }
       }
       mainContent={resolvePrimaryPanelMainContent({
         chatEntries: conversationPane.chatState.entries,
+        cliLayoutKey: workbench.terminalPanelState.isVisible ? "cli:split" : "cli:solo",
         cliPtyState: workbench.cliPtyState,
         errorMessage: workbench.primaryPanelState.errorMessage,
         isRespondingToServerRequest:
@@ -310,6 +313,7 @@ function SessionWorkbenchPageContent(input: {
 
 function resolvePrimaryPanelMainContent(input: {
   chatEntries: React.ComponentProps<typeof SessionConversationMainContent>["chatEntries"];
+  cliLayoutKey: React.ComponentProps<typeof SessionCliPanel>["layoutKey"];
   cliPtyState: React.ComponentProps<typeof SessionCliPanel>["ptyState"];
   errorMessage: string | null;
   isRespondingToServerRequest: React.ComponentProps<
@@ -327,6 +331,9 @@ function resolvePrimaryPanelMainContent(input: {
     typeof useSessionWorkbenchController
   >["workbench"]["primaryPanelState"]["transitionState"];
 }): React.JSX.Element {
+  const cliLayoutKeyProps =
+    input.cliLayoutKey === undefined ? {} : { layoutKey: input.cliLayoutKey };
+
   switch (input.transitionState) {
     case "switching_to_cli":
       return <SessionCliConnectingPanel />;
@@ -340,7 +347,7 @@ function resolvePrimaryPanelMainContent(input: {
         />
       );
     case "stable_cli":
-      return <SessionCliPanel ptyState={input.cliPtyState} />;
+      return <SessionCliPanel ptyState={input.cliPtyState} {...cliLayoutKeyProps} />;
     case "restoring_chat":
       return <SessionChatRestoringPanel />;
     case "restore_failed":

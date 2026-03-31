@@ -1,16 +1,15 @@
-import { SandboxPtyStates } from "@mistle/sandbox-session-client";
-
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
-import { SessionPtyPanelHeader } from "./session-pty-panel-header.js";
 import { SessionPtyPanelShell } from "./session-pty-panel-shell.js";
 import { SessionTerminalSurface } from "./session-terminal-surface.js";
 
 type SessionCliPanelProps = {
+  layoutKey?: string;
   ptyState: ReturnType<typeof useSandboxPtyState>;
 };
 
-export function SessionCliPanel({ ptyState }: SessionCliPanelProps): React.JSX.Element {
+export function SessionCliPanel({ layoutKey, ptyState }: SessionCliPanelProps): React.JSX.Element {
   const { lifecycle, output, actions } = ptyState;
+  const layoutKeyProps = layoutKey === undefined ? {} : { layoutKey };
 
   return (
     <SessionPtyPanelShell
@@ -21,16 +20,11 @@ export function SessionCliPanel({ ptyState }: SessionCliPanelProps): React.JSX.E
           onResize={actions.resizePty}
           onWriteInput={actions.writeInput}
           outputChunks={output.chunks}
+          {...layoutKeyProps}
         />
       }
       dataPtyState={lifecycle.state}
-      header={
-        <SessionPtyPanelHeader
-          indicatorTitle="Codex CLI"
-          isActive={lifecycle.state === SandboxPtyStates.OPEN}
-          title="CLI"
-        />
-      }
+      showTopBorder={false}
     />
   );
 }

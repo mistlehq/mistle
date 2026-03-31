@@ -26,6 +26,13 @@ function createPtyChunks(text: string): readonly Uint8Array[] {
   return text.split(/(?<=\n)/).map((chunk) => textEncoder.encode(chunk));
 }
 
+function createLongCliOutput(): string {
+  return Array.from({ length: 120 }, (_, index) => {
+    const lineNumber = String(index + 1).padStart(3, "0");
+    return `log ${lineNumber}: scanning repository state for pending changes`;
+  }).join("\n");
+}
+
 function StoryCliWorkbench(input: CliStoryScenario): React.JSX.Element {
   const [lifecycleState, setLifecycleState] = useState<
     UseSandboxPtyStateResult["lifecycle"]["state"]
@@ -98,7 +105,7 @@ function StoryCliWorkbench(input: CliStoryScenario): React.JSX.Element {
   return (
     <SessionWorkbenchStoryChrome>
       {renderSessionWorkbenchStory({
-        mainContentLayout: "full",
+        mainContentLayout: { scroll: "contained", width: "full" },
         mainContent: <SessionCliPanel ptyState={ptyState} />,
         primaryBottomPanel: null,
         sandboxInstanceId: StorySandboxInstanceId,
@@ -152,6 +159,13 @@ export const ConnectedWithOutput: Story = {
       "README.md  package.json  apps  packages",
       "",
     ].join("\n"),
+    initialState: SandboxPtyStates.OPEN,
+  },
+};
+
+export const ConnectedLongOutput: Story = {
+  args: {
+    initialOutput: createLongCliOutput(),
     initialState: SandboxPtyStates.OPEN,
   },
 };

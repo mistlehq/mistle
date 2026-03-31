@@ -5,6 +5,7 @@ type SessionPtyPanelShellProps = {
   dataPtyState?: string;
   header?: React.ReactNode;
   message?: React.ReactNode;
+  showTopBorder?: boolean;
 };
 
 export function SessionPtyPanelShell({
@@ -12,11 +13,12 @@ export function SessionPtyPanelShell({
   dataPtyState,
   header,
   message,
+  showTopBorder = true,
 }: SessionPtyPanelShellProps): React.JSX.Element {
   return (
     <div className="h-full min-h-0 bg-white">
       <div
-        className="flex h-full min-h-0 flex-col overflow-hidden border-t bg-white"
+        className={`flex h-full min-h-0 flex-col overflow-hidden bg-white${showTopBorder ? " border-t" : ""}`}
         data-pty-state={dataPtyState}
         style={{ borderColor: SESSION_PTY_PANEL_BORDER_COLOR }}
       >
@@ -28,7 +30,7 @@ export function SessionPtyPanelShell({
             {message}
           </div>
         )}
-        {body}
+        <div className="flex min-h-0 flex-1 flex-col">{body}</div>
       </div>
     </div>
   );
