@@ -14,6 +14,7 @@ export type DataPlaneGatewayGlobalConfig = NonNullable<LoadDataPlaneGatewayConfi
 export type DataPlaneGatewayRuntimeConfig = {
   app: DataPlaneGatewayConfig;
   internalAuth: DataPlaneGatewayGlobalConfig["internalAuth"];
+  publish: DataPlaneGatewayGlobalConfig["sandbox"]["publish"];
   sandbox: DataPlaneGatewayGlobalConfig["sandbox"];
 };
 

@@ -68,6 +68,36 @@ export const GlobalSandboxTokenConfigSchema = z
   })
   .strict();
 
+export const GlobalSandboxPublishSessionConfigSchema = z
+  .object({
+    cookieSigningSecret: z.string().trim().min(1),
+  })
+  .strict();
+
+export const PartialGlobalSandboxPublishSessionConfigSchema = z
+  .object({
+    cookieSigningSecret: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+export const GlobalSandboxPublishConfigSchema = z
+  .object({
+    baseDomain: z.string().trim().min(1),
+    localBaseDomain: z.string().trim().min(1),
+    access: GlobalSandboxTokenConfigSchema,
+    session: GlobalSandboxPublishSessionConfigSchema,
+  })
+  .strict();
+
+export const PartialGlobalSandboxPublishConfigSchema = z
+  .object({
+    baseDomain: z.string().trim().min(1).optional(),
+    localBaseDomain: z.string().trim().min(1).optional(),
+    access: GlobalSandboxTokenConfigSchema.partial().optional(),
+    session: PartialGlobalSandboxPublishSessionConfigSchema.optional(),
+  })
+  .strict();
+
 export const GlobalSandboxConfigSchema = z
   .object({
     provider: z.enum(SandboxProviders),
@@ -77,6 +107,7 @@ export const GlobalSandboxConfigSchema = z
     connect: GlobalSandboxTokenConfigSchema,
     bootstrap: GlobalSandboxTokenConfigSchema,
     egress: GlobalSandboxTokenConfigSchema,
+    publish: GlobalSandboxPublishConfigSchema,
   })
   .strict();
 
@@ -89,6 +120,7 @@ export const PartialGlobalSandboxConfigSchema = z
     connect: GlobalSandboxTokenConfigSchema.partial().optional(),
     bootstrap: GlobalSandboxTokenConfigSchema.partial().optional(),
     egress: GlobalSandboxTokenConfigSchema.partial().optional(),
+    publish: PartialGlobalSandboxPublishConfigSchema.optional(),
   })
   .strict();
 

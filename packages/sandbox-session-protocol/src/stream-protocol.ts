@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const PositiveIntegerSchema = z.int().positive();
 const NonEmptyStringSchema = z.string().min(1);
+const HeaderValuesSchema = z.record(z.string(), z.array(z.string()));
 
 export const FileUploadResetCodes = {
   BYTE_COUNT_EXCEEDED: "byte_count_exceeded",
@@ -150,6 +151,139 @@ const LeaseRenewSchema = z.object({
   leaseId: NonEmptyStringSchema,
 });
 
+const LiveListenerOwnerSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("sandbox-runtime"),
+  }),
+  z.object({
+    kind: z.literal("managed-runtime-client"),
+    clientId: NonEmptyStringSchema,
+    endpointKey: NonEmptyStringSchema.optional(),
+  }),
+  z.object({
+    kind: z.literal("unknown-process"),
+  }),
+]);
+
+const LiveListenerSchema = z.object({
+  port: PositiveIntegerSchema,
+  bindAddress: NonEmptyStringSchema,
+  pid: PositiveIntegerSchema.optional(),
+  command: NonEmptyStringSchema.optional(),
+  owner: LiveListenerOwnerSchema,
+  visibility: z.enum(["internal", "user_selectable"]),
+  observedAt: NonEmptyStringSchema,
+});
+
+const PublishTargetSchema = z.object({
+  kind: z.literal("port"),
+  port: PositiveIntegerSchema,
+});
+
+const PublishListenersGetSchema = z.object({
+  type: z.literal("publish.listeners.get"),
+  requestId: NonEmptyStringSchema,
+});
+
+const PublishListenersSnapshotSchema = z.object({
+  type: z.literal("publish.listeners.snapshot"),
+  requestId: NonEmptyStringSchema,
+  observedAt: NonEmptyStringSchema,
+  listeners: z.array(LiveListenerSchema),
+});
+
+const PublishTargetAuthorizeSchema = z.object({
+  type: z.literal("publish.target.authorize"),
+  requestId: NonEmptyStringSchema,
+  target: PublishTargetSchema,
+});
+
+const PublishTargetAuthorizeResultSchema = z.object({
+  type: z.literal("publish.target.authorize.result"),
+  requestId: NonEmptyStringSchema,
+  authorized: z.boolean(),
+  reason: z.enum(["target_not_found", "target_internal", "target_not_live"]).optional(),
+});
+
+const PublishHttpOpenSchema = z.object({
+  type: z.literal("publish.http.open"),
+  streamId: PositiveIntegerSchema,
+  target: PublishTargetSchema,
+  request: z.object({
+    method: NonEmptyStringSchema,
+    path: NonEmptyStringSchema,
+    query: z.string().optional(),
+    headers: HeaderValuesSchema,
+  }),
+});
+
+const PublishHttpResponseStartSchema = z.object({
+  type: z.literal("publish.http.response.start"),
+  streamId: PositiveIntegerSchema,
+  status: z.int().min(100).max(599),
+  headers: HeaderValuesSchema,
+});
+
+const PublishWsOpenSchema = z.object({
+  type: z.literal("publish.ws.open"),
+  streamId: PositiveIntegerSchema,
+  target: PublishTargetSchema,
+  request: z.object({
+    path: NonEmptyStringSchema,
+    query: z.string().optional(),
+    headers: HeaderValuesSchema,
+  }),
+});
+
+const PublishWsAcceptSchema = z.object({
+  type: z.literal("publish.ws.accept"),
+  streamId: PositiveIntegerSchema,
+  headers: HeaderValuesSchema,
+});
+
+const PublishHttpBodyChunkSchema = z.object({
+  type: z.literal("publish.http.body.chunk"),
+  streamId: PositiveIntegerSchema,
+  direction: z.enum(["request", "response"]),
+  bytes: NonEmptyStringSchema,
+  encoding: z.literal("base64"),
+});
+
+const PublishHttpBodyEndSchema = z.object({
+  type: z.literal("publish.http.body.end"),
+  streamId: PositiveIntegerSchema,
+  direction: z.enum(["request", "response"]),
+});
+
+const PublishWsFrameSchema = z.object({
+  type: z.literal("publish.ws.frame"),
+  streamId: PositiveIntegerSchema,
+  direction: z.enum(["request", "response"]),
+  opcode: z.enum(["text", "binary"]),
+  bytes: NonEmptyStringSchema,
+  encoding: z.literal("base64"),
+});
+
+const PublishWsCloseSchema = z.object({
+  type: z.literal("publish.ws.close"),
+  streamId: PositiveIntegerSchema,
+  direction: z.enum(["request", "response"]),
+  code: z.int(),
+  reason: z.string().optional(),
+});
+
+const PublishStreamCloseSchema = z.object({
+  type: z.literal("publish.stream.close"),
+  streamId: PositiveIntegerSchema,
+});
+
+const PublishStreamErrorSchema = z.object({
+  type: z.literal("publish.stream.error"),
+  streamId: PositiveIntegerSchema,
+  code: NonEmptyStringSchema,
+  message: NonEmptyStringSchema,
+});
+
 const StreamControlMessageSchema = z.discriminatedUnion("type", [
   StreamOpenSchema,
   StreamOpenOKSchema,
@@ -176,6 +310,23 @@ const BootstrapControlMessageSchema = z.discriminatedUnion("type", [
   StreamWindowSchema,
   LeaseCreateSchema,
   LeaseRenewSchema,
+]);
+
+const PublishControlMessageSchema = z.discriminatedUnion("type", [
+  PublishListenersGetSchema,
+  PublishListenersSnapshotSchema,
+  PublishTargetAuthorizeSchema,
+  PublishTargetAuthorizeResultSchema,
+  PublishHttpOpenSchema,
+  PublishHttpResponseStartSchema,
+  PublishWsOpenSchema,
+  PublishWsAcceptSchema,
+  PublishHttpBodyChunkSchema,
+  PublishHttpBodyEndSchema,
+  PublishWsFrameSchema,
+  PublishWsCloseSchema,
+  PublishStreamCloseSchema,
+  PublishStreamErrorSchema,
 ]);
 
 export type AgentStreamChannel = z.infer<typeof AgentStreamChannelSchema>;
@@ -205,6 +356,23 @@ export type LeaseCreate = z.infer<typeof LeaseCreateSchema>;
 export type LeaseRenew = z.infer<typeof LeaseRenewSchema>;
 export type LeaseControlMessage = z.infer<typeof LeaseControlMessageSchema>;
 export type BootstrapControlMessage = z.infer<typeof BootstrapControlMessageSchema>;
+export type LiveListenerOwner = z.infer<typeof LiveListenerOwnerSchema>;
+export type LiveListener = z.infer<typeof LiveListenerSchema>;
+export type PublishTarget = z.infer<typeof PublishTargetSchema>;
+export type PublishListenersGet = z.infer<typeof PublishListenersGetSchema>;
+export type PublishListenersSnapshot = z.infer<typeof PublishListenersSnapshotSchema>;
+export type PublishTargetAuthorize = z.infer<typeof PublishTargetAuthorizeSchema>;
+export type PublishTargetAuthorizeResult = z.infer<typeof PublishTargetAuthorizeResultSchema>;
+export type PublishHttpOpen = z.infer<typeof PublishHttpOpenSchema>;
+export type PublishHttpResponseStart = z.infer<typeof PublishHttpResponseStartSchema>;
+export type PublishWsOpen = z.infer<typeof PublishWsOpenSchema>;
+export type PublishWsAccept = z.infer<typeof PublishWsAcceptSchema>;
+export type PublishHttpBodyChunk = z.infer<typeof PublishHttpBodyChunkSchema>;
+export type PublishHttpBodyEnd = z.infer<typeof PublishHttpBodyEndSchema>;
+export type PublishWsFrame = z.infer<typeof PublishWsFrameSchema>;
+export type PublishWsClose = z.infer<typeof PublishWsCloseSchema>;
+export type PublishStreamClose = z.infer<typeof PublishStreamCloseSchema>;
+export type PublishStreamError = z.infer<typeof PublishStreamErrorSchema>;
 
 function parseJSON(payload: string): unknown {
   try {
@@ -246,4 +414,15 @@ export function parseBootstrapControlMessage(payload: string): BootstrapControlM
   return result.success ? result.data : undefined;
 }
 
+export function parsePublishControlMessage(payload: string): PublishControlMessage | undefined {
+  const parsedPayload = parseJSON(payload);
+  if (parsedPayload === undefined) {
+    return undefined;
+  }
+
+  const result = PublishControlMessageSchema.safeParse(parsedPayload);
+  return result.success ? result.data : undefined;
+}
+
+export type PublishControlMessage = z.infer<typeof PublishControlMessageSchema>;
 export type SandboxSessionControlMessage = StreamControlMessage | LeaseControlMessage;
