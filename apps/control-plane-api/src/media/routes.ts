@@ -1,7 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { ControlPlaneDbSchema } from "@mistle/db/control-plane";
 import { OpenApiValidationHook } from "@mistle/http/errors.js";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import sharp from "sharp";
 import { typeid } from "typeid-js";
 import { z } from "zod";
@@ -176,6 +176,19 @@ export function createMediaRoutes(): {
       );
     }
 
+    if (
+      uploadedObject.bytes.length > MaxAvatarFileSizeBytes ||
+      uploadedObject.bytes.length > Number(uploadSession.sourceFileSize)
+    ) {
+      return ctx.json(
+        {
+          code: "BAD_REQUEST",
+          message: "Uploaded avatar file exceeds the declared size limit.",
+        },
+        400,
+      );
+    }
+
     let normalized;
     try {
       normalized = await normalizeAvatarImage({
@@ -245,6 +258,15 @@ export function createMediaRoutes(): {
       return ctx.json({ code: "UNAUTHORIZED", message: "Unauthorized API request." }, 401);
     }
     const userId = ctx.req.param("userId");
+    const canRead = await canReadUserAvatar({
+      db: ctx.get("db"),
+      actorUserId: session.userId,
+      targetUserId: userId,
+    });
+    if (!canRead) {
+      return ctx.json({ code: "FORBIDDEN", message: "Forbidden API request." }, 403);
+    }
+
     const user = await ctx.get("db").query.users.findFirst({
       columns: {
         avatarKey: true,
@@ -269,6 +291,15 @@ export function createMediaRoutes(): {
       return ctx.json({ code: "UNAUTHORIZED", message: "Unauthorized API request." }, 401);
     }
     const organizationId = ctx.req.param("organizationId");
+    const canRead = await isOrganizationMember({
+      db: ctx.get("db"),
+      actorUserId: session.userId,
+      organizationId,
+    });
+    if (!canRead) {
+      return ctx.json({ code: "FORBIDDEN", message: "Forbidden API request." }, 403);
+    }
+
     const organization = await ctx.get("db").query.organizations.findFirst({
       columns: {
         logoKey: true,
@@ -375,6 +406,30 @@ async function canManageOrganization(input: {
   actorUserId: string;
   organizationId: string;
 }): Promise<boolean> {
+  const membership = await findOrganizationMembership(input);
+
+  if (membership === undefined) {
+    return false;
+  }
+
+  const role = parseOrganizationRole(membership.role);
+  return role === "owner" || role === "admin";
+}
+
+async function isOrganizationMember(input: {
+  db: AppContextBindings["Variables"]["db"];
+  actorUserId: string;
+  organizationId: string;
+}): Promise<boolean> {
+  const membership = await findOrganizationMembership(input);
+  return membership !== undefined;
+}
+
+async function findOrganizationMembership(input: {
+  db: AppContextBindings["Variables"]["db"];
+  actorUserId: string;
+  organizationId: string;
+}) {
   const membership = await input.db.query.members.findFirst({
     columns: {
       role: true,
@@ -384,11 +439,44 @@ async function canManageOrganization(input: {
   });
 
   if (membership === undefined) {
+    return undefined;
+  }
+
+  return membership;
+}
+
+async function canReadUserAvatar(input: {
+  db: AppContextBindings["Variables"]["db"];
+  actorUserId: string;
+  targetUserId: string;
+}): Promise<boolean> {
+  if (input.actorUserId === input.targetUserId) {
+    return true;
+  }
+
+  const actorMemberships = await input.db.query.members.findMany({
+    columns: {
+      organizationId: true,
+    },
+    where: (table, { eq }) => eq(table.userId, input.actorUserId),
+  });
+  if (actorMemberships.length === 0) {
     return false;
   }
 
-  const role = parseOrganizationRole(membership.role);
-  return role === "owner" || role === "admin";
+  const actorOrganizationIds = actorMemberships.map((membership) => membership.organizationId);
+  const sharedMembership = await input.db.query.members.findFirst({
+    columns: {
+      id: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.userId, input.targetUserId),
+        inArray(table.organizationId, actorOrganizationIds),
+      ),
+  });
+
+  return sharedMembership !== undefined;
 }
 
 async function normalizeAvatarImage(input: {

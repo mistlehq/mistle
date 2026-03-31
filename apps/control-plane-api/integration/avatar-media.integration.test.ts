@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 
 import { GetObjectCommand, HeadObjectCommand, NoSuchKey, S3Client } from "@aws-sdk/client-s3";
+import { MemberRoles, members } from "@mistle/db/control-plane";
 import sharp from "sharp";
 import { describe, expect } from "vitest";
 
@@ -232,6 +233,10 @@ describe("avatar media integration", () => {
       accessKeyId: mediaConfig.s3.accessKeyId,
       secretAccessKey: mediaConfig.s3.secretAccessKey,
     });
+    const sourceImage = await createPngBuffer({
+      width: 256,
+      height: 256,
+    });
 
     const createResponse = await fixture.request("/v1/media/avatar-upload-sessions", {
       method: "POST",
@@ -245,17 +250,13 @@ describe("avatar media integration", () => {
           id: authSession.userId,
         },
         contentType: "image/png",
-        fileSize: 2048,
+        fileSize: sourceImage.length,
         fileName: "avatar.png",
       }),
     });
 
     expect(createResponse.status).toBe(200);
     const upload = readUploadPayload(await createResponse.json());
-    const sourceImage = await createPngBuffer({
-      width: 256,
-      height: 256,
-    });
 
     await uploadDirectObject({
       uploadUrl: upload.uploadUrl,
@@ -320,6 +321,10 @@ describe("avatar media integration", () => {
     });
     expect(sessionResponse.status).toBe(200);
     expect(readSessionUserImage(await sessionResponse.json())).toBe(avatarUrl);
+    const replacementImage = await createPngBuffer({
+      width: 320,
+      height: 320,
+    });
 
     const replacementCreateResponse = await fixture.request("/v1/media/avatar-upload-sessions", {
       method: "POST",
@@ -333,21 +338,17 @@ describe("avatar media integration", () => {
           id: authSession.userId,
         },
         contentType: "image/png",
-        fileSize: 2048,
+        fileSize: replacementImage.length,
         fileName: "avatar-replacement.png",
       }),
     });
     expect(replacementCreateResponse.status).toBe(200);
     const replacementUpload = readUploadPayload(await replacementCreateResponse.json());
-
     await uploadDirectObject({
       uploadUrl: replacementUpload.uploadUrl,
       uploadMethod: replacementUpload.uploadMethod,
       uploadHeaders: replacementUpload.uploadHeaders,
-      body: await createPngBuffer({
-        width: 320,
-        height: 320,
-      }),
+      body: replacementImage,
     });
 
     const replacementFinalizeResponse = await fixture.request(
@@ -397,6 +398,32 @@ describe("avatar media integration", () => {
     const unauthorizedRead = await fixture.request(`/v1/media/users/${authSession.userId}/avatar`);
     expect(unauthorizedRead.status).toBe(401);
 
+    const outsiderSession = await fixture.authSession({
+      email: "integration-avatar-outsider@example.com",
+    });
+    const forbiddenRead = await fixture.request(`/v1/media/users/${authSession.userId}/avatar`, {
+      headers: {
+        cookie: outsiderSession.cookie,
+      },
+    });
+    expect(forbiddenRead.status).toBe(403);
+
+    await fixture.db.insert(members).values({
+      organizationId: authSession.organizationId,
+      userId: outsiderSession.userId,
+      role: MemberRoles.MEMBER,
+    });
+
+    const sharedOrganizationRead = await fixture.request(
+      `/v1/media/users/${authSession.userId}/avatar`,
+      {
+        headers: {
+          cookie: outsiderSession.cookie,
+        },
+      },
+    );
+    expect(sharedOrganizationRead.status).toBe(302);
+
     const deleteResponse = await fixture.request("/v1/media/users/me/avatar", {
       method: "DELETE",
       headers: {
@@ -441,6 +468,10 @@ describe("avatar media integration", () => {
     const authSession = await fixture.authSession({
       email: "integration-avatar-org@example.com",
     });
+    const logoImage = await createPngBuffer({
+      width: 256,
+      height: 256,
+    });
 
     const createResponse = await fixture.request("/v1/media/avatar-upload-sessions", {
       method: "POST",
@@ -454,7 +485,7 @@ describe("avatar media integration", () => {
           id: authSession.organizationId,
         },
         contentType: "image/png",
-        fileSize: 2048,
+        fileSize: logoImage.length,
         fileName: "logo.png",
       }),
     });
@@ -466,10 +497,7 @@ describe("avatar media integration", () => {
       uploadUrl: upload.uploadUrl,
       uploadMethod: upload.uploadMethod,
       uploadHeaders: upload.uploadHeaders,
-      body: await createPngBuffer({
-        width: 256,
-        height: 256,
-      }),
+      body: logoImage,
     });
 
     const finalizeResponse = await fixture.request("/v1/media/avatar-upload-sessions/finalize", {
@@ -526,6 +554,35 @@ describe("avatar media integration", () => {
     );
     expect(mediaRedirect.status).toBe(302);
 
+    const outsiderSession = await fixture.authSession({
+      email: "integration-avatar-org-outsider@example.com",
+    });
+    const forbiddenRead = await fixture.request(
+      `/v1/media/organizations/${authSession.organizationId}/logo`,
+      {
+        headers: {
+          cookie: outsiderSession.cookie,
+        },
+      },
+    );
+    expect(forbiddenRead.status).toBe(403);
+
+    await fixture.db.insert(members).values({
+      organizationId: authSession.organizationId,
+      userId: outsiderSession.userId,
+      role: MemberRoles.MEMBER,
+    });
+
+    const memberRead = await fixture.request(
+      `/v1/media/organizations/${authSession.organizationId}/logo`,
+      {
+        headers: {
+          cookie: outsiderSession.cookie,
+        },
+      },
+    );
+    expect(memberRead.status).toBe(302);
+
     const deleteResponse = await fixture.request(
       `/v1/media/organizations/${authSession.organizationId}/logo`,
       {
@@ -555,6 +612,10 @@ describe("avatar media integration", () => {
     const authSession = await fixture.authSession({
       email: "integration-avatar-small@example.com",
     });
+    const smallImage = await createPngBuffer({
+      width: 64,
+      height: 64,
+    });
 
     const createResponse = await fixture.request("/v1/media/avatar-upload-sessions", {
       method: "POST",
@@ -568,7 +629,7 @@ describe("avatar media integration", () => {
           id: authSession.userId,
         },
         contentType: "image/png",
-        fileSize: 512,
+        fileSize: smallImage.length,
         fileName: "small.png",
       }),
     });
@@ -579,10 +640,7 @@ describe("avatar media integration", () => {
       uploadUrl: upload.uploadUrl,
       uploadMethod: upload.uploadMethod,
       uploadHeaders: upload.uploadHeaders,
-      body: await createPngBuffer({
-        width: 64,
-        height: 64,
-      }),
+      body: smallImage,
     });
 
     const finalizeResponse = await fixture.request("/v1/media/avatar-upload-sessions/finalize", {
@@ -666,5 +724,71 @@ describe("avatar media integration", () => {
       where: (table, { eq }) => eq(table.id, upload.uploadSessionId),
     });
     expect(uploadSessionRow?.finalizedAt).toBeNull();
+  });
+
+  it("rejects finalize when the uploaded object exceeds the declared file size", async ({
+    fixture,
+  }) => {
+    const authSession = await fixture.authSession({
+      email: "integration-avatar-oversized@example.com",
+    });
+
+    const createResponse = await fixture.request("/v1/media/avatar-upload-sessions", {
+      method: "POST",
+      headers: {
+        cookie: authSession.cookie,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        subject: {
+          kind: "user",
+          id: authSession.userId,
+        },
+        contentType: "image/png",
+        fileSize: 1,
+        fileName: "oversized.png",
+      }),
+    });
+    expect(createResponse.status).toBe(200);
+    const upload = readUploadPayload(await createResponse.json());
+
+    await uploadDirectObject({
+      uploadUrl: upload.uploadUrl,
+      uploadMethod: upload.uploadMethod,
+      uploadHeaders: upload.uploadHeaders,
+      body: await createPngBuffer({
+        width: 256,
+        height: 256,
+      }),
+    });
+
+    const finalizeResponse = await fixture.request("/v1/media/avatar-upload-sessions/finalize", {
+      method: "POST",
+      headers: {
+        cookie: authSession.cookie,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        uploadSessionId: upload.uploadSessionId,
+      }),
+    });
+    expect(finalizeResponse.status).toBe(400);
+
+    const payload = toRecord(await finalizeResponse.json());
+    expect(readString(payload ?? {}, "message")).toBe(
+      "Uploaded avatar file exceeds the declared size limit.",
+    );
+
+    const userRow = await fixture.db.query.users.findFirst({
+      columns: {
+        avatarKey: true,
+        image: true,
+      },
+      where: (table, { eq }) => eq(table.id, authSession.userId),
+    });
+    expect(userRow).toEqual({
+      avatarKey: null,
+      image: null,
+    });
   });
 });
