@@ -189,12 +189,19 @@ export interface paths {
                 name: string;
               }[];
               egressRoutes: {
-                authInjection: {
-                  target: string;
-                  /** @enum {string} */
-                  type: "bearer" | "basic" | "header" | "query";
-                  username?: string;
-                };
+                authInjection:
+                  | {
+                      target: string;
+                      /** @enum {string} */
+                      type: "bearer" | "basic" | "header" | "query";
+                      username?: string;
+                    }
+                  | {
+                      region: string;
+                      service: string;
+                      /** @enum {string} */
+                      type: "aws_sigv4";
+                    };
                 bindingId: string;
                 credentialResolver: {
                   connectionId: string;
@@ -477,12 +484,19 @@ export interface paths {
                   name: string;
                 }[];
                 egressRoutes: {
-                  authInjection: {
-                    target: string;
-                    /** @enum {string} */
-                    type: "bearer" | "basic" | "header" | "query";
-                    username?: string;
-                  };
+                  authInjection:
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "bearer" | "basic" | "header" | "query";
+                        username?: string;
+                      }
+                    | {
+                        region: string;
+                        service: string;
+                        /** @enum {string} */
+                        type: "aws_sigv4";
+                      };
                   bindingId: string;
                   credentialResolver: {
                     connectionId: string;
