@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 

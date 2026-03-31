@@ -1,3 +1,5 @@
+import { setTimeout as delay } from "node:timers/promises";
+
 import { QueryClient } from "@tanstack/react-query";
 
 const ActiveQueryClients = new Set<QueryClient>();
@@ -35,7 +37,5 @@ export async function cleanupTestQueryClients(): Promise<void> {
 }
 
 export async function flushScheduledReactWork(): Promise<void> {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, 0);
-  });
+  await delay(0);
 }
