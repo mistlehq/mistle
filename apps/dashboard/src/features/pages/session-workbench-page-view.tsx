@@ -12,9 +12,12 @@ type SessionWorkbenchAlert = {
   description: string;
 };
 
+type SessionWorkbenchMainContentLayout = "chat" | "full";
+
 type SessionWorkbenchPageViewProps = {
   sandboxInstanceId: string | null;
   alerts: readonly SessionWorkbenchAlert[];
+  mainContentLayout?: SessionWorkbenchMainContentLayout;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
   secondaryPanel: React.ReactNode;
@@ -23,11 +26,16 @@ type SessionWorkbenchPageViewProps = {
   isSecondaryPanelVisible: boolean;
 };
 
-export type { SessionWorkbenchAlert, SessionWorkbenchPageViewProps };
+export type {
+  SessionWorkbenchAlert,
+  SessionWorkbenchMainContentLayout,
+  SessionWorkbenchPageViewProps,
+};
 
 export function SessionWorkbenchPageView({
   sandboxInstanceId,
   alerts,
+  mainContentLayout = "chat",
   mainContent,
   primaryBottomPanel,
   secondaryPanel,
@@ -43,6 +51,11 @@ export function SessionWorkbenchPageView({
       </Alert>
     );
   }
+
+  const hasPrimaryBottomPanel =
+    primaryBottomPanel !== null && primaryBottomPanel !== undefined && primaryBottomPanel !== false;
+  const mainContentContainerClassName =
+    mainContentLayout === "full" ? "h-full w-full" : "mx-auto w-full max-w-3xl px-4 pb-4";
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -71,12 +84,14 @@ export function SessionWorkbenchPageView({
                 role="region"
                 style={{ scrollbarGutter: "stable both-edges" }}
               >
-                <div className="mx-auto w-full max-w-3xl px-4 pb-4">{mainContent}</div>
+                <div className={mainContentContainerClassName}>{mainContent}</div>
               </div>
 
-              <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
-                <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
-              </div>
+              {!hasPrimaryBottomPanel ? null : (
+                <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
+                  <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
+                </div>
+              )}
             </div>
           </ResizablePanel>
           <ResizableHandle />
@@ -100,12 +115,14 @@ export function SessionWorkbenchPageView({
             role="region"
             style={{ scrollbarGutter: "stable both-edges" }}
           >
-            <div className="mx-auto w-full max-w-3xl px-4 pb-4">{mainContent}</div>
+            <div className={mainContentContainerClassName}>{mainContent}</div>
           </div>
 
-          <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
-            <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
-          </div>
+          {!hasPrimaryBottomPanel ? null : (
+            <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
+              <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
+            </div>
+          )}
         </>
       )}
     </div>

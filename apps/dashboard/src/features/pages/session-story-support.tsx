@@ -58,6 +58,7 @@ export function createStorySessionBottomPanel(
 export function renderSessionWorkbenchStory(input: {
   alerts?: readonly SessionWorkbenchAlert[];
   isSecondaryPanelVisible?: boolean;
+  mainContentLayout?: React.ComponentProps<typeof SessionWorkbenchPageView>["mainContentLayout"];
   mainContent: React.ReactNode;
   onSecondaryPanelResize?: (size: number) => void;
   primaryBottomPanel: React.ReactNode;
@@ -65,6 +66,9 @@ export function renderSessionWorkbenchStory(input: {
   secondaryPanelSize?: number;
   sandboxInstanceId?: string | null;
 }): React.JSX.Element {
+  const mainContentLayoutProps =
+    input.mainContentLayout === undefined ? {} : { mainContentLayout: input.mainContentLayout };
+
   return (
     <SessionWorkbenchPageView
       alerts={input.alerts ?? []}
@@ -75,6 +79,7 @@ export function renderSessionWorkbenchStory(input: {
       secondaryPanel={input.secondaryPanel ?? <></>}
       secondaryPanelSize={input.secondaryPanelSize ?? 38}
       sandboxInstanceId={input.sandboxInstanceId ?? StorySandboxInstanceId}
+      {...mainContentLayoutProps}
     />
   );
 }

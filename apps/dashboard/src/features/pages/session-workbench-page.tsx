@@ -248,6 +248,9 @@ function SessionWorkbenchPageContent(input: {
     <SessionWorkbenchPageView
       alerts={workbench.hasTopAlert ? alerts : []}
       isSecondaryPanelVisible={workbench.terminalPanelState.isVisible}
+      mainContentLayout={
+        workbench.primaryPanelState.transitionState === "stable_cli" ? "full" : "chat"
+      }
       mainContent={resolvePrimaryPanelMainContent({
         chatEntries: conversationPane.chatState.entries,
         cliPtyState: workbench.cliPtyState,
