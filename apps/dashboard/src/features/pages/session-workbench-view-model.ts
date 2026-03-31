@@ -22,21 +22,7 @@ export function resolveSessionHeaderStatusUi(input: {
     };
   }
 
-  if (input.hasConnectionError || input.agentConnectionState === "error") {
-    return {
-      label: "Connection failed",
-      variant: "destructive",
-    };
-  }
-
-  if (input.isRecoveringSession && input.sandboxStatus === "running") {
-    return {
-      label: "Reconnecting session",
-      variant: "outline",
-    };
-  }
-
-  if (input.agentConnectionState === "ready") {
+  if (input.sandboxStatus === "running") {
     return {
       label: "Connected",
       variant: "secondary",
@@ -44,7 +30,7 @@ export function resolveSessionHeaderStatusUi(input: {
     };
   }
 
-  if (input.sandboxStatus === "stopped" && input.step === "idle") {
+  if (input.sandboxStatus === "stopped") {
     return {
       label: "Sandbox stopped",
       variant: "outline",
@@ -65,36 +51,7 @@ export function resolveSessionHeaderStatusUi(input: {
     };
   }
 
-  if (input.agentConnectionState === "opening_agent_stream") {
-    return {
-      label: "Connecting",
-      variant: "outline",
-    };
-  }
-
-  if (input.agentConnectionState === "initializing") {
-    return {
-      label: "Initializing",
-      variant: "outline",
-    };
-  }
-
-  if (
-    input.agentConnectionState === "connecting_socket" ||
-    input.agentConnectionState === "connected_socket" ||
-    input.step === "securing" ||
-    input.step === "connecting"
-  ) {
-    return {
-      label: "Connecting",
-      variant: "outline",
-    };
-  }
-
-  return {
-    label: "Session idle",
-    variant: "outline",
-  };
+  throw new Error(`Unexpected sandbox status: ${input.sandboxStatus}`);
 }
 
 export function hasSessionTopAlert(input: {

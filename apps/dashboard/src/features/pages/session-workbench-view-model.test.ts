@@ -10,13 +10,13 @@ import {
 describe("resolveSessionHeaderStatusUi", () => {
   it.each([
     {
-      description: "shows connected when the transport is ready",
+      description: "shows connected when the sandbox is running",
       input: {
         sandboxStatus: "running",
-        agentConnectionState: "ready",
-        step: "connected",
-        hasConnectionError: false,
-        isRecoveringSession: false,
+        agentConnectionState: "idle",
+        step: "idle",
+        hasConnectionError: true,
+        isRecoveringSession: true,
       } as const,
       expected: {
         label: "Connected",
@@ -39,16 +39,16 @@ describe("resolveSessionHeaderStatusUi", () => {
       },
     },
     {
-      description: "shows connecting while the agent is still handshaking",
+      description: "shows starting while the sandbox is not yet running",
       input: {
-        sandboxStatus: "running",
+        sandboxStatus: "starting",
         agentConnectionState: "opening_agent_stream",
         step: "connecting",
         hasConnectionError: false,
         isRecoveringSession: false,
       } as const,
       expected: {
-        label: "Connecting",
+        label: "Starting sandbox",
         variant: "outline",
       },
     },
@@ -67,8 +67,7 @@ describe("resolveSessionHeaderStatusUi", () => {
       },
     },
     {
-      description:
-        "shows connected once the agent channel is ready even if sandbox status is stale",
+      description: "shows stopped when the sandbox is stopped even if chat state is stale",
       input: {
         sandboxStatus: "stopped",
         agentConnectionState: "ready",
@@ -77,13 +76,12 @@ describe("resolveSessionHeaderStatusUi", () => {
         isRecoveringSession: false,
       } as const,
       expected: {
-        label: "Connected",
-        variant: "secondary",
-        className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+        label: "Sandbox stopped",
+        variant: "outline",
       },
     },
     {
-      description: "shows reconnecting while recovering an interrupted running session",
+      description: "ignores session recovery state while the sandbox is running",
       input: {
         sandboxStatus: "running",
         agentConnectionState: "idle",
@@ -92,8 +90,9 @@ describe("resolveSessionHeaderStatusUi", () => {
         isRecoveringSession: true,
       } as const,
       expected: {
-        label: "Reconnecting session",
-        variant: "outline",
+        label: "Connected",
+        variant: "secondary",
+        className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
       },
     },
   ])("$description", ({ input, expected }) => {
