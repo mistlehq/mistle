@@ -831,8 +831,8 @@ importers:
   packages/sandbox-rs-napi:
     devDependencies:
       '@napi-rs/cli':
-        specifier: ^3.5.1
-        version: 3.5.1(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@25.5.0)(node-addon-api@7.1.1)
+        specifier: ^3.6.0
+        version: 3.6.0(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@25.5.0)(node-addon-api@7.1.1)
 
   packages/sandbox-session-client:
     dependencies:
@@ -2958,8 +2958,8 @@ packages:
     resolution: {integrity: sha512-XyroGQXcHrZdvmrGJvsA9KNeOOgGMg1Vg9OlheUsBOSKznLMDl+YChxbkboRHvtFYJEMRYmlV3uoo/njCw05iw==}
     engines: {node: '>=16'}
 
-  '@napi-rs/cli@3.5.1':
-    resolution: {integrity: sha512-XBfLQRDcB3qhu6bazdMJsecWW55kR85l5/k0af9BIBELXQSsCFU0fzug7PX8eQp6vVdm7W/U3z6uP5WmITB2Gw==}
+  '@napi-rs/cli@3.6.0':
+    resolution: {integrity: sha512-aA8m4+9XxnK1+0sr4GplZP0Ze90gkzO8sMKaplOK0zXbLnzsLl6O2BQQt6rTCcTRzIN24wrrByakr/imM+CxhA==}
     engines: {node: '>= 16'}
     hasBin: true
     peerDependencies:
@@ -7917,8 +7917,8 @@ packages:
   embla-carousel@8.6.0:
     resolution: {integrity: sha512-SjWyZBHJPbqxHOzckOfo8lHisEaJWmwd23XppYFYVh10bU66/Pn5tkVkbkCMZVdbUE5eTCI2nD8OyIP4Z+uwkA==}
 
-  emnapi@1.9.0:
-    resolution: {integrity: sha512-o/MgVYc9Xa92jNd5pk+PRtFx/IuWlILW1vqm9UU7V49Cnos+bK2y982HEtXcRgkdtxZylYBaGWEznC9Alo6xhg==}
+  emnapi@1.9.1:
+    resolution: {integrity: sha512-s4RbfzgbYg9cWBZXJT6LazImJQ5p+F+LyTsCWQJXbGVdPmtCtdlwqd0Oiv3O51KyYV/Hq58xszaQ/l153tK6Uw==}
     peerDependencies:
       node-addon-api: '>= 6.1.0'
     peerDependenciesMeta:
@@ -14393,15 +14393,15 @@ snapshots:
       lilconfig: 2.1.0
     optional: true
 
-  '@napi-rs/cli@3.5.1(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@25.5.0)(node-addon-api@7.1.1)':
+  '@napi-rs/cli@3.6.0(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@25.5.0)(node-addon-api@7.1.1)':
     dependencies:
       '@inquirer/prompts': 8.3.2(@types/node@25.5.0)
       '@napi-rs/cross-toolchain': 1.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)
-      '@napi-rs/wasm-tools': 1.0.1
+      '@napi-rs/wasm-tools': 1.0.1(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)
       '@octokit/rest': 22.0.1
       clipanion: 4.0.0-rc.4(typanion@3.14.0)
       colorette: 2.0.20
-      emnapi: 1.9.0(node-addon-api@7.1.1)
+      emnapi: 1.9.1(node-addon-api@7.1.1)
       es-toolkit: 1.45.1
       js-yaml: 4.1.1
       obug: 2.1.1
@@ -14630,9 +14630,12 @@ snapshots:
   '@napi-rs/wasm-tools-linux-x64-musl@1.0.1':
     optional: true
 
-  '@napi-rs/wasm-tools-wasm32-wasi@1.0.1':
+  '@napi-rs/wasm-tools-wasm32-wasi@1.0.1(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)':
     dependencies:
-      '@napi-rs/wasm-runtime': 1.1.1
+      '@napi-rs/wasm-runtime': 1.1.2(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)
+    transitivePeerDependencies:
+      - '@emnapi/core'
+      - '@emnapi/runtime'
     optional: true
 
   '@napi-rs/wasm-tools-win32-arm64-msvc@1.0.1':
@@ -14644,7 +14647,7 @@ snapshots:
   '@napi-rs/wasm-tools-win32-x64-msvc@1.0.1':
     optional: true
 
-  '@napi-rs/wasm-tools@1.0.1':
+  '@napi-rs/wasm-tools@1.0.1(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)':
     optionalDependencies:
       '@napi-rs/wasm-tools-android-arm-eabi': 1.0.1
       '@napi-rs/wasm-tools-android-arm64': 1.0.1
@@ -14655,10 +14658,13 @@ snapshots:
       '@napi-rs/wasm-tools-linux-arm64-musl': 1.0.1
       '@napi-rs/wasm-tools-linux-x64-gnu': 1.0.1
       '@napi-rs/wasm-tools-linux-x64-musl': 1.0.1
-      '@napi-rs/wasm-tools-wasm32-wasi': 1.0.1
+      '@napi-rs/wasm-tools-wasm32-wasi': 1.0.1(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)
       '@napi-rs/wasm-tools-win32-arm64-msvc': 1.0.1
       '@napi-rs/wasm-tools-win32-ia32-msvc': 1.0.1
       '@napi-rs/wasm-tools-win32-x64-msvc': 1.0.1
+    transitivePeerDependencies:
+      - '@emnapi/core'
+      - '@emnapi/runtime'
 
   '@noble/ciphers@2.1.1': {}
 
@@ -19507,7 +19513,7 @@ snapshots:
 
   embla-carousel@8.6.0: {}
 
-  emnapi@1.9.0(node-addon-api@7.1.1):
+  emnapi@1.9.1(node-addon-api@7.1.1):
     optionalDependencies:
       node-addon-api: 7.1.1
 
