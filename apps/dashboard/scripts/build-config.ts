@@ -49,9 +49,15 @@ function resolveGoogleAuthConfig(
   const googleClientSecret = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET;
 
   if (googleClientId !== undefined || googleClientSecret !== undefined) {
+    if (googleClientId === undefined || googleClientSecret === undefined) {
+      throw new Error(
+        "Dashboard build config requires both MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
+      );
+    }
+
     return {
-      clientId: googleClientId ?? "",
-      clientSecret: googleClientSecret ?? "",
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
     };
   }
 

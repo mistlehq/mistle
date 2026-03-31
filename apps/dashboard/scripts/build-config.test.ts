@@ -152,6 +152,52 @@ describe("loadDashboardBuildConfig", () => {
     });
   });
 
+  it("fails when only the google client id env var is set", () => {
+    const directory = createTempDirectory();
+    const configPath = join(directory, "config.toml");
+
+    writeFileSync(
+      configPath,
+      '[apps.dashboard]\ncontrol_plane_api_origin = "http://127.0.0.1:5100"\n',
+      "utf8",
+    );
+
+    expect(() =>
+      loadDashboardBuildConfig(
+        {
+          MISTLE_CONFIG_PATH: configPath,
+          MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID: "google-client-id",
+        },
+        "development",
+      ),
+    ).toThrow(
+      "Dashboard build config requires both MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
+    );
+  });
+
+  it("fails when only the google client secret env var is set", () => {
+    const directory = createTempDirectory();
+    const configPath = join(directory, "config.toml");
+
+    writeFileSync(
+      configPath,
+      '[apps.dashboard]\ncontrol_plane_api_origin = "http://127.0.0.1:5100"\n',
+      "utf8",
+    );
+
+    expect(() =>
+      loadDashboardBuildConfig(
+        {
+          MISTLE_CONFIG_PATH: configPath,
+          MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET: "google-client-secret",
+        },
+        "development",
+      ),
+    ).toThrow(
+      "Dashboard build config requires both MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
+    );
+  });
+
   it("fails when apps.dashboard.control_plane_api_origin is missing", () => {
     const directory = createTempDirectory();
     const configPath = join(directory, "config.toml");
