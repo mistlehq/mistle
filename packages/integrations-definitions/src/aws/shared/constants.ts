@@ -1,2 +1,9 @@
 export const AwsFamilyId = "aws";
 export const AwsDefaultVariantId = "aws-cli-default";
+export const AwsCliArtifactKey = "aws-cli";
+export const AwsCliArtifactName = "AWS CLI";
+export const AwsCliBootstrapClientId = "aws-cli-bootstrap";
+export const AwsCliInstallDir = "/usr/local/aws-cli-mistle";
+export const AwsCliManagedBinaryPath = "/usr/local/aws-cli-mistle/v2/current/bin/aws";
+export const AwsCliWrapperPath = "/usr/local/bin/aws";
+export const AwsCliConfigPath = "/root/.aws/config";
