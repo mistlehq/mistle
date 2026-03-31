@@ -36,6 +36,7 @@ export type AgentPtyLaunchTemplate = {
 export type AgentPtyLaunchSpec = {
   runtimeId: string;
   displayName: string;
+  logoKey: string;
   newLaunch: AgentPtyLaunchTemplate;
   resumeLaunch: AgentPtyLaunchTemplate;
 };
@@ -74,6 +75,7 @@ export type AgentRuntimeDefinition<
 > = {
   runtimeId: string;
   displayName: string;
+  logoKey: string;
   configSchema: TRuntimeConfigSchema;
   configForm?: IntegrationFormDefinition;
   compileRuntime(

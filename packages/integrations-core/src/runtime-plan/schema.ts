@@ -212,6 +212,7 @@ const AgentPtyLaunchSpecSchema = z
   .object({
     runtimeId: z.string().min(1),
     displayName: z.string().min(1),
+    logoKey: z.string().min(1),
     newLaunch: AgentPtyLaunchTemplateSchema,
     resumeLaunch: AgentPtyLaunchTemplateSchema,
   })
@@ -418,6 +419,7 @@ function normalizeAgentRuntime(
     ptyLaunch: {
       runtimeId: agentRuntime.ptyLaunch.runtimeId,
       displayName: agentRuntime.ptyLaunch.displayName,
+      logoKey: agentRuntime.ptyLaunch.logoKey,
       newLaunch: {
         ptySessionId: agentRuntime.ptyLaunch.newLaunch.ptySessionId,
         cols: agentRuntime.ptyLaunch.newLaunch.cols,

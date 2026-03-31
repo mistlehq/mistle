@@ -35,6 +35,7 @@ function createAgentRuntime(overrides: Partial<CompiledAgentRuntime>): CompiledA
     ptyLaunch: {
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
       newLaunch: {
         ptySessionId: "cli",
         cols: 120,

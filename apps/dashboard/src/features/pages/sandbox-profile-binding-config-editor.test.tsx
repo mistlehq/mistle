@@ -65,8 +65,10 @@ describe("SandboxProfileBindingConfigEditor", () => {
     });
 
     expect(screen.getByText("Default model")).toBeDefined();
+    expect(screen.getByText("Runtime")).toBeDefined();
     expect(screen.getByText("Reasoning effort")).toBeDefined();
     expect(screen.getByText("Additional instructions")).toBeDefined();
+    expect(screen.getByLabelText("Runtime")).toBeDefined();
     expect(screen.getByLabelText("Default model")).toBeDefined();
     expect(screen.getByLabelText("Reasoning effort")).toBeDefined();
     const additionalInstructionsField = screen
@@ -78,8 +80,8 @@ describe("SandboxProfileBindingConfigEditor", () => {
       throw new Error("Expected Additional instructions textarea.");
     }
 
-    expect(container.querySelectorAll('[data-slot="select-trigger"]').length).toBe(2);
-    expect(screen.getAllByText("*").length).toBe(2);
+    expect(container.querySelectorAll('[data-slot="select-trigger"]').length).toBe(3);
+    expect(screen.getAllByText("*").length).toBe(3);
     expect(container.querySelector("textarea")).toBe(additionalInstructionsField);
   });
 

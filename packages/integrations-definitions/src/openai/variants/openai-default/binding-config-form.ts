@@ -31,6 +31,11 @@ function createChoiceList(
   }));
 }
 
+const OpenAiRuntimeLabelByValue: Readonly<Record<string, string>> = {
+  codex: "Codex",
+  opencode: "OpenCode",
+};
+
 function resolveSelectedModel(input: {
   models: readonly OpenAiModelId[];
   currentValue: Record<string, unknown> | undefined;
@@ -90,7 +95,8 @@ export function resolveOpenAiBindingConfigForm(
           },
           properties: {
             runtimeId: {
-              const: OpenAiAllowedRuntimeIds[0],
+              title: "Runtime",
+              oneOf: createChoiceList(OpenAiAllowedRuntimeIds, OpenAiRuntimeLabelByValue),
               default: OpenAiAllowedRuntimeIds[0],
             },
             config: {
@@ -131,7 +137,7 @@ export function resolveOpenAiBindingConfigForm(
     uiSchema: {
       runtime: {
         runtimeId: {
-          "ui:widget": "hidden",
+          "ui:widget": "SelectWidget",
         },
         config: {
           "ui:widget": "hidden",

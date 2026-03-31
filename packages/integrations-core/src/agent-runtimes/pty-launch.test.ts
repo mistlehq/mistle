@@ -5,6 +5,7 @@ import { resolveAgentPtyLaunchTemplate } from "./pty-launch.js";
 const CodexPtyLaunch = {
   runtimeId: "codex",
   displayName: "Codex",
+  logoKey: "openai",
   newLaunch: {
     ptySessionId: "cli",
     cols: 120,

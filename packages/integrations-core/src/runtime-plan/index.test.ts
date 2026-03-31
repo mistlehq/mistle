@@ -3,10 +3,16 @@ import { describe, expect, it } from "vitest";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { assembleCompiledRuntimePlan, CompiledRuntimePlanSchema } from "./index.js";
 
-function createPtyLaunch(input: { runtimeId: string; displayName?: string; command?: string }) {
+function createPtyLaunch(input: {
+  runtimeId: string;
+  displayName?: string;
+  logoKey?: string;
+  command?: string;
+}) {
   return {
     runtimeId: input.runtimeId,
     displayName: input.displayName ?? input.runtimeId,
+    logoKey: input.logoKey ?? input.runtimeId,
     newLaunch: {
       ptySessionId: "cli",
       cols: 120,

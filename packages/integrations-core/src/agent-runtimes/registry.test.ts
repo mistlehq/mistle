@@ -16,6 +16,7 @@ describe("agent runtime registry", () => {
     registry.register({
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
       configSchema: RuntimeConfigSchema,
       compileRuntime: () => ({
         runtimeClients: [],
@@ -31,6 +32,7 @@ describe("agent runtime registry", () => {
     const runtime = {
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
       configSchema: RuntimeConfigSchema,
       compileRuntime: () => ({
         runtimeClients: [],
@@ -54,6 +56,7 @@ describe("agent runtime registry", () => {
     registry.register({
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
       configSchema: RuntimeConfigSchema,
       compileRuntime: () => ({
         runtimeClients: [],
@@ -62,5 +65,22 @@ describe("agent runtime registry", () => {
     });
 
     expect(registry.getRuntime({ runtimeId: "codex" })?.runtimeId).toBe("codex");
+  });
+
+  it("rejects an empty runtime logo key", () => {
+    const registry = new AgentRuntimeRegistry();
+
+    expect(() =>
+      registry.register({
+        runtimeId: "codex",
+        displayName: "Codex",
+        logoKey: "   ",
+        configSchema: RuntimeConfigSchema,
+        compileRuntime: () => ({
+          runtimeClients: [],
+          agentRuntimes: [],
+        }),
+      }),
+    ).toThrow("Agent runtime definition logoKey must be non-empty.");
   });
 });

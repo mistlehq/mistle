@@ -2319,6 +2319,7 @@ export interface paths {
                   endpointKey: string;
                   ptyLaunch: {
                     displayName: string;
+                    logoKey: string;
                     newLaunch: {
                       args: (
                         | {
@@ -2745,6 +2746,7 @@ export interface paths {
                   endpointKey: string;
                   ptyLaunch: {
                     displayName: string;
+                    logoKey: string;
                     newLaunch: {
                       args: (
                         | {

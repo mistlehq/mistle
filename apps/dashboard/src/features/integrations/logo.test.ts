@@ -8,6 +8,9 @@ describe("resolveIntegrationLogoPath", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "github" })).toBe("/integration-logos/github.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "google" })).toBe("/integration-logos/google.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "linear" })).toBe("/integration-logos/linear.svg");
+    expect(resolveIntegrationLogoPath({ logoKey: "opencode" })).toBe(
+      "/integration-logos/opencode.svg",
+    );
   });
 
   it("trims whitespace from the logo key", () => {

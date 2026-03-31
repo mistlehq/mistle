@@ -34,7 +34,7 @@ const AvailableTargets: readonly IntegrationTargetSummary[] = [
 const Row: SandboxProfileBindingEditorRow = {
   clientId: "binding_row_story_001",
   connectionId: "icn_story_github",
-  kind: "config",
+  kind: "git",
   config: {},
 };
 
@@ -45,7 +45,6 @@ const meta = {
   args: {
     availableConnections: AvailableConnections,
     availableTargets: AvailableTargets,
-    errorMessage: undefined,
     onEdit: () => {},
     onRemove: () => {},
     row: Row,

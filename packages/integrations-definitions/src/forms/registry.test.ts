@@ -56,11 +56,13 @@ function registerRuntime(
   input: {
     runtimeId: string;
     displayName: string;
+    logoKey: string;
   },
 ): void {
   registry.register({
     runtimeId: input.runtimeId,
     displayName: input.displayName,
+    logoKey: input.logoKey,
     configSchema: z.object({}),
     compileRuntime: () => ({
       runtimeClients: [],
@@ -107,6 +109,12 @@ describe("integration form registry", () => {
     registerRuntime(agentRuntimeRegistry, {
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
+    });
+    registerRuntime(agentRuntimeRegistry, {
+      runtimeId: "opencode",
+      displayName: "OpenCode",
+      logoKey: "opencode",
     });
 
     const registry = createIntegrationFormRegistry({

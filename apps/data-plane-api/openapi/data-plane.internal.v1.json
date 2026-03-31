@@ -571,6 +571,10 @@
                                   "type": "string",
                                   "minLength": 1
                                 },
+                                "logoKey": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
                                 "newLaunch": {
                                   "type": "object",
                                   "properties": {
@@ -692,7 +696,13 @@
                                   "additionalProperties": false
                                 }
                               },
-                              "required": ["runtimeId", "displayName", "newLaunch", "resumeLaunch"],
+                              "required": [
+                                "runtimeId",
+                                "displayName",
+                                "logoKey",
+                                "newLaunch",
+                                "resumeLaunch"
+                              ],
                               "additionalProperties": false
                             }
                           },
@@ -1682,6 +1692,10 @@
                                     "type": "string",
                                     "minLength": 1
                                   },
+                                  "logoKey": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
                                   "newLaunch": {
                                     "type": "object",
                                     "properties": {
@@ -1806,6 +1820,7 @@
                                 "required": [
                                   "runtimeId",
                                   "displayName",
+                                  "logoKey",
                                   "newLaunch",
                                   "resumeLaunch"
                                 ],

@@ -9,6 +9,7 @@ export const CodexCliDefaultRows = 32;
 export const CodexPtyLaunchSpec: AgentPtyLaunchSpec = {
   runtimeId: "codex",
   displayName: "Codex",
+  logoKey: "openai",
   newLaunch: {
     ptySessionId: CodexCliPtySessionId,
     cols: CodexCliDefaultCols,

@@ -286,6 +286,7 @@ function validateAgentPtyLaunch(input: {
   ptyLaunch: {
     runtimeId: string;
     displayName: string;
+    logoKey: string;
     newLaunch: {
       ptySessionId: string;
       cols: number;
@@ -406,6 +407,12 @@ function validateAgentPtyLaunch(input: {
     throw new IntegrationCompilerError(
       CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
       `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must define a non-empty ptyLaunch.displayName.`,
+    );
+  }
+  if (input.ptyLaunch.logoKey.trim().length === 0) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+      `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must define a non-empty ptyLaunch.logoKey.`,
     );
   }
 

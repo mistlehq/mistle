@@ -63,6 +63,7 @@ function createRuntimePlan() {
             ptyLaunch: {
               runtimeId: "test-agent",
               displayName: "Test Agent",
+              logoKey: "test-agent",
               newLaunch: {
                 ptySessionId: "cli",
                 cols: 120,

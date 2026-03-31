@@ -58,6 +58,7 @@ type SessionWorkbenchCliHarness = {
 const CodexPtyLaunchSpec = {
   runtimeId: "codex",
   displayName: "Codex",
+  logoKey: "openai",
   newLaunch: {
     ptySessionId: "cli",
     cols: 120,

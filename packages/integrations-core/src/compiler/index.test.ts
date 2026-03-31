@@ -84,6 +84,7 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
   agentRuntimeRegistry.register({
     runtimeId: "codex",
     displayName: "Codex",
+    logoKey: "openai",
     configSchema: z.object({}).strict(),
     createConversationProvider: () => NoopConversationProvider,
     createExecutionObserver: () => NoopExecutionObserver,
@@ -211,6 +212,7 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
           ptyLaunch: {
             runtimeId: "codex",
             displayName: "Codex",
+            logoKey: "openai",
             newLaunch: {
               ptySessionId: "cli",
               cols: 120,
@@ -241,6 +243,7 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
   agentRuntimeRegistry.register({
     runtimeId: "claude-code",
     displayName: "Claude Code",
+    logoKey: "anthropic",
     configSchema: z.object({}).strict(),
     createConversationProvider: () => NoopConversationProvider,
     createExecutionObserver: () => NoopExecutionObserver,
@@ -292,6 +295,7 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
           ptyLaunch: {
             runtimeId: "claude-code",
             displayName: "Claude Code",
+            logoKey: "anthropic",
             newLaunch: {
               ptySessionId: "cli",
               cols: 120,
@@ -636,6 +640,7 @@ describe("compileRuntimePlan", () => {
         ptyLaunch: {
           runtimeId: "codex",
           displayName: "Codex",
+          logoKey: "openai",
           newLaunch: {
             ptySessionId: "cli",
             cols: 120,
@@ -1669,6 +1674,7 @@ describe("compileRuntimePlan", () => {
     agentRuntimeRegistry.register({
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
       configSchema: z.object({
         approvalPolicy: z.literal("never"),
       }),
@@ -1818,6 +1824,7 @@ describe("compileRuntimePlan", () => {
     agentRuntimeRegistry.register({
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
       configSchema: z.object({}).strict(),
       createConversationProvider: () => NoopConversationProvider,
       createExecutionObserver: () => NoopExecutionObserver,
@@ -1866,6 +1873,7 @@ describe("compileRuntimePlan", () => {
             ptyLaunch: {
               runtimeId: "codex",
               displayName: "Codex",
+              logoKey: "openai",
               newLaunch: {
                 ptySessionId: "cli",
                 cols: 120,

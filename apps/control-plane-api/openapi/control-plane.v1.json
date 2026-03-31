@@ -5088,6 +5088,10 @@
                                     "type": "string",
                                     "minLength": 1
                                   },
+                                  "logoKey": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
                                   "newLaunch": {
                                     "type": "object",
                                     "properties": {
@@ -5212,6 +5216,7 @@
                                 "required": [
                                   "runtimeId",
                                   "displayName",
+                                  "logoKey",
                                   "newLaunch",
                                   "resumeLaunch"
                                 ],
@@ -5973,6 +5978,10 @@
                                     "type": "string",
                                     "minLength": 1
                                   },
+                                  "logoKey": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
                                   "newLaunch": {
                                     "type": "object",
                                     "properties": {
@@ -6097,6 +6106,7 @@
                                 "required": [
                                   "runtimeId",
                                   "displayName",
+                                  "logoKey",
                                   "newLaunch",
                                   "resumeLaunch"
                                 ],

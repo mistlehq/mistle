@@ -58,8 +58,18 @@ describe("openai binding config forms", () => {
           },
           properties: {
             runtimeId: {
-              const: "codex",
+              title: "Runtime",
               default: "codex",
+              oneOf: [
+                {
+                  const: "codex",
+                  title: "Codex",
+                },
+                {
+                  const: "opencode",
+                  title: "OpenCode",
+                },
+              ],
             },
             config: {
               default: {},
@@ -117,7 +127,7 @@ describe("openai binding config forms", () => {
     expect(resolvedForm.uiSchema).toEqual({
       runtime: {
         runtimeId: {
-          "ui:widget": "hidden",
+          "ui:widget": "SelectWidget",
         },
         config: {
           "ui:widget": "hidden",

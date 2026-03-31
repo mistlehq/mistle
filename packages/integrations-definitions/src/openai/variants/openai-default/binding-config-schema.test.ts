@@ -139,7 +139,7 @@ describe("OpenAiApiKeyBindingConfigSchema", () => {
     ).toThrow(/Invalid option/);
   });
 
-  it("fails when runtime is not codex", () => {
+  it("fails when runtime is not supported", () => {
     expect(() =>
       OpenAiApiKeyBindingConfigSchema.parse({
         runtime: {
@@ -153,7 +153,24 @@ describe("OpenAiApiKeyBindingConfigSchema", () => {
           },
         },
       }),
-    ).toThrow(/Invalid input/);
+    ).toThrow(/Invalid option/);
+  });
+
+  it("parses a valid opencode binding config", () => {
+    const parsed = OpenAiApiKeyBindingConfigSchema.parse({
+      runtime: {
+        runtimeId: "opencode",
+        config: {},
+      },
+      model: {
+        defaultModel: "gpt-5.3-codex",
+        options: {
+          reasoningEffort: "medium",
+        },
+      },
+    });
+
+    expect(parsed.runtime.runtimeId).toBe("opencode");
   });
 
   it("fails when reasoning effort is missing", () => {

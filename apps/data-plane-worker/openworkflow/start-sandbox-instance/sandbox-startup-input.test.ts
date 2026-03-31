@@ -175,6 +175,7 @@ const RuntimePlanSchema = z.object({
       ptyLaunch: z.object({
         runtimeId: z.string().min(1),
         displayName: z.string().min(1),
+        logoKey: z.string().min(1),
         newLaunch: z.object({
           ptySessionId: z.string().min(1),
           cols: z.int().positive(),

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { OpenAiModelIds, OpenAiReasoningEfforts } from "./model-capabilities.js";
 export { OpenAiReasoningEfforts } from "./model-capabilities.js";
 
-export const OpenAiAllowedRuntimeIds = ["codex"] as const;
+export const OpenAiAllowedRuntimeIds = ["codex", "opencode"] as const;
 
 const OpenAiAdditionalInstructionsSchema = z.preprocess((value) => {
   if (typeof value !== "string") {

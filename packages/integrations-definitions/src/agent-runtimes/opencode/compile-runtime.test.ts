@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { compileCodexRuntime } from "./compile-runtime.js";
+import { compileOpencodeRuntime } from "./compile-runtime.js";
 
-describe("compileCodexRuntime", () => {
-  it("compiles Codex runtime artifacts and app-server wiring from provider access", () => {
-    const compiled = compileCodexRuntime({
+describe("compileOpencodeRuntime", () => {
+  it("compiles OpenCode runtime artifacts and headless server wiring from provider access", () => {
+    const compiled = compileOpencodeRuntime({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 1,
       bindingId: "bind_openai_agent",
       connectionId: "conn_openai_org_123",
-      runtimeId: "codex",
+      runtimeId: "opencode",
       runtimeConfig: {},
       providerAccess: {
         providerFamilyId: "openai",
@@ -24,7 +24,7 @@ describe("compileCodexRuntime", () => {
         allowedMethods: ["GET", "POST"],
         allowedPathPrefixes: ["/"],
         defaultModel: "gpt-5.3-codex",
-        allowedModels: ["gpt-5.3-codex"],
+        allowedModels: ["gpt-5.3-codex", "gpt-5.4"],
         providerMetadata: {
           reasoningEffort: "medium",
           additionalInstructions: "Prefer concise answers.",
@@ -34,7 +34,7 @@ describe("compileCodexRuntime", () => {
       refs: {
         sandboxPaths: {
           userHomeDir: "/root",
-          workspaceDir: "/root",
+          workspaceDir: "/workspace",
           runtimeDataDir: "/var/lib/mistle",
           runtimeArtifactDir: "/var/lib/mistle/artifacts",
           runtimeArtifactBinDir: "/usr/local/bin",
@@ -64,74 +64,48 @@ describe("compileCodexRuntime", () => {
       },
     ]);
     expect(compiled.artifacts).toHaveLength(1);
-    expect(compiled.artifacts?.[0]?.artifactKey).toBe("codex-cli");
+    expect(compiled.artifacts?.[0]?.artifactKey).toBe("opencode-cli");
     expect(compiled.runtimeClients).toHaveLength(1);
     expect(compiled.runtimeClients[0]).toMatchObject({
-      clientId: "codex-cli",
+      clientId: "opencode-cli",
       setup: {
         env: {
-          OPENAI_MODEL: "gpt-5.3-codex",
-          OPENAI_REASONING_EFFORT: "medium",
+          OPENCODE_CONFIG_DIR: "/etc/opencode",
+          OPENCODE_CONFIG: "/etc/opencode/opencode.json",
         },
       },
     });
     expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain(
-      'developer_instructions = "Mistle-managed sandbox context:',
+      '"model": "openai/gpt-5.3-codex"',
     );
-    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain(
+    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain('"variant": "medium"');
+    expect(compiled.runtimeClients[0]?.setup.files[1]?.content).toContain(
+      "Mistle-managed sandbox context:",
+    );
+    expect(compiled.runtimeClients[0]?.setup.files[1]?.content).toContain(
       "Prefer concise answers.",
     );
-    expect(compiled.agentRuntimes).toEqual([
+    expect(compiled.runtimeClients[0]?.processes).toEqual([
       {
-        runtimeId: "codex",
-        runtimeKey: "codex-app-server",
-        clientId: "codex-cli",
-        endpointKey: "app-server",
-        ptyLaunch: {
-          runtimeId: "codex",
-          displayName: "Codex",
-          logoKey: "openai",
-          newLaunch: {
-            ptySessionId: "cli",
-            cols: 120,
-            rows: 32,
-            command: "codex",
-            args: [
-              {
-                kind: "literal",
-                value: "--remote",
-              },
-              {
-                kind: "literal",
-                value: "ws://127.0.0.1:4500",
-              },
-            ],
-          },
-          resumeLaunch: {
-            ptySessionId: "cli",
-            cols: 120,
-            rows: 32,
-            command: "codex",
-            args: [
-              {
-                kind: "literal",
-                value: "resume",
-              },
-              {
-                kind: "literal",
-                value: "--remote",
-              },
-              {
-                kind: "literal",
-                value: "ws://127.0.0.1:4500",
-              },
-              {
-                kind: "threadId",
-              },
-            ],
-          },
+        processKey: "opencode-server",
+        command: {
+          args: ["/usr/local/bin/opencode", "serve", "--hostname", "127.0.0.1", "--port", "4601"],
+          cwd: "/workspace",
+        },
+        readiness: {
+          type: "http",
+          url: "http://127.0.0.1:4601/session/status",
+          expectedStatus: 200,
+          timeoutMs: 5_000,
+        },
+        stop: {
+          signal: "sigterm",
+          timeoutMs: 10_000,
+          gracePeriodMs: 2_000,
         },
       },
     ]);
+    expect(compiled.runtimeClients[0]?.endpoints).toEqual([]);
+    expect(compiled.agentRuntimes).toEqual([]);
   });
 });

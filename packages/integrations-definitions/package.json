@@ -39,6 +39,12 @@
       "import": "./src/agent-runtimes/codex/client.ts",
       "default": "./src/agent-runtimes/codex/client.ts"
     },
+    "./agent-runtimes/opencode": {
+      "types": "./src/agent-runtimes/opencode/index.ts",
+      "node": "./dist/agent-runtimes/opencode/index.js",
+      "import": "./src/agent-runtimes/opencode/index.ts",
+      "default": "./src/agent-runtimes/opencode/index.ts"
+    },
     "./openai": {
       "types": "./src/openai/index.ts",
       "node": "./dist/openai/index.js",
