@@ -6,7 +6,7 @@ import {
   steerCodexTurn,
   type CodexTurnInputLocalImageItem,
   type CodexJsonRpcClient,
-} from "@mistle/integrations-definitions/openai/agent/client";
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useReducer, type RefObject } from "react";
 

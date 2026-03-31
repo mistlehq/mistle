@@ -12,10 +12,34 @@ export default defineConfig({
         ),
       },
       {
-        find: /^@mistle\/integrations-definitions\/openai\/agent\/client$/,
+        find: /^@mistle\/integrations-core$/,
+        replacement: fileURLToPath(
+          new URL("../../packages/integrations-core/src/index.ts", import.meta.url),
+        ),
+      },
+      {
+        find: /^@mistle\/integrations-definitions\/agent-runtimes\/codex\/client$/,
         replacement: fileURLToPath(
           new URL(
-            "../../packages/integrations-definitions/src/openai/agent.client.ts",
+            "../../packages/integrations-definitions/src/agent-runtimes/codex/client.ts",
+            import.meta.url,
+          ),
+        ),
+      },
+      {
+        find: /^@mistle\/integrations-definitions\/agent-runtimes\/codex$/,
+        replacement: fileURLToPath(
+          new URL(
+            "../../packages/integrations-definitions/src/agent-runtimes/codex/index.ts",
+            import.meta.url,
+          ),
+        ),
+      },
+      {
+        find: /^@mistle\/integrations-definitions\/agent-runtimes\/codex\/app-server$/,
+        replacement: fileURLToPath(
+          new URL(
+            "../../packages/integrations-definitions/src/agent-runtimes/codex/app-server.ts",
             import.meta.url,
           ),
         ),
@@ -24,6 +48,12 @@ export default defineConfig({
         find: /^@mistle\/sandbox-session-client$/,
         replacement: fileURLToPath(
           new URL("../../packages/sandbox-session-client/src/index.ts", import.meta.url),
+        ),
+      },
+      {
+        find: /^@mistle\/sandbox-session-protocol$/,
+        replacement: fileURLToPath(
+          new URL("../../packages/sandbox-session-protocol/src/index.ts", import.meta.url),
         ),
       },
       {

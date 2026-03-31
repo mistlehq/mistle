@@ -1,4 +1,4 @@
-import type { CodexThreadSummary } from "@mistle/integrations-definitions/openai/agent/client";
+import type { CodexThreadSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
 function resolveThreadCreatedAt(thread: CodexThreadSummary): number {
   if (thread.createdAt !== null) {

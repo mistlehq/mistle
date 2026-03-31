@@ -2,13 +2,13 @@
 
 import { type IncomingMessage, type ServerResponse } from "node:http";
 
+import { CodexAppServerListenUrl } from "@mistle/integrations-definitions/agent-runtimes/codex/app-server";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import { type RawData, type WebSocket, WebSocket as NodeWebSocket, WebSocketServer } from "ws";
 
-import { OpenAiCodexAppServerListenUrl } from "../../../packages/integrations-definitions/src/openai/index.ts";
 import {
   decodeDataFrame,
   parseStreamControlMessage,
@@ -616,8 +616,8 @@ function expectCliPty(record: PtyOpenRecord, input?: { threadId?: string | null 
   expect(record.channel.command).toBe("codex");
   expect(record.channel.args).toEqual(
     input?.threadId === null
-      ? ["--remote", OpenAiCodexAppServerListenUrl]
-      : ["resume", "--remote", OpenAiCodexAppServerListenUrl, input?.threadId ?? "thread_cli_test"],
+      ? ["--remote", CodexAppServerListenUrl]
+      : ["resume", "--remote", CodexAppServerListenUrl, input?.threadId ?? "thread_cli_test"],
   );
 }
 

@@ -2,9 +2,9 @@ export { CodexRuntimeDefinition } from "./definition.js";
 export { CodexRuntimeConfigSchema, type CodexRuntimeConfig } from "./runtime-config-schema.js";
 export { compileCodexRuntime } from "./compile-runtime.js";
 export {
-  OpenAiCodexAppServerEndpointKey,
-  OpenAiCodexAppServerListenUrl,
-  OpenAiCodexAppServerProcessKey,
+  CodexAppServerEndpointKey,
+  CodexAppServerListenUrl,
+  CodexAppServerProcessKey,
 } from "./app-server.js";
 export {
   CodexCliDefaultCols,

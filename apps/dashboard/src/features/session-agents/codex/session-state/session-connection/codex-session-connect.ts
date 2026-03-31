@@ -4,7 +4,7 @@ import {
   startCodexThread,
   type CodexJsonRpcClient,
   type CodexThreadSummary,
-} from "@mistle/integrations-definitions/openai/agent/client";
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
 import type { MintSandboxConnectionTokenResult } from "../../../../sessions/sessions-service.js";
 import type { ConnectedCodexSession } from "../codex-session-types.js";

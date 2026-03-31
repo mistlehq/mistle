@@ -1,9 +1,8 @@
 import { resolveAgentPtyLaunchTemplate } from "@mistle/integrations-core";
+import { CodexPtyLaunchSpec } from "@mistle/integrations-definitions/agent-runtimes/codex";
 import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
-
-import { CodexPtyLaunchSpec } from "../../../../../packages/integrations-definitions/src/agent-runtimes/codex/index.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {

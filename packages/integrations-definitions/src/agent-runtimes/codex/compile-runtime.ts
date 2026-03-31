@@ -6,9 +6,9 @@ import {
 import { stringify as stringifyToml } from "smol-toml";
 
 import {
-  OpenAiCodexAppServerEndpointKey,
-  OpenAiCodexAppServerListenUrl,
-  OpenAiCodexAppServerProcessKey,
+  CodexAppServerEndpointKey,
+  CodexAppServerListenUrl,
+  CodexAppServerProcessKey,
 } from "./app-server.js";
 import { CodexPtyLaunchSpec } from "./pty-launch.js";
 
@@ -196,13 +196,13 @@ export function compileCodexRuntime(
         },
         processes: [
           {
-            processKey: OpenAiCodexAppServerProcessKey,
+            processKey: CodexAppServerProcessKey,
             command: {
-              args: [codexCliInstallPath, "app-server", "--listen", OpenAiCodexAppServerListenUrl],
+              args: [codexCliInstallPath, "app-server", "--listen", CodexAppServerListenUrl],
             },
             readiness: {
               type: "ws",
-              url: OpenAiCodexAppServerListenUrl,
+              url: CodexAppServerListenUrl,
               timeoutMs: RuntimeClientProcessReadinessTimeoutMs,
             },
             stop: {
@@ -214,11 +214,11 @@ export function compileCodexRuntime(
         ],
         endpoints: [
           {
-            endpointKey: OpenAiCodexAppServerEndpointKey,
-            processKey: OpenAiCodexAppServerProcessKey,
+            endpointKey: CodexAppServerEndpointKey,
+            processKey: CodexAppServerProcessKey,
             transport: {
               type: "ws",
-              url: OpenAiCodexAppServerListenUrl,
+              url: CodexAppServerListenUrl,
             },
             connectionMode: "dedicated",
           },
@@ -228,9 +228,9 @@ export function compileCodexRuntime(
     agentRuntimes: [
       {
         runtimeId: "codex",
-        runtimeKey: OpenAiCodexAppServerProcessKey,
+        runtimeKey: CodexAppServerProcessKey,
         clientId: "codex-cli",
-        endpointKey: OpenAiCodexAppServerEndpointKey,
+        endpointKey: CodexAppServerEndpointKey,
         ptyLaunch: CodexPtyLaunchSpec,
       },
     ],

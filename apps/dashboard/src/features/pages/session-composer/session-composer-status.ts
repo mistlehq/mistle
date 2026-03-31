@@ -1,4 +1,4 @@
-import type { CodexModelSummary } from "@mistle/integrations-definitions/openai/agent/client";
+import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
 import type { SessionBootstrapPhase } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import {

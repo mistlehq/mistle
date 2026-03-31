@@ -1,4 +1,4 @@
-import type { CodexModelSummary } from "@mistle/integrations-definitions/openai/agent/client";
+import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
 const NonImageCapableModelWarningMessageSuffix =
   " cannot inspect images. Images will only be sent as file path references.";

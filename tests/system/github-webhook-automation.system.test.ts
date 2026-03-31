@@ -10,8 +10,8 @@ import {
   CodexSessionClient,
   readCodexThread,
   resumeCodexThread,
-} from "@mistle/integrations-definitions/openai/agent/server";
-import { createNodeCodexSessionRuntime } from "@mistle/integrations-definitions/openai/agent/server";
+} from "@mistle/integrations-definitions/agent-runtimes/codex/server";
+import { createNodeCodexSessionRuntime } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
 import { systemSleeper } from "@mistle/time";
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { z } from "zod";

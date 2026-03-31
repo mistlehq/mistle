@@ -2,7 +2,7 @@ import type {
   CodexJsonRpcId,
   CodexJsonRpcNotification,
   CodexJsonRpcServerRequest,
-} from "@mistle/integrations-definitions/openai/agent/client";
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { z } from "zod";
 
 const AvailableDecisionsSchema = z.array(z.string()).optional();

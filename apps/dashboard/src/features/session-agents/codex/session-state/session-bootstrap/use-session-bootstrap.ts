@@ -1,7 +1,7 @@
 import type {
   CodexJsonRpcClient,
   CodexModelSummary,
-} from "@mistle/integrations-definitions/openai/agent/client";
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 

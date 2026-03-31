@@ -1,3 +1,3 @@
-export const OpenAiCodexAppServerProcessKey = "codex-app-server";
-export const OpenAiCodexAppServerEndpointKey = "app-server";
-export const OpenAiCodexAppServerListenUrl = "ws://127.0.0.1:4500";
+export const CodexAppServerProcessKey = "codex-app-server";
+export const CodexAppServerEndpointKey = "app-server";
+export const CodexAppServerListenUrl = "ws://127.0.0.1:4500";

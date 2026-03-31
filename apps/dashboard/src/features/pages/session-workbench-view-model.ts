@@ -1,4 +1,4 @@
-import type { CodexSessionConnectionState } from "@mistle/integrations-definitions/openai/agent/client";
+import type { CodexSessionConnectionState } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
 import type { StartSessionStep } from "../session-agents/codex/session-state/index.js";
 

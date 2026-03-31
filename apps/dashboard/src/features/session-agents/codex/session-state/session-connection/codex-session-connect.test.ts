@@ -1,4 +1,4 @@
-import { CodexJsonRpcRequestError } from "@mistle/integrations-definitions/openai/agent/client";
+import { CodexJsonRpcRequestError } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { describe, expect, it } from "vitest";
 
 import {
