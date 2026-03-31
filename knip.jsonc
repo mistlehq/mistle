@@ -4,7 +4,6 @@
   "ignoreBinaries": ["nix", "typos"],
   "workspaces": {
     ".": {
-      "ignoreDependencies": ["@vitest/coverage-v8"],
       "entry": [
         "package.json",
         "scripts/**/*.{js,mjs,ts}",

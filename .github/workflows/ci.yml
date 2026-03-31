@@ -218,34 +218,8 @@ jobs:
       - name: Generate integration config
         run: nix develop --command bash -lc "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
-      - name: Run tests with coverage in Nix shell
-        run: nix develop --command pnpm test:coverage
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          fail_ci_if_error: true
-          flags: unit
-          name: unit-monorepo
-          token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
-
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-
-      - name: Run Rust coverage in Nix shell
-        run: nix develop --command pnpm test:coverage:rust
-
-      - name: Upload Rust coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          disable_search: true
-          fail_ci_if_error: true
-          files: packages/sandbox-rs-napi/coverage/lcov.info
-          flags: rust
-          name: rust-sandbox-rs-napi
-          token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
+      - name: Run tests in Nix shell
+        run: nix develop --command pnpm test
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.test-turbo-cache.outputs.cache-hit != 'true' }}
