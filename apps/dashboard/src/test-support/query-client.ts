@@ -1,5 +1,4 @@
-import { setTimeout as delay } from "node:timers/promises";
-
+import { systemSleeper } from "@mistle/time";
 import { QueryClient } from "@tanstack/react-query";
 
 const ActiveQueryClients = new Set<QueryClient>();
@@ -37,5 +36,5 @@ export async function cleanupTestQueryClients(): Promise<void> {
 }
 
 export async function flushScheduledReactWork(): Promise<void> {
-  await delay(0);
+  await systemSleeper.sleep(0);
 }
