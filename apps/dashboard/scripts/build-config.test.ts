@@ -66,6 +66,10 @@ describe("loadDashboardBuildConfig", () => {
     const config = loadDashboardBuildConfig({}, "production");
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
+    expect(config.authMethods).toEqual({
+      emailOtp: true,
+      google: false,
+    });
   });
 
   it("loads dashboard origin from MISTLE_CONFIG_PATH", () => {
@@ -86,6 +90,41 @@ describe("loadDashboardBuildConfig", () => {
     );
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
+    expect(config.authMethods).toEqual({
+      emailOtp: true,
+      google: false,
+    });
+  });
+
+  it("derives google auth availability from control-plane auth config", () => {
+    const directory = createTempDirectory();
+    const configPath = join(directory, "config.toml");
+
+    writeFileSync(
+      configPath,
+      [
+        "[apps.dashboard]",
+        'control_plane_api_origin = "http://127.0.0.1:5100"',
+        "",
+        "[apps.control_plane_api.auth.google]",
+        'client_id = "google-client-id"',
+        'client_secret = "google-client-secret"',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const config = loadDashboardBuildConfig(
+      {
+        MISTLE_CONFIG_PATH: configPath,
+      },
+      "development",
+    );
+
+    expect(config.authMethods).toEqual({
+      emailOtp: true,
+      google: true,
+    });
   });
 
   it("fails when apps.dashboard.control_plane_api_origin is missing", () => {

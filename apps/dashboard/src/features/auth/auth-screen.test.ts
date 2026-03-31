@@ -23,12 +23,6 @@ function renderAuthScreen(input: { initialEntry: string }) {
     [
       {
         path: "/auth/login",
-        loader: () => ({
-          methods: {
-            emailOtp: true,
-            google: true,
-          },
-        }),
         element: createElement(AuthScreen),
       },
     ],

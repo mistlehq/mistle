@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import type { OpenWorkflow } from "openworkflow";
 
 import { AUTH_ROUTE_BASE_PATH } from "./constants.js";
-import { createAuthProviders, type AuthCapabilities } from "./providers/index.js";
+import { createAuthProviders } from "./providers/index.js";
 import { applyActiveOrganizationToSession } from "./services/apply-active-organization-to-session.js";
 import { createInitialOrganizationCredentialKey } from "./services/create-initial-organization-credential-key.js";
 import { createSendOrganizationInvitationService } from "./services/create-send-organization-invitation.js";
@@ -174,10 +174,7 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
     ],
   });
 
-  return Object.assign(auth, {
-    capabilities: providers.capabilities,
-  });
+  return auth;
 }
 
 export type ControlPlaneAuth = ReturnType<typeof createControlPlaneAuth>;
-export type { AuthCapabilities } from "./providers/index.js";

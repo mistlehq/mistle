@@ -3,7 +3,7 @@ import type { BetterAuthPlugin } from "better-auth";
 
 import { createEmailOtpProvider } from "./email-otp.js";
 import { createGoogleSocialProvider } from "./google.js";
-import type { AuthCapabilities, AuthProviderAssembly, AuthProviderConfig } from "./types.js";
+import type { AuthProviderAssembly, AuthProviderConfig } from "./types.js";
 
 type CreateAuthProvidersInput = {
   config: AuthProviderConfig;
@@ -13,13 +13,6 @@ type CreateAuthProvidersInput = {
     type: "change-email" | "email-verification" | "forget-password" | "sign-in";
   }) => Promise<void>;
 };
-
-function createBaseCapabilities(): AuthCapabilities["methods"] {
-  return {
-    emailOtp: true,
-    google: false,
-  };
-}
 
 function createEmptySocialProviders(): NonNullable<BetterAuthOptions["socialProviders"]> {
   return {};
@@ -32,18 +25,13 @@ export function createAuthProviders(input: CreateAuthProvidersInput): AuthProvid
       sendVerificationOTP: input.sendVerificationOTP,
     }),
   ];
-  const capabilities = createBaseCapabilities();
   let socialProviders = createEmptySocialProviders();
 
   if (input.config.google !== null) {
     socialProviders = createGoogleSocialProvider(input.config.google);
-    capabilities.google = true;
   }
 
   return {
-    capabilities: {
-      methods: capabilities,
-    },
     options: {
       plugins,
       socialProviders,
@@ -51,4 +39,4 @@ export function createAuthProviders(input: CreateAuthProvidersInput): AuthProvid
   };
 }
 
-export type { AuthCapabilities, AuthProviderConfig } from "./types.js";
+export type { AuthProviderConfig } from "./types.js";

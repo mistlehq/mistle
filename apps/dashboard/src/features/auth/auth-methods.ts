@@ -1,5 +1,3 @@
-import type { AuthCapabilities } from "./auth-capabilities.js";
-
 export const AuthMethodIds = {
   EMAIL_OTP: "emailOtp",
   GOOGLE: "google",
@@ -11,6 +9,11 @@ export type AuthMethod = {
   id: AuthMethodId;
   kind: "form" | "social";
   label: string;
+};
+
+export type AuthMethodAvailability = {
+  emailOtp: boolean;
+  google: boolean;
 };
 
 const AuthMethodCatalog: readonly AuthMethod[] = [
@@ -27,9 +30,9 @@ const AuthMethodCatalog: readonly AuthMethod[] = [
 ] as const;
 
 export function resolveEnabledAuthMethods(
-  authCapabilities: AuthCapabilities,
+  authMethodAvailability: AuthMethodAvailability,
 ): readonly AuthMethod[] {
-  return AuthMethodCatalog.filter((method) => authCapabilities.methods[method.id]);
+  return AuthMethodCatalog.filter((method) => authMethodAvailability[method.id]);
 }
 
 export function hasEnabledAuthMethod(

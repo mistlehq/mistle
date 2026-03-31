@@ -7,7 +7,6 @@ import {
   RouterProvider,
 } from "react-router";
 
-import { fetchAuthCapabilities } from "./features/auth/auth-capabilities.js";
 import { AuthLoginCallbackPage } from "./features/auth/auth-login-callback-page.js";
 import { AuthScreen } from "./features/auth/auth-screen.js";
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
@@ -36,12 +35,7 @@ export function App(): React.JSX.Element {
 
 export const APP_ROUTES = createRoutesFromElements(
   <>
-    <Route
-      element={<AuthScreen />}
-      errorElement={<RouteErrorBoundary />}
-      loader={fetchAuthCapabilities}
-      path="/auth/login"
-    />
+    <Route element={<AuthScreen />} errorElement={<RouteErrorBoundary />} path="/auth/login" />
     <Route
       element={<AuthLoginCallbackPage />}
       errorElement={<RouteErrorBoundary />}

@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { parse } from "smol-toml";
 import { z } from "zod";
 
+import { deriveDashboardAuthMethods } from "../../../packages/config/src/apps/control-plane-api/dashboard-auth-methods.js";
+
 type DashboardBuildEnvironment = "development" | "production";
 
 type UnknownRecord = Record<string, unknown>;
@@ -14,11 +16,29 @@ const DashboardBuildConfigSchema = z.object({
     dashboard: z.object({
       control_plane_api_origin: z.string().min(1),
     }),
+    control_plane_api: z
+      .object({
+        auth: z
+          .object({
+            google: z
+              .object({
+                client_id: z.string().min(1),
+                client_secret: z.string().min(1),
+              })
+              .optional(),
+          })
+          .optional(),
+      })
+      .optional(),
   }),
 });
 
 export type DashboardBuildConfig = {
   controlPlaneApiOrigin: string;
+  authMethods: {
+    emailOtp: boolean;
+    google: boolean;
+  };
 };
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -97,8 +117,18 @@ export function loadDashboardBuildConfig(
     parsedConfig.apps.dashboard.control_plane_api_origin,
     "apps.dashboard.control_plane_api_origin",
   );
+  const authMethods = deriveDashboardAuthMethods({
+    google:
+      parsedConfig.apps.control_plane_api?.auth?.google === undefined
+        ? undefined
+        : {
+            clientId: parsedConfig.apps.control_plane_api.auth.google.client_id,
+            clientSecret: parsedConfig.apps.control_plane_api.auth.google.client_secret,
+          },
+  });
 
   return {
     controlPlaneApiOrigin,
+    authMethods,
   };
 }

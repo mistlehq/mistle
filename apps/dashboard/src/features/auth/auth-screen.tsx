@@ -1,11 +1,11 @@
 import { Separator } from "@mistle/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Navigate, useLoaderData, useLocation } from "react-router";
+import { Navigate, useLocation } from "react-router";
 
+import { getDashboardConfig } from "../../config.js";
 import { authClient } from "../../lib/auth/client.js";
 import { SESSION_QUERY_KEY, useSessionQuery } from "../shell/session-query.js";
-import { parseAuthCapabilities } from "./auth-capabilities.js";
 import {
   createStateForDifferentEmail,
   resolveEmailValidationError,
@@ -19,12 +19,12 @@ import { GoogleSignInButton } from "./google-sign-in-button.js";
 import { resolveErrorMessage, resolveOAuthCallbackError } from "./messages.js";
 
 export function AuthScreen(): React.JSX.Element {
+  const dashboardConfig = getDashboardConfig();
   const queryClient = useQueryClient();
   const sessionQuery = useSessionQuery();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const authCapabilities = parseAuthCapabilities(useLoaderData());
-  const authMethods = resolveEnabledAuthMethods(authCapabilities);
+  const authMethods = resolveEnabledAuthMethods(dashboardConfig.authMethods);
   const hasGoogleAuthMethod = hasEnabledAuthMethod(authMethods, AuthMethodIds.GOOGLE);
   const initialAuthError = resolveOAuthCallbackError(searchParams);
 

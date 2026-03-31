@@ -16,15 +16,7 @@ export type AuthProviderConfig = {
   google: GoogleProviderConfig | null;
 };
 
-export type AuthCapabilities = {
-  methods: {
-    emailOtp: boolean;
-    google: boolean;
-  };
-};
-
 export type AuthProviderAssembly = {
-  capabilities: AuthCapabilities;
   options: {
     plugins: BetterAuthPlugin[];
     socialProviders: NonNullable<BetterAuthOptions["socialProviders"]>;

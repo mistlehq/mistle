@@ -6,10 +6,8 @@ describe("resolveEnabledAuthMethods", () => {
   it("returns enabled auth methods in the configured UI order", () => {
     expect(
       resolveEnabledAuthMethods({
-        methods: {
-          emailOtp: true,
-          google: true,
-        },
+        emailOtp: true,
+        google: true,
       }),
     ).toEqual([
       {
@@ -27,10 +25,8 @@ describe("resolveEnabledAuthMethods", () => {
 
   it("filters out disabled auth methods", () => {
     const authMethods = resolveEnabledAuthMethods({
-      methods: {
-        emailOtp: true,
-        google: false,
-      },
+      emailOtp: true,
+      google: false,
     });
 
     expect(authMethods).toEqual([
