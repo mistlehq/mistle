@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getChatRestorePendingDetail,
+  getChatRestoreStepLabel,
   canRenderChatComposer,
   InitialSessionMainPanelHandoffState,
   isCliToggleActive,
@@ -17,6 +19,7 @@ describe("session main panel handoff state", () => {
     expect(switchingToCli).toEqual({
       transitionState: "switching_to_cli",
       errorMessage: null,
+      restoreStep: null,
     });
 
     const cliEntryFailed = reduceSessionMainPanelHandoffState(switchingToCli, {
@@ -27,6 +30,7 @@ describe("session main panel handoff state", () => {
     expect(cliEntryFailed).toEqual({
       transitionState: "cli_entry_failed",
       errorMessage: "codex executable missing",
+      restoreStep: null,
     });
 
     const restoringChat = reduceSessionMainPanelHandoffState(cliEntryFailed, {
@@ -36,9 +40,21 @@ describe("session main panel handoff state", () => {
     expect(restoringChat).toEqual({
       transitionState: "restoring_chat",
       errorMessage: null,
+      restoreStep: "connecting_transport",
     });
 
-    const restoreFailed = reduceSessionMainPanelHandoffState(restoringChat, {
+    const resolvingThread = reduceSessionMainPanelHandoffState(restoringChat, {
+      type: "chat_restore_step_changed",
+      restoreStep: "resolving_thread",
+    });
+
+    expect(resolvingThread).toEqual({
+      transitionState: "restoring_chat",
+      errorMessage: null,
+      restoreStep: "resolving_thread",
+    });
+
+    const restoreFailed = reduceSessionMainPanelHandoffState(resolvingThread, {
       type: "chat_restore_failed",
       errorMessage: "Could not reconnect chat transport.",
     });
@@ -46,6 +62,7 @@ describe("session main panel handoff state", () => {
     expect(restoreFailed).toEqual({
       transitionState: "restore_failed",
       errorMessage: "Could not reconnect chat transport.",
+      restoreStep: "resolving_thread",
     });
 
     expect(
@@ -55,6 +72,7 @@ describe("session main panel handoff state", () => {
     ).toEqual({
       transitionState: "restoring_chat",
       errorMessage: null,
+      restoreStep: "connecting_transport",
     });
   });
 
@@ -78,5 +96,28 @@ describe("session main panel handoff state", () => {
     expect(shouldLifecycleAutoAttachChat("stable_cli")).toBe(false);
     expect(shouldLifecycleAutoAttachChat("restoring_chat")).toBe(false);
     expect(shouldLifecycleAutoAttachChat("restore_failed")).toBe(false);
+  });
+
+  it("describes restore steps and transport-stage pending work", () => {
+    expect(getChatRestoreStepLabel("connecting_transport")).toBe("Reconnecting session transport");
+    expect(getChatRestoreStepLabel("resolving_thread")).toBe("Resolving chat thread");
+    expect(
+      getChatRestorePendingDetail({
+        restoreStep: "connecting_transport",
+        lifecycleStep: "securing",
+      }),
+    ).toBe("Minting sandbox connection token.");
+    expect(
+      getChatRestorePendingDetail({
+        restoreStep: "connecting_transport",
+        lifecycleStep: "connecting",
+      }),
+    ).toBe("Opening the sandbox agent channel and initializing JSON-RPC.");
+    expect(
+      getChatRestorePendingDetail({
+        restoreStep: "hydrating_chat",
+        lifecycleStep: "connected",
+      }),
+    ).toBeNull();
   });
 });

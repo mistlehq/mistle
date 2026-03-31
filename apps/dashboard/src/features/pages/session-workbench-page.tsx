@@ -260,9 +260,11 @@ function SessionWorkbenchPageContent(input: {
         errorMessage: workbench.primaryPanelState.errorMessage,
         isRespondingToServerRequest:
           conversationPane.serverRequestsState.isRespondingToServerRequest,
+        lifecycleStep: workbench.lifecycleStep,
         onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
         onRetryRestoreChat: workbench.primaryPanelState.retryRestoreChat,
         onReturnToChat: workbench.primaryPanelState.exitCliMode,
+        restoreStep: workbench.primaryPanelState.restoreStep,
         serverRequestPanelEntries: unmatchedServerRequests,
         transitionState: workbench.primaryPanelState.transitionState,
       })}
@@ -319,11 +321,15 @@ function resolvePrimaryPanelMainContent(input: {
   isRespondingToServerRequest: React.ComponentProps<
     typeof SessionConversationMainContent
   >["isRespondingToServerRequest"];
+  lifecycleStep: ReturnType<typeof useSessionWorkbenchController>["workbench"]["lifecycleStep"];
   onRespondToServerRequest: React.ComponentProps<
     typeof SessionConversationMainContent
   >["onRespondToServerRequest"];
   onRetryRestoreChat: () => Promise<void>;
   onReturnToChat: () => Promise<void>;
+  restoreStep: ReturnType<
+    typeof useSessionWorkbenchController
+  >["workbench"]["primaryPanelState"]["restoreStep"];
   serverRequestPanelEntries: React.ComponentProps<
     typeof SessionConversationMainContent
   >["serverRequestPanelEntries"];
@@ -348,7 +354,12 @@ function resolvePrimaryPanelMainContent(input: {
     case "stable_cli":
       return <SessionCliPanel ptyState={input.cliPtyState} {...cliRefitKeyProps} />;
     case "restoring_chat":
-      return <SessionChatRestoringPanel />;
+      return (
+        <SessionChatRestoringPanel
+          lifecycleStep={input.lifecycleStep}
+          restoreStep={input.restoreStep}
+        />
+      );
     case "restore_failed":
       return (
         <SessionChatRestoreFailedPanel
@@ -356,6 +367,7 @@ function resolvePrimaryPanelMainContent(input: {
           onRetry={() => {
             void input.onRetryRestoreChat();
           }}
+          restoreStep={input.restoreStep}
         />
       );
     case "stable_chat":

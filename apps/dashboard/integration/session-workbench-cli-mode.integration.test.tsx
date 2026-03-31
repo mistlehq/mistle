@@ -1122,7 +1122,8 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       await waitFor(
         () => {
           expect(screen.getByText("Could not restore chat")).toBeDefined();
-          expect(screen.getByText("Timed out while restoring chat.")).toBeDefined();
+          expect(screen.getByText(/Timed out while restoring chat during/i)).toBeDefined();
+          expect(screen.getByText(/Last step:/i)).toBeDefined();
         },
         { timeout: 35_000 },
       );

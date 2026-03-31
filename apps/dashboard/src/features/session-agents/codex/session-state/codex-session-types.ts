@@ -5,6 +5,7 @@ export type ConnectedCodexSession = {
   connectedAtIso: string;
   expiresAtIso: string;
   connectionUrl: string;
+  providerThreadId: string | null;
   threadId: string | null;
 };
 

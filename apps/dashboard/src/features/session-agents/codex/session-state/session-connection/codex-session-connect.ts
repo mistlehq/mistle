@@ -7,6 +7,7 @@ import {
 } from "@mistle/integrations-definitions/openai/agent/client";
 
 import type { MintSandboxConnectionTokenResult } from "../../../../sessions/sessions-service.js";
+import type { ThreadSelectionPolicy } from "../../../../sessions/thread-selection.js";
 import type { ConnectedCodexSession } from "../codex-session-types.js";
 import { describeCodexSessionStepError } from "./codex-session-errors.js";
 import { selectCodexConnectionThreadStrategy } from "./codex-session-lifecycle-policy.js";
@@ -74,11 +75,13 @@ export function resolveInitialCodexThreadAction(input: {
   preferredThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  selectionPolicy?: ThreadSelectionPolicy;
 }) {
   return selectCodexConnectionThreadStrategy({
     preferredThreadId: input.preferredThreadId,
     availableThreads: input.availableThreads,
     loadedThreadIds: input.loadedThreadIds,
+    ...(input.selectionPolicy === undefined ? {} : { selectionPolicy: input.selectionPolicy }),
   });
 }
 
@@ -87,6 +90,7 @@ export async function establishCodexThread(input: {
   preferredThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  selectionPolicy?: ThreadSelectionPolicy;
   generation: number;
   sandboxInstanceId: string;
   ensureCurrentGeneration: (generation: number) => void;
@@ -95,6 +99,7 @@ export async function establishCodexThread(input: {
     preferredThreadId: input.preferredThreadId,
     availableThreads: input.availableThreads,
     loadedThreadIds: input.loadedThreadIds,
+    ...(input.selectionPolicy === undefined ? {} : { selectionPolicy: input.selectionPolicy }),
   });
 
   if (action.type === "resume") {
@@ -163,6 +168,7 @@ export async function establishInitialCodexThread(input: {
   preferredThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  selectionPolicy?: ThreadSelectionPolicy;
   generation: number;
   sandboxInstanceId: string;
   mintedConnection: MintSandboxConnectionTokenResult;
@@ -180,6 +186,7 @@ export function createConnectedCodexSession(input: {
   sandboxInstanceId: string;
   connectedAtIso: string;
   mintedConnection: MintSandboxConnectionTokenResult;
+  providerThreadId: string | null;
   threadId: string;
 }): ConnectedCodexSession {
   return {
@@ -187,6 +194,7 @@ export function createConnectedCodexSession(input: {
     connectedAtIso: input.connectedAtIso,
     expiresAtIso: input.mintedConnection.connectionExpiresAt,
     connectionUrl: input.mintedConnection.connectionUrl,
+    providerThreadId: input.providerThreadId,
     threadId: input.threadId,
   };
 }

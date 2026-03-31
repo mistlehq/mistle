@@ -6,10 +6,10 @@ import {
 } from "./session-thread-authority.js";
 
 describe("session thread authority", () => {
-  it("resumes a persisted thread only when it already has turns", () => {
+  it("resumes an active thread only when it already has turns", () => {
     expect(
       resolveCodexCliLaunchTarget({
-        persistedThreadId: "thread_resumable",
+        activeThreadId: "thread_resumable",
         turnCount: 2,
       }),
     ).toEqual({
@@ -18,10 +18,10 @@ describe("session thread authority", () => {
     });
   });
 
-  it("starts a new CLI thread and clears persisted authority for an empty thread", () => {
+  it("starts a new CLI thread and clears active authority for an empty thread", () => {
     expect(
       resolveCodexCliLaunchTarget({
-        persistedThreadId: "thread_empty",
+        activeThreadId: "thread_empty",
         turnCount: 0,
       }),
     ).toEqual({
@@ -30,10 +30,10 @@ describe("session thread authority", () => {
     });
   });
 
-  it("starts a new CLI thread without clearing authority when no persisted thread exists", () => {
+  it("starts a new CLI thread without clearing authority when no active thread exists", () => {
     expect(
       resolveCodexCliLaunchTarget({
-        persistedThreadId: null,
+        activeThreadId: null,
         turnCount: null,
       }),
     ).toEqual({
@@ -42,10 +42,10 @@ describe("session thread authority", () => {
     });
   });
 
-  it("prefers the persisted thread id on chat restore when one exists", () => {
+  it("prefers the provider thread id on chat restore when one exists", () => {
     expect(
       resolvePostCliPreferredThreadId({
-        persistedThreadId: "thread_persisted",
+        providerThreadId: "thread_persisted",
         availableThreads: [
           {
             id: "thread_other",
@@ -60,10 +60,10 @@ describe("session thread authority", () => {
     ).toBe("thread_persisted");
   });
 
-  it("falls back to thread selection heuristics when chat has no persisted thread id", () => {
+  it("falls back to thread selection heuristics when chat has no provider thread id", () => {
     expect(
       resolvePostCliPreferredThreadId({
-        persistedThreadId: null,
+        providerThreadId: null,
         availableThreads: [
           {
             id: "thread_old",
@@ -83,5 +83,30 @@ describe("session thread authority", () => {
         loadedThreadIds: ["thread_cli_from_cli"],
       }),
     ).toBe("thread_cli_from_cli");
+  });
+
+  it("prefers the newest available thread when no loaded thread exists after CLI", () => {
+    expect(
+      resolvePostCliPreferredThreadId({
+        providerThreadId: null,
+        availableThreads: [
+          {
+            id: "thread_old",
+            name: null,
+            preview: null,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+          {
+            id: "thread_new",
+            name: null,
+            preview: null,
+            createdAt: 2,
+            updatedAt: 2,
+          },
+        ],
+        loadedThreadIds: [],
+      }),
+    ).toBe("thread_new");
   });
 });

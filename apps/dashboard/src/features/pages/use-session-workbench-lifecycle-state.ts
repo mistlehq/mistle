@@ -789,6 +789,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     connectSession({
       sandboxInstanceId: input.sandboxInstanceId,
       preferredThreadId: automationConversation?.providerConversationId ?? null,
+      providerThreadId: automationConversation?.providerConversationId ?? null,
     });
   }, [
     automationConversation,

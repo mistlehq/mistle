@@ -1,4 +1,5 @@
 import { Button } from "@mistle/ui";
+import type React from "react";
 
 type SessionPrimaryPanelStatusAction = {
   label: string;
@@ -7,7 +8,7 @@ type SessionPrimaryPanelStatusAction = {
 
 type SessionPrimaryPanelStatusCardProps = {
   title: string;
-  description: string;
+  description: React.ReactNode;
   action?: SessionPrimaryPanelStatusAction;
   tone?: "default" | "destructive";
 };
@@ -26,7 +27,7 @@ export function SessionPrimaryPanelStatusCard(
       <div className="flex max-w-lg flex-col items-start gap-3">
         <div className="space-y-2">
           <h2 className="text-lg font-semibold text-stone-950">{props.title}</h2>
-          <p className={`text-sm leading-6 ${descriptionClass}`}>{props.description}</p>
+          <div className={`text-sm leading-6 ${descriptionClass}`}>{props.description}</div>
         </div>
         {props.action === undefined ? null : (
           <Button onClick={props.action.onClick} type="button" variant="outline">

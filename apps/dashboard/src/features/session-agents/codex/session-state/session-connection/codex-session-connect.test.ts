@@ -82,6 +82,35 @@ describe("codex session connect", () => {
     });
   });
 
+  it("resumes the newest available thread for post-cli restore selection", () => {
+    expect(
+      resolveInitialCodexThreadAction({
+        preferredThreadId: null,
+        availableThreads: [
+          {
+            id: "thread_old",
+            name: null,
+            preview: null,
+            createdAt: 10,
+            updatedAt: 10,
+          },
+          {
+            id: "thread_new",
+            name: null,
+            preview: null,
+            createdAt: 20,
+            updatedAt: 20,
+          },
+        ],
+        loadedThreadIds: [],
+        selectionPolicy: "newest",
+      }),
+    ).toEqual({
+      type: "resume",
+      threadId: "thread_new",
+    });
+  });
+
   it("starts a new thread when a reconnect-selected thread has no rollout", () => {
     expect(
       resolveReconnectResumeFailureAction({
@@ -153,6 +182,7 @@ describe("codex session connect", () => {
           connectionToken: "token_123",
           connectionExpiresAt: "2026-03-20T01:00:00.000Z",
         },
+        providerThreadId: null,
         threadId: "thread_123",
       }),
     ).toEqual({
@@ -160,6 +190,7 @@ describe("codex session connect", () => {
       connectedAtIso: "2026-03-20T00:00:00.000Z",
       expiresAtIso: "2026-03-20T01:00:00.000Z",
       connectionUrl: "wss://example.test/codex",
+      providerThreadId: null,
       threadId: "thread_123",
     });
   });

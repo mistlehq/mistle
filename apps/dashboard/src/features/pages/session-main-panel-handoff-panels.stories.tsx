@@ -58,7 +58,9 @@ export const CliEntryFailed: Story = {
 export const RestoringChat: Story = {
   render: () =>
     renderSessionWorkbenchStory({
-      mainContent: <SessionChatRestoringPanel />,
+      mainContent: (
+        <SessionChatRestoringPanel lifecycleStep="connecting" restoreStep="connecting_transport" />
+      ),
       primaryBottomPanel: null,
     }),
 };
@@ -70,6 +72,7 @@ export const RestoreFailed: Story = {
         <SessionChatRestoreFailedPanel
           errorMessage="Minting sandbox connection token failed: Could not mint connection token."
           onRetry={noop}
+          restoreStep="connecting_transport"
         />
       ),
       primaryBottomPanel: null,

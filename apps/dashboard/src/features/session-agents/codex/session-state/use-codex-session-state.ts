@@ -117,8 +117,9 @@ type CodexSessionMessageState = {
 export type UseCodexSessionStateResult = {
   lifecycle: CodexSessionConnectionLifecycleState;
   threadAuthority: {
-    persistedThreadId: string | null;
+    providerThreadId: string | null;
     resolveCliLaunchTarget: () => Promise<CodexCliLaunchTarget>;
+    clearEphemeralActiveThreadIdAfterCliLaunch: () => void;
     resolveRestoredThreadAuthorityAfterCli: () => Promise<string>;
   };
   threads: CodexSessionThreadState;
@@ -633,8 +634,8 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   }, []);
 
   const resolveCliLaunchTarget = useCallback(async (): Promise<CodexCliLaunchTarget> => {
-    const persistedThreadId = threadIdRef.current;
-    if (persistedThreadId === null) {
+    const activeThreadId = threadIdRef.current;
+    if (activeThreadId === null) {
       return {
         type: "start_new",
         shouldClearPersistedThreadId: false,
@@ -648,10 +649,10 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
 
     const thread = await readCodexThreadState({
       rpcClient,
-      threadId: persistedThreadId,
+      threadId: activeThreadId,
     });
     const launchTarget = resolveCodexCliLaunchTarget({
-      persistedThreadId,
+      activeThreadId,
       turnCount: thread.turns.length,
     });
 
@@ -662,15 +663,29 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     return launchTarget;
   }, [updateActiveThread]);
 
+  const clearEphemeralActiveThreadIdAfterCliLaunch = useCallback((): void => {
+    if (lifecycle.sessionSnapshot?.providerThreadId !== null) {
+      return;
+    }
+
+    updateActiveThread(null);
+  }, [lifecycle.sessionSnapshot?.providerThreadId, updateActiveThread]);
+
   const resolveRestoredThreadAuthorityAfterCli = useCallback(async (): Promise<string> => {
-    const persistedThreadId = threadIdRef.current;
-    if (persistedThreadId !== null) {
-      return persistedThreadId;
+    const activeThreadId = threadIdRef.current;
+    if (activeThreadId !== null) {
+      return activeThreadId;
+    }
+
+    const providerThreadId = lifecycle.sessionSnapshot?.providerThreadId ?? null;
+    if (providerThreadId !== null) {
+      updateActiveThread(providerThreadId);
+      return providerThreadId;
     }
 
     const threadCollections = await refreshThreadCollections();
     const resolvedThreadId = resolvePostCliPreferredThreadId({
-      persistedThreadId: threadIdRef.current,
+      providerThreadId,
       availableThreads: threadCollections.availableThreads,
       loadedThreadIds: threadCollections.loadedThreadIds,
     });
@@ -680,7 +695,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
 
     updateActiveThread(resolvedThreadId);
     return resolvedThreadId;
-  }, [refreshThreadCollections, updateActiveThread]);
+  }, [lifecycle.sessionSnapshot?.providerThreadId, refreshThreadCollections, updateActiveThread]);
 
   const threads = useMemo<CodexSessionThreadState>(() => {
     return {
@@ -740,12 +755,14 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
 
   const threadAuthority = useMemo(() => {
     return {
-      persistedThreadId: lifecycle.sessionSnapshot?.threadId ?? null,
+      providerThreadId: lifecycle.sessionSnapshot?.providerThreadId ?? null,
       resolveCliLaunchTarget,
+      clearEphemeralActiveThreadIdAfterCliLaunch,
       resolveRestoredThreadAuthorityAfterCli,
     };
   }, [
-    lifecycle.sessionSnapshot?.threadId,
+    clearEphemeralActiveThreadIdAfterCliLaunch,
+    lifecycle.sessionSnapshot?.providerThreadId,
     resolveCliLaunchTarget,
     resolveRestoredThreadAuthorityAfterCli,
   ]);

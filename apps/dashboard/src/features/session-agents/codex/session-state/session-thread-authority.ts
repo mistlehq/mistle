@@ -1,7 +1,5 @@
 import type { CodexThreadSummary } from "@mistle/integrations-definitions/openai/agent/client";
 
-import { selectPreferredThreadId } from "../../../sessions/thread-selection.js";
-
 export type CodexCliLaunchTarget =
   | {
       type: "resume";
@@ -17,10 +15,10 @@ export function isCodexThreadResumable(input: { turnCount: number }): boolean {
 }
 
 export function resolveCodexCliLaunchTarget(input: {
-  persistedThreadId: string | null;
+  activeThreadId: string | null;
   turnCount: number | null;
 }): CodexCliLaunchTarget {
-  if (input.persistedThreadId === null) {
+  if (input.activeThreadId === null) {
     return {
       type: "start_new",
       shouldClearPersistedThreadId: false,
@@ -30,7 +28,7 @@ export function resolveCodexCliLaunchTarget(input: {
   if (input.turnCount !== null && isCodexThreadResumable({ turnCount: input.turnCount })) {
     return {
       type: "resume",
-      threadId: input.persistedThreadId,
+      threadId: input.activeThreadId,
     };
   }
 
@@ -41,16 +39,42 @@ export function resolveCodexCliLaunchTarget(input: {
 }
 
 export function resolvePostCliPreferredThreadId(input: {
-  persistedThreadId: string | null;
+  providerThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
 }): string | null {
-  if (input.persistedThreadId !== null) {
-    return input.persistedThreadId;
+  if (input.providerThreadId !== null) {
+    return input.providerThreadId;
   }
 
-  return selectPreferredThreadId({
-    availableThreads: input.availableThreads,
-    loadedThreadIds: input.loadedThreadIds,
+  const availableThreadsById = new Map(input.availableThreads.map((thread) => [thread.id, thread]));
+  const loadedAvailableThreads = input.loadedThreadIds.flatMap((threadId) => {
+    const thread = availableThreadsById.get(threadId);
+    return thread === undefined ? [] : [thread];
   });
+
+  const newestLoadedThread = [...loadedAvailableThreads].sort(compareNewestThreadFirst)[0];
+  if (newestLoadedThread !== undefined) {
+    return newestLoadedThread.id;
+  }
+
+  if (input.loadedThreadIds.length > 0) {
+    return input.loadedThreadIds[input.loadedThreadIds.length - 1] ?? null;
+  }
+
+  const newestAvailableThread = [...input.availableThreads].sort(compareNewestThreadFirst)[0];
+  return newestAvailableThread?.id ?? null;
+}
+
+function resolveThreadUpdatedAt(thread: CodexThreadSummary): number {
+  return thread.updatedAt ?? thread.createdAt ?? Number.NEGATIVE_INFINITY;
+}
+
+function compareNewestThreadFirst(left: CodexThreadSummary, right: CodexThreadSummary): number {
+  const updatedDifference = resolveThreadUpdatedAt(right) - resolveThreadUpdatedAt(left);
+  if (updatedDifference !== 0) {
+    return updatedDifference;
+  }
+
+  return right.id.localeCompare(left.id);
 }

@@ -63,6 +63,7 @@ type SessionWorkbenchState = {
   sessionHeaderStatusUi: ReturnType<
     typeof useSessionWorkbenchLifecycleState
   >["sessionHeaderStatusUi"];
+  lifecycleStep: ReturnType<typeof useCodexSessionState>["lifecycle"]["step"];
   lifecycleErrorMessage: string | null;
   cliPtyState: ReturnType<typeof useSandboxPtyState>;
   primaryPanelState: {
@@ -71,6 +72,7 @@ type SessionWorkbenchState = {
     disabledReason: string | null;
     errorMessage: string | null;
     isCliToggleActive: boolean;
+    restoreStep: ReturnType<typeof useSessionMainPanelHandoff>["restoreStep"];
     showsChatComposer: boolean;
     enterCliMode: () => Promise<void>;
     exitCliMode: () => Promise<void>;
@@ -201,6 +203,7 @@ export function useSessionWorkbenchController(input: {
       sandboxFailureMessage: workbenchLifecycleState.sandboxFailureMessage,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,
       sessionHeaderStatusUi: workbenchLifecycleState.sessionHeaderStatusUi,
+      lifecycleStep: lifecycle.step,
       lifecycleErrorMessage: workbenchLifecycleState.lifecycleErrorMessage,
       primaryPanelState: {
         transitionState: handoff.transitionState,
@@ -208,6 +211,7 @@ export function useSessionWorkbenchController(input: {
         disabledReason: enterCliDisabledReason,
         errorMessage: handoff.errorMessage,
         isCliToggleActive: handoff.isCliToggleActive,
+        restoreStep: handoff.restoreStep,
         showsChatComposer: canRenderChatComposer(handoff.transitionState),
         enterCliMode: handoff.handoffToCli,
         exitCliMode: handoff.handoffToChat,

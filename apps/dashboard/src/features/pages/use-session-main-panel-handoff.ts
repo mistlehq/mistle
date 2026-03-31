@@ -1,13 +1,17 @@
+import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 
 import { OpenAiCodexAppServerListenUrl } from "../../../../../packages/integrations-definitions/src/openai/variants/openai-default/app-server.js";
 import type { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
+  getChatRestorePendingDetail,
+  getChatRestoreStepLabel,
   InitialSessionMainPanelHandoffState,
   isCliToggleActive,
   reduceSessionMainPanelHandoffState,
   shouldLifecycleAutoAttachChat,
+  type ChatRestoreStep,
   type MainPanelTransitionState,
 } from "./session-main-panel-handoff-state.js";
 
@@ -35,26 +39,28 @@ type SessionMainPanelHandoffResult = {
   transitionState: MainPanelTransitionState;
   errorMessage: string | null;
   isCliToggleActive: boolean;
+  restoreStep: ChatRestoreStep | null;
   shouldLifecycleAutoAttachChat: boolean;
   handoffToCli: () => Promise<void>;
   handoffToChat: () => Promise<void>;
   retryRestoreChat: () => Promise<void>;
 };
 
+// Real restore performs token minting, websocket connect, JSON-RPC init, thread selection,
+// and transcript hydration. A short timeout causes false restore failures against the real stack.
+const ChatRestoreTimeoutMs = 30_000;
+
 async function closeAndDisconnectCliPty(
   cliPtyState: ReturnType<typeof useSandboxPtyState>,
 ): Promise<void> {
-  try {
-    await cliPtyState.actions.closePty();
-  } catch {
+  const closePromise = cliPtyState.actions.closePty().catch(() => {
     // Cleanup must be best-effort because the PTY may already be closed or exited.
-  }
-
-  try {
-    await cliPtyState.actions.disconnectPty();
-  } catch {
+  });
+  const disconnectPromise = cliPtyState.actions.disconnectPty().catch(() => {
     // Cleanup must be best-effort because the websocket may already be gone.
-  }
+  });
+
+  await Promise.all([closePromise, disconnectPromise]);
 }
 
 export type { SessionMainPanelHandoffResult, UseSessionMainPanelHandoffInput };
@@ -68,7 +74,9 @@ export function useSessionMainPanelHandoff(
   );
   const generationRef = useRef(0);
   const restoreGenerationRef = useRef<number | null>(null);
-  const restorePreferredThreadIdRef = useRef<string | null>(null);
+  const restoreTimeoutIdRef = useRef<TimerHandle | null>(null);
+  const restoreStepRef = useRef<ChatRestoreStep | null>(null);
+  const restoreExecutionGenerationRef = useRef<number | null>(null);
 
   const nextGeneration = useCallback((): number => {
     generationRef.current += 1;
@@ -80,20 +88,86 @@ export function useSessionMainPanelHandoff(
   }, []);
 
   const resetToStableChat = useCallback((): void => {
+    if (restoreTimeoutIdRef.current !== null) {
+      systemScheduler.cancel(restoreTimeoutIdRef.current);
+      restoreTimeoutIdRef.current = null;
+    }
     restoreGenerationRef.current = null;
-    restorePreferredThreadIdRef.current = null;
+    restoreStepRef.current = null;
+    restoreExecutionGenerationRef.current = null;
     dispatch({
       type: "reset_to_stable_chat",
     });
   }, []);
 
+  const setRestoreStep = useCallback((restoreStep: ChatRestoreStep): void => {
+    restoreStepRef.current = restoreStep;
+    dispatch({
+      type: "chat_restore_step_changed",
+      restoreStep,
+    });
+  }, []);
+
+  const buildRestoreTimeoutMessage = useCallback(
+    (restoreStep: ChatRestoreStep | null): string => {
+      if (restoreStep === null) {
+        return "Timed out while restoring chat.";
+      }
+
+      const baseMessage = `Timed out while restoring chat during ${getChatRestoreStepLabel(restoreStep).toLowerCase()}.`;
+      const pendingDetail = getChatRestorePendingDetail({
+        restoreStep,
+        lifecycleStep: input.lifecycle.transportState === "connected" ? "connected" : "connecting",
+      });
+
+      return pendingDetail === null ? baseMessage : `${baseMessage} Pending: ${pendingDetail}`;
+    },
+    [input.lifecycle.transportState],
+  );
+
+  const waitForRestoreStep = useCallback(
+    async <T>(restoreStep: ChatRestoreStep, operation: Promise<T>): Promise<T> => {
+      return await new Promise<T>((resolve, reject) => {
+        const timeout = systemScheduler.schedule(() => {
+          reject(new Error(buildRestoreTimeoutMessage(restoreStep)));
+        }, ChatRestoreTimeoutMs);
+
+        void operation.then(
+          (value) => {
+            systemScheduler.cancel(timeout);
+            resolve(value);
+          },
+          (error: unknown) => {
+            systemScheduler.cancel(timeout);
+            reject(error);
+          },
+        );
+      });
+    },
+    [buildRestoreTimeoutMessage],
+  );
+
   const startChatRestore = useCallback((): void => {
     const generation = nextGeneration();
-    const preferredThreadId =
-      input.threadAuthority.persistedThreadId ?? restorePreferredThreadIdRef.current;
+    const preferredThreadId = input.threadAuthority.providerThreadId;
 
     restoreGenerationRef.current = generation;
-    restorePreferredThreadIdRef.current = preferredThreadId;
+    restoreStepRef.current = "connecting_transport";
+    restoreExecutionGenerationRef.current = null;
+    if (restoreTimeoutIdRef.current !== null) {
+      systemScheduler.cancel(restoreTimeoutIdRef.current);
+    }
+    restoreTimeoutIdRef.current = systemScheduler.schedule(() => {
+      if (!isCurrentGeneration(generation)) {
+        return;
+      }
+
+      restoreTimeoutIdRef.current = null;
+      dispatch({
+        type: "chat_restore_failed",
+        errorMessage: buildRestoreTimeoutMessage(restoreStepRef.current),
+      });
+    }, ChatRestoreTimeoutMs);
     input.lifecycle.clearLifecycleErrorMessage();
     dispatch({
       type: "chat_restore_requested",
@@ -113,8 +187,11 @@ export function useSessionMainPanelHandoff(
     input.lifecycle.connectSession({
       sandboxInstanceId: input.sandboxInstanceId,
       preferredThreadId,
+      ...(preferredThreadId === null ? {} : { providerThreadId: preferredThreadId }),
+      selectionPolicy: preferredThreadId === null ? "newest" : "oldest",
     });
   }, [
+    buildRestoreTimeoutMessage,
     input.cliPtyState,
     input.lifecycle,
     input.sandboxInstanceId,
@@ -173,6 +250,7 @@ export function useSessionMainPanelHandoff(
         return;
       }
 
+      input.threadAuthority.clearEphemeralActiveThreadIdAfterCliLaunch();
       dispatch({
         type: "cli_handoff_succeeded",
       });
@@ -231,6 +309,10 @@ export function useSessionMainPanelHandoff(
       return;
     }
 
+    if (restoreTimeoutIdRef.current !== null) {
+      systemScheduler.cancel(restoreTimeoutIdRef.current);
+      restoreTimeoutIdRef.current = null;
+    }
     dispatch({
       type: "chat_restore_failed",
       errorMessage: input.lifecycle.lifecycleErrorMessage,
@@ -247,37 +329,55 @@ export function useSessionMainPanelHandoff(
       return;
     }
 
-    let cancelled = false;
+    if (restoreExecutionGenerationRef.current === restoreGeneration) {
+      return;
+    }
+
+    restoreExecutionGenerationRef.current = restoreGeneration;
 
     void (async () => {
       try {
-        await input.chat.hydrateChatFromThread();
-        if (cancelled || !isCurrentGeneration(restoreGeneration)) {
+        setRestoreStep("resolving_thread");
+        await waitForRestoreStep(
+          "resolving_thread",
+          input.threadAuthority.resolveRestoredThreadAuthorityAfterCli(),
+        );
+        if (!isCurrentGeneration(restoreGeneration)) {
+          return;
+        }
+
+        setRestoreStep("hydrating_chat");
+        await waitForRestoreStep("hydrating_chat", input.chat.hydrateChatFromThread());
+        if (!isCurrentGeneration(restoreGeneration)) {
           return;
         }
 
         resetToStableChat();
       } catch (error) {
-        if (cancelled || !isCurrentGeneration(restoreGeneration)) {
+        if (!isCurrentGeneration(restoreGeneration)) {
           return;
         }
 
+        if (restoreTimeoutIdRef.current !== null) {
+          systemScheduler.cancel(restoreTimeoutIdRef.current);
+          restoreTimeoutIdRef.current = null;
+        }
+        restoreExecutionGenerationRef.current = null;
         dispatch({
           type: "chat_restore_failed",
           errorMessage: error instanceof Error ? error.message : "Could not restore chat.",
         });
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [
     input.chat,
     input.lifecycle.transportState,
+    input.threadAuthority,
     isCurrentGeneration,
     resetToStableChat,
+    setRestoreStep,
     state.transitionState,
+    waitForRestoreStep,
   ]);
 
   useEffect(() => {
@@ -290,6 +390,10 @@ export function useSessionMainPanelHandoff(
 
   useEffect(() => {
     generationRef.current += 1;
+    if (restoreTimeoutIdRef.current !== null) {
+      systemScheduler.cancel(restoreTimeoutIdRef.current);
+      restoreTimeoutIdRef.current = null;
+    }
     restoreGenerationRef.current = null;
     dispatch({
       type: "reset_to_stable_chat",
@@ -300,6 +404,7 @@ export function useSessionMainPanelHandoff(
     transitionState: state.transitionState,
     errorMessage: state.errorMessage,
     isCliToggleActive: isCliToggleActive(state.transitionState),
+    restoreStep: state.restoreStep,
     shouldLifecycleAutoAttachChat: shouldLifecycleAutoAttachChat(state.transitionState),
     handoffToCli,
     handoffToChat,
