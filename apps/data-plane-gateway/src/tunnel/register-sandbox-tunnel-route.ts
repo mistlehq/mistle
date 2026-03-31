@@ -6,6 +6,7 @@ import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 
 import type { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { logger } from "../logger.js";
+import type { TunnelMessageDispatcher } from "../publishing/tunnel-message-dispatcher.js";
 import { OWNER_LEASE_TTL_MS } from "../runtime-state/durations.js";
 import type { SandboxActivityStore } from "../runtime-state/sandbox-activity-store.js";
 import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
@@ -41,6 +42,7 @@ type RegisterSandboxTunnelRouteInput = {
   interactiveStreamRouter: InteractiveStreamRouter;
   relayCoordinator: TunnelRelayCoordinator;
   tunnelSessionRegistry: TunnelSessionRegistry;
+  tunnelMessageDispatcher: TunnelMessageDispatcher;
   sandboxOwnerStore: SandboxOwnerStore;
   sandboxOwnerResolver: SandboxOwnerResolver;
   sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat;
@@ -272,6 +274,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               relayCoordinator: input.relayCoordinator,
               sandboxInstanceId,
               sourcePeerSide,
+              tunnelMessageDispatcher: input.tunnelMessageDispatcher,
               tunnelProtocolTranslator,
             }).catch((error: unknown) => {
               if (error instanceof TunnelProtocolViolationError) {
@@ -314,6 +317,9 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                   sandboxInstanceId,
                 });
               } else {
+                input.tunnelMessageDispatcher.releaseClientSession({
+                  clientSessionId: relaySessionId,
+                });
                 void tunnelSessionService.detachConnectionPeer({
                   attachedPeer,
                   sandboxInstanceId,

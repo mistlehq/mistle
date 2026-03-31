@@ -10,7 +10,10 @@ import { createApp, stopApp } from "../app.js";
 import { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { LocalSandboxIdleController } from "../idle/sandbox-idle-controller.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
+import { ConnectionPublishMessageHandler } from "../publishing/connection-publish-message-handler.js";
+import { ConnectionPublishRequestCoordinator } from "../publishing/connection-publish-request-coordinator.js";
 import { registerPublishedTargetRoutes } from "../publishing/register-published-target-routes.js";
+import { TunnelMessageDispatcher } from "../publishing/tunnel-message-dispatcher.js";
 import { InMemorySandboxActivityStore } from "../runtime-state/adapters/in-memory-sandbox-activity-store.js";
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
@@ -48,6 +51,7 @@ import type {
 } from "../types.js";
 
 const DefaultMaxActiveBindingsPerSandbox = 32;
+const PublishRequestTimeoutMs = 5_000;
 
 function closeWebSocketServer(webSocketServer: WebSocketServer): Promise<void> {
   for (const client of webSocketServer.clients) {
@@ -122,6 +126,13 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerResolver,
     gatewayForwardingClient,
   );
+  const connectionPublishRequestCoordinator = new ConnectionPublishRequestCoordinator(
+    systemScheduler,
+    PublishRequestTimeoutMs,
+  );
+  const tunnelMessageDispatcher = new TunnelMessageDispatcher(
+    new ConnectionPublishMessageHandler(tunnelSessionRegistry, connectionPublishRequestCoordinator),
+  );
   const sandboxOwnerLeaseHeartbeat = new SandboxOwnerLeaseHeartbeat(
     sandboxOwnerStore,
     systemScheduler,
@@ -178,6 +189,7 @@ export function createDataPlaneGatewayRuntime(
     interactiveStreamRouter,
     relayCoordinator,
     tunnelSessionRegistry,
+    tunnelMessageDispatcher,
     sandboxOwnerStore,
     sandboxOwnerResolver,
     sandboxOwnerLeaseHeartbeat,

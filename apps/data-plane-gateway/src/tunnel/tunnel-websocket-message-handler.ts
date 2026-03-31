@@ -1,5 +1,6 @@
 import type { WSContext, WSMessageReceive } from "hono/ws";
 
+import type { TunnelMessageDispatcher } from "../publishing/tunnel-message-dispatcher.js";
 import { ExecutionLeaseRepository } from "./execution-lease-repository.js";
 import { SandboxExecutionLeaseNotFoundError } from "./execution-lease-store.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
@@ -44,14 +45,23 @@ export async function handleTunnelWebSocketMessage(input: {
   relayCoordinator: TunnelRelayCoordinator;
   sandboxInstanceId: string;
   sourcePeerSide: RelayPeerSide;
+  tunnelMessageDispatcher: TunnelMessageDispatcher;
   tunnelProtocolTranslator: TunnelProtocolTranslator;
 }): Promise<void> {
-  const translation = await input.tunnelProtocolTranslator.translateInboundMessage({
-    clientSessionId: input.clientSessionId,
-    payload: input.payload,
-    sandboxInstanceId: input.sandboxInstanceId,
-    sourcePeerSide: input.sourcePeerSide,
-  });
+  const dispatchedTranslation =
+    input.tunnelMessageDispatcher.handleInboundMessage({
+      clientSessionId: input.clientSessionId,
+      payload: input.payload,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sourcePeerSide: input.sourcePeerSide,
+    }) ??
+    (await input.tunnelProtocolTranslator.translateInboundMessage({
+      clientSessionId: input.clientSessionId,
+      payload: input.payload,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sourcePeerSide: input.sourcePeerSide,
+    }));
+  const translation = dispatchedTranslation;
 
   if (translation.executionLeaseControlMessage !== undefined) {
     try {

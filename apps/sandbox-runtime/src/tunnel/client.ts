@@ -1,7 +1,9 @@
 import type { CompiledAgentRuntime, CompiledRuntimeClient } from "@mistle/integrations-core";
+import { parsePublishControlMessage } from "@mistle/sandbox-session-protocol";
 import { systemScheduler } from "@mistle/time";
 import type WebSocket from "ws";
 
+import { readLiveListenersSnapshot } from "../runtime/live-listeners/read-live-listeners-snapshot.js";
 import { logSandboxRuntimeEvent } from "../runtime/logger.js";
 import { createAbortRace, ignorePromiseRejectionAfterAbort } from "./abortable-race.js";
 import {
@@ -66,8 +68,22 @@ export type StartTunnelClientInput = {
   bootstrapToken: string;
   tunnelExchangeToken: string;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
+  runtimeListenAddr: string;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
 };
+
+function sendTextPayload(socket: WebSocket, payload: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    socket.send(payload, (error) => {
+      if (error === undefined) {
+        resolve();
+        return;
+      }
+
+      reject(error);
+    });
+  });
+}
 
 function describeUnknownError(error: unknown): string {
   if (typeof error === "string") {
@@ -139,6 +155,7 @@ async function handleTunnelConnection(input: {
   tunnelMessages: AsyncQueue<TunnelSocketMessage>;
   executionLeases: ExecutionLeaseEngine;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
+  runtimeListenAddr: string;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
 }): Promise<void> {
   const connectionAbortController = new AbortController();
@@ -212,6 +229,34 @@ async function handleTunnelConnection(input: {
       }
 
       const message = nextEvent.message;
+      if (message.kind === "text") {
+        const publishControlMessage = parsePublishControlMessage(message.payload);
+        if (publishControlMessage !== undefined) {
+          switch (publishControlMessage.type) {
+            case "publish.listeners.get": {
+              const snapshot = await readLiveListenersSnapshot({
+                runtimeClients: input.runtimeClients,
+                runtimeListenAddr: input.runtimeListenAddr,
+              });
+              await sendTextPayload(
+                input.tunnelSocket,
+                JSON.stringify({
+                  type: "publish.listeners.snapshot",
+                  requestId: publishControlMessage.requestId,
+                  observedAt: snapshot.observedAt,
+                  listeners: snapshot.listeners,
+                }),
+              );
+              continue;
+            }
+            default:
+              throw new Error(
+                `unsupported publish control message type '${publishControlMessage.type}' on bootstrap tunnel`,
+              );
+          }
+        }
+      }
+
       let connectRequest;
       try {
         connectRequest = parseConnectRequestMessage(message);
@@ -344,6 +389,7 @@ async function runTunnelClientLoop(input: {
   gatewayWsUrl: string;
   tokens: TunnelTokens;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
+  runtimeListenAddr: string;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
 }): Promise<void> {
   const executionLeases = new ExecutionLeaseEngine();
@@ -421,6 +467,7 @@ async function runTunnelClientLoop(input: {
         tunnelMessages,
         executionLeases,
         agentRuntimes: input.agentRuntimes,
+        runtimeListenAddr: input.runtimeListenAddr,
         runtimeClients: input.runtimeClients,
       });
     } catch (error) {
@@ -479,6 +526,7 @@ export function startTunnelClient(input: StartTunnelClientInput): StartedTunnelC
     gatewayWsUrl: input.gatewayWsUrl,
     tokens,
     agentRuntimes: input.agentRuntimes,
+    runtimeListenAddr: input.runtimeListenAddr,
     runtimeClients: input.runtimeClients,
   });
 

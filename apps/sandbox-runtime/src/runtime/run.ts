@@ -217,6 +217,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
         bootstrapToken: startupInput.bootstrapToken,
         tunnelExchangeToken: startupInput.tunnelExchangeToken,
         agentRuntimes: startupInput.runtimePlan.agentRuntimes,
+        runtimeListenAddr: config.listenAddr,
         runtimeClients: startupInput.runtimePlan.runtimeClients,
       });
     } catch (error) {

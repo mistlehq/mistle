@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseBootstrapControlMessage,
   parseLeaseControlMessage,
+  parsePublishControlMessage,
   parseStreamControlMessage,
 } from "./stream-protocol.js";
 
@@ -309,5 +310,59 @@ describe("stream control message parser", () => {
         }),
       ),
     ).toBeUndefined();
+  });
+
+  it("parses publish listener control messages without leaking into stream or bootstrap parsing", () => {
+    const publishListenersGetPayload = JSON.stringify({
+      type: "publish.listeners.get",
+      requestId: "req_1",
+    });
+
+    expect(parseStreamControlMessage(publishListenersGetPayload)).toBeUndefined();
+    expect(parseBootstrapControlMessage(publishListenersGetPayload)).toBeUndefined();
+    expect(parsePublishControlMessage(publishListenersGetPayload)).toEqual({
+      type: "publish.listeners.get",
+      requestId: "req_1",
+    });
+
+    expect(
+      parsePublishControlMessage(
+        JSON.stringify({
+          type: "publish.listeners.snapshot",
+          requestId: "req_1",
+          observedAt: "2026-04-01T00:00:00.000Z",
+          listeners: [
+            {
+              bindAddress: "127.0.0.1",
+              command: "vite",
+              observedAt: "2026-04-01T00:00:00.000Z",
+              owner: {
+                kind: "unknown-process",
+              },
+              pid: 501,
+              port: 5173,
+              visibility: "user_selectable",
+            },
+          ],
+        }),
+      ),
+    ).toEqual({
+      type: "publish.listeners.snapshot",
+      requestId: "req_1",
+      observedAt: "2026-04-01T00:00:00.000Z",
+      listeners: [
+        {
+          bindAddress: "127.0.0.1",
+          command: "vite",
+          observedAt: "2026-04-01T00:00:00.000Z",
+          owner: {
+            kind: "unknown-process",
+          },
+          pid: 501,
+          port: 5173,
+          visibility: "user_selectable",
+        },
+      ],
+    });
   });
 });

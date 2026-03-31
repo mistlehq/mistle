@@ -1,0 +1,147 @@
+import {
+  parsePublishControlMessage,
+  type PublishListenersGet,
+  type PublishListenersSnapshot,
+  type PublishControlMessage,
+} from "@mistle/sandbox-session-protocol";
+
+import { TunnelProtocolViolationError } from "../tunnel/protocol/tunnel-protocol-translator.js";
+import type { TunnelProtocolTranslation } from "../tunnel/protocol/tunnel-protocol-translator.js";
+import type { TunnelSessionRegistry } from "../tunnel/tunnel-session/index.js";
+import type { RelayPeerSide } from "../tunnel/types.js";
+import {
+  ConnectionPublishRequestCoordinator,
+  DuplicateConnectionPublishRequestIdError,
+} from "./connection-publish-request-coordinator.js";
+
+function createTranslation(
+  input: TunnelProtocolTranslation["delivery"],
+): TunnelProtocolTranslation {
+  return {
+    delivery: input,
+  };
+}
+
+function stringifyPublishControlMessage(message: PublishControlMessage): string {
+  return JSON.stringify(message);
+}
+
+function replaceRequestId<TMessage extends PublishListenersGet | PublishListenersSnapshot>(input: {
+  message: TMessage;
+  requestId: string;
+}): TMessage {
+  return {
+    ...input.message,
+    requestId: input.requestId,
+  };
+}
+
+export class ConnectionPublishMessageHandler {
+  public constructor(
+    private readonly tunnelSessionRegistry: TunnelSessionRegistry,
+    private readonly requestCoordinator: ConnectionPublishRequestCoordinator,
+  ) {}
+
+  public handleTextMessage(input: {
+    clientSessionId: string;
+    payload: string;
+    sandboxInstanceId: string;
+    sourcePeerSide: RelayPeerSide;
+  }): TunnelProtocolTranslation | undefined {
+    const controlMessage = parsePublishControlMessage(input.payload);
+    if (controlMessage === undefined) {
+      return undefined;
+    }
+
+    if (input.sourcePeerSide === "connection") {
+      return this.#handleConnectionMessage({
+        clientSessionId: input.clientSessionId,
+        controlMessage,
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+    }
+
+    return this.#handleBootstrapMessage({
+      controlMessage,
+    });
+  }
+
+  public releaseClientSession(input: { clientSessionId: string }): void {
+    this.requestCoordinator.releaseClientSession(input);
+  }
+
+  #handleConnectionMessage(input: {
+    clientSessionId: string;
+    controlMessage: PublishControlMessage;
+    sandboxInstanceId: string;
+  }): TunnelProtocolTranslation {
+    if (input.controlMessage.type !== "publish.listeners.get") {
+      throw new TunnelProtocolViolationError(
+        `Connection websocket cannot send publish control message type '${input.controlMessage.type}'.`,
+      );
+    }
+
+    const bootstrapTarget = this.tunnelSessionRegistry.getBootstrapTarget({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    if (bootstrapTarget === undefined) {
+      throw new TunnelProtocolViolationError(
+        "Sandbox bootstrap tunnel is not connected for publish.listeners.get.",
+      );
+    }
+
+    let bootstrapRequestId: string;
+    try {
+      bootstrapRequestId = this.requestCoordinator.beginRequest({
+        clientRequestId: input.controlMessage.requestId,
+        clientSessionId: input.clientSessionId,
+      }).bootstrapRequestId;
+    } catch (error) {
+      if (error instanceof DuplicateConnectionPublishRequestIdError) {
+        throw new TunnelProtocolViolationError(error.message);
+      }
+
+      throw error;
+    }
+
+    return createTranslation({
+      kind: "forward",
+      payload: stringifyPublishControlMessage(
+        replaceRequestId({
+          message: input.controlMessage,
+          requestId: bootstrapRequestId,
+        }),
+      ),
+    });
+  }
+
+  #handleBootstrapMessage(input: {
+    controlMessage: PublishControlMessage;
+  }): TunnelProtocolTranslation {
+    if (input.controlMessage.type !== "publish.listeners.snapshot") {
+      throw new TunnelProtocolViolationError(
+        `Bootstrap websocket cannot send publish control message type '${input.controlMessage.type}'.`,
+      );
+    }
+
+    const resolvedRequest = this.requestCoordinator.resolveRequest({
+      bootstrapRequestId: input.controlMessage.requestId,
+    });
+    if (resolvedRequest === undefined) {
+      return createTranslation({
+        kind: "drop",
+      });
+    }
+
+    return createTranslation({
+      kind: "forward",
+      payload: stringifyPublishControlMessage(
+        replaceRequestId({
+          message: input.controlMessage,
+          requestId: resolvedRequest.clientRequestId,
+        }),
+      ),
+      targetConnectionSessionId: resolvedRequest.clientSessionId,
+    });
+  }
+}

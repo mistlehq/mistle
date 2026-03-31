@@ -259,6 +259,7 @@ async function createUploadHarness(input?: { threadId?: string }): Promise<Uploa
         bootstrapToken: "bootstrap-token",
         tunnelExchangeToken: "exchange-token",
         agentRuntimes: [],
+        runtimeListenAddr: "127.0.0.1:3100",
         runtimeClients: [],
       });
 
