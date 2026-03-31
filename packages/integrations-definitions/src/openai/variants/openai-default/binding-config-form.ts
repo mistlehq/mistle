@@ -11,8 +11,14 @@ import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 
 type OpenAiBindingFormContext = IntegrationFormContext;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+function hasSelectedModelValue(value: unknown): value is { defaultModel: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    "defaultModel" in value &&
+    typeof value.defaultModel === "string"
+  );
 }
 
 function createChoiceList(
@@ -30,7 +36,7 @@ function resolveSelectedModel(input: {
   currentValue: Record<string, unknown> | undefined;
 }): OpenAiModelId {
   const modelValue = input.currentValue?.model;
-  const currentModel = isRecord(modelValue) ? modelValue["defaultModel"] : undefined;
+  const currentModel = hasSelectedModelValue(modelValue) ? modelValue.defaultModel : undefined;
   if (typeof currentModel === "string") {
     const matchingModel = input.models.find((model) => model === currentModel);
     if (matchingModel !== undefined) {

@@ -25,7 +25,6 @@ export {
   isOpenAiReasoningEffortSupported,
   resolveOpenAiDefaultReasoningEffort,
 } from "./model-capabilities.js";
-export { compileOpenAiApiKeyBinding } from "./compile-binding.js";
 export { OpenAiApiKeyCredentialSecretTypes } from "./auth.js";
 export {
   OpenAiCodexAppServerEndpointKey,
