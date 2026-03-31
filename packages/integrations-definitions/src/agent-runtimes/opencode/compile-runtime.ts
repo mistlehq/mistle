@@ -5,7 +5,16 @@ import {
   type RuntimeArtifactCommand,
 } from "@mistle/integrations-core";
 
-import { OpencodeServerProcessKey, OpencodeServerStatusUrl } from "./server.js";
+import { renderOpencodeBridgeScript } from "./bridge-script.js";
+import { OpencodePtyLaunchSpec } from "./pty-launch.js";
+import {
+  OpencodeBridgeEndpointKey,
+  OpencodeBridgeListenUrl,
+  OpencodeBridgeProcessKey,
+  OpencodeBridgeScriptPath,
+  OpencodeServerProcessKey,
+  OpencodeServerStatusUrl,
+} from "./server.js";
 
 const OpencodeCliArtifactKey = "opencode-cli";
 const OpencodeConfigDirectoryPath = "/etc/opencode";
@@ -28,6 +37,7 @@ const ManagedSandboxContext = [
   "- Prefer debugging request behavior and proxy-mediated access before treating missing in-process credentials as the root cause.",
   "- Do not modify proxy-related environment variables unless explicitly instructed.",
 ].join("\n");
+const OpencodeClientId = "opencode-cli";
 
 type OpencodeProviderMetadata = {
   reasoningEffort: string;
@@ -200,7 +210,7 @@ export function compileOpencodeRuntime(
     ],
     runtimeClients: [
       {
-        clientId: "opencode-cli",
+        clientId: OpencodeClientId,
         setup: {
           env: {
             OPENCODE_CONFIG_DIR: OpencodeConfigDirectoryPath,
@@ -224,6 +234,12 @@ export function compileOpencodeRuntime(
               mode: 420,
               content: `${composeDeveloperInstructions(providerMetadata.additionalInstructions)}\n`,
             },
+            {
+              fileId: "opencode_bridge_script",
+              path: OpencodeBridgeScriptPath,
+              mode: 493,
+              content: renderOpencodeBridgeScript(),
+            },
           ],
         },
         processes: [
@@ -245,10 +261,44 @@ export function compileOpencodeRuntime(
               gracePeriodMs: RuntimeClientProcessStopGracePeriodMs,
             },
           },
+          {
+            processKey: OpencodeBridgeProcessKey,
+            command: {
+              args: ["node", OpencodeBridgeScriptPath],
+            },
+            readiness: {
+              type: "ws",
+              url: OpencodeBridgeListenUrl,
+              timeoutMs: RuntimeClientProcessReadinessTimeoutMs,
+            },
+            stop: {
+              signal: "sigterm",
+              timeoutMs: RuntimeClientProcessStopTimeoutMs,
+              gracePeriodMs: RuntimeClientProcessStopGracePeriodMs,
+            },
+          },
         ],
-        endpoints: [],
+        endpoints: [
+          {
+            endpointKey: OpencodeBridgeEndpointKey,
+            processKey: OpencodeBridgeProcessKey,
+            transport: {
+              type: "ws",
+              url: OpencodeBridgeListenUrl,
+            },
+            connectionMode: "dedicated",
+          },
+        ],
       },
     ],
-    agentRuntimes: [],
+    agentRuntimes: [
+      {
+        runtimeId: "opencode",
+        runtimeKey: OpencodeBridgeProcessKey,
+        clientId: OpencodeClientId,
+        endpointKey: OpencodeBridgeEndpointKey,
+        ptyLaunch: OpencodePtyLaunchSpec,
+      },
+    ],
   };
 }

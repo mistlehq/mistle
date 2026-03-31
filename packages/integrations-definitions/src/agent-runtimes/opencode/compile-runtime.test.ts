@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { compileOpencodeRuntime } from "./compile-runtime.js";
+import {
+  OpencodeBridgeEndpointKey,
+  OpencodeBridgeListenUrl,
+  OpencodeBridgeProcessKey,
+  OpencodeBridgeScriptPath,
+} from "./server.js";
 
 describe("compileOpencodeRuntime", () => {
-  it("compiles OpenCode runtime artifacts and headless server wiring from provider access", () => {
+  it("compiles OpenCode runtime artifacts, bridge transport, and PTY wiring", () => {
     const compiled = compileOpencodeRuntime({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
@@ -85,6 +91,14 @@ describe("compileOpencodeRuntime", () => {
     expect(compiled.runtimeClients[0]?.setup.files[1]?.content).toContain(
       "Prefer concise answers.",
     );
+    expect(compiled.runtimeClients[0]?.setup.files[2]).toEqual({
+      fileId: "opencode_bridge_script",
+      path: OpencodeBridgeScriptPath,
+      mode: 493,
+      content: expect.stringContaining(
+        'const methodNames = {"CONVERSATION_CREATE":"conversation.create"',
+      ),
+    });
     expect(compiled.runtimeClients[0]?.processes).toEqual([
       {
         processKey: "opencode-server",
@@ -104,8 +118,44 @@ describe("compileOpencodeRuntime", () => {
           gracePeriodMs: 2_000,
         },
       },
+      {
+        processKey: OpencodeBridgeProcessKey,
+        command: {
+          args: ["node", OpencodeBridgeScriptPath],
+        },
+        readiness: {
+          type: "ws",
+          url: OpencodeBridgeListenUrl,
+          timeoutMs: 5_000,
+        },
+        stop: {
+          signal: "sigterm",
+          timeoutMs: 10_000,
+          gracePeriodMs: 2_000,
+        },
+      },
     ]);
-    expect(compiled.runtimeClients[0]?.endpoints).toEqual([]);
-    expect(compiled.agentRuntimes).toEqual([]);
+    expect(compiled.runtimeClients[0]?.endpoints).toEqual([
+      {
+        endpointKey: OpencodeBridgeEndpointKey,
+        processKey: OpencodeBridgeProcessKey,
+        transport: {
+          type: "ws",
+          url: OpencodeBridgeListenUrl,
+        },
+        connectionMode: "dedicated",
+      },
+    ]);
+    expect(compiled.agentRuntimes).toEqual([
+      {
+        runtimeId: "opencode",
+        runtimeKey: OpencodeBridgeProcessKey,
+        clientId: "opencode-cli",
+        endpointKey: OpencodeBridgeEndpointKey,
+        ptyLaunch: expect.objectContaining({
+          runtimeId: "opencode",
+        }),
+      },
+    ]);
   });
 });
