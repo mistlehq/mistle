@@ -128,6 +128,7 @@ export interface paths {
                 bindingId: string;
                 clientId: string;
                 endpointKey: string;
+                runtimeId: string;
                 runtimeKey: string;
               }[];
               artifacts: {
