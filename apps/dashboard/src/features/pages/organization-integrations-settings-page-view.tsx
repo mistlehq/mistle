@@ -1,18 +1,9 @@
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Skeleton,
-} from "@mistle/ui";
+import { Button, Skeleton } from "@mistle/ui";
 import type { ReactNode } from "react";
 
 import { IntegrationSection } from "../integrations/integration-section.js";
 import { IntegrationTile } from "../integrations/integration-tile.js";
+import { StatusBox } from "../shared/status-box.js";
 
 export type OrganizationIntegrationsSettingsPageCard = {
   actionDisabled?: boolean;
@@ -52,29 +43,28 @@ export function OrganizationIntegrationsSettingsPageView(
 
   if (props.loadErrorMessage !== null) {
     return (
-      <Alert variant="destructive">
-        <AlertTitle>Could not load integrations</AlertTitle>
-        <AlertDescription className="gap-3 flex flex-col items-start">
-          <span>{props.loadErrorMessage}</span>
+      <div className="flex flex-col gap-3">
+        <StatusBox title="Could not load integrations" tone="destructive">
+          <p>{props.loadErrorMessage}</p>
+          <p>Please try again later.</p>
+        </StatusBox>
+        <div>
           <Button onClick={props.onRetryLoad} type="button" variant="outline">
             Retry
           </Button>
-        </AlertDescription>
-      </Alert>
+        </div>
+      </div>
     );
   }
 
   if (props.connectedCards.length === 0 && props.availableCards.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>No integrations available</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <StatusBox title="No integrations available">
+        <p>
           No integration targets are currently configured for this environment. Seed integration
           targets in the control-plane database to populate this page.
-        </CardContent>
-      </Card>
+        </p>
+      </StatusBox>
     );
   }
 

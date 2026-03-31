@@ -245,14 +245,13 @@ export const InteractiveDialogsAndRecovery: Story = {
     await expect(body.getByText("Failed to load members.")).toBeVisible();
     await userEvent.click(body.getByRole("button", { name: "Retry" }));
     await expect(body.getByRole("status")).toHaveTextContent("Members loaded.");
-    await expect(
-      body.getByText("Membership permissions could not be loaded. Try again."),
-    ).toBeVisible();
+    await expect(body.getByText("Could not load membership permissions")).toBeVisible();
+    await expect(body.getByText("Membership permissions could not be loaded.")).toBeVisible();
 
     await userEvent.click(body.getByRole("button", { name: "Retry" }));
     await expect(body.getByRole("status")).toHaveTextContent("Capabilities loaded.");
     await expect(
-      body.queryByText("Membership permissions could not be loaded. Try again."),
+      body.queryByText("Membership permissions could not be loaded."),
     ).not.toBeInTheDocument();
 
     await userEvent.click(body.getByRole("button", { name: "Invite members" }));

@@ -1,4 +1,4 @@
-import { Alert, AlertDescription, AlertTitle, Button } from "@mistle/ui";
+import { Button } from "@mistle/ui";
 
 import { MemberInviteDialog } from "../settings/members/member-invite-dialog.js";
 import { MemberRoleChangeDialog } from "../settings/members/member-role-change-dialog.js";
@@ -18,6 +18,7 @@ import {
   MembersLoadErrorState,
   MembersLoadingState,
 } from "../settings/members/members-query-states.js";
+import { StatusBox } from "../shared/status-box.js";
 
 export type OrganizationMembersSettingsPageViewProps = {
   capabilities: MembershipCapabilities | null;
@@ -72,15 +73,18 @@ export function OrganizationMembersSettingsPageView(
   return (
     <div className="flex flex-col gap-4">
       {props.capabilitiesErrorMessage ? (
-        <Alert variant="destructive">
-          <AlertTitle>Membership permissions could not be loaded. Try again.</AlertTitle>
-          <AlertDescription className="flex items-center justify-between gap-2">
-            <span>Invite and role management actions are disabled until permissions load.</span>
+        <div className="flex flex-col gap-3">
+          <StatusBox title="Could not load membership permissions" tone="destructive">
+            <p>{props.capabilitiesErrorMessage}</p>
+            <p>Invite and role management actions are unavailable until this loads.</p>
+            <p>Please try again later.</p>
+          </StatusBox>
+          <div>
             <Button onClick={props.onRetryCapabilities} type="button" variant="outline">
               Retry
             </Button>
-          </AlertDescription>
-        </Alert>
+          </div>
+        </div>
       ) : null}
 
       <MembersDirectoryTable
