@@ -5,7 +5,7 @@ import {
   integrationCredentials,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
-import type { IntegrationConnectionMethodId, IntegrationRegistry } from "@mistle/integrations-core";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
 
 import {
@@ -43,21 +43,6 @@ export type UpdateFormConnectionInput = {
   secrets?: Record<string, string>;
 };
 
-function resolveConnectionMethodId(
-  config: Record<string, unknown> | null,
-): IntegrationConnectionMethodId | null {
-  if (config === null) {
-    return null;
-  }
-
-  const connectionMethodId = config["connection_method"];
-  if (typeof connectionMethodId !== "string" || connectionMethodId.length === 0) {
-    return null;
-  }
-
-  return connectionMethodId;
-}
-
 export async function updateFormConnection(
   ctx: {
     db: ControlPlaneDatabase;
@@ -82,7 +67,11 @@ export async function updateFormConnection(
     );
   }
 
-  const existingConnectionMethodId = resolveConnectionMethodId(existingConnection.config);
+  const connectionMethodIdValue = existingConnection.config?.["connection_method"];
+  const existingConnectionMethodId =
+    typeof connectionMethodIdValue === "string" && connectionMethodIdValue.length > 0
+      ? connectionMethodIdValue
+      : null;
   if (existingConnectionMethodId === null) {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_REQUIRED,
@@ -125,15 +114,14 @@ export async function updateFormConnection(
     config: input.config,
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
   });
-  const parsedSecrets =
-    input.secrets === undefined
-      ? []
-      : parseUpdateFormSecretsOrThrow({
-          targetKey: existingConnection.targetKey,
-          method: formMethod,
-          secrets: input.secrets,
-          invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
-        });
+  const parsedSecrets = input.secrets
+    ? parseUpdateFormSecretsOrThrow({
+        targetKey: existingConnection.targetKey,
+        method: formMethod,
+        secrets: input.secrets,
+        invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+      })
+    : [];
 
   const organizationCredentialKey = await db.query.organizationCredentialKeys.findFirst({
     where: (table, { eq }) => eq(table.organizationId, input.organizationId),
