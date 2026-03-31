@@ -65,7 +65,6 @@ export function IntegrationsPage() {
       connectionDialog={
         <>
           <IntegrationConnectionDialog
-            apiKeyValue={connectionDialogState.apiKeyValue}
             connectionDisplayNamePlaceholder={
               connectionDialogState.connectionDisplayNamePlaceholder
             }
@@ -74,14 +73,15 @@ export function IntegrationsPage() {
             connectMethodId={connectionDialogState.methodId}
             dialog={connectionDialogState.dialog}
             hasChanges={connectionDialogState.hasChanges}
-            isApiKeyChanged={connectionDialogState.isApiKeyChanged}
+            isSecretsChanged={connectionDialogState.isSecretsChanged}
             isConnectionDisplayNameChanged={connectionDialogState.isConnectionDisplayNameChanged}
-            onApiKeyChange={connectionDialogState.onApiKeyChange}
             onConnectionDisplayNameChange={connectionDialogState.onConnectionDisplayNameChange}
             onClose={connectionDialogState.closeDialog}
             onMethodChange={connectionDialogState.onMethodChange}
+            onSecretChange={connectionDialogState.onSecretChange}
             onSubmit={connectionDialogState.submitDialog}
             pending={connectionDialogState.pending}
+            secrets={connectionDialogState.secrets}
           />
           <IntegrationConnectionApiKeyDialog {...connectionEditors.apiKeyDialog} />
           <DeleteIntegrationConnectionDialog {...connectionEditors.deleteDialog} />

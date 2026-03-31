@@ -34,7 +34,7 @@ describe("integrations-definitions index", () => {
           id: "api-key",
           label: "API key",
           kind: "form",
-          secretField: { label: "API key", inputType: "password" },
+          secretFields: [{ name: "apiKey", label: "API key", inputType: "password" }],
         },
         {
           id: "github-app-installation",
@@ -95,7 +95,7 @@ describe("integrations-definitions index", () => {
           id: "api-key",
           label: "API key",
           kind: "form",
-          secretField: { label: "API key", inputType: "password" },
+          secretFields: [{ name: "apiKey", label: "API key", inputType: "password" }],
         },
         {
           id: "github-app-installation",
@@ -128,7 +128,7 @@ describe("integrations-definitions index", () => {
           id: "api-key",
           label: "API key",
           kind: "form",
-          secretField: { label: "API key", inputType: "password" },
+          secretFields: [{ name: "apiKey", label: "API key", inputType: "password" }],
         },
       ],
     });

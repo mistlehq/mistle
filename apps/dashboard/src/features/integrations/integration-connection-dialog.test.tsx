@@ -16,11 +16,14 @@ const dialog: IntegrationConnectionDialogState = {
       id: IntegrationConnectionMethodIds.API_KEY,
       label: "API key",
       kind: "form",
-      secretField: {
-        label: "API key",
-        placeholder: "Enter API key",
-        inputType: "password",
-      },
+      secretFields: [
+        {
+          name: "apiKey",
+          label: "API key",
+          placeholder: "Enter API key",
+          inputType: "password",
+        },
+      ],
     },
     {
       id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
@@ -40,21 +43,21 @@ describe("IntegrationConnectionDialog", () => {
   it("disables 1Password autofill for API key input", () => {
     render(
       <IntegrationConnectionDialog
-        apiKeyValue=""
         connectionDisplayNamePlaceholder="OpenAI connection"
         connectionDisplayNameValue=""
         connectError={null}
         connectMethodId={IntegrationConnectionMethodIds.API_KEY}
         dialog={dialog}
         hasChanges={true}
-        isApiKeyChanged={false}
+        isSecretsChanged={false}
         isConnectionDisplayNameChanged={false}
-        onApiKeyChange={() => {}}
         onConnectionDisplayNameChange={() => {}}
         onClose={() => {}}
         onMethodChange={() => {}}
+        onSecretChange={() => {}}
         onSubmit={() => {}}
         pending={false}
+        secrets={{}}
       />,
     );
 
@@ -66,7 +69,6 @@ describe("IntegrationConnectionDialog", () => {
   it("does not render auth method selection in update mode", () => {
     render(
       <IntegrationConnectionDialog
-        apiKeyValue=""
         connectionDisplayNamePlaceholder="OpenAI connection"
         connectionDisplayNameValue="Existing connection"
         connectError={null}
@@ -77,10 +79,13 @@ describe("IntegrationConnectionDialog", () => {
             id: IntegrationConnectionMethodIds.API_KEY,
             label: "API key",
             kind: "form",
-            secretField: {
-              label: "API key",
-              inputType: "password",
-            },
+            secretFields: [
+              {
+                name: "apiKey",
+                label: "API key",
+                inputType: "password",
+              },
+            ],
           },
           displayName: "OpenAI",
           initialConnectionDisplayName: "Existing connection",
@@ -88,14 +93,15 @@ describe("IntegrationConnectionDialog", () => {
           targetKey: "openai",
         }}
         hasChanges={false}
-        isApiKeyChanged={false}
+        isSecretsChanged={false}
         isConnectionDisplayNameChanged={false}
-        onApiKeyChange={() => {}}
         onConnectionDisplayNameChange={() => {}}
         onClose={() => {}}
         onMethodChange={() => {}}
+        onSecretChange={() => {}}
         onSubmit={() => {}}
         pending={false}
+        secrets={{}}
       />,
     );
 
@@ -106,7 +112,6 @@ describe("IntegrationConnectionDialog", () => {
   it("renders Save for redirect connections in update mode", () => {
     render(
       <IntegrationConnectionDialog
-        apiKeyValue=""
         connectionDisplayNamePlaceholder="OpenAI connection"
         connectionDisplayNameValue="Existing GitHub App installation connection"
         connectError={null}
@@ -124,14 +129,15 @@ describe("IntegrationConnectionDialog", () => {
           targetKey: "openai",
         }}
         hasChanges={true}
-        isApiKeyChanged={false}
+        isSecretsChanged={false}
         isConnectionDisplayNameChanged={true}
-        onApiKeyChange={() => {}}
         onConnectionDisplayNameChange={() => {}}
         onClose={() => {}}
         onMethodChange={() => {}}
+        onSecretChange={() => {}}
         onSubmit={() => {}}
         pending={false}
+        secrets={{}}
       />,
     );
 

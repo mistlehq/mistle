@@ -33,10 +33,13 @@ describe("integrations page view model", () => {
           id: IntegrationConnectionMethodIds.API_KEY,
           label: "API key",
           kind: "form",
-          secretField: {
-            label: "API key",
-            inputType: "password",
-          },
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+            },
+          ],
         },
       ]),
     ).toEqual([
@@ -49,10 +52,13 @@ describe("integrations page view model", () => {
         id: IntegrationConnectionMethodIds.API_KEY,
         label: "API key",
         kind: "form",
-        secretField: {
-          label: "API key",
-          inputType: "password",
-        },
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "API key",
+            inputType: "password",
+          },
+        ],
       },
     ]);
     expect(toConnectionMethods(undefined)).toEqual([]);

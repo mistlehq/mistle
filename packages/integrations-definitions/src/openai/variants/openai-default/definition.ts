@@ -41,11 +41,15 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
       id: IntegrationConnectionMethodIds.API_KEY,
       label: "API key",
       kind: "form",
-      secretField: {
-        label: "API key",
-        placeholder: "Enter API key",
-        inputType: "password",
-      },
+      secretFields: [
+        {
+          name: "apiKey",
+          label: "API key",
+          placeholder: "Enter API key",
+          inputType: "password",
+          secretType: "api_key",
+        },
+      ],
       configSchema: OpenAiConnectionConfigSchema,
       configForm: OpenAiConnectionConfigForm,
     },

@@ -21,10 +21,14 @@ const ApiKeyConnectionMethods = [
     id: IntegrationConnectionMethodIds.API_KEY,
     label: "API key",
     kind: "form",
-    secretField: {
-      label: "API key",
-      inputType: "password",
-    },
+    secretFields: [
+      {
+        name: "apiKey",
+        label: "API key",
+        inputType: "password",
+        secretType: "api_key",
+      },
+    ],
   },
 ] as const;
 

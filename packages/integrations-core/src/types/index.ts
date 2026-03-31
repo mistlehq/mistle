@@ -37,11 +37,18 @@ export const IntegrationConnectionMethodKinds: {
 };
 
 export type IntegrationConnectionMethodSecretField = {
+  name: string;
   label: string;
   placeholder?: string;
   description?: string;
   inputType: "password" | "text";
+  secretType: string;
 };
+
+export type IntegrationBrowserSafeConnectionMethodSecretField = Omit<
+  IntegrationConnectionMethodSecretField,
+  "secretType"
+>;
 
 export type IntegrationTarget = {
   familyId: string;
@@ -295,7 +302,7 @@ export type IntegrationFormConnectionMethodDefinition<
   TConnectionConfig
 > & {
   kind: "form";
-  secretField: IntegrationConnectionMethodSecretField;
+  secretFields: ReadonlyArray<IntegrationConnectionMethodSecretField>;
 };
 
 export type IntegrationRedirectConnectionMethodDefinition<
@@ -310,7 +317,7 @@ export type IntegrationRedirectConnectionMethodDefinition<
   TConnectionConfig
 > & {
   kind: "redirect";
-  secretField?: never;
+  secretFields?: never;
 };
 
 export type IntegrationConnectionMethodDefinition<
@@ -1166,13 +1173,31 @@ export type AnyIntegrationDefinition = IntegrationDefinition<
   Record<string, unknown>
 >;
 
-export type IntegrationBrowserSafeConnectionMethodDefinition<
+export type IntegrationBrowserSafeFormConnectionMethodDefinition<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TBindingConfig = Record<string, unknown>,
   TConnectionConfig = Record<string, unknown>,
 > = Omit<
-  IntegrationConnectionMethodDefinition<
+  IntegrationFormConnectionMethodDefinition<
+    TTargetConfig,
+    TTargetSecrets,
+    TBindingConfig,
+    TConnectionConfig
+  >,
+  "configSchema" | "secretFields"
+> & {
+  configSchema?: IntegrationConfigSchema<Record<string, unknown>>;
+  secretFields: ReadonlyArray<IntegrationBrowserSafeConnectionMethodSecretField>;
+};
+
+export type IntegrationBrowserSafeRedirectConnectionMethodDefinition<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TBindingConfig = Record<string, unknown>,
+  TConnectionConfig = Record<string, unknown>,
+> = Omit<
+  IntegrationRedirectConnectionMethodDefinition<
     TTargetConfig,
     TTargetSecrets,
     TBindingConfig,
@@ -1182,6 +1207,25 @@ export type IntegrationBrowserSafeConnectionMethodDefinition<
 > & {
   configSchema?: IntegrationConfigSchema<Record<string, unknown>>;
 };
+
+export type IntegrationBrowserSafeConnectionMethodDefinition<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TBindingConfig = Record<string, unknown>,
+  TConnectionConfig = Record<string, unknown>,
+> =
+  | IntegrationBrowserSafeFormConnectionMethodDefinition<
+      TTargetConfig,
+      TTargetSecrets,
+      TBindingConfig,
+      TConnectionConfig
+    >
+  | IntegrationBrowserSafeRedirectConnectionMethodDefinition<
+      TTargetConfig,
+      TTargetSecrets,
+      TBindingConfig,
+      TConnectionConfig
+    >;
 
 export type TriggerFilter =
   | { op: "all"; filters: ReadonlyArray<TriggerFilter> }

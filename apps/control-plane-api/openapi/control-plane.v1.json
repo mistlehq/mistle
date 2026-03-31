@@ -3477,31 +3477,39 @@
                                       "type": "string",
                                       "enum": ["form"]
                                     },
-                                    "secretField": {
-                                      "type": "object",
-                                      "properties": {
-                                        "label": {
-                                          "type": "string",
-                                          "minLength": 1
+                                    "secretFields": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "name": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "placeholder": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "description": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "inputType": {
+                                            "type": "string",
+                                            "enum": ["password", "text"]
+                                          }
                                         },
-                                        "placeholder": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "description": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "inputType": {
-                                          "type": "string",
-                                          "enum": ["password", "text"]
-                                        }
+                                        "required": ["name", "label", "inputType"],
+                                        "additionalProperties": false
                                       },
-                                      "required": ["label", "inputType"],
-                                      "additionalProperties": false
+                                      "minItems": 1
                                     }
                                   },
-                                  "required": ["id", "label", "kind", "secretField"],
+                                  "required": ["id", "label", "kind", "secretFields"],
                                   "additionalProperties": false
                                 },
                                 {

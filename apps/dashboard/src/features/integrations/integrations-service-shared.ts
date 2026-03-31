@@ -27,14 +27,19 @@ export const IntegrationTargetSchema = z
               id: z.string().min(1),
               label: z.string().min(1),
               kind: z.literal("form"),
-              secretField: z
-                .object({
-                  label: z.string().min(1),
-                  placeholder: z.string().min(1).optional(),
-                  description: z.string().min(1).optional(),
-                  inputType: z.enum(["password", "text"]),
-                })
-                .strict(),
+              secretFields: z
+                .array(
+                  z
+                    .object({
+                      name: z.string().min(1),
+                      label: z.string().min(1),
+                      placeholder: z.string().min(1).optional(),
+                      description: z.string().min(1).optional(),
+                      inputType: z.enum(["password", "text"]),
+                    })
+                    .strict(),
+                )
+                .min(1),
             })
             .strict(),
           z

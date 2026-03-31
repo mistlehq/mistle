@@ -1,5 +1,6 @@
 import type { IntegrationTarget as PersistedIntegrationTarget } from "@mistle/db/control-plane";
 import type {
+  IntegrationConnectionMethodDefinition,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
 } from "@mistle/integrations-core";
@@ -77,12 +78,13 @@ export type ResolvedIntegrationTargetMetadata = {
         id: string;
         label: string;
         kind: "form";
-        secretField: {
+        secretFields: {
+          name: string;
           label: string;
           placeholder?: string;
           description?: string;
           inputType: "password" | "text";
-        };
+        }[];
       }
     | {
         id: string;
@@ -94,14 +96,20 @@ export type ResolvedIntegrationTargetMetadata = {
 };
 
 function cloneConnectionMethod(
-  method: NonNullable<ResolvedIntegrationTargetMetadata["connectionMethods"]>[number],
+  method: IntegrationConnectionMethodDefinition,
 ): NonNullable<ResolvedIntegrationTargetMetadata["connectionMethods"]>[number] {
   if (method.kind === "form") {
     return {
       id: method.id,
       label: method.label,
       kind: "form",
-      secretField: method.secretField,
+      secretFields: method.secretFields.map((field) => ({
+        name: field.name,
+        label: field.label,
+        ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
+        ...(field.description === undefined ? {} : { description: field.description }),
+        inputType: field.inputType,
+      })),
     };
   }
 

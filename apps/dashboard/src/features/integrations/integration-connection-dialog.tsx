@@ -22,6 +22,7 @@ export const IntegrationConnectionMethodIds: {
 };
 
 export type IntegrationConnectionMethodSecretField = {
+  name: string;
   label: string;
   placeholder?: string | undefined;
   description?: string | undefined;
@@ -32,7 +33,7 @@ type IntegrationFormConnectionMethod = {
   id: IntegrationConnectionMethodId;
   label: string;
   kind: "form";
-  secretField: IntegrationConnectionMethodSecretField;
+  secretFields: IntegrationConnectionMethodSecretField[];
 };
 
 type IntegrationRedirectConnectionMethod = {
@@ -66,21 +67,21 @@ export type IntegrationConnectionDialogState =
   | UpdateIntegrationConnectionDialogState;
 
 type IntegrationConnectionDialogProps = {
-  apiKeyValue: string;
   connectionDisplayNamePlaceholder: string;
   connectionDisplayNameValue: string;
   connectError: string | null;
   connectMethodId: IntegrationConnectionMethodId;
   dialog: IntegrationConnectionDialogState | null;
   hasChanges: boolean;
-  isApiKeyChanged: boolean;
+  isSecretsChanged: boolean;
   isConnectionDisplayNameChanged: boolean;
   pending: boolean;
-  onApiKeyChange: (value: string) => void;
   onConnectionDisplayNameChange: (value: string) => void;
   onClose: () => void;
   onMethodChange: (methodId: IntegrationConnectionMethodId) => void;
+  onSecretChange: (name: string, value: string) => void;
   onSubmit: () => void;
+  secrets: Record<string, string>;
 };
 
 function formatIntegrationConnectionMethodLabel(method: IntegrationConnectionMethod): string {
@@ -175,31 +176,33 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
 
           {selectedMethod?.kind === "form" ? (
             <div className="gap-2 flex flex-col">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium">{selectedMethod.secretField.label}</p>
-                {isUpdateMode && props.isApiKeyChanged ? (
-                  <span className="text-muted-foreground text-xs">Will update</span>
-                ) : null}
-              </div>
-              {selectedMethod.secretField.description ? (
-                <p className="text-muted-foreground text-sm">
-                  {selectedMethod.secretField.description}
-                </p>
-              ) : null}
-              <Input
-                autoComplete="off"
-                data-1p-ignore="true"
-                onChange={(event) => {
-                  props.onApiKeyChange(event.currentTarget.value);
-                }}
-                placeholder={
-                  isUpdateMode
-                    ? `Leave blank to keep existing ${selectedMethod.secretField.label.toLowerCase()}`
-                    : (selectedMethod.secretField.placeholder ?? "Enter secret")
-                }
-                type={selectedMethod.secretField.inputType}
-                value={props.apiKeyValue}
-              />
+              {selectedMethod.secretFields.map((secretField) => (
+                <div className="gap-2 flex flex-col" key={secretField.name}>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium">{secretField.label}</p>
+                    {isUpdateMode && props.isSecretsChanged ? (
+                      <span className="text-muted-foreground text-xs">Will update</span>
+                    ) : null}
+                  </div>
+                  {secretField.description ? (
+                    <p className="text-muted-foreground text-sm">{secretField.description}</p>
+                  ) : null}
+                  <Input
+                    autoComplete="off"
+                    data-1p-ignore="true"
+                    onChange={(event) => {
+                      props.onSecretChange(secretField.name, event.currentTarget.value);
+                    }}
+                    placeholder={
+                      isUpdateMode
+                        ? `Leave blank to keep existing ${secretField.label.toLowerCase()}`
+                        : (secretField.placeholder ?? `Enter ${secretField.label.toLowerCase()}`)
+                    }
+                    type={secretField.inputType}
+                    value={props.secrets[secretField.name] ?? ""}
+                  />
+                </div>
+              ))}
             </div>
           ) : (
             <p className="text-muted-foreground text-sm">

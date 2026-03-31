@@ -102,8 +102,8 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     const validationError = resolveIntegrationConnectionDialogValidationError({
       dialog,
       methodId: draft.methodId,
-      apiKeyValue: draft.apiKeyValue,
       connectionDisplayNameValue: draft.connectionDisplayNameValue,
+      secrets: draft.secrets,
     });
     if (validationError !== null) {
       setDraft((currentDraft) => ({
@@ -119,7 +119,18 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     });
 
     if (selectedMethod.kind === "form") {
-      const normalizedApiKey = draft.apiKeyValue.trim();
+      const submittedSecrets = Object.fromEntries(
+        Object.entries(draft.secrets).map(([key, value]) => [key, value.trim()]),
+      );
+      const populatedSecrets = Object.entries(submittedSecrets).filter(
+        ([, value]) => value.length > 0,
+      );
+      if (populatedSecrets.length > 1) {
+        throw new Error(
+          `Connection method '${selectedMethod.id}' cannot submit multiple secrets until the generic form routes are available.`,
+        );
+      }
+      const normalizedApiKey = populatedSecrets[0]?.[1] ?? "";
       const normalizedConnectionDisplayName = draft.connectionDisplayNameValue.trim();
 
       if (dialog.mode === "update") {
@@ -203,7 +214,7 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     methodId: draft.methodId,
     connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
     connectionDisplayNameValue: draft.connectionDisplayNameValue,
-    apiKeyValue: draft.apiKeyValue,
+    secrets: draft.secrets,
     error: draft.error,
     pending:
       createApiKeyMutation.isPending ||
@@ -214,9 +225,9 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       dialog,
       connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
       connectionDisplayNameValue: draft.connectionDisplayNameValue,
-      apiKeyValue: draft.apiKeyValue,
+      secrets: draft.secrets,
     }),
-    isApiKeyChanged: draft.apiKeyValue.trim().length > 0,
+    isSecretsChanged: Object.values(draft.secrets).some((value) => value.trim().length > 0),
     isConnectionDisplayNameChanged: isIntegrationConnectionDisplayNameChanged({
       dialog,
       connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
@@ -225,10 +236,13 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     openDialog,
     closeDialog,
     submitDialog,
-    onApiKeyChange: (value: string): void => {
+    onSecretChange: (name: string, value: string): void => {
       setDraft((currentDraft) => ({
         ...currentDraft,
-        apiKeyValue: value,
+        secrets: {
+          ...currentDraft.secrets,
+          [name]: value,
+        },
         error: null,
       }));
     },

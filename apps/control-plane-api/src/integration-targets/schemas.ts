@@ -2,6 +2,7 @@ import { z } from "@hono/zod-openapi";
 
 const IntegrationConnectionMethodSecretFieldSchema = z
   .object({
+    name: z.string().min(1),
     label: z.string().min(1),
     placeholder: z.string().min(1).optional(),
     description: z.string().min(1).optional(),
@@ -15,7 +16,7 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
       id: z.string().min(1),
       label: z.string().min(1),
       kind: z.literal("form"),
-      secretField: IntegrationConnectionMethodSecretFieldSchema,
+      secretFields: z.array(IntegrationConnectionMethodSecretFieldSchema).min(1),
     })
     .strict(),
   z

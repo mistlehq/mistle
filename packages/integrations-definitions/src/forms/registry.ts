@@ -59,11 +59,14 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
         id: "api-key",
         label: "API key",
         kind: "form",
-        secretField: {
-          label: "API key",
-          placeholder: "Enter API key",
-          inputType: "password",
-        },
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "API key",
+            placeholder: "Enter API key",
+            inputType: "password",
+          },
+        ],
         configSchema: GitHubApiKeyConnectionConfigSchema,
       },
       {
@@ -86,11 +89,14 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
         id: "api-key",
         label: "API key",
         kind: "form",
-        secretField: {
-          label: "API key",
-          placeholder: "Enter API key",
-          inputType: "password",
-        },
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "API key",
+            placeholder: "Enter API key",
+            inputType: "password",
+          },
+        ],
         configSchema: GitHubApiKeyConnectionConfigSchema,
       },
       {
@@ -113,11 +119,14 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
         id: "api-key",
         label: "API key",
         kind: "form",
-        secretField: {
-          label: "API key",
-          placeholder: "Enter API key",
-          inputType: "password",
-        },
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "API key",
+            placeholder: "Enter API key",
+            inputType: "password",
+          },
+        ],
         configSchema: OpenAiConnectionConfigSchema,
         configForm: OpenAiConnectionConfigForm,
       },
@@ -134,11 +143,14 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
         id: "api-key",
         label: "API key",
         kind: "form",
-        secretField: {
-          label: "API key",
-          placeholder: "Enter API key",
-          inputType: "password",
-        },
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "API key",
+            placeholder: "Enter API key",
+            inputType: "password",
+          },
+        ],
         configSchema: LinearConnectionConfigSchema,
         configForm: LinearConnectionConfigForm,
       },

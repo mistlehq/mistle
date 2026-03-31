@@ -101,19 +101,22 @@ describe("useIntegrationConnectionDialogState update API key behavior", () => {
             id: IntegrationConnectionMethodIds.API_KEY,
             label: "API key",
             kind: "form",
-            secretField: {
-              label: "API key",
-              inputType: "password",
-            },
+            secretFields: [
+              {
+                name: "apiKey",
+                label: "API key",
+                inputType: "password",
+              },
+            ],
           },
           targetDisplayName: "OpenAI",
           targetKey: "openai-default",
         });
         result.current.onConnectionDisplayNameChange("Renamed connection");
-        result.current.onApiKeyChange("   ");
+        result.current.onSecretChange("apiKey", "   ");
       });
 
-      expect(result.current.isApiKeyChanged).toBe(false);
+      expect(result.current.isSecretsChanged).toBe(false);
 
       act(() => {
         result.current.submitDialog();

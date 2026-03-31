@@ -1783,13 +1783,14 @@ export interface paths {
                       /** @enum {string} */
                       kind: "form";
                       label: string;
-                      secretField: {
+                      secretFields: {
                         description?: string;
                         /** @enum {string} */
                         inputType: "password" | "text";
                         label: string;
+                        name: string;
                         placeholder?: string;
-                      };
+                      }[];
                     }
                   | {
                       id: string;

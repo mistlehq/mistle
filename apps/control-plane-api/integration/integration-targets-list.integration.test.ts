@@ -146,11 +146,14 @@ describe("integration targets discovery integration", () => {
           id: "api-key",
           label: "API key",
           kind: "form",
-          secretField: {
-            label: "API key",
-            placeholder: "Enter API key",
-            inputType: "password",
-          },
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              placeholder: "Enter API key",
+              inputType: "password",
+            },
+          ],
         },
         {
           id: "github-app-installation",
@@ -221,11 +224,14 @@ describe("integration targets discovery integration", () => {
           id: "api-key",
           label: "API key",
           kind: "form",
-          secretField: {
-            label: "API key",
-            placeholder: "Enter API key",
-            inputType: "password",
-          },
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              placeholder: "Enter API key",
+              inputType: "password",
+            },
+          ],
         },
       ],
       targetHealth: {
@@ -330,11 +336,14 @@ describe("integration targets discovery integration", () => {
         id: "api-key",
         label: "API key",
         kind: "form",
-        secretField: {
-          label: "API key",
-          placeholder: "Enter API key",
-          inputType: "password",
-        },
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "API key",
+            placeholder: "Enter API key",
+            inputType: "password",
+          },
+        ],
       },
     ]);
     expect("resolvedBindingEditorUi" in (openAiTarget ?? {})).toBe(false);
