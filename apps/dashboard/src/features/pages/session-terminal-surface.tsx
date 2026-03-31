@@ -84,8 +84,8 @@ function resolveTerminalFontFamily(): string {
 }
 
 type SessionTerminalSurfaceProps = {
+  refitKey?: string;
   isVisible: boolean;
-  layoutKey?: string;
   lifecycleState: string;
   outputChunks: readonly Uint8Array[];
   onResize: (dimensions: { cols: number; rows: number }) => Promise<void>;
@@ -108,8 +108,8 @@ function resolveTerminalDimensions(fitAddon: FitAddon | null): { cols: number; r
 }
 
 export function SessionTerminalSurface({
+  refitKey,
   isVisible,
-  layoutKey,
   lifecycleState,
   outputChunks,
   onResize,
@@ -287,6 +287,8 @@ export function SessionTerminalSurface({
       return;
     }
 
+    // Split-pane transitions can settle after the initial resize observer callback,
+    // so refit again on the next paint when an external layout phase changes.
     let animationFrameId = 0;
     let nestedAnimationFrameId = 0;
 
@@ -304,7 +306,7 @@ export function SessionTerminalSurface({
       window.cancelAnimationFrame(animationFrameId);
       window.cancelAnimationFrame(nestedAnimationFrameId);
     };
-  }, [fitTerminal, isVisible, layoutKey, resizePtyToTerminal]);
+  }, [fitTerminal, isVisible, refitKey, resizePtyToTerminal]);
 
   if (!isVisible) {
     return null;

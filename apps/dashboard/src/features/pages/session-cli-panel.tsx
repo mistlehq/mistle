@@ -3,13 +3,13 @@ import { SessionPtyPanelShell } from "./session-pty-panel-shell.js";
 import { SessionTerminalSurface } from "./session-terminal-surface.js";
 
 type SessionCliPanelProps = {
-  layoutKey?: string;
   ptyState: ReturnType<typeof useSandboxPtyState>;
+  refitKey?: string;
 };
 
-export function SessionCliPanel({ layoutKey, ptyState }: SessionCliPanelProps): React.JSX.Element {
+export function SessionCliPanel({ ptyState, refitKey }: SessionCliPanelProps): React.JSX.Element {
   const { lifecycle, output, actions } = ptyState;
-  const layoutKeyProps = layoutKey === undefined ? {} : { layoutKey };
+  const refitKeyProps = refitKey === undefined ? {} : { refitKey };
 
   return (
     <SessionPtyPanelShell
@@ -20,7 +20,7 @@ export function SessionCliPanel({ layoutKey, ptyState }: SessionCliPanelProps): 
           onResize={actions.resizePty}
           onWriteInput={actions.writeInput}
           outputChunks={output.chunks}
-          {...layoutKeyProps}
+          {...refitKeyProps}
         />
       }
       dataPtyState={lifecycle.state}

@@ -255,7 +255,7 @@ function SessionWorkbenchPageContent(input: {
       }
       mainContent={resolvePrimaryPanelMainContent({
         chatEntries: conversationPane.chatState.entries,
-        cliLayoutKey: workbench.terminalPanelState.isVisible ? "cli:split" : "cli:solo",
+        cliRefitKey: workbench.terminalPanelState.isVisible ? "cli:split" : "cli:solo",
         cliPtyState: workbench.cliPtyState,
         errorMessage: workbench.primaryPanelState.errorMessage,
         isRespondingToServerRequest:
@@ -313,7 +313,7 @@ function SessionWorkbenchPageContent(input: {
 
 function resolvePrimaryPanelMainContent(input: {
   chatEntries: React.ComponentProps<typeof SessionConversationMainContent>["chatEntries"];
-  cliLayoutKey: React.ComponentProps<typeof SessionCliPanel>["layoutKey"];
+  cliRefitKey: React.ComponentProps<typeof SessionCliPanel>["refitKey"];
   cliPtyState: React.ComponentProps<typeof SessionCliPanel>["ptyState"];
   errorMessage: string | null;
   isRespondingToServerRequest: React.ComponentProps<
@@ -331,8 +331,7 @@ function resolvePrimaryPanelMainContent(input: {
     typeof useSessionWorkbenchController
   >["workbench"]["primaryPanelState"]["transitionState"];
 }): React.JSX.Element {
-  const cliLayoutKeyProps =
-    input.cliLayoutKey === undefined ? {} : { layoutKey: input.cliLayoutKey };
+  const cliRefitKeyProps = input.cliRefitKey === undefined ? {} : { refitKey: input.cliRefitKey };
 
   switch (input.transitionState) {
     case "switching_to_cli":
@@ -347,7 +346,7 @@ function resolvePrimaryPanelMainContent(input: {
         />
       );
     case "stable_cli":
-      return <SessionCliPanel ptyState={input.cliPtyState} {...cliLayoutKeyProps} />;
+      return <SessionCliPanel ptyState={input.cliPtyState} {...cliRefitKeyProps} />;
     case "restoring_chat":
       return <SessionChatRestoringPanel />;
     case "restore_failed":

@@ -5,33 +5,18 @@ import { useMemo, useState } from "react";
 import type { UseSandboxPtyStateResult } from "../sessions/use-sandbox-pty-state.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
+  createStoryLongCliOutput,
+  createStoryPtyChunks,
   renderSessionWorkbenchStory,
   SessionWorkbenchStoryChrome,
   StorySandboxInstanceId,
 } from "./session-story-support.js";
-
-const textEncoder = new TextEncoder();
 
 type CliStoryScenario = {
   initialErrorMessage?: string | null;
   initialOutput?: string;
   initialState?: UseSandboxPtyStateResult["lifecycle"]["state"];
 };
-
-function createPtyChunks(text: string): readonly Uint8Array[] {
-  if (text.length === 0) {
-    return [];
-  }
-
-  return text.split(/(?<=\n)/).map((chunk) => textEncoder.encode(chunk));
-}
-
-function createLongCliOutput(): string {
-  return Array.from({ length: 120 }, (_, index) => {
-    const lineNumber = String(index + 1).padStart(3, "0");
-    return `log ${lineNumber}: scanning repository state for pending changes`;
-  }).join("\n");
-}
 
 function StoryCliWorkbench(input: CliStoryScenario): React.JSX.Element {
   const [lifecycleState, setLifecycleState] = useState<
@@ -41,7 +26,7 @@ function StoryCliWorkbench(input: CliStoryScenario): React.JSX.Element {
     input.initialErrorMessage ?? null,
   );
   const [outputChunks, setOutputChunks] = useState<readonly Uint8Array[]>(
-    createPtyChunks(input.initialOutput ?? ""),
+    createStoryPtyChunks(input.initialOutput ?? ""),
   );
 
   const ptyState = useMemo<UseSandboxPtyStateResult>(() => {
@@ -80,7 +65,7 @@ function StoryCliWorkbench(input: CliStoryScenario): React.JSX.Element {
               return currentChunks;
             }
 
-            return createPtyChunks(
+            return createStoryPtyChunks(
               [
                 "Resuming thread thread_storybook_123...",
                 "Connected to Codex remote session.",
@@ -96,7 +81,7 @@ function StoryCliWorkbench(input: CliStoryScenario): React.JSX.Element {
         },
         writeInput: async (data) => {
           const nextText = typeof data === "string" ? data : new TextDecoder().decode(data);
-          setOutputChunks((currentChunks) => [...currentChunks, textEncoder.encode(nextText)]);
+          setOutputChunks((currentChunks) => [...currentChunks, ...createStoryPtyChunks(nextText)]);
         },
       },
     };
@@ -165,7 +150,7 @@ export const ConnectedWithOutput: Story = {
 
 export const ConnectedLongOutput: Story = {
   args: {
-    initialOutput: createLongCliOutput(),
+    initialOutput: createStoryLongCliOutput("log"),
     initialState: SandboxPtyStates.OPEN,
   },
 };

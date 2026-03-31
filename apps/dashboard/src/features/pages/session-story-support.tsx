@@ -1,3 +1,4 @@
+import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import { Badge } from "@mistle/ui";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
@@ -7,6 +8,7 @@ import {
   CodexFixtureSessionEntriesWithExploringGroup,
   CodexFixtureSessionServerRequests,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
+import type { UseSandboxPtyStateResult } from "../sessions/use-sandbox-pty-state.js";
 import {
   SessionConversationBottomPanel,
   SessionConversationMainContent,
@@ -17,6 +19,7 @@ import {
 } from "./session-workbench-page-view.js";
 
 export const StorySandboxInstanceId = "sbi_storybook";
+const textEncoder = new TextEncoder();
 
 export type SessionConversationStoryArgs = {
   chatEntries: React.ComponentProps<typeof SessionConversationMainContent>["chatEntries"];
@@ -37,6 +40,56 @@ export const StorySessionConversationPaneArgs = {
   onRespondToServerRequest: noopRespondToServerRequest,
   serverRequestPanelEntries: CodexFixtureSessionServerRequests,
 } satisfies SessionConversationStoryArgs;
+
+export function createStoryPtyChunks(text: string): readonly Uint8Array[] {
+  if (text.length === 0) {
+    return [];
+  }
+
+  return text.split(/(?<=\n)/).map((chunk) => textEncoder.encode(chunk));
+}
+
+export function createStoryLongCliOutput(prefix: string): string {
+  return Array.from({ length: 120 }, (_, index) => {
+    const lineNumber = String(index + 1).padStart(3, "0");
+    return `${prefix} ${lineNumber}: streamed CLI output remains inside the PTY viewport`;
+  }).join("\n");
+}
+
+export function createStoryWorkbenchCliPtyState(output: string): UseSandboxPtyStateResult {
+  return {
+    lifecycle: {
+      connectedSandboxInstanceId: StorySandboxInstanceId,
+      errorMessage: null,
+      exitInfo: null,
+      resetInfo: null,
+      state: SandboxPtyStates.OPEN,
+    },
+    output: {
+      chunks: createStoryPtyChunks(output),
+      clearOutput: () => {
+        return;
+      },
+    },
+    actions: {
+      closePty: async () => {
+        return;
+      },
+      disconnectPty: async () => {
+        return;
+      },
+      openPty: async () => {
+        return;
+      },
+      resizePty: async () => {
+        return;
+      },
+      writeInput: async () => {
+        return;
+      },
+    },
+  };
+}
 
 export function createStorySessionMainContent(
   overrides?: Partial<SessionConversationStoryArgs>,
