@@ -1,12 +1,18 @@
 import {
   readCodexThread,
   type CodexJsonRpcClient,
+  type CodexThreadReadTurn,
 } from "@mistle/integrations-definitions/openai/agent/client";
 
+type MaterializedCodexThreadReadState = {
+  threadId: string;
+  turns: readonly CodexThreadReadTurn[];
+  response: unknown;
+  status: "materialized";
+};
+
 export type CodexThreadReadState =
-  | (Awaited<ReturnType<typeof readCodexThread>> & {
-      status: "materialized";
-    })
+  | MaterializedCodexThreadReadState
   | {
       threadId: string;
       turns: [];
