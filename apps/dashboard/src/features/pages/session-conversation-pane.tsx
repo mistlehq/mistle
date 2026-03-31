@@ -57,7 +57,6 @@ export function SessionConversationBottomPanel({
         <StatusBox
           className="mb-3"
           tone={composerViewModel.statusMessage.tone === "error" ? "destructive" : "neutral"}
-          variant="subtle"
         >
           {composerViewModel.statusMessage.message}
         </StatusBox>

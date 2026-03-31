@@ -3,19 +3,18 @@ import { describe, expect, it } from "vitest";
 import {
   InitialSessionMainPanelHandoffState,
   isCliToggleActive,
-  isStableChatTransitionState,
   reduceSessionMainPanelHandoffState,
 } from "./session-main-panel-handoff-state.js";
 
 describe("session main panel handoff state", () => {
-  it("returns to stable chat when CLI handoff fails and still enters restore failure explicitly", () => {
+  it("returns to stable chat with inline errors for both CLI handoff and restore failures", () => {
     const switchingToCli = reduceSessionMainPanelHandoffState(InitialSessionMainPanelHandoffState, {
       type: "handoff_to_cli_requested",
     });
 
     expect(switchingToCli).toEqual({
       transitionState: "switching_to_cli",
-      errorMessage: null,
+      error: null,
     });
 
     const cliEntryFailed = reduceSessionMainPanelHandoffState(switchingToCli, {
@@ -25,7 +24,10 @@ describe("session main panel handoff state", () => {
 
     expect(cliEntryFailed).toEqual({
       transitionState: "stable_chat",
-      errorMessage: "codex executable missing",
+      error: {
+        kind: "cli_handoff_failed",
+        message: "codex executable missing",
+      },
     });
 
     const restoringChat = reduceSessionMainPanelHandoffState(cliEntryFailed, {
@@ -34,7 +36,7 @@ describe("session main panel handoff state", () => {
 
     expect(restoringChat).toEqual({
       transitionState: "restoring_chat",
-      errorMessage: null,
+      error: null,
     });
 
     const restoreFailed = reduceSessionMainPanelHandoffState(restoringChat, {
@@ -43,8 +45,11 @@ describe("session main panel handoff state", () => {
     });
 
     expect(restoreFailed).toEqual({
-      transitionState: "restore_failed",
-      errorMessage: "Could not reconnect chat transport.",
+      transitionState: "stable_chat",
+      error: {
+        kind: "chat_restore_failed",
+        message: "Could not reconnect chat transport.",
+      },
     });
 
     expect(
@@ -53,21 +58,14 @@ describe("session main panel handoff state", () => {
       }),
     ).toEqual({
       transitionState: "restoring_chat",
-      errorMessage: null,
+      error: null,
     });
   });
 
-  it("derives CLI activity and stable-chat detection from transition state", () => {
+  it("derives CLI activity and stable-chat behavior from transition state", () => {
     expect(isCliToggleActive("stable_chat")).toBe(false);
     expect(isCliToggleActive("switching_to_cli")).toBe(true);
     expect(isCliToggleActive("stable_cli")).toBe(true);
     expect(isCliToggleActive("restoring_chat")).toBe(false);
-    expect(isCliToggleActive("restore_failed")).toBe(false);
-
-    expect(isStableChatTransitionState("stable_chat")).toBe(true);
-    expect(isStableChatTransitionState("switching_to_cli")).toBe(false);
-    expect(isStableChatTransitionState("stable_cli")).toBe(false);
-    expect(isStableChatTransitionState("restoring_chat")).toBe(false);
-    expect(isStableChatTransitionState("restore_failed")).toBe(false);
   });
 });

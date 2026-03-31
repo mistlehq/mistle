@@ -10,10 +10,7 @@ import {
 } from "../sessions/session-connect-policy.js";
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
-import {
-  isStableChatTransitionState,
-  type MainPanelTransitionState,
-} from "./session-main-panel-handoff-state.js";
+import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import {
   hasSessionTopAlert,
   resolveSandboxHeaderStatusUi,
@@ -677,7 +674,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   }, [input.sandboxInstanceId]);
 
   useEffect(() => {
-    if (isStableChatTransitionState(input.mainPanelTransitionState)) {
+    if (input.mainPanelTransitionState === "stable_chat") {
       setHasAttemptedAutoConnect(false);
     }
   }, [input.mainPanelTransitionState]);
@@ -760,7 +757,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   useEffect(() => {
-    if (!isStableChatTransitionState(input.mainPanelTransitionState)) {
+    if (input.mainPanelTransitionState !== "stable_chat") {
       return;
     }
 
@@ -805,7 +802,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   useEffect(() => {
-    if (!isStableChatTransitionState(input.mainPanelTransitionState)) {
+    if (input.mainPanelTransitionState !== "stable_chat") {
       return;
     }
 
@@ -869,9 +866,8 @@ export function useSessionWorkbenchLifecycleState(input: {
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: sandboxStatusQuery.isError,
     lifecycleErrorMessage: resolvedLifecycleErrorMessage,
-    reconnectMessage: isStableChatTransitionState(input.mainPanelTransitionState)
-      ? sessionReconnectMessage
-      : null,
+    reconnectMessage:
+      input.mainPanelTransitionState === "stable_chat" ? sessionReconnectMessage : null,
     sandboxFailureMessage,
     stoppedSessionMessage: stoppedSessionState.message,
   });

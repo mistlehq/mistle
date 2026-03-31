@@ -7,10 +7,7 @@ import {
   useSessionComposerConfigControl,
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
-import {
-  isStableChatTransitionState,
-  type MainPanelTransitionState,
-} from "./session-main-panel-handoff-state.js";
+import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 import {
@@ -70,7 +67,7 @@ type SessionWorkbenchState = {
     transitionState: MainPanelTransitionState;
     canEnterCli: boolean;
     disabledReason: string | null;
-    errorMessage: string | null;
+    error: ReturnType<typeof useSessionMainPanelHandoff>["error"];
     isCliToggleActive: boolean;
     showsChatComposer: boolean;
     enterCliMode: () => Promise<void>;
@@ -207,9 +204,9 @@ export function useSessionWorkbenchController(input: {
         transitionState: handoff.transitionState,
         canEnterCli: enterCliDisabledReason === null,
         disabledReason: enterCliDisabledReason,
-        errorMessage: handoff.errorMessage,
+        error: handoff.error,
         isCliToggleActive: handoff.isCliToggleActive,
-        showsChatComposer: isStableChatTransitionState(handoff.transitionState),
+        showsChatComposer: handoff.transitionState === "stable_chat",
         enterCliMode: handoff.handoffToCli,
         exitCliMode: handoff.handoffToChat,
       },

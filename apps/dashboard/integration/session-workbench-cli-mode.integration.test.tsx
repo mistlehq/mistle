@@ -122,7 +122,7 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       });
     });
 
-    it("shows a restore failure surface without offering a retry action", async () => {
+    it("shows a restore failure alert in chat without offering a retry action", async () => {
       await withSessionWorkbenchCliHarness(async ({ controls, tunnelServer }) => {
         fireEvent.click(await waitForEnabledButton("CLI"));
         const cliPty = await waitForPtySession(tunnelServer, "cli");
@@ -136,6 +136,7 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
             "Minting sandbox connection token failed: Could not mint connection token.",
           ).length,
         ).toBeGreaterThan(0);
+        expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
         expect(screen.queryByRole("button", { name: "Retry restoring chat" })).toBeNull();
       });
     }, 15_000);

@@ -2,12 +2,16 @@ export type MainPanelTransitionState =
   | "stable_chat"
   | "switching_to_cli"
   | "stable_cli"
-  | "restoring_chat"
-  | "restore_failed";
+  | "restoring_chat";
+
+export type MainPanelTransitionError = {
+  kind: "cli_handoff_failed" | "chat_restore_failed";
+  message: string | null;
+} | null;
 
 export type SessionMainPanelHandoffState = {
   transitionState: MainPanelTransitionState;
-  errorMessage: string | null;
+  error: MainPanelTransitionError;
 };
 
 export type SessionMainPanelHandoffAction =
@@ -36,11 +40,11 @@ const CliToggleActiveStates = new Set<MainPanelTransitionState>(["switching_to_c
 
 function createHandoffState(
   transitionState: MainPanelTransitionState,
-  errorMessage: string | null = null,
+  error: MainPanelTransitionError = null,
 ): SessionMainPanelHandoffState {
   return {
     transitionState,
-    errorMessage,
+    error,
   };
 }
 
@@ -60,7 +64,10 @@ export function reduceSessionMainPanelHandoffState(
     }
 
     case "cli_handoff_failed": {
-      return createHandoffState("stable_chat", action.errorMessage);
+      return createHandoffState("stable_chat", {
+        kind: "cli_handoff_failed",
+        message: action.errorMessage,
+      });
     }
 
     case "chat_restore_requested": {
@@ -72,17 +79,14 @@ export function reduceSessionMainPanelHandoffState(
     }
 
     case "chat_restore_failed": {
-      return createHandoffState("restore_failed", action.errorMessage);
+      return createHandoffState("stable_chat", {
+        kind: "chat_restore_failed",
+        message: action.errorMessage,
+      });
     }
   }
 }
 
 export function isCliToggleActive(transitionState: MainPanelTransitionState): boolean {
   return CliToggleActiveStates.has(transitionState);
-}
-
-export function isStableChatTransitionState(
-  transitionState: MainPanelTransitionState,
-): transitionState is "stable_chat" {
-  return transitionState === "stable_chat";
 }

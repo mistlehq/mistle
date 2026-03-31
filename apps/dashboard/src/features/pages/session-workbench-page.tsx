@@ -11,7 +11,6 @@ import {
   SessionConversationBottomPanelController,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
-import { SessionPrimaryPanelStatusCard } from "./session-primary-panel-status-card.js";
 import { SessionTerminalPanel } from "./session-terminal-panel.js";
 import {
   SessionWorkbenchPageView,
@@ -213,11 +212,18 @@ function SessionWorkbenchPageContent(input: {
   }
   if (
     workbench.primaryPanelState.transitionState === "stable_chat" &&
-    workbench.primaryPanelState.errorMessage !== null
+    workbench.primaryPanelState.error !== null
   ) {
     alerts.push({
-      title: "Could not start Codex CLI",
-      description: workbench.primaryPanelState.errorMessage,
+      title:
+        workbench.primaryPanelState.error.kind === "chat_restore_failed"
+          ? "Could not restore chat"
+          : "Could not start Codex CLI",
+      description:
+        workbench.primaryPanelState.error.message ??
+        (workbench.primaryPanelState.error.kind === "chat_restore_failed"
+          ? "The workbench could not reconnect chat automatically. Please try again later or contact support if the problem continues."
+          : "Could not start Codex CLI."),
     });
   }
   if (input.sandboxInstanceId === null) {
@@ -255,7 +261,7 @@ function SessionWorkbenchPageContent(input: {
       alerts={
         workbench.hasTopAlert ||
         (workbench.primaryPanelState.transitionState === "stable_chat" &&
-          workbench.primaryPanelState.errorMessage !== null)
+          workbench.primaryPanelState.error !== null)
           ? alerts
           : []
       }
@@ -281,7 +287,6 @@ function SessionWorkbenchPageContent(input: {
           ptyState: workbench.cliPtyState,
           refitKey: workbench.terminalPanelState.isVisible ? "cli:split" : "cli:solo",
         },
-        errorMessage: workbench.primaryPanelState.errorMessage,
         transitionState: workbench.primaryPanelState.transitionState,
       })}
       onSecondaryPanelResize={workbench.terminalPanelState.setPanelSize}
@@ -345,7 +350,6 @@ type PrimaryPanelCliContent = Pick<
 function renderPrimaryPanelMainContent(input: {
   cli: PrimaryPanelCliContent;
   conversation: PrimaryPanelConversationContent;
-  errorMessage: string | null;
   transitionState: ReturnType<
     typeof useSessionWorkbenchController
   >["workbench"]["primaryPanelState"]["transitionState"];
@@ -361,24 +365,9 @@ function renderPrimaryPanelMainContent(input: {
           {...(input.cli.refitKey === undefined ? {} : { refitKey: input.cli.refitKey })}
         />
       );
-    case "restore_failed":
-      return renderChatRestoreFailure(input.errorMessage);
     case "stable_chat":
       return <SessionConversationMainContent {...input.conversation} />;
   }
-}
-
-function renderChatRestoreFailure(errorMessage: string | null): React.JSX.Element {
-  return (
-    <SessionPrimaryPanelStatusCard
-      description={
-        errorMessage ??
-        "The workbench could not reconnect chat automatically. Please try again later or contact support if the problem continues."
-      }
-      title="Could not restore chat"
-      tone="destructive"
-    />
-  );
 }
 
 function SessionWorkbenchAutoResumeOnEntry(input: {

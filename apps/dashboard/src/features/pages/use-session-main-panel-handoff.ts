@@ -7,7 +7,6 @@ import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   InitialSessionMainPanelHandoffState,
   isCliToggleActive,
-  isStableChatTransitionState,
   reduceSessionMainPanelHandoffState,
   type MainPanelTransitionState,
 } from "./session-main-panel-handoff-state.js";
@@ -34,7 +33,10 @@ type UseSessionMainPanelHandoffInput = {
 
 type SessionMainPanelHandoffResult = {
   transitionState: MainPanelTransitionState;
-  errorMessage: string | null;
+  error: {
+    kind: "cli_handoff_failed" | "chat_restore_failed";
+    message: string | null;
+  } | null;
   isCliToggleActive: boolean;
   shouldLifecycleAutoAttachChat: boolean;
   handoffToCli: () => Promise<void>;
@@ -324,9 +326,9 @@ export function useSessionMainPanelHandoff(
 
   return {
     transitionState: state.transitionState,
-    errorMessage: state.errorMessage,
+    error: state.error,
     isCliToggleActive: isCliToggleActive(state.transitionState),
-    shouldLifecycleAutoAttachChat: isStableChatTransitionState(state.transitionState),
+    shouldLifecycleAutoAttachChat: state.transitionState === "stable_chat",
     handoffToCli,
     handoffToChat,
   };
