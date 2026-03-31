@@ -39,7 +39,6 @@ type SessionMainPanelHandoffResult = {
   shouldLifecycleAutoAttachChat: boolean;
   handoffToCli: () => Promise<void>;
   handoffToChat: () => Promise<void>;
-  retryRestoreChat: () => Promise<void>;
 };
 
 const ChatRestoreTimeoutMs = 30_000;
@@ -233,14 +232,6 @@ export function useSessionMainPanelHandoff(
     startChatRestore();
   }, [startChatRestore, state.transitionState]);
 
-  const retryRestoreChat = useCallback(async (): Promise<void> => {
-    if (state.transitionState !== "restore_failed") {
-      return;
-    }
-
-    startChatRestore();
-  }, [startChatRestore, state.transitionState]);
-
   useEffect(() => {
     const restoreGeneration = restoreGenerationRef.current;
     if (state.transitionState !== "restoring_chat" || restoreGeneration === null) {
@@ -345,6 +336,5 @@ export function useSessionMainPanelHandoff(
     shouldLifecycleAutoAttachChat: shouldLifecycleAutoAttachChat(state.transitionState),
     handoffToCli,
     handoffToChat,
-    retryRestoreChat,
   };
 }

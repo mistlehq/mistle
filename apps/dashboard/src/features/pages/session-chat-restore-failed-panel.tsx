@@ -2,7 +2,6 @@ import { SessionPrimaryPanelStatusCard } from "./session-primary-panel-status-ca
 
 type SessionChatRestoreFailedPanelProps = {
   errorMessage: string | null;
-  onRetry: () => void;
 };
 
 export function SessionChatRestoreFailedPanel(
@@ -10,13 +9,9 @@ export function SessionChatRestoreFailedPanel(
 ): React.JSX.Element {
   return (
     <SessionPrimaryPanelStatusCard
-      action={{
-        label: "Retry restoring chat",
-        onClick: props.onRetry,
-      }}
       description={
         props.errorMessage ??
-        "The workbench could not reconnect chat automatically. Retry restoring chat to continue in the current thread."
+        "The workbench could not reconnect chat automatically. Please try again later or contact support if the problem continues."
       }
       title="Could not restore chat"
       tone="destructive"

@@ -49,10 +49,7 @@ export const RestoreFailed: Story = {
   render: () =>
     renderSessionWorkbenchStory({
       mainContent: (
-        <SessionChatRestoreFailedPanel
-          errorMessage="Minting sandbox connection token failed: Could not mint connection token."
-          onRetry={noop}
-        />
+        <SessionChatRestoreFailedPanel errorMessage="Minting sandbox connection token failed: Could not mint connection token." />
       ),
       primaryBottomPanel: null,
     }),

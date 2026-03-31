@@ -263,7 +263,6 @@ function SessionWorkbenchPageContent(input: {
         isRespondingToServerRequest:
           conversationPane.serverRequestsState.isRespondingToServerRequest,
         onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
-        onRetryRestoreChat: workbench.primaryPanelState.retryRestoreChat,
         onReturnToChat: workbench.primaryPanelState.exitCliMode,
         serverRequestPanelEntries: unmatchedServerRequests,
         transitionState: workbench.primaryPanelState.transitionState,
@@ -324,7 +323,6 @@ function resolvePrimaryPanelMainContent(input: {
   onRespondToServerRequest: React.ComponentProps<
     typeof SessionConversationMainContent
   >["onRespondToServerRequest"];
-  onRetryRestoreChat: () => Promise<void>;
   onReturnToChat: () => Promise<void>;
   serverRequestPanelEntries: React.ComponentProps<
     typeof SessionConversationMainContent
@@ -352,14 +350,7 @@ function resolvePrimaryPanelMainContent(input: {
     case "restoring_chat":
       return <></>;
     case "restore_failed":
-      return (
-        <SessionChatRestoreFailedPanel
-          errorMessage={input.errorMessage}
-          onRetry={() => {
-            void input.onRetryRestoreChat();
-          }}
-        />
-      );
+      return <SessionChatRestoreFailedPanel errorMessage={input.errorMessage} />;
     case "stable_chat":
       return (
         <SessionConversationMainContent

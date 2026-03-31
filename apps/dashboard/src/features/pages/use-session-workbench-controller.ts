@@ -75,7 +75,6 @@ type SessionWorkbenchState = {
     showsChatComposer: boolean;
     enterCliMode: () => Promise<void>;
     exitCliMode: () => Promise<void>;
-    retryRestoreChat: () => Promise<void>;
   };
   terminalPanelState: {
     closePanel: () => void;
@@ -213,7 +212,6 @@ export function useSessionWorkbenchController(input: {
         showsChatComposer: canRenderChatComposer(handoff.transitionState),
         enterCliMode: handoff.handoffToCli,
         exitCliMode: handoff.handoffToChat,
-        retryRestoreChat: handoff.retryRestoreChat,
       },
       terminalPanelState,
     },
