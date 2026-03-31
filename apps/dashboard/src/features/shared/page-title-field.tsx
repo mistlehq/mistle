@@ -1,5 +1,7 @@
 import { Input } from "@mistle/ui";
 
+import { StatusBox } from "./status-box.js";
+
 export function PageTitleField(input: {
   fieldId: string;
   label: string;
@@ -26,6 +28,7 @@ export function PageTitleField(input: {
       ) : null}
       <Input
         aria-label={input.ariaLabel}
+        aria-invalid={input.errorMessage === undefined ? undefined : true}
         autoFocus={input.autoFocus}
         className={`h-10 w-full py-0 text-xl font-semibold leading-none ${input.className ?? ""}`}
         id={input.fieldId}
@@ -38,7 +41,7 @@ export function PageTitleField(input: {
         value={input.value}
       />
       {input.errorMessage === undefined ? null : (
-        <p className="text-destructive text-sm">{input.errorMessage}</p>
+        <StatusBox tone="destructive">{input.errorMessage}</StatusBox>
       )}
     </div>
   );
