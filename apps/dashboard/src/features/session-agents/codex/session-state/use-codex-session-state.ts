@@ -633,6 +633,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
 
   const resolveCliLaunchTarget = useCallback(async (): Promise<CodexCliLaunchTarget> => {
     const activeThreadId = threadIdRef.current;
+    const providerThreadId = lifecycle.sessionSnapshot?.providerThreadId ?? null;
     if (activeThreadId === null) {
       return {
         type: "start_new",
@@ -654,12 +655,18 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       turnCount: thread.turns.length,
     });
 
+    if (providerThreadId !== null && launchTarget.type === "start_new") {
+      throw new Error(
+        `The linked provider conversation '${providerThreadId}' is not resumable for Codex CLI.`,
+      );
+    }
+
     if (launchTarget.type === "start_new" && launchTarget.shouldClearActiveThreadId) {
       updateActiveThread(null);
     }
 
     return launchTarget;
-  }, [updateActiveThread]);
+  }, [lifecycle.sessionSnapshot?.providerThreadId, updateActiveThread]);
 
   const clearActiveThreadIdAfterCliLaunch = useCallback((): void => {
     if (lifecycle.sessionSnapshot?.providerThreadId !== null) {
