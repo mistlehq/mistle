@@ -19,8 +19,8 @@ import {
 } from "../constants.js";
 import {
   parseFormConnectionConfigOrThrow,
+  parseUpdateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
-  resolvePersistedSecretRefOrThrow,
 } from "./form-connection-methods.js";
 
 type UpdatedConnection = {
@@ -40,7 +40,7 @@ export type UpdateFormConnectionInput = {
   connectionId: string;
   displayName: string;
   config: Record<string, unknown>;
-  secret?: string;
+  secrets?: Record<string, string>;
 };
 
 function resolveConnectionMethodId(
@@ -125,10 +125,15 @@ export async function updateFormConnection(
     config: input.config,
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
   });
-  const persistedSecretRef = resolvePersistedSecretRefOrThrow({
-    secretType: formMethod.secretType,
-    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
-  });
+  const parsedSecrets =
+    input.secrets === undefined
+      ? []
+      : parseUpdateFormSecretsOrThrow({
+          targetKey: existingConnection.targetKey,
+          method: formMethod,
+          secrets: input.secrets,
+          invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+        });
 
   const organizationCredentialKey = await db.query.organizationCredentialKeys.findFirst({
     where: (table, { eq }) => eq(table.organizationId, input.organizationId),
@@ -151,17 +156,9 @@ export async function updateFormConnection(
 
   try {
     return await db.transaction(async (tx) => {
-      if (input.secret !== undefined) {
-        const normalizedSecret = input.secret.trim();
-        if (normalizedSecret.length === 0) {
-          throw new BadRequestError(
-            IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
-            "`secret` must contain at least one non-whitespace character when provided.",
-          );
-        }
-
+      for (const parsedSecret of parsedSecrets) {
         const encryptedSecret = encryptCredentialUtf8({
-          plaintext: normalizedSecret,
+          plaintext: parsedSecret.normalizedValue,
           organizationCredentialKey: unwrappedOrganizationCredentialKey,
         });
 
@@ -169,7 +166,7 @@ export async function updateFormConnection(
           .insert(integrationCredentials)
           .values({
             organizationId: input.organizationId,
-            secretKind: persistedSecretRef.secretKind,
+            secretKind: parsedSecret.persistedSecretRef.secretKind,
             ciphertext: encryptedSecret.ciphertext,
             nonce: encryptedSecret.nonce,
             organizationCredentialKeyVersion: organizationCredentialKey.version,
@@ -188,7 +185,7 @@ export async function updateFormConnection(
           .values({
             connectionId: existingConnection.id,
             credentialId: createdCredential.id,
-            purpose: persistedSecretRef.purpose,
+            purpose: parsedSecret.persistedSecretRef.purpose,
           })
           .onConflictDoUpdate({
             target: [

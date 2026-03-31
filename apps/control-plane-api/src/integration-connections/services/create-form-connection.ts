@@ -19,8 +19,8 @@ import {
 } from "../constants.js";
 import {
   parseFormConnectionConfigOrThrow,
+  parseCreateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
-  resolvePersistedSecretRefOrThrow,
 } from "./form-connection-methods.js";
 
 export type CreateFormConnectionInput = {
@@ -29,7 +29,7 @@ export type CreateFormConnectionInput = {
   displayName: string;
   methodId: IntegrationConnectionMethodId;
   config: Record<string, unknown>;
-  secret: string;
+  secrets: Record<string, string>;
 };
 
 type CreatedConnection = {
@@ -91,18 +91,12 @@ export async function createFormConnection(
     config: input.config,
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
   });
-  const persistedSecretRef = resolvePersistedSecretRefOrThrow({
-    secretType: formMethod.secretType,
+  const parsedSecrets = parseCreateFormSecretsOrThrow({
+    targetKey: input.targetKey,
+    method: formMethod,
+    secrets: input.secrets,
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
   });
-
-  const normalizedSecret = input.secret.trim();
-  if (normalizedSecret.length === 0) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
-      "`secret` must contain at least one non-whitespace character.",
-    );
-  }
 
   const organizationCredentialKey = await db.query.organizationCredentialKeys.findFirst({
     where: (table, { eq }) => eq(table.organizationId, input.organizationId),
@@ -124,11 +118,6 @@ export async function createFormConnection(
   });
 
   try {
-    const encryptedSecret = encryptCredentialUtf8({
-      plaintext: normalizedSecret,
-      organizationCredentialKey: unwrappedOrganizationCredentialKey,
-    });
-
     return await db.transaction(async (tx) => {
       const [createdConnection] = await tx
         .insert(integrationConnections)
@@ -149,29 +138,36 @@ export async function createFormConnection(
         throw new Error("Failed to create integration connection.");
       }
 
-      const [createdCredential] = await tx
-        .insert(integrationCredentials)
-        .values({
-          organizationId: input.organizationId,
-          secretKind: persistedSecretRef.secretKind,
-          ciphertext: encryptedSecret.ciphertext,
-          nonce: encryptedSecret.nonce,
-          organizationCredentialKeyVersion: organizationCredentialKey.version,
-          intendedFamilyId: target.familyId,
-        })
-        .returning({
-          id: integrationCredentials.id,
+      for (const parsedSecret of parsedSecrets) {
+        const encryptedSecret = encryptCredentialUtf8({
+          plaintext: parsedSecret.normalizedValue,
+          organizationCredentialKey: unwrappedOrganizationCredentialKey,
         });
 
-      if (createdCredential === undefined) {
-        throw new Error("Failed to create integration credential.");
-      }
+        const [createdCredential] = await tx
+          .insert(integrationCredentials)
+          .values({
+            organizationId: input.organizationId,
+            secretKind: parsedSecret.persistedSecretRef.secretKind,
+            ciphertext: encryptedSecret.ciphertext,
+            nonce: encryptedSecret.nonce,
+            organizationCredentialKeyVersion: organizationCredentialKey.version,
+            intendedFamilyId: target.familyId,
+          })
+          .returning({
+            id: integrationCredentials.id,
+          });
 
-      await tx.insert(integrationConnectionCredentials).values({
-        connectionId: createdConnection.id,
-        credentialId: createdCredential.id,
-        purpose: persistedSecretRef.purpose,
-      });
+        if (createdCredential === undefined) {
+          throw new Error("Failed to create integration credential.");
+        }
+
+        await tx.insert(integrationConnectionCredentials).values({
+          connectionId: createdConnection.id,
+          credentialId: createdCredential.id,
+          purpose: parsedSecret.persistedSecretRef.purpose,
+        });
+      }
 
       return {
         id: createdConnection.id,

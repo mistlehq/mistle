@@ -28,7 +28,9 @@ export async function createApiKeyIntegrationConnection(input: {
         config: {
           connection_method: IntegrationConnectionMethodIds.API_KEY,
         },
-        secret: input.apiKey,
+        secrets: {
+          apiKey: input.apiKey,
+        },
       },
       fallbackMessage: "Could not create integration connection.",
     });
@@ -91,7 +93,9 @@ export async function updateApiKeyIntegrationConnection(input: {
         config: {
           connection_method: IntegrationConnectionMethodIds.API_KEY,
         },
-        secret: input.apiKey,
+        secrets: {
+          apiKey: input.apiKey,
+        },
       },
       fallbackMessage: "Could not update integration connection API key.",
     });

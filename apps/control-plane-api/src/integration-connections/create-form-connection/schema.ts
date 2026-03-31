@@ -20,10 +20,7 @@ export const CreateFormConnectionBodySchema = z
     displayName: z.string().min(1),
     methodId: z.string().min(1),
     config: z.record(z.string(), z.unknown()),
-    secret: z
-      .string()
-      .min(1)
-      .regex(/\S/, "`secret` must contain at least one non-whitespace character."),
+    secrets: z.record(z.string(), z.string()),
   })
   .strict();
 

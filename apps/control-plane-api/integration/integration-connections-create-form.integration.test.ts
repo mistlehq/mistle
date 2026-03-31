@@ -59,7 +59,9 @@ describe("integration connections create form integration", () => {
       config: {
         connection_method: IntegrationConnectionMethodIds.API_KEY,
       },
-      secret: "sk-test-connection-api-key",
+      secrets: {
+        apiKey: "sk-test-connection-api-key",
+      },
     });
 
     const response = await fixture.request("/v1/integration/connections/openai-default/form", {
@@ -127,7 +129,7 @@ describe("integration connections create form integration", () => {
 
     expect(createdCredential.secretKind).toBe(IntegrationCredentialSecretKinds.API_KEY);
     expect(createdCredential.intendedFamilyId).toBe("openai");
-    expect(createdCredential.ciphertext).not.toContain(requestBody.secret);
+    expect(createdCredential.ciphertext).not.toContain(requestBody.secrets.apiKey);
 
     const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
       where: (table, { and, eq }) =>
@@ -150,7 +152,7 @@ describe("integration connections create form integration", () => {
       ciphertext: createdCredential.ciphertext,
     });
 
-    expect(decryptedApiKey).toBe(requestBody.secret);
+    expect(decryptedApiKey).toBe(requestBody.secrets.apiKey);
   });
 
   it("returns 404 when target does not exist", async ({ fixture }) => {
@@ -170,7 +172,9 @@ describe("integration connections create form integration", () => {
         config: {
           connection_method: IntegrationConnectionMethodIds.API_KEY,
         },
-        secret: "sk-test-missing-target",
+        secrets: {
+          apiKey: "sk-test-missing-target",
+        },
       }),
     });
 
@@ -209,7 +213,9 @@ describe("integration connections create form integration", () => {
         config: {
           connection_method: IntegrationConnectionMethodIds.API_KEY,
         },
-        secret: "sk-test-disabled-target",
+        secrets: {
+          apiKey: "sk-test-disabled-target",
+        },
       }),
     });
 
@@ -256,7 +262,9 @@ describe("integration connections create form integration", () => {
         displayName: "",
         methodId: "",
         config: {},
-        secret: "",
+        secrets: {
+          apiKey: "",
+        },
       }),
     });
 
@@ -280,7 +288,9 @@ describe("integration connections create form integration", () => {
         config: {
           connection_method: IntegrationConnectionMethodIds.API_KEY,
         },
-        secret: "sk-test-unauthenticated",
+        secrets: {
+          apiKey: "sk-test-unauthenticated",
+        },
       }),
     });
 
@@ -308,7 +318,9 @@ describe("integration connections create form integration", () => {
         config: {
           connection_method: IntegrationConnectionMethodIds.API_KEY,
         },
-        secret: "sk-test-no-records",
+        secrets: {
+          apiKey: "sk-test-no-records",
+        },
       }),
     });
 

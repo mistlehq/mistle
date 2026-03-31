@@ -14,7 +14,7 @@ const routeHandler = async (
   const integrationRegistry = ctx.get("integrationRegistry");
   const integrationsConfig = ctx.get("config").integrations;
   const { connectionId } = ctx.req.valid("param");
-  const { config, displayName, secret } = ctx.req.valid("json");
+  const { config, displayName, secrets } = ctx.req.valid("json");
 
   const updatedConnection = await updateFormConnection(
     {
@@ -27,7 +27,7 @@ const routeHandler = async (
       connectionId,
       displayName,
       config,
-      ...(secret === undefined ? {} : { secret }),
+      ...(secrets === undefined ? {} : { secrets }),
     },
   );
 

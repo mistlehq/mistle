@@ -38,7 +38,9 @@ describe("integration connections update form integration", () => {
       config: {
         connection_method: IntegrationConnectionMethodIds.API_KEY,
       },
-      secret: "sk-test-original-api-key",
+      secrets: {
+        apiKey: "sk-test-original-api-key",
+      },
     });
 
     const createResponse = await fixture.request(
@@ -71,7 +73,9 @@ describe("integration connections update form integration", () => {
       config: {
         connection_method: IntegrationConnectionMethodIds.API_KEY,
       },
-      secret: "sk-test-rotated-api-key",
+      secrets: {
+        apiKey: "sk-test-rotated-api-key",
+      },
     });
 
     const updateResponse = await fixture.request(
@@ -162,7 +166,9 @@ describe("integration connections update form integration", () => {
           config: {
             connection_method: IntegrationConnectionMethodIds.API_KEY,
           },
-          secret: "sk-test-rotated-api-key",
+          secrets: {
+            apiKey: "sk-test-rotated-api-key",
+          },
         }),
       ),
     });
@@ -215,7 +221,9 @@ describe("integration connections update form integration", () => {
           config: {
             connection_method: IntegrationConnectionMethodIds.API_KEY,
           },
-          secret: "sk-test-rotated-api-key",
+          secrets: {
+            apiKey: "sk-test-rotated-api-key",
+          },
         }),
       },
     );
@@ -249,7 +257,9 @@ describe("integration connections update form integration", () => {
           config: {
             connection_method: IntegrationConnectionMethodIds.API_KEY,
           },
-          secret: "sk-test-original-api-key",
+          secrets: {
+            apiKey: "sk-test-original-api-key",
+          },
         }),
       },
     );
@@ -322,7 +332,9 @@ describe("integration connections update form integration", () => {
           config: {
             connection_method: IntegrationConnectionMethodIds.API_KEY,
           },
-          secret: "sk-test-original-api-key",
+          secrets: {
+            apiKey: "sk-test-original-api-key",
+          },
         }),
       },
     );
@@ -343,7 +355,9 @@ describe("integration connections update form integration", () => {
           config: {
             connection_method: IntegrationConnectionMethodIds.API_KEY,
           },
-          secret: "   ",
+          secrets: {
+            apiKey: "   ",
+          },
         }),
       },
     );

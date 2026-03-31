@@ -19,11 +19,7 @@ export const UpdateFormConnectionBodySchema = z
   .object({
     displayName: z.string().min(1),
     config: z.record(z.string(), z.unknown()),
-    secret: z
-      .string()
-      .min(1)
-      .regex(/\S/, "`secret` must contain at least one non-whitespace character when provided.")
-      .optional(),
+    secrets: z.record(z.string(), z.string()).optional(),
   })
   .strict();
 

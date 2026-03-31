@@ -14,7 +14,7 @@ const routeHandler = async (
   const integrationRegistry = ctx.get("integrationRegistry");
   const integrationsConfig = ctx.get("config").integrations;
   const { targetKey } = ctx.req.valid("param");
-  const { config, displayName, methodId, secret } = ctx.req.valid("json");
+  const { config, displayName, methodId, secrets } = ctx.req.valid("json");
 
   const createdConnection = await createFormConnection(
     {
@@ -28,7 +28,7 @@ const routeHandler = async (
       displayName,
       methodId,
       config,
-      secret,
+      secrets,
     },
   );
 

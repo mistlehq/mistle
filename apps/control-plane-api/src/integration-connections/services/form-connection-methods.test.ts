@@ -9,6 +9,8 @@ import { z } from "zod";
 
 import {
   parseFormConnectionConfigOrThrow,
+  parseCreateFormSecretsOrThrow,
+  parseUpdateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
   resolvePersistedSecretRefOrThrow,
 } from "./form-connection-methods.js";
@@ -23,11 +25,14 @@ describe("resolveFormConnectionMethodOrThrow", () => {
           id: IntegrationConnectionMethodIds.API_KEY,
           label: "API key",
           kind: "form",
-          secretField: {
-            label: "API key",
-            inputType: "password",
-          },
-          secretType: IntegrationCredentialSecretKinds.API_KEY,
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+              secretType: IntegrationCredentialSecretKinds.API_KEY,
+            },
+          ],
           configSchema: z
             .object({
               connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),
@@ -81,11 +86,14 @@ describe("parseFormConnectionConfigOrThrow", () => {
         id: IntegrationConnectionMethodIds.API_KEY,
         label: "API key",
         kind: "form",
-        secretField: {
-          label: "API key",
-          inputType: "password",
-        },
-        secretType: IntegrationCredentialSecretKinds.API_KEY,
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "API key",
+            inputType: "password",
+            secretType: IntegrationCredentialSecretKinds.API_KEY,
+          },
+        ],
         configSchema: z
           .object({
             connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),
@@ -113,11 +121,14 @@ describe("parseFormConnectionConfigOrThrow", () => {
           id: IntegrationConnectionMethodIds.API_KEY,
           label: "API key",
           kind: "form",
-          secretField: {
-            label: "API key",
-            inputType: "password",
-          },
-          secretType: IntegrationCredentialSecretKinds.API_KEY,
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+              secretType: IntegrationCredentialSecretKinds.API_KEY,
+            },
+          ],
           configSchema: z
             .object({
               connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),
@@ -173,5 +184,89 @@ describe("resolvePersistedSecretRefOrThrow", () => {
     expect(thrownError.message).toBe(
       "Unsupported persisted secret type 'github_app_installation_token'.",
     );
+  });
+});
+
+describe("parseCreateFormSecretsOrThrow", () => {
+  it("returns normalized persisted secrets for all declared secret fields", () => {
+    const parsedSecrets = parseCreateFormSecretsOrThrow({
+      targetKey: "openai-default",
+      method: {
+        id: IntegrationConnectionMethodIds.API_KEY,
+        label: "API key",
+        kind: "form",
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "API key",
+            inputType: "password",
+            secretType: IntegrationCredentialSecretKinds.API_KEY,
+          },
+        ],
+        configSchema: z.object({}).loose(),
+      },
+      secrets: {
+        apiKey: "  sk-test-api-key  ",
+      },
+      invalidInputCode: "INVALID_CREATE_CONNECTION_INPUT",
+    });
+
+    expect(parsedSecrets).toEqual([
+      {
+        field: {
+          name: "apiKey",
+          label: "API key",
+          inputType: "password",
+          secretType: IntegrationCredentialSecretKinds.API_KEY,
+        },
+        normalizedValue: "sk-test-api-key",
+        persistedSecretRef: {
+          secretKind: IntegrationCredentialSecretKinds.API_KEY,
+          purpose: IntegrationConnectionCredentialPurposes.API_KEY,
+        },
+      },
+    ]);
+  });
+});
+
+describe("parseUpdateFormSecretsOrThrow", () => {
+  it("returns only the provided secrets during update", () => {
+    const parsedSecrets = parseUpdateFormSecretsOrThrow({
+      targetKey: "openai-default",
+      method: {
+        id: IntegrationConnectionMethodIds.API_KEY,
+        label: "API key",
+        kind: "form",
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "API key",
+            inputType: "password",
+            secretType: IntegrationCredentialSecretKinds.API_KEY,
+          },
+        ],
+        configSchema: z.object({}).loose(),
+      },
+      secrets: {
+        apiKey: "  sk-rotated-api-key  ",
+      },
+      invalidInputCode: "INVALID_UPDATE_CONNECTION_INPUT",
+    });
+
+    expect(parsedSecrets).toEqual([
+      {
+        field: {
+          name: "apiKey",
+          label: "API key",
+          inputType: "password",
+          secretType: IntegrationCredentialSecretKinds.API_KEY,
+        },
+        normalizedValue: "sk-rotated-api-key",
+        persistedSecretRef: {
+          secretKind: IntegrationCredentialSecretKinds.API_KEY,
+          purpose: IntegrationConnectionCredentialPurposes.API_KEY,
+        },
+      },
+    ]);
   });
 });
