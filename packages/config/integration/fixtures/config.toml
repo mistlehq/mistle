@@ -58,6 +58,18 @@ otp_allowed_attempts = 3
 [apps.control_plane_api.dashboard]
 base_url = "http://127.0.0.1:5173"
 
+[apps.control_plane_api.media]
+media_base_url = "http://127.0.0.1:5000"
+bucket = "fixture-media"
+provider = "s3"
+
+[apps.control_plane_api.media.s3]
+region = "us-east-1"
+endpoint = "http://127.0.0.1:8333"
+access_key_id = "fixture-access-key"
+secret_access_key = "fixture-secret-key"
+force_path_style = true
+
 [apps.control_plane_api.workflow]
 database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle"
 namespace_id = "fixture"

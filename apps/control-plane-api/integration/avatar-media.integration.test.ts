@@ -86,6 +86,25 @@ function readAvatarUrl(value: unknown): string | null {
   return readNullableString(payload, "avatarUrl");
 }
 
+function expectStableMediaUrl(input: {
+  mediaBaseUrl: string;
+  mediaUrl: string | null;
+  pathname: string;
+  versionToken: string;
+}): void {
+  expect(input.mediaUrl).not.toBeNull();
+  if (input.mediaUrl === null) {
+    throw new Error("Expected media URL to be present.");
+  }
+
+  const actualUrl = new URL(input.mediaUrl);
+  const expectedOrigin = new URL(input.mediaBaseUrl).origin;
+
+  expect(actualUrl.origin).toBe(expectedOrigin);
+  expect(actualUrl.pathname).toBe(input.pathname);
+  expect(actualUrl.searchParams.get("v")).toBe(input.versionToken);
+}
+
 function readSessionUserImage(value: unknown): string | null {
   const payload = toRecord(value);
   const user = payload === null ? null : toRecord(payload["user"]);
@@ -258,9 +277,6 @@ describe("avatar media integration", () => {
 
     expect(finalizeResponse.status).toBe(200);
     const avatarUrl = readAvatarUrl(await finalizeResponse.json());
-    expect(avatarUrl).toBe(
-      `${fixture.config.media.mediaBaseUrl}/v1/media/users/${authSession.userId}/avatar`,
-    );
 
     const userRow = await fixture.db.query.users.findFirst({
       columns: {
@@ -275,6 +291,12 @@ describe("avatar media integration", () => {
     if (userRow?.avatarKey === null || userRow?.avatarKey === undefined) {
       throw new Error("Expected uploaded avatar key to be stored.");
     }
+    expectStableMediaUrl({
+      mediaBaseUrl: fixture.config.media.mediaBaseUrl,
+      mediaUrl: avatarUrl,
+      pathname: `/v1/media/users/${authSession.userId}/avatar`,
+      versionToken: userRow.avatarKey,
+    });
 
     expect(
       await objectExists({
@@ -298,6 +320,71 @@ describe("avatar media integration", () => {
     });
     expect(sessionResponse.status).toBe(200);
     expect(readSessionUserImage(await sessionResponse.json())).toBe(avatarUrl);
+
+    const replacementCreateResponse = await fixture.request("/v1/media/avatar-upload-sessions", {
+      method: "POST",
+      headers: {
+        cookie: authSession.cookie,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        subject: {
+          kind: "user",
+          id: authSession.userId,
+        },
+        contentType: "image/png",
+        fileSize: 2048,
+        fileName: "avatar-replacement.png",
+      }),
+    });
+    expect(replacementCreateResponse.status).toBe(200);
+    const replacementUpload = readUploadPayload(await replacementCreateResponse.json());
+
+    await uploadDirectObject({
+      uploadUrl: replacementUpload.uploadUrl,
+      uploadMethod: replacementUpload.uploadMethod,
+      uploadHeaders: replacementUpload.uploadHeaders,
+      body: await createPngBuffer({
+        width: 320,
+        height: 320,
+      }),
+    });
+
+    const replacementFinalizeResponse = await fixture.request(
+      "/v1/media/avatar-upload-sessions/finalize",
+      {
+        method: "POST",
+        headers: {
+          cookie: authSession.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          uploadSessionId: replacementUpload.uploadSessionId,
+        }),
+      },
+    );
+    expect(replacementFinalizeResponse.status).toBe(200);
+    const replacementAvatarUrl = readAvatarUrl(await replacementFinalizeResponse.json());
+
+    const replacedUserRow = await fixture.db.query.users.findFirst({
+      columns: {
+        avatarKey: true,
+        image: true,
+      },
+      where: (table, { eq }) => eq(table.id, authSession.userId),
+    });
+    expect(replacedUserRow?.avatarKey).not.toBeNull();
+    if (replacedUserRow?.avatarKey === null || replacedUserRow?.avatarKey === undefined) {
+      throw new Error("Expected replacement avatar key to be stored.");
+    }
+    expectStableMediaUrl({
+      mediaBaseUrl: fixture.config.media.mediaBaseUrl,
+      mediaUrl: replacementAvatarUrl,
+      pathname: `/v1/media/users/${authSession.userId}/avatar`,
+      versionToken: replacedUserRow.avatarKey,
+    });
+    expect(replacementAvatarUrl).not.toBe(avatarUrl);
+    expect(replacedUserRow.image).toBe(replacementAvatarUrl);
 
     const mediaRedirect = await fixture.request(`/v1/media/users/${authSession.userId}/avatar`, {
       headers: {
@@ -398,9 +485,6 @@ describe("avatar media integration", () => {
 
     expect(finalizeResponse.status).toBe(200);
     const logoUrl = readAvatarUrl(await finalizeResponse.json());
-    expect(logoUrl).toBe(
-      `${fixture.config.media.mediaBaseUrl}/v1/media/organizations/${authSession.organizationId}/logo`,
-    );
 
     const organizationRow = await fixture.db.query.organizations.findFirst({
       columns: {
@@ -410,6 +494,15 @@ describe("avatar media integration", () => {
       where: (table, { eq }) => eq(table.id, authSession.organizationId),
     });
     expect(organizationRow?.logoKey).not.toBeNull();
+    if (organizationRow?.logoKey === null || organizationRow?.logoKey === undefined) {
+      throw new Error("Expected organization logo key to be stored.");
+    }
+    expectStableMediaUrl({
+      mediaBaseUrl: fixture.config.media.mediaBaseUrl,
+      mediaUrl: logoUrl,
+      pathname: `/v1/media/organizations/${authSession.organizationId}/logo`,
+      versionToken: organizationRow.logoKey,
+    });
     expect(organizationRow?.logo).toBe(logoUrl);
 
     const organizationResponse = await fixture.request(

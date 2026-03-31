@@ -190,7 +190,10 @@ export function createMediaRoutes(): {
       return ctx.json({ code: "BAD_REQUEST", message }, 400);
     }
     const finalObjectKey = mediaService.buildFinalObjectKey({ subject });
-    const stableMediaUrl = mediaService.buildStableMediaUrl({ subject });
+    const stableMediaUrl = mediaService.buildStableMediaUrl({
+      subject,
+      versionToken: finalObjectKey,
+    });
 
     await mediaService.putObject({
       objectKey: finalObjectKey,

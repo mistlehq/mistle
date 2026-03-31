@@ -276,7 +276,7 @@ export type MediaService = {
     filename: string;
   }): string;
   buildFinalObjectKey(input: { subject: StableMediaSubject }): string;
-  buildStableMediaUrl(input: { subject: StableMediaSubject }): string;
+  buildStableMediaUrl(input: { subject: StableMediaSubject; versionToken: string }): string;
 };
 
 export function createMediaService(input: { config: MediaConfig }): MediaService {
@@ -304,12 +304,14 @@ export function createMediaService(input: { config: MediaConfig }): MediaService
 
       return `avatars/organizations/${subject.organizationId}/obj_${objectId}-logo.webp`;
     },
-    buildStableMediaUrl: ({ subject }) => {
+    buildStableMediaUrl: ({ subject, versionToken }) => {
       const relativePath =
         subject.kind === "user"
           ? `/v1/media/users/${encodeURIComponent(subject.userId)}/avatar`
           : `/v1/media/organizations/${encodeURIComponent(subject.organizationId)}/logo`;
-      return new URL(relativePath, input.config.mediaBaseUrl).toString();
+      const url = new URL(relativePath, input.config.mediaBaseUrl);
+      url.searchParams.set("v", versionToken);
+      return url.toString();
     },
   };
 }
