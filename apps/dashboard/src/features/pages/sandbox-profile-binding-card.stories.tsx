@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
+import { SandboxIntegrationBindingKinds } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { SandboxProfileBindingCard } from "./sandbox-profile-binding-card.js";
 import type {
   IntegrationConnectionSummary,
@@ -34,7 +35,7 @@ const AvailableTargets: readonly IntegrationTargetSummary[] = [
 const Row: SandboxProfileBindingEditorRow = {
   clientId: "binding_row_story_001",
   connectionId: "icn_story_github",
-  kind: "config",
+  kind: SandboxIntegrationBindingKinds.CONNECTOR,
   config: {},
 };
 
@@ -45,7 +46,6 @@ const meta = {
   args: {
     availableConnections: AvailableConnections,
     availableTargets: AvailableTargets,
-    errorMessage: undefined,
     onEdit: () => {},
     onRemove: () => {},
     row: Row,

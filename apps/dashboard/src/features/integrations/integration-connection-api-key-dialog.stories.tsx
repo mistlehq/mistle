@@ -12,7 +12,6 @@ const meta = {
   },
   args: {
     connectionDisplayName: "GitHub Production",
-    errorMessage: undefined,
     isOpen: true,
     isPending: false,
     onClose: () => {},
