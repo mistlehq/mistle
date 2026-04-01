@@ -503,7 +503,7 @@ export const EditPageLayout: Story = {
   },
   render: function RenderStory(args): React.JSX.Element {
     return (
-      <FormPageFrame title="Edit automation">
+      <FormPageFrame title="">
         <StoryHarness {...args} />
       </FormPageFrame>
     );
