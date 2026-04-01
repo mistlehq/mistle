@@ -30,6 +30,7 @@ Exported from [`src/index.ts`](./src/index.ts):
 
 - [Mailpit service](./src/services/mailpit/README.md)
 - [Postgres + PgBouncer service](./src/services/postgres/README.md)
+- [SeaweedFS S3 service](./src/services/seaweedfs/README.md)
 
 ## App Modules
 
