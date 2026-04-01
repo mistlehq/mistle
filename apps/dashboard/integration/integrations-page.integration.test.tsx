@@ -12,7 +12,6 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { ROUTE_HANDLES } from "../src/features/navigation/route-handles.js";
 import { IntegrationsPage } from "../src/features/pages/integrations-page.js";
-import { SettingsLayout } from "../src/features/settings/settings-layout.js";
 import { renderDashboardPageIntegration } from "./helpers/dashboard-page.js";
 
 function createDeferredPromise<T>() {
@@ -31,7 +30,7 @@ function createIntegrationsRouter(): ReturnType<typeof createMemoryRouter> {
   return createMemoryRouter(
     createRoutesFromElements(
       <Route element={<Outlet />} path="/">
-        <Route element={<SettingsLayout />} handle={ROUTE_HANDLES.settings} path="settings">
+        <Route element={<Outlet />} handle={ROUTE_HANDLES.settings} path="settings">
           <Route
             element={<Outlet />}
             handle={ROUTE_HANDLES.settingsOrganization}
