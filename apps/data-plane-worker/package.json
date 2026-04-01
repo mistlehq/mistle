@@ -25,7 +25,7 @@
     "@mistle/time": "workspace:*",
     "@mistle/workflow-registry": "workspace:*",
     "@openworkflow/cli": "^0.4.3",
-    "drizzle-orm": "^0.45.1",
+    "drizzle-orm": "^0.45.2",
     "openworkflow": "^0.8.1",
     "pg": "^8.20.0",
     "typeid-js": "^1.2.0",

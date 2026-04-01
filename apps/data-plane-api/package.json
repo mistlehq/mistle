@@ -29,7 +29,7 @@
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/workflow-registry": "workspace:*",
-    "drizzle-orm": "^0.45.1",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.12.8",
     "openworkflow": "^0.8.1",
     "pg": "^8.20.0",
