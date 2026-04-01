@@ -1,12 +1,6 @@
-import { derivePublishedTargetHost } from "@mistle/gateway-published-target-auth";
+import { derivePublishedTargetHost } from "@mistle/published-target-auth";
 
 import type { DataPlaneGatewayIntegrationFixture } from "./test-context.js";
-
-function resolvePublishedBaseDomain(fixture: DataPlaneGatewayIntegrationFixture): string {
-  return fixture.config.environment === "development"
-    ? fixture.config.publish.localBaseDomain
-    : fixture.config.publish.baseDomain;
-}
 
 export function deriveIntegrationPublishedHost(input: {
   fixture: DataPlaneGatewayIntegrationFixture;
@@ -14,7 +8,7 @@ export function deriveIntegrationPublishedHost(input: {
   sandboxInstanceId: string;
 }): string {
   return derivePublishedTargetHost({
-    baseDomain: resolvePublishedBaseDomain(input.fixture),
+    baseDomain: input.fixture.config.sandbox.publish.baseDomain,
     sandboxInstanceId: input.sandboxInstanceId,
     target: {
       kind: "port",

@@ -21,7 +21,7 @@ locally, in self-hosted installs, and behind Cloudflare-managed certificates.
 
 Local development uses:
 
-- `sandbox.publish.localBaseDomain = "mistle.localhost"`
+- `sandbox.publish.baseDomain = "mistle.localhost"`
 - plain HTTP and plain WS at the edge
 - host-scoped published-target session cookies without `Secure`
 
@@ -40,8 +40,8 @@ Deployed environments use:
 - HTTPS and WSS at the edge
 - `Secure` host-scoped published-target session cookies
 
-When `environment === "production"`, published-target host parsing and bootstrap verification use
-`sandbox.publish.baseDomain`, not `localBaseDomain`.
+Every environment provides its own `sandbox.publish.baseDomain`. The gateway does not branch
+between separate local and deployed base-domain settings.
 
 ## Header Policy
 

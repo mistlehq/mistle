@@ -11,8 +11,8 @@ import {
   request as httpRequest,
 } from "node:http";
 
-import { mintPublishedTargetAccessToken } from "@mistle/gateway-published-target-auth";
 import { mintBootstrapToken, mintTunnelExchangeToken } from "@mistle/gateway-tunnel-auth";
+import { mintPublishedTargetAccessToken } from "@mistle/published-target-auth";
 import { afterEach, describe, expect } from "vitest";
 
 import {
@@ -146,7 +146,7 @@ async function bootstrapPublishedCookieResponse(input: {
   sandboxInstanceId: string;
 }): Promise<Response> {
   const token = await mintPublishedTargetAccessToken({
-    config: input.fixture.config.publish.access,
+    config: input.fixture.config.sandbox.publish.access,
     host: input.host,
     jti: randomUUID(),
     organizationId: "org_publish_hardening",
@@ -342,7 +342,7 @@ describe("published target hardening integration", () => {
       });
 
       const token = await mintPublishedTargetAccessToken({
-        config: fixture.config.publish.access,
+        config: fixture.config.sandbox.publish.access,
         host: canonicalHost,
         jti: randomUUID(),
         organizationId: "org_publish_hardening",
@@ -371,7 +371,7 @@ describe("published target hardening integration", () => {
   );
 
   itProduction(
-    "uses sandbox.publish.baseDomain instead of localBaseDomain in production",
+    "uses sandbox.publish.baseDomain in production",
     async ({ fixture }) => {
       const sandboxInstanceId = "sbi_publish_hardening_003";
       await insertSandboxInstanceRow({
@@ -402,8 +402,7 @@ describe("published target hardening integration", () => {
         sandboxInstanceId,
       });
 
-      expect(productionHost.endsWith(`.${fixture.config.publish.baseDomain}`)).toBe(true);
-      expect(productionHost.endsWith(`.${fixture.config.publish.localBaseDomain}`)).toBe(false);
+      expect(productionHost.endsWith(`.${fixture.config.sandbox.publish.baseDomain}`)).toBe(true);
 
       const localHost = deriveIntegrationPublishedHost({
         fixture: {
@@ -418,7 +417,7 @@ describe("published target hardening integration", () => {
       });
 
       const token = await mintPublishedTargetAccessToken({
-        config: fixture.config.publish.access,
+        config: fixture.config.sandbox.publish.access,
         host: productionHost,
         jti: randomUUID(),
         organizationId: "org_publish_hardening",
