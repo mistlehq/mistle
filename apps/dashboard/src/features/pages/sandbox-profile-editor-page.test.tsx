@@ -127,7 +127,7 @@ function Harness(): React.JSX.Element {
   );
 }
 
-function getSectionAddButton(sectionTitle: string): HTMLButtonElement {
+function getSectionContainer(sectionTitle: string): HTMLElement {
   const sectionHeading = screen.getAllByRole("heading", { name: sectionTitle })[0];
 
   if (sectionHeading === undefined) {
@@ -140,7 +140,11 @@ function getSectionAddButton(sectionTitle: string): HTMLButtonElement {
     throw new Error(`Could not resolve section container for ${sectionTitle}.`);
   }
 
-  return within(sectionContainer).getByRole("button", { name: "Add" });
+  return sectionContainer;
+}
+
+function getSectionAddButton(sectionTitle: string): HTMLButtonElement {
+  return within(getSectionContainer(sectionTitle)).getByRole("button", { name: "Add" });
 }
 
 afterEach(() => {
@@ -211,7 +215,7 @@ describe("IntegrationsEditorSection", () => {
     expect(preserved.config).toStrictEqual({ model: "gpt-5.4-codex" });
   });
 
-  it("does not render save status copy for integration bindings", () => {
+  it("does not render save status copy in the connector bindings section", () => {
     const queryClient = createTestQueryClient();
 
     render(
@@ -241,7 +245,9 @@ describe("IntegrationsEditorSection", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.queryByText("Saving...")).toBeNull();
-    expect(screen.queryByText("Saved.")).toBeNull();
+    const connectorBindingsSection = getSectionContainer("Connector Bindings");
+
+    expect(within(connectorBindingsSection).queryByText("Saving...")).toBeNull();
+    expect(within(connectorBindingsSection).queryByText("Saved.")).toBeNull();
   });
 });
