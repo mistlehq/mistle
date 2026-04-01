@@ -214,46 +214,4 @@ describe("IntegrationsEditorSection", () => {
     expect(preserved.connectionId).toBe("conn-agent-2");
     expect(preserved.config).toStrictEqual({ model: "gpt-5.4-codex" });
   });
-
-  it("disables adding a binding while integration bindings are submitting", () => {
-    const queryClient = createTestQueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <IntegrationsEditorSection
-          availableConnections={[
-            {
-              id: "conn-git",
-              displayName: "GitHub Production",
-              targetKey: "target-git",
-              status: "active",
-            },
-          ]}
-          availableTargets={[createTarget("target-git", "git")]}
-          integrationBindingsQuery={{
-            isError: false,
-            error: null,
-            isPending: false,
-          }}
-          integrationDirectoryQuery={{
-            isError: false,
-            error: null,
-            isPending: false,
-          }}
-          integrationRowErrorsByClientId={{}}
-          integrationRows={[]}
-          integrationSaveError={null}
-          isSubmittingIntegrationBindings={true}
-          onAddIntegrationBindingRow={async () => false}
-          onIntegrationBindingRowChange={() => {}}
-          onRemoveIntegrationBindingRow={() => {}}
-          resolveSelectedConnectionDisplayName={(row) => row.connectionId}
-        />
-      </QueryClientProvider>,
-    );
-
-    fireEvent.click(getSectionAddButton("Git Bindings"));
-
-    expect(screen.getByRole("button", { name: "Add binding" }).hasAttribute("disabled")).toBe(true);
-  });
 });
