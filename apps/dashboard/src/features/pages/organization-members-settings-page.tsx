@@ -37,12 +37,7 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
     membersState.capabilitiesQuery.isPending;
 
   return (
-    <PageFrame
-      description={description}
-      headerActions={headerActions}
-      title={title}
-      variant="default"
-    >
+    <PageFrame description={description} headerActions={headerActions} title={title}>
       <OrganizationMembersSettingsPageView
         capabilities={membersState.capabilities}
         capabilitiesErrorMessage={

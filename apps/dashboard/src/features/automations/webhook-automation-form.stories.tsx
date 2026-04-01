@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
-import { PageFrame } from "../shared/page-frame.js";
+import { FormPageFrame } from "../shared/page-frame.js";
 import {
   WebhookAutomationForm,
   type WebhookAutomationEventOption,
@@ -488,9 +488,9 @@ export const CreatePageLayout: Story = {
   },
   render: function RenderStory(args): React.JSX.Element {
     return (
-      <PageFrame title="Create automation" variant="form">
+      <FormPageFrame title="Create automation">
         <StoryHarness {...args} />
-      </PageFrame>
+      </FormPageFrame>
     );
   },
 };
@@ -503,9 +503,9 @@ export const EditPageLayout: Story = {
   },
   render: function RenderStory(args): React.JSX.Element {
     return (
-      <PageFrame title="Edit automation" variant="form">
+      <FormPageFrame title="Edit automation">
         <StoryHarness {...args} />
-      </PageFrame>
+      </FormPageFrame>
     );
   },
 };

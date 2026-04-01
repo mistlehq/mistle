@@ -7,7 +7,6 @@ export type PageFrameProps = {
   headerActions?: React.ReactNode;
   headerIcon?: React.ReactNode;
   title: React.ReactNode;
-  variant?: "default" | "form";
 };
 
 export function resolvePageFrameText(
@@ -26,30 +25,52 @@ export function resolvePageFrameText(
   };
 }
 
+function shouldRenderPageFrameHeader(input: Omit<PageFrameProps, "children">): boolean {
+  const hasTitle =
+    typeof input.title === "string"
+      ? input.title.trim().length > 0
+      : input.title !== null && input.title !== undefined;
+  const hasDescription = input.description !== undefined && input.description !== null;
+  const hasHeaderActions = input.headerActions !== undefined && input.headerActions !== null;
+  const hasHeaderIcon = input.headerIcon !== undefined && input.headerIcon !== null;
+
+  return hasTitle || hasDescription || hasHeaderActions || hasHeaderIcon;
+}
+
 export function PageFrame(input: PageFrameProps): React.JSX.Element {
-  const isFormLayout = input.variant === "form";
+  const shouldRenderHeader = shouldRenderPageFrameHeader(input);
 
   return (
-    <div
-      className={
-        isFormLayout
-          ? "flex min-h-full flex-col gap-3 bg-muted/30 px-4 py-6"
-          : "flex min-h-full flex-col gap-4 px-4 py-6"
-      }
-    >
-      <div className={isFormLayout ? "mx-auto w-full max-w-2xl" : undefined}>
+    <div className="flex min-h-full flex-col gap-4 px-4 py-6">
+      {shouldRenderHeader ? (
         <FormPageHeader
           actions={input.headerActions}
           description={input.description}
           icon={input.headerIcon}
           title={input.title}
         />
-      </div>
-      {isFormLayout ? (
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">{input.children}</div>
-      ) : (
-        input.children
-      )}
+      ) : null}
+      {input.children}
+    </div>
+  );
+}
+
+export function FormPageFrame(input: PageFrameProps): React.JSX.Element {
+  const shouldRenderHeader = shouldRenderPageFrameHeader(input);
+
+  return (
+    <div className="flex min-h-full flex-col gap-6 bg-muted/30 px-4 py-6">
+      {shouldRenderHeader ? (
+        <div className="mx-auto w-full max-w-2xl">
+          <FormPageHeader
+            actions={input.headerActions}
+            description={input.description}
+            icon={input.headerIcon}
+            title={input.title}
+          />
+        </div>
+      ) : null}
+      <div className="mx-auto w-full max-w-2xl">{input.children}</div>
     </div>
   );
 }

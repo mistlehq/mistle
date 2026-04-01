@@ -15,7 +15,7 @@ import { webhookAutomationDetailQueryKey } from "../automations/webhook-automati
 import { getWebhookAutomation } from "../automations/webhook-automations-service.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
-import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 
 type WebhookAutomationEditorPageProps = {
   mode: "create" | "edit";
@@ -31,9 +31,9 @@ export function WebhookAutomationEditorPage(
   const { title, description } = resolvePageFrameText(pageMeta, fallbackTitle);
   if (input.mode === "create") {
     return (
-      <PageFrame description={description} title={title} variant="form">
+      <FormPageFrame description={description} title={title}>
         <CreateWebhookAutomationEditor navigate={navigate} />
-      </PageFrame>
+      </FormPageFrame>
     );
   }
 
@@ -43,9 +43,9 @@ export function WebhookAutomationEditorPage(
   }
 
   return (
-    <PageFrame description={description} title={title} variant="form">
+    <FormPageFrame description={description} title={title}>
       <EditWebhookAutomationEditor automationId={automationId} navigate={navigate} />
-    </PageFrame>
+    </FormPageFrame>
   );
 }
 

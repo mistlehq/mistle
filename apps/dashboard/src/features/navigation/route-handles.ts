@@ -180,11 +180,13 @@ export const ROUTE_HANDLES = {
     description: "Manage sandbox profile configuration.",
   },
   sandboxProfilesNew: {
+    appShellInsetOwner: "child",
     breadcrumb: "Create",
     title: "Create",
     description: "Create a sandbox profile.",
   },
   sandboxProfilesDetail: {
+    appShellInsetOwner: "child",
     breadcrumb: resolveSandboxProfileDetailBreadcrumb,
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
@@ -198,13 +200,13 @@ export const ROUTE_HANDLES = {
     appShellInsetOwner: "child",
     breadcrumb: "Create",
     title: "Create automation",
-    description: "Create a webhook automation.",
+    description: "",
   },
   automationsDetail: {
     appShellInsetOwner: "child",
     breadcrumb: resolveAutomationDetailBreadcrumb,
-    title: "Edit automation",
-    description: "Edit webhook automation configuration.",
+    title: "",
+    description: "",
   },
   settings: {
     breadcrumb: "Settings",

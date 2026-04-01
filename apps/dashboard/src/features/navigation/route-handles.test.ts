@@ -21,20 +21,20 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.sandboxProfiles.description).toBe("Manage sandbox profile configuration.");
     expect(ROUTE_HANDLES.sandboxProfilesNew.title).toBe("Create");
     expect(ROUTE_HANDLES.sandboxProfilesNew.description).toBe("Create a sandbox profile.");
+    expect(ROUTE_HANDLES.sandboxProfilesNew.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.sandboxProfilesDetail.title).toBe("Edit profile");
     expect(ROUTE_HANDLES.sandboxProfilesDetail.description).toBe(
       "Edit sandbox profile configuration.",
     );
+    expect(ROUTE_HANDLES.sandboxProfilesDetail.appShellInsetOwner).toBe("child");
 
     expect(ROUTE_HANDLES.automations.title).toBe("Automations");
     expect(ROUTE_HANDLES.automations.description).toBe("Manage webhook automations.");
     expect(ROUTE_HANDLES.automationsNew.title).toBe("Create automation");
-    expect(ROUTE_HANDLES.automationsNew.description).toBe("Create a webhook automation.");
+    expect(ROUTE_HANDLES.automationsNew.description).toBe("");
     expect(ROUTE_HANDLES.automationsNew.appShellInsetOwner).toBe("child");
-    expect(ROUTE_HANDLES.automationsDetail.title).toBe("Edit automation");
-    expect(ROUTE_HANDLES.automationsDetail.description).toBe(
-      "Edit webhook automation configuration.",
-    );
+    expect(ROUTE_HANDLES.automationsDetail.title).toBe("");
+    expect(ROUTE_HANDLES.automationsDetail.description).toBe("");
     expect(ROUTE_HANDLES.automationsDetail.appShellInsetOwner).toBe("child");
 
     expect(ROUTE_HANDLES.settingsPersonal.title).toBe("Personal");

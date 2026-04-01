@@ -8,7 +8,7 @@ import {
   getOrganizationGeneral,
   updateOrganizationGeneral,
 } from "../settings/organization/organization-general-service.js";
-import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { OrganizationGeneralSettingsPageView } from "./organization-general-settings-page-view.js";
@@ -114,7 +114,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
   });
 
   return (
-    <PageFrame description={description} title={title} variant="form">
+    <FormPageFrame description={description} title={title}>
       <OrganizationGeneralSettingsEditor
         key={
           organizationQuery.data === undefined
@@ -146,7 +146,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         saveErrorMessage={saveError}
         saveSuccess={showSaveSuccess}
       />
-    </PageFrame>
+    </FormPageFrame>
   );
 }
 

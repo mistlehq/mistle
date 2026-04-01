@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { updateProfileDisplayName } from "../settings/profile/profile-service.js";
-import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
@@ -56,7 +56,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
   const persistedDisplayName = resolveUserDisplayName(session.user);
 
   return (
-    <PageFrame description={description} title={title} variant="form">
+    <FormPageFrame description={description} title={title}>
       <ProfileSettingsEditor
         key={`${session.user.email}:${persistedDisplayName}`}
         email={session.user.email}
@@ -74,7 +74,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
         saveSuccess={saveSuccess}
         saving={saveMutation.isPending}
       />
-    </PageFrame>
+    </FormPageFrame>
   );
 }
 

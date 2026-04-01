@@ -18,7 +18,7 @@ import {
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
 
-import { FormPageFooter, FormPageSection } from "../shared/form-page.js";
+import { FormPageFooter, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
 import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
@@ -179,7 +179,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
     input.values.inputTemplate === DefaultWebhookAutomationInputTemplate;
 
   return (
-    <div className="flex flex-col gap-6">
+    <FormPageStack>
       {input.mode === "edit" ? (
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -454,6 +454,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           {input.isSaving ? "Saving..." : submitLabel}
         </Button>
       </FormPageFooter>
-    </div>
+    </FormPageStack>
   );
 }

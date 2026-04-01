@@ -1,6 +1,15 @@
 import { cn } from "@mistle/ui";
 import type { ReactNode } from "react";
 
+export type FormPageStackProps = {
+  children: ReactNode;
+  className?: string;
+};
+
+export function FormPageStack(input: FormPageStackProps): React.JSX.Element {
+  return <div className={cn("flex flex-col gap-6", input.className)}>{input.children}</div>;
+}
+
 export type FormPageSectionProps = {
   children: ReactNode;
   className?: string;
@@ -29,7 +38,7 @@ export function FormPageHeader(input: FormPageHeaderProps): React.JSX.Element {
   const hasIcon = input.icon !== undefined && input.icon !== null;
 
   return (
-    <div className="flex items-start justify-between gap-3">
+    <div className="flex items-start justify-between gap-3" data-slot="page-header">
       <div className={cn("flex min-w-0 flex-1 gap-3", hasIcon ? "items-center" : "items-start")}>
         {hasIcon ? <div className="shrink-0">{input.icon}</div> : null}
         <div className="min-w-0 flex-1">
@@ -43,6 +52,7 @@ export function FormPageHeader(input: FormPageHeaderProps): React.JSX.Element {
                   "text-muted-foreground truncate text-sm",
                   hasIcon ? "leading-tight" : null,
                 )}
+                data-slot="page-header-description"
               >
                 {input.description}
               </p>

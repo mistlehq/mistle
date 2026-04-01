@@ -182,7 +182,7 @@ describe("route breadcrumb metadata", () => {
             appShellInsetOwner: "child",
             appShellViewportMode: "workspace",
             title: "Create automation",
-            description: "Create a webhook automation.",
+            description: "",
           },
           params: {},
           pathname: "/automations/new",
@@ -193,7 +193,7 @@ describe("route breadcrumb metadata", () => {
       appShellViewportMode: "workspace",
       title: "Create automation",
       headerIcon: null,
-      supportingText: "Create a webhook automation.",
+      supportingText: "",
     });
   });
 });

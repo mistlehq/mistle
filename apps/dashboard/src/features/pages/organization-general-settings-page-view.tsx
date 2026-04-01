@@ -1,7 +1,7 @@
 import { Field, FieldContent, FieldHeader, FieldLabel, Input, Skeleton, Notice } from "@mistle/ui";
 
 import { SaveActions } from "../settings/save-actions.js";
-import { FormPageSection } from "../shared/form-page.js";
+import { FormPageSection, FormPageStack } from "../shared/form-page.js";
 
 export type OrganizationGeneralSettingsPageViewProps = {
   hasDirtyChanges: boolean;
@@ -22,7 +22,7 @@ export function OrganizationGeneralSettingsPageView(
 ): React.JSX.Element {
   if (props.isLoading) {
     return (
-      <>
+      <FormPageStack>
         <FormPageSection>
           <div className="flex flex-col gap-4 p-4">
             <div className="flex flex-col gap-2">
@@ -40,24 +40,24 @@ export function OrganizationGeneralSettingsPageView(
             </div>
           </div>
         </FormPageSection>
-      </>
+      </FormPageStack>
     );
   }
 
   if (props.loadErrorMessage) {
     return (
-      <>
+      <FormPageStack>
         <FormPageSection>
           <div className="flex flex-col gap-3 p-4">
             <Notice tone="destructive">{props.loadErrorMessage} Please try again later.</Notice>
           </div>
         </FormPageSection>
-      </>
+      </FormPageStack>
     );
   }
 
   return (
-    <>
+    <FormPageStack>
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
           <p aria-live="polite" className="sr-only" role="status">
@@ -96,6 +96,6 @@ export function OrganizationGeneralSettingsPageView(
         saveSuccess={props.saveSuccess}
         saving={props.isSaving}
       />
-    </>
+    </FormPageStack>
   );
 }

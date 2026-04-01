@@ -9,7 +9,7 @@ import {
   createSettingsFixtureInviteMembersButton,
 } from "../settings/settings-fixtures.js";
 import { SettingsSectionNavView } from "../settings/settings-section-nav-view.js";
-import { PageFrame } from "../shared/page-frame.js";
+import { FormPageFrame, PageFrame } from "../shared/page-frame.js";
 import { AppShellView } from "./app-shell-view.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 
@@ -150,9 +150,9 @@ export const SettingsProfile: Story = {
     contentInsetOwner: "child",
     headerActions: null,
     mainContent: (
-      <PageFrame headerActions={null} variant="form" title="Profile">
+      <FormPageFrame headerActions={null} title="Profile">
         {createProfileSettingsFixtureContent()}
-      </PageFrame>
+      </FormPageFrame>
     ),
     showBreadcrumbs: true,
     sidebarContent: <SettingsSectionNavView pathname="/settings/account/profile" />,
