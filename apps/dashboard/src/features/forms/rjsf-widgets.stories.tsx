@@ -9,7 +9,6 @@ import type React from "react";
 import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
 import type { IntegrationFormContext } from "./integration-form-context.js";
 import { IntegrationFormTemplates, IntegrationFormWidgets } from "./integration-form-theme.js";
-import { RepositoryItems } from "./integration-resource-string-array-widget-story-support.js";
 
 type JsonObject = Record<string, unknown>;
 
@@ -171,62 +170,6 @@ function CommaSeparatedStringArrayWidgetStory(): React.JSX.Element {
   );
 }
 
-function IntegrationResourceStringArrayWidgetStory(): React.JSX.Element {
-  return (
-    <div className="w-full max-w-3xl">
-      <WidgetForm
-        formContext={{
-          resourceOverrides: [
-            {
-              connectionId: "storybook-github",
-              kind: "repository",
-              syncState: "ready",
-              lastSyncedAt: "2026-03-09T12:00:00.000Z",
-              items: RepositoryItems,
-            },
-          ],
-        }}
-        formData={{
-          repositories: ["mistle/main-dashboard", "mistle/control-plane-api"],
-        }}
-        schema={{
-          type: "object",
-          required: ["repositories"],
-          properties: {
-            repositories: {
-              type: "array",
-              title: "Repositories",
-              items: {
-                type: "string",
-              },
-            },
-          },
-        }}
-        uiSchema={{
-          repositories: {
-            "ui:widget": "integration-resource-string-array",
-            "ui:options": {
-              connectionId: "storybook-github",
-              kind: "repository",
-              title: "Repositories",
-              searchPlaceholder: "Search repositories",
-              emptyMessage: "No repositories available for this connection.",
-              refreshLabel: "Refresh repositories",
-              resourceSummary: {
-                kind: "repository",
-                selectionMode: "multi",
-                count: RepositoryItems.length,
-                syncState: "ready",
-                lastSyncedAt: "2026-03-09T12:00:00.000Z",
-              },
-            },
-          },
-        }}
-      />
-    </div>
-  );
-}
-
 const meta = {
   title: "Dashboard/Forms/RJSFWidgets",
   decorators: [withDashboardCenteredSurface],
@@ -254,11 +197,5 @@ export const SelectWidget: Story = {
 export const CommaSeparatedStringArrayWidget: Story = {
   render: function RenderStory(): React.JSX.Element {
     return <CommaSeparatedStringArrayWidgetStory />;
-  },
-};
-
-export const IntegrationResourceStringArrayWidget: Story = {
-  render: function RenderStory(): React.JSX.Element {
-    return <IntegrationResourceStringArrayWidgetStory />;
   },
 };
