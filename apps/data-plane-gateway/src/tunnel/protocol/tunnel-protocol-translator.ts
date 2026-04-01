@@ -3,12 +3,15 @@ import {
   PayloadKindWebSocketBinary,
   PayloadKindWebSocketText,
   parseBootstrapControlMessage,
+  parsePublishControlMessage,
   parseStreamControlMessage,
   type BootstrapControlMessage,
   type LeaseControlMessage,
+  type PublishControlMessage,
   type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
 
+import type { ConnectionPublishMessageHandler } from "../../publishing/connection-publish-message-handler.js";
 import { BootstrapTunnelNotConnectedError } from "../bootstrap-tunnel-not-connected-error.js";
 import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
 import {
@@ -340,6 +343,7 @@ export class TunnelProtocolViolationError extends Error {
 export class TunnelProtocolTranslator {
   public constructor(
     private readonly interactiveStreamRouter: InteractiveStreamRouter,
+    private readonly connectionPublishMessageHandler: ConnectionPublishMessageHandler,
     private readonly frameCodec: FrameCodec = new FrameCodec(),
   ) {}
 
@@ -383,6 +387,16 @@ export class TunnelProtocolTranslator {
   private async translateConnectionTextPayload(
     input: TranslateTunnelInboundMessageInput & { payload: string; sourcePeerSide: "connection" },
   ): Promise<TunnelProtocolTranslation> {
+    const publishControlMessage = parsePublishControlMessage(input.payload);
+    if (publishControlMessage !== undefined) {
+      return this.translatePublishControlMessage({
+        clientSessionId: input.clientSessionId,
+        controlMessage: publishControlMessage,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sourcePeerSide: "connection",
+      });
+    }
+
     const ptyStreamOpen = parsePTYStreamOpen(input.payload);
     if (ptyStreamOpen !== undefined) {
       return this.translateConnectionStreamOpen({
@@ -500,6 +514,16 @@ export class TunnelProtocolTranslator {
   private async translateBootstrapTextPayload(
     input: TranslateTunnelInboundMessageInput & { payload: string; sourcePeerSide: "bootstrap" },
   ): Promise<TunnelProtocolTranslation> {
+    const publishControlMessage = parsePublishControlMessage(input.payload);
+    if (publishControlMessage !== undefined) {
+      return this.translatePublishControlMessage({
+        clientSessionId: input.clientSessionId,
+        controlMessage: publishControlMessage,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      });
+    }
+
     const controlMessage = parseBootstrapControlMessage(input.payload);
     if (controlMessage === undefined) {
       throw new TunnelProtocolViolationError(createUnsupportedTextPayloadErrorMessage("bootstrap"));
@@ -616,6 +640,15 @@ export class TunnelProtocolTranslator {
         payload: translatedPayload,
       }),
     });
+  }
+
+  private translatePublishControlMessage(input: {
+    clientSessionId: string;
+    controlMessage: PublishControlMessage;
+    sandboxInstanceId: string;
+    sourcePeerSide: RelayPeerSide;
+  }): TunnelProtocolTranslation {
+    return this.connectionPublishMessageHandler.handleControlMessage(input);
   }
 
   private async translateBootstrapBinaryPayload(

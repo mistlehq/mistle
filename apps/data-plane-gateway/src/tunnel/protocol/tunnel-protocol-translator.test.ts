@@ -2,10 +2,13 @@ import {
   PayloadKindRawBytes,
   PayloadKindWebSocketText,
   encodeDataFrame,
+  parsePublishControlMessage,
 } from "@mistle/sandbox-session-protocol";
-import { systemClock } from "@mistle/time";
+import { systemClock, systemScheduler } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 
+import { ConnectionPublishMessageHandler } from "../../publishing/connection-publish-message-handler.js";
+import { ConnectionPublishRequestCoordinator } from "../../publishing/connection-publish-request-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
 import { InteractiveStreamRouter } from "../gateway-forwarding/interactive-stream-router.js";
@@ -55,7 +58,13 @@ async function createTranslatorHarness() {
 
   return {
     router,
-    translator: new TunnelProtocolTranslator(router),
+    translator: new TunnelProtocolTranslator(
+      router,
+      new ConnectionPublishMessageHandler(
+        registry,
+        new ConnectionPublishRequestCoordinator(systemScheduler, 5_000),
+      ),
+    ),
   };
 }
 
@@ -132,6 +141,91 @@ async function sendBootstrapStreamComplete(
 }
 
 describe("TunnelProtocolTranslator", () => {
+  it("treats publish listener requests as tunnel control messages", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    const translation = await translator.translateInboundMessage({
+      clientSessionId: "conn_1",
+      payload: JSON.stringify({
+        type: "publish.listeners.get",
+        requestId: "client_req_1",
+      }),
+      sandboxInstanceId: SandboxInstanceId,
+      sourcePeerSide: "connection",
+    });
+
+    expect(translation.delivery.kind).toBe("forward");
+    if (translation.delivery.kind !== "forward") {
+      throw new Error("Expected a forwarded publish.listeners.get tunnel message.");
+    }
+    if (typeof translation.delivery.payload !== "string") {
+      throw new Error("Expected forwarded publish.listeners.get payload to be a JSON string.");
+    }
+
+    const forwardedPayload = parsePublishControlMessage(translation.delivery.payload);
+    if (forwardedPayload === undefined) {
+      throw new Error(
+        "Expected forwarded publish.listeners.get payload to be a publish control message.",
+      );
+    }
+    if (forwardedPayload.type !== "publish.listeners.get") {
+      throw new Error("Expected forwarded publish.listeners.get payload type.");
+    }
+    expect(forwardedPayload.requestId).not.toBe("client_req_1");
+  });
+
+  it("maps bootstrap publish listener snapshots back to the requesting connection session", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    const forwardedRequest = await translator.translateInboundMessage({
+      clientSessionId: "conn_1",
+      payload: JSON.stringify({
+        type: "publish.listeners.get",
+        requestId: "client_req_1",
+      }),
+      sandboxInstanceId: SandboxInstanceId,
+      sourcePeerSide: "connection",
+    });
+    if (forwardedRequest.delivery.kind !== "forward") {
+      throw new Error("Expected a forwarded publish.listeners.get tunnel message.");
+    }
+    if (typeof forwardedRequest.delivery.payload !== "string") {
+      throw new Error("Expected forwarded publish.listeners.get payload to be a JSON string.");
+    }
+
+    const forwardedControlMessage = parsePublishControlMessage(forwardedRequest.delivery.payload);
+    if (forwardedControlMessage?.type !== "publish.listeners.get") {
+      throw new Error(
+        "Expected forwarded publish.listeners.get payload to be a publish control message.",
+      );
+    }
+    const bootstrapRequestId = forwardedControlMessage.requestId;
+    const translation = await translator.translateInboundMessage({
+      clientSessionId: BootstrapSessionId,
+      payload: JSON.stringify({
+        type: "publish.listeners.snapshot",
+        requestId: bootstrapRequestId,
+        observedAt: "2026-04-01T00:00:00.000Z",
+        listeners: [],
+      }),
+      sandboxInstanceId: SandboxInstanceId,
+      sourcePeerSide: "bootstrap",
+    });
+
+    expect(translation).toEqual({
+      delivery: {
+        kind: "forward",
+        payload: JSON.stringify({
+          type: "publish.listeners.snapshot",
+          requestId: "client_req_1",
+          observedAt: "2026-04-01T00:00:00.000Z",
+          listeners: [],
+        }),
+        targetConnectionSessionId: "conn_1",
+      },
+    });
+  });
+
   it("maps a connection stream.open to the bootstrap stream id", async () => {
     const { translator } = await createTranslatorHarness();
 

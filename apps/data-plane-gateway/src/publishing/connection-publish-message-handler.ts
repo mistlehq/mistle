@@ -1,5 +1,4 @@
 import {
-  parsePublishControlMessage,
   type PublishListenersGet,
   type PublishListenersSnapshot,
   type PublishControlMessage,
@@ -42,27 +41,22 @@ export class ConnectionPublishMessageHandler {
     private readonly requestCoordinator: ConnectionPublishRequestCoordinator,
   ) {}
 
-  public handleTextMessage(input: {
+  public handleControlMessage(input: {
     clientSessionId: string;
-    payload: string;
+    controlMessage: PublishControlMessage;
     sandboxInstanceId: string;
     sourcePeerSide: RelayPeerSide;
-  }): TunnelProtocolTranslation | undefined {
-    const controlMessage = parsePublishControlMessage(input.payload);
-    if (controlMessage === undefined) {
-      return undefined;
-    }
-
+  }): TunnelProtocolTranslation {
     if (input.sourcePeerSide === "connection") {
       return this.#handleConnectionMessage({
         clientSessionId: input.clientSessionId,
-        controlMessage,
+        controlMessage: input.controlMessage,
         sandboxInstanceId: input.sandboxInstanceId,
       });
     }
 
     return this.#handleBootstrapMessage({
-      controlMessage,
+      controlMessage: input.controlMessage,
     });
   }
 

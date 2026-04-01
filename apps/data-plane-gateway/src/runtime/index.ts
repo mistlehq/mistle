@@ -13,7 +13,6 @@ import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/regi
 import { ConnectionPublishMessageHandler } from "../publishing/connection-publish-message-handler.js";
 import { ConnectionPublishRequestCoordinator } from "../publishing/connection-publish-request-coordinator.js";
 import { registerPublishedTargetRoutes } from "../publishing/register-published-target-routes.js";
-import { TunnelMessageDispatcher } from "../publishing/tunnel-message-dispatcher.js";
 import { InMemorySandboxActivityStore } from "../runtime-state/adapters/in-memory-sandbox-activity-store.js";
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
@@ -130,8 +129,9 @@ export function createDataPlaneGatewayRuntime(
     systemScheduler,
     PublishRequestTimeoutMs,
   );
-  const tunnelMessageDispatcher = new TunnelMessageDispatcher(
-    new ConnectionPublishMessageHandler(tunnelSessionRegistry, connectionPublishRequestCoordinator),
+  const connectionPublishMessageHandler = new ConnectionPublishMessageHandler(
+    tunnelSessionRegistry,
+    connectionPublishRequestCoordinator,
   );
   const sandboxOwnerLeaseHeartbeat = new SandboxOwnerLeaseHeartbeat(
     sandboxOwnerStore,
@@ -189,7 +189,7 @@ export function createDataPlaneGatewayRuntime(
     interactiveStreamRouter,
     relayCoordinator,
     tunnelSessionRegistry,
-    tunnelMessageDispatcher,
+    connectionPublishMessageHandler,
     sandboxOwnerStore,
     sandboxOwnerResolver,
     sandboxOwnerLeaseHeartbeat,
