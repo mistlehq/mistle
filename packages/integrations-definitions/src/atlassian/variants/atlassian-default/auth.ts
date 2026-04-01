@@ -27,8 +27,19 @@ export function normalizeAtlassianBaseUrl(input: string): string {
   return normalizedPathname === "/" ? parsedUrl.origin : parsedUrl.toString();
 }
 
+function tryParseAtlassianSiteUrl(value: string): URL | null {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
 const AtlassianSiteUrlSchema = z.url().superRefine((value, ctx) => {
-  const parsedUrl = new URL(value);
+  const parsedUrl = tryParseAtlassianSiteUrl(value);
+  if (parsedUrl === null) {
+    return;
+  }
 
   if (parsedUrl.protocol !== "https:") {
     ctx.addIssue({

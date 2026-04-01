@@ -48,6 +48,16 @@ describe("Atlassian auth", () => {
     ).toThrow("Atlassian site URLs must not include a path.");
   });
 
+  it("treats incomplete personal api token site urls as validation failures without throwing", () => {
+    const result = AtlassianConnectionConfigSchema.safeParse({
+      connection_method: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+      site_url: "https://",
+      email: "user@example.com",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it("normalizes site urls for upstream routing", () => {
     expect(normalizeAtlassianBaseUrl("https://mistle.atlassian.net/")).toBe(
       "https://mistle.atlassian.net",

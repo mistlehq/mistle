@@ -365,6 +365,57 @@ describe("IntegrationConnectionDialog", () => {
     expect(screen.getByPlaceholderText("Enter personal API token")).toBeTruthy();
   });
 
+  it("does not throw while resolving Atlassian personal token fields for an incomplete site url", () => {
+    const dialog: IntegrationConnectionDialogState = {
+      methods: [
+        {
+          id: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+          label: "Personal API token",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "Personal API token",
+              placeholder: "Enter personal API token",
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+      mode: "create",
+      targetConfig: {},
+      targetDisplayName: "Atlassian",
+      targetFamilyId: "atlassian",
+      targetKey: "atlassian-default",
+      targetVariantId: "atlassian-default",
+    };
+
+    expect(() =>
+      resolveConnectionMethodFormUiModel({
+        dialog,
+        methodId: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+        currentValue: {
+          connection_method: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+          site_url: "https://",
+        },
+      }),
+    ).not.toThrow();
+
+    const configForm = resolveConnectionMethodFormUiModel({
+      dialog,
+      methodId: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+      currentValue: {
+        connection_method: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+        site_url: "https://",
+      },
+    });
+
+    expect(configForm).toMatchObject({
+      mode: "form",
+      visiblePropertyKeys: ["site_url", "email"],
+    });
+  });
+
   it("renders Atlassian service account token configuration fields", () => {
     const dialog: IntegrationConnectionDialogState = {
       methods: [
