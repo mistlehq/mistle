@@ -7,6 +7,7 @@ import {
 import { systemClock, systemScheduler } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 
+import { BootstrapPublishControlRequestCoordinator } from "../../publishing/bootstrap-publish-control-request-coordinator.js";
 import { ConnectionPublishMessageHandler } from "../../publishing/connection-publish-message-handler.js";
 import { ConnectionPublishRequestCoordinator } from "../../publishing/connection-publish-request-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
@@ -63,6 +64,7 @@ async function createTranslatorHarness() {
       new ConnectionPublishMessageHandler(
         registry,
         new ConnectionPublishRequestCoordinator(systemScheduler, 5_000),
+        new BootstrapPublishControlRequestCoordinator(systemScheduler, 5_000),
       ),
     ),
   };
