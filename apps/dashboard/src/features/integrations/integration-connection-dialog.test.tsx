@@ -363,6 +363,75 @@ describe("IntegrationConnectionDialog", () => {
     expect(screen.getByPlaceholderText("Enter personal API token")).toBeTruthy();
   });
 
+  it("hides GitHub API key discriminator config and the nested rjsf submit button", () => {
+    const dialog: IntegrationConnectionDialogState = {
+      methods: [
+        {
+          id: IntegrationConnectionMethodIds.API_KEY,
+          label: "API key",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              placeholder: "Enter API key",
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+      mode: "create",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      targetDisplayName: "GitHub",
+      targetFamilyId: "github",
+      targetKey: "github-cloud",
+      targetVariantId: "github-cloud",
+    };
+
+    const configForm = resolveConnectionMethodFormUiModel({
+      dialog,
+      methodId: IntegrationConnectionMethodIds.API_KEY,
+      currentValue: {},
+    });
+
+    expect(configForm).toMatchObject({
+      mode: "form",
+      visiblePropertyKeys: [],
+    });
+
+    render(
+      <IntegrationConnectionDialog
+        configForm={configForm}
+        configValue={{}}
+        connectionDisplayNamePlaceholder="GitHub connection"
+        connectionDisplayNameValue=""
+        connectError={null}
+        dialog={dialog}
+        hasChanges={true}
+        isConnectionDisplayNameChanged={false}
+        isSecretChanged={false}
+        methodId={IntegrationConnectionMethodIds.API_KEY}
+        onClose={() => {}}
+        onConfigChange={() => {}}
+        onConnectionDisplayNameChange={() => {}}
+        onMethodChange={() => {}}
+        onSecretChange={() => {}}
+        onSubmit={() => {}}
+        pending={false}
+        secrets={{}}
+      />,
+    );
+
+    expect(screen.queryByText("Configuration")).toBeNull();
+    expect(screen.queryByLabelText("connection_method")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
+    expect(screen.getByPlaceholderText("Enter API key")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Create connection" })).toBeTruthy();
+  });
+
   it("does not throw while resolving Atlassian personal token fields for an incomplete site url", () => {
     const dialog: IntegrationConnectionDialogState = {
       methods: [

@@ -10,6 +10,7 @@ import {
   GitHubAppInstallationConnectionConfigSchema,
 } from "../../shared/auth.js";
 import { resolveGitHubBindingConfigForm } from "../../shared/binding-config-form.js";
+import { GitHubApiKeyConnectionConfigForm } from "../../shared/connection-config-form.js";
 import { GitHubFamilyId } from "../../shared/constants.js";
 import {
   GitHubAppInstallationCredentialResolver,
@@ -61,6 +62,7 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
         },
       ],
       configSchema: GitHubApiKeyConnectionConfigSchema,
+      configForm: GitHubApiKeyConnectionConfigForm,
     },
     {
       id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
