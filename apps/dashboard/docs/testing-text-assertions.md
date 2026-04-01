@@ -1,11 +1,27 @@
 # Text Assertions In Dashboard Tests
 
-This dashboard follows a narrow rule for text assertions:
+This dashboard follows a narrow rule for rendered UI assertions:
 
-- assert text when the copy itself is the product contract
-- do not assert text just to proxy some other behavior
+- default to semantic assertions
+- add stable semantic hooks when existing semantics do not expose the needed state
+- assert text only when the copy itself is the product contract
 
 When reviewing a text assertion, start with the test's real intent, not the asserted string.
+
+Do not use text as the default way to prove UI state or behavior.
+
+## Default Assertion Strategy
+
+For rendered UI tests, use this order of preference:
+
+1. Existing semantics:
+   roles, labels, aria state, disabled state, checked state, expanded state, selected state, row presence, option presence, and scoped container queries
+1. Stable semantic hooks:
+   add a machine-readable state surface when existing semantics do not expose the behavior the test must distinguish
+1. Text assertions:
+   use only when the exact wording is the contract
+
+Copy is not a stable default assertion surface.
 
 ## Core Rule
 
@@ -22,6 +38,34 @@ Common valid cases:
 Do not use text assertions as a substitute for checking state, structure, or behavior.
 
 Text is not a contract just because it appears in a heading, field title, badge, or summary.
+
+## Add Semantic Hooks When Semantics Do Not Expose State
+
+If a rendered UI test needs to distinguish state and the only observable difference is non-contract copy, add a stable semantic hook and assert that instead.
+
+Do not keep a weak text assertion just because no better selector exists yet.
+
+This applies especially to:
+
+- pending, success, failure, connected, revoked, sent, or similar UI states
+- row, badge, or status surfaces that otherwise differ only by visible text
+- controls whose availability changes with state
+- repeated or portal-rendered UI where text queries are ambiguous
+
+Prefer hooks that expose product state, not presentation.
+
+Good examples:
+
+- `disabled`
+- `aria-selected="true"`
+- `aria-expanded="false"`
+- `data-state="open"`
+- `data-feedback-state="sent"`
+
+Bad hooks:
+
+- attributes that simply restate visible copy
+- hooks tied to styling rather than state
 
 ## Why This Is A Smell
 
@@ -50,7 +94,9 @@ These tests are a smell because they are:
 Before adding `getByText`, `queryByText`, or `findByText`, ask:
 
 1. What behavior is this test actually trying to prove?
-   If the answer is state, structure, filtering, visibility, or action availability, prefer a non-text assertion.
+   If the answer is state, structure, filtering, visibility, or action availability, prefer an existing semantic assertion.
+1. If the current UI does not expose that state semantically, should the test add a stable semantic hook?
+   In rendered UI tests, yes.
 1. Is this exact copy part of a user-facing contract that product, docs, support, navigation, or UX explicitly care about?
    If yes, a text assertion may be correct.
 1. Am I really trying to verify state or behavior?
@@ -76,6 +122,35 @@ Better:
 
 ```tsx
 expect(saveButton.hasAttribute("disabled")).toBe(true);
+```
+
+### Prefer Existing Semantics First
+
+Bad:
+
+```tsx
+expect(screen.getByText("Connected")).toBeDefined();
+```
+
+Better:
+
+```tsx
+expect(screen.getByRole("button", { name: "Refresh repositories" })).toBeDefined();
+expect(actionMenu).toBeNull();
+```
+
+### Add A Semantic Hook When Needed
+
+Bad:
+
+```tsx
+expect(screen.getByText("Sent")).toBeDefined();
+```
+
+Better:
+
+```tsx
+expect(statusElement.getAttribute("data-feedback-state")).toBe("sent");
 ```
 
 ### Assert Structure Instead Of Copy
@@ -184,6 +259,8 @@ These are often fine:
 The key distinction is whether the text itself is the contract.
 
 A heading, badge, or summary is only a valid text assertion when the test is explicitly about that wording. If it is being used to prove render or hide behavior, completed or pending state, action availability, or filtered counts, treat it as a proxy and prefer semantic assertions.
+
+For pure formatter or view-model tests, asserting user-facing labels can be correct when the purpose of the test is to lock label mapping. This guidance is primarily about rendered UI tests.
 
 ## Practical Review Smells
 
