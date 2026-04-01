@@ -208,6 +208,118 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
+  it("rejects telemetry control messages from connection peers", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: JSON.stringify({
+          type: "telemetry.open",
+          streamId: 77,
+          signal: "logs",
+          format: "mistle.sandbox-runtime.log.v1",
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).rejects.toThrow(
+      "Connection websocket cannot send telemetry control message type 'telemetry.open'.",
+    );
+  });
+
+  it("keeps bootstrap telemetry opens out of the interactive stream router", async () => {
+    const { router, translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: JSON.stringify({
+          type: "telemetry.open",
+          streamId: 51,
+          signal: "logs",
+          format: "mistle.sandbox-runtime.log.v1",
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "telemetryOpen",
+        message: {
+          type: "telemetry.open",
+          streamId: 51,
+          signal: "logs",
+          format: "mistle.sandbox-runtime.log.v1",
+        },
+      },
+    });
+
+    await expect(
+      router.findInteractiveStreamByTunnel({
+        sandboxInstanceId: SandboxInstanceId,
+        tunnelStreamId: 51,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("keeps unbound bootstrap raw-bytes frames out of the interactive stream router", async () => {
+    const { router, translator } = await createTranslatorHarness();
+
+    const payload = encodeDataFrame({
+      streamId: 91,
+      payloadKind: PayloadKindRawBytes,
+      payload: new Uint8Array([1, 2, 3]),
+    });
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: toArrayBuffer(payload),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "telemetryData",
+        payload: toArrayBuffer(payload),
+        streamId: 91,
+      },
+    });
+
+    await expect(
+      router.findInteractiveStreamByTunnel({
+        sandboxInstanceId: SandboxInstanceId,
+        tunnelStreamId: 91,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("marks unbound bootstrap non-raw frames for local telemetry reset handling", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    const payload = encodeDataFrame({
+      streamId: 92,
+      payloadKind: PayloadKindWebSocketText,
+      payload: new TextEncoder().encode("invalid telemetry payload kind"),
+    });
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: toArrayBuffer(payload),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "telemetryInvalidData",
+        payloadKind: PayloadKindWebSocketText,
+        streamId: 92,
+      },
+    });
+  });
+
   it("drops late bootstrap pty.exit events after the binding is gone", async () => {
     const { router, translator } = await createTranslatorHarness();
 
