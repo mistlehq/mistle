@@ -14,18 +14,13 @@ Do not use text as the default way to prove UI state or behavior.
 
 For rendered UI tests, use this order of preference:
 
-1. Existing semantics:
-   roles, labels, aria state, disabled state, checked state, expanded state, selected state, row presence, option presence, and scoped container queries
-1. Stable semantic hooks:
-   add a machine-readable state surface when existing semantics do not expose the behavior the test must distinguish
-1. Text assertions:
-   use only when the exact wording is the contract
+1. Existing semantics: roles, labels, aria state, disabled state, checked state, expanded state, selected state, row presence, option presence, and scoped container queries
+2. Stable semantic hooks: add a machine-readable state surface when existing semantics do not expose the behavior the test must distinguish
+3. Text assertions: use only when the exact wording is the contract
 
 Copy is not a stable default assertion surface.
 
-## Core Rule
-
-Use text assertions when the user-visible wording is the thing that matters.
+Use text assertions only when the user-visible wording is the thing that matters.
 
 Common valid cases:
 
@@ -73,10 +68,7 @@ These tests are easy to circumvent and easy to break for the wrong reason.
 
 Examples of weak assertions:
 
-- asserting `"Saving..."` is absent when the real requirement is "no save-status UI is shown"
-- asserting `"Saved"` is present when the real requirement is "the mutation completed successfully"
-- asserting `"Revoked"` or `"Connected"` when the real requirement is a completed state or available action
-- asserting transient status copy like `"Sending..."`, `"Saved"`, `"Sent"`, `"Revoked"`, or `"Connected"` when the real requirement is which control, badge, or action state is visible
+- asserting `"Saved"` when the real requirement is a completed state or successful outcome
 - asserting `"Showing 1 of 2"` when the real requirement is filtered results or row count
 - asserting generic text across the whole screen instead of the relevant container
 - asserting field titles or headings when role or label queries already prove the same thing
@@ -89,42 +81,9 @@ These tests are a smell because they are:
 - often testing implementation detail instead of behavior
 - sometimes redundant with stronger semantic assertions already in the test
 
-## Decision Tree
-
-Before adding `getByText`, `queryByText`, or `findByText`, ask:
-
-1. What behavior is this test actually trying to prove?
-   If the answer is state, structure, filtering, visibility, or action availability, prefer an existing semantic assertion.
-1. If the current UI does not expose that state semantically, should the test add a stable semantic hook?
-   In rendered UI tests, yes.
-1. Is this exact copy part of a user-facing contract that product, docs, support, navigation, or UX explicitly care about?
-   If yes, a text assertion may be correct.
-1. Am I really trying to verify state or behavior?
-   If yes, assert that state or behavior directly.
-1. Would the test still be valid if the copy changed to a synonym?
-   If no, it is probably a proxy text assertion.
-1. Am I searching the whole screen for generic text?
-   If yes, that is usually too broad.
-1. Does a role, label, state, row-count, or other semantic assertion already prove the same thing?
-   If yes, the text assertion is probably redundant.
-
 ## Preferred Alternatives
 
-### Assert UI State Directly
-
-Bad:
-
-```tsx
-expect(screen.queryByText("Saving...")).toBeNull();
-```
-
-Better:
-
-```tsx
-expect(saveButton.hasAttribute("disabled")).toBe(true);
-```
-
-### Prefer Existing Semantics First
+### Use Existing Semantics
 
 Bad:
 
@@ -151,20 +110,6 @@ Better:
 
 ```tsx
 expect(statusElement.getAttribute("data-feedback-state")).toBe("sent");
-```
-
-### Assert Structure Instead Of Copy
-
-Bad:
-
-```tsx
-expect(screen.getByText("Save failed")).toBeDefined();
-```
-
-Better when the exact wording is not the contract:
-
-```tsx
-expect(screen.getByRole("alert")).toBeDefined();
 ```
 
 ### Scope Queries To The Relevant Region
@@ -198,51 +143,19 @@ Better:
 expect(screen.getByRole("button", { name: "Edit binding" })).toBeDefined();
 ```
 
-Or:
-
-```tsx
-expect(onClose).toHaveBeenCalled();
-```
-
 Use whatever observable outcome actually represents success in that flow.
 
-### Prefer Stronger Semantic Queries Over Duplicate Text Checks
-
-Bad:
-
-```tsx
-expect(screen.getByText("Default model")).toBeDefined();
-expect(screen.getByLabelText("Default model")).toBeDefined();
-```
-
-Better:
-
-```tsx
-expect(screen.getByLabelText("Default model")).toBeDefined();
-```
-
 If a label, role, state, or container assertion already proves the same thing, extra `getByText` is noise unless that wording itself is the contract.
-
-A stronger assertion elsewhere in the test does not rescue a weak text assertion. Keep the text check only if it proves an independent copy contract.
 
 ## Disallowed Or Suspicious Patterns
 
 Be very skeptical of:
 
-- `queryByText("Saving...")`
-- `queryByText("Saved")`
-- `queryByText("Sent")`
-- `queryByText("Revoked")`
-- `queryByText("Connected")`
-- `queryByText("Loading")`
-- `queryByText("Success")`
-- `queryByText("Done")`
-- `getByText("Showing 1 of 2")`
-- `getByText("Showing 2 of 2")`
+- transient status text used to stand in for state, such as `queryByText("Saved")`
+- summary text used to stand in for visible counts, such as `getByText("Showing 1 of 2")`
+- generic whole-screen text assertions, such as `queryByText("Loading")`
 - field-title or heading assertions used only to prove a form or section rendered
-- text assertions duplicated by stronger label/role/state assertions
-- `getByText(...)` presence checks for headings, badges, or summaries used to prove a section rendered or disappeared
-- whole-screen absence checks for generic copy
+- text assertions duplicated by stronger label, role, state, or container assertions
 - tests where changing copy to `Save complete` would bypass the intent
 
 These are usually proxy text assertions, not behavior tests.
@@ -261,17 +174,3 @@ The key distinction is whether the text itself is the contract.
 A heading, badge, or summary is only a valid text assertion when the test is explicitly about that wording. If it is being used to prove render or hide behavior, completed or pending state, action availability, or filtered counts, treat it as a proxy and prefer semantic assertions.
 
 For pure formatter or view-model tests, asserting user-facing labels can be correct when the purpose of the test is to lock label mapping. This guidance is primarily about rendered UI tests.
-
-## Practical Review Smells
-
-Be suspicious when you see:
-
-- a test name about behavior but an assertion only about text
-- generic copy used as a proxy for async state
-- transient status labels used to stand in for completed state
-- summary text used to stand in for filtered results or counts
-- whole-screen `queryByText` assertions
-- a heading, field title, or badge used to prove structure instead of wording
-- `getByText` repeated alongside stronger semantic assertions for the same UI
-- tests that would pass after replacing one weak string with another
-- copy assertions for UI that the product explicitly does not care about
