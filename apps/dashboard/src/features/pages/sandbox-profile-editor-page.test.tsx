@@ -215,14 +215,21 @@ describe("IntegrationsEditorSection", () => {
     expect(preserved.config).toStrictEqual({ model: "gpt-5.4-codex" });
   });
 
-  it("does not render save status copy in the connector bindings section", () => {
+  it("disables adding a binding while integration bindings are submitting", () => {
     const queryClient = createTestQueryClient();
 
     render(
       <QueryClientProvider client={queryClient}>
         <IntegrationsEditorSection
-          availableConnections={[]}
-          availableTargets={[]}
+          availableConnections={[
+            {
+              id: "conn-git",
+              displayName: "GitHub Production",
+              targetKey: "target-git",
+              status: "active",
+            },
+          ]}
+          availableTargets={[createTarget("target-git", "git")]}
           integrationBindingsQuery={{
             isError: false,
             error: null,
@@ -245,9 +252,8 @@ describe("IntegrationsEditorSection", () => {
       </QueryClientProvider>,
     );
 
-    const connectorBindingsSection = getSectionContainer("Connector Bindings");
+    fireEvent.click(getSectionAddButton("Git Bindings"));
 
-    expect(within(connectorBindingsSection).queryByText("Saving...")).toBeNull();
-    expect(within(connectorBindingsSection).queryByText("Saved.")).toBeNull();
+    expect(screen.getByRole("button", { name: "Add binding" }).hasAttribute("disabled")).toBe(true);
   });
 });
