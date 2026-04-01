@@ -48,7 +48,7 @@ function resolveSelectWidgetOptions(input: {
 
 export const IntegrationHorizontalFieldGroupClassName = "gap-6 flex flex-col";
 export const IntegrationHorizontalFieldLayoutClassName =
-  "w-full gap-2 md:flex-row md:items-start md:gap-4 md:[&>*]:w-auto md:[&>[data-slot=field-label]]:w-40 md:[&>[data-slot=field-label]]:shrink-0 md:[&>[data-slot=field-label]]:pt-2 md:[&>[data-slot=field-content]]:min-w-0 md:[&>[data-slot=field-content]]:w-auto md:[&>[data-slot=field-content]]:flex-1";
+  "w-full gap-2 md:flex-row md:items-start md:gap-4 md:[&>[data-slot=field-label]]:w-40 md:[&>[data-slot=field-label]]:shrink-0 md:[&>[data-slot=field-label]]:pt-2 md:[&>[data-slot=field-content]]:min-w-0 md:[&>[data-slot=field-content]]:w-full md:[&>[data-slot=field-content]]:basis-0 md:[&>[data-slot=field-content]]:flex-1";
 export const IntegrationStackedFieldLayoutClassName = "w-full";
 export const IntegrationSelectContentClassName =
   "w-max min-w-(--anchor-width) max-w-[min(32rem,calc(100vw-2rem))]";
@@ -101,9 +101,84 @@ function CommaSeparatedStringArrayWidget(
   );
 }
 
-function SelectWidget(props: WidgetProps<JsonObject, RJSFSchema>): React.JSX.Element {
+function resolveTextInputValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return String(value);
+  }
+
+  return "";
+}
+
+function TextWidget(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element {
+  const value = resolveTextInputValue(props.value);
+
+  return (
+    <Input
+      aria-label={props.label}
+      autoFocus={props.autofocus}
+      className="w-full"
+      disabled={props.disabled || props.readonly}
+      id={props.id}
+      onBlur={(event) => {
+        props.onBlur(props.id, event.currentTarget.value);
+      }}
+      onChange={(event) => {
+        const nextValue = event.currentTarget.value;
+        props.onChange(nextValue.length === 0 ? undefined : nextValue);
+      }}
+      onFocus={(event) => {
+        props.onFocus(props.id, event.currentTarget.value);
+      }}
+      placeholder={props.placeholder}
+      type="text"
+      value={value}
+    />
+  );
+}
+
+function PasswordWidget(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element {
+  const value = resolveTextInputValue(props.value);
+
+  return (
+    <Input
+      aria-label={props.label}
+      autoFocus={props.autofocus}
+      className="w-full"
+      disabled={props.disabled || props.readonly}
+      id={props.id}
+      onBlur={(event) => {
+        props.onBlur(props.id, event.currentTarget.value);
+      }}
+      onChange={(event) => {
+        const nextValue = event.currentTarget.value;
+        props.onChange(nextValue.length === 0 ? undefined : nextValue);
+      }}
+      onFocus={(event) => {
+        props.onFocus(props.id, event.currentTarget.value);
+      }}
+      placeholder={props.placeholder}
+      type="password"
+      value={value}
+    />
+  );
+}
+
+function SelectWidget(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element {
   const enumOptions = props.options.enumOptions ?? [];
   const selectedValue = typeof props.value === "string" ? props.value : undefined;
+  const selectedOptionLabel = enumOptions.find(
+    (option) => String(option.value) === selectedValue,
+  )?.label;
   const { fitContent } = resolveSelectWidgetOptions({
     options: props.options,
     formContext: props.registry.formContext,
@@ -129,7 +204,7 @@ function SelectWidget(props: WidgetProps<JsonObject, RJSFSchema>): React.JSX.Ele
           className={fitContent ? "w-full md:w-auto md:min-w-fit md:max-w-full" : "w-full"}
           id={props.id}
         >
-          <SelectValue placeholder={placeholder} />
+          <SelectValue placeholder={placeholder}>{selectedOptionLabel}</SelectValue>
         </SelectTrigger>
       </div>
       <SelectContent
@@ -216,6 +291,10 @@ function resolveFieldLayout(
     return "horizontal";
   }
 
+  // Repo-specific contract for schema-driven forms:
+  // - `formContext.layout` sets the default field orientation
+  // - `ui:options.layout = "stacked"` opts a field back into vertical
+  //   presentation inside a horizontal form
   return options.layout === "stacked" ? "vertical" : "horizontal";
 }
 
@@ -233,12 +312,11 @@ function IntegrationFieldTemplate(
     <Field
       className={cn(
         props.classNames,
-        layout === "horizontal"
-          ? IntegrationHorizontalFieldLayoutClassName
-          : IntegrationStackedFieldLayoutClassName,
+        layout === "vertical" ? IntegrationStackedFieldLayoutClassName : undefined,
       )}
+      contentWidth={layout === "horizontal" ? "fill" : undefined}
       data-invalid={errorItems.length > 0 || undefined}
-      orientation="vertical"
+      orientation={layout}
       style={props.style}
     >
       {props.displayLabel && props.label.length > 0 ? (
@@ -304,6 +382,8 @@ export const IntegrationFormTemplates = {
 };
 
 export const IntegrationFormWidgets = {
+  TextWidget,
+  PasswordWidget,
   SelectWidget,
   TextareaWidget,
   "comma-separated-string-array": CommaSeparatedStringArrayWidget,

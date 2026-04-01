@@ -54,9 +54,9 @@ const fieldVariants = cva("data-[invalid=true]:text-destructive group/field flex
     orientation: {
       vertical: "gap-2.5 flex-col [&>*]:w-full [&>.sr-only]:w-auto",
       horizontal:
-        "flex-row items-start gap-4 [&>[data-slot=field-label],[data-slot=field-header]]:w-40 [&>[data-slot=field-label],[data-slot=field-header]]:shrink-0 [&>[data-slot=field-label],[data-slot=field-header]]:pt-2 [&>[data-slot=field-content]]:min-w-0 has-[>[role=checkbox]+[data-slot=field-content]]:items-center has-[>[role=radio]+[data-slot=field-content]]:items-center has-[>[role=switch]+[data-slot=field-content]]:items-center has-[>[role=checkbox]+[data-slot=field-content]]:[&>[role=checkbox]]:mt-px has-[>[role=radio]+[data-slot=field-content]]:[&>[role=radio]]:mt-px has-[>[role=switch]+[data-slot=field-content]]:[&>[role=switch]]:mt-px",
+        "flex-row items-start gap-4 [&>[data-slot=field-label],&>[data-slot=field-header]]:w-40 [&>[data-slot=field-label],&>[data-slot=field-header]]:shrink-0 [&>[data-slot=field-label],&>[data-slot=field-header]]:pt-2 [&>[data-slot=field-content]]:min-w-0 has-[>[role=checkbox]+[data-slot=field-content]]:items-center has-[>[role=radio]+[data-slot=field-content]]:items-center has-[>[role=switch]+[data-slot=field-content]]:items-center has-[>[role=checkbox]+[data-slot=field-content]]:[&>[role=checkbox]]:mt-px has-[>[role=radio]+[data-slot=field-content]]:[&>[role=radio]]:mt-px has-[>[role=switch]+[data-slot=field-content]]:[&>[role=switch]]:mt-px",
       responsive:
-        "gap-2.5 flex-col [&>*]:w-full [&>.sr-only]:w-auto @md/field-group:flex-row @md/field-group:items-center @md/field-group:[&>*]:w-auto @md/field-group:[&>[data-slot=field-label],[data-slot=field-header]]:flex-auto @md/field-group:has-[>[data-slot=field-header]>[data-slot=field-description]]:items-start @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+        "gap-2.5 flex-col [&>*]:w-full [&>.sr-only]:w-auto @md/field-group:flex-row @md/field-group:items-center @md/field-group:[&>*]:w-auto @md/field-group:[&>[data-slot=field-label],&>[data-slot=field-header]]:flex-auto @md/field-group:has-[>[data-slot=field-header]>[data-slot=field-description]]:items-start @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
     },
     contentWidth: {
       fit: "",
@@ -152,7 +152,7 @@ function FieldDescription({ className, ...props }: React.ComponentProps<"p">) {
     <p
       data-slot="field-description"
       className={cn(
-        "text-muted-foreground text-left text-sm [[data-variant=legend]+&]:-mt-1.5 leading-normal font-normal group-has-[[data-orientation=horizontal]]/field:text-balance",
+        "text-muted-foreground text-left text-sm [[data-variant=legend]+&]:-mt-1.5 leading-normal font-normal",
         "[&>a:hover]:text-primary [&>a]:underline [&>a]:underline-offset-4",
         className,
       )}
