@@ -9,6 +9,7 @@ import {
   AtlassianServiceAccountApiTokenConnectionConfigSchema,
   AtlassianServiceAccountOauthClientCredentialsConnectionConfigSchema,
 } from "./auth.js";
+import { resolveAtlassianBindingConfigForm } from "./binding-config-form.js";
 import { AtlassianBindingConfigSchema } from "./binding-config-schema.js";
 import { compileAtlassianBinding } from "./compile-binding.js";
 import {
@@ -34,11 +35,12 @@ export const AtlassianDefinition: AtlassianIntegrationDefinition = {
   kind: IntegrationKinds.CONNECTOR,
   displayName: "Atlassian",
   description:
-    "Access Atlassian REST APIs with personal tokens, service-account tokens, or service-account OAuth client credentials.",
+    "Access Atlassian REST APIs with personal tokens, service-account tokens, or service-account OAuth client credentials, with optional Jira CLI in sandbox.",
   logoKey: "atlassian",
   targetConfigSchema: AtlassianTargetConfigSchema,
   targetSecretSchema: AtlassianTargetSecretSchema,
   bindingConfigSchema: AtlassianBindingConfigSchema,
+  bindingConfigForm: resolveAtlassianBindingConfigForm,
   connectionMethods: [
     {
       id: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,

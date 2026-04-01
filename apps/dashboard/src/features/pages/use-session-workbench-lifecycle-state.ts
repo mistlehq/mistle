@@ -10,9 +10,10 @@ import {
 } from "../sessions/session-connect-policy.js";
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
+import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import {
   hasSessionTopAlert,
-  resolveSessionHeaderStatusUi,
+  resolveSandboxHeaderStatusUi,
 } from "./session-workbench-view-model.js";
 
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
@@ -36,7 +37,7 @@ type ResumeRequestGuard = {
 type RecoverableCodexDisconnect = {
   id: number;
   message: string;
-  preferredThreadId: string | null;
+  targetThreadId: string | null;
   recoveryStrategy: "reconnect_transport" | "reopen_stream";
 };
 
@@ -60,7 +61,7 @@ export type CodexRecoveryState =
       kind: "recovering";
       baseMessage: string;
       errorMessage: string | null;
-      preferredThreadId: string | null;
+      targetThreadId: string | null;
       recoveryStrategy: "reconnect_transport" | "reopen_stream";
       reconnectAttemptCount: number;
       reconnectCommand: CodexRecoveryReconnectCommand;
@@ -93,7 +94,7 @@ function createCodexRecoveryStateFromDisconnect(
     kind: "recovering",
     baseMessage: disconnect.message,
     errorMessage: null,
-    preferredThreadId: disconnect.preferredThreadId,
+    targetThreadId: disconnect.targetThreadId,
     recoveryStrategy: disconnect.recoveryStrategy,
     reconnectAttemptCount: 0,
     reconnectCommand: "none",
@@ -121,7 +122,7 @@ export function reduceCodexRecoveryState(
             return {
               ...state,
               baseMessage: event.disconnect.message,
-              preferredThreadId: event.disconnect.preferredThreadId,
+              targetThreadId: event.disconnect.targetThreadId,
               recoveryStrategy: event.disconnect.recoveryStrategy,
             };
           }
@@ -450,10 +451,9 @@ export function seedSandboxInstanceStatusQuery(input: {
 
 export function useSessionWorkbenchLifecycleState(input: {
   sandboxInstanceId: string | null;
-  chatTransportPolicy: "auto_attach" | "detached_for_cli";
+  mainPanelTransitionState: MainPanelTransitionState;
   lifecycle: Pick<
     ReturnType<typeof useCodexSessionState>["lifecycle"],
-    | "agentConnectionState"
     | "clearLifecycleErrorMessage"
     | "connectSession"
     | "detachSessionTransport"
@@ -463,7 +463,6 @@ export function useSessionWorkbenchLifecycleState(input: {
     | "recoverSession"
     | "recoverableDisconnect"
     | "sessionSnapshot"
-    | "step"
     | "transportState"
   >;
   ptyState: ReturnType<typeof useSandboxPtyState>;
@@ -490,7 +489,6 @@ export function useSessionWorkbenchLifecycleState(input: {
   const lastRecoverableDisconnectIdRef = useRef<number | null>(null);
 
   const {
-    agentConnectionState,
     clearLifecycleErrorMessage,
     connectSession,
     sessionSnapshot,
@@ -499,7 +497,6 @@ export function useSessionWorkbenchLifecycleState(input: {
     lifecycleErrorMessage,
     recoverSession,
     recoverableDisconnect,
-    step,
     transportState,
   } = input.lifecycle;
   const { disconnectPty } = input.ptyState.actions;
@@ -677,10 +674,10 @@ export function useSessionWorkbenchLifecycleState(input: {
   }, [input.sandboxInstanceId]);
 
   useEffect(() => {
-    if (input.chatTransportPolicy === "auto_attach") {
+    if (input.mainPanelTransitionState === "stable_chat") {
       setHasAttemptedAutoConnect(false);
     }
-  }, [input.chatTransportPolicy]);
+  }, [input.mainPanelTransitionState]);
 
   useEffect(() => {
     if (!isWaitingForAutomationThread) {
@@ -760,7 +757,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   useEffect(() => {
-    if (input.chatTransportPolicy !== "auto_attach") {
+    if (input.mainPanelTransitionState !== "stable_chat") {
       return;
     }
 
@@ -788,12 +785,13 @@ export function useSessionWorkbenchLifecycleState(input: {
     setHasAttemptedAutoConnect(true);
     connectSession({
       sandboxInstanceId: input.sandboxInstanceId,
-      preferredThreadId: automationConversation?.providerConversationId ?? null,
+      targetThreadId: automationConversation?.providerConversationId ?? null,
+      providerThreadId: automationConversation?.providerConversationId ?? null,
     });
   }, [
     automationConversation,
     connectSession,
-    input.chatTransportPolicy,
+    input.mainPanelTransitionState,
     connectionReadiness.canConnect,
     hasAttemptedAutoConnect,
     input.sandboxInstanceId,
@@ -804,7 +802,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   useEffect(() => {
-    if (input.chatTransportPolicy !== "auto_attach") {
+    if (input.mainPanelTransitionState !== "stable_chat") {
       return;
     }
 
@@ -825,7 +823,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     });
     const recoveryInput = {
       sandboxInstanceId: input.sandboxInstanceId,
-      preferredThreadId: codexRecoveryState.preferredThreadId,
+      targetThreadId: codexRecoveryState.targetThreadId,
     };
 
     if (codexRecoveryState.reconnectCommand === "reopen_stream") {
@@ -837,7 +835,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   }, [
     codexRecoveryState,
     connectSession,
-    input.chatTransportPolicy,
+    input.mainPanelTransitionState,
     input.sandboxInstanceId,
     recoverSession,
   ]);
@@ -861,18 +859,15 @@ export function useSessionWorkbenchLifecycleState(input: {
 
   const sandboxStatusLabel =
     effectiveSandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
-  const sessionHeaderStatusUi = resolveSessionHeaderStatusUi({
-    sandboxStatus: sandboxStatusLabel.toLowerCase(),
-    agentConnectionState,
-    step,
-    hasConnectionError: resolvedLifecycleErrorMessage !== null,
-    isRecoveringSession: codexRecoveryState.kind === "recovering",
+  const sandboxHeaderStatusUi = resolveSandboxHeaderStatusUi({
+    sandboxLifecycleStatus: sandboxStatusLabel.toLowerCase(),
   });
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: sandboxStatusQuery.isError,
     lifecycleErrorMessage: resolvedLifecycleErrorMessage,
-    reconnectMessage: input.chatTransportPolicy === "auto_attach" ? sessionReconnectMessage : null,
+    reconnectMessage:
+      input.mainPanelTransitionState === "stable_chat" ? sessionReconnectMessage : null,
     sandboxFailureMessage,
     stoppedSessionMessage: stoppedSessionState.message,
   });
@@ -973,7 +968,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       isRecovering: codexRecoveryState.kind === "recovering",
       message: sessionReconnectMessage,
     },
-    sessionHeaderStatusUi,
+    sandboxHeaderStatusUi,
     shouldAutoResumeOnEntry:
       shouldAttemptInitialStoppedResume || shouldAttemptRecoverableStoppedResume,
     lifecycleErrorMessage: resolvedLifecycleErrorMessage,

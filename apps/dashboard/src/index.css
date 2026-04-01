@@ -4,3 +4,63 @@
 @source "../../../node_modules/.pnpm/node_modules/@streamdown/code/dist/*.js";
 @source "../../../node_modules/.pnpm/node_modules/streamdown/dist/*.js";
 @source "./**/*.{ts,tsx}";
+
+.chat-markdown-content {
+  word-break: break-word;
+}
+
+.chat-markdown-content p,
+.chat-markdown-content ul,
+.chat-markdown-content ol {
+  margin-block: 0;
+}
+
+.chat-markdown-content > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.35rem !important;
+}
+
+.chat-markdown-content ul,
+.chat-markdown-content ol {
+  padding-inline-start: 0.5rem;
+}
+
+.chat-markdown-content .contains-task-list {
+  list-style-type: none;
+  padding-inline-start: 0.25rem;
+}
+
+.chat-markdown-content [data-streamdown="list-item"] {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.chat-markdown-content .task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.chat-markdown-content .task-list-item > input[type="checkbox"] {
+  margin: 0;
+  margin-top: 0.5em;
+  flex-shrink: 0;
+}
+
+.chat-markdown-content .task-list-item::marker {
+  content: none;
+}
+
+.chat-markdown-content [data-streamdown$="button"],
+.chat-markdown-content [data-streamdown$="actions"] button {
+  cursor: default;
+}
+
+.chat-markdown-content > :first-child,
+.chat-markdown-content li > p:first-child {
+  margin-top: 0;
+}
+
+.chat-markdown-content > :last-child,
+.chat-markdown-content li > p:last-child {
+  margin-bottom: 0;
+}

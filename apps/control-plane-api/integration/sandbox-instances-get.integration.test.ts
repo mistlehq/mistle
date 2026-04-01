@@ -124,6 +124,7 @@ describe("sandbox instances get integration", () => {
       status: "running",
       failureCode: null,
       failureMessage: null,
+      runtimePlan: null,
       automationConversation: {
         conversationId: "cnv_cp_get_001",
         routeId: "cvr_cp_get_001",
@@ -215,6 +216,7 @@ describe("sandbox instances get integration", () => {
       status: "running",
       failureCode: null,
       failureMessage: null,
+      runtimePlan: null,
       automationConversation: {
         conversationId: "cnv_cp_get_pending_001",
         routeId: "cvr_cp_get_pending_001",
@@ -381,6 +383,7 @@ describe("sandbox instances get integration", () => {
       status: "running",
       failureCode: null,
       failureMessage: null,
+      runtimePlan: null,
       automationConversation: {
         conversationId: "cnv_cp_get_003_a",
         routeId: "cvr_cp_get_003_a",
@@ -502,6 +505,7 @@ describe("sandbox instances get integration", () => {
       status: "running",
       failureCode: null,
       failureMessage: null,
+      runtimePlan: null,
       automationConversation: {
         conversationId: "cnv_cp_get_004_b",
         routeId: "cvr_cp_get_004_b",

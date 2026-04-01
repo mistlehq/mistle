@@ -5,7 +5,8 @@ export type ConnectedCodexSession = {
   connectedAtIso: string;
   expiresAtIso: string;
   connectionUrl: string;
-  threadId: string | null;
+  providerThreadId: string | null;
+  activeThreadId: string | null;
 };
 
 export type CodexThreadLifecycleEvent = {

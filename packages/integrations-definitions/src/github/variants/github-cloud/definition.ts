@@ -40,7 +40,7 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
   variantId: "github-cloud",
   kind: IntegrationKinds.GIT,
   displayName: "GitHub",
-  description: "Enable webhooks, repository access, GitHub CLI in sandbox.",
+  description: "Enable webhooks, repository access, and optional GitHub CLI in sandbox.",
   logoKey: "github",
   targetConfigSchema: GitHubCloudTargetConfigSchema,
   targetSecretSchema: GitHubTargetSecretSchema,

@@ -100,7 +100,7 @@ export function useSessionBootstrap(input: {
   const activeConnectionKey = bootstrapPlan.connectionKey;
   const shouldLoadBootstrapData = bootstrapPlan.shouldLoadBootstrapData;
   const activeThreadSyncKey = bootstrapPlan.threadSyncKey;
-  const activeThreadId = input.bootstrapConnectionContext?.threadId ?? null;
+  const activeThreadId = input.bootstrapConnectionContext?.activeThreadId ?? null;
 
   const modelsQuery = useQuery<LoadModelsResult>({
     queryKey:

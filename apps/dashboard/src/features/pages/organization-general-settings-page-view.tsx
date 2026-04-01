@@ -1,7 +1,4 @@
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   Avatar,
   AvatarFallback,
   AvatarImage,
@@ -18,6 +15,7 @@ import { useRef } from "react";
 
 import { SaveActions } from "../settings/save-actions.js";
 import { FormPageSection, FormPageShell } from "../shared/form-page.js";
+import { StatusBox } from "../shared/status-box.js";
 
 export type OrganizationGeneralSettingsPageViewProps = {
   hasDirtyChanges: boolean;
@@ -73,10 +71,9 @@ export function OrganizationGeneralSettingsPageView(
       <FormPageShell className="pt-0">
         <FormPageSection>
           <div className="flex flex-col gap-3 p-4">
-            <Alert variant="destructive">
-              <AlertTitle>Could not load organization settings</AlertTitle>
-              <AlertDescription>{props.loadErrorMessage}</AlertDescription>
-            </Alert>
+            <StatusBox tone="destructive">
+              {props.loadErrorMessage} Please try again later.
+            </StatusBox>
             <div>
               <Button onClick={props.onRetryLoad} type="button" variant="outline">
                 Retry
@@ -96,11 +93,12 @@ export function OrganizationGeneralSettingsPageView(
             {props.saveSuccess ? "Organization settings updated." : ""}
           </p>
 
-          {props.saveErrorMessage ? (
-            <Alert variant="destructive">
-              <AlertTitle>Update failed</AlertTitle>
-              <AlertDescription>{props.saveErrorMessage}</AlertDescription>
-            </Alert>
+          {props.saveErrorMessage !== null || props.nameErrorMessage !== null ? (
+            <StatusBox tone="destructive">
+              {props.saveErrorMessage !== null
+                ? `${props.saveErrorMessage} Please try again later.`
+                : props.nameErrorMessage}
+            </StatusBox>
           ) : null}
 
           <Field contentWidth="fill" orientation="horizontal">
@@ -167,14 +165,12 @@ export function OrganizationGeneralSettingsPageView(
             </FieldHeader>
             <FieldContent>
               <Input
+                aria-invalid={props.nameErrorMessage !== null ? true : undefined}
                 id="organization-name"
                 onChange={(event) => props.onNameChange(event.currentTarget.value)}
                 value={props.name}
               />
             </FieldContent>
-            {props.nameErrorMessage ? (
-              <FieldError errors={[{ message: props.nameErrorMessage }]} />
-            ) : null}
           </Field>
         </div>
       </FormPageSection>

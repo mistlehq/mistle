@@ -99,8 +99,7 @@ function Harness(): React.JSX.Element {
       integrationRowErrorsByClientId={{}}
       integrationRows={rows}
       integrationSaveError={null}
-      integrationSaveSuccess={false}
-      isSavingIntegrationBindings={false}
+      isSubmittingIntegrationBindings={false}
       onAddIntegrationBindingRow={async (input) => {
         const clientId = `row-${String(nextId)}`;
         setRows((currentRows) => [
@@ -128,7 +127,7 @@ function Harness(): React.JSX.Element {
   );
 }
 
-function getSectionAddButton(sectionTitle: string): HTMLButtonElement {
+function getSectionContainer(sectionTitle: string): HTMLElement {
   const sectionHeading = screen.getAllByRole("heading", { name: sectionTitle })[0];
 
   if (sectionHeading === undefined) {
@@ -141,7 +140,11 @@ function getSectionAddButton(sectionTitle: string): HTMLButtonElement {
     throw new Error(`Could not resolve section container for ${sectionTitle}.`);
   }
 
-  return within(sectionContainer).getByRole("button", { name: "Add" });
+  return sectionContainer;
+}
+
+function getSectionAddButton(sectionTitle: string): HTMLButtonElement {
+  return within(getSectionContainer(sectionTitle)).getByRole("button", { name: "Add" });
 }
 
 afterEach(() => {

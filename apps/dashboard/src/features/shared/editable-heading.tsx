@@ -2,6 +2,7 @@ import { Button } from "@mistle/ui";
 import { PencilSimpleIcon } from "@phosphor-icons/react";
 
 import { PageTitleField } from "./page-title-field.js";
+import { StatusBox } from "./status-box.js";
 
 export function EditableHeading(input: {
   value: string;
@@ -25,6 +26,7 @@ export function EditableHeading(input: {
   const containerClassName = `w-full ${input.maxWidthClassName ?? "max-w-2xl"} space-y-2`;
   const HeadingTag = input.headingTag ?? "h1";
   const headingClassName = input.headingClassName ?? "text-xl font-semibold leading-none";
+  const headingToneClassName = input.errorMessage === undefined ? "" : " text-destructive";
 
   if (input.isEditing) {
     return (
@@ -60,7 +62,9 @@ export function EditableHeading(input: {
   return (
     <div className={containerClassName}>
       <div className="flex max-w-full items-center gap-1">
-        <HeadingTag className={`min-w-0 ${headingClassName}`}>{input.value}</HeadingTag>
+        <HeadingTag className={`min-w-0 ${headingClassName}${headingToneClassName}`}>
+          {input.value}
+        </HeadingTag>
         <Button
           aria-label={input.editButtonLabel}
           disabled={input.saveDisabled}
@@ -73,7 +77,7 @@ export function EditableHeading(input: {
         </Button>
       </div>
       {input.errorMessage === undefined ? null : (
-        <p className="text-destructive text-sm">{input.errorMessage}</p>
+        <StatusBox tone="destructive">{input.errorMessage}</StatusBox>
       )}
     </div>
   );

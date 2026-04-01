@@ -12,6 +12,7 @@ import type { GitHubBindingConfig } from "./binding-config-schema.js";
 import { GitHubApiMethods, GitHubGitHttpMethods } from "./constants.js";
 import { GitHubCredentialResolverKeys } from "./credential-resolver.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
+import { GitHubToolIds } from "./tool-ids.js";
 
 export type GitHubCompileBindingInput = CompileBindingInput<
   GitHubTargetConfig,
@@ -150,6 +151,7 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
   const repositories = [...new Set(input.binding.config.repositories)].sort((left, right) =>
     left.localeCompare(right),
   );
+  const includesGitHubCli = input.binding.config.tools.includes(GitHubToolIds.GITHUB_CLI);
   if (repositories.length === 0) {
     return {
       egressRoutes: [],
@@ -222,20 +224,22 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
             }),
           ]),
     ],
-    artifacts: [
-      {
-        artifactKey: GitHubCliArtifactKey,
-        name: GitHubCliArtifactName,
-        env: GitHubCliArtifactEnv,
-        lifecycle: {
-          install: ({ refs }) => [
-            buildGitHubCliLifecycleCommand({
-              installPath: refs.artifactBinPath("gh"),
-            }),
-          ],
-        },
-      },
-    ],
+    artifacts: includesGitHubCli
+      ? [
+          {
+            artifactKey: GitHubCliArtifactKey,
+            name: GitHubCliArtifactName,
+            env: GitHubCliArtifactEnv,
+            lifecycle: {
+              install: ({ refs }) => [
+                buildGitHubCliLifecycleCommand({
+                  installPath: refs.artifactBinPath("gh"),
+                }),
+              ],
+            },
+          },
+        ]
+      : [],
     runtimeClients: [],
     workspaceSources: repositories.map((repository) => ({
       sourceKind: "git-clone",

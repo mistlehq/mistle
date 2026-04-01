@@ -154,21 +154,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const TerminalClosed: Story = {
-  args: {
-    initialTerminalVisible: false,
-  },
-};
-
-export const OpenEmpty: Story = {
-  args: {
-    initialOutput: "",
-    initialState: "closed",
-    initialTerminalVisible: true,
-  },
-};
-
-export const OpenWithOutput: Story = {
+export const ActiveWithOutput: Story = {
   args: {
     initialOutput: [
       "root@sandbox:~# git status --short",
@@ -181,26 +167,9 @@ export const OpenWithOutput: Story = {
   },
 };
 
-export const Connecting: Story = {
+export const InactiveConnecting: Story = {
   args: {
     initialState: "connecting",
-    initialTerminalVisible: true,
-  },
-};
-
-export const ErrorState: Story = {
-  args: {
-    initialErrorMessage: "Sandbox PTY websocket connection failed.",
-    initialState: "error",
-    initialTerminalVisible: true,
-  },
-};
-
-export const ErrorWithBufferedOutput: Story = {
-  args: {
-    initialErrorMessage: "Sandbox PTY websocket connection failed.",
-    initialOutput: ["root@sandbox:~# ./long-task.sh", "running\u2026", ""].join("\n"),
-    initialState: "error",
     initialTerminalVisible: true,
   },
 };

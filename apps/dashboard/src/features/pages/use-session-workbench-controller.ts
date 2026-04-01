@@ -1,8 +1,4 @@
-import { resolveAgentPtyLaunchTemplate } from "@mistle/integrations-core";
-import { CodexPtyLaunchSpec } from "@mistle/integrations-definitions/agent-runtimes/codex";
-import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
@@ -11,6 +7,8 @@ import {
   useSessionComposerConfigControl,
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
+import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
+import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 import {
   getSandboxInstanceStatusQueryKey,
@@ -59,16 +57,19 @@ type SessionWorkbenchState = {
   sandboxLifecycleStatus: "resuming" | "starting" | "running" | "stopped" | "failed" | null;
   sandboxFailureMessage: string | null;
   sandboxStatusQuery: ReturnType<typeof useSessionWorkbenchLifecycleState>["sandboxStatusQuery"];
-  sessionHeaderStatusUi: ReturnType<
+  sandboxHeaderStatusUi: ReturnType<
     typeof useSessionWorkbenchLifecycleState
-  >["sessionHeaderStatusUi"];
+  >["sandboxHeaderStatusUi"];
+  lifecycleStep: ReturnType<typeof useCodexSessionState>["lifecycle"]["step"];
   lifecycleErrorMessage: string | null;
   cliPtyState: ReturnType<typeof useSandboxPtyState>;
   primaryPanelState: {
-    mode: "chat" | "cli";
-    isSwitching: boolean;
+    transitionState: MainPanelTransitionState;
     canEnterCli: boolean;
     disabledReason: string | null;
+    error: ReturnType<typeof useSessionMainPanelHandoff>["error"];
+    isCliToggleActive: boolean;
+    showsChatComposer: boolean;
     enterCliMode: () => Promise<void>;
     exitCliMode: () => Promise<void>;
   };
@@ -126,11 +127,6 @@ export function useSessionWorkbenchController(input: {
 }): UseSessionWorkbenchControllerResult {
   const queryClient = useQueryClient();
   const sessionState = useCodexSessionState();
-  const [primaryPanelMode, setPrimaryPanelMode] = useState<"chat" | "cli">("chat");
-  const [isSwitchingPrimaryPanel, setIsSwitchingPrimaryPanel] = useState(false);
-  const shouldHydrateAfterCliExitRef = useRef(false);
-  const chatTransportPolicy =
-    primaryPanelMode === "cli" ? ("detached_for_cli" as const) : ("auto_attach" as const);
   const ptyState = useSandboxPtyState();
   const cliPtyState = useSandboxPtyState();
   const terminalPanelState = useSessionTerminalWorkbenchState({
@@ -142,9 +138,18 @@ export function useSessionWorkbenchController(input: {
   const serverRequests = sessionState.serverRequests;
   const sessionMessage = sessionState.sessionMessage;
 
+  const handoff = useSessionMainPanelHandoff({
+    cliPtyState,
+    chat,
+    lifecycle,
+    sandboxInstanceId: input.sandboxInstanceId,
+    serverRequests,
+    threadAuthority: sessionState.threadAuthority,
+  });
+
   const workbenchLifecycleState = useSessionWorkbenchLifecycleState({
     sandboxInstanceId: input.sandboxInstanceId,
-    chatTransportPolicy,
+    mainPanelTransitionState: handoff.transitionState,
     lifecycle,
     ptyState,
     queryClient,
@@ -163,147 +168,20 @@ export function useSessionWorkbenchController(input: {
         : !workbenchLifecycleState.connectionReadiness.canConnect
           ? (workbenchLifecycleState.stoppedSessionState.message ??
             "CLI is available only when the sandbox is running.")
-          : null;
-  const canEnterCli = enterCliDisabledReason === null && !isSwitchingPrimaryPanel;
+          : handoff.transitionState !== "stable_chat"
+            ? "Finish the current primary-panel transition before opening Codex CLI."
+            : null;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
       input.sandboxInstanceId !== null &&
       sessionSnapshot !== null &&
-      sessionSnapshot.threadId !== null
+      sessionSnapshot.activeThreadId !== null
         ? {
             sandboxInstanceId: input.sandboxInstanceId,
-            threadId: sessionSnapshot.threadId,
+            threadId: sessionSnapshot.activeThreadId,
           }
         : null,
   });
-
-  const enterCliMode = useCallback(async (): Promise<void> => {
-    if (
-      input.sandboxInstanceId === null ||
-      sessionSnapshot === null ||
-      !workbenchLifecycleState.connectionReadiness.canConnect ||
-      isSwitchingPrimaryPanel
-    ) {
-      return;
-    }
-
-    setIsSwitchingPrimaryPanel(true);
-    try {
-      const resolvedCliLaunch = resolveAgentPtyLaunchTemplate({
-        launch: CodexPtyLaunchSpec,
-        threadId: sessionSnapshot.threadId,
-      });
-      setPrimaryPanelMode("cli");
-      lifecycle.detachSessionTransport();
-      serverRequests.resetServerRequests();
-      await cliPtyState.actions.openPty({
-        sandboxInstanceId: input.sandboxInstanceId,
-        ptySessionId: resolvedCliLaunch.ptySessionId,
-        cols: resolvedCliLaunch.cols,
-        rows: resolvedCliLaunch.rows,
-        ...(resolvedCliLaunch.cwd === undefined ? {} : { cwd: resolvedCliLaunch.cwd }),
-        command: resolvedCliLaunch.command,
-        args: resolvedCliLaunch.args,
-      });
-    } finally {
-      setIsSwitchingPrimaryPanel(false);
-    }
-  }, [
-    cliPtyState.actions,
-    input.sandboxInstanceId,
-    isSwitchingPrimaryPanel,
-    lifecycle,
-    serverRequests,
-    sessionSnapshot,
-    workbenchLifecycleState.connectionReadiness.canConnect,
-  ]);
-
-  const exitCliMode = useCallback(async (): Promise<void> => {
-    if (primaryPanelMode !== "cli" || input.sandboxInstanceId === null || isSwitchingPrimaryPanel) {
-      return;
-    }
-
-    setIsSwitchingPrimaryPanel(true);
-    serverRequests.resetServerRequests();
-    shouldHydrateAfterCliExitRef.current = true;
-    setPrimaryPanelMode("chat");
-    if (sessionSnapshot !== null) {
-      lifecycle.connectSession({
-        sandboxInstanceId: input.sandboxInstanceId,
-        preferredThreadId: sessionSnapshot.threadId,
-      });
-    }
-
-    try {
-      if (cliPtyState.lifecycle.state === SandboxPtyStates.OPEN) {
-        try {
-          await cliPtyState.actions.closePty();
-        } catch {
-          // Returning to chat must not depend on the CLI PTY still being closable.
-        }
-      }
-      try {
-        await cliPtyState.actions.disconnectPty();
-      } catch {
-        // Returning to chat must not depend on the CLI PTY websocket disconnect succeeding.
-      }
-    } finally {
-      setIsSwitchingPrimaryPanel(false);
-    }
-  }, [
-    cliPtyState.actions,
-    cliPtyState.lifecycle.state,
-    input.sandboxInstanceId,
-    isSwitchingPrimaryPanel,
-    lifecycle,
-    primaryPanelMode,
-    sessionSnapshot,
-    serverRequests,
-  ]);
-
-  useEffect(() => {
-    if (!shouldHydrateAfterCliExitRef.current) {
-      return;
-    }
-
-    if (primaryPanelMode !== "chat" || lifecycle.transportState !== "connected") {
-      return;
-    }
-
-    shouldHydrateAfterCliExitRef.current = false;
-    void chat.hydrateChatFromThread().catch(() => {});
-  }, [chat, lifecycle.transportState, primaryPanelMode]);
-
-  useEffect(() => {
-    if (
-      primaryPanelMode !== "cli" ||
-      cliPtyState.lifecycle.exitInfo === null ||
-      input.sandboxInstanceId === null ||
-      isSwitchingPrimaryPanel
-    ) {
-      return;
-    }
-
-    serverRequests.resetServerRequests();
-    shouldHydrateAfterCliExitRef.current = true;
-    setPrimaryPanelMode("chat");
-    if (sessionSnapshot !== null) {
-      lifecycle.connectSession({
-        sandboxInstanceId: input.sandboxInstanceId,
-        preferredThreadId: sessionSnapshot.threadId,
-      });
-    }
-    void cliPtyState.actions.disconnectPty().catch(() => {});
-  }, [
-    cliPtyState.actions,
-    cliPtyState.lifecycle.exitInfo,
-    input.sandboxInstanceId,
-    isSwitchingPrimaryPanel,
-    lifecycle,
-    primaryPanelMode,
-    serverRequests,
-    sessionSnapshot,
-  ]);
 
   return {
     workbench: {
@@ -319,15 +197,18 @@ export function useSessionWorkbenchController(input: {
       sandboxLifecycleStatus: workbenchLifecycleState.sandboxLifecycleStatus,
       sandboxFailureMessage: workbenchLifecycleState.sandboxFailureMessage,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,
-      sessionHeaderStatusUi: workbenchLifecycleState.sessionHeaderStatusUi,
+      sandboxHeaderStatusUi: workbenchLifecycleState.sandboxHeaderStatusUi,
+      lifecycleStep: lifecycle.step,
       lifecycleErrorMessage: workbenchLifecycleState.lifecycleErrorMessage,
       primaryPanelState: {
-        mode: primaryPanelMode,
-        isSwitching: isSwitchingPrimaryPanel,
-        canEnterCli,
+        transitionState: handoff.transitionState,
+        canEnterCli: enterCliDisabledReason === null,
         disabledReason: enterCliDisabledReason,
-        enterCliMode,
-        exitCliMode,
+        error: handoff.error,
+        isCliToggleActive: handoff.isCliToggleActive,
+        showsChatComposer: handoff.transitionState === "stable_chat",
+        enterCliMode: handoff.handoffToCli,
+        exitCliMode: handoff.handoffToChat,
       },
       terminalPanelState,
     },

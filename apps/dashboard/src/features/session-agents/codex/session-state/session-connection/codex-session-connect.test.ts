@@ -11,7 +11,7 @@ describe("codex session connect", () => {
   it("resumes the oldest created existing thread on reconnect", () => {
     expect(
       resolveInitialCodexThreadAction({
-        preferredThreadId: null,
+        targetThreadId: null,
         availableThreads: [
           {
             id: "thread_old",
@@ -39,7 +39,7 @@ describe("codex session connect", () => {
   it("resumes a loaded thread that is missing from the available page", () => {
     expect(
       resolveInitialCodexThreadAction({
-        preferredThreadId: null,
+        targetThreadId: null,
         availableThreads: [],
         loadedThreadIds: ["thread_loaded_only"],
       }),
@@ -52,7 +52,7 @@ describe("codex session connect", () => {
   it("prefers the persisted provider conversation id on reconnect", () => {
     expect(
       resolveInitialCodexThreadAction({
-        preferredThreadId: "thread_persisted",
+        targetThreadId: "thread_persisted",
         availableThreads: [
           {
             id: "thread_persisted",
@@ -73,12 +73,41 @@ describe("codex session connect", () => {
   it("starts a new thread when no existing thread is available", () => {
     expect(
       resolveInitialCodexThreadAction({
-        preferredThreadId: null,
+        targetThreadId: null,
         availableThreads: [],
         loadedThreadIds: [],
       }),
     ).toEqual({
       type: "start_new",
+    });
+  });
+
+  it("resumes the most recently updated available thread for post-cli restore selection", () => {
+    expect(
+      resolveInitialCodexThreadAction({
+        targetThreadId: null,
+        availableThreads: [
+          {
+            id: "thread_old_but_active",
+            name: null,
+            preview: null,
+            createdAt: 10,
+            updatedAt: 30,
+          },
+          {
+            id: "thread_newer_but_stale",
+            name: null,
+            preview: null,
+            createdAt: 20,
+            updatedAt: 20,
+          },
+        ],
+        loadedThreadIds: [],
+        selectionPolicy: "most_recently_updated",
+      }),
+    ).toEqual({
+      type: "resume",
+      threadId: "thread_old_but_active",
     });
   });
 
@@ -91,7 +120,7 @@ describe("codex session connect", () => {
           code: -32600,
           message: "no rollout found for thread id thread_empty",
         }),
-        preferredThreadId: null,
+        targetThreadId: null,
         selectedThreadId: "thread_empty",
       }),
     ).toBe("start_new");
@@ -106,7 +135,7 @@ describe("codex session connect", () => {
           code: -32600,
           message: "thread not found: thread_missing",
         }),
-        preferredThreadId: null,
+        targetThreadId: null,
         selectedThreadId: "thread_missing",
       }),
     ).toBe("start_new");
@@ -121,7 +150,7 @@ describe("codex session connect", () => {
           code: -32600,
           message: "invalid thread id: thread_persisted",
         }),
-        preferredThreadId: "thread_persisted",
+        targetThreadId: "thread_persisted",
         selectedThreadId: "thread_persisted",
       }),
     ).toBe("error_broken_persisted");
@@ -136,7 +165,7 @@ describe("codex session connect", () => {
           code: -32600,
           message: "no rollout found for thread id thread_persisted",
         }),
-        preferredThreadId: "thread_persisted",
+        targetThreadId: "thread_persisted",
         selectedThreadId: "thread_persisted",
       }),
     ).toBe("error_broken_persisted");
@@ -153,14 +182,16 @@ describe("codex session connect", () => {
           connectionToken: "token_123",
           connectionExpiresAt: "2026-03-20T01:00:00.000Z",
         },
-        threadId: "thread_123",
+        providerThreadId: null,
+        activeThreadId: "thread_123",
       }),
     ).toEqual({
       sandboxInstanceId: "sandbox_123",
       connectedAtIso: "2026-03-20T00:00:00.000Z",
       expiresAtIso: "2026-03-20T01:00:00.000Z",
       connectionUrl: "wss://example.test/codex",
-      threadId: "thread_123",
+      providerThreadId: null,
+      activeThreadId: "thread_123",
     });
   });
 });

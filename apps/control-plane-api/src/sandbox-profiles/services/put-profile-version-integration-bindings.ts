@@ -237,8 +237,10 @@ export async function putProfileVersionIntegrationBindings(
   }
 
   const validatedBindings: Array<{
+    id?: string;
     clientRef?: string;
     bindingIdOrDraftIndex: string;
+    kind: IntegrationBindingKind;
     bindingConfig: Record<string, unknown>;
     connectionId: string;
     definition: ReturnType<typeof IntegrationRegistry.getDefinitionOrThrow>;
@@ -310,8 +312,10 @@ export async function putProfileVersionIntegrationBindings(
     }
 
     validatedBindings.push({
+      ...(binding.id === undefined ? {} : { id: binding.id }),
       ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
       bindingIdOrDraftIndex: binding.id ?? `draft:${String(bindingIndex)}`,
+      kind: binding.kind,
       bindingConfig: toRecord(validationResult.parsed.bindingConfig),
       connectionId: binding.connectionId,
       definition,
@@ -397,7 +401,7 @@ export async function putProfileVersionIntegrationBindings(
         );
     }
 
-    const bindingsToInsert = input.bindings.filter((binding) => binding.id === undefined);
+    const bindingsToInsert = validatedBindings.filter((binding) => binding.id === undefined);
     if (bindingsToInsert.length > 0) {
       await tx.insert(sandboxProfileVersionIntegrationBindings).values(
         bindingsToInsert.map((binding) => ({
@@ -405,12 +409,12 @@ export async function putProfileVersionIntegrationBindings(
           sandboxProfileVersion: input.profileVersion,
           connectionId: binding.connectionId,
           kind: binding.kind,
-          config: binding.config,
+          config: binding.bindingConfig,
         })),
       );
     }
 
-    for (const binding of input.bindings) {
+    for (const binding of validatedBindings) {
       if (binding.id === undefined) {
         continue;
       }
@@ -420,7 +424,7 @@ export async function putProfileVersionIntegrationBindings(
         .set({
           connectionId: binding.connectionId,
           kind: binding.kind,
-          config: binding.config,
+          config: binding.bindingConfig,
           updatedAt: sql`now()`,
         })
         .where(

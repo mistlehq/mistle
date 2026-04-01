@@ -1,10 +1,9 @@
-import { Alert, AlertDescription } from "@mistle/ui";
-
 import type { ChatEntry } from "../chat/chat-types.js";
 import { ChatComposer, type ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { ChatThread } from "../chat/components/chat-thread.js";
 import { CodexApprovalRequestsPanel } from "../session-agents/codex/approvals/index.js";
 import type { CodexApprovalRequestEntry } from "../session-agents/codex/approvals/index.js";
+import { StatusBox } from "../shared/status-box.js";
 import {
   useSessionComposerState,
   type SessionComposerStateInput,
@@ -55,12 +54,12 @@ export function SessionConversationBottomPanel({
         onRespondToServerRequest={onRespondToServerRequest}
       />
       {composerViewModel.statusMessage === null ? null : (
-        <Alert
+        <StatusBox
           className="mb-3"
-          variant={composerViewModel.statusMessage.tone === "error" ? "destructive" : "default"}
+          tone={composerViewModel.statusMessage.tone === "error" ? "destructive" : "neutral"}
         >
-          <AlertDescription>{composerViewModel.statusMessage.message}</AlertDescription>
-        </Alert>
+          {composerViewModel.statusMessage.message}
+        </StatusBox>
       )}
       <ChatComposer {...composerViewModel} />
     </>

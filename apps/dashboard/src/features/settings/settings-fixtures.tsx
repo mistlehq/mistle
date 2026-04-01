@@ -147,8 +147,6 @@ export function createOrganizationMembersSettingsFixtureContent(): React.JSX.Ele
       onInviteDialogOpenChange={() => {}}
       onRemoveMember={() => {}}
       onResendInvite={() => {}}
-      onRetryCapabilities={() => {}}
-      onRetryLoad={() => {}}
       onRevokeInvite={() => {}}
       onRoleDialogCancel={() => {}}
       onRoleDialogOpenChange={() => {}}

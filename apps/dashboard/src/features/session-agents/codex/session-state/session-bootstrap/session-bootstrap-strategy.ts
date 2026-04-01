@@ -1,12 +1,12 @@
 export type BootstrapConnectionContext = {
   connectionKey: string;
-  threadId: string;
+  activeThreadId: string;
 };
 
 export type BootstrapConnectionCandidate = {
   sandboxInstanceId: string;
   connectedAtIso: string;
-  threadId: string | null;
+  activeThreadId: string | null;
 };
 
 export type SessionBootstrapPlan = {
@@ -22,13 +22,13 @@ function createConnectionKey(candidate: BootstrapConnectionCandidate): string {
 export function resolveBootstrapConnectionContext(input: {
   connectionCandidate: BootstrapConnectionCandidate | null;
 }): BootstrapConnectionContext | null {
-  if (input.connectionCandidate === null || input.connectionCandidate.threadId === null) {
+  if (input.connectionCandidate === null || input.connectionCandidate.activeThreadId === null) {
     return null;
   }
 
   return {
     connectionKey: createConnectionKey(input.connectionCandidate),
-    threadId: input.connectionCandidate.threadId,
+    activeThreadId: input.connectionCandidate.activeThreadId,
   };
 }
 
@@ -49,6 +49,6 @@ export function resolveSessionBootstrapPlan(input: {
   return {
     connectionKey,
     shouldLoadBootstrapData: input.establishedConnectionKey !== connectionKey,
-    threadSyncKey: `${connectionKey}:${input.bootstrapConnectionContext.threadId}`,
+    threadSyncKey: `${connectionKey}:${input.bootstrapConnectionContext.activeThreadId}`,
   };
 }

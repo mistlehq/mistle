@@ -68,4 +68,39 @@ describe("selectPreferredThreadId", () => {
 
     expect(result).toBeNull();
   });
+
+  it("prefers the most recently updated available thread when requested", () => {
+    const result = selectPreferredThreadId({
+      availableThreads: [
+        {
+          id: "thread_old_but_active",
+          name: null,
+          preview: null,
+          updatedAt: 30,
+          createdAt: 1,
+        },
+        {
+          id: "thread_newer_but_stale",
+          name: null,
+          preview: null,
+          updatedAt: 20,
+          createdAt: 2,
+        },
+      ],
+      loadedThreadIds: [],
+      selectionPolicy: "most_recently_updated",
+    });
+
+    expect(result).toBe("thread_old_but_active");
+  });
+
+  it("falls back to the last loaded-only thread when most recent update is requested", () => {
+    const result = selectPreferredThreadId({
+      availableThreads: [],
+      loadedThreadIds: ["thread_old_loaded", "thread_new_loaded"],
+      selectionPolicy: "most_recently_updated",
+    });
+
+    expect(result).toBe("thread_new_loaded");
+  });
 });

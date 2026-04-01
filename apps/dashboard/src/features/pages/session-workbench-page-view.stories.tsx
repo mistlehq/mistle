@@ -9,12 +9,16 @@ import {
   SessionComposerFixtureStatusMessageForNonImageCapableModel,
   SessionComposerFixtureStatusMessageForUnavailableModel,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
+import { SessionCliPanel } from "./session-cli-panel.js";
 import {
+  createStoryLongCliOutput,
+  createStoryWorkbenchCliPtyState,
   createStorySessionBottomPanel,
   createStorySessionMainContent,
   SessionWorkbenchStoryChrome,
   StorySandboxInstanceId,
 } from "./session-story-support.js";
+import { SessionTerminalPanel } from "./session-terminal-panel.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 const meta = {
@@ -51,7 +55,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const WithAlerts: Story = {
+export const WithErrorStatusBoxes: Story = {
   args: {
     alerts: [
       {
@@ -61,6 +65,28 @@ export const WithAlerts: Story = {
       {
         title: "Sandbox failed",
         description: "The underlying sandbox exited before the session fully connected.",
+      },
+    ],
+  },
+};
+
+export const WithCliEntryFailureStatusBox: Story = {
+  args: {
+    alerts: [
+      {
+        title: "Could not start Codex CLI",
+        description: "codex executable missing from the sandbox image",
+      },
+    ],
+  },
+};
+
+export const WithChatRestoreFailureStatusBox: Story = {
+  args: {
+    alerts: [
+      {
+        title: "Could not restore chat",
+        description: "Minting sandbox connection token failed: Could not mint connection token.",
       },
     ],
   },
@@ -83,7 +109,7 @@ export const WithNonImageCapableModelWarning: Story = {
   },
 };
 
-export const WithUnavailableModelAlert: Story = {
+export const WithUnavailableModelStatusBox: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
       composerViewModel: {
@@ -94,7 +120,7 @@ export const WithUnavailableModelAlert: Story = {
   },
 };
 
-export const WithLoadingSelectedModelAlert: Story = {
+export const WithLoadingSelectedModelStatusBox: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
       composerViewModel: {
@@ -108,5 +134,41 @@ export const WithLoadingSelectedModelAlert: Story = {
 export const MissingSessionId: Story = {
   args: {
     sandboxInstanceId: null,
+  },
+};
+
+export const CliSplitWithTerminal: Story = {
+  args: {
+    isSecondaryPanelVisible: true,
+    mainContent: (
+      <SessionCliPanel
+        ptyState={createStoryWorkbenchCliPtyState(createStoryLongCliOutput("task"))}
+      />
+    ),
+    mainContentLayout: { scroll: "contained", width: "full" },
+    primaryBottomPanel: null,
+    secondaryPanel: (
+      <SessionTerminalPanel
+        isConnectionReady={true}
+        isResumingSandbox={false}
+        isVisible={true}
+        onDisconnectTerminal={noop}
+        onHide={noop}
+        onRequestSandboxResume={async () => {
+          return;
+        }}
+        ptyState={createStoryWorkbenchCliPtyState(
+          [
+            "root@sandbox:~# pwd",
+            "/root",
+            "root@sandbox:~# ls",
+            "apps  packages  README.md",
+            "",
+          ].join("\n"),
+        )}
+        sandboxInstanceId={StorySandboxInstanceId}
+        sandboxStatus="running"
+      />
+    ),
   },
 };

@@ -8,6 +8,8 @@ export type SessionHeaderStatusUi = {
   className?: string;
 };
 
+export type SandboxHeaderStatusUi = SessionHeaderStatusUi;
+
 export function resolveSessionHeaderStatusUi(input: {
   sandboxStatus: string;
   agentConnectionState: CodexSessionConnectionState;
@@ -93,6 +95,44 @@ export function resolveSessionHeaderStatusUi(input: {
 
   return {
     label: "Session idle",
+    variant: "outline",
+  };
+}
+
+export function resolveSandboxHeaderStatusUi(input: {
+  sandboxLifecycleStatus: string;
+}): SandboxHeaderStatusUi {
+  if (input.sandboxLifecycleStatus === "failed") {
+    return {
+      label: "Sandbox failed",
+      variant: "destructive",
+    };
+  }
+
+  if (input.sandboxLifecycleStatus === "running") {
+    return {
+      label: "Connected",
+      variant: "secondary",
+      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+    };
+  }
+
+  if (input.sandboxLifecycleStatus === "stopped") {
+    return {
+      label: "Sandbox stopped",
+      variant: "outline",
+    };
+  }
+
+  if (input.sandboxLifecycleStatus === "resuming") {
+    return {
+      label: "Resuming sandbox",
+      variant: "outline",
+    };
+  }
+
+  return {
+    label: "Starting sandbox",
     variant: "outline",
   };
 }

@@ -91,7 +91,7 @@ export type AgentConversationProvider = {
     this: void,
     input: AgentConversationStartExecutionInput,
   ): Promise<AgentConversationStartExecutionResult>;
-  steerExecution?(
+  steerExecution(
     this: void,
     input: AgentConversationSteerExecutionInput,
   ): Promise<AgentConversationSteerExecutionResult>;
@@ -99,5 +99,5 @@ export type AgentConversationProvider = {
     this: void,
     input: AgentConversationRecoverLateSteerInput,
   ): Promise<AgentConversationRecoverLateSteerResult>;
-  interruptExecution?(this: void, input: AgentConversationInterruptExecutionInput): Promise<void>;
+  interruptExecution(this: void, input: AgentConversationInterruptExecutionInput): Promise<void>;
 };

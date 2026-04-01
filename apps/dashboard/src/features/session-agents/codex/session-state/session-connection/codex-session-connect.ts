@@ -7,6 +7,7 @@ import {
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
 import type { MintSandboxConnectionTokenResult } from "../../../../sessions/sessions-service.js";
+import type { ThreadSelectionPolicy } from "../../../../sessions/thread-selection.js";
 import type { ConnectedCodexSession } from "../codex-session-types.js";
 import { describeCodexSessionStepError } from "./codex-session-errors.js";
 import { selectCodexConnectionThreadStrategy } from "./codex-session-lifecycle-policy.js";
@@ -39,12 +40,12 @@ export type ReconnectResumeFailureAction = "error_broken_persisted" | "start_new
 
 export function resolveReconnectResumeFailureAction(input: {
   error: unknown;
-  preferredThreadId: string | null;
+  targetThreadId: string | null;
   selectedThreadId: string;
 }): ReconnectResumeFailureAction {
   if (
-    input.preferredThreadId !== null &&
-    input.selectedThreadId === input.preferredThreadId &&
+    input.targetThreadId !== null &&
+    input.selectedThreadId === input.targetThreadId &&
     (isMissingPersistedThreadError(input.error) || isNoRolloutPersistedThreadError(input.error))
   ) {
     return "error_broken_persisted";
@@ -61,41 +62,48 @@ export type CodexConnectionBootstrapResult = {
   generation: number;
   sandboxInstanceId: string;
   mintedConnection: MintSandboxConnectionTokenResult;
+  resolvedThreadId: string | null;
   threadId: string;
 };
 
 export type EstablishedCodexThreadResult = {
   generation: number;
   sandboxInstanceId: string;
+  resolvedThreadId: string | null;
   threadId: string;
 };
 
 export function resolveInitialCodexThreadAction(input: {
-  preferredThreadId: string | null;
+  targetThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  selectionPolicy?: ThreadSelectionPolicy;
 }) {
   return selectCodexConnectionThreadStrategy({
-    preferredThreadId: input.preferredThreadId,
+    targetThreadId: input.targetThreadId,
     availableThreads: input.availableThreads,
     loadedThreadIds: input.loadedThreadIds,
+    ...(input.selectionPolicy === undefined ? {} : { selectionPolicy: input.selectionPolicy }),
   });
 }
 
 export async function establishCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
-  preferredThreadId: string | null;
+  targetThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  selectionPolicy?: ThreadSelectionPolicy;
   generation: number;
   sandboxInstanceId: string;
   ensureCurrentGeneration: (generation: number) => void;
 }): Promise<EstablishedCodexThreadResult> {
   const action = resolveInitialCodexThreadAction({
-    preferredThreadId: input.preferredThreadId,
+    targetThreadId: input.targetThreadId,
     availableThreads: input.availableThreads,
     loadedThreadIds: input.loadedThreadIds,
+    ...(input.selectionPolicy === undefined ? {} : { selectionPolicy: input.selectionPolicy }),
   });
+  const resolvedThreadId = action.type === "resume" ? action.threadId : null;
 
   if (action.type === "resume") {
     let resumedThread;
@@ -107,7 +115,7 @@ export async function establishCodexThread(input: {
     } catch (error) {
       const failureAction = resolveReconnectResumeFailureAction({
         error,
-        preferredThreadId: input.preferredThreadId,
+        targetThreadId: input.targetThreadId,
         selectedThreadId: action.threadId,
       });
 
@@ -115,7 +123,7 @@ export async function establishCodexThread(input: {
         throw describeCodexSessionStepError(
           "Resuming persisted chat session",
           new Error(
-            `This chat session could not be resumed because the linked persisted session '${input.preferredThreadId}' is no longer resumable.`,
+            `This chat session could not be resumed because the linked persisted session '${input.targetThreadId}' is no longer resumable.`,
           ),
         );
       }
@@ -130,6 +138,7 @@ export async function establishCodexThread(input: {
         return {
           generation: input.generation,
           sandboxInstanceId: input.sandboxInstanceId,
+          resolvedThreadId,
           threadId: startedThread.threadId,
         };
       }
@@ -141,6 +150,7 @@ export async function establishCodexThread(input: {
     return {
       generation: input.generation,
       sandboxInstanceId: input.sandboxInstanceId,
+      resolvedThreadId,
       threadId: resumedThread.threadId,
     };
   }
@@ -154,15 +164,17 @@ export async function establishCodexThread(input: {
   return {
     generation: input.generation,
     sandboxInstanceId: input.sandboxInstanceId,
+    resolvedThreadId,
     threadId: startedThread.threadId,
   };
 }
 
 export async function establishInitialCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
-  preferredThreadId: string | null;
+  targetThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  selectionPolicy?: ThreadSelectionPolicy;
   generation: number;
   sandboxInstanceId: string;
   mintedConnection: MintSandboxConnectionTokenResult;
@@ -180,13 +192,15 @@ export function createConnectedCodexSession(input: {
   sandboxInstanceId: string;
   connectedAtIso: string;
   mintedConnection: MintSandboxConnectionTokenResult;
-  threadId: string;
+  providerThreadId: string | null;
+  activeThreadId: string;
 }): ConnectedCodexSession {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     connectedAtIso: input.connectedAtIso,
     expiresAtIso: input.mintedConnection.connectionExpiresAt,
     connectionUrl: input.mintedConnection.connectionUrl,
-    threadId: input.threadId,
+    providerThreadId: input.providerThreadId,
+    activeThreadId: input.activeThreadId,
   };
 }

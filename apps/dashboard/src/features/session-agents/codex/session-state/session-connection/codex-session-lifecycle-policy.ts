@@ -3,7 +3,10 @@ import type {
   CodexThreadSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
-import { selectPreferredThreadId } from "../../../../sessions/thread-selection.js";
+import {
+  selectPreferredThreadId,
+  type ThreadSelectionPolicy,
+} from "../../../../sessions/thread-selection.js";
 
 export type CodexConnectionThreadStrategy =
   | {
@@ -43,26 +46,28 @@ export function resolveCodexConnectionStateTransition(input: {
 }
 
 export function selectCodexConnectionThreadStrategy(input: {
-  preferredThreadId: string | null;
+  targetThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  selectionPolicy?: ThreadSelectionPolicy;
 }): CodexConnectionThreadStrategy {
-  if (input.preferredThreadId !== null) {
+  if (input.targetThreadId !== null) {
     return {
       type: "resume",
-      threadId: input.preferredThreadId,
+      threadId: input.targetThreadId,
     };
   }
 
-  const preferredThreadId = selectPreferredThreadId({
+  const selectedThreadId = selectPreferredThreadId({
     availableThreads: input.availableThreads,
     loadedThreadIds: input.loadedThreadIds,
+    ...(input.selectionPolicy === undefined ? {} : { selectionPolicy: input.selectionPolicy }),
   });
 
-  if (preferredThreadId !== null) {
+  if (selectedThreadId !== null) {
     return {
       type: "resume",
-      threadId: preferredThreadId,
+      threadId: selectedThreadId,
     };
   }
 

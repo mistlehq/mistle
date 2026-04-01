@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --import ./instrument.ts ./node_modules/@openworkflow/cli/dist/cli.js worker start --config ./openworkflow.config.ts",
-    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && tsc -p tsconfig.build.openworkflow.json && tsc-alias -p tsconfig.build.openworkflow.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && tsc -p tsconfig.build.openworkflow.json && tsc-alias -p tsconfig.build.openworkflow.json",
     "start": "node --import ./dist/instrument.js ./node_modules/@openworkflow/cli/dist/cli.js worker start --config ./dist/openworkflow.config.js",
     "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsgo --noEmit",
@@ -30,7 +30,7 @@
     "@mistle/workflow-registry": "workspace:*",
     "@openworkflow/cli": "^0.4.3",
     "drizzle-orm": "^0.45.1",
-    "liquidjs": "^10.25.1",
+    "liquidjs": "^10.25.2",
     "openworkflow": "^0.8.1",
     "pg": "^8.20.0",
     "typeid-js": "^1.2.0",
@@ -39,7 +39,7 @@
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
-    "@types/pg": "^8.18.0",
+    "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1"
   }
 }

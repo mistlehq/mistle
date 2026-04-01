@@ -83,6 +83,10 @@ function registerRuntime(
       startExecution: async () => ({
         providerExecutionId: null,
       }),
+      steerExecution: async () => ({
+        providerExecutionId: "turn_123",
+      }),
+      interruptExecution: async () => {},
     }),
     createExecutionObserver: () => ({
       createSession: () => ({

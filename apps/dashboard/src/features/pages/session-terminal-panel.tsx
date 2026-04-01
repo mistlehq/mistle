@@ -8,13 +8,13 @@ import { MinusIcon, SpinnerGapIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useReducer, useRef } from "react";
 
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
+import { SessionPtyPanelHeader } from "./session-pty-panel-header.js";
+import { SessionPtyPanelShell } from "./session-pty-panel-shell.js";
 import {
   resolveSessionTerminalStatusPresentation,
   sessionTerminalStatusDotClassName,
 } from "./session-terminal-status.js";
 import { INITIAL_PTY_DIMENSIONS, SessionTerminalSurface } from "./session-terminal-surface.js";
-
-const TERMINAL_BORDER_COLOR = "#D6D3D1";
 const MaxTerminalReconnectAttempts = 3;
 
 type SessionTerminalRecoverySandboxStatus =
@@ -266,13 +266,15 @@ function SessionTerminalToolbarStatus(input: {
     >
       <span className="sr-only">{liveStatusText}</span>
       <div aria-hidden className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="shrink-0 text-sm font-semibold text-stone-900">Terminal</span>
-        <span className="flex items-center gap-2" title={indicatorTitle}>
-          {presentation.showSpinner ? (
-            <SpinnerGapIcon className="size-4 shrink-0 animate-spin text-stone-500" />
-          ) : null}
-          <span className={cn("size-2.5 shrink-0 rounded-full", dotClass)} />
-        </span>
+        <SessionPtyPanelHeader
+          indicatorTitle={indicatorTitle}
+          isActive={presentation.tone === "live"}
+          title="Terminal"
+        />
+        {presentation.showSpinner ? (
+          <SpinnerGapIcon className="size-4 shrink-0 animate-spin text-stone-500" />
+        ) : null}
+        <span className={cn("size-2.5 shrink-0 rounded-full", dotClass)} />
       </div>
     </div>
   );
@@ -484,13 +486,19 @@ export function SessionTerminalPanel({
   }
 
   return (
-    <div className="bg-white h-full min-h-0">
-      <div
-        className="flex h-full min-h-0 flex-col overflow-hidden border-t bg-white"
-        data-terminal-state={lifecycle.state}
-        style={{ borderColor: TERMINAL_BORDER_COLOR }}
-      >
-        <div className="flex items-center gap-2 bg-white px-3 py-1">
+    <SessionPtyPanelShell
+      body={
+        <SessionTerminalSurface
+          isVisible={isVisible}
+          lifecycleState={lifecycle.state}
+          onResize={resizePty}
+          onWriteInput={writeInput}
+          outputChunks={output.chunks}
+        />
+      }
+      dataPtyState={lifecycle.state}
+      header={
+        <>
           <SessionTerminalToolbarStatus
             errorMessage={lifecycle.errorMessage}
             isRecovering={recovery.kind === "recovering"}
@@ -516,21 +524,10 @@ export function SessionTerminalPanel({
               <XIcon className="size-4" />
             </Button>
           </div>
-        </div>
-        {terminalRecoveryMessage === null ? null : (
-          <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
-            {terminalRecoveryMessage}
-          </div>
-        )}
-        <SessionTerminalSurface
-          isVisible={isVisible}
-          lifecycleState={lifecycle.state}
-          onResize={resizePty}
-          onWriteInput={writeInput}
-          outputChunks={output.chunks}
-        />
-      </div>
-    </div>
+        </>
+      }
+      message={terminalRecoveryMessage ?? undefined}
+    />
   );
 }
 

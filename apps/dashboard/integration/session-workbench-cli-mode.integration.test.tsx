@@ -1,695 +1,190 @@
 // @vitest-environment jsdom
 
-import { type IncomingMessage, type ServerResponse } from "node:http";
-
-import { CodexAppServerListenUrl } from "@mistle/integrations-definitions/agent-runtimes/codex/app-server";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { useState } from "react";
-import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
-import { type RawData, type WebSocket, WebSocket as NodeWebSocket, WebSocketServer } from "ws";
 
 import {
-  decodeDataFrame,
-  parseStreamControlMessage,
-  PayloadKindWebSocketText,
-  type PTYStreamChannel,
-} from "../../../packages/sandbox-session-protocol/src/index.ts";
-import { SessionWorkbenchPage } from "../src/features/pages/session-workbench-page.js";
-import { AppShellHeaderActionsContext } from "../src/features/shell/app-shell-header-actions.js";
-import { renderDashboardPageIntegration } from "./helpers/dashboard-page.js";
-
-type JsonRpcRequest = {
-  id?: string | number;
-  method: string;
-  params?: unknown;
-};
-
-type PtyOpenRecord = {
-  streamId: number;
-  channel: PTYStreamChannel;
-};
-
-type PtyOpenWaiter = {
-  predicate: (record: PtyOpenRecord) => boolean;
-  reject: (reason?: unknown) => void;
-  resolve: (value: PtyOpenRecord) => void;
-};
-
-type SessionWorkbenchTunnelServer = {
-  close: () => Promise<void>;
-  emitPtyExit: (streamId: number, exitCode?: number) => void;
-  url: string;
-  waitForPtyClose: (streamId: number) => Promise<number>;
-  waitForPtyOpen: (predicate: (record: PtyOpenRecord) => boolean) => Promise<PtyOpenRecord>;
-};
-
-type DashboardPageHandle = Awaited<ReturnType<typeof renderDashboardPageIntegration>>;
-
-type SessionWorkbenchCliHarness = {
-  renderedPage: DashboardPageHandle;
-  tunnelServer: SessionWorkbenchTunnelServer;
-};
-
-function toText(data: RawData): string {
-  if (typeof data === "string") {
-    return data;
-  }
-  if (data instanceof ArrayBuffer) {
-    return Buffer.from(data).toString("utf8");
-  }
-  if (Buffer.isBuffer(data)) {
-    return data.toString("utf8");
-  }
-
-  return Buffer.concat(data).toString("utf8");
-}
-
-function toUint8Array(data: RawData): Uint8Array {
-  if (typeof data === "string") {
-    return new TextEncoder().encode(data);
-  }
-  if (data instanceof ArrayBuffer) {
-    return new Uint8Array(data);
-  }
-  if (Buffer.isBuffer(data)) {
-    return new Uint8Array(data);
-  }
-
-  return new Uint8Array(Buffer.concat(data));
-}
-
-function decodeAgentTextPayload(data: RawData): string {
-  const frame = decodeDataFrame(toUint8Array(data));
-  if (frame.payloadKind !== PayloadKindWebSocketText) {
-    throw new Error(
-      `Expected websocket text payload kind ${String(PayloadKindWebSocketText)}, received ${String(frame.payloadKind)}.`,
-    );
-  }
-
-  return new TextDecoder().decode(frame.payload);
-}
-
-function parseJsonRpcRequest(data: RawData): JsonRpcRequest {
-  const payload = JSON.parse(decodeAgentTextPayload(data));
-  if (
-    typeof payload !== "object" ||
-    payload === null ||
-    Array.isArray(payload) ||
-    !("method" in payload) ||
-    typeof payload.method !== "string"
-  ) {
-    throw new Error("Expected a JSON-RPC request payload.");
-  }
-
-  return payload as JsonRpcRequest;
-}
-
-function createThreadStartResult(threadId: string) {
-  return {
-    thread: {
-      id: threadId,
-    },
-  };
-}
-
-function installNodeWebSocket(): () => void {
-  const originalWebSocket = globalThis.WebSocket;
-
-  Object.defineProperty(globalThis, "WebSocket", {
-    configurable: true,
-    value: NodeWebSocket,
-    writable: true,
-  });
-
-  return () => {
-    Object.defineProperty(globalThis, "WebSocket", {
-      configurable: true,
-      value: originalWebSocket,
-      writable: true,
-    });
-  };
-}
-
-async function startSessionWorkbenchTunnelServer(input?: {
-  initialThreadId?: string | null;
-}): Promise<SessionWorkbenchTunnelServer> {
-  const wsServer = new WebSocketServer({
-    host: "127.0.0.1",
-    port: 0,
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    wsServer.once("listening", () => resolve());
-    wsServer.once("error", (error: Error) => reject(error));
-  });
-
-  const ptyOpenRecords: PtyOpenRecord[] = [];
-  const ptyOpenWaiters: PtyOpenWaiter[] = [];
-  const ptyCloseStreamIds = new Set<number>();
-  const ptyCloseWaiters = new Map<number, Array<(streamId: number) => void>>();
-  const ptySockets = new Map<number, WebSocket>();
-  const sockets = new Set<WebSocket>();
-  let knownThreadId =
-    input !== undefined && "initialThreadId" in input
-      ? (input.initialThreadId ?? null)
-      : "thread_cli_test";
-
-  function dispatchPtyOpen(record: PtyOpenRecord): void {
-    ptyOpenRecords.push(record);
-    const waiterIndex = ptyOpenWaiters.findIndex((waiter) => waiter.predicate(record));
-    if (waiterIndex === -1) {
-      return;
-    }
-
-    const waiter = ptyOpenWaiters.splice(waiterIndex, 1)[0];
-    if (waiter === undefined) {
-      throw new Error("Expected PTY waiter to be present.");
-    }
-    waiter.resolve(record);
-  }
-
-  function dispatchPtyClose(streamId: number): void {
-    ptyCloseStreamIds.add(streamId);
-    const waiters = ptyCloseWaiters.get(streamId);
-    if (waiters === undefined) {
-      return;
-    }
-
-    ptyCloseWaiters.delete(streamId);
-    for (const resolve of waiters) {
-      resolve(streamId);
-    }
-  }
-
-  function emitPtyExit(streamId: number, exitCode = 0): void {
-    const socket = ptySockets.get(streamId);
-    if (socket === undefined) {
-      throw new Error(`Expected PTY socket for stream ${String(streamId)}.`);
-    }
-
-    socket.send(
-      JSON.stringify({
-        type: "stream.event",
-        streamId,
-        event: {
-          type: "pty.exit",
-          exitCode,
-        },
-      }),
-    );
-  }
-
-  wsServer.on("connection", (socket) => {
-    sockets.add(socket);
-    let streamKind: "agent" | "pty" | null = null;
-
-    socket.on("message", (data, isBinary) => {
-      if (!isBinary) {
-        const controlMessage = parseStreamControlMessage(toText(data));
-        if (controlMessage?.type === "stream.open") {
-          if (controlMessage.channel.kind === "agent") {
-            streamKind = "agent";
-          }
-
-          if (controlMessage.channel.kind === "pty") {
-            streamKind = "pty";
-            ptySockets.set(controlMessage.streamId, socket);
-            dispatchPtyOpen({
-              streamId: controlMessage.streamId,
-              channel: controlMessage.channel,
-            });
-          }
-
-          socket.send(
-            JSON.stringify({
-              type: "stream.open.ok",
-              streamId: controlMessage.streamId,
-            }),
-          );
-          return;
-        }
-
-        if (controlMessage?.type === "stream.close") {
-          dispatchPtyClose(controlMessage.streamId);
-          emitPtyExit(controlMessage.streamId);
-          return;
-        }
-
-        return;
-      }
-
-      if (streamKind !== "agent") {
-        return;
-      }
-
-      const request = parseJsonRpcRequest(data);
-      const requestId = request.id ?? 0;
-
-      switch (request.method) {
-        case "initialize": {
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {
-                protocolVersion: "2026-03-14",
-              },
-            }),
-          );
-          return;
-        }
-
-        case "initialized": {
-          return;
-        }
-
-        case "thread/list": {
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {
-                data:
-                  knownThreadId === null
-                    ? []
-                    : [
-                        {
-                          id: knownThreadId,
-                          name: "CLI Test Thread",
-                          createdAt: 1,
-                          updatedAt: 1,
-                        },
-                      ],
-                nextCursor: null,
-              },
-            }),
-          );
-          return;
-        }
-
-        case "thread/loaded/list": {
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {
-                data: [],
-              },
-            }),
-          );
-          return;
-        }
-
-        case "thread/start": {
-          knownThreadId ??= "thread_cli_test";
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: createThreadStartResult(knownThreadId),
-            }),
-          );
-          return;
-        }
-
-        case "thread/resume": {
-          const params =
-            typeof request.params === "object" &&
-            request.params !== null &&
-            !Array.isArray(request.params)
-              ? request.params
-              : null;
-          const requestedThreadId =
-            params !== null &&
-            "threadId" in params &&
-            typeof params.threadId === "string" &&
-            params.threadId.length > 0
-              ? params.threadId
-              : null;
-
-          if (requestedThreadId === null) {
-            throw new Error("Expected thread/resume to provide a thread id.");
-          }
-
-          knownThreadId = requestedThreadId;
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: createThreadStartResult(requestedThreadId),
-            }),
-          );
-          return;
-        }
-
-        case "thread/read": {
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {
-                thread: {
-                  id: knownThreadId ?? "thread_cli_test",
-                  turns: [],
-                },
-              },
-            }),
-          );
-          return;
-        }
-
-        case "model/list": {
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {
-                data: [
-                  {
-                    id: "mdl_gpt53",
-                    model: "gpt-5.3-codex",
-                    displayName: "GPT-5.3 Codex",
-                    hidden: false,
-                    isDefault: true,
-                    inputModalities: ["text", "image"],
-                    supportsPersonality: false,
-                  },
-                ],
-                nextCursor: null,
-              },
-            }),
-          );
-          return;
-        }
-
-        case "config/read": {
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {
-                config: {},
-              },
-            }),
-          );
-          return;
-        }
-
-        default: {
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {},
-            }),
-          );
-        }
-      }
-    });
-
-    socket.on("close", () => {
-      sockets.delete(socket);
-      for (const [streamId, candidateSocket] of ptySockets.entries()) {
-        if (candidateSocket === socket) {
-          ptySockets.delete(streamId);
-        }
-      }
-    });
-  });
-
-  const address = wsServer.address();
-  if (typeof address !== "object" || address === null) {
-    throw new Error("Expected websocket server to expose a socket address.");
-  }
-
-  return {
-    emitPtyExit,
-    url: `ws://127.0.0.1:${String(address.port)}`,
-    waitForPtyClose: async (streamId) => {
-      if (ptyCloseStreamIds.has(streamId)) {
-        return streamId;
-      }
-
-      return await new Promise<number>((resolve) => {
-        const currentWaiters = ptyCloseWaiters.get(streamId) ?? [];
-        currentWaiters.push(resolve);
-        ptyCloseWaiters.set(streamId, currentWaiters);
-      });
-    },
-    waitForPtyOpen: async (predicate) => {
-      const existingRecord = ptyOpenRecords.find(predicate);
-      if (existingRecord !== undefined) {
-        return existingRecord;
-      }
-
-      return await new Promise<PtyOpenRecord>((resolve, reject) => {
-        ptyOpenWaiters.push({
-          predicate,
-          resolve,
-          reject,
-        });
-      });
-    },
-    close: async () => {
-      for (const waiter of ptyOpenWaiters.splice(0, ptyOpenWaiters.length)) {
-        waiter.reject(new Error("PTY open waiter was canceled while closing the test server."));
-      }
-
-      for (const socket of sockets) {
-        socket.close();
-      }
-
-      await new Promise<void>((resolve, reject) => {
-        wsServer.close((error?: Error) => {
-          if (error === undefined) {
-            resolve();
-            return;
-          }
-
-          reject(error);
-        });
-      });
-    },
-  };
-}
-
-function extractSandboxInstanceId(pathname: string): string | null {
-  const match = pathname.match(/^\/v1\/sandbox\/instances\/([^/]+)$/);
-  return match?.[1] ?? null;
-}
-
-function extractConnectionTokenSandboxInstanceId(pathname: string): string | null {
-  const match = pathname.match(/^\/v1\/sandbox\/instances\/([^/]+)\/connection-tokens$/);
-  return match?.[1] ?? null;
-}
-
-function createWorkbenchRequestHandler(
-  tunnelServer: SessionWorkbenchTunnelServer,
-): (request: IncomingMessage, response: ServerResponse<IncomingMessage>) => void {
-  return (request, response) => {
-    const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
-    const statusSandboxInstanceId = extractSandboxInstanceId(requestUrl.pathname);
-    const connectionTokenSandboxInstanceId = extractConnectionTokenSandboxInstanceId(
-      requestUrl.pathname,
-    );
-
-    if (
-      request.method === "GET" &&
-      statusSandboxInstanceId !== null &&
-      requestUrl.pathname === `/v1/sandbox/instances/${statusSandboxInstanceId}`
-    ) {
-      response.writeHead(200, { "content-type": "application/json" });
-      response.end(
-        JSON.stringify({
-          id: statusSandboxInstanceId,
-          status: "running",
-          failureCode: null,
-          failureMessage: null,
-          automationConversation: null,
-        }),
-      );
-      return;
-    }
-
-    if (
-      request.method === "POST" &&
-      connectionTokenSandboxInstanceId !== null &&
-      requestUrl.pathname ===
-        `/v1/sandbox/instances/${connectionTokenSandboxInstanceId}/connection-tokens`
-    ) {
-      response.writeHead(200, { "content-type": "application/json" });
-      response.end(
-        JSON.stringify({
-          instanceId: connectionTokenSandboxInstanceId,
-          url: tunnelServer.url,
-          token: "tok_cli_test",
-          expiresAt: "2026-03-31T00:00:00.000Z",
-        }),
-      );
-      return;
-    }
-
-    response.writeHead(404, { "content-type": "application/json" });
-    response.end(JSON.stringify({ message: "Not found" }));
-  };
-}
-
-function HeaderActionsHost(input: { children: React.ReactNode }): React.JSX.Element {
-  const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
-
-  return (
-    <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
-      <div>
-        <div data-testid="header-actions">{headerActions}</div>
-        {input.children}
-      </div>
-    </AppShellHeaderActionsContext.Provider>
-  );
-}
-
-async function renderSessionWorkbenchCliHarness(input?: {
-  initialThreadId?: string | null;
-}): Promise<SessionWorkbenchCliHarness> {
-  const tunnelServer = await startSessionWorkbenchTunnelServer(input);
-  const renderedPage = await renderDashboardPageIntegration({
-    handler: createWorkbenchRequestHandler(tunnelServer),
-    ui: (
-      <HeaderActionsHost>
-        <MemoryRouter initialEntries={["/sessions/sbi_cli_test"]}>
-          <Routes>
-            <Route element={<SessionWorkbenchPage />} path="/sessions/:sandboxInstanceId" />
-          </Routes>
-        </MemoryRouter>
-      </HeaderActionsHost>
-    ),
-  });
-
-  return {
-    renderedPage,
-    tunnelServer,
-  };
-}
-
-async function withSessionWorkbenchCliHarness(
-  run: (harness: SessionWorkbenchCliHarness) => Promise<void>,
-): Promise<void>;
-async function withSessionWorkbenchCliHarness(
-  input: { initialThreadId?: string | null },
-  run: (harness: SessionWorkbenchCliHarness) => Promise<void>,
-): Promise<void>;
-async function withSessionWorkbenchCliHarness(
-  inputOrRun:
-    | { initialThreadId?: string | null }
-    | ((harness: SessionWorkbenchCliHarness) => Promise<void>),
-  maybeRun?: (harness: SessionWorkbenchCliHarness) => Promise<void>,
-): Promise<void> {
-  const restoreWebSocket = installNodeWebSocket();
-  const input = typeof inputOrRun === "function" ? {} : inputOrRun;
-  const run = typeof inputOrRun === "function" ? inputOrRun : maybeRun;
-  if (run === undefined) {
-    throw new Error("Expected a session workbench CLI harness callback.");
-  }
-  const harness = await renderSessionWorkbenchCliHarness(input);
-
-  try {
-    await run(harness);
-  } finally {
-    await harness.renderedPage.close();
-    await harness.tunnelServer.close();
-    restoreWebSocket();
-  }
-}
-
-async function waitForEnabledButton(name: string): Promise<HTMLButtonElement> {
-  const button = await screen.findByRole("button", { name });
-  await waitFor(() => {
-    expect(button).toHaveProperty("disabled", false);
-  });
-
-  return button as HTMLButtonElement;
-}
-
-async function waitForPtySession(
-  tunnelServer: SessionWorkbenchTunnelServer,
-  ptySessionId: string,
-): Promise<PtyOpenRecord> {
-  return await tunnelServer.waitForPtyOpen(
-    (record) => record.channel.ptySessionId === ptySessionId,
-  );
-}
-
-function expectCliPty(record: PtyOpenRecord, input?: { threadId?: string | null }): void {
-  expect(record.channel.session).toBe("create");
-  expect(record.channel.ptySessionId).toBe("cli");
-  expect(record.channel.command).toBe("codex");
-  expect(record.channel.args).toEqual(
-    input?.threadId === null
-      ? ["--remote", CodexAppServerListenUrl]
-      : ["resume", "--remote", CodexAppServerListenUrl, input?.threadId ?? "thread_cli_test"],
-  );
-}
-
-function expectTerminalPty(record: PtyOpenRecord): void {
-  expect(record.channel.session).toBe("create");
-  expect(record.channel.ptySessionId).toBe("terminal");
-  expect(record.channel.command).toBeUndefined();
-  expect(record.channel.args).toBeUndefined();
-}
+  expectCliPty,
+  expectTerminalPty,
+  waitForChatReady,
+  waitForEnabledButton,
+  waitForPtySession,
+  withSessionWorkbenchCliHarness,
+} from "./helpers/session-workbench-cli-harness.js";
 
 describe("SessionWorkbenchPage CLI mode integration", () => {
   afterEach(() => {
     cleanup();
   });
 
-  it("runs Codex CLI in the primary panel while keeping the side terminal available", async () => {
-    await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
-      fireEvent.click(await waitForEnabledButton("CLI"));
-      const cliPty = await waitForPtySession(tunnelServer, "cli");
-      expectCliPty(cliPty);
+  describe("primary panel flow", () => {
+    it("runs Codex CLI in the primary panel while keeping the side terminal available", async () => {
+      await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+        fireEvent.click(await waitForEnabledButton("CLI"));
+        const cliPty = await waitForPtySession(tunnelServer, "cli");
+        expectCliPty(cliPty);
 
-      expect(await screen.findByText("Codex CLI connected")).toBeDefined();
-      expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
+        expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
 
-      fireEvent.click(await waitForEnabledButton("Open terminal"));
-      expectTerminalPty(await waitForPtySession(tunnelServer, "terminal"));
+        fireEvent.click(await waitForEnabledButton("Open terminal"));
+        expectTerminalPty(await waitForPtySession(tunnelServer, "terminal"));
 
-      fireEvent.click(screen.getByRole("button", { name: "CLI" }));
-      await tunnelServer.waitForPtyClose(cliPty.streamId);
+        fireEvent.click(screen.getByRole("button", { name: "CLI" }));
+        await tunnelServer.waitForPtyClose(cliPty.streamId);
+        await tunnelServer.waitForThreadResume("thread_cli_from_cli");
 
-      await waitFor(
-        () => {
-          expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
-        },
-        { timeout: 5_000 },
-      );
-      expect(screen.queryByText("Codex CLI connected")).toBeNull();
+        await waitForChatReady();
+        expect(screen.queryByTitle("Codex CLI")).toBeNull();
+      });
     });
+
+    it("starts a new CLI session when the connected chat thread is not materialized yet", async () => {
+      await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+        fireEvent.click(await waitForEnabledButton("CLI"));
+        const cliPty = await waitForPtySession(tunnelServer, "cli");
+
+        expectCliPty(cliPty);
+        expect(screen.queryByText("Could not start Codex CLI")).toBeNull();
+      });
+    });
+
+    it("fails CLI entry for an unmaterialized provider-backed thread instead of starting a new CLI thread", async () => {
+      await withSessionWorkbenchCliHarness(
+        {
+          providerConversationId: "thread_provider_empty",
+          providerThreadTurnCount: 0,
+        },
+        async () => {
+          fireEvent.click(await waitForEnabledButton("CLI"));
+
+          expect(await screen.findByText("Could not start Codex CLI")).toBeDefined();
+          expect(
+            screen.getByText(
+              "The linked provider conversation 'thread_provider_empty' is not resumable for Codex CLI.",
+            ),
+          ).toBeDefined();
+        },
+      );
+    });
+
+    it("opens the CLI after the side terminal without PTY session collisions", async () => {
+      await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+        fireEvent.click(await waitForEnabledButton("Open terminal"));
+        expectTerminalPty(await waitForPtySession(tunnelServer, "terminal"));
+
+        fireEvent.click(await waitForEnabledButton("CLI"));
+        expectCliPty(await waitForPtySession(tunnelServer, "cli"));
+
+        expect(screen.getByRole("button", { name: "Terminal" }).getAttribute("aria-pressed")).toBe(
+          "true",
+        );
+        expect(screen.queryByText("pty session already exists")).toBeNull();
+      });
+    });
+
+    it("returns to chat even after the CLI PTY has already exited", async () => {
+      await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+        fireEvent.click(await waitForEnabledButton("CLI"));
+        const cliPty = await waitForPtySession(tunnelServer, "cli");
+        expectCliPty(cliPty);
+        tunnelServer.emitPtyExit(cliPty.streamId);
+        await tunnelServer.waitForThreadResume("thread_cli_from_cli");
+
+        await waitForChatReady();
+      });
+    }, 15_000);
+
+    it("shows a CLI entry failure alert in the chat view and leaves chat active", async () => {
+      await withSessionWorkbenchCliHarness(async ({ controls }) => {
+        controls.failNextCliOpen("codex executable missing");
+
+        fireEvent.click(await waitForEnabledButton("CLI"));
+
+        expect(await screen.findByText("Could not start Codex CLI")).toBeDefined();
+        expect(screen.getByText("codex executable missing")).toBeDefined();
+        expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
+        expect(screen.queryByRole("button", { name: "Return to chat" })).toBeNull();
+      });
+    });
+
+    it("preserves the active resumable thread when CLI launch fails before handoff completes", async () => {
+      await withSessionWorkbenchCliHarness(async ({ controls, tunnelServer }) => {
+        controls.failNextCliOpen("codex executable missing");
+
+        fireEvent.click(await waitForEnabledButton("CLI"));
+
+        expect(await screen.findByText("Could not start Codex CLI")).toBeDefined();
+        await waitForChatReady();
+
+        fireEvent.click(await waitForEnabledButton("CLI"));
+        expectCliPty(await waitForPtySession(tunnelServer, "cli"));
+        await tunnelServer.waitForThreadResume("thread_cli_test");
+      });
+    });
+
+    it("shows a restore failure alert in chat without offering a retry action", async () => {
+      await withSessionWorkbenchCliHarness(async ({ controls, tunnelServer }) => {
+        fireEvent.click(await waitForEnabledButton("CLI"));
+        const cliPty = await waitForPtySession(tunnelServer, "cli");
+        expectCliPty(cliPty);
+        controls.setConnectionTokenFailure(true);
+        tunnelServer.emitPtyExit(cliPty.streamId);
+
+        expect(await screen.findByText("Could not restore chat")).toBeDefined();
+        expect(
+          screen.getAllByText(
+            "Minting sandbox connection token failed: Could not mint connection token.",
+          ).length,
+        ).toBeGreaterThan(0);
+        expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
+        expect(screen.queryByRole("button", { name: "Retry restoring chat" })).toBeNull();
+      });
+    }, 15_000);
+
+    it("fails restore explicitly instead of hanging forever when reconnect never establishes an active thread", async () => {
+      await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+        fireEvent.click(await waitForEnabledButton("CLI"));
+        const cliPty = await waitForPtySession(tunnelServer, "cli");
+        expectCliPty(cliPty);
+        tunnelServer.hangNextThreadList();
+        fireEvent.click(screen.getByRole("button", { name: "CLI" }));
+
+        await waitFor(
+          () => {
+            expect(screen.getByText("Could not restore chat")).toBeDefined();
+            expect(screen.getByText("Timed out while restoring chat.")).toBeDefined();
+          },
+          { timeout: 35_000 },
+        );
+      });
+    }, 45_000);
   });
 
-  it("opens the CLI after the side terminal without PTY session collisions", async () => {
-    await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
-      fireEvent.click(await waitForEnabledButton("Open terminal"));
-      expectTerminalPty(await waitForPtySession(tunnelServer, "terminal"));
+  describe("restore policy", () => {
+    it("restores non-provider sessions from the most recently updated available thread even when it is not loaded yet", async () => {
+      await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+        tunnelServer.omitLoadedThreadForNextCliOpen();
 
-      fireEvent.click(await waitForEnabledButton("CLI"));
-      expectCliPty(await waitForPtySession(tunnelServer, "cli"));
+        fireEvent.click(await waitForEnabledButton("CLI"));
+        const cliPty = await waitForPtySession(tunnelServer, "cli");
+        expectCliPty(cliPty);
+        fireEvent.click(screen.getByRole("button", { name: "CLI" }));
 
-      expect(await screen.findByText("Codex CLI connected")).toBeDefined();
-      expect(screen.getByRole("button", { name: "Terminal" }).getAttribute("aria-pressed")).toBe(
-        "true",
-      );
-      expect(screen.queryByText("pty session already exists")).toBeNull();
-    });
+        await waitForChatReady();
+      });
+    }, 15_000);
+
+    it("does not try to reconnect chat through the provisional empty thread after leaving CLI", async () => {
+      await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
+        fireEvent.click(await waitForEnabledButton("CLI"));
+        const cliPty = await waitForPtySession(tunnelServer, "cli");
+        expectCliPty(cliPty);
+        tunnelServer.hangResumeForThread("thread_cli_test");
+        fireEvent.click(screen.getByRole("button", { name: "CLI" }));
+
+        await tunnelServer.waitForThreadResume("thread_cli_from_cli");
+        await waitForChatReady();
+      });
+    }, 15_000);
   });
-
-  it("returns to chat even after the CLI PTY has already exited", async () => {
-    await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
-      fireEvent.click(await waitForEnabledButton("CLI"));
-      const cliPty = await waitForPtySession(tunnelServer, "cli");
-      expectCliPty(cliPty);
-      expect(await screen.findByText("Codex CLI connected")).toBeDefined();
-
-      tunnelServer.emitPtyExit(cliPty.streamId);
-
-      await waitFor(
-        () => {
-          expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
-        },
-        { timeout: 5_000 },
-      );
-      expect(screen.queryByText("Codex CLI connected")).toBeNull();
-    });
-  }, 15_000);
 });

@@ -12,6 +12,7 @@ export type StatusBoxProps = {
 export function StatusBox(input: StatusBoxProps): React.JSX.Element {
   const tone = input.tone ?? "neutral";
   const variant = input.variant ?? "boxed";
+  const hasTitle = input.title !== undefined && input.title !== null && input.title !== "";
 
   return (
     <div
@@ -28,13 +29,11 @@ export function StatusBox(input: StatusBoxProps): React.JSX.Element {
         input.className,
       )}
     >
-      {input.title === undefined ? (
+      {!hasTitle ? (
         <div className="text-sm">{input.children}</div>
       ) : (
         <div className="flex flex-col gap-1">
-          {input.title === undefined ? null : (
-            <div className="text-sm font-medium">{input.title}</div>
-          )}
+          <div className="text-sm font-medium">{input.title}</div>
           {input.children === undefined ? null : <div className="text-sm">{input.children}</div>}
         </div>
       )}

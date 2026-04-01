@@ -13,7 +13,6 @@ export const AutomationConversationExecutionActions = {
   FAIL_MISSING_CONVERSATION: "fail_missing_conversation",
   FAIL_PROVIDER_ERROR: "fail_provider_error",
   FAIL_MISSING_EXECUTION: "fail_missing_execution",
-  FAIL_STEER_NOT_SUPPORTED: "fail_steer_not_supported",
 } as const;
 
 export type ConversationExecutionAction =
@@ -22,9 +21,7 @@ export type ConversationExecutionAction =
 export function resolveAutomationConversationExecutionAction(input: {
   inspectAutomationConversation: ProviderInspectConversationOutput;
   providerExecutionId: string | null;
-  adapter: {
-    steerExecution?: ConversationProviderAdapter["steerExecution"];
-  };
+  adapter: Pick<ConversationProviderAdapter, "steerExecution">;
 }): ConversationExecutionAction {
   if (!input.inspectAutomationConversation.exists) {
     return AutomationConversationExecutionActions.FAIL_MISSING_CONVERSATION;
@@ -38,10 +35,6 @@ export function resolveAutomationConversationExecutionAction(input: {
   if (input.providerExecutionId === null) {
     return AutomationConversationExecutionActions.FAIL_MISSING_EXECUTION;
   }
-  if (input.adapter.steerExecution === undefined) {
-    return AutomationConversationExecutionActions.FAIL_STEER_NOT_SUPPORTED;
-  }
-
   return AutomationConversationExecutionActions.STEER;
 }
 

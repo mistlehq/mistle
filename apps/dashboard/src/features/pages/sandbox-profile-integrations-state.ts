@@ -238,15 +238,13 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
   resolveSelectedConnectionDisplayName: (row: SandboxProfileBindingEditorRow) => string | undefined;
-  integrationSaveSuccess: boolean;
-  isSavingIntegrationBindings: boolean;
+  isSubmittingIntegrationBindings: boolean;
 } {
   const [integrationRows, setIntegrationRows] = useState([...input.initialRows]);
   const [integrationSaveError, setIntegrationSaveError] = useState<string | null>(null);
   const [integrationRowErrorsByClientId, setIntegrationRowErrorsByClientId] = useState<
     Record<string, string>
   >({});
-  const [integrationSaveSuccess, setIntegrationSaveSuccess] = useState(false);
 
   function clearIntegrationRowError(clientId: string): void {
     setIntegrationRowErrorsByClientId((currentErrors) => {
@@ -270,12 +268,10 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     } else {
       clearIntegrationRowError(inputValue.clientId);
     }
-    setIntegrationSaveSuccess(false);
   }
 
   function setIntegrationSaveFailure(message: string): void {
     setIntegrationSaveError(message);
-    setIntegrationSaveSuccess(false);
   }
 
   const putIntegrationBindingsMutation = useMutation({
@@ -297,7 +293,6 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
       setIntegrationRows(mapBindingsToEditorRows(updatedBindings.bindings));
       setIntegrationSaveError(null);
       setIntegrationRowErrorsByClientId({});
-      setIntegrationSaveSuccess(true);
       await input.invalidateVersionBindings({
         profileId: input.profileId,
         version: input.version,
@@ -332,14 +327,12 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
             fallbackMessage: "Could not save sandbox profile integrations.",
           }),
       );
-      setIntegrationSaveSuccess(false);
     },
   });
 
   function setNeutralSaveState(): void {
     setIntegrationSaveError(null);
     setIntegrationRowErrorsByClientId({});
-    setIntegrationSaveSuccess(false);
   }
 
   async function persistIntegrationRows(
@@ -469,7 +462,6 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     onRemoveIntegrationBindingRow,
     onIntegrationBindingRowChange,
     resolveSelectedConnectionDisplayName,
-    integrationSaveSuccess,
-    isSavingIntegrationBindings: putIntegrationBindingsMutation.isPending,
+    isSubmittingIntegrationBindings: putIntegrationBindingsMutation.isPending,
   };
 }

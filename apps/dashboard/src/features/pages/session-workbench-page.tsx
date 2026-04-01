@@ -41,9 +41,9 @@ function SessionWorkbenchPageContent(input: {
       "Terminal is available only when the sandbox is running.")
     : terminalButtonLabel;
   const cliButtonLabel = "CLI";
-  const cliButtonTitle =
-    workbench.primaryPanelState.disabledReason ??
-    (workbench.primaryPanelState.mode === "cli" ? "Return to chat" : "Open Codex CLI");
+  const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
+    ? "Return to chat"
+    : (workbench.primaryPanelState.disabledReason ?? "Open Codex CLI");
   const showResumeButton = shouldShowResumeAction({
     requiresManualResume: workbench.stoppedSessionState.requiresManualResume,
     isResumingStoppedSandbox: workbench.isResumingStoppedSandbox,
@@ -52,10 +52,10 @@ function SessionWorkbenchPageContent(input: {
     () => (
       <div className="flex items-center gap-2">
         <Badge
-          className={workbench.sessionHeaderStatusUi.className}
-          variant={workbench.sessionHeaderStatusUi.variant}
+          className={workbench.sandboxHeaderStatusUi.className}
+          variant={workbench.sandboxHeaderStatusUi.variant}
         >
-          {workbench.sessionHeaderStatusUi.label}
+          {workbench.sandboxHeaderStatusUi.label}
         </Badge>
         <span aria-hidden className="h-5 w-px bg-stone-200" />
         {showResumeButton ? (
@@ -73,17 +73,18 @@ function SessionWorkbenchPageContent(input: {
         ) : null}
         <Button
           aria-label={cliButtonLabel}
-          aria-pressed={workbench.primaryPanelState.mode === "cli"}
+          aria-pressed={workbench.primaryPanelState.isCliToggleActive}
           className={
-            workbench.primaryPanelState.mode === "cli"
+            workbench.primaryPanelState.isCliToggleActive
               ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
               : "bg-transparent text-foreground shadow-none hover:bg-stone-100"
           }
           disabled={
-            !workbench.primaryPanelState.canEnterCli && workbench.primaryPanelState.mode !== "cli"
+            !workbench.primaryPanelState.canEnterCli &&
+            !workbench.primaryPanelState.isCliToggleActive
           }
           onClick={() => {
-            if (workbench.primaryPanelState.mode === "cli") {
+            if (workbench.primaryPanelState.isCliToggleActive) {
               void workbench.primaryPanelState.exitCliMode();
               return;
             }
@@ -134,14 +135,13 @@ function SessionWorkbenchPageContent(input: {
       workbench.primaryPanelState.disabledReason,
       workbench.primaryPanelState.enterCliMode,
       workbench.primaryPanelState.exitCliMode,
-      workbench.primaryPanelState.isSwitching,
-      workbench.primaryPanelState.mode,
+      workbench.primaryPanelState.isCliToggleActive,
       workbench.isResumingStoppedSandbox,
       workbench.ptyState.actions.disconnectPty,
       workbench.requestStoppedSandboxResume,
-      workbench.sessionHeaderStatusUi.className,
-      workbench.sessionHeaderStatusUi.label,
-      workbench.sessionHeaderStatusUi.variant,
+      workbench.sandboxHeaderStatusUi.className,
+      workbench.sandboxHeaderStatusUi.label,
+      workbench.sandboxHeaderStatusUi.variant,
       workbench.terminalPanelState.closePanel,
       workbench.terminalPanelState.isVisible,
       workbench.terminalPanelState.openPanel,
@@ -210,6 +210,22 @@ function SessionWorkbenchPageContent(input: {
       description: workbench.sandboxFailureMessage,
     });
   }
+  if (
+    workbench.primaryPanelState.transitionState === "stable_chat" &&
+    workbench.primaryPanelState.error !== null
+  ) {
+    alerts.push({
+      title:
+        workbench.primaryPanelState.error.kind === "chat_restore_failed"
+          ? "Could not restore chat"
+          : "Could not start Codex CLI",
+      description:
+        workbench.primaryPanelState.error.message ??
+        (workbench.primaryPanelState.error.kind === "chat_restore_failed"
+          ? "The workbench could not reconnect chat automatically. Please try again later or contact support if the problem continues."
+          : "Could not start Codex CLI."),
+    });
+  }
   if (input.sandboxInstanceId === null) {
     return (
       <SessionWorkbenchPageView
@@ -242,25 +258,40 @@ function SessionWorkbenchPageContent(input: {
 
   return (
     <SessionWorkbenchPageView
-      alerts={workbench.hasTopAlert ? alerts : []}
-      isSecondaryPanelVisible={workbench.terminalPanelState.isVisible}
-      mainContent={
-        workbench.primaryPanelState.mode === "cli" ? (
-          <SessionCliPanel ptyState={workbench.cliPtyState} />
-        ) : (
-          <SessionConversationMainContent
-            chatEntries={conversationPane.chatState.entries}
-            isRespondingToServerRequest={
-              conversationPane.serverRequestsState.isRespondingToServerRequest
-            }
-            onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
-            serverRequestPanelEntries={unmatchedServerRequests}
-          />
-        )
+      alerts={
+        workbench.hasTopAlert ||
+        (workbench.primaryPanelState.transitionState === "stable_chat" &&
+          workbench.primaryPanelState.error !== null)
+          ? alerts
+          : []
       }
+      isPrimaryPanelTransitioning={
+        workbench.primaryPanelState.transitionState === "switching_to_cli" ||
+        workbench.primaryPanelState.transitionState === "restoring_chat"
+      }
+      isSecondaryPanelVisible={workbench.terminalPanelState.isVisible}
+      mainContentLayout={
+        workbench.primaryPanelState.transitionState === "stable_cli"
+          ? { scroll: "contained", width: "full" }
+          : { scroll: "page", width: "chat" }
+      }
+      mainContent={renderPrimaryPanelMainContent({
+        conversation: {
+          chatEntries: conversationPane.chatState.entries,
+          isRespondingToServerRequest:
+            conversationPane.serverRequestsState.isRespondingToServerRequest,
+          onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
+          serverRequestPanelEntries: unmatchedServerRequests,
+        },
+        cli: {
+          ptyState: workbench.cliPtyState,
+          refitKey: workbench.terminalPanelState.isVisible ? "cli:split" : "cli:solo",
+        },
+        transitionState: workbench.primaryPanelState.transitionState,
+      })}
       onSecondaryPanelResize={workbench.terminalPanelState.setPanelSize}
       primaryBottomPanel={
-        workbench.primaryPanelState.mode === "cli" ? null : (
+        workbench.primaryPanelState.showsChatComposer ? (
           <>
             {workbench.shouldAutoResumeOnEntry ? (
               <SessionWorkbenchAutoResumeOnEntry
@@ -278,7 +309,7 @@ function SessionWorkbenchPageContent(input: {
               serverRequestPanelEntries={unmatchedServerRequests}
             />
           </>
-        )
+        ) : null
       }
       secondaryPanel={
         <SessionTerminalPanel
@@ -301,6 +332,42 @@ function SessionWorkbenchPageContent(input: {
       sandboxInstanceId={input.sandboxInstanceId}
     />
   );
+}
+
+type PrimaryPanelConversationContent = Pick<
+  React.ComponentProps<typeof SessionConversationMainContent>,
+  | "chatEntries"
+  | "isRespondingToServerRequest"
+  | "onRespondToServerRequest"
+  | "serverRequestPanelEntries"
+>;
+
+type PrimaryPanelCliContent = Pick<
+  React.ComponentProps<typeof SessionCliPanel>,
+  "ptyState" | "refitKey"
+>;
+
+function renderPrimaryPanelMainContent(input: {
+  cli: PrimaryPanelCliContent;
+  conversation: PrimaryPanelConversationContent;
+  transitionState: ReturnType<
+    typeof useSessionWorkbenchController
+  >["workbench"]["primaryPanelState"]["transitionState"];
+}): React.JSX.Element {
+  switch (input.transitionState) {
+    case "switching_to_cli":
+    case "restoring_chat":
+      return <></>;
+    case "stable_cli":
+      return (
+        <SessionCliPanel
+          ptyState={input.cli.ptyState}
+          {...(input.cli.refitKey === undefined ? {} : { refitKey: input.cli.refitKey })}
+        />
+      );
+    case "stable_chat":
+      return <SessionConversationMainContent {...input.conversation} />;
+  }
 }
 
 function SessionWorkbenchAutoResumeOnEntry(input: {

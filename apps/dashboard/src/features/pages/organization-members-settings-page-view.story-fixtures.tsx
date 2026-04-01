@@ -143,8 +143,6 @@ export function createOrganizationMembersSettingsPageStoryArgs(
     onInviteDialogOpenChange: overrides.onInviteDialogOpenChange ?? (() => {}),
     onRemoveMember: overrides.onRemoveMember ?? (() => {}),
     onResendInvite: overrides.onResendInvite ?? (() => {}),
-    onRetryCapabilities: overrides.onRetryCapabilities ?? (() => {}),
-    onRetryLoad: overrides.onRetryLoad ?? (() => {}),
     onRevokeInvite: overrides.onRevokeInvite ?? (() => {}),
     onRoleDialogCancel: overrides.onRoleDialogCancel ?? (() => {}),
     onRoleDialogOpenChange: overrides.onRoleDialogOpenChange ?? (() => {}),

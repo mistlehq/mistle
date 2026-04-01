@@ -118,6 +118,7 @@ export async function getInstance(
     status: sandboxInstance.status,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
+    runtimePlan: sandboxInstance.runtimePlan,
     automationConversation,
   };
 }

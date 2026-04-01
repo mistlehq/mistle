@@ -30,6 +30,7 @@ export type SandboxInstanceStatus = {
   status: NonNullable<GetSandboxInstanceResponse>["status"];
   failureCode: string | null;
   failureMessage: string | null;
+  runtimePlan: NonNullable<GetSandboxInstanceResponse>["runtimePlan"];
   automationConversation: SandboxInstanceAutomationConversation | null;
 };
 

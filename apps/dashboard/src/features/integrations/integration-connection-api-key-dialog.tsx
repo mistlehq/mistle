@@ -8,6 +8,8 @@ import {
   Input,
 } from "@mistle/ui";
 
+import { StatusBox } from "../shared/status-box.js";
+
 export function IntegrationConnectionApiKeyDialog(input: {
   connectionDisplayName: string;
   errorMessage?: string;
@@ -37,6 +39,7 @@ export function IntegrationConnectionApiKeyDialog(input: {
 
           <div className="gap-2 flex flex-col">
             <Input
+              aria-invalid={input.errorMessage === undefined ? undefined : true}
               autoComplete="off"
               data-1p-ignore="true"
               onChange={(event) => {
@@ -49,7 +52,7 @@ export function IntegrationConnectionApiKeyDialog(input: {
           </div>
 
           {input.errorMessage === undefined ? null : (
-            <p className="text-destructive text-sm">{input.errorMessage}</p>
+            <StatusBox tone="destructive">{input.errorMessage}</StatusBox>
           )}
 
           <DialogFooter>

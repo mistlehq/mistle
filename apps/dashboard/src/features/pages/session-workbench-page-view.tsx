@@ -1,20 +1,22 @@
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@mistle/ui";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@mistle/ui";
+
+import { StatusBox } from "../shared/status-box.js";
 
 type SessionWorkbenchAlert = {
   title: string;
   description: string;
 };
 
+type SessionWorkbenchMainContentLayout = {
+  scroll: "contained" | "page";
+  width: "chat" | "full";
+};
+
 type SessionWorkbenchPageViewProps = {
   sandboxInstanceId: string | null;
   alerts: readonly SessionWorkbenchAlert[];
+  isPrimaryPanelTransitioning?: boolean;
+  mainContentLayout?: SessionWorkbenchMainContentLayout;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
   secondaryPanel: React.ReactNode;
@@ -23,11 +25,17 @@ type SessionWorkbenchPageViewProps = {
   isSecondaryPanelVisible: boolean;
 };
 
-export type { SessionWorkbenchAlert, SessionWorkbenchPageViewProps };
+export type {
+  SessionWorkbenchAlert,
+  SessionWorkbenchMainContentLayout,
+  SessionWorkbenchPageViewProps,
+};
 
 export function SessionWorkbenchPageView({
   sandboxInstanceId,
   alerts,
+  isPrimaryPanelTransitioning = false,
+  mainContentLayout = { scroll: "page", width: "chat" },
   mainContent,
   primaryBottomPanel,
   secondaryPanel,
@@ -37,22 +45,38 @@ export function SessionWorkbenchPageView({
 }: SessionWorkbenchPageViewProps): React.JSX.Element {
   if (sandboxInstanceId === null) {
     return (
-      <Alert variant="destructive">
-        <AlertTitle>Session id is missing</AlertTitle>
-        <AlertDescription>Open a session from the Sessions page.</AlertDescription>
-      </Alert>
+      <StatusBox title="Session id is missing" tone="destructive">
+        Open a session from the Sessions page.
+      </StatusBox>
     );
   }
+
+  const hasPrimaryBottomPanel =
+    primaryBottomPanel !== null && primaryBottomPanel !== undefined && primaryBottomPanel !== false;
+  const mainContentContainerClassName =
+    mainContentLayout.width === "full" ? "h-full w-full" : "mx-auto w-full max-w-3xl px-4 pb-4";
+  const mainContentRegionClassName =
+    mainContentLayout.scroll === "contained"
+      ? "min-h-0 flex-1 overflow-hidden"
+      : "min-h-0 flex-1 overflow-y-auto";
+  const mainContentScrollbarGutterStyle =
+    mainContentLayout.width === "full" ? undefined : { scrollbarGutter: "stable both-edges" };
+  const primaryPanelTransitionClassName = isPrimaryPanelTransitioning
+    ? "opacity-0 transition-opacity duration-200 ease-out"
+    : "opacity-100 transition-opacity duration-200 ease-in";
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {alerts.length === 0 ? null : (
         <div className="mx-auto flex w-full max-w-3xl flex-none flex-col gap-4 px-4 py-6">
           {alerts.map((alert) => (
-            <Alert key={`${alert.title}:${alert.description}`} variant="destructive">
-              <AlertTitle>{alert.title}</AlertTitle>
-              <AlertDescription>{alert.description}</AlertDescription>
-            </Alert>
+            <StatusBox
+              key={`${alert.title}:${alert.description}`}
+              title={alert.title}
+              tone="destructive"
+            >
+              {alert.description}
+            </StatusBox>
           ))}
         </div>
       )}
@@ -64,19 +88,23 @@ export function SessionWorkbenchPageView({
           orientation="vertical"
         >
           <ResizablePanel defaultSize={100 - secondaryPanelSize} minSize={25}>
-            <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <div
+              className={`flex h-full min-h-0 flex-col overflow-hidden ${primaryPanelTransitionClassName}`}
+            >
               <div
                 aria-label="Conversation chat"
-                className="min-h-0 flex-1 overflow-y-auto"
+                className={mainContentRegionClassName}
                 role="region"
-                style={{ scrollbarGutter: "stable both-edges" }}
+                style={mainContentScrollbarGutterStyle}
               >
-                <div className="mx-auto w-full max-w-3xl px-4 pb-4">{mainContent}</div>
+                <div className={mainContentContainerClassName}>{mainContent}</div>
               </div>
 
-              <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
-                <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
-              </div>
+              {!hasPrimaryBottomPanel ? null : (
+                <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
+                  <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
+                </div>
+              )}
             </div>
           </ResizablePanel>
           <ResizableHandle />
@@ -96,16 +124,20 @@ export function SessionWorkbenchPageView({
         <>
           <div
             aria-label="Conversation chat"
-            className="min-h-0 flex-1 overflow-y-auto"
+            className={`${mainContentRegionClassName} ${primaryPanelTransitionClassName}`}
             role="region"
-            style={{ scrollbarGutter: "stable both-edges" }}
+            style={mainContentScrollbarGutterStyle}
           >
-            <div className="mx-auto w-full max-w-3xl px-4 pb-4">{mainContent}</div>
+            <div className={mainContentContainerClassName}>{mainContent}</div>
           </div>
 
-          <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
-            <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
-          </div>
+          {!hasPrimaryBottomPanel ? null : (
+            <div
+              className={`bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm ${primaryPanelTransitionClassName}`}
+            >
+              <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
+            </div>
+          )}
         </>
       )}
     </div>

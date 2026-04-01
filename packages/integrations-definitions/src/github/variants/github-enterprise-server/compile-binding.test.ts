@@ -39,6 +39,11 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
           args: ["github-releases.installLatestBinary"],
         };
       },
+      installLatestTaggedAsset() {
+        return {
+          args: ["github-releases.installLatestTaggedAsset"],
+        };
+      },
     },
     compileContext: {
       organizationId: "org_123",
@@ -87,6 +92,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         kind: "git",
         config: {
           repositories: ["acme/repo"],
+          tools: ["github-cli"],
         },
       },
       refs: {
@@ -168,6 +174,54 @@ describe("compileGitHubEnterpriseServerBinding", () => {
     ]);
   });
 
+  it("omits the gh artifact when github-cli is not selected", () => {
+    const compiled = compileGitHubEnterpriseServerBinding({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "github_enterprise_server",
+      target: {
+        familyId: "github",
+        variantId: "github-enterprise-server",
+        enabled: true,
+        secrets: {},
+        config: {
+          apiBaseUrl: "https://ghe.example.com/api/v3",
+          webBaseUrl: "https://ghe.example.com",
+        },
+      },
+      connection: {
+        id: "icn_123",
+        status: "active",
+        config: {
+          connection_method: "api-key",
+        },
+      },
+      binding: {
+        id: "ibd_123",
+        kind: "git",
+        config: {
+          repositories: ["acme/repo"],
+          tools: [],
+        },
+      },
+      refs: {
+        sandboxPaths: SandboxPaths,
+        artifactBinPath,
+      },
+    });
+
+    expect(compiled.artifacts).toEqual([]);
+    expect(compiled.workspaceSources).toEqual([
+      {
+        sourceKind: "git-clone",
+        resourceKind: "repository",
+        path: "/root/acme/repo",
+        originUrl: "https://ghe.example.com/acme/repo.git",
+      },
+    ]);
+  });
+
   it("deduplicates and sorts repositories for deterministic route matching", () => {
     const compiled = compileGitHubEnterpriseServerBinding({
       organizationId: "org_123",
@@ -196,6 +250,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         kind: "git",
         config: {
           repositories: ["acme/repo-b", "acme/repo-a", "acme/repo-a"],
+          tools: ["github-cli"],
         },
       },
       refs: {
@@ -240,6 +295,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         kind: "git",
         config: {
           repositories: ["acme/repo"],
+          tools: ["github-cli"],
         },
       },
       refs: {
@@ -291,6 +347,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
           kind: "git",
           config: {
             repositories: ["acme/repo"],
+            tools: [],
           },
         },
         refs: {

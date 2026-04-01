@@ -1,5 +1,3 @@
-import { Alert, AlertDescription, AlertTitle, Button } from "@mistle/ui";
-
 import { MemberInviteDialog } from "../settings/members/member-invite-dialog.js";
 import { MemberRoleChangeDialog } from "../settings/members/member-role-change-dialog.js";
 import type {
@@ -18,6 +16,7 @@ import {
   MembersLoadErrorState,
   MembersLoadingState,
 } from "../settings/members/members-query-states.js";
+import { StatusBox } from "../shared/status-box.js";
 
 export type OrganizationMembersSettingsPageViewProps = {
   capabilities: MembershipCapabilities | null;
@@ -44,8 +43,6 @@ export type OrganizationMembersSettingsPageViewProps = {
   onInviteDialogOpenChange: (nextOpen: boolean) => void;
   onRemoveMember: (member: SettingsMember) => void;
   onResendInvite: (invitation: SettingsInvitation) => void;
-  onRetryCapabilities: () => void;
-  onRetryLoad: () => void;
   onRevokeInvite: (invitation: SettingsInvitation) => void;
   onRoleDialogCancel: () => void;
   onRoleDialogOpenChange: (nextOpen: boolean) => void;
@@ -66,21 +63,18 @@ export function OrganizationMembersSettingsPageView(
   }
 
   if (props.loadErrorMessage) {
-    return <MembersLoadErrorState message={props.loadErrorMessage} onRetry={props.onRetryLoad} />;
+    return <MembersLoadErrorState message={props.loadErrorMessage} />;
   }
 
   return (
     <div className="flex flex-col gap-4">
       {props.capabilitiesErrorMessage ? (
-        <Alert variant="destructive">
-          <AlertTitle>Membership permissions could not be loaded. Try again.</AlertTitle>
-          <AlertDescription className="flex items-center justify-between gap-2">
-            <span>Invite and role management actions are disabled until permissions load.</span>
-            <Button onClick={props.onRetryCapabilities} type="button" variant="outline">
-              Retry
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <div className="flex flex-col gap-3">
+          <StatusBox title="Could not load membership permissions" tone="destructive">
+            Invite and role management actions are unavailable until this loads. Please try again
+            later.
+          </StatusBox>
+        </div>
       ) : null}
 
       <MembersDirectoryTable

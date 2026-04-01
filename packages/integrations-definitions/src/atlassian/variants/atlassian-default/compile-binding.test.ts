@@ -1,10 +1,71 @@
+import type { RuntimeArtifactCommand, RuntimeArtifactSpec } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { AtlassianConnectionMethodIds } from "./auth.js";
 import { compileAtlassianBinding } from "./compile-binding.js";
 
+function artifactBinPath(name: string): string {
+  return `/usr/local/bin/${name}`;
+}
+
+const SandboxPaths = {
+  userHomeDir: "/root",
+  workspaceDir: "/root",
+  runtimeDataDir: "/var/lib/mistle",
+  runtimeArtifactDir: "/var/lib/mistle/artifacts",
+  runtimeArtifactBinDir: "/usr/local/bin",
+} as const;
+
+function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
+  install: ReadonlyArray<RuntimeArtifactCommand>;
+} {
+  const refs = {
+    command: {
+      exec(input: RuntimeArtifactCommand): RuntimeArtifactCommand {
+        return input;
+      },
+    },
+    sandboxPaths: SandboxPaths,
+    artifactBinPath,
+    mise: {
+      install(input: { tools: ReadonlyArray<string>; force?: boolean; timeoutMs?: number }) {
+        return {
+          args: ["mise", "install", ...input.tools],
+        };
+      },
+    },
+    githubReleases: {
+      installLatestBinary() {
+        return {
+          args: ["github-releases.installLatestBinary"],
+        };
+      },
+      installLatestTaggedAsset() {
+        return {
+          args: ["github-releases.installLatestTaggedAsset"],
+        };
+      },
+    },
+    compileContext: {
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "atlassian-default",
+      bindingId: "ibd_123",
+    },
+  };
+
+  const install =
+    typeof artifact.lifecycle.install === "function"
+      ? artifact.lifecycle.install({ refs })
+      : artifact.lifecycle.install;
+  return {
+    install,
+  };
+}
+
 describe("compileAtlassianBinding", () => {
-  it("builds the expected Atlassian personal token egress route", () => {
+  it("builds the expected Atlassian personal token egress route and optional jira artifact", () => {
     const compiled = compileAtlassianBinding({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
@@ -29,17 +90,13 @@ describe("compileAtlassianBinding", () => {
       binding: {
         id: "ibd_123",
         kind: "connector",
-        config: {},
+        config: {
+          tools: ["jira-cli"],
+        },
       },
       refs: {
-        sandboxPaths: {
-          userHomeDir: "/root",
-          workspaceDir: "/root",
-          runtimeDataDir: "/var/lib/mistle",
-          runtimeArtifactDir: "/var/lib/mistle/artifacts",
-          runtimeArtifactBinDir: "/usr/local/bin",
-        },
-        artifactBinPath: (name) => `/usr/local/bin/${name}`,
+        sandboxPaths: SandboxPaths,
+        artifactBinPath,
       },
     });
 
@@ -62,7 +119,20 @@ describe("compileAtlassianBinding", () => {
         },
       },
     ]);
-    expect(compiled.artifacts).toEqual([]);
+    expect(compiled.artifacts).toHaveLength(1);
+    const artifact = compiled.artifacts[0];
+    expect(artifact?.artifactKey).toBe("jira-cli");
+    expect(artifact?.name).toBe("Jira CLI");
+    if (artifact === undefined) {
+      throw new Error("Expected compiled jira artifact.");
+    }
+    expect(resolveArtifactLifecycleCommands(artifact)).toEqual({
+      install: [
+        {
+          args: ["github-releases.installLatestTaggedAsset"],
+        },
+      ],
+    });
     expect(compiled.runtimeClients).toEqual([]);
   });
 
@@ -90,17 +160,13 @@ describe("compileAtlassianBinding", () => {
       binding: {
         id: "ibd_123",
         kind: "connector",
-        config: {},
+        config: {
+          tools: [],
+        },
       },
       refs: {
-        sandboxPaths: {
-          userHomeDir: "/root",
-          workspaceDir: "/root",
-          runtimeDataDir: "/var/lib/mistle",
-          runtimeArtifactDir: "/var/lib/mistle/artifacts",
-          runtimeArtifactBinDir: "/usr/local/bin",
-        },
-        artifactBinPath: (name) => `/usr/local/bin/${name}`,
+        sandboxPaths: SandboxPaths,
+        artifactBinPath,
       },
     });
 
@@ -152,17 +218,13 @@ describe("compileAtlassianBinding", () => {
       binding: {
         id: "ibd_123",
         kind: "connector",
-        config: {},
+        config: {
+          tools: [],
+        },
       },
       refs: {
-        sandboxPaths: {
-          userHomeDir: "/root",
-          workspaceDir: "/root",
-          runtimeDataDir: "/var/lib/mistle",
-          runtimeArtifactDir: "/var/lib/mistle/artifacts",
-          runtimeArtifactBinDir: "/usr/local/bin",
-        },
-        artifactBinPath: (name) => `/usr/local/bin/${name}`,
+        sandboxPaths: SandboxPaths,
+        artifactBinPath,
       },
     });
 

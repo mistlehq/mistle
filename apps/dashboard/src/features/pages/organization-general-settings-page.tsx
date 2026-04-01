@@ -179,11 +179,6 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
 
   return (
     <OrganizationGeneralSettingsEditor
-      key={
-        organizationQuery.data === undefined
-          ? "loading"
-          : `${organizationQuery.data.slug}:${organizationQuery.data.name}:${organizationQuery.data.logoUrl ?? "none"}`
-      }
       isLogoMutating={uploadLogoMutation.isPending || deleteLogoMutation.isPending}
       isLoading={organizationQuery.isPending}
       isSaving={saveMutation.isPending}

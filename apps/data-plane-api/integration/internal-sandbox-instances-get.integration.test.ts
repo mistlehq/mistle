@@ -139,6 +139,7 @@ describe("internal sandbox instances get integration", () => {
       status: "pending",
       failureCode: null,
       failureMessage: null,
+      runtimePlan: null,
     });
   });
 
@@ -194,6 +195,7 @@ describe("internal sandbox instances get integration", () => {
         status: "starting",
         failureCode: null,
         failureMessage: null,
+        runtimePlan: null,
       });
     } finally {
       await gateway.stop();
@@ -251,6 +253,7 @@ describe("internal sandbox instances get integration", () => {
       status: "failed",
       failureCode: "provider_runtime_missing",
       failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
+      runtimePlan: null,
     });
 
     const persistedRow = await fixture.db.query.sandboxInstances.findFirst({
@@ -322,6 +325,7 @@ describe("internal sandbox instances get integration", () => {
         status: "starting",
         failureCode: null,
         failureMessage: null,
+        runtimePlan: null,
       });
 
       const persistedRow = await fixture.db.query.sandboxInstances.findFirst({
@@ -404,6 +408,7 @@ describe("internal sandbox instances get integration", () => {
         status: "running",
         failureCode: null,
         failureMessage: null,
+        runtimePlan: null,
       });
     } finally {
       if (bootstrapSocket !== null) {
@@ -464,6 +469,7 @@ describe("internal sandbox instances get integration", () => {
       status: "failed",
       failureCode: "provider_runtime_missing",
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
+      runtimePlan: null,
     });
 
     const persistedRow = await fixture.db.query.sandboxInstances.findFirst({

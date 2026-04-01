@@ -36,8 +36,6 @@ type UseOrganizationMembersSettingsStateResult = {
   invitationActionState: MembersDirectoryInvitationActionState;
   isUpdatingRole: boolean;
   roleUpdateErrorMessage: string | null;
-  retryMembersAndInvitations: () => void;
-  onRetryCapabilities: () => void;
   onChangeRole: (member: SettingsMember) => void;
   onRoleDialogOpenChange: (nextOpen: boolean) => void;
   onRoleSelectValueChange: (nextRoleValue: string | null) => void;
@@ -100,12 +98,6 @@ export function useOrganizationMembersSettingsState(
     invitationActionState,
     isUpdatingRole: mutations.isUpdatingRole,
     roleUpdateErrorMessage,
-    retryMembersAndInvitations: () => {
-      void Promise.all([queries.membersQuery.refetch(), queries.invitationsQuery.refetch()]);
-    },
-    onRetryCapabilities: () => {
-      void queries.capabilitiesQuery.refetch();
-    },
     onChangeRole: (member) => {
       const nextRoleChangeDialog = buildRoleChangeDialogState({
         capabilities: queries.capabilities,

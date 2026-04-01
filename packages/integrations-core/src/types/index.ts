@@ -2,7 +2,6 @@ import type { z } from "zod";
 
 import type { AgentRuntimeRegistry } from "../agent-runtimes/index.js";
 import type { AgentPtyLaunchSpec } from "../agent-runtimes/types.js";
-import type { AgentIntegrationHooks } from "../agent/index.js";
 import type { ConnectionCapabilitySet } from "../capabilities/index.js";
 import type { IntegrationRegistry } from "../registry/index.js";
 
@@ -838,6 +837,23 @@ export type RuntimeArtifactGithubReleaseInstallInput = {
   timeoutMs?: number;
 };
 
+type RuntimeArtifactGithubReleaseTaggedAssetInstallBaseInput = {
+  repository: string;
+  releaseTagPrefix: string;
+  assetName: string;
+  installPath: string;
+  timeoutMs?: number;
+};
+
+export type RuntimeArtifactGithubReleaseTaggedAssetInstallInput =
+  | (RuntimeArtifactGithubReleaseTaggedAssetInstallBaseInput & {
+      format?: "binary";
+    })
+  | (RuntimeArtifactGithubReleaseTaggedAssetInstallBaseInput & {
+      format: "tar.gz";
+      binaryPath: string;
+    });
+
 export type RuntimeArtifactRefs = {
   command: {
     exec(input: RuntimeArtifactCommand): RuntimeArtifactCommand;
@@ -853,6 +869,9 @@ export type RuntimeArtifactRefs = {
   };
   githubReleases: {
     installLatestBinary(input: RuntimeArtifactGithubReleaseInstallInput): RuntimeArtifactCommand;
+    installLatestTaggedAsset(
+      input: RuntimeArtifactGithubReleaseTaggedAssetInstallInput,
+    ): RuntimeArtifactCommand;
   };
   compileContext: {
     organizationId: string;
@@ -1126,7 +1145,6 @@ export type IntegrationDefinition<
   familyId: string;
   variantId: string;
   kind: IntegrationKind;
-  agent?: AgentIntegrationHooks;
   displayName: string;
   description?: string;
   logoKey: string;

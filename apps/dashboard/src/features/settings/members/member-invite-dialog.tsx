@@ -1,7 +1,4 @@
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   Button,
   Dialog,
   DialogContent,
@@ -19,6 +16,7 @@ import {
   SelectValue,
 } from "@mistle/ui";
 
+import { StatusBox } from "../../shared/status-box.js";
 import { MemberInviteChipInput } from "./member-invite-chip-input.js";
 import { MemberInviteResultsView } from "./member-invite-results-view.js";
 import type { InviteMemberResponse, OrganizationRole } from "./members-api.js";
@@ -154,19 +152,15 @@ function OpenMemberInviteDialog(input: {
         )}
 
         {!input.canExecute ? (
-          <Alert variant="destructive">
-            <AlertTitle>Invites are disabled</AlertTitle>
-            <AlertDescription>
-              You do not have permission to invite members in this organization.
-            </AlertDescription>
-          </Alert>
+          <StatusBox title="Invites are disabled" tone="destructive">
+            You do not have permission to invite members in this organization.
+          </StatusBox>
         ) : null}
 
         {form.dialogError ? (
-          <Alert variant="destructive">
-            <AlertTitle>Request failed</AlertTitle>
-            <AlertDescription>{form.dialogError}</AlertDescription>
-          </Alert>
+          <StatusBox title="Request failed" tone="destructive">
+            {form.dialogError}
+          </StatusBox>
         ) : null}
 
         <DialogFooter>

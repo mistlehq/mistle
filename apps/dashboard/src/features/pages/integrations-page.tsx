@@ -100,9 +100,6 @@ export function IntegrationsPage() {
             })
           : null
       }
-      onRetryLoad={() => {
-        void directoryState.integrationsQuery.refetch();
-      }}
     />
   );
 }

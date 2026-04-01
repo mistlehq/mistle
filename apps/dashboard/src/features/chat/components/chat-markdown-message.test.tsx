@@ -35,4 +35,20 @@ describe("ChatMarkdownMessage", () => {
     expect(screen.getByText("apps/dashboard")).toBeDefined();
     expect(screen.getByText("apps/control-plane-api")).toBeDefined();
   });
+
+  it("renders markdown task lists with native checkboxes", () => {
+    render(
+      <ChatMarkdownMessage
+        isStreaming={false}
+        text={"- [x] Completed task\n- [ ] Remaining task"}
+      />,
+    );
+
+    const completedTaskItem = screen.getByText("Completed task").closest("li");
+    const remainingTaskItem = screen.getByText("Remaining task").closest("li");
+
+    expect(completedTaskItem).not.toBeNull();
+    expect(remainingTaskItem).not.toBeNull();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
+  });
 });
