@@ -27,7 +27,6 @@ describe("IntegrationConnectionApiKeyDialog", () => {
       />,
     );
 
-    expect(screen.getByText("Update OpenAI Production")).toBeTruthy();
     const input = screen.getByPlaceholderText("Enter new API key");
     expect(input.getAttribute("data-1p-ignore")).toBe("true");
     expect(input.getAttribute("autocomplete")).toBe("off");

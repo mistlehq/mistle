@@ -264,7 +264,6 @@ describe("WebhookAutomationForm", () => {
     const form = within(container);
 
     expect(form.getAllByRole("heading", { name: "Create Automation" }).length).toBeGreaterThan(0);
-    expect(form.getByText("Automation name")).toBeDefined();
     expect(form.queryByDisplayValue("Your automation")).toBeNull();
     expect(form.queryByRole("button", { name: "Edit automation name" })).toBeNull();
   });

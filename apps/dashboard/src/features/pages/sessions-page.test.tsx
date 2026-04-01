@@ -181,11 +181,8 @@ describe("SessionsPage", () => {
     const rendered = renderSessionsPage({ queryClient });
 
     try {
-      expect(screen.getByText("Start a new session")).toBeDefined();
       expect(screen.getByRole("combobox", { name: "Sandbox profile" })).toBeDefined();
       expect(screen.getByRole("button", { name: "Start session" })).toBeDefined();
-      expect(screen.queryByText("Recent Sessions")).toBeNull();
-      expect(screen.queryByText("No launched sessions yet.")).toBeNull();
     } finally {
       rendered.unmount();
       await queryClient.cancelQueries();

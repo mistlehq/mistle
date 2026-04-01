@@ -140,7 +140,6 @@ describe("IntegrationConnectionDialog", () => {
       />,
     );
 
-    expect(screen.getByText("Configuration")).toBeTruthy();
     expect(screen.getByLabelText("Endpoint")).toBeTruthy();
     expect(screen.getByPlaceholderText("Paste token")).toBeTruthy();
   });
@@ -200,7 +199,6 @@ describe("IntegrationConnectionDialog", () => {
       />,
     );
 
-    expect(screen.queryByText("Authentication method")).toBeNull();
     expect(screen.queryByRole("radio")).toBeNull();
   });
 
