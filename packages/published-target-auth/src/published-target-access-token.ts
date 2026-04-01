@@ -3,28 +3,25 @@ import { createSecretKey } from "node:crypto";
 import { SignJWT, errors as JoseErrors, jwtVerify } from "jose";
 import { z } from "zod";
 
-const AllowedPublishedTargetAccessTokenAlgorithms = ["HS256"];
-const NonEmptyStringSchema = z.string().trim().min(1);
-const TokenStringSchema = z.string().trim().min(1);
 const PublishedTargetAccessTokenMintInputSchema = z.object({
-  host: NonEmptyStringSchema,
-  jti: NonEmptyStringSchema,
-  organizationId: NonEmptyStringSchema,
-  sandboxInstanceId: NonEmptyStringSchema,
-  targetId: NonEmptyStringSchema,
+  host: z.string().trim().min(1),
+  jti: z.string().trim().min(1),
+  organizationId: z.string().trim().min(1),
+  sandboxInstanceId: z.string().trim().min(1),
+  targetId: z.string().trim().min(1),
   targetKind: z.literal("port"),
   ttlSeconds: z.number().int().gte(1),
-  userId: NonEmptyStringSchema,
+  userId: z.string().trim().min(1),
 });
 const PublishedTargetAccessTokenPayloadSchema = z.object({
   exp: z.number().int().gte(1),
-  host: NonEmptyStringSchema,
-  jti: NonEmptyStringSchema,
-  organizationId: NonEmptyStringSchema,
-  sandboxInstanceId: NonEmptyStringSchema,
-  targetId: NonEmptyStringSchema,
+  host: z.string().trim().min(1),
+  jti: z.string().trim().min(1),
+  organizationId: z.string().trim().min(1),
+  sandboxInstanceId: z.string().trim().min(1),
+  targetId: z.string().trim().min(1),
   targetKind: z.literal("port"),
-  userId: NonEmptyStringSchema,
+  userId: z.string().trim().min(1),
 });
 
 export type PublishedTargetAccessTokenConfig = {
@@ -198,7 +195,7 @@ export async function verifyPublishedTargetAccessToken(input: {
   config: PublishedTargetAccessTokenConfig;
   token: string;
 }): Promise<VerifiedPublishedTargetAccessToken> {
-  const parsedToken = TokenStringSchema.safeParse(input.token);
+  const parsedToken = z.string().trim().min(1).safeParse(input.token);
   if (!parsedToken.success) {
     throw new PublishedTargetAccessTokenError({
       code: PublishedTargetAccessTokenErrorCode.TOKEN_REQUIRED,
@@ -210,17 +207,16 @@ export async function verifyPublishedTargetAccessToken(input: {
   let payload: Awaited<ReturnType<typeof jwtVerify>>["payload"];
 
   try {
-    payload = (
-      await jwtVerify(
-        parsedToken.data,
-        createSecretKey(new TextEncoder().encode(input.config.tokenSecret)),
-        {
-          algorithms: AllowedPublishedTargetAccessTokenAlgorithms,
-          audience: input.config.tokenAudience,
-          issuer: input.config.tokenIssuer,
-        },
-      )
-    ).payload;
+    const verified = await jwtVerify(
+      parsedToken.data,
+      createSecretKey(new TextEncoder().encode(input.config.tokenSecret)),
+      {
+        algorithms: ["HS256"],
+        audience: input.config.tokenAudience,
+        issuer: input.config.tokenIssuer,
+      },
+    );
+    payload = verified.payload;
   } catch (error) {
     if (error instanceof JoseErrors.JWTExpired) {
       throw new PublishedTargetAccessTokenError({

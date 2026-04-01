@@ -3,25 +3,22 @@ import { createSecretKey } from "node:crypto";
 import { SignJWT, errors as JoseErrors, jwtVerify } from "jose";
 import { z } from "zod";
 
-const AllowedPublishedTargetShareTokenAlgorithms = ["HS256"];
-const NonEmptyStringSchema = z.string().trim().min(1);
-const TokenStringSchema = z.string().trim().min(1);
 const PublishedTargetShareTokenMintInputSchema = z.object({
-  host: NonEmptyStringSchema,
-  jti: NonEmptyStringSchema,
-  sandboxInstanceId: NonEmptyStringSchema,
-  shareId: NonEmptyStringSchema.optional(),
-  targetId: NonEmptyStringSchema,
+  host: z.string().trim().min(1),
+  jti: z.string().trim().min(1),
+  sandboxInstanceId: z.string().trim().min(1),
+  shareId: z.string().trim().min(1).optional(),
+  targetId: z.string().trim().min(1),
   targetKind: z.literal("port"),
   ttlSeconds: z.number().int().gte(1),
 });
 const PublishedTargetShareTokenPayloadSchema = z.object({
   exp: z.number().int().gte(1),
-  host: NonEmptyStringSchema,
-  jti: NonEmptyStringSchema,
-  sandboxInstanceId: NonEmptyStringSchema,
-  shareId: NonEmptyStringSchema.optional(),
-  targetId: NonEmptyStringSchema,
+  host: z.string().trim().min(1),
+  jti: z.string().trim().min(1),
+  sandboxInstanceId: z.string().trim().min(1),
+  shareId: z.string().trim().min(1).optional(),
+  targetId: z.string().trim().min(1),
   targetKind: z.literal("port"),
 });
 
@@ -187,7 +184,7 @@ export async function verifyPublishedTargetShareToken(input: {
   config: PublishedTargetShareTokenConfig;
   token: string;
 }): Promise<VerifiedPublishedTargetShareToken> {
-  const parsedToken = TokenStringSchema.safeParse(input.token);
+  const parsedToken = z.string().trim().min(1).safeParse(input.token);
   if (!parsedToken.success) {
     throw new PublishedTargetShareTokenError({
       code: PublishedTargetShareTokenErrorCode.TOKEN_REQUIRED,
@@ -199,17 +196,16 @@ export async function verifyPublishedTargetShareToken(input: {
   let payload: Awaited<ReturnType<typeof jwtVerify>>["payload"];
 
   try {
-    payload = (
-      await jwtVerify(
-        parsedToken.data,
-        createSecretKey(new TextEncoder().encode(input.config.tokenSecret)),
-        {
-          algorithms: AllowedPublishedTargetShareTokenAlgorithms,
-          audience: input.config.tokenAudience,
-          issuer: input.config.tokenIssuer,
-        },
-      )
-    ).payload;
+    const verified = await jwtVerify(
+      parsedToken.data,
+      createSecretKey(new TextEncoder().encode(input.config.tokenSecret)),
+      {
+        algorithms: ["HS256"],
+        audience: input.config.tokenAudience,
+        issuer: input.config.tokenIssuer,
+      },
+    );
+    payload = verified.payload;
   } catch (error) {
     if (error instanceof JoseErrors.JWTExpired) {
       throw new PublishedTargetShareTokenError({
@@ -258,7 +254,7 @@ export async function verifyPublishedTargetShareToken(input: {
     host: verifiedPayload.host,
     jti: verifiedPayload.jti,
     sandboxInstanceId: verifiedPayload.sandboxInstanceId,
-    ...(verifiedPayload.shareId === undefined ? {} : { shareId: verifiedPayload.shareId }),
+    ...(verifiedPayload.shareId ? { shareId: verifiedPayload.shareId } : {}),
     targetId: verifiedPayload.targetId,
     targetKind: "port",
   };
