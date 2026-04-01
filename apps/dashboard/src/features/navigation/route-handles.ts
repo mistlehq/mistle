@@ -138,19 +138,14 @@ function resolveSandboxProfileDetailBreadcrumb(input: RouteTextResolverInput): s
 
   const profileId = input.params["profileId"];
   if (profileId === undefined || profileId.trim().length === 0) {
-    return "Profile";
+    return "Edit profile";
   }
 
-  return profileId;
+  return "Edit profile";
 }
 
-function resolveAutomationDetailBreadcrumb(input: RouteTextResolverInput): string {
-  const automationId = input.params["automationId"];
-  if (automationId === undefined || automationId.trim().length === 0) {
-    return "Automation";
-  }
-
-  return automationId;
+function resolveAutomationDetailBreadcrumb(_input: RouteTextResolverInput): string {
+  return "Edit automation";
 }
 
 export const ROUTE_HANDLES = {

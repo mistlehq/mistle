@@ -433,7 +433,7 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
     return (
       <PageFrame title="">
         <div className="gap-4 flex flex-col">
-          <h1 className="text-xl font-semibold">{profileId}</h1>
+          <h1 className="text-xl font-semibold">Edit profile</h1>
           <Card>
             <CardContent className="pt-4">
               <div className="gap-3 flex flex-col">
@@ -457,7 +457,7 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
     return (
       <PageFrame title="">
         <div className="gap-4 flex flex-col">
-          <h1 className="text-xl font-semibold">{profileId}</h1>
+          <h1 className="text-xl font-semibold">Edit profile</h1>
           <Card>
             <CardContent className="gap-3 flex flex-col pt-4">
               <Notice

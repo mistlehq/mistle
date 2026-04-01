@@ -167,7 +167,8 @@ describe("app routing breadcrumb integration", () => {
 
     expect(markup).toContain('href="/sandbox-profiles"');
     expect(markup).toContain("Sandbox Profiles");
-    expect(markup).toContain("sbp_abc");
+    expect(markup).toContain("Edit profile");
+    expect(markup).not.toContain("sbp_abc");
     expect(markup).toContain('data-slot="meta-title">Edit profile');
     expect(markup).toContain("Edit sandbox profile configuration.");
   });
@@ -215,7 +216,8 @@ describe("app routing breadcrumb integration", () => {
     markup = renderToStaticMarkup(<RouterProvider router={router} />);
 
     expect(markup).toContain('href="/automations"');
-    expect(markup).toContain("aut_123");
+    expect(markup).toContain("Edit automation");
+    expect(markup).not.toContain("aut_123");
     expect(markup).toContain('data-slot="meta-title"></p>');
     expect(markup).toContain('data-slot="meta-description"></p>');
   });

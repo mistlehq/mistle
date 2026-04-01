@@ -133,7 +133,7 @@ describe("route handles", () => {
     expect(detailDescription({ params: {} })).toBe("");
   });
 
-  it("resolves sandbox profile detail breadcrumb with profile id fallback", () => {
+  it("resolves sandbox profile detail breadcrumb with edit fallback", () => {
     const detailBreadcrumb = ROUTE_HANDLES.sandboxProfilesDetail.breadcrumb;
     expect(typeof detailBreadcrumb).toBe("function");
 
@@ -141,8 +141,8 @@ describe("route handles", () => {
       throw new Error("sandboxProfilesDetail breadcrumb must be a function");
     }
 
-    expect(detailBreadcrumb({ params: { profileId: "sbp_123" } })).toBe("sbp_123");
-    expect(detailBreadcrumb({ params: {} })).toBe("Profile");
+    expect(detailBreadcrumb({ params: { profileId: "sbp_123" } })).toBe("Edit profile");
+    expect(detailBreadcrumb({ params: {} })).toBe("Edit profile");
   });
 
   it("resolves session detail breadcrumb with sandbox instance id fallback", () => {
@@ -157,7 +157,7 @@ describe("route handles", () => {
     expect(detailBreadcrumb({ params: {} })).toBe("Session");
   });
 
-  it("resolves automation detail breadcrumb with automation id fallback", () => {
+  it("resolves automation detail breadcrumb with edit fallback", () => {
     const detailBreadcrumb = ROUTE_HANDLES.automationsDetail.breadcrumb;
     expect(typeof detailBreadcrumb).toBe("function");
 
@@ -165,7 +165,7 @@ describe("route handles", () => {
       throw new Error("automationsDetail breadcrumb must be a function");
     }
 
-    expect(detailBreadcrumb({ params: { automationId: "aut_123" } })).toBe("aut_123");
-    expect(detailBreadcrumb({ params: {} })).toBe("Automation");
+    expect(detailBreadcrumb({ params: { automationId: "aut_123" } })).toBe("Edit automation");
+    expect(detailBreadcrumb({ params: {} })).toBe("Edit automation");
   });
 });
