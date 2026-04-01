@@ -12,8 +12,11 @@ Namespace in final config:
 | `telemetry.enabled`               | `boolean`                       | Enables OpenTelemetry export for instrumented apps.           | None    | `[global.telemetry].enabled`                | `MISTLE_GLOBAL_TELEMETRY_ENABLED`                |
 | `telemetry.debug`                 | `boolean`                       | Enables OpenTelemetry SDK debug diagnostics.                  | None    | `[global.telemetry].debug`                  | `MISTLE_GLOBAL_TELEMETRY_DEBUG`                  |
 | `telemetry.traces.endpoint`       | `string`                        | OTLP HTTP traces endpoint (for example `/v1/traces`).         | None    | `[global.telemetry.traces].endpoint`        | `MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT`        |
+| `telemetry.traces.headers`        | `Record<string, string>`        | Optional OTLP HTTP headers for traces export.                 | None    | `[global.telemetry.traces.headers]`         | `MISTLE_GLOBAL_TELEMETRY_TRACES_HEADERS_JSON`    |
 | `telemetry.logs.endpoint`         | `string`                        | OTLP HTTP logs endpoint (for example `/v1/logs`).             | None    | `[global.telemetry.logs].endpoint`          | `MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT`          |
+| `telemetry.logs.headers`          | `Record<string, string>`        | Optional OTLP HTTP headers for logs export.                   | None    | `[global.telemetry.logs.headers]`           | `MISTLE_GLOBAL_TELEMETRY_LOGS_HEADERS_JSON`      |
 | `telemetry.metrics.endpoint`      | `string`                        | OTLP HTTP metrics endpoint (for example `/v1/metrics`).       | None    | `[global.telemetry.metrics].endpoint`       | `MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT`       |
+| `telemetry.metrics.headers`       | `Record<string, string>`        | Optional OTLP HTTP headers for metrics export.                | None    | `[global.telemetry.metrics.headers]`        | `MISTLE_GLOBAL_TELEMETRY_METRICS_HEADERS_JSON`   |
 | `telemetry.resourceAttributes`    | `string`                        | Optional OTEL resource attributes string.                     | None    | `[global.telemetry].resource_attributes`    | `MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES`    |
 | `internalAuth.serviceToken`       | `string`                        | Shared internal service auth token across apps.               | None    | `[global.internal_auth].service_token`      | `MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN`      |
 | `sandbox.provider`                | `"docker" \| "e2b"`             | Sandbox provider used by API, worker, and provisioning flow.  | None    | `[global.sandbox].provider`                 | `MISTLE_GLOBAL_SANDBOX_PROVIDER`                 |
@@ -35,3 +38,4 @@ Env behavior:
 - If `NODE_ENV` is `"production"`, `env` is `"production"`.
 - Any other defined `NODE_ENV` value maps to `"development"`.
 - If `NODE_ENV` is unset, this module contributes no env override.
+- `*_HEADERS_JSON` env vars must be JSON objects whose values are all strings.

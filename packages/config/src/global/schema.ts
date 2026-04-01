@@ -10,15 +10,19 @@ const GlobalTelemetryEndpointSchema = z
   }, "telemetry endpoint must use http or https.")
   .transform((value) => value.trim());
 
-const GlobalTelemetrySignalConfigSchema = z
+const GlobalTelemetryHeadersSchema = z.record(z.string().trim().min(1), z.string());
+
+export const GlobalTelemetrySignalConfigSchema = z
   .object({
     endpoint: GlobalTelemetryEndpointSchema,
+    headers: GlobalTelemetryHeadersSchema.optional(),
   })
   .strict();
 
-const PartialGlobalTelemetrySignalConfigSchema = z
+export const PartialGlobalTelemetrySignalConfigSchema = z
   .object({
     endpoint: GlobalTelemetryEndpointSchema.optional(),
+    headers: GlobalTelemetryHeadersSchema.optional(),
   })
   .strict();
 

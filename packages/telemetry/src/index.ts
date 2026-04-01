@@ -8,13 +8,20 @@ import {
   trace,
   type Span,
 } from "@opentelemetry/api";
-import { logs, SeverityNumber } from "@opentelemetry/api-logs";
+import { logs, SeverityNumber, type LogRecord } from "@opentelemetry/api-logs";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import type { PgRequestHookInformation } from "@opentelemetry/instrumentation-pg";
-import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { NodeSDK } from "@opentelemetry/sdk-node";
+import { BatchLogRecordProcessor, LoggerProvider } from "@opentelemetry/sdk-logs";
+import { NodeSDK, resources } from "@opentelemetry/sdk-node";
+
+import {
+  buildOtlpHttpExporterConfig,
+  parseOtlpHeadersJson,
+  parseOtlpResourceAttributes,
+  type OtlpHeaders,
+} from "./otlp-config.js";
 
 const TELEMETRY_STATE_SYMBOL = Symbol.for("@mistle/telemetry/state");
 const ENABLED_ENV = "MISTLE_TELEMETRY_ENABLED";
@@ -22,6 +29,9 @@ const DEBUG_ENV = "MISTLE_TELEMETRY_DEBUG";
 const OTLP_TRACES_ENDPOINT_ENV = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT";
 const OTLP_LOGS_ENDPOINT_ENV = "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT";
 const OTLP_METRICS_ENDPOINT_ENV = "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT";
+const MISTLE_OTLP_TRACES_HEADERS_ENV = "MISTLE_GLOBAL_TELEMETRY_TRACES_HEADERS_JSON";
+const MISTLE_OTLP_LOGS_HEADERS_ENV = "MISTLE_GLOBAL_TELEMETRY_LOGS_HEADERS_JSON";
+const MISTLE_OTLP_METRICS_HEADERS_ENV = "MISTLE_GLOBAL_TELEMETRY_METRICS_HEADERS_JSON";
 const OTEL_NODE_ENABLED_INSTRUMENTATIONS_ENV = "OTEL_NODE_ENABLED_INSTRUMENTATIONS";
 const DISABLED_VALUES = new Set(["0", "false"]);
 const ENABLED_VALUES = new Set(["1", "true"]);
@@ -63,9 +73,9 @@ type TelemetryConfig =
   | {
       enabled: true;
       debug: boolean;
-      tracesEndpoint: string;
-      logsEndpoint: string;
-      metricsEndpoint: string;
+      traces: EnabledTelemetrySignalRuntimeConfig;
+      logs: EnabledTelemetrySignalRuntimeConfig;
+      metrics: EnabledTelemetrySignalRuntimeConfig;
     };
 
 export type InitializeTelemetryInput = {
@@ -75,10 +85,12 @@ export type InitializeTelemetryInput = {
 
 export type DisabledTelemetrySignalRuntimeConfig = {
   endpoint?: string | undefined;
+  headers?: OtlpHeaders | undefined;
 };
 
 export type EnabledTelemetrySignalRuntimeConfig = {
   endpoint: string;
+  headers?: OtlpHeaders | undefined;
 };
 
 export type DisabledTelemetryRuntimeConfig = {
@@ -104,6 +116,11 @@ export type TelemetryRuntimeConfig = DisabledTelemetryRuntimeConfig | EnabledTel
 export type TelemetryHandle = {
   enabled: boolean;
   serviceName: string;
+  shutdown: () => Promise<void>;
+};
+
+export type OtlpLogForwarder = {
+  emit: (record: LogRecord) => void;
   shutdown: () => Promise<void>;
 };
 
@@ -299,6 +316,18 @@ function resolveRequiredEndpoint(env: NodeJS.ProcessEnv, envName: string): strin
   return endpoint;
 }
 
+function resolveHeadersEnv(env: NodeJS.ProcessEnv, envName: string): OtlpHeaders | undefined {
+  const rawValue = env[envName]?.trim();
+  if (rawValue === undefined || rawValue.length === 0) {
+    return undefined;
+  }
+
+  return parseOtlpHeadersJson({
+    envName,
+    rawValue,
+  });
+}
+
 function readTelemetryConfig(env: NodeJS.ProcessEnv): TelemetryConfig {
   const enabled = normalizeBooleanEnv(env[ENABLED_ENV], ENABLED_ENV) ?? false;
   const debug = normalizeBooleanEnv(env[DEBUG_ENV], DEBUG_ENV) ?? false;
@@ -313,9 +342,18 @@ function readTelemetryConfig(env: NodeJS.ProcessEnv): TelemetryConfig {
   return {
     enabled: true,
     debug,
-    tracesEndpoint: resolveRequiredEndpoint(env, OTLP_TRACES_ENDPOINT_ENV),
-    logsEndpoint: resolveRequiredEndpoint(env, OTLP_LOGS_ENDPOINT_ENV),
-    metricsEndpoint: resolveRequiredEndpoint(env, OTLP_METRICS_ENDPOINT_ENV),
+    traces: {
+      endpoint: resolveRequiredEndpoint(env, OTLP_TRACES_ENDPOINT_ENV),
+      headers: resolveHeadersEnv(env, MISTLE_OTLP_TRACES_HEADERS_ENV),
+    },
+    logs: {
+      endpoint: resolveRequiredEndpoint(env, OTLP_LOGS_ENDPOINT_ENV),
+      headers: resolveHeadersEnv(env, MISTLE_OTLP_LOGS_HEADERS_ENV),
+    },
+    metrics: {
+      endpoint: resolveRequiredEndpoint(env, OTLP_METRICS_ENDPOINT_ENV),
+      headers: resolveHeadersEnv(env, MISTLE_OTLP_METRICS_HEADERS_ENV),
+    },
   };
 }
 
@@ -359,6 +397,39 @@ async function shutdownEnabledTelemetry(
   await state.shutdownPromise;
 }
 
+export function createOtlpLogForwarder(input: {
+  serviceName: string;
+  resourceAttributes?: string | undefined;
+  logs: EnabledTelemetrySignalRuntimeConfig;
+}): OtlpLogForwarder {
+  const serviceName = input.serviceName.trim();
+  if (serviceName.length === 0) {
+    throw new Error("Telemetry serviceName is required.");
+  }
+
+  const loggerProvider = new LoggerProvider({
+    resource: resources.resourceFromAttributes(
+      parseOtlpResourceAttributes({
+        serviceName,
+        resourceAttributes: input.resourceAttributes,
+      }),
+    ),
+    processors: [
+      new BatchLogRecordProcessor(new OTLPLogExporter(buildOtlpHttpExporterConfig(input.logs))),
+    ],
+  });
+  const logger = loggerProvider.getLogger(serviceName);
+
+  return {
+    emit: (record) => {
+      logger.emit(record);
+    },
+    shutdown: async () => {
+      await loggerProvider.shutdown();
+    },
+  };
+}
+
 export function initializeTelemetry(input: InitializeTelemetryInput): TelemetryHandle {
   const serviceName = input.serviceName.trim();
   if (serviceName.length === 0) {
@@ -397,22 +468,16 @@ export function initializeTelemetry(input: InitializeTelemetryInput): TelemetryH
     return createDisabledTelemetryHandle(serviceName);
   }
 
-  process.env[OTLP_TRACES_ENDPOINT_ENV] = config.tracesEndpoint;
-  process.env[OTLP_LOGS_ENDPOINT_ENV] = config.logsEndpoint;
-  process.env[OTLP_METRICS_ENDPOINT_ENV] = config.metricsEndpoint;
+  process.env[OTLP_TRACES_ENDPOINT_ENV] = config.traces.endpoint;
+  process.env[OTLP_LOGS_ENDPOINT_ENV] = config.logs.endpoint;
+  process.env[OTLP_METRICS_ENDPOINT_ENV] = config.metrics.endpoint;
   configureDefaultNodeInstrumentations();
 
   const sdk = new NodeSDK({
     serviceName,
-    traceExporter: new OTLPTraceExporter({
-      url: config.tracesEndpoint,
-    }),
+    traceExporter: new OTLPTraceExporter(buildOtlpHttpExporterConfig(config.traces)),
     logRecordProcessors: [
-      new BatchLogRecordProcessor(
-        new OTLPLogExporter({
-          url: config.logsEndpoint,
-        }),
-      ),
+      new BatchLogRecordProcessor(new OTLPLogExporter(buildOtlpHttpExporterConfig(config.logs))),
     ],
     instrumentations: [
       getNodeAutoInstrumentations({
@@ -476,6 +541,27 @@ export function initializeTelemetryFromConfig(input: {
           OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: input.config.traces.endpoint,
           OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: input.config.logs.endpoint,
           OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: input.config.metrics.endpoint,
+          ...(input.config.traces.headers === undefined
+            ? {}
+            : {
+                MISTLE_GLOBAL_TELEMETRY_TRACES_HEADERS_JSON: JSON.stringify(
+                  input.config.traces.headers,
+                ),
+              }),
+          ...(input.config.logs.headers === undefined
+            ? {}
+            : {
+                MISTLE_GLOBAL_TELEMETRY_LOGS_HEADERS_JSON: JSON.stringify(
+                  input.config.logs.headers,
+                ),
+              }),
+          ...(input.config.metrics.headers === undefined
+            ? {}
+            : {
+                MISTLE_GLOBAL_TELEMETRY_METRICS_HEADERS_JSON: JSON.stringify(
+                  input.config.metrics.headers,
+                ),
+              }),
           ...(input.config.resourceAttributes === undefined
             ? {}
             : {

@@ -29,14 +29,32 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT",
   },
   {
+    configPath: ["global", "telemetry", "traces", "headers"],
+    tomlPath: ["global", "telemetry", "traces", "headers"],
+    envVar: "MISTLE_GLOBAL_TELEMETRY_TRACES_HEADERS_JSON",
+    envValueFormat: "json",
+  },
+  {
     configPath: ["global", "telemetry", "logs", "endpoint"],
     tomlPath: ["global", "telemetry", "logs", "endpoint"],
     envVar: "MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT",
   },
   {
+    configPath: ["global", "telemetry", "logs", "headers"],
+    tomlPath: ["global", "telemetry", "logs", "headers"],
+    envVar: "MISTLE_GLOBAL_TELEMETRY_LOGS_HEADERS_JSON",
+    envValueFormat: "json",
+  },
+  {
     configPath: ["global", "telemetry", "metrics", "endpoint"],
     tomlPath: ["global", "telemetry", "metrics", "endpoint"],
     envVar: "MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT",
+  },
+  {
+    configPath: ["global", "telemetry", "metrics", "headers"],
+    tomlPath: ["global", "telemetry", "metrics", "headers"],
+    envVar: "MISTLE_GLOBAL_TELEMETRY_METRICS_HEADERS_JSON",
+    envValueFormat: "json",
   },
   {
     configPath: ["global", "telemetry", "resourceAttributes"],

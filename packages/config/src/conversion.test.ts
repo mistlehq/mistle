@@ -17,8 +17,11 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_GLOBAL_TELEMETRY_ENABLED: "true",
       MISTLE_GLOBAL_TELEMETRY_DEBUG: "false",
       MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT: "http://127.0.0.1:4318/v1/traces",
+      MISTLE_GLOBAL_TELEMETRY_TRACES_HEADERS_JSON: '{"authorization":"Bearer traces-token"}',
       MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT: "http://127.0.0.1:4318/v1/logs",
+      MISTLE_GLOBAL_TELEMETRY_LOGS_HEADERS_JSON: '{"x-scope-orgid":"tenant-a"}',
       MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT: "http://127.0.0.1:4318/v1/metrics",
+      MISTLE_GLOBAL_TELEMETRY_METRICS_HEADERS_JSON: '{"authorization":"Bearer metrics-token"}',
       MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES: "deployment.environment=test",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: "fixture-bootstrap-secret",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: "data-plane-worker",
@@ -72,12 +75,21 @@ describe("convertEnvToTomlRecord", () => {
           debug: false,
           traces: {
             endpoint: "http://127.0.0.1:4318/v1/traces",
+            headers: {
+              authorization: "Bearer traces-token",
+            },
           },
           logs: {
             endpoint: "http://127.0.0.1:4318/v1/logs",
+            headers: {
+              "x-scope-orgid": "tenant-a",
+            },
           },
           metrics: {
             endpoint: "http://127.0.0.1:4318/v1/metrics",
+            headers: {
+              authorization: "Bearer metrics-token",
+            },
           },
           resource_attributes: "deployment.environment=test",
         },
@@ -198,12 +210,21 @@ describe("convertTomlToEnvRecord", () => {
           debug: false,
           traces: {
             endpoint: "http://otel-collector:4318/v1/traces",
+            headers: {
+              authorization: "Bearer traces-token",
+            },
           },
           logs: {
             endpoint: "http://otel-collector:4318/v1/logs",
+            headers: {
+              "x-scope-orgid": "tenant-a",
+            },
           },
           metrics: {
             endpoint: "http://otel-collector:4318/v1/metrics",
+            headers: {
+              authorization: "Bearer metrics-token",
+            },
           },
           resource_attributes: "deployment.environment=production",
         },
@@ -312,8 +333,11 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_GLOBAL_TELEMETRY_ENABLED: "true",
       MISTLE_GLOBAL_TELEMETRY_DEBUG: "false",
       MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT: "http://otel-collector:4318/v1/traces",
+      MISTLE_GLOBAL_TELEMETRY_TRACES_HEADERS_JSON: '{"authorization":"Bearer traces-token"}',
       MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT: "http://otel-collector:4318/v1/logs",
+      MISTLE_GLOBAL_TELEMETRY_LOGS_HEADERS_JSON: '{"x-scope-orgid":"tenant-a"}',
       MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT: "http://otel-collector:4318/v1/metrics",
+      MISTLE_GLOBAL_TELEMETRY_METRICS_HEADERS_JSON: '{"authorization":"Bearer metrics-token"}',
       MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES: "deployment.environment=production",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: "prod-bootstrap-secret",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: "data-plane-worker",

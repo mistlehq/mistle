@@ -1,12 +1,32 @@
 import { asObjectRecord } from "../core/record.js";
 import { type PartialGlobalConfigInput, PartialGlobalConfigSchema } from "./schema.js";
 
+function loadTelemetrySignalFromToml(signalToml: Record<string, unknown>): Record<string, unknown> {
+  const signalHeaders = asObjectRecord(signalToml.headers);
+
+  return {
+    ...(typeof signalToml.endpoint === "string"
+      ? {
+          endpoint: signalToml.endpoint,
+        }
+      : {}),
+    ...(Object.keys(signalHeaders).length > 0
+      ? {
+          headers: signalHeaders,
+        }
+      : {}),
+  };
+}
+
 export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGlobalConfigInput {
   const global = asObjectRecord(tomlRoot.global);
   const telemetry = asObjectRecord(global.telemetry);
   const telemetryTraces = asObjectRecord(telemetry.traces);
   const telemetryLogs = asObjectRecord(telemetry.logs);
   const telemetryMetrics = asObjectRecord(telemetry.metrics);
+  const telemetryTracesSignal = loadTelemetrySignalFromToml(telemetryTraces);
+  const telemetryLogsSignal = loadTelemetrySignalFromToml(telemetryLogs);
+  const telemetryMetricsSignal = loadTelemetrySignalFromToml(telemetryMetrics);
   const internalAuth = asObjectRecord(global.internal_auth);
   const sandbox = asObjectRecord(global.sandbox);
   const sandboxBootstrap = asObjectRecord(sandbox.bootstrap);
@@ -20,33 +40,27 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
     env: global.env,
     ...(typeof telemetry.enabled === "boolean" ||
     typeof telemetry.debug === "boolean" ||
-    typeof telemetryTraces.endpoint === "string" ||
-    typeof telemetryLogs.endpoint === "string" ||
-    typeof telemetryMetrics.endpoint === "string" ||
+    Object.keys(telemetryTracesSignal).length > 0 ||
+    Object.keys(telemetryLogsSignal).length > 0 ||
+    Object.keys(telemetryMetricsSignal).length > 0 ||
     typeof telemetry.resource_attributes === "string"
       ? {
           telemetry: {
             enabled: telemetry.enabled,
             debug: telemetry.debug,
-            ...(typeof telemetryTraces.endpoint === "string"
+            ...(Object.keys(telemetryTracesSignal).length > 0
               ? {
-                  traces: {
-                    endpoint: telemetryTraces.endpoint,
-                  },
+                  traces: telemetryTracesSignal,
                 }
               : {}),
-            ...(typeof telemetryLogs.endpoint === "string"
+            ...(Object.keys(telemetryLogsSignal).length > 0
               ? {
-                  logs: {
-                    endpoint: telemetryLogs.endpoint,
-                  },
+                  logs: telemetryLogsSignal,
                 }
               : {}),
-            ...(typeof telemetryMetrics.endpoint === "string"
+            ...(Object.keys(telemetryMetricsSignal).length > 0
               ? {
-                  metrics: {
-                    endpoint: telemetryMetrics.endpoint,
-                  },
+                  metrics: telemetryMetricsSignal,
                 }
               : {}),
             resourceAttributes: telemetry.resource_attributes,
