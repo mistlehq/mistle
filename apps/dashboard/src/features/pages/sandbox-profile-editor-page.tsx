@@ -1,7 +1,4 @@
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   Button,
   Card,
   CardContent,
@@ -9,6 +6,7 @@ import {
   FieldContent,
   FieldLabel,
   Input,
+  Notice,
   Skeleton,
 } from "@mistle/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -273,34 +271,27 @@ export function IntegrationsEditorSection(
   return (
     <div className="gap-4 flex flex-col">
       {props.integrationBindingsQuery.isError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Could not load integration bindings</AlertTitle>
-          <AlertDescription>
-            {resolveApiErrorMessage({
-              error: props.integrationBindingsQuery.error,
-              fallbackMessage: "Could not load sandbox profile integration bindings.",
-            })}
-          </AlertDescription>
-        </Alert>
+        <Notice title="Could not load integration bindings" tone="destructive">
+          {resolveApiErrorMessage({
+            error: props.integrationBindingsQuery.error,
+            fallbackMessage: "Could not load sandbox profile integration bindings.",
+          })}
+        </Notice>
       ) : null}
 
       {props.integrationDirectoryQuery.isError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Could not load integration connections</AlertTitle>
-          <AlertDescription>
-            {resolveApiErrorMessage({
-              error: props.integrationDirectoryQuery.error,
-              fallbackMessage: "Could not load integration connections.",
-            })}
-          </AlertDescription>
-        </Alert>
+        <Notice title="Could not load integration connections" tone="destructive">
+          {resolveApiErrorMessage({
+            error: props.integrationDirectoryQuery.error,
+            fallbackMessage: "Could not load integration connections.",
+          })}
+        </Notice>
       ) : null}
 
       {props.integrationSaveError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Save failed</AlertTitle>
-          <AlertDescription>{props.integrationSaveError}</AlertDescription>
-        </Alert>
+        <Notice title="Save failed" tone="destructive">
+          {props.integrationSaveError}
+        </Notice>
       ) : null}
 
       {BindingSectionKinds.map((kind) => (
@@ -366,10 +357,9 @@ function CreateSandboxProfileEditorPage(): React.JSX.Element {
         <h1 className="text-xl font-semibold">{metaState.pageTitle}</h1>
       </div>
       {metaState.saveError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Create failed</AlertTitle>
-          <AlertDescription>{metaState.saveError}</AlertDescription>
-        </Alert>
+        <Notice title="Create failed" tone="destructive">
+          {metaState.saveError}
+        </Notice>
       ) : null}
 
       <Card>
@@ -457,19 +447,17 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
         <h1 className="text-xl font-semibold">{profileId}</h1>
         <Card>
           <CardContent className="gap-3 flex flex-col pt-4">
-            <Alert variant="destructive">
-              <AlertTitle>
-                {isNotFoundError ? "Sandbox profile not found" : "Could not load profile"}
-              </AlertTitle>
-              <AlertDescription>
-                {resolveApiErrorMessage({
-                  error: profileQuery.error,
-                  fallbackMessage: isNotFoundError
-                    ? "The sandbox profile was not found."
-                    : "Could not load sandbox profile.",
-                })}
-              </AlertDescription>
-            </Alert>
+            <Notice
+              title={isNotFoundError ? "Sandbox profile not found" : "Could not load profile"}
+              tone="destructive"
+            >
+              {resolveApiErrorMessage({
+                error: profileQuery.error,
+                fallbackMessage: isNotFoundError
+                  ? "The sandbox profile was not found."
+                  : "Could not load sandbox profile.",
+              })}
+            </Notice>
             <div>
               <Button
                 onClick={() => {
@@ -587,10 +575,9 @@ function LoadedSandboxProfileMetaSection(input: {
         />
       </div>
       {metaState.saveError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Update failed</AlertTitle>
-          <AlertDescription>{metaState.saveError}</AlertDescription>
-        </Alert>
+        <Notice title="Update failed" tone="destructive">
+          {metaState.saveError}
+        </Notice>
       ) : null}
     </>
   );

@@ -1,7 +1,4 @@
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   Button,
   Card,
   CardContent,
@@ -14,6 +11,7 @@ import {
   FieldContent,
   FieldLabel,
   Input,
+  Notice,
   Skeleton,
   Table,
   TableBody,
@@ -265,15 +263,12 @@ export function SandboxProfilesPage(): React.JSX.Element {
       </Dialog>
 
       {listQuery.isError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Could not load sandbox profiles</AlertTitle>
-          <AlertDescription>
-            {resolveApiErrorMessage({
-              error: listQuery.error,
-              fallbackMessage: "Could not load sandbox profiles.",
-            })}
-          </AlertDescription>
-        </Alert>
+        <Notice title="Could not load sandbox profiles" tone="destructive">
+          {resolveApiErrorMessage({
+            error: listQuery.error,
+            fallbackMessage: "Could not load sandbox profiles.",
+          })}
+        </Notice>
       ) : null}
 
       {listQuery.isPending ? (

@@ -1,4 +1,4 @@
-import { Alert, AlertDescription, AlertTitle, Button } from "@mistle/ui";
+import { Button, Notice } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router";
 
@@ -45,10 +45,9 @@ function renderWebhookAutomationEditorError(input: {
     <FormPageShell>
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
-          <Alert variant="destructive">
-            <AlertTitle>{input.title}</AlertTitle>
-            <AlertDescription>{input.description}</AlertDescription>
-          </Alert>
+          <Notice title={input.title} tone="destructive">
+            {input.description}
+          </Notice>
           <div>
             <Button onClick={input.onBack} type="button" variant="outline">
               Back to automations

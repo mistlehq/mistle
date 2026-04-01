@@ -1,9 +1,7 @@
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   Badge,
   Button,
+  Notice,
   Table,
   TableBody,
   TableCell,
@@ -476,30 +474,25 @@ export function SessionsPage(): React.JSX.Element {
         </div>
 
         {selectableProfilesQuery.isError ? (
-          <Alert variant="destructive">
-            <AlertTitle>Could not load sandbox profiles</AlertTitle>
-            <AlertDescription>
-              {resolveApiErrorMessage({
-                error: selectableProfilesQuery.error,
-                fallbackMessage: "Could not load sandbox profiles.",
-              })}
-            </AlertDescription>
-          </Alert>
+          <Notice title="Could not load sandbox profiles" tone="destructive">
+            {resolveApiErrorMessage({
+              error: selectableProfilesQuery.error,
+              fallbackMessage: "Could not load sandbox profiles.",
+            })}
+          </Notice>
         ) : null}
         {startErrorMessage === null ? null : (
-          <Alert variant="destructive">
-            <AlertTitle>Session start failed</AlertTitle>
-            <AlertDescription>{startErrorMessage}</AlertDescription>
-          </Alert>
+          <Notice title="Session start failed" tone="destructive">
+            {startErrorMessage}
+          </Notice>
         )}
       </div>
 
       <div className="flex flex-col gap-3">
         {listErrorMessage === null ? null : (
-          <Alert variant="destructive">
-            <AlertTitle>Could not load sandbox instances</AlertTitle>
-            <AlertDescription>{listErrorMessage}</AlertDescription>
-          </Alert>
+          <Notice title="Could not load sandbox instances" tone="destructive">
+            {listErrorMessage}
+          </Notice>
         )}
 
         <div className="flex flex-col gap-3">

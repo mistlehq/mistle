@@ -1,7 +1,4 @@
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   Button,
   Field,
   FieldContent,
@@ -220,10 +217,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       )}
 
       {input.formError === null ? null : (
-        <Alert variant="destructive">
-          <AlertTitle>Automation could not be saved</AlertTitle>
-          <AlertDescription>{input.formError}</AlertDescription>
-        </Alert>
+        <Notice title="Automation could not be saved" tone="destructive">
+          {input.formError}
+        </Notice>
       )}
 
       {input.mode === "edit" ? (
