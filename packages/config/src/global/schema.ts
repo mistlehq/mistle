@@ -83,7 +83,6 @@ export const PartialGlobalSandboxPublishSessionConfigSchema = z
 export const GlobalSandboxPublishConfigSchema = z
   .object({
     baseDomain: z.string().trim().min(1),
-    localBaseDomain: z.string().trim().min(1),
     access: GlobalSandboxTokenConfigSchema,
     session: GlobalSandboxPublishSessionConfigSchema,
   })
@@ -92,7 +91,6 @@ export const GlobalSandboxPublishConfigSchema = z
 export const PartialGlobalSandboxPublishConfigSchema = z
   .object({
     baseDomain: z.string().trim().min(1).optional(),
-    localBaseDomain: z.string().trim().min(1).optional(),
     access: GlobalSandboxTokenConfigSchema.partial().optional(),
     session: PartialGlobalSandboxPublishSessionConfigSchema.optional(),
   })

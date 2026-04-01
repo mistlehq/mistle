@@ -30,7 +30,6 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER: "control-plane-api",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE: "data-plane-gateway",
       MISTLE_GLOBAL_SANDBOX_PUBLISH_BASE_DOMAIN: "mistle.example.test",
-      MISTLE_GLOBAL_SANDBOX_PUBLISH_LOCAL_BASE_DOMAIN: "mistle.localhost",
       MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: "fixture-publish-secret",
       MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER: "control-plane-api",
       MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE: "data-plane-gateway",
@@ -103,7 +102,6 @@ describe("convertEnvToTomlRecord", () => {
           },
           publish: {
             base_domain: "mistle.example.test",
-            local_base_domain: "mistle.localhost",
             access: {
               token_secret: "fixture-publish-secret",
               token_issuer: "control-plane-api",
@@ -230,7 +228,6 @@ describe("convertTomlToEnvRecord", () => {
           },
           publish: {
             base_domain: "mistle.example.com",
-            local_base_domain: "mistle.localhost",
             access: {
               token_secret: "prod-publish-secret",
               token_issuer: "control-plane-api",
@@ -328,7 +325,6 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER: "control-plane-api",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE: "data-plane-gateway",
       MISTLE_GLOBAL_SANDBOX_PUBLISH_BASE_DOMAIN: "mistle.example.com",
-      MISTLE_GLOBAL_SANDBOX_PUBLISH_LOCAL_BASE_DOMAIN: "mistle.localhost",
       MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: "prod-publish-secret",
       MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER: "control-plane-api",
       MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE: "data-plane-gateway",

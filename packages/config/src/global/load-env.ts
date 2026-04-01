@@ -136,10 +136,6 @@ const loadSandboxPublishEnv = createEnvLoader<typeof PartialGlobalSandboxPublish
     key: "baseDomain",
     envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_BASE_DOMAIN",
   },
-  {
-    key: "localBaseDomain",
-    envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_LOCAL_BASE_DOMAIN",
-  },
 ]);
 
 const loadSandboxEnv = createEnvLoader<typeof PartialGlobalSandboxConfigSchema>([

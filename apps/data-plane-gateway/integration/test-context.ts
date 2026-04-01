@@ -262,7 +262,6 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
               },
               publish: {
                 baseDomain: "mistle.example.test",
-                localBaseDomain: "mistle.localhost",
                 access: {
                   tokenSecret: "integration-publish-token-secret",
                   tokenIssuer: "integration-control-plane-api",

@@ -47,7 +47,6 @@ describe("parseConfigRecord", () => {
           },
           publish: {
             baseDomain: "mistle.example.test",
-            localBaseDomain: "mistle.localhost",
             access: {
               tokenSecret: "test-publish-token-secret",
               tokenIssuer: "control-plane-api",
@@ -243,7 +242,6 @@ describe("parseConfigRecord", () => {
           },
           publish: {
             baseDomain: "mistle.example.test",
-            localBaseDomain: "mistle.localhost",
             access: {
               tokenSecret: "test-publish-token-secret",
               tokenIssuer: "control-plane-api",
@@ -439,7 +437,6 @@ describe("parseConfigRecord", () => {
           },
           publish: {
             baseDomain: "mistle.example.test",
-            localBaseDomain: "mistle.localhost",
             access: {
               tokenSecret: "test-publish-token-secret",
               tokenIssuer: "control-plane-api",

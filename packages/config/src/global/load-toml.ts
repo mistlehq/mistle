@@ -68,7 +68,6 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
     typeof sandboxConnect.token_secret === "string" ||
     typeof sandboxEgress.token_secret === "string" ||
     typeof sandboxPublish.base_domain === "string" ||
-    typeof sandboxPublish.local_base_domain === "string" ||
     typeof sandboxPublishAccess.token_secret === "string" ||
     typeof sandboxPublishSession.cookie_signing_secret === "string"
       ? {
@@ -94,7 +93,6 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
             },
             publish: {
               baseDomain: sandboxPublish.base_domain,
-              localBaseDomain: sandboxPublish.local_base_domain,
               access: {
                 tokenSecret: sandboxPublishAccess.token_secret,
                 tokenIssuer: sandboxPublishAccess.token_issuer,

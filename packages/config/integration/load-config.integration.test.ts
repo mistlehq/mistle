@@ -21,7 +21,6 @@ const sandboxEgressTokenSecret = "fixture-egress-token-secret";
 const sandboxEgressTokenIssuer = "data-plane-worker";
 const sandboxEgressTokenAudience = "tokenizer-proxy";
 const sandboxPublishBaseDomain = "mistle.example.test";
-const sandboxPublishLocalBaseDomain = "mistle.localhost";
 const sandboxPublishAccessTokenSecret = "fixture-publish-token-secret";
 const sandboxPublishAccessTokenIssuer = "control-plane-api";
 const sandboxPublishAccessTokenAudience = "data-plane-gateway";
@@ -53,7 +52,6 @@ const globalDevelopmentConfig = {
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     publish: {
       baseDomain: sandboxPublishBaseDomain,
-      localBaseDomain: sandboxPublishLocalBaseDomain,
       access: {
         tokenSecret: sandboxPublishAccessTokenSecret,
         tokenIssuer: sandboxPublishAccessTokenIssuer,
@@ -107,7 +105,6 @@ const globalProductionConfig = {
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     publish: {
       baseDomain: sandboxPublishBaseDomain,
-      localBaseDomain: sandboxPublishLocalBaseDomain,
       access: {
         tokenSecret: sandboxPublishAccessTokenSecret,
         tokenIssuer: sandboxPublishAccessTokenIssuer,

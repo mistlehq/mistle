@@ -119,11 +119,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_BASE_DOMAIN",
   },
   {
-    configPath: ["global", "sandbox", "publish", "localBaseDomain"],
-    tomlPath: ["global", "sandbox", "publish", "local_base_domain"],
-    envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_LOCAL_BASE_DOMAIN",
-  },
-  {
     configPath: ["global", "sandbox", "publish", "access", "tokenSecret"],
     tomlPath: ["global", "sandbox", "publish", "access", "token_secret"],
     envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET",

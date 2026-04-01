@@ -49,7 +49,6 @@ describe("createEgressGrantByRuleId", () => {
           internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
           publish: {
             baseDomain: "mistle.example.test",
-            localBaseDomain: "mistle.localhost",
             access: {
               tokenSecret: "integration-publish-token-secret",
               tokenIssuer: "integration-control-plane-api",
