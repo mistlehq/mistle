@@ -47,7 +47,7 @@ function hasErrorName(error: unknown, names: readonly string[]): boolean {
 }
 
 function isObjectNotFoundError(error: unknown): boolean {
-  return hasErrorName(error, ["NotFound", "NoSuchKey", "NoSuchBucket"]);
+  return hasErrorName(error, ["NotFound", "NoSuchKey"]);
 }
 
 function hasTransformToByteArray(body: unknown): body is ByteArrayReadable {
