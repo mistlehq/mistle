@@ -114,6 +114,31 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE",
   },
   {
+    configPath: ["global", "sandbox", "publish", "baseDomain"],
+    tomlPath: ["global", "sandbox", "publish", "base_domain"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_BASE_DOMAIN",
+  },
+  {
+    configPath: ["global", "sandbox", "publish", "access", "tokenSecret"],
+    tomlPath: ["global", "sandbox", "publish", "access", "token_secret"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET",
+  },
+  {
+    configPath: ["global", "sandbox", "publish", "access", "tokenIssuer"],
+    tomlPath: ["global", "sandbox", "publish", "access", "token_issuer"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER",
+  },
+  {
+    configPath: ["global", "sandbox", "publish", "access", "tokenAudience"],
+    tomlPath: ["global", "sandbox", "publish", "access", "token_audience"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE",
+  },
+  {
+    configPath: ["global", "sandbox", "publish", "session", "cookieSigningSecret"],
+    tomlPath: ["global", "sandbox", "publish", "session", "cookie_signing_secret"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET",
+  },
+  {
     configPath: ["apps", "control_plane_api", "server", "host"],
     tomlPath: ["apps", "control_plane_api", "server", "host"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_HOST",

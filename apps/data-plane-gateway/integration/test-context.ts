@@ -260,6 +260,17 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
                 tokenIssuer: "integration-data-plane-worker",
                 tokenAudience: "integration-tokenizer-proxy",
               },
+              publish: {
+                baseDomain: "mistle.example.test",
+                access: {
+                  tokenSecret: "integration-publish-token-secret",
+                  tokenIssuer: "integration-control-plane-api",
+                  tokenAudience: IntegrationTokenAudience,
+                },
+                session: {
+                  cookieSigningSecret: "integration-publish-cookie-secret",
+                },
+              },
             },
           };
 
