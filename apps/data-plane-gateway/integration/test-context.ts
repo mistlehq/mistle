@@ -273,18 +273,6 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
                 },
               },
             },
-            publish: {
-              baseDomain: "mistle.example.test",
-              localBaseDomain: "mistle.localhost",
-              access: {
-                tokenSecret: "integration-publish-token-secret",
-                tokenIssuer: "integration-control-plane-api",
-                tokenAudience: IntegrationTokenAudience,
-              },
-              session: {
-                cookieSigningSecret: "integration-publish-cookie-secret",
-              },
-            },
           };
 
           const runtime = createDataPlaneGatewayRuntime(runtimeConfig);

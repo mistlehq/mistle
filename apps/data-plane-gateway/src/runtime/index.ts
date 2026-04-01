@@ -159,7 +159,6 @@ export function createDataPlaneGatewayRuntime(
   });
   registerPublishedTargetRoutes({
     app,
-    publishConfig: config.publish,
   });
 
   registerSandboxTunnelRoute({
