@@ -158,7 +158,9 @@ describe("AutomationsPage", () => {
     seedAutomationsList(
       queryClient,
       createListResult([
-        createWebhookAutomationListItem(),
+        createWebhookAutomationListItem({
+          name: "Alpha automation",
+        }),
         createWebhookAutomationListItem({
           id: "aut_456",
           name: "Backlog sync",
@@ -175,12 +177,14 @@ describe("AutomationsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Showing 2 of 2")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Alpha automation" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Backlog sync" })).toBeDefined();
 
     fireEvent.change(screen.getByRole("textbox", { name: "Search automations" }), {
       target: { value: "Backlog" },
     });
 
-    expect(screen.getByText("Showing 1 of 2")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Alpha automation" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Backlog sync" })).toBeDefined();
   });
 });

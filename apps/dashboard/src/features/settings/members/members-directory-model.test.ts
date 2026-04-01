@@ -344,6 +344,7 @@ describe("members directory model", () => {
       }),
     ).toEqual({
       label: "Sending...",
+      state: "resend_invite_pending",
       tone: "pending",
     });
 
@@ -358,6 +359,7 @@ describe("members directory model", () => {
       }),
     ).toEqual({
       label: "Sent",
+      state: "resend_invite_completed",
       tone: "success",
     });
 
@@ -372,6 +374,7 @@ describe("members directory model", () => {
       }),
     ).toEqual({
       label: "Revoked",
+      state: "revoke_invitation_completed",
       tone: "destructive",
     });
   });

@@ -64,6 +64,11 @@ export type MembersDirectoryInvitationActionState = {
 
 export type MembersDirectoryActionFeedback = {
   label: string;
+  state:
+    | "resend_invite_pending"
+    | "resend_invite_completed"
+    | "revoke_invitation_pending"
+    | "revoke_invitation_completed";
   tone: "pending" | "success" | "destructive";
 };
 
@@ -78,17 +83,34 @@ const INVITATION_FEEDBACK_BY_PHASE_AND_ACTION: Record<
     "resend_invite" | "revoke_invitation",
     {
       label: string;
+      state: MembersDirectoryActionFeedback["state"];
       tone: MembersDirectoryActionFeedback["tone"];
     }
   >
 > = {
   pending: {
-    resend_invite: { label: "Sending...", tone: "pending" },
-    revoke_invitation: { label: "Revoking...", tone: "pending" },
+    resend_invite: {
+      label: "Sending...",
+      state: "resend_invite_pending",
+      tone: "pending",
+    },
+    revoke_invitation: {
+      label: "Revoking...",
+      state: "revoke_invitation_pending",
+      tone: "pending",
+    },
   },
   completed: {
-    resend_invite: { label: "Sent", tone: "success" },
-    revoke_invitation: { label: "Revoked", tone: "destructive" },
+    resend_invite: {
+      label: "Sent",
+      state: "resend_invite_completed",
+      tone: "success",
+    },
+    revoke_invitation: {
+      label: "Revoked",
+      state: "revoke_invitation_completed",
+      tone: "destructive",
+    },
   },
 };
 

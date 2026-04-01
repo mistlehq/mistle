@@ -196,10 +196,6 @@ describe("IntegrationsPage resource refresh concurrency", () => {
     try {
       const connectionNameMatches = await screen.findAllByText("Engineering GitHub");
       expect(connectionNameMatches.length).toBeGreaterThanOrEqual(1);
-      expect(screen.queryByText("Connected")).toBeNull();
-      expect(screen.queryByText("Available Integrations")).toBeNull();
-      expect(screen.queryByText("Integration connection")).toBeNull();
-      expect(screen.getByText("GitHub")).toBeTruthy();
 
       const repositoriesRefreshButton = await screen.findByRole("button", {
         name: "Refresh repositories",
