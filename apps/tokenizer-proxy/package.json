@@ -22,7 +22,7 @@
     "@mistle/sandbox-egress-auth": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@opentelemetry/api": "^1.9.0",
-    "hono": "^4.12.8"
+    "hono": "^4.12.9"
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*"
