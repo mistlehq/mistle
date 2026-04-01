@@ -39,6 +39,10 @@ import { SandboxOwnerLeaseHeartbeat } from "../tunnel/ownership/sandbox-owner-le
 import { StoreBackedSandboxOwnerResolver } from "../tunnel/ownership/store-backed-sandbox-owner-resolver.js";
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
 import { registerSandboxTunnelTokenExchangeRoute } from "../tunnel/register-sandbox-tunnel-token-exchange-route.js";
+import {
+  SandboxTelemetryIngressService,
+  UnimplementedSandboxTelemetryIngressSink,
+} from "../tunnel/telemetry-ingress/index.js";
 import { InMemoryTunnelSessionRegistryAdapter } from "../tunnel/tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
 import { TunnelSessionRegistry } from "../tunnel/tunnel-session/index.js";
 import type {
@@ -127,6 +131,9 @@ export function createDataPlaneGatewayRuntime(
     systemScheduler,
     OWNER_LEASE_RENEW_INTERVAL_MS,
   );
+  const telemetryIngressService = new SandboxTelemetryIngressService(
+    new UnimplementedSandboxTelemetryIngressSink(),
+  );
   const dataPlaneClient = createDataPlaneSandboxInstancesClient({
     baseUrl: config.app.dataPlaneApi.baseUrl,
     serviceToken: config.internalAuth.serviceToken,
@@ -185,6 +192,7 @@ export function createDataPlaneGatewayRuntime(
     sandboxPresenceStore,
     sandboxRuntimeAttachmentStore,
     sandboxIdleControllerRegistry,
+    telemetryIngressService,
     clock: systemClock,
     scheduler: systemScheduler,
   });
