@@ -198,10 +198,11 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    expect(screen.getByText("Auth method:")).toBeTruthy();
-    expect(screen.getAllByText("API key")[0]).toBeTruthy();
-    expect(screen.getByText("API key:")).toBeTruthy();
-    expect(screen.getByText("**********")).toBeTruthy();
+    const authSection = screen.getByLabelText("Connection authentication");
+    expect(authSection.getAttribute("data-auth-method-id")).toBe("api-key");
+    expect(screen.getByLabelText("Masked API key value").getAttribute("data-api-key-state")).toBe(
+      "masked",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Edit API key" }));
     expect(editedConnectionId).toBe("icn_openai_primary");
   });

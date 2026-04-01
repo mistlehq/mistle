@@ -117,7 +117,8 @@ describe("SessionsPage integration", () => {
     });
 
     try {
-      expect(await screen.findByText("Start a new session")).toBeDefined();
+      expect(await screen.findByRole("combobox", { name: "Sandbox profile" })).toBeDefined();
+      expect(screen.getByRole("button", { name: "Start session" })).toBeDefined();
       expect(await screen.findByText("Alpha Profile")).toBeDefined();
       expect(await screen.findByText("Jordan Example")).toBeDefined();
       expect(screen.getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);

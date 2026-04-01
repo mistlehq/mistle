@@ -250,9 +250,17 @@ function ConnectionAuthSection(input: {
 
   if (input.authMethodId === "api-key") {
     return (
-      <div className="gap-1 flex flex-col">
+      <div
+        aria-label="Connection authentication"
+        className="gap-1 flex flex-col"
+        data-auth-method-id="api-key"
+      >
         <InlineField label="Auth method" value="API key" />
-        <div className="inline-flex items-center gap-1.5 text-sm">
+        <div
+          aria-label="Masked API key value"
+          className="inline-flex items-center gap-1.5 text-sm"
+          data-api-key-state="masked"
+        >
           <InlineField label="API key" value="**********" />
           {input.onEditApiKey ? (
             <Button

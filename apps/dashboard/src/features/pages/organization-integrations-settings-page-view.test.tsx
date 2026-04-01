@@ -95,6 +95,6 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
 
     expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
     expect(screen.queryByRole("button", { name: "View" })).toBeNull();
-    expect(screen.getByText("GitHub connection detail")).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Integration detail" })).toBeTruthy();
   });
 });

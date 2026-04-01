@@ -61,10 +61,10 @@ export function OrganizationIntegrationsSettingsPageView(
 
   if (isDetailFocused) {
     return (
-      <div className="w-full gap-4 flex flex-col">
+      <section aria-label="Integration detail" className="w-full gap-4 flex flex-col">
         {props.connectionDialog ?? null}
         {props.detailSurface}
-      </div>
+      </section>
     );
   }
 
