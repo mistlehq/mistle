@@ -18,20 +18,26 @@ export type SettingsShellViewProps = {
 };
 
 export function SettingsShellView(input: SettingsShellViewProps): React.JSX.Element {
+  const isFormLayout = input.layoutVariant === "form";
+
   return (
     <AppShellView
       breadcrumbs={input.breadcrumbs}
       headerActions={null}
       isSessionDetail={false}
       mainContent={
-        <SettingsLayoutView
-          supportingText={input.supportingText}
-          headerActions={input.headerActions}
-          title={input.title}
-          {...(input.layoutVariant === undefined ? {} : { layoutVariant: input.layoutVariant })}
-        >
-          {input.content}
-        </SettingsLayoutView>
+        isFormLayout ? (
+          input.content
+        ) : (
+          <SettingsLayoutView
+            supportingText={input.supportingText}
+            headerActions={input.headerActions}
+            headerIcon={null}
+            title={input.title}
+          >
+            {input.content}
+          </SettingsLayoutView>
+        )
       }
       showBreadcrumbs={input.showBreadcrumbs}
       sidebarContent={<SettingsSectionNavView pathname={input.pathname} />}

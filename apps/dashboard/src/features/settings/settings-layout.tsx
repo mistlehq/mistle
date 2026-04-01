@@ -11,18 +11,22 @@ export function SettingsLayout(): React.JSX.Element {
   const title = pageMeta.title ?? "Settings";
   const supportingText = pageMeta.supportingText ?? "Manage account and organization settings.";
   const shouldShowSupportingText = supportingText.trim().length > 0;
+  const isFormLayout = pageMeta.settingsLayoutVariant === "form";
 
   return (
     <SettingsHeaderActionsContext.Provider value={setHeaderActions}>
-      <SettingsLayoutView
-        supportingText={shouldShowSupportingText ? supportingText : ""}
-        headerActions={headerActions}
-        headerIcon={pageMeta.headerIcon}
-        layoutVariant={pageMeta.settingsLayoutVariant}
-        title={title}
-      >
+      {isFormLayout ? (
         <Outlet />
-      </SettingsLayoutView>
+      ) : (
+        <SettingsLayoutView
+          supportingText={shouldShowSupportingText ? supportingText : ""}
+          headerActions={headerActions}
+          headerIcon={pageMeta.headerIcon}
+          title={title}
+        >
+          <Outlet />
+        </SettingsLayoutView>
+      )}
     </SettingsHeaderActionsContext.Provider>
   );
 }
