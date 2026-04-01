@@ -167,7 +167,6 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
     const hasEquivalentSpec =
       existingArtifact.name === artifact.name &&
       existingArtifact.description === artifact.description &&
-      stringRecordEquals(existingArtifact.env, artifact.env) &&
       artifactLifecycleEquals(existingArtifact.lifecycle, artifact.lifecycle);
 
     if (!hasEquivalentSpec) {

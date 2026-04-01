@@ -144,6 +144,8 @@ describe("route breadcrumb metadata", () => {
         },
       ]),
     ).toEqual({
+      appShellInsetOwner: "app-shell",
+      appShellViewportMode: "document",
       title: "Integrations",
       headerIcon: null,
       settingsLayoutVariant: "default",
@@ -165,10 +167,36 @@ describe("route breadcrumb metadata", () => {
         },
       ]),
     ).toEqual({
+      appShellInsetOwner: "app-shell",
+      appShellViewportMode: "document",
       title: "Integration connection",
       headerIcon: "Custom icon",
       settingsLayoutVariant: "default",
       supportingText: "github-cloud",
+    });
+  });
+
+  it("returns route-level app shell dimension metadata", () => {
+    expect(
+      resolveAppPageMetaFromMatches([
+        {
+          handle: {
+            appShellInsetOwner: "child",
+            appShellViewportMode: "workspace",
+            title: "Create automation",
+            description: "Create a webhook automation.",
+          },
+          params: {},
+          pathname: "/automations/new",
+        },
+      ]),
+    ).toEqual({
+      appShellInsetOwner: "child",
+      appShellViewportMode: "workspace",
+      title: "Create automation",
+      headerIcon: null,
+      settingsLayoutVariant: "default",
+      supportingText: "Create a webhook automation.",
     });
   });
 });

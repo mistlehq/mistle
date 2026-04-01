@@ -13,7 +13,13 @@ export function SettingsLayoutView(input: SettingsLayoutViewProps): React.JSX.El
   const isFormLayout = input.layoutVariant === "form";
 
   return (
-    <div className={isFormLayout ? "flex flex-col gap-3" : "flex flex-col gap-4"}>
+    <div
+      className={
+        isFormLayout
+          ? "flex min-h-full flex-col gap-3 bg-muted/30 px-4 py-6"
+          : "flex min-h-full flex-col gap-4 px-4 py-6"
+      }
+    >
       <div className={isFormLayout ? "mx-auto w-full max-w-2xl" : undefined}>
         <SettingsPageHeader
           headerActions={input.headerActions}

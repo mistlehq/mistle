@@ -9,6 +9,10 @@ import {
 } from "./settings-fixtures.js";
 import { SettingsShellView } from "./settings-shell-view.js";
 
+type SettingsShellStoryArgs = React.ComponentProps<typeof SettingsShellView> & {
+  examplePage: "organization-general" | "organization-members" | "profile";
+};
+
 function createStoryBreadcrumb(text: string): React.JSX.Element {
   return <p className="truncate text-sm">{text}</p>;
 }
@@ -58,30 +62,99 @@ function createOrganizationMembersStoryArgs(): React.ComponentProps<typeof Setti
   };
 }
 
+function resolveExamplePageArgs(
+  examplePage: SettingsShellStoryArgs["examplePage"],
+): React.ComponentProps<typeof SettingsShellView> {
+  if (examplePage === "organization-general") {
+    return createOrganizationGeneralStoryArgs();
+  }
+
+  if (examplePage === "organization-members") {
+    return createOrganizationMembersStoryArgs();
+  }
+
+  return createProfileStoryArgs();
+}
+
 const meta = {
   title: "Dashboard/Settings/SettingsShellView",
   component: SettingsShellView,
+  decorators: [createDashboardMemoryRouterDecorator()],
   parameters: {
     layout: "fullscreen",
+    controls: {
+      include: [
+        "examplePage",
+        "layoutVariant",
+        "showBreadcrumbs",
+        "title",
+        "supportingText",
+        "pathname",
+        "backLabel",
+      ],
+    },
   },
-  decorators: [createDashboardMemoryRouterDecorator()],
-  args: createProfileStoryArgs(),
-} satisfies Meta<typeof SettingsShellView>;
+  argTypes: {
+    backLabel: {
+      control: "text",
+    },
+    breadcrumbs: {
+      control: false,
+    },
+    content: {
+      control: false,
+    },
+    examplePage: {
+      control: "inline-radio",
+      options: ["profile", "organization-general", "organization-members"],
+    },
+    headerActions: {
+      control: false,
+    },
+    layoutVariant: {
+      control: "inline-radio",
+      options: ["default", "form"],
+    },
+    onBack: {
+      control: false,
+    },
+    pathname: {
+      control: "text",
+    },
+    showBreadcrumbs: {
+      control: "boolean",
+    },
+    supportingText: {
+      control: "text",
+    },
+    title: {
+      control: "text",
+    },
+  },
+  args: {
+    ...createProfileStoryArgs(),
+    examplePage: "profile",
+  },
+  render: function RenderStory(input): React.JSX.Element {
+    const baseArgs = resolveExamplePageArgs(input.examplePage);
+
+    return (
+      <SettingsShellView
+        {...baseArgs}
+        onBack={input.onBack}
+        pathname={input.pathname}
+        showBreadcrumbs={input.showBreadcrumbs}
+        supportingText={input.supportingText}
+        title={input.title}
+        {...(input.backLabel === undefined ? {} : { backLabel: input.backLabel })}
+        {...(input.layoutVariant === undefined ? {} : { layoutVariant: input.layoutVariant })}
+      />
+    );
+  },
+} satisfies Meta<SettingsShellStoryArgs>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Profile: Story = {};
-
-export const OrganizationGeneral: Story = {
-  args: {
-    ...createOrganizationGeneralStoryArgs(),
-  },
-};
-
-export const OrganizationMembers: Story = {
-  args: {
-    ...createOrganizationMembersStoryArgs(),
-  },
-};
+export const Default: Story = {};

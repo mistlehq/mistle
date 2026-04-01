@@ -2,20 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ChatMarkdownMessage } from "./chat-markdown-message.js";
 
-const ReviewSummaryText = [
-  "## Storybook rollout review",
-  "",
-  "The current setup is functional and a few cleanup items remain:",
-  "",
-  "- move shared font ownership out of `apps/dashboard`",
-  "- keep adding stories only for prop-driven feature views",
-  "- avoid Storybook-only runtime aliases for dashboard containers",
-  "",
-  "```bash",
-  "pnpm storybook",
-  "```",
-].join("\n");
-
 const meta = {
   title: "Dashboard/Chat/ChatMarkdownMessage",
   component: ChatMarkdownMessage,
@@ -29,13 +15,26 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const ReviewSummary: Story = {
-  args: {
-    isStreaming: false,
-    text: ReviewSummaryText,
-  },
-};
-
+/**
+ * FormatGallery is the visual reference surface for chat markdown formatting.
+ *
+ * Use this story to review renderer changes across the common content blocks we
+ * expect in chat output: headings, emphasis, lists, tasks, tables, fenced code
+ * blocks, and mermaid diagrams.
+ *
+ * Update Streamdown presentation through the ChatMarkdownMessage styling
+ * surface, not by rewriting this example payload:
+ * - keep `ChatMarkdownMessage` responsible for the Streamdown wrapper and class
+ *   hooks
+ * - change Streamdown overrides in `apps/dashboard/src/index.css`, primarily
+ *   under `.chat-markdown-content`
+ * - keep this sample markdown stable unless the supported markdown surface
+ *   itself has intentionally changed
+ *
+ * Use this story as the reference when changing Streamdown CSS, markdown
+ * spacing, list rendering, task list layout, code block presentation, and
+ * mermaid output.
+ */
 export const FormatGallery: Story = {
   args: {
     isStreaming: false,
@@ -85,12 +84,5 @@ export const FormatGallery: Story = {
       "  Renderer --> Output[Rendered markdown]",
       "```",
     ].join("\n"),
-  },
-};
-
-export const Streaming: Story = {
-  args: {
-    isStreaming: true,
-    text: "Drafting the next refactor so dashboard container logic stays out of Storybook...",
   },
 };

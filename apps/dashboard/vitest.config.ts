@@ -12,6 +12,12 @@ export default defineConfig({
         ),
       },
       {
+        find: /^@mistle\/integrations-definitions\/forms$/,
+        replacement: fileURLToPath(
+          new URL("../../packages/integrations-definitions/src/forms/index.ts", import.meta.url),
+        ),
+      },
+      {
         find: /^@mistle\/integrations-core$/,
         replacement: fileURLToPath(
           new URL("../../packages/integrations-core/src/index.ts", import.meta.url),

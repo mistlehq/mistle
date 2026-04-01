@@ -436,6 +436,9 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(ghInstallCommand?.args[2]).toContain("https://github.com/cli/cli/releases/latest");
 
     const jiraInstallCommand = runtimePlan.artifacts[1]?.lifecycle.install[0];
+    expect(runtimePlan.artifacts[1]?.env).toEqual({
+      JIRA_BASE_URL: "https://mistle.atlassian.net",
+    });
     expect(jiraInstallCommand?.args.slice(0, 2)).toEqual(["sh", "-euc"]);
     expect(jiraInstallCommand?.timeoutMs).toBe(120_000);
     expect(jiraInstallCommand?.args[2]).toContain("repo=mistlehq/tools");
