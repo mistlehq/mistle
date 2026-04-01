@@ -9,7 +9,7 @@ import {
   createSettingsFixtureInviteMembersButton,
 } from "../settings/settings-fixtures.js";
 import { SettingsSectionNavView } from "../settings/settings-section-nav-view.js";
-import { FormPageHeader } from "../shared/form-page.js";
+import { PageFrame } from "../shared/page-frame.js";
 import { AppShellView } from "./app-shell-view.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 
@@ -142,40 +142,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-type StorySettingsLayoutProps = {
-  children: React.ReactNode;
-  headerActions: React.ReactNode | null;
-  headerIcon?: React.ReactNode | null;
-  layoutVariant?: "default" | "form";
-  supportingText: string;
-  title: string;
-};
-
-function StorySettingsLayout(input: StorySettingsLayoutProps): React.JSX.Element {
-  const isFormLayout = input.layoutVariant === "form";
-  const description = input.supportingText.trim().length > 0 ? input.supportingText : undefined;
-
-  return (
-    <div
-      className={
-        isFormLayout
-          ? "flex min-h-full flex-col gap-3 bg-muted/30 px-4 py-6"
-          : "flex min-h-full flex-col gap-4 px-4 py-6"
-      }
-    >
-      <div className={isFormLayout ? "mx-auto w-full max-w-2xl" : undefined}>
-        <FormPageHeader
-          actions={input.headerActions}
-          description={description}
-          icon={input.headerIcon}
-          title={input.title}
-        />
-      </div>
-      {input.children}
-    </div>
-  );
-}
-
 export const Default: Story = {};
 
 export const SettingsProfile: Story = {
@@ -184,14 +150,9 @@ export const SettingsProfile: Story = {
     contentInsetOwner: "child",
     headerActions: null,
     mainContent: (
-      <StorySettingsLayout
-        headerActions={null}
-        layoutVariant="form"
-        supportingText=""
-        title="Profile"
-      >
+      <PageFrame headerActions={null} variant="form" title="Profile">
         {createProfileSettingsFixtureContent()}
-      </StorySettingsLayout>
+      </PageFrame>
     ),
     showBreadcrumbs: true,
     sidebarContent: <SettingsSectionNavView pathname="/settings/account/profile" />,
@@ -209,14 +170,9 @@ export const SettingsMembers: Story = {
     contentInsetOwner: "child",
     headerActions: null,
     mainContent: (
-      <StorySettingsLayout
-        headerActions={createSettingsFixtureInviteMembersButton()}
-        layoutVariant="default"
-        supportingText=""
-        title="Members"
-      >
+      <PageFrame headerActions={createSettingsFixtureInviteMembersButton()} title="Members">
         {createOrganizationMembersSettingsFixtureContent()}
-      </StorySettingsLayout>
+      </PageFrame>
     ),
     showBreadcrumbs: true,
     sidebarContent: <SettingsSectionNavView pathname="/settings/organization/members" />,

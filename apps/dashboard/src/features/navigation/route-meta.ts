@@ -18,7 +18,6 @@ export type AppRouteHandle = {
   description?: RouteTextValue;
   headerIcon?: (input: RouteTextResolverInput) => React.ReactNode;
   hideBreadcrumb?: boolean;
-  settingsLayoutVariant?: "default" | "form";
 };
 
 export type AppBreadcrumb = {
@@ -33,7 +32,6 @@ export type AppPageMeta = {
   title: string | null;
   headerIcon: React.ReactNode | null;
   supportingText: string | null;
-  settingsLayoutVariant: "default" | "form";
 };
 
 type MatchLike = {
@@ -104,7 +102,6 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   const description = handle["description"];
   const headerIcon = handle["headerIcon"];
   const hideBreadcrumb = handle["hideBreadcrumb"];
-  const settingsLayoutVariant = handle["settingsLayoutVariant"];
 
   if (appShellInsetOwner === "app-shell" || appShellInsetOwner === "child") {
     parsedHandle.appShellInsetOwner = appShellInsetOwner;
@@ -142,10 +139,6 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
     parsedHandle.hideBreadcrumb = hideBreadcrumb;
   }
 
-  if (settingsLayoutVariant === "default" || settingsLayoutVariant === "form") {
-    parsedHandle.settingsLayoutVariant = settingsLayoutVariant;
-  }
-
   if (
     parsedHandle.appShellInsetOwner === undefined &&
     parsedHandle.appShellViewportMode === undefined &&
@@ -155,8 +148,7 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
     parsedHandle.title === undefined &&
     parsedHandle.description === undefined &&
     parsedHandle.headerIcon === undefined &&
-    parsedHandle.hideBreadcrumb === undefined &&
-    parsedHandle.settingsLayoutVariant === undefined
+    parsedHandle.hideBreadcrumb === undefined
   ) {
     return null;
   }
@@ -265,7 +257,6 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
       supportingText: null,
       appShellInsetOwner: "app-shell",
       appShellViewportMode: "document",
-      settingsLayoutVariant: "default",
     };
   }
 
@@ -292,7 +283,6 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
         supportingText,
         appShellInsetOwner: handle.appShellInsetOwner ?? "app-shell",
         appShellViewportMode: handle.appShellViewportMode ?? "document",
-        settingsLayoutVariant: handle.settingsLayoutVariant ?? "default",
       };
     }
   }
@@ -303,6 +293,5 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
     supportingText: null,
     appShellInsetOwner: "app-shell",
     appShellViewportMode: "document",
-    settingsLayoutVariant: "default",
   };
 }

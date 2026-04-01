@@ -148,7 +148,6 @@ describe("route breadcrumb metadata", () => {
       appShellViewportMode: "document",
       title: "Integrations",
       headerIcon: null,
-      settingsLayoutVariant: "default",
       supportingText: "",
     });
   });
@@ -171,7 +170,6 @@ describe("route breadcrumb metadata", () => {
       appShellViewportMode: "document",
       title: "Integration connection",
       headerIcon: "Custom icon",
-      settingsLayoutVariant: "default",
       supportingText: "github-cloud",
     });
   });
@@ -195,7 +193,6 @@ describe("route breadcrumb metadata", () => {
       appShellViewportMode: "workspace",
       title: "Create automation",
       headerIcon: null,
-      settingsLayoutVariant: "default",
       supportingText: "Create a webhook automation.",
     });
   });

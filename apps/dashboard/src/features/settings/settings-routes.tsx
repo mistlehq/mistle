@@ -4,7 +4,6 @@ import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { SETTINGS_DEFAULT_PATH } from "./model.js";
 
 export type SettingsRouteElements = {
-  settingsRoot: React.JSX.Element;
   personal: React.JSX.Element;
   organizationGeneral: React.JSX.Element;
   organizationMembers: React.JSX.Element;
@@ -15,7 +14,7 @@ export type SettingsRouteElements = {
 
 export function createSettingsRoutes(elements: SettingsRouteElements): React.JSX.Element {
   return (
-    <Route element={elements.settingsRoot} handle={ROUTE_HANDLES.settings} path="settings">
+    <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.settings} path="settings">
       <Route element={<Navigate replace to={SETTINGS_DEFAULT_PATH} />} index />
       <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.settingsAccount} path="account">
         <Route element={<Navigate replace to={SETTINGS_DEFAULT_PATH} />} index />

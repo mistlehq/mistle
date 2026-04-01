@@ -23,7 +23,6 @@ import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
 import { SessionWorkbenchPage } from "./features/pages/session-workbench-page.js";
 import { SessionsPage } from "./features/pages/sessions-page.js";
 import { WebhookAutomationEditorPage } from "./features/pages/webhook-automation-editor-page.js";
-import { SettingsLayout } from "./features/settings/settings-layout.js";
 import { createSettingsRoutes } from "./features/settings/settings-routes.js";
 import { AppShell } from "./features/shell/app-shell.js";
 import { RequireAuth } from "./features/shell/require-auth.js";
@@ -88,7 +87,6 @@ export const APP_ROUTES = createRoutesFromElements(
           />
         </Route>
         {createSettingsRoutes({
-          settingsRoot: <SettingsLayout />,
           personal: <ProfileSettingsPage />,
           organizationGeneral: <OrganizationGeneralSettingsPage />,
           organizationMembers: <OrganizationMembersSettingsPage />,
