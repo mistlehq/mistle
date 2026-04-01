@@ -1,8 +1,31 @@
 import { createSecretKey } from "node:crypto";
 
 import { SignJWT, errors as JoseErrors, jwtVerify } from "jose";
+import { z } from "zod";
 
 const AllowedPublishedTargetAccessTokenAlgorithms = ["HS256"];
+const NonEmptyStringSchema = z.string().trim().min(1);
+const TokenStringSchema = z.string().trim().min(1);
+const PublishedTargetAccessTokenMintInputSchema = z.object({
+  host: NonEmptyStringSchema,
+  jti: NonEmptyStringSchema,
+  organizationId: NonEmptyStringSchema,
+  sandboxInstanceId: NonEmptyStringSchema,
+  targetId: NonEmptyStringSchema,
+  targetKind: z.literal("port"),
+  ttlSeconds: z.number().int().gte(1),
+  userId: NonEmptyStringSchema,
+});
+const PublishedTargetAccessTokenPayloadSchema = z.object({
+  exp: z.number().int().gte(1),
+  host: NonEmptyStringSchema,
+  jti: NonEmptyStringSchema,
+  organizationId: NonEmptyStringSchema,
+  sandboxInstanceId: NonEmptyStringSchema,
+  targetId: NonEmptyStringSchema,
+  targetKind: z.literal("port"),
+  userId: NonEmptyStringSchema,
+});
 
 export type PublishedTargetAccessTokenConfig = {
   tokenAudience: string;
@@ -48,11 +71,6 @@ type PublishedTargetAccessTokenErrorInput = {
   message: string;
 };
 
-function trimToUndefined(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed === "" ? undefined : trimmed;
-}
-
 export class PublishedTargetAccessTokenError extends Error {
   readonly code: PublishedTargetAccessTokenErrorCode;
 
@@ -77,6 +95,56 @@ function mapClaimValidationErrorCode(
   return PublishedTargetAccessTokenErrorCode.TOKEN_INVALID_CLAIMS;
 }
 
+function mapMintInputErrorCode(
+  error: z.ZodError<z.infer<typeof PublishedTargetAccessTokenMintInputSchema>>,
+): PublishedTargetAccessTokenErrorCode {
+  switch (error.issues[0]?.path[0]) {
+    case "jti":
+      return PublishedTargetAccessTokenErrorCode.JTI_REQUIRED;
+    case "host":
+      return PublishedTargetAccessTokenErrorCode.HOST_REQUIRED;
+    case "organizationId":
+      return PublishedTargetAccessTokenErrorCode.ORGANIZATION_ID_REQUIRED;
+    case "sandboxInstanceId":
+      return PublishedTargetAccessTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED;
+    case "targetId":
+      return PublishedTargetAccessTokenErrorCode.TARGET_ID_REQUIRED;
+    case "targetKind":
+      return PublishedTargetAccessTokenErrorCode.TARGET_KIND_INVALID;
+    case "ttlSeconds":
+      return PublishedTargetAccessTokenErrorCode.INVALID_TTL_SECONDS;
+    case "userId":
+      return PublishedTargetAccessTokenErrorCode.USER_ID_REQUIRED;
+    default:
+      return PublishedTargetAccessTokenErrorCode.TOKEN_INVALID_CLAIMS;
+  }
+}
+
+function mapPayloadErrorCode(
+  error: z.ZodError<z.infer<typeof PublishedTargetAccessTokenPayloadSchema>>,
+): PublishedTargetAccessTokenErrorCode {
+  switch (error.issues[0]?.path[0]) {
+    case "jti":
+      return PublishedTargetAccessTokenErrorCode.JTI_REQUIRED;
+    case "host":
+      return PublishedTargetAccessTokenErrorCode.HOST_REQUIRED;
+    case "organizationId":
+      return PublishedTargetAccessTokenErrorCode.ORGANIZATION_ID_REQUIRED;
+    case "sandboxInstanceId":
+      return PublishedTargetAccessTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED;
+    case "targetId":
+      return PublishedTargetAccessTokenErrorCode.TARGET_ID_REQUIRED;
+    case "targetKind":
+      return PublishedTargetAccessTokenErrorCode.TARGET_KIND_INVALID;
+    case "userId":
+      return PublishedTargetAccessTokenErrorCode.USER_ID_REQUIRED;
+    case "exp":
+      return PublishedTargetAccessTokenErrorCode.TOKEN_INVALID_CLAIMS;
+    default:
+      return PublishedTargetAccessTokenErrorCode.TOKEN_INVALID_CLAIMS;
+  }
+}
+
 export async function mintPublishedTargetAccessToken(input: {
   config: PublishedTargetAccessTokenConfig;
   host: string;
@@ -88,70 +156,18 @@ export async function mintPublishedTargetAccessToken(input: {
   ttlSeconds: number;
   userId: string;
 }): Promise<string> {
-  const jti = trimToUndefined(input.jti);
-  if (jti === undefined) {
+  const parsedInput = PublishedTargetAccessTokenMintInputSchema.safeParse(input);
+  if (!parsedInput.success) {
     throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.JTI_REQUIRED,
-      message: "Published target access token jti claim is required.",
-    });
-  }
-
-  const host = trimToUndefined(input.host);
-  if (host === undefined) {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.HOST_REQUIRED,
-      message: "Published target access token host claim is required.",
-    });
-  }
-
-  const organizationId = trimToUndefined(input.organizationId);
-  if (organizationId === undefined) {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.ORGANIZATION_ID_REQUIRED,
-      message: "Published target access token organizationId claim is required.",
-    });
-  }
-
-  const sandboxInstanceId = trimToUndefined(input.sandboxInstanceId);
-  if (sandboxInstanceId === undefined) {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED,
-      message: "Published target access token sandboxInstanceId claim is required.",
-    });
-  }
-
-  const targetId = trimToUndefined(input.targetId);
-  if (targetId === undefined) {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.TARGET_ID_REQUIRED,
-      message: "Published target access token targetId claim is required.",
-    });
-  }
-
-  const userId = trimToUndefined(input.userId);
-  if (userId === undefined) {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.USER_ID_REQUIRED,
-      message: "Published target access token userId claim is required.",
-    });
-  }
-
-  if (input.targetKind !== "port") {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.TARGET_KIND_INVALID,
-      message: "Published target access token targetKind must be 'port'.",
-    });
-  }
-
-  if (!Number.isInteger(input.ttlSeconds) || input.ttlSeconds < 1) {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.INVALID_TTL_SECONDS,
-      message:
-        "Published target access token ttlSeconds must be an integer greater than or equal to 1.",
+      code: mapMintInputErrorCode(parsedInput.error),
+      message: "Published target access token input is invalid.",
+      cause: parsedInput.error,
     });
   }
 
   const nowEpochSeconds = Math.floor(Date.now() / 1000);
+  const { host, jti, organizationId, sandboxInstanceId, targetId, userId, ttlSeconds } =
+    parsedInput.data;
 
   try {
     return await new SignJWT({
@@ -167,7 +183,7 @@ export async function mintPublishedTargetAccessToken(input: {
       .setIssuer(input.config.tokenIssuer)
       .setAudience(input.config.tokenAudience)
       .setIssuedAt(nowEpochSeconds)
-      .setExpirationTime(nowEpochSeconds + input.ttlSeconds)
+      .setExpirationTime(nowEpochSeconds + ttlSeconds)
       .sign(createSecretKey(new TextEncoder().encode(input.config.tokenSecret)));
   } catch (error) {
     throw new PublishedTargetAccessTokenError({
@@ -182,11 +198,12 @@ export async function verifyPublishedTargetAccessToken(input: {
   config: PublishedTargetAccessTokenConfig;
   token: string;
 }): Promise<VerifiedPublishedTargetAccessToken> {
-  const token = trimToUndefined(input.token);
-  if (token === undefined) {
+  const parsedToken = TokenStringSchema.safeParse(input.token);
+  if (!parsedToken.success) {
     throw new PublishedTargetAccessTokenError({
       code: PublishedTargetAccessTokenErrorCode.TOKEN_REQUIRED,
       message: "Published target access token is required.",
+      cause: parsedToken.error,
     });
   }
 
@@ -194,11 +211,15 @@ export async function verifyPublishedTargetAccessToken(input: {
 
   try {
     payload = (
-      await jwtVerify(token, createSecretKey(new TextEncoder().encode(input.config.tokenSecret)), {
-        algorithms: AllowedPublishedTargetAccessTokenAlgorithms,
-        audience: input.config.tokenAudience,
-        issuer: input.config.tokenIssuer,
-      })
+      await jwtVerify(
+        parsedToken.data,
+        createSecretKey(new TextEncoder().encode(input.config.tokenSecret)),
+        {
+          algorithms: AllowedPublishedTargetAccessTokenAlgorithms,
+          audience: input.config.tokenAudience,
+          issuer: input.config.tokenIssuer,
+        },
+      )
     ).payload;
   } catch (error) {
     if (error instanceof JoseErrors.JWTExpired) {
@@ -232,83 +253,25 @@ export async function verifyPublishedTargetAccessToken(input: {
     });
   }
 
-  const jti = trimToUndefined(payload.jti);
-  if (jti === undefined) {
+  const parsedPayload = PublishedTargetAccessTokenPayloadSchema.safeParse(payload);
+  if (!parsedPayload.success) {
     throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.JTI_REQUIRED,
-      message: "Published target access token jti claim is required.",
+      code: mapPayloadErrorCode(parsedPayload.error),
+      message: "Published target access token claims are invalid.",
+      cause: parsedPayload.error,
     });
   }
 
-  const host = typeof payload.host === "string" ? trimToUndefined(payload.host) : undefined;
-  if (host === undefined) {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.HOST_REQUIRED,
-      message: "Published target access token host claim is required.",
-    });
-  }
-
-  const organizationId =
-    typeof payload.organizationId === "string"
-      ? trimToUndefined(payload.organizationId)
-      : undefined;
-  if (organizationId === undefined) {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.ORGANIZATION_ID_REQUIRED,
-      message: "Published target access token organizationId claim is required.",
-    });
-  }
-
-  const sandboxInstanceId =
-    typeof payload.sandboxInstanceId === "string"
-      ? trimToUndefined(payload.sandboxInstanceId)
-      : undefined;
-  if (sandboxInstanceId === undefined) {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED,
-      message: "Published target access token sandboxInstanceId claim is required.",
-    });
-  }
-
-  const targetId =
-    typeof payload.targetId === "string" ? trimToUndefined(payload.targetId) : undefined;
-  if (targetId === undefined) {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.TARGET_ID_REQUIRED,
-      message: "Published target access token targetId claim is required.",
-    });
-  }
-
-  const userId = typeof payload.userId === "string" ? trimToUndefined(payload.userId) : undefined;
-  if (userId === undefined) {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.USER_ID_REQUIRED,
-      message: "Published target access token userId claim is required.",
-    });
-  }
-
-  if (payload.targetKind !== "port") {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.TARGET_KIND_INVALID,
-      message: "Published target access token targetKind must be 'port'.",
-    });
-  }
-
-  if (typeof payload.exp !== "number" || !Number.isInteger(payload.exp) || payload.exp < 1) {
-    throw new PublishedTargetAccessTokenError({
-      code: PublishedTargetAccessTokenErrorCode.TOKEN_INVALID_CLAIMS,
-      message: "Published target access token exp claim is required.",
-    });
-  }
+  const verifiedPayload = parsedPayload.data;
 
   return {
-    expiresAtEpochSeconds: payload.exp,
-    host,
-    jti,
-    organizationId,
-    sandboxInstanceId,
-    targetId,
+    expiresAtEpochSeconds: verifiedPayload.exp,
+    host: verifiedPayload.host,
+    jti: verifiedPayload.jti,
+    organizationId: verifiedPayload.organizationId,
+    sandboxInstanceId: verifiedPayload.sandboxInstanceId,
+    targetId: verifiedPayload.targetId,
     targetKind: "port",
-    userId,
+    userId: verifiedPayload.userId,
   };
 }

@@ -1,8 +1,29 @@
 import { createSecretKey } from "node:crypto";
 
 import { SignJWT, errors as JoseErrors, jwtVerify } from "jose";
+import { z } from "zod";
 
 const AllowedPublishedTargetShareTokenAlgorithms = ["HS256"];
+const NonEmptyStringSchema = z.string().trim().min(1);
+const TokenStringSchema = z.string().trim().min(1);
+const PublishedTargetShareTokenMintInputSchema = z.object({
+  host: NonEmptyStringSchema,
+  jti: NonEmptyStringSchema,
+  sandboxInstanceId: NonEmptyStringSchema,
+  shareId: NonEmptyStringSchema.optional(),
+  targetId: NonEmptyStringSchema,
+  targetKind: z.literal("port"),
+  ttlSeconds: z.number().int().gte(1),
+});
+const PublishedTargetShareTokenPayloadSchema = z.object({
+  exp: z.number().int().gte(1),
+  host: NonEmptyStringSchema,
+  jti: NonEmptyStringSchema,
+  sandboxInstanceId: NonEmptyStringSchema,
+  shareId: NonEmptyStringSchema.optional(),
+  targetId: NonEmptyStringSchema,
+  targetKind: z.literal("port"),
+});
 
 export type PublishedTargetShareTokenConfig = {
   tokenAudience: string;
@@ -46,11 +67,6 @@ type PublishedTargetShareTokenErrorInput = {
   message: string;
 };
 
-function trimToUndefined(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed === "" ? undefined : trimmed;
-}
-
 export class PublishedTargetShareTokenError extends Error {
   readonly code: PublishedTargetShareTokenErrorCode;
 
@@ -75,6 +91,52 @@ function mapClaimValidationErrorCode(
   return PublishedTargetShareTokenErrorCode.TOKEN_INVALID_CLAIMS;
 }
 
+function mapMintInputErrorCode(
+  error: z.ZodError<z.infer<typeof PublishedTargetShareTokenMintInputSchema>>,
+): PublishedTargetShareTokenErrorCode {
+  switch (error.issues[0]?.path[0]) {
+    case "jti":
+      return PublishedTargetShareTokenErrorCode.JTI_REQUIRED;
+    case "host":
+      return PublishedTargetShareTokenErrorCode.HOST_REQUIRED;
+    case "sandboxInstanceId":
+      return PublishedTargetShareTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED;
+    case "shareId":
+      return PublishedTargetShareTokenErrorCode.SHARE_ID_INVALID;
+    case "targetId":
+      return PublishedTargetShareTokenErrorCode.TARGET_ID_REQUIRED;
+    case "targetKind":
+      return PublishedTargetShareTokenErrorCode.TARGET_KIND_INVALID;
+    case "ttlSeconds":
+      return PublishedTargetShareTokenErrorCode.INVALID_TTL_SECONDS;
+    default:
+      return PublishedTargetShareTokenErrorCode.TOKEN_INVALID_CLAIMS;
+  }
+}
+
+function mapPayloadErrorCode(
+  error: z.ZodError<z.infer<typeof PublishedTargetShareTokenPayloadSchema>>,
+): PublishedTargetShareTokenErrorCode {
+  switch (error.issues[0]?.path[0]) {
+    case "jti":
+      return PublishedTargetShareTokenErrorCode.JTI_REQUIRED;
+    case "host":
+      return PublishedTargetShareTokenErrorCode.HOST_REQUIRED;
+    case "sandboxInstanceId":
+      return PublishedTargetShareTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED;
+    case "shareId":
+      return PublishedTargetShareTokenErrorCode.SHARE_ID_INVALID;
+    case "targetId":
+      return PublishedTargetShareTokenErrorCode.TARGET_ID_REQUIRED;
+    case "targetKind":
+      return PublishedTargetShareTokenErrorCode.TARGET_KIND_INVALID;
+    case "exp":
+      return PublishedTargetShareTokenErrorCode.TOKEN_INVALID_CLAIMS;
+    default:
+      return PublishedTargetShareTokenErrorCode.TOKEN_INVALID_CLAIMS;
+  }
+}
+
 export async function mintPublishedTargetShareToken(input: {
   config: PublishedTargetShareTokenConfig;
   host: string;
@@ -85,62 +147,17 @@ export async function mintPublishedTargetShareToken(input: {
   targetKind: "port";
   ttlSeconds: number;
 }): Promise<string> {
-  const jti = trimToUndefined(input.jti);
-  if (jti === undefined) {
+  const parsedInput = PublishedTargetShareTokenMintInputSchema.safeParse(input);
+  if (!parsedInput.success) {
     throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.JTI_REQUIRED,
-      message: "Published target share token jti claim is required.",
-    });
-  }
-
-  const host = trimToUndefined(input.host);
-  if (host === undefined) {
-    throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.HOST_REQUIRED,
-      message: "Published target share token host claim is required.",
-    });
-  }
-
-  const sandboxInstanceId = trimToUndefined(input.sandboxInstanceId);
-  if (sandboxInstanceId === undefined) {
-    throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED,
-      message: "Published target share token sandboxInstanceId claim is required.",
-    });
-  }
-
-  const targetId = trimToUndefined(input.targetId);
-  if (targetId === undefined) {
-    throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.TARGET_ID_REQUIRED,
-      message: "Published target share token targetId claim is required.",
-    });
-  }
-
-  if (input.targetKind !== "port") {
-    throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.TARGET_KIND_INVALID,
-      message: "Published target share token targetKind must be 'port'.",
-    });
-  }
-
-  const shareId = input.shareId === undefined ? undefined : trimToUndefined(input.shareId);
-  if (input.shareId !== undefined && shareId === undefined) {
-    throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.SHARE_ID_INVALID,
-      message: "Published target share token shareId must be non-empty when provided.",
-    });
-  }
-
-  if (!Number.isInteger(input.ttlSeconds) || input.ttlSeconds < 1) {
-    throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.INVALID_TTL_SECONDS,
-      message:
-        "Published target share token ttlSeconds must be an integer greater than or equal to 1.",
+      code: mapMintInputErrorCode(parsedInput.error),
+      message: "Published target share token input is invalid.",
+      cause: parsedInput.error,
     });
   }
 
   const nowEpochSeconds = Math.floor(Date.now() / 1000);
+  const { host, jti, sandboxInstanceId, shareId, targetId, ttlSeconds } = parsedInput.data;
 
   try {
     return await new SignJWT({
@@ -155,7 +172,7 @@ export async function mintPublishedTargetShareToken(input: {
       .setIssuer(input.config.tokenIssuer)
       .setAudience(input.config.tokenAudience)
       .setIssuedAt(nowEpochSeconds)
-      .setExpirationTime(nowEpochSeconds + input.ttlSeconds)
+      .setExpirationTime(nowEpochSeconds + ttlSeconds)
       .sign(createSecretKey(new TextEncoder().encode(input.config.tokenSecret)));
   } catch (error) {
     throw new PublishedTargetShareTokenError({
@@ -170,11 +187,12 @@ export async function verifyPublishedTargetShareToken(input: {
   config: PublishedTargetShareTokenConfig;
   token: string;
 }): Promise<VerifiedPublishedTargetShareToken> {
-  const token = trimToUndefined(input.token);
-  if (token === undefined) {
+  const parsedToken = TokenStringSchema.safeParse(input.token);
+  if (!parsedToken.success) {
     throw new PublishedTargetShareTokenError({
       code: PublishedTargetShareTokenErrorCode.TOKEN_REQUIRED,
       message: "Published target share token is required.",
+      cause: parsedToken.error,
     });
   }
 
@@ -182,11 +200,15 @@ export async function verifyPublishedTargetShareToken(input: {
 
   try {
     payload = (
-      await jwtVerify(token, createSecretKey(new TextEncoder().encode(input.config.tokenSecret)), {
-        algorithms: AllowedPublishedTargetShareTokenAlgorithms,
-        audience: input.config.tokenAudience,
-        issuer: input.config.tokenIssuer,
-      })
+      await jwtVerify(
+        parsedToken.data,
+        createSecretKey(new TextEncoder().encode(input.config.tokenSecret)),
+        {
+          algorithms: AllowedPublishedTargetShareTokenAlgorithms,
+          audience: input.config.tokenAudience,
+          issuer: input.config.tokenIssuer,
+        },
+      )
     ).payload;
   } catch (error) {
     if (error instanceof JoseErrors.JWTExpired) {
@@ -220,76 +242,24 @@ export async function verifyPublishedTargetShareToken(input: {
     });
   }
 
-  const jti = trimToUndefined(payload.jti);
-  if (jti === undefined) {
+  const parsedPayload = PublishedTargetShareTokenPayloadSchema.safeParse(payload);
+  if (!parsedPayload.success) {
     throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.JTI_REQUIRED,
-      message: "Published target share token jti claim is required.",
+      code: mapPayloadErrorCode(parsedPayload.error),
+      message: "Published target share token claims are invalid.",
+      cause: parsedPayload.error,
     });
   }
 
-  const host = typeof payload.host === "string" ? trimToUndefined(payload.host) : undefined;
-  if (host === undefined) {
-    throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.HOST_REQUIRED,
-      message: "Published target share token host claim is required.",
-    });
-  }
-
-  const sandboxInstanceId =
-    typeof payload.sandboxInstanceId === "string"
-      ? trimToUndefined(payload.sandboxInstanceId)
-      : undefined;
-  if (sandboxInstanceId === undefined) {
-    throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED,
-      message: "Published target share token sandboxInstanceId claim is required.",
-    });
-  }
-
-  const targetId =
-    typeof payload.targetId === "string" ? trimToUndefined(payload.targetId) : undefined;
-  if (targetId === undefined) {
-    throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.TARGET_ID_REQUIRED,
-      message: "Published target share token targetId claim is required.",
-    });
-  }
-
-  const shareId =
-    payload.shareId === undefined
-      ? undefined
-      : typeof payload.shareId === "string"
-        ? trimToUndefined(payload.shareId)
-        : undefined;
-  if (payload.shareId !== undefined && shareId === undefined) {
-    throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.SHARE_ID_INVALID,
-      message: "Published target share token shareId claim must be non-empty when provided.",
-    });
-  }
-
-  if (payload.targetKind !== "port") {
-    throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.TARGET_KIND_INVALID,
-      message: "Published target share token targetKind must be 'port'.",
-    });
-  }
-
-  if (typeof payload.exp !== "number" || !Number.isInteger(payload.exp) || payload.exp < 1) {
-    throw new PublishedTargetShareTokenError({
-      code: PublishedTargetShareTokenErrorCode.TOKEN_INVALID_CLAIMS,
-      message: "Published target share token exp claim is required.",
-    });
-  }
+  const verifiedPayload = parsedPayload.data;
 
   return {
-    expiresAtEpochSeconds: payload.exp,
-    host,
-    jti,
-    sandboxInstanceId,
-    ...(shareId === undefined ? {} : { shareId }),
-    targetId,
+    expiresAtEpochSeconds: verifiedPayload.exp,
+    host: verifiedPayload.host,
+    jti: verifiedPayload.jti,
+    sandboxInstanceId: verifiedPayload.sandboxInstanceId,
+    ...(verifiedPayload.shareId === undefined ? {} : { shareId: verifiedPayload.shareId }),
+    targetId: verifiedPayload.targetId,
     targetKind: "port",
   };
 }

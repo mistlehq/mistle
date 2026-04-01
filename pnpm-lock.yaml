@@ -805,6 +805,9 @@ importers:
       jose:
         specifier: ^6.2.2
         version: 6.2.2
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
 
   packages/sandbox:
     dependencies:
