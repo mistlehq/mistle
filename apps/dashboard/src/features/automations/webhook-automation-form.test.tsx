@@ -283,7 +283,7 @@ describe("WebhookAutomationForm", () => {
       mode: "create",
       triggerPickerDisabledState: {
         reason: "The selected profile has no bindings with automation triggers.",
-        tone: "neutral",
+        variant: "default",
       },
       webhookEventOptions: [],
       values: buildFormValues({

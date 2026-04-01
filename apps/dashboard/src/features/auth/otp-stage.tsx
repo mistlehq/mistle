@@ -16,7 +16,7 @@ type OtpStageProps = {
 export function OtpStage(props: OtpStageProps): React.JSX.Element {
   return (
     <div className="gap-4 pt-1 flex flex-col">
-      {props.authError === null ? null : <Notice tone="destructive">{props.authError}</Notice>}
+      {props.authError === null ? null : <Notice variant="alert">{props.authError}</Notice>}
       <OtpStepForm
         email={props.email}
         isVerifyingOtp={props.isVerifyingOtp}
@@ -27,7 +27,7 @@ export function OtpStage(props: OtpStageProps): React.JSX.Element {
           ? {}
           : { onUseDifferentEmail: props.onUseDifferentEmail })}
       />
-      {props.footerError === null ? null : <Notice tone="destructive">{props.footerError}</Notice>}
+      {props.footerError === null ? null : <Notice variant="alert">{props.footerError}</Notice>}
     </div>
   );
 }

@@ -104,7 +104,7 @@ export const SessionComposerFixtureStatusMessageForNonImageCapableModel: ChatCom
   {
     message:
       "Model GPT-5.3 Codex Spark cannot inspect images. Images will only be sent as file path references.",
-    tone: "warning",
+    variant: "default",
   };
 
 export const SessionComposerFixturePropsForUnavailableModel: ChatComposerViewModel = {
@@ -114,7 +114,7 @@ export const SessionComposerFixturePropsForUnavailableModel: ChatComposerViewMod
 
 export const SessionComposerFixtureStatusMessageForUnavailableModel: ChatComposerStatusMessage = {
   message: "Model gpt-legacy-preview is no longer available. Switch to another model to continue.",
-  tone: "error",
+  variant: "alert",
 };
 
 export const SessionComposerFixturePropsForLoadingModel: ChatComposerViewModel = {
@@ -125,5 +125,5 @@ export const SessionComposerFixturePropsForLoadingModel: ChatComposerViewModel =
 
 export const SessionComposerFixtureStatusMessageForLoadingModel: ChatComposerStatusMessage = {
   message: "Wait for the selected model to finish loading before sending a message.",
-  tone: "error",
+  variant: "alert",
 };

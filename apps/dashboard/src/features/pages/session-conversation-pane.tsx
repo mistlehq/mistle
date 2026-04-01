@@ -55,10 +55,7 @@ export function SessionConversationBottomPanel({
         onRespondToServerRequest={onRespondToServerRequest}
       />
       {composerViewModel.statusMessage === null ? null : (
-        <Notice
-          className="mb-3"
-          tone={composerViewModel.statusMessage.tone === "error" ? "destructive" : "neutral"}
-        >
+        <Notice className="mb-3" variant={composerViewModel.statusMessage.variant}>
           {composerViewModel.statusMessage.message}
         </Notice>
       )}

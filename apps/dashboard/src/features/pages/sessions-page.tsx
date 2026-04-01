@@ -471,7 +471,7 @@ export function SessionsPage(): React.JSX.Element {
         </div>
 
         {selectableProfilesQuery.isError ? (
-          <Notice title="Could not load sandbox profiles" tone="destructive">
+          <Notice title="Could not load sandbox profiles" variant="alert">
             {resolveApiErrorMessage({
               error: selectableProfilesQuery.error,
               fallbackMessage: "Could not load sandbox profiles.",
@@ -479,7 +479,7 @@ export function SessionsPage(): React.JSX.Element {
           </Notice>
         ) : null}
         {startErrorMessage === null ? null : (
-          <Notice title="Session start failed" tone="destructive">
+          <Notice title="Session start failed" variant="alert">
             {startErrorMessage}
           </Notice>
         )}
@@ -487,7 +487,7 @@ export function SessionsPage(): React.JSX.Element {
 
       <div className="flex flex-col gap-3">
         {listErrorMessage === null ? null : (
-          <Notice title="Could not load sandbox instances" tone="destructive">
+          <Notice title="Could not load sandbox instances" variant="alert">
             {listErrorMessage}
           </Notice>
         )}

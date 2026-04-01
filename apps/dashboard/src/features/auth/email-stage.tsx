@@ -21,7 +21,7 @@ export function EmailStage(props: EmailStageProps): React.JSX.Element {
   return (
     <div className="gap-4 pt-1 flex flex-col">
       {props.beforeForm === undefined ? null : props.beforeForm}
-      {props.authError === null ? null : <Notice tone="destructive">{props.authError}</Notice>}
+      {props.authError === null ? null : <Notice variant="alert">{props.authError}</Notice>}
       <EmailStepForm
         email={props.email}
         isSendingOtp={props.isSendingOtp}
@@ -32,7 +32,7 @@ export function EmailStage(props: EmailStageProps): React.JSX.Element {
         {...(props.submitLabel === undefined ? {} : { submitLabel: props.submitLabel })}
       />
       {props.afterForm === undefined ? null : props.afterForm}
-      {props.footerError === null ? null : <Notice tone="destructive">{props.footerError}</Notice>}
+      {props.footerError === null ? null : <Notice variant="alert">{props.footerError}</Notice>}
     </div>
   );
 }

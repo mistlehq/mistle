@@ -96,7 +96,7 @@ export function resolveSelectedProfileTriggerState(input: {
       selectableConnectionIds: [],
       disabledState: {
         reason: NoProfileSelectedMessage,
-        tone: "neutral",
+        variant: "default",
       },
     };
   }
@@ -106,7 +106,7 @@ export function resolveSelectedProfileTriggerState(input: {
       selectableConnectionIds: [],
       disabledState: {
         reason: input.bindingErrorMessage,
-        tone: "destructive",
+        variant: "alert",
       },
     };
   }
@@ -116,7 +116,7 @@ export function resolveSelectedProfileTriggerState(input: {
       selectableConnectionIds: [],
       disabledState: {
         reason: "Loading profile bindings...",
-        tone: "neutral",
+        variant: "default",
       },
     };
   }
@@ -133,7 +133,7 @@ export function resolveSelectedProfileTriggerState(input: {
       selectableConnectionIds.length === 0
         ? {
             reason: InvalidProfileBindingMessage,
-            tone: "neutral",
+            variant: "default",
           }
         : null,
   };

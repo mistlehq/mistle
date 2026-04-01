@@ -41,7 +41,7 @@ export const ValidationError: Story = {
   render: (args) => (
     <AuthPageShell maxWidthClass={AuthPageWidths.SM} title="Create an organization">
       <div className="grid gap-4">
-        <Notice tone="destructive">Organization name is required.</Notice>
+        <Notice variant="alert">Organization name is required.</Notice>
         <NoOrganizationAccessViewContent {...args} />
       </div>
     </AuthPageShell>

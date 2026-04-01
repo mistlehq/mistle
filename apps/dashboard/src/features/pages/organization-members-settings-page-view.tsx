@@ -71,7 +71,7 @@ export function OrganizationMembersSettingsPageView(
     <div className="flex flex-col gap-4">
       {props.capabilitiesErrorMessage ? (
         <div className="flex flex-col gap-3">
-          <Notice title="Could not load membership permissions" tone="destructive">
+          <Notice title="Could not load membership permissions" variant="alert">
             Invite and role management actions are unavailable until this loads. Please try again
             later.
           </Notice>

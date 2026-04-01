@@ -43,7 +43,7 @@ export function InvitationAccessView(props: InvitationAccessViewProps): React.JS
         </CardContent>
       </Card>
       {props.mutationError === null ? null : (
-        <Notice title="Something went wrong" tone="destructive">
+        <Notice title="Something went wrong" variant="alert">
           {props.mutationError}
         </Notice>
       )}

@@ -355,7 +355,7 @@ function ResourceSection(input: {
         ) : null}
       </div>
       {input.resource.lastErrorMessage ? (
-        <Notice tone="destructive">{input.resource.lastErrorMessage}</Notice>
+        <Notice variant="alert">{input.resource.lastErrorMessage}</Notice>
       ) : null}
       <ResourceItemsPreview
         errorMessage={input.resourceItems?.errorMessage ?? null}
@@ -378,7 +378,7 @@ function ResourceItemsPreview(input: {
   }
 
   if (input.errorMessage !== null) {
-    return <Notice tone="destructive">{input.errorMessage}</Notice>;
+    return <Notice variant="alert">{input.errorMessage}</Notice>;
   }
 
   if (input.items.length === 0) {

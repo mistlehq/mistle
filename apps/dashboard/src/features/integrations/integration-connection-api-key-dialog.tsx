@@ -22,6 +22,11 @@ export function IntegrationConnectionApiKeyDialog(input: {
 }): React.JSX.Element {
   function handleSubmit(event: SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();
+
+    if (input.isPending || input.value.trim().length === 0) {
+      return;
+    }
+
     input.onSubmit();
   }
 
@@ -62,7 +67,7 @@ export function IntegrationConnectionApiKeyDialog(input: {
           </div>
 
           {input.errorMessage === undefined ? null : (
-            <Notice tone="destructive">{input.errorMessage}</Notice>
+            <Notice variant="alert">{input.errorMessage}</Notice>
           )}
 
           <DialogFooter>

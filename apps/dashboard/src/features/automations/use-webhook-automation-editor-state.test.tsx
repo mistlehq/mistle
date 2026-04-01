@@ -120,7 +120,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     expect(result.current.formError).toBeNull();
     expect(result.current.triggerPickerDisabledState).toEqual({
       reason: "Select a sandbox profile to choose triggers.",
-      tone: "neutral",
+      variant: "default",
     });
   });
 
@@ -136,7 +136,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       }).disabledState,
     ).toEqual({
       reason: "The selected profile has no bindings with automation triggers.",
-      tone: "neutral",
+      variant: "default",
     });
   });
 
@@ -152,7 +152,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       }).disabledState,
     ).toEqual({
       reason: "Could not load profile bindings.",
-      tone: "destructive",
+      variant: "alert",
     });
   });
 

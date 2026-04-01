@@ -216,7 +216,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       ) : null}
 
       {input.formError === null ? null : (
-        <Notice title="Automation could not be saved" tone="destructive">
+        <Notice title="Automation could not be saved" variant="alert">
           {input.formError}
         </Notice>
       )}
@@ -442,7 +442,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
       <FormPageFooter>
         {input.validationSummaryError === null ? null : (
-          <Notice tone="destructive" variant="subtle">
+          <Notice appearance="subtle" variant="alert">
             {input.validationSummaryError}
           </Notice>
         )}

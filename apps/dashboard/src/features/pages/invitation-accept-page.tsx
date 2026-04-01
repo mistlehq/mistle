@@ -34,7 +34,7 @@ function renderInvitationErrorState(message: string): React.JSX.Element {
       maxWidthClass={AuthPageWidths.LG}
       title="Oops, something went wrong"
     >
-      <Notice tone="destructive">{message}</Notice>
+      <Notice variant="alert">{message}</Notice>
     </AuthStatusPage>
   );
 }
@@ -236,7 +236,7 @@ export function InvitationAcceptPage(): React.JSX.Element {
           </Button>
         }
       >
-        <Notice tone="neutral">
+        <Notice>
           <p className="text-center">You now have access to {pageState.organizationName}.</p>
         </Notice>
       </AuthStatusPage>
@@ -246,7 +246,7 @@ export function InvitationAcceptPage(): React.JSX.Element {
   if (pageState.kind === "declined") {
     return (
       <AuthStatusPage align="center" maxWidthClass={AuthPageWidths.XL} title="Invitation declined">
-        <Notice tone="neutral">
+        <Notice>
           <p className="text-center">You declined this invitation.</p>
         </Notice>
       </AuthStatusPage>

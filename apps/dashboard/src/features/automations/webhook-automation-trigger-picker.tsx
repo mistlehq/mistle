@@ -52,13 +52,13 @@ type WebhookAutomationTriggerPickerState = {
   groupedAvailableEventOptions: readonly GroupedWebhookAutomationEventOptions[];
   disabled: boolean;
   helperMessage: string | null;
-  helperTone: "neutral" | "destructive";
+  helperVariant: "default" | "alert";
   inputPlaceholder: string;
 };
 
 export type WebhookAutomationTriggerPickerDisabledState = {
   reason: string;
-  tone: "neutral" | "destructive";
+  variant: "default" | "alert";
 };
 
 export function groupWebhookAutomationEventOptions(
@@ -124,7 +124,7 @@ function resolveWebhookAutomationTriggerPickerState(input: {
       groupedAvailableEventOptions: [],
       disabled: true,
       helperMessage: input.disabledState.reason,
-      helperTone: input.disabledState.tone,
+      helperVariant: input.disabledState.variant,
       inputPlaceholder: "No triggers available",
     };
   }
@@ -143,7 +143,7 @@ function resolveWebhookAutomationTriggerPickerState(input: {
     helperMessage: input.hasConnectedIntegrations
       ? null
       : "Connect an integration to add triggers.",
-    helperTone: "neutral",
+    helperVariant: "default",
     inputPlaceholder: hasAvailableTriggers ? "Add trigger" : "No triggers available",
   };
 }
@@ -190,12 +190,12 @@ export function WebhookAutomationTriggerPicker(input: {
       )}
 
       {pickerState.helperMessage === null ? null : (
-        <Notice tone={pickerState.helperTone}>{pickerState.helperMessage}</Notice>
+        <Notice variant={pickerState.helperVariant}>{pickerState.helperMessage}</Notice>
       )}
 
       {selectedEventOptions.length === 0 ? (
         pickerState.disabled ? null : (
-          <Notice tone={input.error === undefined ? "neutral" : "destructive"}>
+          <Notice variant={input.error === undefined ? "default" : "alert"}>
             {emptyStateMessage}
           </Notice>
         )

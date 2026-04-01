@@ -278,7 +278,7 @@ export function SandboxProfilesPage(): React.JSX.Element {
       </Dialog>
 
       {listQuery.isError ? (
-        <Notice title="Could not load sandbox profiles" tone="destructive">
+        <Notice title="Could not load sandbox profiles" variant="alert">
           {resolveApiErrorMessage({
             error: listQuery.error,
             fallbackMessage: "Could not load sandbox profiles.",

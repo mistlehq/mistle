@@ -38,7 +38,7 @@ export function DeleteWebhookAutomationDialog(
           </p>
 
           {input.errorMessage === null ? null : (
-            <Notice title="Delete failed" tone="destructive">
+            <Notice title="Delete failed" variant="alert">
               {input.errorMessage}
             </Notice>
           )}

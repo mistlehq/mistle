@@ -20,7 +20,7 @@ describe("SessionConversationBottomPanel", () => {
           statusMessage: {
             message:
               "Model GPT-5.3 Codex Spark cannot inspect images. Images will only be sent as file path references.",
-            tone: "warning",
+            variant: "default",
           },
         }}
         isRespondingToServerRequest={false}

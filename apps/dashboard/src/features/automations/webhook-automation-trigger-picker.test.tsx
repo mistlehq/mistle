@@ -238,7 +238,7 @@ describe("WebhookAutomationTriggerPicker", () => {
       eventOptions: [],
       disabledState: {
         reason: "The selected profile has no bindings with automation triggers.",
-        tone: "neutral",
+        variant: "default",
       },
     });
 
@@ -273,7 +273,7 @@ describe("WebhookAutomationTriggerPicker", () => {
       eventOptions: [],
       disabledState: {
         reason: "Could not load profile bindings.",
-        tone: "destructive",
+        variant: "alert",
       },
     });
 

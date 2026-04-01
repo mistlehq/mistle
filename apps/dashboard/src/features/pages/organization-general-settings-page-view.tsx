@@ -49,7 +49,7 @@ export function OrganizationGeneralSettingsPageView(
       <FormPageStack>
         <FormPageSection>
           <div className="flex flex-col gap-3 p-4">
-            <Notice tone="destructive">{props.loadErrorMessage} Please try again later.</Notice>
+            <Notice variant="alert">{props.loadErrorMessage} Please try again later.</Notice>
           </div>
         </FormPageSection>
       </FormPageStack>
@@ -65,7 +65,7 @@ export function OrganizationGeneralSettingsPageView(
           </p>
 
           {props.saveErrorMessage !== null || props.nameErrorMessage !== null ? (
-            <Notice tone="destructive">
+            <Notice variant="alert">
               {props.saveErrorMessage !== null
                 ? `${props.saveErrorMessage} Please try again later.`
                 : props.nameErrorMessage}

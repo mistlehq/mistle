@@ -248,7 +248,7 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
           ) : props.configForm.mode === "unsupported" ? (
             <p className="text-destructive text-sm">{props.configForm.message}</p>
           ) : !isUpdateMode ? (
-            <Notice tone="neutral">Continue to start the connection flow.</Notice>
+            <Notice>Continue to start the connection flow.</Notice>
           ) : (
             <p className="text-muted-foreground text-sm">Save to update this connection.</p>
           )}

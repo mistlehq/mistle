@@ -58,7 +58,7 @@ function renderWebhookAutomationEditorError(input: {
     <>
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
-          <Notice title={input.title} tone="destructive">
+          <Notice title={input.title} variant="alert">
             {input.description}
           </Notice>
           <div>

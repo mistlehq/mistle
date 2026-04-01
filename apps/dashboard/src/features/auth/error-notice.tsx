@@ -10,13 +10,7 @@ export function ErrorNotice(props: ErrorNoticeProps): React.JSX.Element | null {
   }
 
   return (
-    <Notice
-      aria-atomic="true"
-      aria-live="assertive"
-      role="alert"
-      title="Something went wrong"
-      tone="destructive"
-    >
+    <Notice aria-atomic="true" title="Something went wrong" variant="alert">
       {props.message}
     </Notice>
   );

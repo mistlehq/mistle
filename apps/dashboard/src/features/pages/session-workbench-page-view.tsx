@@ -43,7 +43,7 @@ export function SessionWorkbenchPageView({
 }: SessionWorkbenchPageViewProps): React.JSX.Element {
   if (sandboxInstanceId === null) {
     return (
-      <Notice title="Session id is missing" tone="destructive">
+      <Notice title="Session id is missing" variant="alert">
         Open a session from the Sessions page.
       </Notice>
     );
@@ -68,11 +68,7 @@ export function SessionWorkbenchPageView({
       {alerts.length === 0 ? null : (
         <div className="mx-auto flex w-full max-w-3xl flex-none flex-col gap-4 px-4 py-6">
           {alerts.map((alert) => (
-            <Notice
-              key={`${alert.title}:${alert.description}`}
-              title={alert.title}
-              tone="destructive"
-            >
+            <Notice key={`${alert.title}:${alert.description}`} title={alert.title} variant="alert">
               {alert.description}
             </Notice>
           ))}

@@ -5,41 +5,41 @@ import { cn } from "../../lib/utils.js";
 
 const noticeVariants = cva(["group/notice w-full rounded-lg text-left text-sm"].join(" "), {
   variants: {
-    tone: {
-      neutral: "",
-      destructive:
+    variant: {
+      default: "",
+      alert:
         "[&_[data-slot=notice-description]]:text-destructive/90 [&_[data-slot=notice-icon]]:text-current text-destructive",
     },
-    variant: {
+    appearance: {
       boxed: "border px-4 py-3",
       subtle: "border border-transparent px-3 py-2",
     },
   },
   compoundVariants: [
     {
-      tone: "neutral",
-      variant: "boxed",
+      variant: "default",
+      appearance: "boxed",
       className: "bg-muted/20 text-muted-foreground",
     },
     {
-      tone: "neutral",
-      variant: "subtle",
+      variant: "default",
+      appearance: "subtle",
       className: "bg-muted/20 text-muted-foreground",
     },
     {
-      tone: "destructive",
-      variant: "boxed",
+      variant: "alert",
+      appearance: "boxed",
       className: "bg-destructive/5 border-destructive/40",
     },
     {
-      tone: "destructive",
-      variant: "subtle",
+      variant: "alert",
+      appearance: "subtle",
       className: "bg-destructive/5",
     },
   ],
   defaultVariants: {
-    tone: "neutral",
-    variant: "boxed",
+    variant: "default",
+    appearance: "boxed",
   },
 });
 
@@ -76,14 +76,41 @@ type NoticeProps = React.ComponentProps<"div"> &
   NoticeOwnProps &
   VariantProps<typeof noticeVariants>;
 
+function resolveUrgencyProps(input: {
+  ariaLive: React.AriaAttributes["aria-live"];
+  role: React.AriaRole | undefined;
+  variant: NoticeProps["variant"];
+}): Pick<React.ComponentProps<"div">, "aria-live" | "role"> {
+  if (input.role !== undefined || input.ariaLive !== undefined) {
+    return {
+      "aria-live": input.ariaLive,
+      role: input.role,
+    };
+  }
+
+  if (input.variant === "alert") {
+    return {
+      "aria-live": "assertive",
+      role: "alert",
+    };
+  }
+
+  return {
+    "aria-live": undefined,
+    role: undefined,
+  };
+}
+
 function Notice({
   action,
+  "aria-live": ariaLive,
   children,
   className,
   icon,
+  role,
   title,
-  tone,
   variant,
+  appearance,
   ...props
 }: NoticeProps) {
   const layoutState = resolveLayoutState({
@@ -94,9 +121,20 @@ function Notice({
   });
   const shouldRenderStructuredContent =
     layoutState.hasIcon || layoutState.hasTitle || layoutState.hasAction;
+  const urgencyProps = resolveUrgencyProps({
+    ariaLive,
+    role,
+    variant,
+  });
 
   return (
-    <div className={cn(noticeVariants({ tone, variant }), className)} data-slot="notice" {...props}>
+    <div
+      aria-live={urgencyProps["aria-live"]}
+      className={cn(noticeVariants({ variant, appearance }), className)}
+      data-slot="notice"
+      role={urgencyProps.role}
+      {...props}
+    >
       {shouldRenderStructuredContent ? (
         <NoticeStructuredContent action={action} icon={icon} title={title}>
           {children}

@@ -20,7 +20,7 @@ export const PlainError: Story = {
     title: "Oops, something went wrong",
     align: "center",
     children: (
-      <Notice tone="destructive">This invitation link is invalid or can no longer be used.</Notice>
+      <Notice variant="alert">This invitation link is invalid or can no longer be used.</Notice>
     ),
   },
 };
@@ -29,7 +29,7 @@ export const WithActions: Story = {
   args: {
     title: "Oops, something went wrong",
     align: "center",
-    children: <Notice tone="destructive">This invitation belongs to a different account.</Notice>,
+    children: <Notice variant="alert">This invitation belongs to a different account.</Notice>,
     actions: (
       <>
         <Button className="h-12 w-full text-sm" size="lg" type="button" variant="secondary">

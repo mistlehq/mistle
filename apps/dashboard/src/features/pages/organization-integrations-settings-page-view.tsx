@@ -42,7 +42,7 @@ export function OrganizationIntegrationsSettingsPageView(
   if (props.loadErrorMessage !== null) {
     return (
       <div className="flex flex-col gap-3">
-        <Notice tone="destructive">{props.loadErrorMessage} Please try again later.</Notice>
+        <Notice variant="alert">{props.loadErrorMessage} Please try again later.</Notice>
       </div>
     );
   }

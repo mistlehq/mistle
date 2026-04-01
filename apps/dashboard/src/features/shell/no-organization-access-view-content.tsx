@@ -17,11 +17,11 @@ export function NoOrganizationAccessViewContent(
   return (
     <>
       {props.organizationNameError === null ? null : (
-        <Notice tone="destructive">{props.organizationNameError}</Notice>
+        <Notice variant="alert">{props.organizationNameError}</Notice>
       )}
 
       {props.createOrganizationError === null ? null : (
-        <Notice tone="destructive">{props.createOrganizationError}</Notice>
+        <Notice variant="alert">{props.createOrganizationError}</Notice>
       )}
 
       <form className="flex flex-col gap-4" onSubmit={props.onCreateOrganization}>

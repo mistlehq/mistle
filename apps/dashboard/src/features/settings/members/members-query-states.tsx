@@ -39,7 +39,7 @@ export function MembersLoadErrorState(input: { message: string }): React.JSX.Ele
         <CardTitle>Members</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <Notice tone="destructive">{input.message} Please try again later.</Notice>
+        <Notice variant="alert">{input.message} Please try again later.</Notice>
       </CardContent>
     </Card>
   );

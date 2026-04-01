@@ -274,7 +274,7 @@ export function IntegrationsEditorSection(
   return (
     <div className="gap-4 flex flex-col">
       {props.integrationBindingsQuery.isError ? (
-        <Notice title="Could not load integration bindings" tone="destructive">
+        <Notice title="Could not load integration bindings" variant="alert">
           {resolveApiErrorMessage({
             error: props.integrationBindingsQuery.error,
             fallbackMessage: "Could not load sandbox profile integration bindings.",
@@ -283,7 +283,7 @@ export function IntegrationsEditorSection(
       ) : null}
 
       {props.integrationDirectoryQuery.isError ? (
-        <Notice title="Could not load integration connections" tone="destructive">
+        <Notice title="Could not load integration connections" variant="alert">
           {resolveApiErrorMessage({
             error: props.integrationDirectoryQuery.error,
             fallbackMessage: "Could not load integration connections.",
@@ -292,7 +292,7 @@ export function IntegrationsEditorSection(
       ) : null}
 
       {props.integrationSaveError ? (
-        <Notice title="Save failed" tone="destructive">
+        <Notice title="Save failed" variant="alert">
           {props.integrationSaveError}
         </Notice>
       ) : null}
@@ -365,7 +365,7 @@ function CreateSandboxProfileEditorPage(): React.JSX.Element {
     <PageFrame description={description} title={title}>
       <div className="gap-4 flex flex-col">
         {metaState.saveError ? (
-          <Notice title="Create failed" tone="destructive">
+          <Notice title="Create failed" variant="alert">
             {metaState.saveError}
           </Notice>
         ) : null}
@@ -462,7 +462,7 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
             <CardContent className="gap-3 flex flex-col pt-4">
               <Notice
                 title={isNotFoundError ? "Sandbox profile not found" : "Could not load profile"}
-                tone="destructive"
+                variant="alert"
               >
                 {resolveApiErrorMessage({
                   error: profileQuery.error,
@@ -591,7 +591,7 @@ function LoadedSandboxProfileMetaSection(input: {
         />
       </div>
       {metaState.saveError ? (
-        <Notice title="Update failed" tone="destructive">
+        <Notice title="Update failed" variant="alert">
           {metaState.saveError}
         </Notice>
       ) : null}

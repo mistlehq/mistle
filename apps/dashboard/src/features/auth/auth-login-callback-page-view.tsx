@@ -29,7 +29,7 @@ export function AuthLoginCallbackPageView(
         ) : (
           <>
             {props.callbackError === null ? null : (
-              <Notice tone="destructive">{props.callbackError}</Notice>
+              <Notice variant="alert">{props.callbackError}</Notice>
             )}
             <Button onClick={props.onBackToLogin} type="button" variant="outline">
               Back to login

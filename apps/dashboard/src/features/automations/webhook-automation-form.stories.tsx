@@ -482,7 +482,7 @@ export const CreatePageLayout: Story = {
     mode: "create",
     triggerPickerDisabledState: {
       reason: "Select a sandbox profile to choose triggers.",
-      tone: "neutral",
+      variant: "default",
     },
     values: EmptyCreateValues,
   },
@@ -551,7 +551,7 @@ export const NoTriggersAvailable: Story = {
     mode: "create",
     triggerPickerDisabledState: {
       reason: "The selected profile has no bindings with automation triggers.",
-      tone: "neutral",
+      variant: "default",
     },
     values: {
       ...EmptyCreateValues,
@@ -566,7 +566,7 @@ export const LoadingProfileBindings: Story = {
     mode: "create",
     triggerPickerDisabledState: {
       reason: "Loading profile bindings...",
-      tone: "neutral",
+      variant: "default",
     },
     values: {
       ...EmptyCreateValues,
@@ -582,7 +582,7 @@ export const ProfileBindingsLoadFailure: Story = {
     onDelete: function onDelete() {},
     triggerPickerDisabledState: {
       reason: "Could not load profile bindings.",
-      tone: "destructive",
+      variant: "alert",
     },
     values: ExistingAutomationValues,
   },

@@ -39,7 +39,7 @@ export function PageTitleField(input: {
         value={input.value}
       />
       {input.errorMessage === undefined ? null : (
-        <Notice tone="destructive">{input.errorMessage}</Notice>
+        <Notice variant="alert">{input.errorMessage}</Notice>
       )}
     </div>
   );

@@ -35,4 +35,33 @@ describe("IntegrationConnectionApiKeyDialog", () => {
     });
     expect(updatedValue).toBe("sk-test-key");
   });
+
+  it("does not resubmit while a key update is pending", () => {
+    let submitCount = 0;
+
+    render(
+      <IntegrationConnectionApiKeyDialog
+        connectionDisplayName="OpenAI Production"
+        isOpen={true}
+        isPending={true}
+        onClose={() => {}}
+        onSubmit={() => {
+          submitCount += 1;
+        }}
+        onValueChange={() => {}}
+        value="sk-test-key"
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog");
+    const form = dialog.querySelector("form");
+
+    if (form === null) {
+      throw new Error("Expected dialog form.");
+    }
+
+    fireEvent.submit(form);
+
+    expect(submitCount).toBe(0);
+  });
 });

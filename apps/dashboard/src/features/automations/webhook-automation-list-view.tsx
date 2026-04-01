@@ -192,7 +192,7 @@ export function WebhookAutomationListView(
             </Button>
           }
           title="Could not load automations"
-          tone="destructive"
+          variant="alert"
         >
           {input.errorMessage}
         </Notice>

@@ -10,15 +10,15 @@ type NoticeStoryArgs = {
   showAction: boolean;
   showIcon: boolean;
   title?: string;
-} & Pick<React.ComponentProps<typeof Notice>, "tone" | "variant">;
+} & Pick<React.ComponentProps<typeof Notice>, "appearance" | "variant">;
 
 const meta = {
   title: "UI/Notice",
   component: Notice,
   tags: ["autodocs"],
   args: {
-    tone: "neutral",
-    variant: "boxed",
+    appearance: "boxed",
+    variant: "default",
     role: "status",
     title: "Sandbox session connected",
     body: "The session is now attached to its runtime and ready to accept commands.",
@@ -26,11 +26,11 @@ const meta = {
     showAction: false,
   },
   argTypes: {
-    tone: {
-      control: "radio",
-      options: ["neutral", "destructive"],
-    },
     variant: {
+      control: "radio",
+      options: ["default", "alert"],
+    },
+    appearance: {
       control: "radio",
       options: ["boxed", "subtle"],
     },
@@ -56,13 +56,13 @@ const meta = {
     docs: {
       description: {
         component:
-          "Notice is a neutral feedback primitive for inline or section-scoped messaging. Use role controls to preview urgency semantics separately from visual tone.",
+          "Notice is an inline feedback primitive for section-scoped messaging. Use the variant control to preview alert semantics and appearance to preview chrome.",
       },
     },
   },
   render: function Render(args: NoticeStoryArgs) {
     const icon = args.showIcon ? (
-      args.tone === "destructive" ? (
+      args.variant === "alert" ? (
         <WarningIcon />
       ) : (
         <InfoIcon />
@@ -78,11 +78,11 @@ const meta = {
     return (
       <Notice
         action={action}
+        appearance={args.appearance}
         className="w-[560px]"
         icon={icon}
         role={args.role}
         title={args.title === "" ? undefined : args.title}
-        tone={args.tone}
         variant={args.variant}
       >
         {args.body}

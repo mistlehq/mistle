@@ -22,7 +22,7 @@ export const LinkInvalid: Story = {
     align: "center",
     title: "Oops, something went wrong",
     children: (
-      <Notice tone="destructive">This invitation link is invalid or can no longer be used.</Notice>
+      <Notice variant="alert">This invitation link is invalid or can no longer be used.</Notice>
     ),
   },
   parameters: {
@@ -58,7 +58,7 @@ export const WrongAccountSignedIn: Story = {
   args: {
     align: "center",
     title: "Oops, something went wrong",
-    children: <Notice tone="destructive">This invitation belongs to a different account.</Notice>,
+    children: <Notice variant="alert">This invitation belongs to a different account.</Notice>,
   },
   parameters: {
     docs: {
@@ -74,7 +74,7 @@ export const SessionCheckFailed: Story = {
   args: {
     align: "center",
     title: "Oops, something went wrong",
-    children: <Notice tone="destructive">Please try again later.</Notice>,
+    children: <Notice variant="alert">Please try again later.</Notice>,
   },
   parameters: {
     docs: {
@@ -91,7 +91,7 @@ export const InvitationAccepted: Story = {
     align: "center",
     title: "Invitation accepted",
     children: (
-      <Notice tone="neutral">
+      <Notice>
         <p className="text-center">You now have access to Mistle Labs.</p>
       </Notice>
     ),
@@ -115,7 +115,7 @@ export const InvitationDeclined: Story = {
     align: "center",
     title: "Invitation declined",
     children: (
-      <Notice tone="neutral">
+      <Notice>
         <p className="text-center">You declined this invitation.</p>
       </Notice>
     ),

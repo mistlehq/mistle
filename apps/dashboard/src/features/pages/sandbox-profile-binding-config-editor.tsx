@@ -465,7 +465,7 @@ export function SandboxProfileBindingConfigEditor(input: {
   if (configUiModel.mode === "unsupported") {
     return (
       <div className="gap-2 flex flex-col">
-        <Notice title="Unsupported binding config" tone="destructive">
+        <Notice title="Unsupported binding config" variant="alert">
           {configUiModel.message}
         </Notice>
         <div>
