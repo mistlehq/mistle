@@ -13,7 +13,7 @@ export function FormPageShell(input: FormPageShellProps): React.JSX.Element {
     <div className={cn("mx-auto flex w-full flex-col gap-4", input.className)}>
       <div
         className={cn(
-          "flex w-full flex-col gap-4",
+          "mx-auto flex w-full flex-col gap-4",
           input.maxWidthClassName ?? "max-w-2xl",
           input.contentClassName,
         )}
