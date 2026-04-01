@@ -40,6 +40,12 @@ const WorkspaceAliases = [
     replacement: fileURLToPath(new URL("../../packages/logging/src/index.ts", import.meta.url)),
   },
   {
+    find: /^@mistle\/published-target-auth$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/published-target-auth/src/index.ts", import.meta.url),
+    ),
+  },
+  {
     find: /^@mistle\/sandbox-session-protocol$/,
     replacement: fileURLToPath(
       new URL("../../packages/sandbox-session-protocol/src/index.ts", import.meta.url),

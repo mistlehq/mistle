@@ -8,8 +8,10 @@ import { systemClock, systemScheduler } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 
 import { BootstrapPublishControlRequestCoordinator } from "../../publishing/bootstrap-publish-control-request-coordinator.js";
+import { BootstrapPublishRouter } from "../../publishing/bootstrap-publish-router.js";
 import { ConnectionPublishMessageHandler } from "../../publishing/connection-publish-message-handler.js";
 import { ConnectionPublishRequestCoordinator } from "../../publishing/connection-publish-request-coordinator.js";
+import { createInMemoryTunnelRelayCoordinator } from "../create-in-memory-relay-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
 import { InteractiveStreamRouter } from "../gateway-forwarding/interactive-stream-router.js";
@@ -51,11 +53,13 @@ async function createTranslatorHarness() {
 
   const forwardingServer = new LocalGatewayForwardingServerAdapter(registry);
   const forwardingClient = new LocalGatewayForwardingClientAdapter(LocalNodeId, forwardingServer);
+  const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
   const router = new InteractiveStreamRouter(
     LocalNodeId,
     new StoreBackedSandboxOwnerResolver(LocalNodeId, ownerStore),
     forwardingClient,
   );
+  const bootstrapPublishRouter = new BootstrapPublishRouter(relayCoordinator, registry);
 
   return {
     router,
@@ -66,6 +70,7 @@ async function createTranslatorHarness() {
         new ConnectionPublishRequestCoordinator(systemScheduler, 5_000),
         new BootstrapPublishControlRequestCoordinator(systemScheduler, 5_000),
       ),
+      bootstrapPublishRouter,
     ),
   };
 }

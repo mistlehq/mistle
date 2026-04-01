@@ -118,7 +118,7 @@ export class ConnectionPublishMessageHandler {
 
   #handleBootstrapMessage(input: {
     controlMessage: PublishControlMessage;
-  }): TunnelProtocolTranslation | undefined {
+  }): TunnelProtocolTranslation {
     if (input.controlMessage.type === "publish.target.authorize.result") {
       return this.#handleAuthorizeResult({
         controlMessage: input.controlMessage,
@@ -126,7 +126,9 @@ export class ConnectionPublishMessageHandler {
     }
 
     if (input.controlMessage.type !== "publish.listeners.snapshot") {
-      return undefined;
+      throw new TunnelProtocolViolationError(
+        `Bootstrap websocket cannot send publish control message type '${input.controlMessage.type}'.`,
+      );
     }
 
     const resolvedRequest = this.requestCoordinator.resolveRequest({

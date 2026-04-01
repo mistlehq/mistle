@@ -2,7 +2,7 @@ import {
   parsePublishedTargetHost,
   PublishedTargetHostError,
   type ParsedPublishedTargetHost,
-} from "@mistle/gateway-published-target-auth";
+} from "@mistle/published-target-auth";
 import type { PublishTargetAuthorizeResult } from "@mistle/sandbox-session-protocol";
 
 import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
@@ -151,14 +151,6 @@ function createBootstrapErrorResponse(error: unknown): Response {
   throw error;
 }
 
-function resolvePublishedBaseDomain(input: {
-  baseDomain: string;
-  environment: DataPlaneGatewayRuntimeConfig["environment"];
-  localBaseDomain: string;
-}): string {
-  return input.environment === "development" ? input.localBaseDomain : input.baseDomain;
-}
-
 type ParsedPublishedPortHost = ParsedPublishedTargetHost & {
   target: {
     kind: "port";
@@ -168,9 +160,7 @@ type ParsedPublishedPortHost = ParsedPublishedTargetHost & {
 
 function parsePublishedPortHost(input: {
   baseDomain: string;
-  environment: DataPlaneGatewayRuntimeConfig["environment"];
   host: string | undefined;
-  localBaseDomain: string;
 }): ParsedPublishedPortHost | undefined {
   if (input.host === undefined) {
     return undefined;
@@ -178,7 +168,7 @@ function parsePublishedPortHost(input: {
 
   try {
     const parsedHost = parsePublishedTargetHost({
-      baseDomain: resolvePublishedBaseDomain(input),
+      baseDomain: input.baseDomain,
       host: input.host,
     });
     if (parsedHost.target.kind !== "port") {
@@ -292,9 +282,7 @@ export function registerPublishedTargetRoutes(input: RegisterPublishedTargetRout
   input.app.all("*", async (ctx, next) => {
     const parsedHost = parsePublishedPortHost({
       baseDomain: input.publishConfig.baseDomain,
-      environment: input.environment,
       host: ctx.req.header("host"),
-      localBaseDomain: input.publishConfig.localBaseDomain,
     });
     if (parsedHost === undefined) {
       await next();
