@@ -2,6 +2,7 @@ import { Field, FieldContent, FieldError, FieldHeader, FieldLabel, Input } from 
 
 import { UserIdentitySummary } from "../account/user-identity-summary.js";
 import { SaveActions } from "../settings/save-actions.js";
+import { SettingsPageHeader } from "../settings/settings-page-header.js";
 import { FormPageSection, FormPageShell } from "../shared/form-page.js";
 
 export type ProfileSettingsPageViewProps = {
@@ -19,7 +20,9 @@ export type ProfileSettingsPageViewProps = {
 
 export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): React.JSX.Element {
   return (
-    <FormPageShell className="pt-0">
+    <FormPageShell className="-my-6">
+      <SettingsPageHeader headerActions={null} supportingText="" title="Profile" />
+
       <FormPageSection>
         <div className="p-4">
           <UserIdentitySummary email={props.email} name={props.displayName} />

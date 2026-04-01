@@ -12,9 +12,13 @@ export type SettingsLayoutViewProps = {
 export function SettingsLayoutView(input: SettingsLayoutViewProps): React.JSX.Element {
   const isFormLayout = input.layoutVariant === "form";
 
+  if (isFormLayout) {
+    return <>{input.children}</>;
+  }
+
   return (
-    <div className={isFormLayout ? "flex flex-col gap-3" : "flex flex-col gap-4"}>
-      <div className={isFormLayout ? "mx-auto w-full max-w-2xl" : undefined}>
+    <div className="flex flex-col gap-4">
+      <div>
         <SettingsPageHeader
           headerActions={input.headerActions}
           headerIcon={input.headerIcon}

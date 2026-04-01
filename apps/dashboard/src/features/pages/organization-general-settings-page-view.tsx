@@ -1,6 +1,7 @@
 import { Field, FieldContent, FieldHeader, FieldLabel, Input, Skeleton } from "@mistle/ui";
 
 import { SaveActions } from "../settings/save-actions.js";
+import { SettingsPageHeader } from "../settings/settings-page-header.js";
 import { FormPageSection, FormPageShell } from "../shared/form-page.js";
 import { StatusBox } from "../shared/status-box.js";
 
@@ -23,7 +24,9 @@ export function OrganizationGeneralSettingsPageView(
 ): React.JSX.Element {
   if (props.isLoading) {
     return (
-      <FormPageShell className="pt-0">
+      <FormPageShell className="-my-6">
+        <SettingsPageHeader headerActions={null} supportingText="" title="General" />
+
         <FormPageSection>
           <div className="flex flex-col gap-4 p-4">
             <div className="flex flex-col gap-2">
@@ -47,7 +50,9 @@ export function OrganizationGeneralSettingsPageView(
 
   if (props.loadErrorMessage) {
     return (
-      <FormPageShell className="pt-0">
+      <FormPageShell className="-my-6">
+        <SettingsPageHeader headerActions={null} supportingText="" title="General" />
+
         <FormPageSection>
           <div className="flex flex-col gap-3 p-4">
             <StatusBox tone="destructive">
@@ -60,7 +65,9 @@ export function OrganizationGeneralSettingsPageView(
   }
 
   return (
-    <FormPageShell className="pt-0">
+    <FormPageShell className="-my-6">
+      <SettingsPageHeader headerActions={null} supportingText="" title="General" />
+
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
           <p aria-live="polite" className="sr-only" role="status">
