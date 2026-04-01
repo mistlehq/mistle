@@ -8,6 +8,7 @@ import {
   Input,
   Notice,
 } from "@mistle/ui";
+import type { SyntheticEvent } from "react";
 
 export function IntegrationConnectionApiKeyDialog(input: {
   connectionDisplayName: string;
@@ -19,6 +20,11 @@ export function IntegrationConnectionApiKeyDialog(input: {
   onValueChange: (nextValue: string) => void;
   value: string;
 }): React.JSX.Element {
+  function handleSubmit(event: SyntheticEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    input.onSubmit();
+  }
+
   return (
     <Dialog
       isBusy={input.isPending}
@@ -31,7 +37,12 @@ export function IntegrationConnectionApiKeyDialog(input: {
       open={input.isOpen}
     >
       {input.isOpen ? (
-        <DialogContent>
+        <DialogContent
+          formProps={{
+            className: "gap-6 grid",
+            onSubmit: handleSubmit,
+          }}
+        >
           <DialogHeader variant="sectioned">
             <DialogTitle>{`Update ${input.connectionDisplayName}`}</DialogTitle>
           </DialogHeader>
@@ -63,11 +74,7 @@ export function IntegrationConnectionApiKeyDialog(input: {
             >
               Cancel
             </Button>
-            <Button
-              disabled={input.isPending || input.value.trim().length === 0}
-              onClick={input.onSubmit}
-              type="button"
-            >
+            <Button disabled={input.isPending || input.value.trim().length === 0} type="submit">
               Update key
             </Button>
           </DialogFooter>

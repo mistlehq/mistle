@@ -143,7 +143,7 @@ export function AppShell(): React.JSX.Element {
     isSigningOut,
     locationPathname: location.pathname,
     organizationErrorMessage: organizationSummary.organizationErrorMessage,
-    organizationName: organizationSummary.organizationName,
+    organizationName: organizationSummary.organizationName ?? "",
     pageMeta,
     signOutError,
   });
@@ -168,7 +168,7 @@ function resolveAppShellFrame(input: {
   isSigningOut: boolean;
   locationPathname: string;
   organizationErrorMessage: string | null;
-  organizationName: string | null;
+  organizationName: string;
   pageMeta: ReturnType<typeof useAppPageMeta>;
   signOutError: string | null;
 }): AppShellFrame {

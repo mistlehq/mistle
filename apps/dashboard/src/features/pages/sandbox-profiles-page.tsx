@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogFooter,
   DialogHeader,
+  DialogShortcut,
   DialogTitle,
   Field,
   FieldContent,
@@ -21,6 +22,7 @@ import {
   TableRow,
 } from "@mistle/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { SyntheticEvent } from "react";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -150,6 +152,11 @@ export function SandboxProfilesPage(): React.JSX.Element {
     createMutation.mutate(trimmedDisplayName);
   }
 
+  function handleCreateProfileSubmit(event: SyntheticEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    createProfile();
+  }
+
   function navigateToProfileDetail(profileId: string): void {
     void navigate(`/sandbox-profiles/${profileId}`);
   }
@@ -220,7 +227,12 @@ export function SandboxProfilesPage(): React.JSX.Element {
         }}
         open={isCreateDialogOpen}
       >
-        <DialogContent>
+        <DialogContent
+          formProps={{
+            className: "gap-6 grid",
+            onSubmit: handleCreateProfileSubmit,
+          }}
+        >
           <DialogHeader variant="sectioned">
             <DialogTitle>Create profile</DialogTitle>
           </DialogHeader>
@@ -251,12 +263,15 @@ export function SandboxProfilesPage(): React.JSX.Element {
             <Button onClick={closeCreateDialog} type="button" variant="outline">
               Cancel
             </Button>
-            <Button
-              disabled={isCreateProfileInvalid || createMutation.isPending}
-              onClick={createProfile}
-              type="button"
-            >
-              {createMutation.isPending ? "Creating..." : "Create profile"}
+            <Button disabled={isCreateProfileInvalid || createMutation.isPending} type="submit">
+              {createMutation.isPending ? (
+                "Creating..."
+              ) : (
+                <>
+                  Create
+                  <DialogShortcut aria-label="Enter" />
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

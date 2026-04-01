@@ -10,7 +10,7 @@ import {
   Skeleton,
 } from "@mistle/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { FormEvent } from "react";
+import type { SyntheticEvent } from "react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
@@ -356,7 +356,7 @@ function CreateSandboxProfileEditorPage(): React.JSX.Element {
     },
   });
 
-  function handleCreateProfileSubmit(event: FormEvent<HTMLFormElement>): void {
+  function handleCreateProfileSubmit(event: SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();
     metaState.onCreate();
   }

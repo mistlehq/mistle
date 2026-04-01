@@ -4,11 +4,14 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils.js";
 import { Button } from "./button.js";
+import { Kbd } from "./kbd.js";
 
 type DialogContextValue = {
   isBusy: boolean;
   isDismissible: boolean;
 };
+
+type DialogFormProps = Omit<React.ComponentProps<"form">, "children">;
 
 const DialogContext = React.createContext<DialogContextValue>({
   isBusy: false,
@@ -76,12 +79,37 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
 function DialogContent({
   className,
   children,
+  formProps,
   showCloseButton = true,
   ...props
 }: DialogPrimitive.Popup.Props & {
+  formProps?: DialogFormProps;
   showCloseButton?: boolean;
 }) {
   const { isBusy, isDismissible } = React.useContext(DialogContext);
+  const closeButton = showCloseButton && isDismissible && (
+    <DialogPrimitive.Close
+      data-slot="dialog-close"
+      render={
+        <Button className="absolute top-4 right-4" size="icon-sm" type="button" variant="ghost" />
+      }
+    >
+      <XIcon />
+      <span className="sr-only">Close</span>
+    </DialogPrimitive.Close>
+  );
+  const content =
+    formProps === undefined ? (
+      <>
+        {children}
+        {closeButton}
+      </>
+    ) : (
+      <form {...formProps} className={cn("contents", formProps.className)}>
+        {children}
+        {closeButton}
+      </form>
+    );
 
   return (
     <DialogPortal>
@@ -95,16 +123,7 @@ function DialogContent({
         )}
         {...props}
       >
-        {children}
-        {showCloseButton && isDismissible && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            render={<Button variant="ghost" className="absolute top-4 right-4" size="icon-sm" />}
-          >
-            <XIcon />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
-        )}
+        {content}
       </DialogPrimitive.Popup>
     </DialogPortal>
   );
@@ -146,7 +165,9 @@ function DialogFooter({
     >
       {children}
       {showCloseButton && (
-        <DialogPrimitive.Close render={<Button variant="outline" />}>Close</DialogPrimitive.Close>
+        <DialogPrimitive.Close render={<Button type="button" variant="outline" />}>
+          Close
+        </DialogPrimitive.Close>
       )}
     </div>
   );
@@ -175,6 +196,14 @@ function DialogDescription({ className, ...props }: DialogPrimitive.Description.
   );
 }
 
+function DialogShortcut({ children, className, ...props }: React.ComponentProps<"kbd">) {
+  return (
+    <Kbd className={cn(className)} variant="shortcut" {...props}>
+      {children ?? <span aria-hidden="true">{"\u2B90"}</span>}
+    </Kbd>
+  );
+}
+
 export {
   Dialog,
   DialogClose,
@@ -184,6 +213,7 @@ export {
   DialogHeader,
   DialogOverlay,
   DialogPortal,
+  DialogShortcut,
   DialogTitle,
   DialogTrigger,
 };
