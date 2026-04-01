@@ -11,11 +11,11 @@ import {
   type ServerResponse,
 } from "node:http";
 
+import { mintBootstrapToken, mintTunnelExchangeToken } from "@mistle/gateway-tunnel-auth";
 import {
   derivePublishedTargetHost,
   mintPublishedTargetAccessToken,
-} from "@mistle/gateway-published-target-auth";
-import { mintBootstrapToken, mintTunnelExchangeToken } from "@mistle/gateway-tunnel-auth";
+} from "@mistle/published-target-auth";
 import { afterEach, describe, expect } from "vitest";
 import WebSocket, { WebSocketServer, type RawData } from "ws";
 
@@ -204,7 +204,7 @@ function createPublishedHost(input: {
   port: number;
 }): string {
   return derivePublishedTargetHost({
-    baseDomain: input.fixture.config.publish.localBaseDomain,
+    baseDomain: input.fixture.config.sandbox.publish.baseDomain,
     sandboxInstanceId: input.sandboxInstanceId,
     target: {
       kind: "port",
@@ -265,7 +265,7 @@ async function bootstrapPublishedCookiePair(input: {
   sandboxInstanceId: string;
 }): Promise<string> {
   const token = await mintPublishedTargetAccessToken({
-    config: input.fixture.config.publish.access,
+    config: input.fixture.config.sandbox.publish.access,
     host: input.host,
     jti: randomUUID(),
     organizationId: "org_publish_ws",

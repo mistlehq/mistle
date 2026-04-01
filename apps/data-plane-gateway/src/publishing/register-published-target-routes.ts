@@ -338,9 +338,7 @@ export function registerPublishedTargetRoutes(input: RegisterPublishedTargetRout
 
     const parsedHost = parsePublishedPortHost({
       baseDomain: input.publishConfig.baseDomain,
-      environment: input.environment,
       host: ctx.req.header("host"),
-      localBaseDomain: input.publishConfig.localBaseDomain,
     });
     if (parsedHost === undefined) {
       await next();

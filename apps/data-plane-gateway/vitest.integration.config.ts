@@ -34,9 +34,9 @@ const WorkspaceAliases = [
     ),
   },
   {
-    find: /^@mistle\/gateway-published-target-auth$/,
+    find: /^@mistle\/published-target-auth$/,
     replacement: fileURLToPath(
-      new URL("../../packages/gateway-published-target-auth/src/index.ts", import.meta.url),
+      new URL("../../packages/published-target-auth/src/index.ts", import.meta.url),
     ),
   },
   {
