@@ -10,16 +10,16 @@ import {
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
-import { FormPageActionBar, FormPageHeader, FormPageSection, FormPageShell } from "./form-page.js";
+import { FormPageActionBar, FormPageSection } from "./form-page.js";
+import { PageFrame } from "./page-frame.js";
 
 function FormPageStoryPreview(): React.JSX.Element {
   return (
-    <FormPageShell>
-      <FormPageHeader
-        description="Shared form-page surface for dashboard editors."
-        title="Editor Shell"
-      />
-
+    <PageFrame
+      description="Shared form-page surface for dashboard editors."
+      title="Editor Shell"
+      variant="form"
+    >
       <FormPageSection header={<h2 className="text-base font-semibold">General Settings</h2>}>
         <div className="p-4">
           <Field>
@@ -40,7 +40,7 @@ function FormPageStoryPreview(): React.JSX.Element {
           Cancel
         </Button>
       </FormPageActionBar>
-    </FormPageShell>
+    </PageFrame>
   );
 }
 

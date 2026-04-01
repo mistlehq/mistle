@@ -1,29 +1,6 @@
 import { cn } from "@mistle/ui";
 import type { ReactNode } from "react";
 
-export type FormPageShellProps = {
-  children: ReactNode;
-  className?: string;
-  contentClassName?: string;
-  maxWidthClassName?: string;
-};
-
-export function FormPageShell(input: FormPageShellProps): React.JSX.Element {
-  return (
-    <div className={cn("mx-auto flex w-full flex-col gap-4", input.className)}>
-      <div
-        className={cn(
-          "mx-auto flex w-full flex-col gap-4",
-          input.maxWidthClassName ?? "max-w-2xl",
-          input.contentClassName,
-        )}
-      >
-        {input.children}
-      </div>
-    </div>
-  );
-}
-
 export type FormPageSectionProps = {
   children: ReactNode;
   className?: string;

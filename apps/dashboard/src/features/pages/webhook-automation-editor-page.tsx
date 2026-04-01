@@ -13,7 +13,9 @@ import { toWebhookAutomationFormValues } from "../automations/webhook-automation
 import { WebhookAutomationForm } from "../automations/webhook-automation-form.js";
 import { webhookAutomationDetailQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { getWebhookAutomation } from "../automations/webhook-automations-service.js";
-import { FormPageSection, FormPageShell } from "../shared/form-page.js";
+import { useAppPageMeta } from "../navigation/route-meta.js";
+import { FormPageSection } from "../shared/form-page.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 
 type WebhookAutomationEditorPageProps = {
   mode: "create" | "edit";
@@ -22,10 +24,17 @@ type WebhookAutomationEditorPageProps = {
 export function WebhookAutomationEditorPage(
   input: WebhookAutomationEditorPageProps,
 ): React.JSX.Element {
+  const pageMeta = useAppPageMeta();
   const navigate = useNavigate();
   const params = useParams();
+  const fallbackTitle = input.mode === "create" ? "Create automation" : "Edit automation";
+  const { title, description } = resolvePageFrameText(pageMeta, fallbackTitle);
   if (input.mode === "create") {
-    return <CreateWebhookAutomationEditor navigate={navigate} />;
+    return (
+      <PageFrame description={description} title={title} variant="form">
+        <CreateWebhookAutomationEditor navigate={navigate} />
+      </PageFrame>
+    );
   }
 
   const automationId = params["automationId"];
@@ -33,7 +42,11 @@ export function WebhookAutomationEditorPage(
     throw new Error("Automation id is required.");
   }
 
-  return <EditWebhookAutomationEditor automationId={automationId} navigate={navigate} />;
+  return (
+    <PageFrame description={description} title={title} variant="form">
+      <EditWebhookAutomationEditor automationId={automationId} navigate={navigate} />
+    </PageFrame>
+  );
 }
 
 function renderWebhookAutomationEditorError(input: {
@@ -42,7 +55,7 @@ function renderWebhookAutomationEditorError(input: {
   onBack: () => void;
 }): React.JSX.Element {
   return (
-    <FormPageShell>
+    <>
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
           <Notice title={input.title} tone="destructive">
@@ -55,17 +68,17 @@ function renderWebhookAutomationEditorError(input: {
           </div>
         </div>
       </FormPageSection>
-    </FormPageShell>
+    </>
   );
 }
 
 function renderWebhookAutomationEditorLoading(): React.JSX.Element {
   return (
-    <FormPageShell>
+    <>
       <FormPageSection>
         <div className="p-4">Loading automation…</div>
       </FormPageSection>
-    </FormPageShell>
+    </>
   );
 }
 
@@ -196,7 +209,7 @@ function LoadedWebhookAutomationEditor(input: {
   const state = useLoadedWebhookAutomationEditorState(input);
 
   return (
-    <FormPageShell>
+    <>
       <WebhookAutomationForm
         connectionOptions={state.connectionOptions}
         fieldErrors={state.fieldErrors}
@@ -209,7 +222,7 @@ function LoadedWebhookAutomationEditor(input: {
         onSubmit={state.onSubmit}
         onValueChange={state.onValueChange}
         sandboxProfileOptions={state.sandboxProfileOptions}
-        triggerPickerDisabledReason={state.triggerPickerDisabledReason}
+        triggerPickerDisabledState={state.triggerPickerDisabledState}
         webhookEventOptions={state.webhookEventOptions}
         values={state.values}
       />
@@ -224,6 +237,6 @@ function LoadedWebhookAutomationEditor(input: {
           onOpenChange={state.onDeleteDialogOpenChange}
         />
       ) : null}
-    </FormPageShell>
+    </>
   );
 }

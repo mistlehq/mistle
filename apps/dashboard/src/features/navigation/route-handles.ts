@@ -195,11 +195,13 @@ export const ROUTE_HANDLES = {
     description: "Manage webhook automations.",
   },
   automationsNew: {
+    appShellInsetOwner: "child",
     breadcrumb: "Create",
     title: "Create automation",
     description: "Create a webhook automation.",
   },
   automationsDetail: {
+    appShellInsetOwner: "child",
     breadcrumb: resolveAutomationDetailBreadcrumb,
     title: "Edit automation",
     description: "Edit webhook automation configuration.",
