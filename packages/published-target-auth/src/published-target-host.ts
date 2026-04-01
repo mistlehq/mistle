@@ -88,6 +88,8 @@ export function derivePublishedTargetHost(input: {
     });
   }
 
+  // Published hosts use DNS-safe labels, so sandbox instance IDs encode `_` as `-`.
+  // We reject raw `-` here to keep the mapping reversible when parsing the host back.
   return `p-${String(requirePort(input.target.port))}--${input.sandboxInstanceId.replaceAll("_", "-")}.${input.baseDomain}`;
 }
 
@@ -132,6 +134,7 @@ export function parsePublishedTargetHost(input: {
   return {
     baseDomain: input.baseDomain,
     host: publishedHost,
+    // This reverses the label encoding applied by `derivePublishedTargetHost()`.
     sandboxInstanceId: sandboxInstanceIdLabel.replaceAll("-", "_"),
     target: {
       kind: "port",
