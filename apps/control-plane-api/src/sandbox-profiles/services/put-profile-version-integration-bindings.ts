@@ -4,7 +4,7 @@ import type {
 } from "@mistle/db/control-plane";
 import { sandboxProfileVersionIntegrationBindings } from "@mistle/db/control-plane";
 import { IntegrationKinds, runDefinitionBindingWriteValidation } from "@mistle/integrations-core";
-import { AtlassianToolIds, createDefinitionsBundle } from "@mistle/integrations-definitions";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import {
@@ -111,66 +111,6 @@ function findGitFamilyConflictIssues(
       validatorCode: "system.duplicate_git_family_binding",
       field: "connectionId",
       safeMessage: `Only one binding from Git integration family '${binding.definition.familyId}' may exist on a sandbox profile version.`,
-    });
-  }
-
-  return issues;
-}
-
-function includesJiraCliTool(bindingConfig: Record<string, unknown>): boolean {
-  const tools = bindingConfig.tools;
-  if (!Array.isArray(tools)) {
-    return false;
-  }
-
-  return tools.includes(AtlassianToolIds.JIRA_CLI);
-}
-
-function findAtlassianJiraCliConflictIssues(
-  bindings: ReadonlyArray<{
-    clientRef?: string;
-    bindingIdOrDraftIndex: string;
-    definition: {
-      familyId: string;
-    };
-    bindingConfig: Record<string, unknown>;
-  }>,
-): ReadonlyArray<{
-  clientRef?: string;
-  bindingIdOrDraftIndex: string;
-  validatorCode: string;
-  field: string;
-  safeMessage: string;
-}> {
-  let hasSeenAtlassianJiraCliBinding = false;
-  const issues: Array<{
-    clientRef?: string;
-    bindingIdOrDraftIndex: string;
-    validatorCode: string;
-    field: string;
-    safeMessage: string;
-  }> = [];
-
-  for (const binding of bindings) {
-    if (binding.definition.familyId !== "atlassian") {
-      continue;
-    }
-
-    if (!includesJiraCliTool(binding.bindingConfig)) {
-      continue;
-    }
-
-    if (!hasSeenAtlassianJiraCliBinding) {
-      hasSeenAtlassianJiraCliBinding = true;
-      continue;
-    }
-
-    issues.push({
-      ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
-      bindingIdOrDraftIndex: binding.bindingIdOrDraftIndex,
-      validatorCode: "system.duplicate_atlassian_jira_cli_binding",
-      field: "config.tools",
-      safeMessage: "Only one Atlassian binding may include Jira CLI on a sandbox profile version.",
     });
   }
 
@@ -390,18 +330,6 @@ export async function putProfileVersionIntegrationBindings(
       `Binding '${firstIssue?.bindingIdOrDraftIndex ?? "unknown"}' has invalid config reference: ${firstIssue?.safeMessage ?? "Binding config is invalid."}`,
       {
         issues: gitFamilyConflictIssues,
-      },
-    );
-  }
-
-  const atlassianJiraCliConflictIssues = findAtlassianJiraCliConflictIssues(validatedBindings);
-  if (atlassianJiraCliConflictIssues.length > 0) {
-    const firstIssue = atlassianJiraCliConflictIssues[0];
-    throw new SandboxProfilesIntegrationBindingsBadRequestError(
-      SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
-      `Binding '${firstIssue?.bindingIdOrDraftIndex ?? "unknown"}' has invalid config reference: ${firstIssue?.safeMessage ?? "Binding config is invalid."}`,
-      {
-        issues: atlassianJiraCliConflictIssues,
       },
     );
   }

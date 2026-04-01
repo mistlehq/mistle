@@ -457,6 +457,51 @@ describe("validateCompiledBindingResults", () => {
     ).not.toThrow();
   });
 
+  it("accepts duplicate artifacts when only artifact env differs", () => {
+    const resultA = createCompiledBindingResult({
+      route: createRoute({
+        egressRuleId: "egress_rule_a",
+        bindingId: "bind_a",
+        hosts: ["mistle.atlassian.net"],
+      }),
+      artifactKey: "jira-cli",
+      artifactName: "Jira CLI",
+      artifactEnv: {
+        JIRA_BASE_URL: "https://mistle.atlassian.net",
+      },
+      artifactInstallCommands: [
+        {
+          args: ["sh", "-euc", "install jira"],
+          timeoutMs: 120_000,
+        },
+      ],
+    });
+    const resultB = createCompiledBindingResult({
+      route: createRoute({
+        egressRuleId: "egress_rule_b",
+        bindingId: "bind_b",
+        hosts: ["mistle-dev.atlassian.net"],
+      }),
+      artifactKey: "jira-cli",
+      artifactName: "Jira CLI",
+      artifactEnv: {
+        JIRA_BASE_URL: "https://mistle-dev.atlassian.net",
+      },
+      artifactInstallCommands: [
+        {
+          args: ["sh", "-euc", "install jira"],
+          timeoutMs: 120_000,
+        },
+      ],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [resultA, resultB],
+      }),
+    ).not.toThrow();
+  });
+
   it("fails on runtime client process key conflicts", () => {
     const processA: RuntimeClientProcessSpec = {
       processKey: "codex-app-server",

@@ -401,7 +401,7 @@ describe("sandbox profile compile runtime plan integration", () => {
         connectionId: "icn_compile_selected_tools_atlassian_b",
         kind: IntegrationBindingKinds.CONNECTOR,
         config: {
-          tools: [],
+          tools: ["jira-cli"],
         },
       },
     ]);
