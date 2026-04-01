@@ -565,7 +565,7 @@ function RjsfLayoutComparisonStory(input: { caseItem?: ComparisonCase }): React.
 }
 
 const meta = {
-  title: "Dashboard/Forms/RJSFLayoutComparison",
+  title: "Dashboard/RJSF/LayoutComparison",
   component: RjsfLayoutComparisonStory,
   decorators: [withDashboardCenteredSurface],
   parameters: {
