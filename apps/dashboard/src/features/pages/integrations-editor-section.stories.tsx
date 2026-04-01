@@ -21,6 +21,8 @@ function IntegrationsEditorSectionStory(): React.JSX.Element {
     return client;
   });
   const [rows, setRows] = useState<readonly SandboxProfileBindingEditorRow[]>([]);
+  const integrationSaveError = null;
+  const isSubmittingIntegrationBindings = false;
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -39,9 +41,8 @@ function IntegrationsEditorSectionStory(): React.JSX.Element {
         }}
         integrationRowErrorsByClientId={{}}
         integrationRows={rows}
-        integrationSaveError={null}
-        integrationSaveSuccess={false}
-        isSavingIntegrationBindings={false}
+        integrationSaveError={integrationSaveError}
+        isSubmittingIntegrationBindings={isSubmittingIntegrationBindings}
         bindingFormContext={{
           resourceOverrides: [StoryGithubResources],
         }}

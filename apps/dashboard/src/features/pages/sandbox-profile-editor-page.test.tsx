@@ -99,8 +99,7 @@ function Harness(): React.JSX.Element {
       integrationRowErrorsByClientId={{}}
       integrationRows={rows}
       integrationSaveError={null}
-      integrationSaveSuccess={false}
-      isSavingIntegrationBindings={false}
+      isSubmittingIntegrationBindings={false}
       onAddIntegrationBindingRow={async (input) => {
         const clientId = `row-${String(nextId)}`;
         setRows((currentRows) => [
@@ -210,5 +209,39 @@ describe("IntegrationsEditorSection", () => {
     expect(preserved.id).toBe("binding-99");
     expect(preserved.connectionId).toBe("conn-agent-2");
     expect(preserved.config).toStrictEqual({ model: "gpt-5.4-codex" });
+  });
+
+  it("does not render save status copy for integration bindings", () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <IntegrationsEditorSection
+          availableConnections={[]}
+          availableTargets={[]}
+          integrationBindingsQuery={{
+            isError: false,
+            error: null,
+            isPending: false,
+          }}
+          integrationDirectoryQuery={{
+            isError: false,
+            error: null,
+            isPending: false,
+          }}
+          integrationRowErrorsByClientId={{}}
+          integrationRows={[]}
+          integrationSaveError={null}
+          isSubmittingIntegrationBindings={true}
+          onAddIntegrationBindingRow={async () => false}
+          onIntegrationBindingRowChange={() => {}}
+          onRemoveIntegrationBindingRow={() => {}}
+          resolveSelectedConnectionDisplayName={(row) => row.connectionId}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByText("Saving...")).toBeNull();
+    expect(screen.queryByText("Saved.")).toBeNull();
   });
 });

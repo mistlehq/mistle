@@ -45,7 +45,7 @@ export function SandboxProfileBindingDialog(input: {
     Record<SandboxProfileBindingEditorRow["kind"], readonly IntegrationConnectionSummary[]>
   >;
   bindingFormContext?: IntegrationFormContext | undefined;
-  isSavingIntegrationBindings: boolean;
+  isSubmittingIntegrationBindings: boolean;
   resolveSelectedConnectionDisplayName: (row: SandboxProfileBindingEditorRow) => string | undefined;
   onClose: () => void;
   onConnectionIdChange: (nextConnectionId: string) => void;
@@ -130,7 +130,7 @@ export function SandboxProfileBindingDialog(input: {
             </Button>
             <Button
               disabled={
-                input.isSavingIntegrationBindings ||
+                input.isSubmittingIntegrationBindings ||
                 input.availableConnectionsByKind[input.state.row.kind].length === 0
               }
               onClick={input.onSave}

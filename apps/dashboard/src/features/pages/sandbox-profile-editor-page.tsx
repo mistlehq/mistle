@@ -77,8 +77,7 @@ type IntegrationsEditorSectionProps = {
     connectionId: string;
     config: Record<string, unknown>;
   }) => Promise<boolean>;
-  isSavingIntegrationBindings: boolean;
-  integrationSaveSuccess: boolean;
+  isSubmittingIntegrationBindings: boolean;
   bindingFormContext?: IntegrationFormContext | undefined;
 };
 
@@ -329,7 +328,7 @@ export function IntegrationsEditorSection(
         availableConnectionsByKind={availableConnectionsByKind}
         availableTargets={props.availableTargets}
         bindingFormContext={props.bindingFormContext}
-        isSavingIntegrationBindings={props.isSavingIntegrationBindings}
+        isSubmittingIntegrationBindings={props.isSubmittingIntegrationBindings}
         onClose={closeIntegrationDialog}
         onConnectionIdChange={updateDialogConnectionId}
         onRowChange={updateDialogRow}
@@ -337,15 +336,6 @@ export function IntegrationsEditorSection(
         resolveSelectedConnectionDisplayName={props.resolveSelectedConnectionDisplayName}
         state={integrationDialogState}
       />
-
-      <div className="gap-2 flex">
-        {props.isSavingIntegrationBindings ? (
-          <p className="text-muted-foreground text-sm self-center">Saving...</p>
-        ) : null}
-        {props.integrationSaveSuccess ? (
-          <p className="text-muted-foreground text-sm self-center">Saved.</p>
-        ) : null}
-      </div>
     </div>
   );
 }
@@ -628,8 +618,7 @@ function LoadedSandboxProfileIntegrationsSection(input: {
         integrationRowErrorsByClientId={{}}
         integrationRows={[]}
         integrationSaveError={null}
-        integrationSaveSuccess={false}
-        isSavingIntegrationBindings={false}
+        isSubmittingIntegrationBindings={false}
         onAddIntegrationBindingRow={async () => false}
         onIntegrationBindingRowChange={() => {}}
         onRemoveIntegrationBindingRow={() => {}}
@@ -685,8 +674,7 @@ function ReadySandboxProfileIntegrationsSection(input: {
       integrationRowErrorsByClientId={integrationsState.integrationRowErrorsByClientId}
       integrationRows={integrationsState.integrationRows}
       integrationSaveError={integrationsState.integrationSaveError}
-      integrationSaveSuccess={integrationsState.integrationSaveSuccess}
-      isSavingIntegrationBindings={integrationsState.isSavingIntegrationBindings}
+      isSubmittingIntegrationBindings={integrationsState.isSubmittingIntegrationBindings}
       onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}
       onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
       onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
