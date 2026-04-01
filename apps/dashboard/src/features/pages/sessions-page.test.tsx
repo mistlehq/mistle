@@ -264,8 +264,8 @@ describe("SessionsPage", () => {
 
     expect(markup).toContain("View failure details");
     expect(markup).toContain("Failed");
-    expect(markup).toContain("sandbox_start_failed");
-    expect(markup).toContain("Failed to start sandbox runtime.");
+    expect(markup).not.toContain("sandbox_start_failed");
+    expect(markup).not.toContain("Failed to start sandbox runtime.");
     expect(markup).not.toContain("text-destructive whitespace-pre-wrap text-xs");
   });
 

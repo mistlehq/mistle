@@ -141,10 +141,7 @@ export function SandboxSessionStatusBadge(input: {
     );
   }
 
-  const tooltipMessage =
-    input.failureCode === null
-      ? input.failureMessage
-      : `${input.failureCode}\n${input.failureMessage}`;
+  const tooltipMessage = input.failureMessage;
 
   return (
     <Tooltip>
@@ -153,7 +150,7 @@ export function SandboxSessionStatusBadge(input: {
         render={
           <Badge
             className={statusUi.className}
-            render={<span aria-hidden="true" title={tooltipMessage} />}
+            render={<span aria-hidden="true" />}
             variant={statusUi.variant}
           />
         }
