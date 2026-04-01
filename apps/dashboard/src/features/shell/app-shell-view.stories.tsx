@@ -9,17 +9,69 @@ const meta = {
   title: "Dashboard/Shell/AppShellView",
   component: AppShellView,
   tags: ["autodocs"],
+  argTypes: {
+    breadcrumbs: {
+      control: false,
+    },
+    contentInsetOwner: {
+      control: "inline-radio",
+      options: ["app-shell", "child"],
+    },
+    headerActions: {
+      control: false,
+    },
+    mainContent: {
+      control: false,
+    },
+    showBreadcrumbs: {
+      control: "boolean",
+    },
+    sidebarContent: {
+      control: false,
+    },
+    sidebarFooterContent: {
+      control: false,
+    },
+    sidebarHeaderClassName: {
+      control: false,
+    },
+    sidebarHeaderContent: {
+      control: false,
+    },
+    topLoadingBar: {
+      control: false,
+    },
+    viewportMode: {
+      control: "inline-radio",
+      options: ["document", "workspace"],
+    },
+  },
   parameters: {
     layout: "fullscreen",
+    controls: {
+      include: [
+        "contentInsetOwner",
+        "viewportMode",
+        "showBreadcrumbs",
+        "breadcrumbs",
+        "headerActions",
+        "mainContent",
+        "sidebarHeaderContent",
+        "sidebarContent",
+        "sidebarFooterContent",
+        "topLoadingBar",
+        "sidebarHeaderClassName",
+      ],
+    },
   },
   args: {
     breadcrumbs: <p className="truncate text-sm">Sessions / Storybook Session</p>,
+    contentInsetOwner: "app-shell",
     headerActions: (
       <Badge className="bg-emerald-600 text-white hover:bg-emerald-600/90" variant="secondary">
         Connected
       </Badge>
     ),
-    isSessionDetail: false,
     mainContent: (
       <div className="rounded-xl border bg-card p-6 shadow-xs">
         <h2 className="font-semibold text-lg">Storybook shell preview</h2>
@@ -47,6 +99,7 @@ const meta = {
       />
     ),
     topLoadingBar: <div className="h-0" />,
+    viewportMode: "document",
   },
 } satisfies Meta<typeof AppShellView>;
 
@@ -55,35 +108,3 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
-
-export const SessionDetail: Story = {
-  args: {
-    isSessionDetail: true,
-    mainContent: (
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="min-h-0 flex-1 rounded-xl border bg-card p-6 shadow-xs">
-          <p className="text-sm">Session chat thread surface</p>
-        </div>
-      </div>
-    ),
-  },
-};
-
-export const SettingsMode: Story = {
-  args: {
-    breadcrumbs: <p className="truncate text-sm">Settings / Members</p>,
-    headerActions: null,
-    sidebarContent: (
-      <div className="space-y-1 px-2">
-        <div className="rounded-md bg-muted px-3 py-2 text-sm">General</div>
-        <div className="rounded-md px-3 py-2 text-sm">Members</div>
-        <div className="rounded-md px-3 py-2 text-sm">Billing</div>
-      </div>
-    ),
-    sidebarHeaderContent: (
-      <button className="h-8 w-full rounded-md px-2 text-left text-sm" type="button">
-        Back
-      </button>
-    ),
-  },
-};

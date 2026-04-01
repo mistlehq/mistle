@@ -42,7 +42,7 @@ function renderWebhookAutomationEditorError(input: {
   onBack: () => void;
 }): React.JSX.Element {
   return (
-    <FormPageShell className="-my-6">
+    <FormPageShell>
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
           <Alert variant="destructive">
@@ -62,7 +62,7 @@ function renderWebhookAutomationEditorError(input: {
 
 function renderWebhookAutomationEditorLoading(): React.JSX.Element {
   return (
-    <FormPageShell className="-my-6">
+    <FormPageShell>
       <FormPageSection>
         <div className="p-4">Loading automation…</div>
       </FormPageSection>
@@ -197,7 +197,7 @@ function LoadedWebhookAutomationEditor(input: {
   const state = useLoadedWebhookAutomationEditorState(input);
 
   return (
-    <FormPageShell className="-my-6">
+    <FormPageShell>
       <WebhookAutomationForm
         connectionOptions={state.connectionOptions}
         fieldErrors={state.fieldErrors}

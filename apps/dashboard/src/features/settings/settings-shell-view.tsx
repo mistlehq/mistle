@@ -21,8 +21,8 @@ export function SettingsShellView(input: SettingsShellViewProps): React.JSX.Elem
   return (
     <AppShellView
       breadcrumbs={input.breadcrumbs}
+      contentInsetOwner="child"
       headerActions={null}
-      isSessionDetail={false}
       mainContent={
         <SettingsLayoutView
           supportingText={input.supportingText}
@@ -39,6 +39,7 @@ export function SettingsShellView(input: SettingsShellViewProps): React.JSX.Elem
       sidebarHeaderClassName="pb-0"
       sidebarHeaderContent={<SettingsBackButton onBack={input.onBack} />}
       topLoadingBar={<div className="h-0" />}
+      viewportMode="document"
     />
   );
 }

@@ -7,6 +7,7 @@ import { authClient } from "../../lib/auth/client.js";
 import { ErrorNotice } from "../auth/error-notice.js";
 import { resolveErrorMessage } from "../auth/messages.js";
 import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
+import { useAppPageMeta } from "../navigation/route-meta.js";
 import { SidebarNavGroups } from "../navigation/sidebar-nav-groups.js";
 import type { SidebarNavGroup } from "../navigation/sidebar-nav-model.js";
 import {
@@ -61,6 +62,7 @@ function SessionsNavIcon(props: {
 
 export function AppShell(): React.JSX.Element {
   const organizationSummary = useOrganizationSummary();
+  const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -115,8 +117,8 @@ export function AppShell(): React.JSX.Element {
     <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
       <AppShellView
         breadcrumbs={showBreadcrumbs ? <AppBreadcrumbs /> : null}
+        contentInsetOwner={inSettings ? "child" : pageMeta.appShellInsetOwner}
         headerActions={headerActions}
-        isSessionDetail={inSessionDetail}
         mainContent={<Outlet />}
         showBreadcrumbs={showBreadcrumbs}
         sidebarContent={
@@ -153,6 +155,7 @@ export function AppShell(): React.JSX.Element {
           )
         }
         topLoadingBar={<TopLoadingBar />}
+        viewportMode={inSessionDetail ? "workspace" : pageMeta.appShellViewportMode}
         {...(inSettings ? { sidebarHeaderClassName: "pb-0" } : {})}
       />
     </AppShellHeaderActionsContext.Provider>

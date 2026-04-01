@@ -10,10 +10,10 @@ export type FormPageShellProps = {
 
 export function FormPageShell(input: FormPageShellProps): React.JSX.Element {
   return (
-    <div className={cn("-mx-4 min-h-full bg-muted/30 px-4 py-6", input.className)}>
+    <div className={cn("mx-auto flex w-full flex-col gap-4", input.className)}>
       <div
         className={cn(
-          "mx-auto flex w-full flex-col gap-4",
+          "flex w-full flex-col gap-4",
           input.maxWidthClassName ?? "max-w-2xl",
           input.contentClassName,
         )}
