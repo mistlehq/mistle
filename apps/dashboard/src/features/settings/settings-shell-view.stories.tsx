@@ -141,13 +141,13 @@ const meta = {
     return (
       <SettingsShellView
         {...baseArgs}
-        backLabel={input.backLabel}
-        layoutVariant={input.layoutVariant}
         onBack={input.onBack}
         pathname={input.pathname}
         showBreadcrumbs={input.showBreadcrumbs}
         supportingText={input.supportingText}
         title={input.title}
+        {...(input.backLabel === undefined ? {} : { backLabel: input.backLabel })}
+        {...(input.layoutVariant === undefined ? {} : { layoutVariant: input.layoutVariant })}
       />
     );
   },

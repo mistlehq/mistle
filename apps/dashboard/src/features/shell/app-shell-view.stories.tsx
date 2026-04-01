@@ -5,6 +5,20 @@ import { ErrorNotice } from "../auth/error-notice.js";
 import { AppShellView } from "./app-shell-view.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 
+/**
+ * AppShellView owns the outer dashboard shell contract.
+ *
+ * Use the two layout dimensions together:
+ * - `contentInsetOwner="app-shell"`: the shell provides the standard outer page inset.
+ * - `contentInsetOwner="child"`: the child page or child shell provides its own outer spacing and framing.
+ * - `viewportMode="document"`: normal document page behavior with regular vertical page flow.
+ * - `viewportMode="workspace"`: viewport-managed application surface with fixed height and child-owned internal scrolling.
+ *
+ * Current usage in the dashboard:
+ * - Standard dashboard pages: `app-shell` + `document`.
+ * - Settings routes: `child` + `document`.
+ * - Session detail routes: `child` + `workspace`.
+ */
 const meta = {
   title: "Dashboard/Shell/AppShellView",
   component: AppShellView,
@@ -12,37 +26,50 @@ const meta = {
   argTypes: {
     breadcrumbs: {
       control: false,
+      description: "Optional header breadcrumb content shown when `showBreadcrumbs` is enabled.",
     },
     contentInsetOwner: {
       control: "inline-radio",
+      description:
+        "`app-shell` means AppShellView provides the outer page inset. `child` means the page or child shell owns outer spacing and framing.",
       options: ["app-shell", "child"],
     },
     headerActions: {
       control: false,
+      description: "Optional header actions rendered on the right side of the sticky header.",
     },
     mainContent: {
       control: false,
+      description: "Primary page content rendered inside the shell content region.",
     },
     showBreadcrumbs: {
       control: "boolean",
+      description: "Toggles whether the breadcrumb region is shown in the sticky header.",
     },
     sidebarContent: {
       control: false,
+      description: "Main sidebar navigation content.",
     },
     sidebarFooterContent: {
       control: false,
+      description: "Sidebar footer content, typically notices or errors.",
     },
     sidebarHeaderClassName: {
       control: false,
+      description: "Optional className override for the sidebar header wrapper.",
     },
     sidebarHeaderContent: {
       control: false,
+      description: "Sidebar header content, such as the org switcher or settings back button.",
     },
     topLoadingBar: {
       control: false,
+      description: "Top-of-page loading indicator region.",
     },
     viewportMode: {
       control: "inline-radio",
+      description:
+        "`document` is a normal vertically-growing page. `workspace` is a viewport-managed surface with fixed height and child-owned internal scrolling.",
       options: ["document", "workspace"],
     },
   },

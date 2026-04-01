@@ -14,7 +14,7 @@ const SidebarWidthStyle: React.CSSProperties & Record<`--${string}`, string> = {
   "--sidebar-width": DASHBOARD_SIDEBAR_WIDTH,
 };
 
-type AppShellViewProps = {
+export interface AppShellViewProps {
   sidebarHeaderClassName?: string;
   sidebarHeaderContent: React.ReactNode;
   sidebarContent: React.ReactNode;
@@ -26,7 +26,7 @@ type AppShellViewProps = {
   topLoadingBar: React.ReactNode;
   viewportMode: "document" | "workspace";
   showBreadcrumbs: boolean;
-};
+}
 
 export function AppShellView(input: AppShellViewProps): React.JSX.Element {
   const contentContainerClassName = resolveContentContainerClassName({
