@@ -123,6 +123,9 @@ describe("compileAtlassianBinding", () => {
     const artifact = compiled.artifacts[0];
     expect(artifact?.artifactKey).toBe("jira-cli");
     expect(artifact?.name).toBe("Jira CLI");
+    expect(artifact?.env).toEqual({
+      JIRA_BASE_URL: "https://mistle.atlassian.net",
+    });
     if (artifact === undefined) {
       throw new Error("Expected compiled jira artifact.");
     }
@@ -136,7 +139,7 @@ describe("compileAtlassianBinding", () => {
     expect(compiled.runtimeClients).toEqual([]);
   });
 
-  it("builds the expected Atlassian service account token egress route", () => {
+  it("builds the expected Atlassian service account token egress route and jira artifact env", () => {
     const compiled = compileAtlassianBinding({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
@@ -161,7 +164,7 @@ describe("compileAtlassianBinding", () => {
         id: "ibd_123",
         kind: "connector",
         config: {
-          tools: [],
+          tools: ["jira-cli"],
         },
       },
       refs: {
@@ -189,11 +192,14 @@ describe("compileAtlassianBinding", () => {
         },
       },
     ]);
-    expect(compiled.artifacts).toEqual([]);
+    expect(compiled.artifacts).toHaveLength(1);
+    expect(compiled.artifacts[0]?.env).toEqual({
+      JIRA_BASE_URL: "https://api.atlassian.com/ex/jira/cloud-id-123",
+    });
     expect(compiled.runtimeClients).toEqual([]);
   });
 
-  it("builds the expected Atlassian service account oauth client credentials egress route", () => {
+  it("builds the expected Atlassian service account oauth client credentials egress route and jira artifact env", () => {
     const compiled = compileAtlassianBinding({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
@@ -219,7 +225,7 @@ describe("compileAtlassianBinding", () => {
         id: "ibd_123",
         kind: "connector",
         config: {
-          tools: [],
+          tools: ["jira-cli"],
         },
       },
       refs: {
@@ -248,7 +254,10 @@ describe("compileAtlassianBinding", () => {
         },
       },
     ]);
-    expect(compiled.artifacts).toEqual([]);
+    expect(compiled.artifacts).toHaveLength(1);
+    expect(compiled.artifacts[0]?.env).toEqual({
+      JIRA_BASE_URL: "https://api.atlassian.com/ex/jira/cloud-id-123",
+    });
     expect(compiled.runtimeClients).toEqual([]);
   });
 });

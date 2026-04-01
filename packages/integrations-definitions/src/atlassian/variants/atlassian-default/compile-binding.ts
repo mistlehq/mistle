@@ -24,6 +24,28 @@ const JiraCliArtifactKey = "jira-cli";
 const JiraCliArtifactName = "Jira CLI";
 const ArtifactCommandTimeoutMs = 120_000;
 
+function createJiraCliArtifact(upstreamBaseUrl: string): CompileBindingResult["artifacts"][number] {
+  return {
+    artifactKey: JiraCliArtifactKey,
+    name: JiraCliArtifactName,
+    env: {
+      JIRA_BASE_URL: upstreamBaseUrl,
+    },
+    lifecycle: {
+      install: ({ refs }) => [
+        refs.githubReleases.installLatestTaggedAsset({
+          repository: "mistlehq/tools",
+          releaseTagPrefix: "jira/",
+          assetName: "jira-linux-amd64",
+          installPath: refs.artifactBinPath("jira"),
+          format: "binary",
+          timeoutMs: ArtifactCommandTimeoutMs,
+        }),
+      ],
+    },
+  };
+}
+
 function resolveMatchFromBaseUrl(baseUrl: string): {
   hosts: string[];
   pathPrefixes?: string[];
@@ -47,26 +69,6 @@ export function compileAtlassianBinding(input: AtlassianCompileBindingInput): Co
   const parsedConnectionConfig = AtlassianConnectionConfigSchema.parse(input.connection.config);
   const credentialSecretType = resolveAtlassianCredentialSecretType(input.connection.config);
   const includesJiraCli = input.binding.config.tools.includes(AtlassianToolIds.JIRA_CLI);
-  const artifacts: CompileBindingResult["artifacts"] = includesJiraCli
-    ? [
-        {
-          artifactKey: JiraCliArtifactKey,
-          name: JiraCliArtifactName,
-          lifecycle: {
-            install: ({ refs }) => [
-              refs.githubReleases.installLatestTaggedAsset({
-                repository: "mistlehq/tools",
-                releaseTagPrefix: "jira/",
-                assetName: "jira-linux-amd64",
-                installPath: refs.artifactBinPath("jira"),
-                format: "binary",
-                timeoutMs: ArtifactCommandTimeoutMs,
-              }),
-            ],
-          },
-        },
-      ]
-    : [];
 
   if (
     parsedConnectionConfig.connection_method === AtlassianConnectionMethodIds.PERSONAL_API_TOKEN
@@ -91,7 +93,7 @@ export function compileAtlassianBinding(input: AtlassianCompileBindingInput): Co
           },
         },
       ],
-      artifacts,
+      artifacts: includesJiraCli ? [createJiraCliArtifact(upstreamBaseUrl)] : [],
       runtimeClients: [],
     };
   }
@@ -120,7 +122,7 @@ export function compileAtlassianBinding(input: AtlassianCompileBindingInput): Co
           },
         },
       ],
-      artifacts,
+      artifacts: includesJiraCli ? [createJiraCliArtifact(upstreamBaseUrl)] : [],
       runtimeClients: [],
     };
   }
@@ -142,7 +144,7 @@ export function compileAtlassianBinding(input: AtlassianCompileBindingInput): Co
         },
       },
     ],
-    artifacts,
+    artifacts: includesJiraCli ? [createJiraCliArtifact(upstreamBaseUrl)] : [],
     runtimeClients: [],
   };
 }

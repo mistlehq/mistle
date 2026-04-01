@@ -6,7 +6,10 @@ import {
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
-import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
+import {
+  AtlassianToolIds,
+  createOpenAiRawBindingCapabilities,
+} from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import {
@@ -407,6 +410,119 @@ describe("sandbox profile version put integration bindings integration", () => {
           field: "connectionId",
           safeMessage:
             "Only one binding from Git integration family 'github' may exist on a sandbox profile version.",
+        },
+      ],
+    });
+  });
+
+  it("returns 400 when the request includes multiple Atlassian bindings with Jira CLI selected", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email:
+        "integration-sandbox-profile-version-put-bindings-route-duplicate-jira-cli@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values([
+      {
+        targetKey: "atlassian-default-put-bindings-route-duplicate-jira-cli-a",
+        familyId: "atlassian",
+        variantId: "atlassian-default",
+        enabled: true,
+        config: {},
+      },
+      {
+        targetKey: "atlassian-default-put-bindings-route-duplicate-jira-cli-b",
+        familyId: "atlassian",
+        variantId: "atlassian-default",
+        enabled: true,
+        config: {},
+      },
+    ]);
+
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_put_bindings_route_duplicate_jira_cli_001",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "atlassian-default-put-bindings-route-duplicate-jira-cli-a",
+        displayName: "Atlassian Route Jira CLI A",
+        config: {
+          connection_method: "atlassian-personal-api-token",
+          site_url: "https://mistle.atlassian.net",
+          email: "user@example.com",
+        },
+      },
+      {
+        id: "icn_put_bindings_route_duplicate_jira_cli_002",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "atlassian-default-put-bindings-route-duplicate-jira-cli-b",
+        displayName: "Atlassian Route Jira CLI B",
+        config: {
+          connection_method: "atlassian-personal-api-token",
+          site_url: "https://mistle-dev.atlassian.net",
+          email: "user+dev@example.com",
+        },
+      },
+    ]);
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_put_bindings_route_duplicate_jira_cli_001",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Duplicate Jira CLI Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_put_bindings_route_duplicate_jira_cli_001",
+      version: 1,
+    });
+
+    const response = await fixture.request(
+      "/v1/sandbox/profiles/sbp_put_bindings_route_duplicate_jira_cli_001/versions/1/integration-bindings",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          bindings: [
+            {
+              connectionId: "icn_put_bindings_route_duplicate_jira_cli_001",
+              kind: IntegrationBindingKinds.CONNECTOR,
+              config: {
+                tools: [AtlassianToolIds.JIRA_CLI],
+              },
+            },
+            {
+              clientRef: "duplicate-jira-binding",
+              connectionId: "icn_put_bindings_route_duplicate_jira_cli_002",
+              kind: IntegrationBindingKinds.CONNECTOR,
+              config: {
+                tools: [AtlassianToolIds.JIRA_CLI],
+              },
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    if (!("details" in responseBody)) {
+      throw new Error("Expected integration bindings validation details.");
+    }
+    expect(responseBody.code).toBe("INVALID_BINDING_CONFIG_REFERENCE");
+    expect(responseBody.details).toEqual({
+      issues: [
+        {
+          clientRef: "duplicate-jira-binding",
+          bindingIdOrDraftIndex: "draft:1",
+          validatorCode: "system.duplicate_atlassian_jira_cli_binding",
+          field: "config.tools",
+          safeMessage:
+            "Only one Atlassian binding may include Jira CLI on a sandbox profile version.",
         },
       ],
     });
