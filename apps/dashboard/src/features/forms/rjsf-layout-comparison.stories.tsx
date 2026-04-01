@@ -101,6 +101,13 @@ function ComparisonBlock(input: {
   );
 }
 
+type ComparisonCase = {
+  description: string;
+  manual: React.ReactNode;
+  rjsf: React.ReactNode;
+  title: string;
+};
+
 function createReadyState(items: typeof RepositoryItems): IntegrationResourceListViewState {
   return {
     mode: "ready",
@@ -143,9 +150,7 @@ function ManualCheckboxGroup(): React.JSX.Element {
     <Field>
       <FieldHeader>
         <FieldLabel>Enabled tools</FieldLabel>
-        <FieldDescription>
-          Hand-built grouped checkboxes using the same field primitives.
-        </FieldDescription>
+        <FieldDescription>Grouped checkbox array using the shared field styling.</FieldDescription>
       </FieldHeader>
       <FieldContent className="gap-3">
         <label className="gap-2 flex items-center">
@@ -197,7 +202,7 @@ function ManualHorizontalField(): React.JSX.Element {
       <FieldHeader>
         <FieldLabel htmlFor="comparison-provider">Provider region</FieldLabel>
         <FieldDescription>
-          Hand-built horizontal field using dashboard form primitives.
+          Horizontal field using the shared integration form theme.
         </FieldDescription>
       </FieldHeader>
       <FieldContent>
@@ -245,7 +250,7 @@ function ManualMixedLayout(): React.JSX.Element {
         <FieldContent>
           <Textarea
             className="min-h-28 w-full resize-y"
-            defaultValue="This is the same mixed-layout pattern used in hand-built dashboard forms."
+            defaultValue="The notes field opts out of horizontal layout with ui:options.layout = 'stacked'."
             id="comparison-notes"
             rows={6}
           />
@@ -316,7 +321,7 @@ function RjsfHorizontalField(): React.JSX.Element {
           provider: {
             type: "string",
             title: "Provider region",
-            description: "RJSF horizontal field using the shared integration form theme.",
+            description: "Horizontal field using the shared integration form theme.",
             oneOf: [
               {
                 const: "us-east-1",
@@ -400,7 +405,7 @@ function RjsfCheckboxGroup(): React.JSX.Element {
           tools: {
             type: "array",
             title: "Enabled tools",
-            description: "Schema-driven checkbox array using the shared field styling.",
+            description: "Grouped checkbox array using the shared field styling.",
             uniqueItems: true,
             items: {
               oneOf: [
@@ -457,7 +462,7 @@ function RjsfResourcePicker(): React.JSX.Element {
           repositories: {
             type: "array",
             title: "Repositories",
-            description: "Schema-driven repository picker using the integration resource widget.",
+            description: "Repository picker using the integration resource widget.",
             items: {
               type: "string",
             },
@@ -488,7 +493,48 @@ function RjsfResourcePicker(): React.JSX.Element {
   );
 }
 
-function RjsfLayoutComparisonStory(): React.JSX.Element {
+function RjsfLayoutComparisonStory(input: { caseItem?: ComparisonCase }): React.JSX.Element {
+  const comparisonCases: readonly ComparisonCase[] =
+    input.caseItem === undefined
+      ? [
+          {
+            description:
+              "Hidden schema-only fields should stay invisible while visible text and password rows match the hand-built field system.",
+            manual: <ManualTextAndPasswordFields />,
+            rjsf: <RjsfTextAndPasswordFields />,
+            title: "Text, Password, and Hidden Fields",
+          },
+          {
+            description:
+              "Baseline horizontal row composition. Tune the RJSF theme until label alignment, width behavior, and field spacing match the hand-built pattern.",
+            manual: <ManualHorizontalField />,
+            rjsf: <RjsfHorizontalField />,
+            title: "Horizontal Field",
+          },
+          {
+            description:
+              "Mixed layout pattern: compact rows remain horizontal while large text areas become stacked. This is the RJSF equivalent of how forms like Create Automation mix orientations.",
+            manual: <ManualMixedLayout />,
+            rjsf: <RjsfMixedLayout />,
+            title: "Mixed Layout",
+          },
+          {
+            description:
+              "Checkbox-array handling should stay visually aligned with grouped manual controls.",
+            manual: <ManualCheckboxGroup />,
+            rjsf: <RjsfCheckboxGroup />,
+            title: "Checkbox Group",
+          },
+          {
+            description:
+              "The resource picker is a custom RJSF widget. Keep its standalone view and schema-driven rendering aligned.",
+            manual: <ManualResourcePicker />,
+            rjsf: <RjsfResourcePicker />,
+            title: "Resource Picker",
+          },
+        ]
+      : [input.caseItem];
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8">
       <div className="gap-2 flex flex-col">
@@ -505,40 +551,15 @@ function RjsfLayoutComparisonStory(): React.JSX.Element {
         </p>
       </div>
 
-      <ComparisonBlock
-        description="Hidden schema-only fields should stay invisible while visible text and password rows match the hand-built field system."
-        manual={<ManualTextAndPasswordFields />}
-        rjsf={<RjsfTextAndPasswordFields />}
-        title="Text, Password, and Hidden Fields"
-      />
-
-      <ComparisonBlock
-        description="Baseline horizontal row composition. Tune the RJSF theme until label alignment, width behavior, and field spacing match the hand-built pattern."
-        manual={<ManualHorizontalField />}
-        rjsf={<RjsfHorizontalField />}
-        title="Horizontal Field"
-      />
-
-      <ComparisonBlock
-        description="Mixed layout pattern: compact rows remain horizontal while large text areas become stacked. This is the RJSF equivalent of how forms like Create Automation mix orientations."
-        manual={<ManualMixedLayout />}
-        rjsf={<RjsfMixedLayout />}
-        title="Mixed Layout"
-      />
-
-      <ComparisonBlock
-        description="Checkbox-array handling should stay visually aligned with grouped manual controls."
-        manual={<ManualCheckboxGroup />}
-        rjsf={<RjsfCheckboxGroup />}
-        title="Checkbox Group"
-      />
-
-      <ComparisonBlock
-        description="The resource picker is a custom RJSF widget. Keep its standalone view and schema-driven rendering aligned."
-        manual={<ManualResourcePicker />}
-        rjsf={<RjsfResourcePicker />}
-        title="Resource Picker"
-      />
+      {comparisonCases.map((caseItem) => (
+        <ComparisonBlock
+          description={caseItem.description}
+          key={caseItem.title}
+          manual={caseItem.manual}
+          rjsf={caseItem.rjsf}
+          title={caseItem.title}
+        />
+      ))}
     </div>
   );
 }
@@ -556,4 +577,88 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Overview: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    return <RjsfLayoutComparisonStory />;
+  },
+};
+
+export const TextPasswordAndHiddenFields: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    return (
+      <RjsfLayoutComparisonStory
+        caseItem={{
+          description:
+            "Hidden schema-only fields should stay invisible while visible text and password rows match the hand-built field system.",
+          manual: <ManualTextAndPasswordFields />,
+          rjsf: <RjsfTextAndPasswordFields />,
+          title: "Text, Password, and Hidden Fields",
+        }}
+      />
+    );
+  },
+};
+
+export const HorizontalField: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    return (
+      <RjsfLayoutComparisonStory
+        caseItem={{
+          description:
+            "Baseline horizontal row composition. Tune the RJSF theme until label alignment, width behavior, and field spacing match the hand-built pattern.",
+          manual: <ManualHorizontalField />,
+          rjsf: <RjsfHorizontalField />,
+          title: "Horizontal Field",
+        }}
+      />
+    );
+  },
+};
+
+export const MixedLayout: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    return (
+      <RjsfLayoutComparisonStory
+        caseItem={{
+          description:
+            "Mixed layout pattern: compact rows remain horizontal while large text areas become stacked. This is the RJSF equivalent of how forms like Create Automation mix orientations.",
+          manual: <ManualMixedLayout />,
+          rjsf: <RjsfMixedLayout />,
+          title: "Mixed Layout",
+        }}
+      />
+    );
+  },
+};
+
+export const CheckboxGroup: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    return (
+      <RjsfLayoutComparisonStory
+        caseItem={{
+          description:
+            "Checkbox-array handling should stay visually aligned with grouped manual controls.",
+          manual: <ManualCheckboxGroup />,
+          rjsf: <RjsfCheckboxGroup />,
+          title: "Checkbox Group",
+        }}
+      />
+    );
+  },
+};
+
+export const ResourcePicker: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    return (
+      <RjsfLayoutComparisonStory
+        caseItem={{
+          description:
+            "The resource picker is a custom RJSF widget. Keep its standalone view and schema-driven rendering aligned.",
+          manual: <ManualResourcePicker />,
+          rjsf: <RjsfResourcePicker />,
+          title: "Resource Picker",
+        }}
+      />
+    );
+  },
+};

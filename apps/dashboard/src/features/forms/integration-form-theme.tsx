@@ -1,4 +1,5 @@
 import {
+  Checkbox,
   Field,
   FieldContent,
   FieldDescription,
@@ -20,6 +21,14 @@ import type {
   ObjectFieldTemplateProps,
   RJSFSchema,
   WidgetProps,
+} from "@rjsf/utils";
+import {
+  ariaDescribedByIds,
+  enumOptionsDeselectValue,
+  enumOptionsIsSelected,
+  enumOptionsSelectValue,
+  enumOptionsValueForIndex,
+  optionId,
 } from "@rjsf/utils";
 
 import { isRecord } from "../shared/is-record.js";
@@ -225,6 +234,78 @@ function SelectWidget(
   );
 }
 
+function CheckboxesWidget(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element {
+  const {
+    autofocus = false,
+    disabled,
+    htmlName,
+    id,
+    onBlur,
+    onChange,
+    onFocus,
+    options: { emptyValue, enumDisabled, enumOptions, inline = false },
+    readonly,
+  } = props;
+  const values = Array.isArray(props.value) ? props.value : [props.value];
+
+  return (
+    <div
+      className={cn(
+        "gap-3 flex flex-col",
+        inline ? "sm:flex-row sm:flex-wrap sm:gap-4" : undefined,
+      )}
+      id={id}
+    >
+      {Array.isArray(enumOptions)
+        ? enumOptions.map((option, index) => {
+            const checked = enumOptionsIsSelected(option.value, values);
+            const itemDisabled = Array.isArray(enumDisabled) && enumDisabled.includes(option.value);
+            const itemId = optionId(id, index);
+            const describedBy = ariaDescribedByIds(id);
+
+            return (
+              <label
+                className={cn(
+                  "gap-2 flex items-center",
+                  disabled || itemDisabled || readonly ? "opacity-50" : undefined,
+                )}
+                key={itemId}
+              >
+                <Checkbox
+                  aria-describedby={describedBy}
+                  aria-label={String(option.label)}
+                  autoFocus={autofocus && index === 0}
+                  checked={checked}
+                  disabled={disabled || itemDisabled || readonly}
+                  id={itemId}
+                  name={htmlName ?? id}
+                  onBlur={() => {
+                    onBlur(id, enumOptionsValueForIndex(String(index), enumOptions, emptyValue));
+                  }}
+                  onCheckedChange={(nextChecked) => {
+                    if (nextChecked) {
+                      onChange(enumOptionsSelectValue(index, values, enumOptions));
+                      return;
+                    }
+
+                    onChange(enumOptionsDeselectValue(index, values, enumOptions));
+                  }}
+                  onFocus={() => {
+                    onFocus(id, enumOptionsValueForIndex(String(index), enumOptions, emptyValue));
+                  }}
+                  value={String(index)}
+                />
+                <span className="text-sm">{option.label}</span>
+              </label>
+            );
+          })
+        : null}
+    </div>
+  );
+}
+
 function resolveTextareaWidgetOptions(
   options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"],
 ): {
@@ -385,7 +466,9 @@ export const IntegrationFormWidgets = {
   TextWidget,
   PasswordWidget,
   SelectWidget,
+  CheckboxesWidget,
   TextareaWidget,
+  checkboxes: CheckboxesWidget,
   "comma-separated-string-array": CommaSeparatedStringArrayWidget,
   "integration-resource-string-array": IntegrationResourceStringArrayWidget,
 };
