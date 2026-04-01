@@ -17,11 +17,11 @@ import {
   SelectValue,
   Switch,
   Textarea,
+  Notice,
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
 
 import { FormPageFooter, FormPageHeader, FormPageSection } from "../shared/form-page.js";
-import { StatusBox } from "../shared/status-box.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
 import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
@@ -447,9 +447,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
       <FormPageFooter>
         {input.validationSummaryError === null ? null : (
-          <StatusBox tone="destructive" variant="subtle">
+          <Notice tone="destructive" variant="subtle">
             {input.validationSummaryError}
-          </StatusBox>
+          </Notice>
         )}
         <Button
           disabled={input.isDeleting || input.isSaving}

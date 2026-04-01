@@ -1,9 +1,8 @@
-import { Badge, Button } from "@mistle/ui";
+import { Badge, Button, Notice } from "@mistle/ui";
 import { ArrowClockwiseIcon, PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { EditableHeading } from "../shared/editable-heading.js";
-import { StatusBox } from "../shared/status-box.js";
 import {
   formatConnectionStatusLabel,
   formatResourceHeading,
@@ -356,7 +355,7 @@ function ResourceSection(input: {
         ) : null}
       </div>
       {input.resource.lastErrorMessage ? (
-        <StatusBox tone="destructive">{input.resource.lastErrorMessage}</StatusBox>
+        <Notice tone="destructive">{input.resource.lastErrorMessage}</Notice>
       ) : null}
       <ResourceItemsPreview
         errorMessage={input.resourceItems?.errorMessage ?? null}
@@ -379,7 +378,7 @@ function ResourceItemsPreview(input: {
   }
 
   if (input.errorMessage !== null) {
-    return <StatusBox tone="destructive">{input.errorMessage}</StatusBox>;
+    return <Notice tone="destructive">{input.errorMessage}</Notice>;
   }
 
   if (input.items.length === 0) {

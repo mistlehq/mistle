@@ -1,9 +1,8 @@
-import { Button, Input, ScrollArea } from "@mistle/ui";
+import { Button, Input, ScrollArea, Notice } from "@mistle/ui";
 import { ArrowClockwiseIcon } from "@phosphor-icons/react";
 import { useCallback } from "react";
 
 import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
-import { StatusBox } from "../shared/status-box.js";
 import {
   buildIntegrationResourceWidgetViewModel,
   type IntegrationResourceListViewState,
@@ -38,15 +37,12 @@ function IntegrationResourceMessageSection(input: {
   children?: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <StatusBox
-      tone={input.tone === "destructive" ? "destructive" : "neutral"}
-      title={input.message}
-    >
+    <Notice tone={input.tone === "destructive" ? "destructive" : "neutral"} title={input.message}>
       <div className="flex flex-col gap-1">
         {input.detail === undefined ? null : <p>{input.detail}</p>}
         {input.children}
       </div>
-    </StatusBox>
+    </Notice>
   );
 }
 

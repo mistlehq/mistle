@@ -1,8 +1,7 @@
-import { Field, FieldContent, FieldHeader, FieldLabel, Input, Skeleton } from "@mistle/ui";
+import { Field, FieldContent, FieldHeader, FieldLabel, Input, Skeleton, Notice } from "@mistle/ui";
 
 import { SaveActions } from "../settings/save-actions.js";
 import { FormPageSection, FormPageShell } from "../shared/form-page.js";
-import { StatusBox } from "../shared/status-box.js";
 
 export type OrganizationGeneralSettingsPageViewProps = {
   hasDirtyChanges: boolean;
@@ -50,9 +49,7 @@ export function OrganizationGeneralSettingsPageView(
       <FormPageShell>
         <FormPageSection>
           <div className="flex flex-col gap-3 p-4">
-            <StatusBox tone="destructive">
-              {props.loadErrorMessage} Please try again later.
-            </StatusBox>
+            <Notice tone="destructive">{props.loadErrorMessage} Please try again later.</Notice>
           </div>
         </FormPageSection>
       </FormPageShell>
@@ -68,11 +65,11 @@ export function OrganizationGeneralSettingsPageView(
           </p>
 
           {props.saveErrorMessage !== null || props.nameErrorMessage !== null ? (
-            <StatusBox tone="destructive">
+            <Notice tone="destructive">
               {props.saveErrorMessage !== null
                 ? `${props.saveErrorMessage} Please try again later.`
                 : props.nameErrorMessage}
-            </StatusBox>
+            </Notice>
           ) : null}
 
           <Field contentWidth="fill" orientation="horizontal">

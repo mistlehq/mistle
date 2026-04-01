@@ -24,6 +24,7 @@ import {
   TooltipContent,
   TooltipTrigger,
   useComboboxAnchor,
+  Notice,
 } from "@mistle/ui";
 import { InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
@@ -31,7 +32,6 @@ import { useEffect, useId, useState } from "react";
 
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
-import { StatusBox } from "../shared/status-box.js";
 import {
   createSyntheticWebhookAutomationEventOption,
   isWebhookAutomationEventOptionUnavailable,
@@ -182,14 +182,14 @@ export function WebhookAutomationTriggerPicker(input: {
       )}
 
       {pickerState.helperMessage === null ? null : (
-        <StatusBox tone="destructive">{pickerState.helperMessage}</StatusBox>
+        <Notice tone="destructive">{pickerState.helperMessage}</Notice>
       )}
 
       {selectedEventOptions.length === 0 ? (
         pickerState.disabled ? null : (
-          <StatusBox tone={input.error === undefined ? "neutral" : "destructive"}>
+          <Notice tone={input.error === undefined ? "neutral" : "destructive"}>
             {emptyStateMessage}
-          </StatusBox>
+          </Notice>
         )
       ) : (
         <div className="space-y-1.5">

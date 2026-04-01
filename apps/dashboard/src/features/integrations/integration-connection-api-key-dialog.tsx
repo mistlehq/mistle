@@ -6,9 +6,8 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Notice,
 } from "@mistle/ui";
-
-import { StatusBox } from "../shared/status-box.js";
 
 export function IntegrationConnectionApiKeyDialog(input: {
   connectionDisplayName: string;
@@ -52,7 +51,7 @@ export function IntegrationConnectionApiKeyDialog(input: {
           </div>
 
           {input.errorMessage === undefined ? null : (
-            <StatusBox tone="destructive">{input.errorMessage}</StatusBox>
+            <Notice tone="destructive">{input.errorMessage}</Notice>
           )}
 
           <DialogFooter>
