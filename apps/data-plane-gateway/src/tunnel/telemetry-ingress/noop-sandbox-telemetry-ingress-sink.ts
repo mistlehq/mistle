@@ -17,4 +17,8 @@ export class NoopSandboxTelemetryIngressSink implements SandboxTelemetryIngressS
   public async closeStream(_input: SandboxTelemetryIngressStream): Promise<void> {
     return;
   }
+
+  public async shutdown(): Promise<void> {
+    return;
+  }
 }

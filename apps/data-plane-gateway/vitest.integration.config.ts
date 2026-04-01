@@ -24,6 +24,10 @@ const WorkspaceAliases = [
     ),
   },
   {
+    find: /^@mistle\/db\/migrator$/,
+    replacement: fileURLToPath(new URL("../../packages/db/src/migrator/index.ts", import.meta.url)),
+  },
+  {
     find: /^@mistle\/gateway-connection-auth$/,
     replacement: fileURLToPath(
       new URL("../../packages/gateway-connection-auth/src/index.ts", import.meta.url),
@@ -36,8 +40,18 @@ const WorkspaceAliases = [
     ),
   },
   {
+    find: /^@mistle\/integrations-core$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/integrations-core/src/index.ts", import.meta.url),
+    ),
+  },
+  {
     find: /^@mistle\/logging$/,
     replacement: fileURLToPath(new URL("../../packages/logging/src/index.ts", import.meta.url)),
+  },
+  {
+    find: /^@mistle\/sandbox$/,
+    replacement: fileURLToPath(new URL("../../packages/sandbox/src/index.ts", import.meta.url)),
   },
   {
     find: /^@mistle\/sandbox-session-protocol$/,

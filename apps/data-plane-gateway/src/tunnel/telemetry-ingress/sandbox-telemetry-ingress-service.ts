@@ -16,6 +16,7 @@ import type {
   SandboxTelemetryIngressSink,
   SandboxTelemetryIngressStream,
 } from "./sandbox-telemetry-ingress-sink.js";
+import { SandboxTelemetryResetError } from "./sandbox-telemetry-reset-error.js";
 import { createTelemetryOpenError, createTelemetryReset } from "./telemetry-control-messages.js";
 
 type TelemetryControlMessage =
@@ -105,6 +106,8 @@ export class SandboxTelemetryIngressService {
           relaySessionId: input.relaySessionId,
           sandboxInstanceId: input.sandboxInstanceId,
           stream: invalidation.stream,
+        }).catch(() => {
+          // Preserve the original invalid-data reset reason for the peer.
         });
       }
       this.deleteSessionIfEmpty(sessionKey, session);
@@ -117,11 +120,20 @@ export class SandboxTelemetryIngressService {
       return;
     }
 
-    await this.closeSinkStream({
-      relaySessionId: input.relaySessionId,
-      sandboxInstanceId: input.sandboxInstanceId,
-      stream,
-    });
+    try {
+      await this.closeSinkStream({
+        relaySessionId: input.relaySessionId,
+        sandboxInstanceId: input.sandboxInstanceId,
+        stream,
+      });
+    } catch (error) {
+      input.sendControlMessage(
+        this.toTelemetryReset({
+          error,
+          streamId: stream.streamId,
+        }),
+      );
+    }
     this.deleteSessionIfEmpty(sessionKey, session);
   }
 
@@ -143,9 +155,25 @@ export class SandboxTelemetryIngressService {
           relaySessionId: input.relaySessionId,
           sandboxInstanceId: input.sandboxInstanceId,
           stream,
+        }).catch((error: unknown) => {
+          logger.warn(
+            {
+              err: error,
+              relaySessionId: input.relaySessionId,
+              sandboxInstanceId: input.sandboxInstanceId,
+              signal: stream.signal,
+              streamId: stream.streamId,
+            },
+            "Failed closing sandbox telemetry ingress stream during detach",
+          );
         }),
       ),
     );
+  }
+
+  public async shutdown(): Promise<void> {
+    this.#sessions.clear();
+    await this.sink.shutdown();
   }
 
   private async handleOpen(input: {
@@ -212,6 +240,8 @@ export class SandboxTelemetryIngressService {
           relaySessionId: input.relaySessionId,
           sandboxInstanceId: input.sandboxInstanceId,
           stream: consumeResult.stream,
+        }).catch(() => {
+          // Preserve the original receive-window reset reason for the peer.
         });
       }
       this.deleteSessionIfEmpty(input.sessionKey, input.session);
@@ -229,15 +259,18 @@ export class SandboxTelemetryIngressService {
       });
     } catch {
       input.session.closeStream(consumeResult.stream.streamId);
-      await this.closeSinkStream({
-        relaySessionId: input.relaySessionId,
-        sandboxInstanceId: input.sandboxInstanceId,
-        stream: consumeResult.stream,
-      });
+      try {
+        await this.closeSinkStream({
+          relaySessionId: input.relaySessionId,
+          sandboxInstanceId: input.sandboxInstanceId,
+          stream: consumeResult.stream,
+        });
+      } catch {
+        // Preserve the original sink failure/reset reason for the peer.
+      }
       input.sendControlMessage(
-        createTelemetryReset({
-          code: "telemetry_sink_failed",
-          message: TelemetrySinkFailureMessage,
+        this.toTelemetryReset({
+          error,
           streamId: consumeResult.stream.streamId,
         }),
       );
@@ -245,8 +278,7 @@ export class SandboxTelemetryIngressService {
       return;
     }
 
-    const replenishWindow = input.session.restoreWindow({
-      bytes: frame.payload.byteLength,
+    const replenishWindow = input.session.grantWindowIfNeeded({
       streamId: consumeResult.stream.streamId,
     });
     if (replenishWindow !== undefined) {
@@ -265,25 +297,31 @@ export class SandboxTelemetryIngressService {
     sandboxInstanceId: string;
     stream: ActiveBootstrapTelemetryStream;
   }): Promise<void> {
-    try {
-      await this.sink.closeStream(
-        toIngressStream({
-          relaySessionId: input.relaySessionId,
-          sandboxInstanceId: input.sandboxInstanceId,
-          stream: input.stream,
-        }),
-      );
-    } catch (error) {
-      logger.error(
-        {
-          err: error,
-          relaySessionId: input.relaySessionId,
-          sandboxInstanceId: input.sandboxInstanceId,
-          signal: input.stream.signal,
-          streamId: input.stream.streamId,
-        },
-        "Failed closing sandbox telemetry ingress stream",
-      );
+    await this.sink.closeStream(
+      toIngressStream({
+        relaySessionId: input.relaySessionId,
+        sandboxInstanceId: input.sandboxInstanceId,
+        stream: input.stream,
+      }),
+    );
+  }
+
+  private toTelemetryReset(input: {
+    error: unknown;
+    streamId: number;
+  }): ReturnType<typeof createTelemetryReset> {
+    if (input.error instanceof SandboxTelemetryResetError) {
+      return createTelemetryReset({
+        code: input.error.code,
+        message: input.error.message,
+        streamId: input.streamId,
+      });
     }
+
+    return createTelemetryReset({
+      code: "telemetry_sink_failed",
+      message: TelemetrySinkFailureMessage,
+      streamId: input.streamId,
+    });
   }
 }
