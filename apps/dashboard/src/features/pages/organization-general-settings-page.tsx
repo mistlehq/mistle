@@ -8,7 +8,7 @@ import {
   getOrganizationGeneral,
   updateOrganizationGeneral,
 } from "../settings/organization/organization-general-service.js";
-import { PageFrame } from "../shared/page-frame.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { OrganizationGeneralSettingsPageView } from "./organization-general-settings-page-view.js";
@@ -38,11 +38,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
   const organizationId = useRequiredOrganizationId();
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const title = pageMeta.title ?? "General";
-  const description =
-    pageMeta.supportingText === null || pageMeta.supportingText.trim().length === 0
-      ? undefined
-      : pageMeta.supportingText;
+  const { title, description } = resolvePageFrameText(pageMeta, "General");
 
   const organizationQuery = useQuery({
     queryKey: settingsOrganizationGeneralQueryKey(organizationId),

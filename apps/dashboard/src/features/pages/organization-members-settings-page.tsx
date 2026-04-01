@@ -7,8 +7,7 @@ import {
   toMembersLoadErrorMessage,
   useOrganizationMembersSettingsState,
 } from "../settings/members/use-organization-members-settings-state.js";
-import { PageFrame } from "../shared/page-frame.js";
-import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { OrganizationMembersSettingsPageView } from "./organization-members-settings-page-view.js";
 
@@ -18,11 +17,7 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
   const membersState = useOrganizationMembersSettingsState({
     organizationId,
   });
-  const title = pageMeta.title ?? "Members";
-  const description =
-    pageMeta.supportingText === null || pageMeta.supportingText.trim().length === 0
-      ? undefined
-      : pageMeta.supportingText;
+  const { title, description } = resolvePageFrameText(pageMeta, "Members");
   const headerActions = useMemo(
     () => (
       <Button
@@ -35,7 +30,6 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
     ),
     [membersState.inviteMembersDisabled, membersState.setInviteDialogOpen],
   );
-  useAppShellHeaderActions(headerActions);
 
   const isPageLoading =
     membersState.membersQuery.isPending ||

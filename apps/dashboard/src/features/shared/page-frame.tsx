@@ -1,3 +1,4 @@
+import type { AppPageMeta } from "../navigation/route-meta.js";
 import { FormPageHeader } from "./form-page.js";
 
 export type PageFrameProps = {
@@ -8,6 +9,22 @@ export type PageFrameProps = {
   title: React.ReactNode;
   variant?: "default" | "form";
 };
+
+export function resolvePageFrameText(
+  pageMeta: AppPageMeta,
+  fallbackTitle: string,
+): {
+  description: string | undefined;
+  title: string;
+} {
+  return {
+    description:
+      pageMeta.supportingText === null || pageMeta.supportingText.trim().length === 0
+        ? undefined
+        : pageMeta.supportingText,
+    title: pageMeta.title ?? fallbackTitle,
+  };
+}
 
 export function PageFrame(input: PageFrameProps): React.JSX.Element {
   const isFormLayout = input.variant === "form";

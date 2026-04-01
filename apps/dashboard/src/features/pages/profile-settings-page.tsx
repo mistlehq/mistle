@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { updateProfileDisplayName } from "../settings/profile/profile-service.js";
-import { PageFrame } from "../shared/page-frame.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
@@ -17,11 +17,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
   const session = useRequiredSession();
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
-  const title = pageMeta.title ?? "Profile";
-  const description =
-    pageMeta.supportingText === null || pageMeta.supportingText.trim().length === 0
-      ? undefined
-      : pageMeta.supportingText;
+  const { title, description } = resolvePageFrameText(pageMeta, "Profile");
 
   useEffect(() => {
     if (!saveSuccess) {
