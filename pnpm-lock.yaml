@@ -714,12 +714,6 @@ importers:
         specifier: ^6.2.2
         version: 6.2.2
 
-  packages/gateway-published-target-auth:
-    dependencies:
-      jose:
-        specifier: ^6.2.2
-        version: 6.2.2
-
   packages/gateway-tunnel-auth:
     dependencies:
       jose:
