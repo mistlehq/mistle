@@ -2,6 +2,14 @@ import { Badge } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ErrorNotice } from "../auth/error-notice.js";
+import { SettingsBackButton } from "../settings/settings-back-button.js";
+import {
+  createOrganizationMembersSettingsFixtureContent,
+  createProfileSettingsFixtureContent,
+  createSettingsFixtureInviteMembersButton,
+} from "../settings/settings-fixtures.js";
+import { SettingsLayoutView } from "../settings/settings-layout-view.js";
+import { SettingsSectionNavView } from "../settings/settings-section-nav-view.js";
 import { AppShellView } from "./app-shell-view.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 
@@ -135,3 +143,53 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const SettingsProfile: Story = {
+  args: {
+    breadcrumbs: <p className="truncate text-sm">Settings / Profile</p>,
+    contentInsetOwner: "child",
+    headerActions: null,
+    mainContent: (
+      <SettingsLayoutView
+        headerActions={null}
+        layoutVariant="form"
+        supportingText=""
+        title="Profile"
+      >
+        {createProfileSettingsFixtureContent()}
+      </SettingsLayoutView>
+    ),
+    showBreadcrumbs: true,
+    sidebarContent: <SettingsSectionNavView pathname="/settings/account/profile" />,
+    sidebarFooterContent: <ErrorNotice message={null} />,
+    sidebarHeaderClassName: "pb-0",
+    sidebarHeaderContent: <SettingsBackButton onBack={() => {}} />,
+    topLoadingBar: <div className="h-0" />,
+    viewportMode: "document",
+  },
+};
+
+export const SettingsMembers: Story = {
+  args: {
+    breadcrumbs: <p className="truncate text-sm">Settings / Organization / Members</p>,
+    contentInsetOwner: "child",
+    headerActions: null,
+    mainContent: (
+      <SettingsLayoutView
+        headerActions={createSettingsFixtureInviteMembersButton()}
+        layoutVariant="default"
+        supportingText=""
+        title="Members"
+      >
+        {createOrganizationMembersSettingsFixtureContent()}
+      </SettingsLayoutView>
+    ),
+    showBreadcrumbs: true,
+    sidebarContent: <SettingsSectionNavView pathname="/settings/organization/members" />,
+    sidebarFooterContent: <ErrorNotice message={null} />,
+    sidebarHeaderClassName: "pb-0",
+    sidebarHeaderContent: <SettingsBackButton onBack={() => {}} />,
+    topLoadingBar: <div className="h-0" />,
+    viewportMode: "document",
+  },
+};
