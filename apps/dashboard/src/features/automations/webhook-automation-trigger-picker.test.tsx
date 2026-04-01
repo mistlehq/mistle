@@ -247,7 +247,9 @@ describe("WebhookAutomationTriggerPicker", () => {
     expect(
       screen.getAllByText("The selected profile has no bindings with automation triggers.").length,
     ).toBeGreaterThan(0);
-    expect(screen.queryByText("No triggers added yet.")).toBeNull();
+    expect(within(container).queryAllByRole("button", { name: /Remove .* trigger/ })).toHaveLength(
+      0,
+    );
   });
 
   it("shows an empty state when no triggers are selected", () => {
@@ -280,7 +282,7 @@ describe("WebhookAutomationTriggerPicker", () => {
 
     expect(container.className.includes("text-destructive")).toBe(true);
     expect(container.className.includes("border-destructive/40")).toBe(true);
-    expect(within(renderContainer).queryByText("No triggers added yet.")).toBeNull();
+    expect(within(renderContainer).queryByRole("button", { name: /Remove .* trigger/ })).toBeNull();
   });
 
   it("renders selector-backed trigger parameters", () => {
@@ -308,7 +310,7 @@ describe("WebhookAutomationTriggerPicker", () => {
   });
 
   it("renders enum-backed trigger parameters", () => {
-    renderTriggerPicker({
+    const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
       selectedTriggerIds: [
@@ -327,7 +329,12 @@ describe("WebhookAutomationTriggerPicker", () => {
       },
     });
 
-    expect(screen.getAllByText("pull request").length).toBeGreaterThan(0);
+    const parameterSelect = container.querySelector('[data-slot="select-trigger"]');
+    if (parameterSelect === null) {
+      throw new Error("Expected enum-backed trigger parameter select.");
+    }
+
+    expect(parameterSelect.textContent).toContain("pull request");
   });
 
   it("renders explicit invocation parameters as an enabled switch", () => {
@@ -454,8 +461,9 @@ describe("WebhookAutomationTriggerPicker", () => {
     }
 
     fireEvent.click(addTriggerButton);
-    expect(screen.getAllByText("GitHub - GitHub Engineering").length).toBeGreaterThan(0);
     expect(addTriggerInput.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("option", { name: "Issue comment created" })).toBeDefined();
+    expect(screen.getByRole("option", { name: "Pull request opened" })).toBeDefined();
 
     fireEvent.click(screen.getByRole("option", { name: "Issue comment created" }));
 
@@ -515,7 +523,12 @@ describe("WebhookAutomationTriggerPicker", () => {
 
     fireEvent.click(closeButton);
     await waitFor(() => {
-      expect(screen.queryByText("Only one trigger is supported")).toBeNull();
+      expect(
+        within(container).getByRole("button", {
+          hidden: true,
+          name: "Remove Issue comment created trigger",
+        }),
+      ).toBeDefined();
     });
   });
 

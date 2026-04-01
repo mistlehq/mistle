@@ -153,9 +153,19 @@ describe("WebhookAutomationForm", () => {
   });
 
   it("shows connector-defined conversation grouping choices", () => {
-    renderForm("create");
+    const { container } = renderForm("create");
 
-    expect(screen.getAllByText("Group events by").length).toBeGreaterThan(0);
+    const groupingFieldCandidate = within(container)
+      .getAllByText("Group events by")[0]
+      ?.closest('[role="group"]');
+    if (groupingFieldCandidate === null) {
+      throw new Error("Expected conversation grouping field.");
+    }
+    if (!(groupingFieldCandidate instanceof HTMLElement)) {
+      throw new Error("Expected conversation grouping field.");
+    }
+
+    expect(within(groupingFieldCandidate).getByRole("combobox")).toBeDefined();
   });
 
   it("hides conversation grouping when no triggers are selected", () => {
@@ -167,7 +177,7 @@ describe("WebhookAutomationForm", () => {
       }),
     });
 
-    expect(container.textContent?.includes("Group events by")).toBe(false);
+    expect(within(container).queryByText("Group events by")).toBeNull();
   });
 
   it("does not inject an unsupported current conversation grouping option", () => {
@@ -193,7 +203,6 @@ describe("WebhookAutomationForm", () => {
     ).toBeGreaterThan(0);
     expect(currentForm.getAllByText("{{webhookEvent.eventType}}").length).toBeGreaterThan(0);
     expect(currentForm.getAllByText("{{payload}}").length).toBeGreaterThan(0);
-    expect(currentForm.queryByText("Basics")).toBeNull();
     expect(currentForm.queryByRole("heading", { name: "Agent Instructions" })).toBeNull();
   });
 
