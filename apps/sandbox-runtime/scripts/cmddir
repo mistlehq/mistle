@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  echo "Usage: cmddir list | cmddir search <pattern>" >&2
+  exit 1
+}
+
+list_commands() {
+  old_ifs=$IFS
+  IFS=:
+  for dir in $PATH; do
+    [ -d "$dir" ] || continue
+    for entry in "$dir"/*; do
+      [ -f "$entry" ] || continue
+      [ -x "$entry" ] || continue
+      basename "$entry"
+    done
+  done
+  IFS=$old_ifs
+}
+
+[ $# -ge 1 ] || usage
+
+case "$1" in
+  list)
+    [ $# -eq 1 ] || usage
+    list_commands | sort -u
+    ;;
+  search)
+    [ $# -eq 2 ] || usage
+    list_commands | sort -u | rg -- "$2"
+    ;;
+  *)
+    usage
+    ;;
+esac

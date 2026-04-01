@@ -21,6 +21,9 @@ RUN apt-get update \
     unzip \
   && rm -rf /var/lib/apt/lists/*
 
+COPY apps/sandbox-runtime/scripts/cmddir /usr/local/bin/cmddir
+RUN chmod +x /usr/local/bin/cmddir
+
 # Keep only generic runtime-owned paths in the base image. Agent-specific config
 # trees such as /etc/codex are created on demand by runtime-plan file application.
 RUN mkdir -p \

@@ -39,6 +39,11 @@ const ManagedSandboxContext = [
   "- Do not assume missing API keys or auth-related environment variables inside the sandbox mean authentication is misconfigured.",
   "- Prefer debugging request behavior and proxy-mediated access before treating missing in-process credentials as the root cause.",
   "- Do not modify proxy-related environment variables unless explicitly instructed.",
+  "- When interacting with external systems, prefer the provider CLI available in the environment over ad hoc HTTP requests or raw `curl`.",
+  "- Use `cmddir search <pattern>` to discover relevant commands progressively before reaching for lower-level approaches.",
+  "- Examples:",
+  "  - `cmddir search '^gh$'`",
+  "  - `cmddir search '^(jira|slack)$'`",
 ].join("\n");
 
 type CodexProviderMetadata = {
