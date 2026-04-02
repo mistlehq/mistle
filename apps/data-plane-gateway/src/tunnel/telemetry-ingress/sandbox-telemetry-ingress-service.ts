@@ -175,7 +175,7 @@ export class SandboxTelemetryIngressService {
           stream: openResult.stream,
         }),
       );
-    } catch (error) {
+    } catch {
       session.closeStream(openResult.stream.streamId);
       input.sendControlMessage(
         createTelemetryOpenError({
@@ -227,7 +227,7 @@ export class SandboxTelemetryIngressService {
         }),
         payload: frame.payload,
       });
-    } catch (error) {
+    } catch {
       input.session.closeStream(consumeResult.stream.streamId);
       await this.closeSinkStream({
         relaySessionId: input.relaySessionId,
