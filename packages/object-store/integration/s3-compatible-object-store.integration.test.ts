@@ -78,4 +78,37 @@ describe("S3-compatible object store integration", () => {
 
     await expect(seaweedfs.stop()).rejects.toThrow("SeaweedFS container was already stopped.");
   }, 60_000);
+
+  test("uses path-style requests by default for custom S3-compatible endpoints", async () => {
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "object-store-default-path-style",
+    });
+
+    const objectStore = new S3CompatibleObjectStore({
+      bucketName: seaweedfs.bucketName,
+      credentials: {
+        accessKeyId: seaweedfs.accessKeyId,
+        secretAccessKey: seaweedfs.secretAccessKey,
+      },
+      endpoint: seaweedfs.endpoint,
+      region: seaweedfs.region,
+    });
+
+    try {
+      await expect(
+        objectStore.putObject({
+          Body: new TextEncoder().encode("path-style-default"),
+          ContentType: "text/plain",
+          objectKey: "path-style-default.txt",
+        }),
+      ).resolves.toMatchObject({
+        $metadata: {
+          httpStatusCode: 200,
+        },
+      });
+    } finally {
+      objectStore.destroy();
+      await seaweedfs.stop();
+    }
+  }, 60_000);
 });

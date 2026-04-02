@@ -33,7 +33,7 @@ export class S3CompatibleObjectStore {
     this.#bucketName = input.bucketName;
     this.#client = new S3Client({
       bucketEndpoint: false,
-      forcePathStyle: input.forcePathStyle ?? false,
+      forcePathStyle: input.forcePathStyle ?? true,
       region: input.region,
       ...(input.credentials === undefined
         ? {}
