@@ -9,6 +9,7 @@ import {
   CodexFixtureSessionServerRequests,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
 import type { UseSandboxPtyStateResult } from "../sessions/use-sandbox-pty-state.js";
+import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import {
   SessionConversationBottomPanel,
   SessionConversationMainContent,
@@ -139,12 +140,19 @@ export function renderSessionWorkbenchStory(input: {
 
 export function SessionWorkbenchStoryChrome(input: {
   children: React.ReactNode;
+  headerStatusUi?: SandboxStatusBadgeUi;
 }): React.JSX.Element {
+  const headerStatusUi = input.headerStatusUi ?? {
+    label: "Connected",
+    variant: "secondary",
+    className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+  };
+
   return (
     <div className="from-background to-muted/20 min-h-screen bg-linear-to-b">
       <div className="bg-background/80 flex h-12 items-center justify-end border-b px-4 backdrop-blur-sm">
-        <Badge className="bg-emerald-600 text-white hover:bg-emerald-600/90" variant="secondary">
-          Connected
+        <Badge className={headerStatusUi.className} variant={headerStatusUi.variant}>
+          {headerStatusUi.label}
         </Badge>
       </div>
       <div className="h-[calc(100vh-3rem)]">{input.children}</div>

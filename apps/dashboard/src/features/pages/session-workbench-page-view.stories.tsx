@@ -9,6 +9,7 @@ import {
   SessionComposerFixtureStatusMessageForNonImageCapableModel,
   SessionComposerFixtureStatusMessageForUnavailableModel,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
+import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
   createStoryLongCliOutput,
@@ -20,6 +21,10 @@ import {
 } from "./session-story-support.js";
 import { SessionTerminalPanel } from "./session-terminal-panel.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
+
+type SessionWorkbenchPageViewStoryArgs = React.ComponentProps<typeof SessionWorkbenchPageView> & {
+  headerStatusUi: SandboxStatusBadgeUi;
+};
 
 const meta = {
   title: "Dashboard/Pages/SessionWorkbenchPageView",
@@ -37,23 +42,55 @@ const meta = {
     secondaryPanel: <div className="h-full w-full border-t bg-white" />,
     secondaryPanelSize: 38,
     onSecondaryPanelResize: noop,
+    headerStatusUi: {
+      label: "Connected",
+      variant: "secondary",
+      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+    },
   },
   decorators: [
-    function StoryDecorator(Story): React.JSX.Element {
+    function StoryDecorator(Story, context): React.JSX.Element {
       return (
-        <SessionWorkbenchStoryChrome>
+        <SessionWorkbenchStoryChrome headerStatusUi={context.args.headerStatusUi}>
           <Story />
         </SessionWorkbenchStoryChrome>
       );
     },
   ],
-} satisfies Meta<typeof SessionWorkbenchPageView>;
+} satisfies Meta<SessionWorkbenchPageViewStoryArgs>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const ConnectingHeader: Story = {
+  args: {
+    headerStatusUi: {
+      label: "Connecting",
+      variant: "outline",
+    },
+  },
+};
+
+export const ReconnectingHeader: Story = {
+  args: {
+    headerStatusUi: {
+      label: "Reconnecting",
+      variant: "outline",
+    },
+  },
+};
+
+export const SessionErrorHeader: Story = {
+  args: {
+    headerStatusUi: {
+      label: "Session error",
+      variant: "destructive",
+    },
+  },
+};
 
 export const WithErrorNoticees: Story = {
   args: {
