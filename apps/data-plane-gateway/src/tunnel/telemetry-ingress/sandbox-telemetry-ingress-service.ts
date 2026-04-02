@@ -24,6 +24,8 @@ type TelemetryControlMessage =
   | TelemetryReset
   | TelemetryWindow;
 
+const TelemetrySinkFailureMessage = "Gateway failed to ingest telemetry bytes.";
+
 function toSessionKey(input: { relaySessionId: string; sandboxInstanceId: string }): string {
   return `${input.sandboxInstanceId}:${input.relaySessionId}`;
 }
@@ -177,9 +179,8 @@ export class SandboxTelemetryIngressService {
       session.closeStream(openResult.stream.streamId);
       input.sendControlMessage(
         createTelemetryOpenError({
-          code: "telemetry_sink_open_failed",
-          message:
-            error instanceof Error ? error.message : "Failed to open sandbox telemetry sink.",
+          code: "telemetry_sink_failed",
+          message: TelemetrySinkFailureMessage,
           streamId: openResult.stream.streamId,
         }),
       );
@@ -235,9 +236,8 @@ export class SandboxTelemetryIngressService {
       });
       input.sendControlMessage(
         createTelemetryReset({
-          code: "telemetry_sink_write_failed",
-          message:
-            error instanceof Error ? error.message : "Failed to write sandbox telemetry payload.",
+          code: "telemetry_sink_failed",
+          message: TelemetrySinkFailureMessage,
           streamId: consumeResult.stream.streamId,
         }),
       );
