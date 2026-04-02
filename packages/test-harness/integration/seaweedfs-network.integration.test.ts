@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { startDockerNetwork, startSeaweedfsS3 } from "../src/index.js";
 
 describe("SeaweedFS S3 service network integration", () => {
-  test("returns a network-reachable endpoint when started on a Docker network", async () => {
+  test("returns host and container reachable endpoints when started on a Docker network", async () => {
     const network = await startDockerNetwork();
 
     try {
@@ -14,7 +14,8 @@ describe("SeaweedFS S3 service network integration", () => {
       });
 
       try {
-        expect(seaweedfs.endpoint).toBe("http://seaweedfs-test:8333");
+        expect(seaweedfs.endpoint).toMatch(/^http:\/\/.+:\d+$/);
+        expect(seaweedfs.containerEndpoint).toBe("http://seaweedfs-test:8333");
       } finally {
         await seaweedfs.stop();
       }

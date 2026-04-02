@@ -23,7 +23,8 @@ const objectStorage = await startSeaweedfsS3({
   bucketName: "mistle-test",
 });
 
-// use objectStorage.endpoint and credentials with an S3-compatible client
+// use objectStorage.endpoint from the host test process
+// use objectStorage.containerEndpoint from sibling containers on the same Docker network
 
 await objectStorage.stop();
 ```
@@ -45,6 +46,8 @@ await objectStorage.stop();
 
 - Startup waits until the SeaweedFS S3 endpoint accepts bucket creation.
 - The requested bucket is provisioned before the service is returned.
+- `endpoint` is always host-reachable.
+- `containerEndpoint` is set when the service is attached to a Docker network.
 - `stop()` is required.
 - Calling `stop()` twice throws.
 - No fallback behavior is applied for startup or teardown failures.

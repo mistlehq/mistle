@@ -26,6 +26,7 @@ export type StartSeaweedfsS3Input = {
 export type SeaweedfsS3Service = {
   bucketName: string;
   endpoint: string;
+  containerEndpoint?: string;
   region: string;
   accessKeyId: string;
   secretAccessKey: string;
@@ -66,9 +67,9 @@ export async function startSeaweedfsS3(
     container = await containerDefinition.start();
 
     const hostEndpoint = `http://${container.getHost()}:${String(container.getMappedPort(SEAWEEDFS_S3_PORT))}`;
-    const endpoint =
+    const containerEndpoint =
       input.network === undefined
-        ? hostEndpoint
+        ? undefined
         : `http://${networkAlias}:${String(SEAWEEDFS_S3_PORT)}`;
 
     await ensureBucketExists({
@@ -108,7 +109,8 @@ export async function startSeaweedfsS3(
     return {
       accessKeyId,
       bucketName,
-      endpoint,
+      endpoint: hostEndpoint,
+      ...(containerEndpoint === undefined ? {} : { containerEndpoint }),
       region: SEAWEEDFS_REGION,
       runtimeMetadata: {
         containerId: container.getId(),
