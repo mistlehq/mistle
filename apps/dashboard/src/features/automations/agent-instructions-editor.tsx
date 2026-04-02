@@ -29,6 +29,13 @@ type ActiveSuggestionState = {
   options: readonly AgentInstructionsEditorToken[];
 };
 
+type SuggestionPopoverPosition = {
+  left: number;
+  top: number;
+};
+
+type SuggestionInteractionMode = "keyboard" | "pointer";
+
 function createAgentInstructionsEditorTheme(): ReturnType<typeof EditorView.theme> {
   return EditorView.theme({
     "&": {
@@ -92,7 +99,29 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
     null,
   );
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+  const [suggestionPopoverPosition, setSuggestionPopoverPosition] =
+    useState<SuggestionPopoverPosition | null>(null);
+  const [suggestionInteractionMode, setSuggestionInteractionMode] =
+    useState<SuggestionInteractionMode>("pointer");
   const editorViewRef = useRef<CodeMirrorEditorView | null>(null);
+  const rootElementRef = useRef<HTMLDivElement | null>(null);
+  const suggestionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  useEffect(() => {
+    if (activeSuggestionState === null) {
+      suggestionButtonRefs.current = [];
+      return;
+    }
+
+    if (suggestionInteractionMode !== "keyboard") {
+      return;
+    }
+
+    const activeButton = suggestionButtonRefs.current[selectedSuggestionIndex];
+    activeButton?.scrollIntoView({
+      block: "nearest",
+    });
+  }, [activeSuggestionState, selectedSuggestionIndex, suggestionInteractionMode]);
 
   useEffect(() => {
     setActiveSuggestionState((currentState) => {
@@ -105,6 +134,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
         tokens: input.tokens,
       });
       if (nextOptions.length === 0) {
+        setSuggestionPopoverPosition(null);
         return null;
       }
 
@@ -148,6 +178,8 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
     editorView.focus();
     setActiveSuggestionState(null);
     setSelectedSuggestionIndex(0);
+    setSuggestionPopoverPosition(null);
+    setSuggestionInteractionMode("pointer");
     return true;
   }
 
@@ -156,6 +188,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
       return false;
     }
 
+    setSuggestionInteractionMode("keyboard");
     const optionCount = activeSuggestionState.options.length;
     setSelectedSuggestionIndex(
       (currentIndex) => (currentIndex + delta + optionCount) % optionCount,
@@ -209,6 +242,8 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
 
               setActiveSuggestionState(null);
               setSelectedSuggestionIndex(0);
+              setSuggestionPopoverPosition(null);
+              setSuggestionInteractionMode("pointer");
               return true;
             },
           },
@@ -239,6 +274,8 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
     if (input.disabled) {
       setActiveSuggestionState(null);
       setSelectedSuggestionIndex(0);
+      setSuggestionPopoverPosition(null);
+      setSuggestionInteractionMode("pointer");
       return;
     }
 
@@ -246,6 +283,8 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
     if (!mainSelection.empty) {
       setActiveSuggestionState(null);
       setSelectedSuggestionIndex(0);
+      setSuggestionPopoverPosition(null);
+      setSuggestionInteractionMode("pointer");
       return;
     }
 
@@ -258,7 +297,26 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
 
     if (nextSuggestionState === null) {
       setSelectedSuggestionIndex(0);
+      setSuggestionPopoverPosition(null);
+      setSuggestionInteractionMode("pointer");
       return;
+    }
+
+    const anchorCoordinates = update.view.coordsAtPos(mainSelection.head);
+    const rootElement = rootElementRef.current;
+    if (anchorCoordinates === null || rootElement === null) {
+      setSuggestionPopoverPosition(null);
+    } else {
+      const rootRect = rootElement.getBoundingClientRect();
+      const horizontalPadding = 12;
+      const minLeft = horizontalPadding;
+      const maxLeft = Math.max(minLeft, rootRect.width - 320 - horizontalPadding);
+      const desiredLeft = anchorCoordinates.left - rootRect.left;
+
+      setSuggestionPopoverPosition({
+        left: Math.min(Math.max(desiredLeft, minLeft), maxLeft),
+        top: anchorCoordinates.bottom - rootRect.top + 6,
+      });
     }
 
     setSelectedSuggestionIndex((currentIndex) =>
@@ -267,7 +325,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
   }
 
   return (
-    <div className="space-y-2" data-slot="agent-instructions-editor">
+    <div className="relative" data-slot="agent-instructions-editor" ref={rootElementRef}>
       <div
         aria-disabled={input.disabled ? "true" : "false"}
         aria-invalid={input.invalid ? "true" : "false"}
@@ -290,38 +348,46 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
           value={input.value}
         />
       </div>
-      {activeSuggestionState !== null ? (
+      {activeSuggestionState !== null && suggestionPopoverPosition !== null ? (
         <div
-          className="border-border bg-popover text-popover-foreground rounded-md border shadow-md"
+          className="border-border bg-popover text-popover-foreground absolute z-20 w-80 rounded-md border text-sm shadow-md"
           data-slot="agent-instructions-suggestions"
+          style={{
+            left: `${suggestionPopoverPosition.left}px`,
+            top: `${suggestionPopoverPosition.top}px`,
+          }}
         >
           <div className="max-h-64 overflow-y-auto p-1" role="listbox">
             {activeSuggestionState.options.map((token, index) => (
               <button
                 className={cn(
-                  "hover:bg-accent hover:text-accent-foreground flex w-full items-start justify-between gap-4 rounded-sm px-3 py-2 text-left transition-colors",
+                  "flex w-full items-start rounded-sm px-2.5 py-1.5 text-left transition-colors",
                   index === selectedSuggestionIndex
                     ? "bg-accent text-accent-foreground"
                     : "text-foreground",
                 )}
                 key={token.path}
-                onClick={() => {
+                onMouseDown={(event) => {
+                  event.preventDefault();
                   applySuggestion(token);
                 }}
-                onMouseEnter={() => {
+                onPointerMove={() => {
+                  setSuggestionInteractionMode("pointer");
                   setSelectedSuggestionIndex(index);
+                }}
+                ref={(element) => {
+                  suggestionButtonRefs.current[index] = element;
                 }}
                 type="button"
               >
                 <span className="min-w-0">
-                  <span className="block truncate font-medium">{token.path}</span>
+                  <span className="block truncate text-sm font-medium">{token.path}</span>
                   {token.description === undefined ? null : (
-                    <span className="text-muted-foreground block truncate text-xs">
+                    <span className="text-muted-foreground block truncate text-[0.8125rem] leading-5">
                       {token.description}
                     </span>
                   )}
                 </span>
-                <span className="text-muted-foreground shrink-0 text-xs">{token.label}</span>
               </button>
             ))}
           </div>

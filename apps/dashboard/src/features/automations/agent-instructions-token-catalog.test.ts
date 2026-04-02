@@ -17,6 +17,7 @@ describe("buildAgentInstructionTokenCatalog", () => {
 
     expect(tokens.some((token) => token.path === "webhookEvent.eventType")).toBe(true);
     expect(tokens.some((token) => token.path === "automationRun.id")).toBe(true);
+    expect(tokens.some((token) => token.path === "automationRun.automationId")).toBe(false);
     expect(tokens.some((token) => token.path === "payload")).toBe(true);
   });
 
@@ -49,6 +50,37 @@ describe("buildAgentInstructionTokenCatalog", () => {
     });
 
     expect(tokens.filter((token) => token.path === "payload.comment.body")).toHaveLength(1);
+  });
+
+  it("uses curated semantic descriptions for known payload paths", () => {
+    const tokens = buildAgentInstructionTokenCatalog({
+      selectedEventOptions: [createGithubIssueCommentCreatedEventOption()],
+    });
+
+    expect(tokens.find((token) => token.path === "payload.comment.body")?.description).toBe(
+      "Comment text",
+    );
+  });
+
+  it("omits the description for unknown payload paths", () => {
+    const tokens = buildAgentInstructionTokenCatalog({
+      selectedEventOptions: [
+        createGithubIssueCommentCreatedEventOption({
+          parameters: [
+            {
+              id: "unknown-field",
+              label: "unknown field",
+              kind: "string",
+              payloadPath: ["unknown", "field"],
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(tokens.find((token) => token.path === "payload.unknown.field")?.description).toBe(
+      undefined,
+    );
   });
 
   it("keeps shared runtime groups ahead of payload tokens", () => {

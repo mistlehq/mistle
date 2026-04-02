@@ -22,6 +22,21 @@ export type AgentInstructionsEditorToken = {
 export const AgentInstructionsNoTriggerHelpText =
   "Select a trigger to unlock event-specific payload fields.";
 
+const PayloadTokenDescriptions = {
+  "payload.comment.body": "Comment text",
+  "payload.comment.html_url": "URL to the comment",
+  "payload.issue.body": "Issue description",
+  "payload.issue.number": "Issue number",
+  "payload.issue.pull_request": "Present when the issue is a pull request",
+  "payload.issue.title": "Issue title",
+  "payload.pull_request.base.ref": "Base branch name",
+  "payload.pull_request.body": "Pull request description",
+  "payload.pull_request.head.ref": "Head branch name",
+  "payload.ref": "Git ref for the event",
+  "payload.repository.full_name": "Repository owner and name",
+  "payload.sender.login": "GitHub username of the sender",
+} as const;
+
 const SharedAgentInstructionTokens: readonly AgentInstructionsEditorToken[] = [
   createSharedToken({
     path: "webhookEvent.eventType",
@@ -60,12 +75,6 @@ const SharedAgentInstructionTokens: readonly AgentInstructionsEditorToken[] = [
     description: "The current automation run id.",
   }),
   createSharedToken({
-    path: "automationRun.automationId",
-    label: "Automation id",
-    group: AgentInstructionTokenGroups.AUTOMATION_RUN,
-    description: "The parent automation id.",
-  }),
-  createSharedToken({
     path: "automationRun.automationTargetId",
     label: "Automation target id",
     group: AgentInstructionTokenGroups.AUTOMATION_RUN,
@@ -98,7 +107,7 @@ function createSharedToken(input: {
 function createPayloadToken(input: {
   path: string;
   label: string;
-  description: string;
+  description?: string;
   sourceEventType: string;
 }): AgentInstructionsEditorToken {
   return {
@@ -106,7 +115,7 @@ function createPayloadToken(input: {
     insertText: `{{${input.path}}}`,
     label: input.label,
     group: AgentInstructionTokenGroups.PAYLOAD,
-    description: input.description,
+    ...(input.description === undefined ? {} : { description: input.description }),
     sourceEventType: input.sourceEventType,
     replacePath: input.path,
   };
@@ -153,7 +162,7 @@ export function buildAgentInstructionTokenCatalog(input: {
           parameterLabel: parameter.label,
           path,
         }),
-        description: `${eventOption.label} payload field`,
+        description: PayloadTokenDescriptions[path as keyof typeof PayloadTokenDescriptions],
         sourceEventType: eventOption.eventType,
       });
 
