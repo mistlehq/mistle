@@ -29,6 +29,8 @@ import {
 } from "./messages.js";
 import { handlePtyConnectRequest } from "./pty-channel.js";
 import type { PtySession } from "./pty-session.js";
+import { TelemetryLogRelay } from "./telemetry-log-relay.js";
+import { parseBootstrapTelemetryControlMessage } from "./telemetry-protocol.js";
 import {
   TunnelTokens,
   exchangeTunnelTokensNow,
@@ -138,6 +140,7 @@ async function handleTunnelConnection(input: {
   tunnelSocket: WebSocket;
   tunnelMessages: AsyncQueue<TunnelSocketMessage>;
   executionLeases: ExecutionLeaseEngine;
+  telemetryLogRelay: TelemetryLogRelay;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
 }): Promise<void> {
@@ -212,6 +215,16 @@ async function handleTunnelConnection(input: {
       }
 
       const message = nextEvent.message;
+      if (message.kind === "text") {
+        const telemetryControlMessage = parseBootstrapTelemetryControlMessage(message.payload);
+        if (
+          telemetryControlMessage !== undefined &&
+          input.telemetryLogRelay.handleControlMessage(telemetryControlMessage)
+        ) {
+          continue;
+        }
+      }
+
       let connectRequest;
       try {
         connectRequest = parseConnectRequestMessage(message);
@@ -347,6 +360,7 @@ async function runTunnelClientLoop(input: {
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
 }): Promise<void> {
   const executionLeases = new ExecutionLeaseEngine();
+  const telemetryLogRelay = new TelemetryLogRelay();
 
   void runTunnelTokenExchangeLoop({
     signal: input.signal,
@@ -390,6 +404,7 @@ async function runTunnelClientLoop(input: {
       });
       tunnelSocket = connectedTunnel.socket;
       tunnelMessages = connectedTunnel.messages;
+      telemetryLogRelay.attachTunnelConnection(tunnelSocket);
       logSandboxRuntimeEvent({
         level: "info",
         event: "sandbox_tunnel_connect_attempt_succeeded",
@@ -420,6 +435,7 @@ async function runTunnelClientLoop(input: {
         tunnelSocket,
         tunnelMessages,
         executionLeases,
+        telemetryLogRelay,
         agentRuntimes: input.agentRuntimes,
         runtimeClients: input.runtimeClients,
       });
@@ -427,6 +443,7 @@ async function runTunnelClientLoop(input: {
       connectionError = error;
     } finally {
       executionLeases.detachTunnelConnection(tunnelSocket);
+      telemetryLogRelay.detachTunnelConnection(tunnelSocket);
       await closeWebSocket(tunnelSocket).catch(() => undefined);
     }
 

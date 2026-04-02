@@ -20,6 +20,7 @@ import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
 import { TunnelProtocolTranslator } from "./protocol/tunnel-protocol-translator.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
 import { type AttachedTunnelPeer, TunnelSessionService } from "./session/tunnel-session-service.js";
+import type { SandboxTelemetryIngressService } from "./telemetry-ingress/index.js";
 import { getSandboxTunnelSessionAttributes, getSandboxTunnelSessionSpanName } from "./telemetry.js";
 import { finalizeTunnelSession, recordTunnelSessionError } from "./tunnel-session-observability.js";
 import type { TunnelSessionRegistry } from "./tunnel-session/index.js";
@@ -48,6 +49,7 @@ type RegisterSandboxTunnelRouteInput = {
   sandboxPresenceStore: SandboxPresenceStore;
   sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
   sandboxIdleControllerRegistry: SandboxIdleControllerRegistry;
+  telemetryIngressService: SandboxTelemetryIngressService;
   clock: Clock;
   scheduler: Scheduler;
 };
@@ -267,6 +269,16 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               clientSessionId: relaySessionId,
               currentSocket: ws,
               executionLeaseRepository,
+              handleTelemetryDelivery: async (delivery) => {
+                await input.telemetryIngressService.handleDelivery({
+                  delivery,
+                  relaySessionId,
+                  sandboxInstanceId,
+                  sendControlMessage: (message) => {
+                    ws.send(JSON.stringify(message));
+                  },
+                });
+              },
               interactiveStreamRouter: input.interactiveStreamRouter,
               payload,
               relayCoordinator: input.relayCoordinator,
@@ -308,6 +320,22 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
           onClose: (event) => {
             if (attachedPeer !== undefined) {
               if (admittedRequest.kind === "bootstrap") {
+                void input.telemetryIngressService
+                  .detachBootstrapSession({
+                    relaySessionId,
+                    sandboxInstanceId,
+                  })
+                  .catch((error: unknown) => {
+                    logger.error(
+                      {
+                        err: error,
+                        relaySessionId,
+                        sandboxInstanceId,
+                        tokenKind: sourceTokenKind,
+                      },
+                      "Failed detaching sandbox telemetry ingress session",
+                    );
+                  });
                 void tunnelSessionService.detachBootstrapPeer({
                   attachedPeer,
                   leaseId: admittedRequest.ownerLeaseId,

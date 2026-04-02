@@ -4,9 +4,12 @@ import {
   PayloadKindWebSocketText,
   parseBootstrapControlMessage,
   parseStreamControlMessage,
+  parseTelemetryControlMessage,
   type BootstrapControlMessage,
   type LeaseControlMessage,
   type StreamControlMessage,
+  type TelemetryClose,
+  type TelemetryOpen,
 } from "@mistle/sandbox-session-protocol";
 
 import { BootstrapTunnelNotConnectedError } from "../bootstrap-tunnel-not-connected-error.js";
@@ -36,6 +39,24 @@ export type TunnelProtocolDelivery =
   | {
       kind: "respond";
       payload: RelayPayload;
+    }
+  | {
+      kind: "telemetryOpen";
+      message: TelemetryOpen;
+    }
+  | {
+      kind: "telemetryClose";
+      message: TelemetryClose;
+    }
+  | {
+      kind: "telemetryData";
+      payload: ArrayBuffer;
+      streamId: number;
+    }
+  | {
+      kind: "telemetryInvalidData";
+      payloadKind: number;
+      streamId: number;
     };
 
 export type TunnelProtocolTranslation = {
@@ -211,6 +232,12 @@ function createUnsupportedBinaryPayloadErrorMessage(side: RelayPeerSide): string
     : "Bootstrap websocket binary payloads must be valid tunnel data frames.";
 }
 
+function createUnsupportedConnectionTelemetryMessageError(messageType: string): Error {
+  return new TunnelProtocolViolationError(
+    `Connection websocket cannot send telemetry control message type '${messageType}'.`,
+  );
+}
+
 function isConnectionControlMessageAllowed(message: StreamControlMessage): boolean {
   return (
     message.type === "stream.open" ||
@@ -220,7 +247,20 @@ function isConnectionControlMessageAllowed(message: StreamControlMessage): boole
   );
 }
 
-function isBootstrapStreamControlMessageAllowed(message: StreamControlMessage): boolean {
+function isBootstrapStreamControlMessageAllowed(
+  message: BootstrapControlMessage,
+): message is Extract<
+  BootstrapControlMessage,
+  {
+    type:
+      | "stream.open.ok"
+      | "stream.open.error"
+      | "stream.complete"
+      | "stream.event"
+      | "stream.reset"
+      | "stream.window";
+  }
+> {
   return (
     message.type === "stream.open.ok" ||
     message.type === "stream.open.error" ||
@@ -229,6 +269,12 @@ function isBootstrapStreamControlMessageAllowed(message: StreamControlMessage): 
     message.type === "stream.reset" ||
     message.type === "stream.window"
   );
+}
+
+function isBootstrapTelemetryControlMessageAllowed(
+  message: BootstrapControlMessage,
+): message is TelemetryOpen | TelemetryClose {
+  return message.type === "telemetry.open" || message.type === "telemetry.close";
 }
 
 function assertConnectionControlMessageAllowed(message: StreamControlMessage): void {
@@ -242,6 +288,8 @@ function assertConnectionControlMessageAllowed(message: StreamControlMessage): v
 }
 
 function assertBootstrapControlMessageAllowed(message: BootstrapControlMessage): void {
+  const controlMessageType = message.type;
+
   if (message.type === "lease.create" || message.type === "lease.renew") {
     return;
   }
@@ -250,8 +298,12 @@ function assertBootstrapControlMessageAllowed(message: BootstrapControlMessage):
     return;
   }
 
+  if (isBootstrapTelemetryControlMessageAllowed(message)) {
+    return;
+  }
+
   throw new TunnelProtocolViolationError(
-    `Bootstrap websocket cannot send control message type '${message.type}'.`,
+    `Bootstrap websocket cannot send control message type '${controlMessageType}'.`,
   );
 }
 
@@ -413,6 +465,11 @@ export class TunnelProtocolTranslator {
       });
     }
 
+    const telemetryControlMessage = parseTelemetryControlMessage(input.payload);
+    if (telemetryControlMessage !== undefined) {
+      throw createUnsupportedConnectionTelemetryMessageError(telemetryControlMessage.type);
+    }
+
     const controlMessage = parseStreamControlMessage(input.payload);
     if (controlMessage === undefined) {
       throw new TunnelProtocolViolationError(
@@ -511,6 +568,24 @@ export class TunnelProtocolTranslator {
           kind: "drop",
         },
         executionLeaseControlMessage: controlMessage,
+      });
+    }
+
+    if (controlMessage.type === "telemetry.open") {
+      return createTranslation({
+        delivery: {
+          kind: "telemetryOpen",
+          message: controlMessage,
+        },
+      });
+    }
+
+    if (controlMessage.type === "telemetry.close") {
+      return createTranslation({
+        delivery: {
+          kind: "telemetryClose",
+          message: controlMessage,
+        },
       });
     }
 
@@ -636,10 +711,22 @@ export class TunnelProtocolTranslator {
       tunnelStreamId: dataFrameHeader.streamId,
     });
     if (route === undefined) {
+      if (dataFrameHeader.payloadKind !== PayloadKindRawBytes) {
+        return createTranslation({
+          delivery: {
+            kind: "telemetryInvalidData",
+            streamId: dataFrameHeader.streamId,
+            payloadKind: dataFrameHeader.payloadKind,
+          },
+        });
+      }
+
       return createTranslation({
-        delivery: createRespondDelivery(
-          createUnboundInteractiveStreamResetPayload(dataFrameHeader.streamId),
-        ),
+        delivery: {
+          kind: "telemetryData",
+          payload: input.payload,
+          streamId: dataFrameHeader.streamId,
+        },
       });
     }
     if (
