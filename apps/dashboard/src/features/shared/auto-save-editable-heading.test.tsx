@@ -155,6 +155,47 @@ describe("AutoSaveEditableHeading", () => {
     expect(screen.getByDisplayValue("Retry Title")).toBeDefined();
   });
 
+  it("preserves the retry draft when an external save error is cleared before retry", async () => {
+    function RetryHarness(): React.JSX.Element {
+      const [value, setValue] = useState("Repo Maintainer");
+      const [errorState, setErrorState] = useState<{
+        kind: "save";
+        message: string;
+      } | null>({
+        kind: "save",
+        message: "Could not update heading.",
+      });
+
+      return (
+        <AutoSaveEditableHeading
+          ariaLabel="Heading"
+          editButtonLabel="Edit heading"
+          initialErrorState={errorState}
+          initialValue={value}
+          onSave={async (nextValue) => {
+            setErrorState(null);
+            setValue(nextValue);
+          }}
+          successFadeDurationMs={20}
+          successVisibleDurationMs={40}
+          validate={() => null}
+        />
+      );
+    }
+
+    render(<RetryHarness />);
+
+    const input = screen.getByRole("textbox", { name: "Heading" });
+    fireEvent.change(input, { target: { value: "Retry Title" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("textbox", { name: "Heading" })).toBeNull();
+    });
+
+    expect(screen.getByText("Retry Title")).toBeDefined();
+  });
+
   it("ignores a stale save result after the parent resets the value", async () => {
     let resolveSave: (() => void) | undefined;
 

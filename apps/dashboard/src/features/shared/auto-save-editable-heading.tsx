@@ -65,13 +65,17 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
     setValue(input.initialValue);
     setErrorState(input.initialErrorState ?? null);
     setStatus("idle");
-  }, [
-    initialErrorKind,
-    initialErrorMessage,
-    input.initialValue,
-    input.initiallyEditing,
-    scheduler,
-  ]);
+  }, [input.initialValue, input.initiallyEditing, scheduler]);
+
+  useEffect(() => {
+    if (input.initialErrorState == null) {
+      return;
+    }
+
+    setErrorState(input.initialErrorState);
+    setStatus("idle");
+    setIsEditing(true);
+  }, [initialErrorKind, initialErrorMessage, input.initialErrorState]);
 
   useEffect(() => {
     return () => {
