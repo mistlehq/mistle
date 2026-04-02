@@ -7,9 +7,13 @@ import * as completeGitHubAppInstallationConnection from "./complete-github-app-
 import * as completeOAuth2AuthorizationCodeConnection from "./complete-oauth2-authorization-code-connection/index.js";
 import { INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH } from "./constants.js";
 import * as createFormConnection from "./create-form-connection/index.js";
+import * as createIntegrationWebhookSource from "./create-integration-webhook-source/index.js";
 import * as deleteIntegrationConnection from "./delete-integration-connection/index.js";
+import * as deleteIntegrationWebhookSource from "./delete-integration-webhook-source/index.js";
+import * as getIntegrationWebhookSource from "./get-integration-webhook-source/index.js";
 import * as listIntegrationConnectionResources from "./list-integration-connection-resources/index.js";
 import * as listIntegrationConnections from "./list-integration-connections/index.js";
+import * as listIntegrationWebhookSources from "./list-integration-webhook-sources/index.js";
 import * as refreshIntegrationConnectionResources from "./refresh-integration-connection-resources/index.js";
 import * as startGitHubAppInstallationConnection from "./start-github-app-installation-connection/index.js";
 import * as startOAuth2AuthorizationCodeConnection from "./start-oauth2-authorization-code-connection/index.js";
@@ -32,6 +36,26 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
     listIntegrationConnectionResources.route,
     listIntegrationConnectionResources.handler,
   );
+
+  routes.use(listIntegrationWebhookSources.route.path, requireAuthSession);
+  routes.openapi(listIntegrationWebhookSources.route, listIntegrationWebhookSources.handler);
+
+  routes.use(createIntegrationWebhookSource.route.path, requireAuthSession);
+  routes.openapi(createIntegrationWebhookSource.route, createIntegrationWebhookSource.handler);
+
+  routes.on(
+    getIntegrationWebhookSource.route.method,
+    getIntegrationWebhookSource.route.path,
+    requireAuthSession,
+  );
+  routes.openapi(getIntegrationWebhookSource.route, getIntegrationWebhookSource.handler);
+
+  routes.on(
+    deleteIntegrationWebhookSource.route.method,
+    deleteIntegrationWebhookSource.route.path,
+    requireAuthSession,
+  );
+  routes.openapi(deleteIntegrationWebhookSource.route, deleteIntegrationWebhookSource.handler);
 
   routes.use(refreshIntegrationConnectionResources.route.path, requireAuthSession);
   routes.openapi(
