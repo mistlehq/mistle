@@ -6,6 +6,7 @@ import {
   HeadObjectCommand,
   type HeadObjectCommandOutput,
   PutObjectCommand,
+  type PutObjectCommandInput,
   type PutObjectCommandOutput,
   S3Client,
   type S3ClientConfig,
@@ -21,10 +22,8 @@ export type S3CompatibleObjectStoreConfig = {
 
 export type PutObjectInput = {
   objectKey: string;
-  body: Uint8Array;
-  contentType: string;
-  cacheControl?: string;
-};
+  Body: NonNullable<PutObjectCommandInput["Body"]>;
+} & Pick<PutObjectCommandInput, "ContentType" | "CacheControl">;
 
 export class S3CompatibleObjectStore {
   readonly #bucketName: string;
@@ -50,19 +49,19 @@ export class S3CompatibleObjectStore {
   }
 
   async putObject(input: PutObjectInput): Promise<PutObjectCommandOutput> {
-    return await this.#client.send(
+    return this.#client.send(
       new PutObjectCommand({
-        Body: input.body,
+        Body: input.Body,
         Bucket: this.#bucketName,
-        CacheControl: input.cacheControl,
-        ContentType: input.contentType,
+        CacheControl: input.CacheControl,
+        ContentType: input.ContentType,
         Key: input.objectKey,
       }),
     );
   }
 
   async headObject(objectKey: string): Promise<HeadObjectCommandOutput> {
-    return await this.#client.send(
+    return this.#client.send(
       new HeadObjectCommand({
         Bucket: this.#bucketName,
         Key: objectKey,
@@ -71,7 +70,7 @@ export class S3CompatibleObjectStore {
   }
 
   async readObject(objectKey: string): Promise<GetObjectCommandOutput> {
-    return await this.#client.send(
+    return this.#client.send(
       new GetObjectCommand({
         Bucket: this.#bucketName,
         Key: objectKey,
@@ -80,11 +79,15 @@ export class S3CompatibleObjectStore {
   }
 
   async deleteObject(objectKey: string): Promise<DeleteObjectCommandOutput> {
-    return await this.#client.send(
+    return this.#client.send(
       new DeleteObjectCommand({
         Bucket: this.#bucketName,
         Key: objectKey,
       }),
     );
+  }
+
+  destroy(): void {
+    this.#client.destroy();
   }
 }

@@ -3,9 +3,8 @@
 Shared S3-compatible object storage primitives for Mistle.
 
 Use this package instead of wiring AWS SDK S3 clients directly in app code. It
-provides a small storage boundary that binds a bucket and exposes a narrow
-subset of S3-compatible operations while staying close to the underlying AWS SDK
-response types.
+provides a bucket-bound S3-compatible client that exposes a narrow subset of
+operations while staying close to the underlying AWS SDK response types.
 
 ## Public API
 
@@ -33,8 +32,8 @@ const objectStore = new S3CompatibleObjectStore({
 
 await objectStore.putObject({
   objectKey: "avatars/users/usr_123/avatar.webp",
-  body: new TextEncoder().encode("hello"),
-  contentType: "image/webp",
+  Body: new TextEncoder().encode("hello"),
+  ContentType: "image/webp",
 });
 
 const object = await objectStore.readObject("avatars/users/usr_123/avatar.webp");
@@ -42,6 +41,8 @@ const object = await objectStore.readObject("avatars/users/usr_123/avatar.webp")
 const bytes = await object.Body?.transformToByteArray();
 
 await objectStore.deleteObject("avatars/users/usr_123/avatar.webp");
+
+objectStore.destroy();
 ```
 
 ## Design Constraints

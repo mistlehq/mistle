@@ -63,9 +63,9 @@ describe("S3-compatible object store integration", () => {
     });
 
     await objectStore.putObject({
-      body: objectBytes,
-      cacheControl: "public, max-age=60",
-      contentType: "image/webp",
+      Body: objectBytes,
+      CacheControl: "public, max-age=60",
+      ContentType: "image/webp",
       objectKey,
     });
 
