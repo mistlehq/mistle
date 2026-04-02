@@ -6,6 +6,22 @@ import { describe, expect, it } from "vitest";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 
 describe("WebhookAutomationTitleEditor", () => {
+  it("disables edit entry while saves are disabled", () => {
+    render(
+      <WebhookAutomationTitleEditor
+        errorMessage={undefined}
+        onCommit={() => {}}
+        saveDisabled={true}
+        title="Old automation name"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Edit automation name" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+  });
+
   it("resets edit state from a keyed remount when the title changes", () => {
     const { rerender } = render(
       <WebhookAutomationTitleEditor

@@ -9,16 +9,13 @@ export function WebhookAutomationTitleEditor(input: {
   return (
     <AutoSaveEditableHeading
       ariaLabel="Automation name"
+      disabled={input.saveDisabled}
       editButtonLabel="Edit automation name"
       key={input.title}
       initialValue={input.title}
       inputClassName="text-base font-medium"
       maxWidthClassName="max-w-4xl"
       onSave={async (nextValue) => {
-        if (input.saveDisabled) {
-          return;
-        }
-
         await input.onCommit(nextValue.trim());
       }}
       placeholder="Automation name"

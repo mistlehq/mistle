@@ -51,6 +51,7 @@ export type IntegrationConnectionDetailViewProps = {
   >;
   titleEditor?:
     | {
+        disabled: boolean;
         errorByConnectionId: Readonly<Record<string, string | undefined>>;
         onSave: (connectionId: string, draftValue: string) => Promise<void> | void;
       }
@@ -188,6 +189,7 @@ function EditableConnectionTitle(input: {
   return (
     <AutoSaveEditableHeading
       ariaLabel="Connection name"
+      disabled={input.titleEditor.disabled}
       editButtonLabel="Edit connection name"
       headingClassName="text-base font-semibold leading-tight"
       initialValue={input.connection.displayName}

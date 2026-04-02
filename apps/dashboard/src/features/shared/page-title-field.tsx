@@ -12,6 +12,7 @@ export function PageTitleField(input: {
   maxWidthClassName?: string;
   className?: string;
   autoFocus?: boolean;
+  disabled?: boolean;
   saveStatus?: AutoSaveInputVisualStatus;
   onBlur?: () => void;
   onChange: (nextValue: string) => void;
@@ -33,6 +34,7 @@ export function PageTitleField(input: {
         onChange={input.onChange}
         value={input.value}
         {...(input.autoFocus === undefined ? {} : { autoFocus: input.autoFocus })}
+        {...(input.disabled === undefined ? {} : { disabled: input.disabled })}
         {...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage })}
         {...(input.onBlur === undefined ? {} : { onBlur: input.onBlur })}
         {...(input.onKeyDown === undefined ? {} : { onKeyDown: input.onKeyDown })}

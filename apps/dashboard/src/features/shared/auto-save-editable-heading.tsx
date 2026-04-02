@@ -18,6 +18,7 @@ export type AutoSaveEditableHeadingProps = {
   initialValue: string;
   ariaLabel: string;
   editButtonLabel: string;
+  disabled?: boolean;
   placeholder?: string;
   maxWidthClassName?: string;
   headingTag?: "div" | "h1" | "h2";
@@ -37,6 +38,8 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
   const successVisibleDurationMs = input.successVisibleDurationMs ?? 2200;
   const successFadeDurationMs = input.successFadeDurationMs ?? 700;
   const scheduler = input.scheduler ?? systemScheduler;
+  const initialErrorKind = input.initialErrorState?.kind ?? null;
+  const initialErrorMessage = input.initialErrorState?.message ?? null;
   const [isEditing, setIsEditing] = useState(
     input.initiallyEditing ?? input.initialErrorState != null,
   );
@@ -51,12 +54,24 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
   const fadeEndTimeoutRef = useRef<TimerHandle | null>(null);
 
   useEffect(() => {
+    saveSequenceRef.current += 1;
+    clearPendingStatusTimeouts({
+      fadeEndTimeoutRef,
+      fadeStartTimeoutRef,
+      scheduler,
+    });
     setIsEditing(input.initiallyEditing ?? input.initialErrorState != null);
     setDraftValue(input.initialValue);
     setValue(input.initialValue);
     setErrorState(input.initialErrorState ?? null);
     setStatus("idle");
-  }, [input.initialErrorState, input.initialValue, input.initiallyEditing]);
+  }, [
+    initialErrorKind,
+    initialErrorMessage,
+    input.initialValue,
+    input.initiallyEditing,
+    scheduler,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -69,7 +84,7 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
   }, [scheduler]);
 
   async function handleCommit(): Promise<void> {
-    if (status === "saving") {
+    if (input.disabled === true || status === "saving") {
       return;
     }
 
@@ -153,6 +168,7 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
         autoFocus={true}
         fieldId="editable-heading-input"
         label={input.ariaLabel}
+        disabled={input.disabled === true || status === "saving"}
         onBlur={() => {
           void handleCommit();
         }}
@@ -201,7 +217,7 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
         </HeadingTag>
         <Button
           aria-label={input.editButtonLabel}
-          disabled={status === "saving"}
+          disabled={input.disabled === true || status === "saving"}
           onClick={() => {
             clearPendingStatusTimeouts({
               fadeEndTimeoutRef,

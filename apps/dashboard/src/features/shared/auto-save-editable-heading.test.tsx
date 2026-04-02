@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AutoSaveEditableHeading } from "./auto-save-editable-heading.js";
@@ -59,5 +60,150 @@ describe("AutoSaveEditableHeading", () => {
     });
 
     expect(screen.getByText("New Title")).toBeDefined();
+  });
+
+  it("does not allow edit entry while disabled", () => {
+    render(
+      <AutoSaveEditableHeading
+        ariaLabel="Heading"
+        disabled={true}
+        editButtonLabel="Edit heading"
+        initialValue="Repo Maintainer"
+        onSave={async () => {}}
+        validate={() => null}
+      />,
+    );
+
+    const editButton = screen.getByRole("button", { name: "Edit heading" });
+    expect(editButton).toHaveProperty("disabled", true);
+    expect(screen.queryByRole("textbox", { name: "Heading" })).toBeNull();
+  });
+
+  it("disables the input while saving", async () => {
+    let resolveSave: (() => void) | undefined;
+    render(
+      <AutoSaveEditableHeading
+        ariaLabel="Heading"
+        editButtonLabel="Edit heading"
+        initialValue="Repo Maintainer"
+        onSave={() =>
+          new Promise<void>((resolve) => {
+            resolveSave = resolve;
+          })
+        }
+        successFadeDurationMs={20}
+        successVisibleDurationMs={40}
+        validate={() => null}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit heading" }));
+    const input = screen.getByRole("textbox", { name: "Heading" });
+    fireEvent.change(input, { target: { value: "New Title" } });
+    fireEvent.blur(input);
+
+    expect(screen.getByRole("textbox", { name: "Heading" })).toHaveProperty("disabled", true);
+
+    const finishSave = resolveSave;
+    if (finishSave === undefined) {
+      throw new Error("Expected save resolver to be captured.");
+    }
+    finishSave();
+
+    return waitFor(() => {
+      expect(screen.queryByRole("textbox", { name: "Heading" })).toBeNull();
+    });
+  });
+
+  it("keeps retry text across rerenders with the same error message", () => {
+    function ErrorHarness(): React.JSX.Element {
+      const [revision, setRevision] = useState(0);
+
+      return (
+        <div>
+          <button
+            onClick={() => {
+              setRevision((current) => current + 1);
+            }}
+            type="button"
+          >
+            Rerender
+          </button>
+          <AutoSaveEditableHeading
+            ariaLabel="Heading"
+            editButtonLabel="Edit heading"
+            initialErrorState={{
+              kind: "save",
+              message: "Could not update heading.",
+            }}
+            initialValue="Repo Maintainer"
+            initiallyEditing={true}
+            onSave={async () => {}}
+            validate={() => null}
+          />
+          <span>{revision}</span>
+        </div>
+      );
+    }
+
+    render(<ErrorHarness />);
+
+    const input = screen.getByRole("textbox", { name: "Heading" });
+    fireEvent.change(input, { target: { value: "Retry Title" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rerender" }));
+
+    expect(screen.getByDisplayValue("Retry Title")).toBeDefined();
+  });
+
+  it("ignores a stale save result after the parent resets the value", async () => {
+    let resolveSave: (() => void) | undefined;
+
+    function ResetHarness(): React.JSX.Element {
+      const [value, setValue] = useState("Repo Maintainer");
+
+      return (
+        <div>
+          <button
+            onClick={() => {
+              setValue("Server Title");
+            }}
+            type="button"
+          >
+            Reset
+          </button>
+          <AutoSaveEditableHeading
+            ariaLabel="Heading"
+            editButtonLabel="Edit heading"
+            initialValue={value}
+            onSave={() =>
+              new Promise<void>((resolve) => {
+                resolveSave = resolve;
+              })
+            }
+            validate={() => null}
+          />
+        </div>
+      );
+    }
+
+    render(<ResetHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit heading" }));
+    const input = screen.getByRole("textbox", { name: "Heading" });
+    fireEvent.change(input, { target: { value: "Client Title" } });
+    fireEvent.blur(input);
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+
+    const finishSave = resolveSave;
+    if (finishSave === undefined) {
+      throw new Error("Expected save resolver to be captured.");
+    }
+    finishSave();
+
+    await waitFor(() => {
+      expect(screen.getByText("Server Title")).toBeDefined();
+    });
+
+    expect(screen.queryByText("Client Title")).toBeNull();
   });
 });

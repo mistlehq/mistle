@@ -152,6 +152,7 @@ describe("IntegrationConnectionDetailView", () => {
           },
         ]}
         titleEditor={{
+          disabled: false,
           errorByConnectionId: {},
           onSave: async () => {},
         }}

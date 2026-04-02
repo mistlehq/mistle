@@ -93,6 +93,7 @@ export function useCreateSandboxProfileMetaState(input: CommonInput): {
 export function useEditSandboxProfileMetaState(input: EditInput): {
   formState: SandboxProfileEditorFormState;
   pageTitle: string;
+  isUpdating: boolean;
   onDisplayNameChange: (nextValue: string) => void;
   onProfileNameSave: (nextValue: string) => Promise<void>;
 } {
@@ -131,6 +132,7 @@ export function useEditSandboxProfileMetaState(input: EditInput): {
       displayName,
     },
     pageTitle: editTitleProfileName,
+    isUpdating: updateMutation.isPending,
     onDisplayNameChange: (nextValue) => {
       setDisplayName(nextValue);
     },

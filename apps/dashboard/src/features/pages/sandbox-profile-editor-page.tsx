@@ -575,6 +575,7 @@ function LoadedSandboxProfileMetaSection(input: {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <AutoSaveEditableHeading
           ariaLabel="Profile name"
+          disabled={metaState.isUpdating}
           editButtonLabel="Edit profile name"
           initialValue={metaState.pageTitle}
           onSave={metaState.onProfileNameSave}

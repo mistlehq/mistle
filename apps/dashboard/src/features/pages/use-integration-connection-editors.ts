@@ -159,6 +159,7 @@ export function useIntegrationConnectionEditors(input: {
       input.connections.length === 0
         ? undefined
         : {
+            disabled: updateConnectionNameMutation.isPending,
             errorByConnectionId: connectionNameErrorById,
             onSave: async (connectionId: string, draftValue: string) => {
               const editingConnection =
