@@ -352,6 +352,18 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
         return;
       }
 
+      if (!update.docChanged && update.selectionSet) {
+        if (activeSuggestionStateRef.current !== null) {
+          setActiveSuggestionState(null);
+        }
+        setSelectedSuggestionIndex(0);
+        setSuggestionPopoverPosition((currentPosition) =>
+          currentPosition === null ? currentPosition : null,
+        );
+        setSuggestionInteractionMode("pointer");
+        return;
+      }
+
       if (input.disabled) {
         if (activeSuggestionStateRef.current !== null) {
           setActiveSuggestionState(null);

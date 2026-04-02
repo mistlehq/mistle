@@ -21,6 +21,10 @@ function resolveTemplateTokenContext(input: {
     return null;
   }
 
+  if (input.cursorOffset < openingOffset + 2) {
+    return null;
+  }
+
   const closingBeforeCursor = input.documentText.indexOf("}}", openingOffset);
   if (closingBeforeCursor >= 0 && closingBeforeCursor < input.cursorOffset) {
     return null;
@@ -32,6 +36,7 @@ function resolveTemplateTokenContext(input: {
   }
 
   let replaceEnd = input.cursorOffset;
+  let hasTrailingPathCharacters = false;
   while (replaceEnd < input.documentText.length) {
     const currentCharacter = input.documentText[replaceEnd] ?? "";
     if (currentCharacter === "}" && input.documentText[replaceEnd + 1] === "}") {
@@ -43,7 +48,12 @@ function resolveTemplateTokenContext(input: {
       break;
     }
 
+    hasTrailingPathCharacters = true;
     replaceEnd += 1;
+  }
+
+  if (hasTrailingPathCharacters) {
+    return null;
   }
 
   return {
