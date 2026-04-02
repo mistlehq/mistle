@@ -13,8 +13,8 @@ export {
   parseSandboxTelemetryLogLine,
   toSandboxTelemetryLogRecord,
 } from "./sandbox-telemetry-log-line.js";
+export { SandboxTelemetryResetError } from "./errors.js";
 export { SandboxTelemetryLogLineDecoder } from "./sandbox-telemetry-log-line-decoder.js";
-export { SandboxTelemetryResetError } from "./sandbox-telemetry-reset-error.js";
 export { SandboxTelemetryIngressService } from "./sandbox-telemetry-ingress-service.js";
 export type {
   SandboxTelemetryIngressSink,

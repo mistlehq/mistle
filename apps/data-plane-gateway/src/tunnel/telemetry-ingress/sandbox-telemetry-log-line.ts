@@ -1,7 +1,7 @@
 import { SeverityNumber, type LogRecord } from "@mistle/telemetry";
 import type { Clock } from "@mistle/time";
 
-import { SandboxTelemetryResetError } from "./sandbox-telemetry-reset-error.js";
+import { SandboxTelemetryResetError } from "./errors.js";
 
 type SandboxTelemetryLogLevel = "info" | "warn" | "error";
 type SandboxTelemetryLogValue = string | number | boolean | null;
@@ -15,10 +15,11 @@ type ParsedSandboxTelemetryLogLine = {
 const InvalidTelemetryLogShapeMessage =
   "Telemetry log line does not match mistle.sandbox-runtime.log.v1.";
 const ReservedSandboxTelemetryFields = new Set(["timestamp", "level", "event"]);
-
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+const SeverityNumberByLevel = {
+  info: SeverityNumber.INFO,
+  warn: SeverityNumber.WARN,
+  error: SeverityNumber.ERROR,
+} satisfies Record<SandboxTelemetryLogLevel, SeverityNumber>;
 
 function isSandboxTelemetryLogValue(value: unknown): value is SandboxTelemetryLogValue {
   return (
@@ -29,21 +30,20 @@ function isSandboxTelemetryLogValue(value: unknown): value is SandboxTelemetryLo
   );
 }
 
-function toInvalidTelemetryLogShapeError(): SandboxTelemetryResetError {
-  return new SandboxTelemetryResetError({
-    code: "invalid_telemetry_log_shape",
-    message: InvalidTelemetryLogShapeMessage,
-  });
-}
-
 function parseTimestamp(rawTimestamp: unknown): Date {
   if (typeof rawTimestamp !== "string") {
-    throw toInvalidTelemetryLogShapeError();
+    throw new SandboxTelemetryResetError({
+      code: "invalid_telemetry_log_shape",
+      message: InvalidTelemetryLogShapeMessage,
+    });
   }
 
   const timestamp = new Date(rawTimestamp);
   if (Number.isNaN(timestamp.getTime())) {
-    throw toInvalidTelemetryLogShapeError();
+    throw new SandboxTelemetryResetError({
+      code: "invalid_telemetry_log_shape",
+      message: InvalidTelemetryLogShapeMessage,
+    });
   }
 
   return timestamp;
@@ -54,37 +54,21 @@ function parseLevel(rawLevel: unknown): SandboxTelemetryLogLevel {
     return rawLevel;
   }
 
-  throw toInvalidTelemetryLogShapeError();
+  throw new SandboxTelemetryResetError({
+    code: "invalid_telemetry_log_shape",
+    message: InvalidTelemetryLogShapeMessage,
+  });
 }
 
 function parseEvent(rawEvent: unknown): string {
   if (typeof rawEvent !== "string" || rawEvent.trim().length === 0) {
-    throw toInvalidTelemetryLogShapeError();
+    throw new SandboxTelemetryResetError({
+      code: "invalid_telemetry_log_shape",
+      message: InvalidTelemetryLogShapeMessage,
+    });
   }
 
   return rawEvent;
-}
-
-function toSeverityNumber(level: SandboxTelemetryLogLevel): SeverityNumber {
-  switch (level) {
-    case "info":
-      return SeverityNumber.INFO;
-    case "warn":
-      return SeverityNumber.WARN;
-    case "error":
-      return SeverityNumber.ERROR;
-  }
-}
-
-function toSeverityText(level: SandboxTelemetryLogLevel): "INFO" | "WARN" | "ERROR" {
-  switch (level) {
-    case "info":
-      return "INFO";
-    case "warn":
-      return "WARN";
-    case "error":
-      return "ERROR";
-  }
 }
 
 export function parseSandboxTelemetryLogLine(line: string): ParsedSandboxTelemetryLogLine {
@@ -93,11 +77,17 @@ export function parseSandboxTelemetryLogLine(line: string): ParsedSandboxTelemet
   try {
     parsedValue = JSON.parse(line);
   } catch {
-    throw toInvalidTelemetryLogShapeError();
+    throw new SandboxTelemetryResetError({
+      code: "invalid_telemetry_log_shape",
+      message: InvalidTelemetryLogShapeMessage,
+    });
   }
 
-  if (!isObjectRecord(parsedValue)) {
-    throw toInvalidTelemetryLogShapeError();
+  if (typeof parsedValue !== "object" || parsedValue === null || Array.isArray(parsedValue)) {
+    throw new SandboxTelemetryResetError({
+      code: "invalid_telemetry_log_shape",
+      message: InvalidTelemetryLogShapeMessage,
+    });
   }
 
   const extraFields: Record<string, SandboxTelemetryLogValue> = {};
@@ -107,7 +97,10 @@ export function parseSandboxTelemetryLogLine(line: string): ParsedSandboxTelemet
     }
 
     if (!isSandboxTelemetryLogValue(fieldValue)) {
-      throw toInvalidTelemetryLogShapeError();
+      throw new SandboxTelemetryResetError({
+        code: "invalid_telemetry_log_shape",
+        message: InvalidTelemetryLogShapeMessage,
+      });
     }
 
     extraFields[fieldName] = fieldValue;
@@ -141,11 +134,13 @@ export function toSandboxTelemetryLogRecord(input: {
     attributes[`mistle.sandbox.log.${fieldName}`] = fieldValue;
   }
 
+  const severityText = input.logLine.level.toUpperCase();
+
   return {
     timestamp: input.logLine.timestamp,
     observedTimestamp: input.clock.nowDate(),
-    severityNumber: toSeverityNumber(input.logLine.level),
-    severityText: toSeverityText(input.logLine.level),
+    severityNumber: SeverityNumberByLevel[input.logLine.level],
+    severityText,
     eventName: input.logLine.event,
     body: input.logLine.event,
     attributes,

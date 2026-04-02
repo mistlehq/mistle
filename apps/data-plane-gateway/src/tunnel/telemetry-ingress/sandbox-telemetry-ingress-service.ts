@@ -12,11 +12,11 @@ import {
   BootstrapTelemetrySession,
   type ActiveBootstrapTelemetryStream,
 } from "./bootstrap-telemetry-session.js";
+import { SandboxTelemetryResetError } from "./errors.js";
 import type {
   SandboxTelemetryIngressSink,
   SandboxTelemetryIngressStream,
 } from "./sandbox-telemetry-ingress-sink.js";
-import { SandboxTelemetryResetError } from "./sandbox-telemetry-reset-error.js";
 import { createTelemetryOpenError, createTelemetryReset } from "./telemetry-control-messages.js";
 
 type TelemetryControlMessage =

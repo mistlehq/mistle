@@ -1,4 +1,4 @@
-import { SandboxTelemetryResetError } from "./sandbox-telemetry-reset-error.js";
+import { SandboxTelemetryResetError } from "./errors.js";
 
 const LineDelimiterByte = 0x0a;
 const MaxTelemetryLineBytes = 64 * 1024;
