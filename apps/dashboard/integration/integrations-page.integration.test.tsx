@@ -89,6 +89,13 @@ describe("IntegrationsPage resource refresh concurrency", () => {
                       id: "github-app-installation",
                       label: "GitHub App installation",
                       kind: "redirect",
+                      ui: {
+                        create: {
+                          submitLabel: "Install GitHub App",
+                          helperText:
+                            "Continue to GitHub to install the app and finish connecting this account.",
+                        },
+                      },
                     },
                   ],
                   targetHealth: {
@@ -287,6 +294,13 @@ describe("IntegrationsPage resource refresh concurrency", () => {
                       id: "github-app-installation",
                       label: "GitHub App installation",
                       kind: "redirect",
+                      ui: {
+                        create: {
+                          submitLabel: "Install GitHub App",
+                          helperText:
+                            "Continue to GitHub to install the app and finish connecting this account.",
+                        },
+                      },
                     },
                   ],
                   targetHealth: {

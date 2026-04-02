@@ -1808,6 +1808,12 @@ export interface paths {
                       /** @enum {string} */
                       kind: "redirect";
                       label: string;
+                      ui: {
+                        create: {
+                          helperText: string;
+                          submitLabel: string;
+                        };
+                      };
                     }
                 )[];
                 description: string;

@@ -117,6 +117,22 @@ function resolveSelectedMethod(input: {
   return input.dialog.methods.find((method) => method.id === input.methodId) ?? null;
 }
 
+function resolveCreateSubmitLabel(method: IntegrationConnectionMethod | null): string {
+  if (method?.kind === "redirect") {
+    return method.ui.create.submitLabel;
+  }
+
+  return "Create connection";
+}
+
+function renderRedirectCreateHelper(method: IntegrationConnectionMethod | null) {
+  if (method?.kind !== "redirect") {
+    return null;
+  }
+
+  return <Notice>{method.ui.create.helperText}</Notice>;
+}
+
 export function IntegrationConnectionDialog(props: IntegrationConnectionDialogProps) {
   const dialog = props.dialog;
   const isUpdateMode = dialog?.mode === "update";
@@ -248,7 +264,7 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
           ) : props.configForm.mode === "unsupported" ? (
             <p className="text-destructive text-sm">{props.configForm.message}</p>
           ) : !isUpdateMode ? (
-            <Notice>Continue to start the connection flow.</Notice>
+            renderRedirectCreateHelper(selectedMethod)
           ) : (
             <p className="text-muted-foreground text-sm">Save to update this connection.</p>
           )}
@@ -266,11 +282,7 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
               onClick={props.onSubmit}
               type="button"
             >
-              {isUpdateMode
-                ? "Save"
-                : selectedMethod?.kind === "form"
-                  ? "Create connection"
-                  : "Continue"}
+              {isUpdateMode ? "Save" : resolveCreateSubmitLabel(selectedMethod)}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -9,6 +9,13 @@ export const KeysetPageSchema = z
   })
   .strict();
 
+const IntegrationConnectionMethodCreateUiSchema = z
+  .object({
+    submitLabel: z.string().min(1),
+    helperText: z.string().min(1),
+  })
+  .strict();
+
 export const IntegrationTargetSchema = z
   .object({
     targetKey: z.string().min(1),
@@ -47,6 +54,11 @@ export const IntegrationTargetSchema = z
               id: z.string().min(1),
               label: z.string().min(1),
               kind: z.literal("redirect"),
+              ui: z
+                .object({
+                  create: IntegrationConnectionMethodCreateUiSchema,
+                })
+                .strict(),
             })
             .strict(),
         ]),

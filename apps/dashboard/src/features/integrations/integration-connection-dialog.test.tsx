@@ -30,6 +30,12 @@ const createDialog: IntegrationConnectionDialogState = {
       id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       label: "GitHub App installation",
       kind: "redirect",
+      ui: {
+        create: {
+          submitLabel: "Install GitHub App",
+          helperText: "Continue to GitHub to install the app and finish connecting this account.",
+        },
+      },
     },
   ],
   mode: "create",
@@ -224,6 +230,13 @@ describe("IntegrationConnectionDialog", () => {
             id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
             label: "GitHub App installation",
             kind: "redirect",
+            ui: {
+              create: {
+                submitLabel: "Install GitHub App",
+                helperText:
+                  "Continue to GitHub to install the app and finish connecting this account.",
+              },
+            },
           },
           initialConnectionDisplayName: "Existing GitHub App installation connection",
           mode: "update",
@@ -275,6 +288,13 @@ describe("IntegrationConnectionDialog", () => {
             id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
             label: "GitHub App installation",
             kind: "redirect",
+            ui: {
+              create: {
+                submitLabel: "Install GitHub App",
+                helperText:
+                  "Continue to GitHub to install the app and finish connecting this account.",
+              },
+            },
           },
           initialConnectionDisplayName: "Existing GitHub App installation connection",
           mode: "update",
@@ -430,6 +450,39 @@ describe("IntegrationConnectionDialog", () => {
     expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
     expect(screen.getByPlaceholderText("Enter API key")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Create connection" })).toBeTruthy();
+  });
+
+  it("renders method-defined redirect create copy", () => {
+    render(
+      <IntegrationConnectionDialog
+        configForm={{
+          mode: "none",
+        }}
+        configValue={{}}
+        connectionDisplayNamePlaceholder="GitHub connection"
+        connectionDisplayNameValue=""
+        connectError={null}
+        dialog={createDialog}
+        hasChanges={true}
+        isConnectionDisplayNameChanged={false}
+        isSecretChanged={false}
+        methodId={IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION}
+        onClose={() => {}}
+        onConfigChange={() => {}}
+        onConnectionDisplayNameChange={() => {}}
+        onMethodChange={() => {}}
+        onSecretChange={() => {}}
+        onSubmit={() => {}}
+        pending={false}
+        secrets={{}}
+      />,
+    );
+
+    expect(
+      screen.getByText("Continue to GitHub to install the app and finish connecting this account."),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Install GitHub App" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
   });
 
   it("does not throw while resolving Atlassian personal token fields for an incomplete site url", () => {
