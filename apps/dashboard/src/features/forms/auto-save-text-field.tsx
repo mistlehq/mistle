@@ -3,15 +3,18 @@ import { Field, FieldContent, FieldDescription, FieldHeader, FieldLabel } from "
 import { useEffect, useRef, useState } from "react";
 
 import {
+  clearPendingStatusTimeouts,
+  getErrorMessage,
+  scheduleSavedStateReset,
+  type AutoSaveErrorState,
+} from "../shared/auto-save-behavior.js";
+import {
   AutoSaveInputSurface,
   type AutoSaveInputVisualStatus,
 } from "../shared/auto-save-input-surface.js";
 
 type AutoSaveStatus = AutoSaveInputVisualStatus;
-export type AutoSaveTextFieldErrorState = {
-  kind: "validation" | "save";
-  message: string;
-};
+export type AutoSaveTextFieldErrorState = AutoSaveErrorState;
 
 export type AutoSaveTextFieldProps = {
   id: string;
@@ -157,51 +160,4 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
       </FieldContent>
     </Field>
   );
-}
-
-function scheduleSavedStateReset(input: {
-  successVisibleDurationMs: number;
-  successFadeDurationMs: number;
-  fadeStartTimeoutRef: { current: TimerHandle | null };
-  fadeEndTimeoutRef: { current: TimerHandle | null };
-  onFadeStart: () => void;
-  onFadeEnd: () => void;
-  scheduler: Scheduler;
-}): void {
-  const fadeStartDelayMs = Math.max(
-    0,
-    input.successVisibleDurationMs - input.successFadeDurationMs,
-  );
-
-  input.fadeStartTimeoutRef.current = input.scheduler.schedule(() => {
-    input.onFadeStart();
-  }, fadeStartDelayMs);
-
-  input.fadeEndTimeoutRef.current = input.scheduler.schedule(() => {
-    input.onFadeEnd();
-  }, input.successVisibleDurationMs);
-}
-
-function clearPendingStatusTimeouts(input: {
-  fadeStartTimeoutRef: { current: TimerHandle | null };
-  fadeEndTimeoutRef: { current: TimerHandle | null };
-  scheduler: Scheduler;
-}): void {
-  if (input.fadeStartTimeoutRef.current !== null) {
-    input.scheduler.cancel(input.fadeStartTimeoutRef.current);
-    input.fadeStartTimeoutRef.current = null;
-  }
-
-  if (input.fadeEndTimeoutRef.current !== null) {
-    input.scheduler.cancel(input.fadeEndTimeoutRef.current);
-    input.fadeEndTimeoutRef.current = null;
-  }
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Could not save changes.";
 }
