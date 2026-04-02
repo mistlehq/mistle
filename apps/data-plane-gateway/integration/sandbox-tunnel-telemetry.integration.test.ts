@@ -63,7 +63,7 @@ async function connectBootstrapSocket(input: {
 
 describe("sandbox tunnel telemetry ingress integration", () => {
   it(
-    "returns telemetry.open.error until the gateway telemetry sink is configured",
+    "accepts telemetry.open with the gateway local no-op sink",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -87,10 +87,9 @@ describe("sandbox tunnel telemetry ingress integration", () => {
 
       await expect(waitForWebSocketMessage(bootstrapSocket)).resolves.toEqual({
         data: JSON.stringify({
-          type: "telemetry.open.error",
+          type: "telemetry.open.ok",
           streamId: 41,
-          code: "telemetry_sink_open_failed",
-          message: "Sandbox telemetry sink is not configured on this gateway.",
+          initialWindowBytes: 65536,
         }),
         isBinary: false,
       });

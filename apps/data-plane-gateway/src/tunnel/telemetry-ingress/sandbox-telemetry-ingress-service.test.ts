@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { NoopSandboxTelemetryIngressSink } from "./noop-sandbox-telemetry-ingress-sink.js";
 import { SandboxTelemetryIngressService } from "./sandbox-telemetry-ingress-service.js";
-import { UnimplementedSandboxTelemetryIngressSink } from "./unimplemented-sandbox-telemetry-ingress-sink.js";
 
 describe("SandboxTelemetryIngressService", () => {
-  it("returns telemetry.open.error when the gateway sink is not configured", async () => {
-    const service = new SandboxTelemetryIngressService(
-      new UnimplementedSandboxTelemetryIngressSink(),
-    );
+  it("accepts telemetry.open with the local no-op sink", async () => {
+    const service = new SandboxTelemetryIngressService(new NoopSandboxTelemetryIngressSink());
     const sentMessages: unknown[] = [];
 
     await service.handleDelivery({
@@ -29,18 +27,15 @@ describe("SandboxTelemetryIngressService", () => {
 
     expect(sentMessages).toEqual([
       {
-        type: "telemetry.open.error",
+        type: "telemetry.open.ok",
         streamId: 41,
-        code: "telemetry_sink_open_failed",
-        message: "Sandbox telemetry sink is not configured on this gateway.",
+        initialWindowBytes: 65536,
       },
     ]);
   });
 
   it("resets data frames for telemetry streams that are not attached", async () => {
-    const service = new SandboxTelemetryIngressService(
-      new UnimplementedSandboxTelemetryIngressSink(),
-    );
+    const service = new SandboxTelemetryIngressService(new NoopSandboxTelemetryIngressSink());
     const sentMessages: unknown[] = [];
 
     await service.handleDelivery({

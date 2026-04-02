@@ -3,21 +3,18 @@ import type {
   SandboxTelemetryIngressStream,
 } from "./sandbox-telemetry-ingress-sink.js";
 
-const UnimplementedTelemetrySinkMessage =
-  "Sandbox telemetry sink is not configured on this gateway.";
-
-export class UnimplementedSandboxTelemetryIngressSink implements SandboxTelemetryIngressSink {
+export class NoopSandboxTelemetryIngressSink implements SandboxTelemetryIngressSink {
   public async openStream(_input: SandboxTelemetryIngressStream): Promise<void> {
-    throw new Error(UnimplementedTelemetrySinkMessage);
+    return;
   }
 
   public async append(
     _input: SandboxTelemetryIngressStream & { payload: Uint8Array },
   ): Promise<void> {
-    throw new Error(UnimplementedTelemetrySinkMessage);
+    return;
   }
 
   public async closeStream(_input: SandboxTelemetryIngressStream): Promise<void> {
-    throw new Error(UnimplementedTelemetrySinkMessage);
+    return;
   }
 }

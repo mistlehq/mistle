@@ -72,8 +72,8 @@ describe("BootstrapTelemetrySession", () => {
       response: {
         type: "telemetry.open.error",
         streamId: 42,
-        code: "telemetry_signal_already_open",
-        message: "Telemetry signal 'logs' is already open on stream 41.",
+        code: "telemetry_stream_already_open",
+        message: "A logs telemetry stream is already active for this bootstrap session.",
       },
     });
   });
@@ -174,8 +174,8 @@ describe("BootstrapTelemetrySession", () => {
       response: {
         type: "telemetry.reset",
         streamId: 41,
-        code: "invalid_telemetry_data",
-        message: "Telemetry stream 41 only accepts raw-bytes frames, received payload kind 2.",
+        code: "invalid_telemetry_payload_kind",
+        message: "Telemetry streams only accept raw-bytes payloads.",
       },
       stream: {
         format: "mistle.sandbox-runtime.log.v1",

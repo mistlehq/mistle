@@ -68,8 +68,8 @@ export class BootstrapTelemetrySession {
       return {
         kind: "error",
         response: createTelemetryOpenError({
-          code: "telemetry_signal_already_open",
-          message: `Telemetry signal '${input.signal}' is already open on stream ${String(existingSignalStreamId)}.`,
+          code: "telemetry_stream_already_open",
+          message: `A logs telemetry stream is already active for this bootstrap session.`,
           streamId: input.streamId,
         }),
       };
@@ -187,8 +187,8 @@ export class BootstrapTelemetrySession {
 
     return {
       response: createTelemetryReset({
-        code: "invalid_telemetry_data",
-        message: `Telemetry stream ${String(input.streamId)} only accepts raw-bytes frames, received payload kind ${String(input.payloadKind)}.`,
+        code: "invalid_telemetry_payload_kind",
+        message: "Telemetry streams only accept raw-bytes payloads.",
         streamId: input.streamId,
       }),
       stream,

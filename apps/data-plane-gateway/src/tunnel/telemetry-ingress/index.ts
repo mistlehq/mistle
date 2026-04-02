@@ -10,4 +10,4 @@ export type {
   SandboxTelemetryIngressSink,
   SandboxTelemetryIngressStream,
 } from "./sandbox-telemetry-ingress-sink.js";
-export { UnimplementedSandboxTelemetryIngressSink } from "./unimplemented-sandbox-telemetry-ingress-sink.js";
+export { NoopSandboxTelemetryIngressSink } from "./noop-sandbox-telemetry-ingress-sink.js";
