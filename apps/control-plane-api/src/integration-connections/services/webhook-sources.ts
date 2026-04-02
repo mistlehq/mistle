@@ -19,6 +19,7 @@ import { eq } from "drizzle-orm";
 
 import { ensureImplicitTargetWebhookSource } from "../../integration-webhook-sources/services/ensure-implicit-target-webhook-source.js";
 import {
+  decryptIntegrationConnectionSecrets,
   encryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
@@ -55,6 +56,11 @@ type ConnectionWithTarget = {
   targetKey: string;
   displayName: string;
   config: Record<string, unknown> | null;
+  secrets: {
+    ciphertext: string;
+    nonce: string;
+    masterKeyVersion: number;
+  } | null;
   target: {
     targetKey: string;
     familyId: string;
@@ -121,8 +127,29 @@ async function resolveConnectionWithTargetOrThrow(input: {
     targetKey: connection.targetKey,
     displayName: connection.displayName,
     config: connection.config,
+    secrets: connection.secrets,
     target: connection.target,
   };
+}
+
+function resolveConnectionSecretsOrThrow(input: {
+  connection: ConnectionWithTarget;
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+}): Record<string, string> {
+  if (input.connection.secrets === null) {
+    return {};
+  }
+
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: input.connection.secrets.masterKeyVersion,
+    masterEncryptionKeys: input.integrationsConfig.masterEncryptionKeys,
+  });
+
+  return decryptIntegrationConnectionSecrets({
+    nonce: input.connection.secrets.nonce,
+    ciphertext: input.connection.secrets.ciphertext,
+    masterEncryptionKeyMaterial,
+  });
 }
 
 function resolveWebhookSourceCapabilityOrThrow(input: {
@@ -199,7 +226,7 @@ function toWebhookSourceListItem(input: {
 }
 
 async function resolveWebhookSourceDescriptor(input: {
-  definition: AnyIntegrationDefinition;
+  controlPlaneBaseUrl: string;
   webhookSourceCapability: NonNullable<AnyIntegrationDefinition["webhookSource"]>;
   parsedTargetConfig: unknown;
   parsedTargetSecrets: unknown;
@@ -209,6 +236,7 @@ async function resolveWebhookSourceDescriptor(input: {
   const descriptor = await input.webhookSourceCapability.describeSource({
     organizationId: input.connection.organizationId,
     targetKey: input.connection.targetKey,
+    controlPlaneBaseUrl: input.controlPlaneBaseUrl,
     target: {
       familyId: input.connection.target.familyId,
       variantId: input.connection.target.variantId,
@@ -347,6 +375,7 @@ export async function listIntegrationWebhookSources(
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
     integrationsConfig: AppContext["var"]["config"]["integrations"];
+    controlPlaneBaseUrl: string;
   },
   input: {
     organizationId: string;
@@ -381,10 +410,7 @@ export async function listIntegrationWebhookSources(
       routingStrategy: webhookSourceCapability.routingStrategy,
     });
     const descriptor = await resolveWebhookSourceDescriptor({
-      definition: ctx.integrationRegistry.getDefinitionOrThrow({
-        familyId: connection.target.familyId,
-        variantId: connection.target.variantId,
-      }),
+      controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
       webhookSourceCapability,
       parsedTargetConfig,
       parsedTargetSecrets,
@@ -404,17 +430,12 @@ export async function listIntegrationWebhookSources(
     orderBy: (table, { asc }) => [asc(table.createdAt), asc(table.id)],
   });
 
-  const definitionWithSource = ctx.integrationRegistry.getDefinitionOrThrow({
-    familyId: connection.target.familyId,
-    variantId: connection.target.variantId,
-  });
-
   return Promise.all(
     sources.map(async (source) =>
       toWebhookSourceListItem({
         source,
         descriptor: await resolveWebhookSourceDescriptor({
-          definition: definitionWithSource,
+          controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
           webhookSourceCapability,
           parsedTargetConfig,
           parsedTargetSecrets,
@@ -431,6 +452,7 @@ export async function getIntegrationWebhookSource(
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
     integrationsConfig: AppContext["var"]["config"]["integrations"];
+    controlPlaneBaseUrl: string;
   },
   input: {
     organizationId: string;
@@ -454,12 +476,8 @@ export async function getIntegrationWebhookSource(
     connection,
     webhookSourceId: input.webhookSourceId,
   });
-  const definition = ctx.integrationRegistry.getDefinitionOrThrow({
-    familyId: connection.target.familyId,
-    variantId: connection.target.variantId,
-  });
   const descriptor = await resolveWebhookSourceDescriptor({
-    definition,
+    controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
     webhookSourceCapability,
     parsedTargetConfig,
     parsedTargetSecrets,
@@ -475,6 +493,7 @@ export async function createIntegrationWebhookSource(
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
     integrationsConfig: AppContext["var"]["config"]["integrations"];
+    controlPlaneBaseUrl: string;
   },
   input: {
     organizationId: string;
@@ -487,7 +506,7 @@ export async function createIntegrationWebhookSource(
     organizationId: input.organizationId,
     connectionId: input.connectionId,
   });
-  const { definition, webhookSourceCapability, parsedTargetConfig, parsedTargetSecrets } =
+  const { webhookSourceCapability, parsedTargetConfig, parsedTargetSecrets } =
     resolveWebhookSourceCapabilityOrThrow({
       integrationRegistry: ctx.integrationRegistry,
       integrationsConfig: ctx.integrationsConfig,
@@ -520,6 +539,10 @@ export async function createIntegrationWebhookSource(
   const webhookSecret = generateWebhookSecret();
   const endpointKey =
     webhookSourceCapability.routingStrategy === "path" ? generateEndpointKey() : undefined;
+  const connectionSecrets = resolveConnectionSecretsOrThrow({
+    connection,
+    integrationsConfig: ctx.integrationsConfig,
+  });
 
   const createdSource = await ctx.db.transaction(async (tx) => {
     const webhookSecretCredentialId = await createWebhookSecretCredential({
@@ -549,36 +572,52 @@ export async function createIntegrationWebhookSource(
       throw new Error("Failed to create integration webhook source.");
     }
 
-    const registration = await createRegistration({
-      organizationId: input.organizationId,
-      targetKey: connection.targetKey,
-      target: {
-        familyId: connection.target.familyId,
-        variantId: connection.target.variantId,
-        enabled: connection.target.enabled,
-        config: parsedTargetConfig,
-        secrets: parsedTargetSecrets,
-      },
-      connection: {
-        id: connection.id,
-        status: "active",
-        config: resolveConnectionConfigOrThrow({
-          connectionId: connection.id,
-          config: connection.config,
-        }),
-      },
-      source: {
-        id: insertedSource.id,
-        targetKey: insertedSource.targetKey ?? connection.targetKey,
-        ownerScope: insertedSource.ownerScope,
+    let registration;
+    try {
+      registration = await createRegistration({
         organizationId: input.organizationId,
-        integrationConnectionId: connection.id,
-        ...(insertedSource.displayName === null ? {} : { displayName: insertedSource.displayName }),
-        ...(insertedSource.endpointKey === null ? {} : { endpointKey: insertedSource.endpointKey }),
-        providerMetadata: insertedSource.providerMetadata,
-      },
-      webhookSecret,
-    });
+        targetKey: connection.targetKey,
+        controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
+        target: {
+          familyId: connection.target.familyId,
+          variantId: connection.target.variantId,
+          enabled: connection.target.enabled,
+          config: parsedTargetConfig,
+          secrets: parsedTargetSecrets,
+        },
+        connection: {
+          id: connection.id,
+          status: "active",
+          config: resolveConnectionConfigOrThrow({
+            connectionId: connection.id,
+            config: connection.config,
+          }),
+        },
+        connectionSecrets,
+        source: {
+          id: insertedSource.id,
+          targetKey: insertedSource.targetKey ?? connection.targetKey,
+          ownerScope: insertedSource.ownerScope,
+          organizationId: input.organizationId,
+          integrationConnectionId: connection.id,
+          ...(insertedSource.displayName === null
+            ? {}
+            : { displayName: insertedSource.displayName }),
+          ...(insertedSource.endpointKey === null
+            ? {}
+            : { endpointKey: insertedSource.endpointKey }),
+          providerMetadata: insertedSource.providerMetadata,
+        },
+        webhookSecret,
+      });
+    } catch (error) {
+      throw new BadRequestError(
+        IntegrationConnectionsBadRequestCodes.INVALID_WEBHOOK_SOURCE_INPUT,
+        error instanceof Error
+          ? error.message
+          : `Webhook source registration failed for '${connection.targetKey}'.`,
+      );
+    }
 
     const [updatedSource] = await tx
       .update(integrationWebhookSources)
@@ -601,7 +640,7 @@ export async function createIntegrationWebhookSource(
   });
 
   const descriptor = await resolveWebhookSourceDescriptor({
-    definition,
+    controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
     webhookSourceCapability,
     parsedTargetConfig,
     parsedTargetSecrets,
@@ -623,6 +662,7 @@ export async function deleteIntegrationWebhookSource(
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
     integrationsConfig: AppContext["var"]["config"]["integrations"];
+    controlPlaneBaseUrl: string;
   },
   input: {
     organizationId: string;
@@ -664,40 +704,54 @@ export async function deleteIntegrationWebhookSource(
   const deleteRegistration =
     webhookSourceCapability.deleteRegistration?.bind(webhookSourceCapability);
   if (deleteRegistration !== undefined) {
-    await deleteRegistration({
-      organizationId: input.organizationId,
-      targetKey: connection.targetKey,
-      target: {
-        familyId: connection.target.familyId,
-        variantId: connection.target.variantId,
-        enabled: connection.target.enabled,
-        config: parsedTargetConfig,
-        secrets: parsedTargetSecrets,
-      },
-      connection: {
-        id: connection.id,
-        status: "active",
-        config: resolveConnectionConfigOrThrow({
-          connectionId: connection.id,
-          config: connection.config,
+    try {
+      await deleteRegistration({
+        organizationId: input.organizationId,
+        targetKey: connection.targetKey,
+        controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
+        target: {
+          familyId: connection.target.familyId,
+          variantId: connection.target.variantId,
+          enabled: connection.target.enabled,
+          config: parsedTargetConfig,
+          secrets: parsedTargetSecrets,
+        },
+        connection: {
+          id: connection.id,
+          status: "active",
+          config: resolveConnectionConfigOrThrow({
+            connectionId: connection.id,
+            config: connection.config,
+          }),
+        },
+        connectionSecrets: resolveConnectionSecretsOrThrow({
+          connection,
+          integrationsConfig: ctx.integrationsConfig,
         }),
-      },
-      source: {
-        id: source.id,
-        targetKey: source.targetKey ?? connection.targetKey,
-        ownerScope: source.ownerScope,
-        ...(source.organizationId === null ? {} : { organizationId: source.organizationId }),
-        ...(source.integrationConnectionId === null
-          ? {}
-          : { integrationConnectionId: source.integrationConnectionId }),
-        ...(source.displayName === null ? {} : { displayName: source.displayName }),
-        ...(source.endpointKey === null ? {} : { endpointKey: source.endpointKey }),
-        ...(source.remoteRegistrationId === null
-          ? {}
-          : { remoteRegistrationId: source.remoteRegistrationId }),
-        providerMetadata: source.providerMetadata,
-      },
-    });
+        source: {
+          id: source.id,
+          targetKey: source.targetKey ?? connection.targetKey,
+          ownerScope: source.ownerScope,
+          ...(source.organizationId === null ? {} : { organizationId: source.organizationId }),
+          ...(source.integrationConnectionId === null
+            ? {}
+            : { integrationConnectionId: source.integrationConnectionId }),
+          ...(source.displayName === null ? {} : { displayName: source.displayName }),
+          ...(source.endpointKey === null ? {} : { endpointKey: source.endpointKey }),
+          ...(source.remoteRegistrationId === null
+            ? {}
+            : { remoteRegistrationId: source.remoteRegistrationId }),
+          providerMetadata: source.providerMetadata,
+        },
+      });
+    } catch (error) {
+      throw new BadRequestError(
+        IntegrationConnectionsBadRequestCodes.INVALID_WEBHOOK_SOURCE_INPUT,
+        error instanceof Error
+          ? error.message
+          : `Webhook source deletion failed for '${connection.targetKey}'.`,
+      );
+    }
   }
 
   await ctx.db.transaction(async (tx) => {

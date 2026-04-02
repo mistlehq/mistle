@@ -17,6 +17,7 @@ const routeHandler = async (
       db: ctx.get("db"),
       integrationRegistry: ctx.get("integrationRegistry"),
       integrationsConfig: ctx.get("config").integrations,
+      controlPlaneBaseUrl: ctx.get("config").auth.baseUrl,
     },
     {
       organizationId: session.activeOrganizationId,
