@@ -160,7 +160,6 @@ describe("parseConfigRecord", () => {
             docker: {
               socketPath: "/var/run/docker.sock",
               networkName: "mistle-sandbox-dev",
-              tracesEndpoint: "http://otel-lgtm:4318/v1/traces",
             },
           },
         },
@@ -355,7 +354,6 @@ describe("parseConfigRecord", () => {
             docker: {
               socketPath: "/var/run/docker.sock",
               networkName: "mistle-sandbox-dev",
-              tracesEndpoint: "http://otel-lgtm:4318/v1/traces",
             },
           },
         },

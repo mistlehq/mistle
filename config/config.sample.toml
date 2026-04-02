@@ -121,6 +121,13 @@ port = 8082
 url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 migration_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 
+[apps.data_plane_api.sandbox.docker]
+socket_path = "/var/run/docker.sock"
+
+# [apps.data_plane_api.sandbox.e2b]
+# api_key = "replace-with-e2b-api-key"
+# domain = "e2b.app"
+
 [apps.data_plane_api.workflow]
 database_url = "postgresql://mistle:replace-with-password@db:6432/mistle"
 namespace_id = "production"
