@@ -272,6 +272,10 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
                 },
               },
             },
+            telemetry: {
+              enabled: false,
+              debug: false,
+            },
           };
 
           const runtime = createDataPlaneGatewayRuntime(runtimeConfig);
