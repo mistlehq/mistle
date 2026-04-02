@@ -16,7 +16,11 @@ import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
 } from "./session-workbench-page-view.js";
-import { shouldShowResumeAction } from "./session-workbench-view-model.js";
+import {
+  hasSessionTopAlert,
+  resolveSessionWorkbenchHeaderStatusUi,
+  shouldShowResumeAction,
+} from "./session-workbench-view-model.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
 export function SessionWorkbenchPage(): React.JSX.Element {
@@ -44,17 +48,18 @@ function SessionWorkbenchPageContent(input: {
   const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
     ? "Return to chat"
     : (workbench.primaryPanelState.disabledReason ?? "Open Codex CLI");
+  const sandboxHeaderStatusUi = resolveSessionWorkbenchHeaderStatusUi({
+    sandboxLifecycleStatus: workbench.sandboxLifecycleStatus,
+    sandboxStatusReadState: workbench.sandboxStatusReadState,
+  });
   const showResumeButton = shouldShowResumeAction({
     requiresManualResume: workbench.stoppedSessionState.requiresManualResume,
   });
   const headerActions = useMemo(
     () => (
       <div className="flex items-center gap-2">
-        <Badge
-          className={workbench.sandboxHeaderStatusUi.className}
-          variant={workbench.sandboxHeaderStatusUi.variant}
-        >
-          {workbench.sandboxHeaderStatusUi.label}
+        <Badge className={sandboxHeaderStatusUi.className} variant={sandboxHeaderStatusUi.variant}>
+          {sandboxHeaderStatusUi.label}
         </Badge>
         <span aria-hidden className="h-5 w-px bg-stone-200" />
         {showResumeButton ? (
@@ -138,9 +143,9 @@ function SessionWorkbenchPageContent(input: {
       workbench.isResumingStoppedSandbox,
       workbench.ptyState.actions.disconnectPty,
       workbench.requestStoppedSandboxResume,
-      workbench.sandboxHeaderStatusUi.className,
-      workbench.sandboxHeaderStatusUi.label,
-      workbench.sandboxHeaderStatusUi.variant,
+      sandboxHeaderStatusUi.className,
+      sandboxHeaderStatusUi.label,
+      sandboxHeaderStatusUi.variant,
       workbench.terminalPanelState.closePanel,
       workbench.terminalPanelState.isVisible,
       workbench.terminalPanelState.openPanel,
@@ -225,6 +230,16 @@ function SessionWorkbenchPageContent(input: {
           : "Could not start Codex CLI."),
     });
   }
+  const hasTopAlert = hasSessionTopAlert({
+    hasSandboxStatusError: workbench.sandboxStatusQuery.isError,
+    lifecycleErrorMessage: workbench.lifecycleErrorMessage,
+    reconnectMessage:
+      workbench.primaryPanelState.transitionState === "stable_chat"
+        ? workbench.sessionReconnectState.message
+        : null,
+    sandboxFailureMessage: workbench.sandboxFailureMessage,
+    stoppedSessionMessage: workbench.stoppedSessionState.message,
+  });
   if (input.sandboxInstanceId === null) {
     return (
       <SessionWorkbenchPageView
@@ -258,7 +273,7 @@ function SessionWorkbenchPageContent(input: {
   return (
     <SessionWorkbenchPageView
       alerts={
-        workbench.hasTopAlert ||
+        hasTopAlert ||
         (workbench.primaryPanelState.transitionState === "stable_chat" &&
           workbench.primaryPanelState.error !== null)
           ? alerts

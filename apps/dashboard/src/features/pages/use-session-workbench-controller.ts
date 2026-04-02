@@ -8,23 +8,25 @@ import {
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
-import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
-import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 import {
-  getSandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   hasFreshSandboxStatusReadSinceRecoveryBoundary,
   isActiveResumeRequest,
-  reduceCodexRecoveryState,
   resolveAutomationSessionPreparationTimeoutDelayMs,
-  resolveCodexReconnectMessage,
-  resolveSessionEntryPhase,
-  resolveStoppedSessionMessageForEntryPhase,
-  seedSandboxInstanceStatusQuery,
+  resolveStoppedSessionMessageForWorkbenchEntryPhase,
+  resolveWorkbenchEntryPhase,
   shouldPollStoppedSandboxStatus,
   shouldShowResumeInFlightState,
   shouldWaitForAutomationSessionThread,
+} from "./session-workbench-state.js";
+import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
+import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
+import {
+  getSandboxInstanceStatusQueryKey,
+  reduceCodexRecoveryState,
+  resolveCodexReconnectMessage,
+  seedSandboxInstanceStatusQuery,
   useSessionWorkbenchLifecycleState,
 } from "./use-session-workbench-lifecycle-state.js";
 
@@ -48,7 +50,6 @@ type SessionWorkbenchState = {
     message: string | null;
     requiresManualResume: boolean;
   };
-  hasTopAlert: boolean;
   isResumingStoppedSandbox: boolean;
   sessionReconnectState: {
     isRecovering: boolean;
@@ -57,12 +58,11 @@ type SessionWorkbenchState = {
   shouldAutoResumeOnEntry: boolean;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   requestStoppedSandboxResume: () => Promise<void>;
-  sandboxLifecycleStatus: "resuming" | "starting" | "running" | "stopped" | "failed" | null;
+  sandboxLifecycleStatus: ReturnType<
+    typeof useSessionWorkbenchLifecycleState
+  >["sandboxLifecycleStatus"];
   sandboxFailureMessage: string | null;
   sandboxStatusQuery: ReturnType<typeof useSessionWorkbenchLifecycleState>["sandboxStatusQuery"];
-  sandboxHeaderStatusUi: ReturnType<
-    typeof useSessionWorkbenchLifecycleState
-  >["sandboxHeaderStatusUi"];
   lifecycleStep: ReturnType<typeof useCodexSessionState>["lifecycle"]["step"];
   lifecycleErrorMessage: string | null;
   cliPtyState: ReturnType<typeof useSandboxPtyState>;
@@ -112,8 +112,8 @@ export {
   reduceCodexRecoveryState,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveCodexReconnectMessage,
-  resolveSessionEntryPhase,
-  resolveStoppedSessionMessageForEntryPhase,
+  resolveStoppedSessionMessageForWorkbenchEntryPhase,
+  resolveWorkbenchEntryPhase,
   seedSandboxInstanceStatusQuery,
   shouldPollStoppedSandboxStatus,
   shouldShowResumeInFlightState,
@@ -191,7 +191,6 @@ export function useSessionWorkbenchController(input: {
       sandboxStatusReadState: workbenchLifecycleState.sandboxStatusReadState,
       connectionReadiness: workbenchLifecycleState.connectionReadiness,
       stoppedSessionState: workbenchLifecycleState.stoppedSessionState,
-      hasTopAlert: workbenchLifecycleState.hasTopAlert,
       isResumingStoppedSandbox: workbenchLifecycleState.isResumingStoppedSandbox,
       sessionReconnectState: workbenchLifecycleState.sessionReconnectState,
       shouldAutoResumeOnEntry: workbenchLifecycleState.shouldAutoResumeOnEntry,
@@ -201,7 +200,6 @@ export function useSessionWorkbenchController(input: {
       sandboxLifecycleStatus: workbenchLifecycleState.sandboxLifecycleStatus,
       sandboxFailureMessage: workbenchLifecycleState.sandboxFailureMessage,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,
-      sandboxHeaderStatusUi: workbenchLifecycleState.sandboxHeaderStatusUi,
       lifecycleStep: lifecycle.step,
       lifecycleErrorMessage: workbenchLifecycleState.lifecycleErrorMessage,
       primaryPanelState: {

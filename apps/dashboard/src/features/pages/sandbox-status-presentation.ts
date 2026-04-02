@@ -1,6 +1,9 @@
-export type SandboxLifecycleStatus = "pending" | "starting" | "running" | "stopped" | "failed";
+import type { WorkbenchSandboxLifecycleStatus } from "./session-workbench-state.js";
 
-export type WorkbenchSandboxLifecycleStatus = SandboxLifecycleStatus | "resuming" | null;
+export type {
+  SandboxLifecycleStatus,
+  WorkbenchSandboxLifecycleStatus,
+} from "./session-workbench-state.js";
 
 export type SandboxStatusBadgeUi = {
   label: string;

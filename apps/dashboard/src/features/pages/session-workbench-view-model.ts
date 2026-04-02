@@ -1,3 +1,12 @@
+import {
+  resolveSandboxStatusBadgeUi,
+  type SandboxStatusBadgeUi,
+} from "./sandbox-status-presentation.js";
+import type {
+  SandboxStatusReadState,
+  WorkbenchSandboxLifecycleStatus,
+} from "./session-workbench-state.js";
+
 export function hasSessionTopAlert(input: {
   hasSandboxStatusError: boolean;
   lifecycleErrorMessage: string | null;
@@ -12,6 +21,15 @@ export function hasSessionTopAlert(input: {
     input.sandboxFailureMessage !== null ||
     input.stoppedSessionMessage !== null
   );
+}
+
+export function resolveSessionWorkbenchHeaderStatusUi(input: {
+  sandboxLifecycleStatus: WorkbenchSandboxLifecycleStatus;
+  sandboxStatusReadState: SandboxStatusReadState;
+}): SandboxStatusBadgeUi {
+  return input.sandboxStatusReadState === "loading"
+    ? resolveSandboxStatusBadgeUi(null)
+    : resolveSandboxStatusBadgeUi(input.sandboxLifecycleStatus);
 }
 
 export function shouldShowResumeAction(input: { requiresManualResume: boolean }): boolean {

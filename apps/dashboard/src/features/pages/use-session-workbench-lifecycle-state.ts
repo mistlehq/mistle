@@ -10,29 +10,29 @@ import {
 } from "../sessions/session-connect-policy.js";
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
-import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
-import { hasSessionTopAlert } from "./session-workbench-view-model.js";
+import {
+  type ResumeRequestGuard,
+  hasAutomationSessionPreparationTimedOut,
+  hasFreshSandboxStatusRead,
+  hasFreshSandboxStatusReadSinceRecoveryBoundary,
+  isActiveResumeRequest,
+  resolveAutomationSessionPreparationTimeoutDelayMs,
+  resolveSandboxLifecycleStatusForWorkbenchEntryPhase,
+  resolveSandboxStatusReadState,
+  resolveStoppedSessionMessageForWorkbenchEntryPhase,
+  resolveTrustedSandboxStatus,
+  resolveWorkbenchEntryPhase,
+  shouldPollStoppedSandboxStatus,
+  shouldShowResumeInFlightState,
+  shouldWaitForAutomationSessionThread,
+} from "./session-workbench-state.js";
 
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
-const AutomationSessionPreparationTimeoutMs = 30_000;
 const AutomationSessionPreparationTimeoutMessage =
   "This chat session is taking longer than expected to become ready. Please try again shortly.";
 const MaxCodexReconnectAttempts = 3;
 const CodexReconnectLimitMessage = `Could not reconnect session after ${String(MaxCodexReconnectAttempts)} attempts.`;
-
-type SandboxStatusReadState = "error" | "loading" | "ready";
-
-type SandboxAutomationConversation = {
-  conversationId: string;
-  routeId: string | null;
-  providerConversationId: string | null;
-} | null;
-
-type ResumeRequestGuard = {
-  requestId: number;
-  sandboxInstanceId: string;
-};
 
 type RecoverableCodexDisconnect = {
   id: number;
@@ -50,7 +50,7 @@ type CodexRecoveryObservedState = {
   isStartingSession: boolean;
   isWaitingForAutomationThread: boolean;
   sandboxInstanceId: string | null;
-  sandboxStatus: "resuming" | "starting" | "running" | "stopped" | "failed" | null;
+  sandboxStatus: "pending" | "resuming" | "starting" | "running" | "stopped" | "failed" | null;
 };
 
 export type CodexRecoveryState =
@@ -216,7 +216,7 @@ export function resolveCodexReconnectMessage(input: {
   recoveryBaseMessage: string | null;
   recoveryErrorMessage: string | null;
   reconnectAttemptCount: number;
-  sandboxStatus: "resuming" | "starting" | "running" | "stopped" | "failed" | null;
+  sandboxStatus: "pending" | "resuming" | "starting" | "running" | "stopped" | "failed" | null;
 }): string | null {
   if (input.recoveryErrorMessage !== null) {
     return input.recoveryErrorMessage;
@@ -231,6 +231,7 @@ export function resolveCodexReconnectMessage(input: {
   }
 
   if (
+    input.sandboxStatus === "pending" ||
     input.sandboxStatus === "resuming" ||
     input.sandboxStatus === "starting" ||
     input.sandboxStatus === null
@@ -245,41 +246,6 @@ export function resolveCodexReconnectMessage(input: {
   return `${input.recoveryBaseMessage} Reconnecting session${input.reconnectAttemptCount > 0 ? ` (attempt ${String(input.reconnectAttemptCount)} of ${String(MaxCodexReconnectAttempts)})` : ""}.`;
 }
 
-type SessionEntryPhase =
-  | "connecting"
-  | "sandbox_failed"
-  | "loading"
-  | "manual_resume_required"
-  | "ready"
-  | "resume_pending"
-  | "sandbox_starting";
-
-function resolveSandboxStatusForEntryPhase(
-  phase: SessionEntryPhase,
-): "resuming" | "starting" | "running" | "stopped" | "failed" | null {
-  if (phase === "sandbox_failed") {
-    return "failed";
-  }
-
-  if (phase === "resume_pending") {
-    return "resuming";
-  }
-
-  if (phase === "sandbox_starting") {
-    return "starting";
-  }
-
-  if (phase === "connecting" || phase === "ready") {
-    return "running";
-  }
-
-  if (phase === "manual_resume_required") {
-    return "stopped";
-  }
-
-  return null;
-}
-
 function resolveResumeFailureMessage(error: unknown): string {
   if (error instanceof SandboxProfilesApiError) {
     return error.message;
@@ -292,171 +258,10 @@ function resolveResumeFailureMessage(error: unknown): string {
   return "Could not resume sandbox session.";
 }
 
-export function shouldWaitForAutomationSessionThread(input: {
-  sandboxStatus: string | null;
-  automationConversation: SandboxAutomationConversation;
-}): boolean {
-  return (
-    input.sandboxStatus === "running" &&
-    input.automationConversation !== null &&
-    input.automationConversation.providerConversationId === null
-  );
-}
-
-export function hasAutomationSessionPreparationTimedOut(input: {
-  pendingSinceMs: number | null;
-  nowMs: number;
-}): boolean {
-  if (input.pendingSinceMs === null) {
-    return false;
-  }
-
-  return input.nowMs - input.pendingSinceMs >= AutomationSessionPreparationTimeoutMs;
-}
-
-export function resolveAutomationSessionPreparationTimeoutDelayMs(input: {
-  pendingSinceMs: number | null;
-  nowMs: number;
-}): number | null {
-  if (input.pendingSinceMs === null) {
-    return null;
-  }
-
-  const remainingMs = AutomationSessionPreparationTimeoutMs - (input.nowMs - input.pendingSinceMs);
-  return remainingMs > 0 ? remainingMs : 0;
-}
-
 export function getSandboxInstanceStatusQueryKey(
   sandboxInstanceId: string | null,
 ): readonly ["sandbox-instance-status", string | null] {
   return ["sandbox-instance-status", sandboxInstanceId];
-}
-
-export function hasFreshSandboxStatusRead(input: {
-  initialDataUpdatedAtMs: number | null;
-  currentDataUpdatedAtMs: number;
-}): boolean {
-  if (input.initialDataUpdatedAtMs === null) {
-    return false;
-  }
-
-  return input.currentDataUpdatedAtMs > input.initialDataUpdatedAtMs;
-}
-
-export function hasFreshSandboxStatusReadSinceRecoveryBoundary(input: {
-  recoveryBoundaryDataUpdatedAtMs: number | null;
-  currentDataUpdatedAtMs: number;
-}): boolean {
-  if (input.recoveryBoundaryDataUpdatedAtMs === null) {
-    return true;
-  }
-
-  return input.currentDataUpdatedAtMs > input.recoveryBoundaryDataUpdatedAtMs;
-}
-
-function resolveSandboxStatusReadState(input: {
-  hasFreshSandboxStatusSinceMount: boolean;
-  hasFreshSandboxStatusSinceRecovery: boolean;
-  hasStatusQueryError: boolean;
-}): SandboxStatusReadState {
-  if (input.hasStatusQueryError) {
-    return "error";
-  }
-
-  return input.hasFreshSandboxStatusSinceMount && input.hasFreshSandboxStatusSinceRecovery
-    ? "ready"
-    : "loading";
-}
-
-function resolveTrustedSandboxStatus(input: {
-  sandboxStatusReadState: SandboxStatusReadState;
-  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed" | null;
-}): "pending" | "starting" | "running" | "stopped" | "failed" | null {
-  return input.sandboxStatusReadState === "ready" ? input.sandboxStatus : null;
-}
-
-export function shouldShowResumeInFlightState(input: {
-  hasAttemptedInitialStoppedResume: boolean;
-  resumeActionErrorMessage: string | null;
-  shouldAttemptInitialStoppedResume: boolean;
-  isResumingStoppedSandbox: boolean;
-  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed" | null;
-}): boolean {
-  return (
-    input.sandboxStatus === "stopped" &&
-    (input.isResumingStoppedSandbox ||
-      input.shouldAttemptInitialStoppedResume ||
-      (input.hasAttemptedInitialStoppedResume && input.resumeActionErrorMessage === null))
-  );
-}
-
-export function shouldPollStoppedSandboxStatus(input: {
-  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed" | null;
-  hasAttemptedInitialStoppedResume: boolean;
-  isResumingStoppedSandbox: boolean;
-  resumeActionErrorMessage: string | null;
-}): boolean {
-  return (
-    input.sandboxStatus === "stopped" &&
-    shouldShowResumeInFlightState({
-      hasAttemptedInitialStoppedResume: input.hasAttemptedInitialStoppedResume,
-      resumeActionErrorMessage: input.resumeActionErrorMessage,
-      shouldAttemptInitialStoppedResume: false,
-      isResumingStoppedSandbox: input.isResumingStoppedSandbox,
-      sandboxStatus: input.sandboxStatus,
-    })
-  );
-}
-
-export function resolveSessionEntryPhase(input: {
-  connectedSession: boolean;
-  hasResumeInFlightState: boolean;
-  isStatusPending: boolean;
-  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed" | null;
-}): SessionEntryPhase {
-  if (input.sandboxStatus === "failed") {
-    return "sandbox_failed";
-  }
-
-  if (input.sandboxStatus === "running") {
-    return input.connectedSession ? "ready" : "connecting";
-  }
-
-  if (input.sandboxStatus === "starting") {
-    return "sandbox_starting";
-  }
-
-  if (input.sandboxStatus === "stopped") {
-    return input.hasResumeInFlightState ? "resume_pending" : "manual_resume_required";
-  }
-
-  return "loading";
-}
-
-export function resolveStoppedSessionMessageForEntryPhase(input: {
-  phase: SessionEntryPhase;
-  resumeActionErrorMessage: string | null;
-}): string | null {
-  if (input.phase !== "manual_resume_required") {
-    return null;
-  }
-
-  return (
-    input.resumeActionErrorMessage ??
-    "This sandbox is stopped. Resume it to reconnect chat and terminal."
-  );
-}
-
-export function isActiveResumeRequest(input: {
-  activeRequest: ResumeRequestGuard | null;
-  requestId: number;
-  sandboxInstanceId: string;
-}): boolean {
-  return (
-    input.activeRequest !== null &&
-    input.activeRequest.requestId === input.requestId &&
-    input.activeRequest.sandboxInstanceId === input.sandboxInstanceId
-  );
 }
 
 export function seedSandboxInstanceStatusQuery(input: {
@@ -601,13 +406,13 @@ export function useSessionWorkbenchLifecycleState(input: {
     isResumingStoppedSandbox,
     sandboxStatus: trustedSandboxStatus,
   });
-  const sessionEntryPhase = resolveSessionEntryPhase({
+  const workbenchEntryPhase = resolveWorkbenchEntryPhase({
     connectedSession: sessionSnapshot !== null,
     hasResumeInFlightState: isShowingResumeInFlightState,
-    isStatusPending: sandboxStatusQuery.isPending,
     sandboxStatus: trustedSandboxStatus,
   });
-  const displaySandboxLifecycleStatus = resolveSandboxStatusForEntryPhase(sessionEntryPhase);
+  const displaySandboxLifecycleStatus =
+    resolveSandboxLifecycleStatusForWorkbenchEntryPhase(workbenchEntryPhase);
   const automationConversation = sandboxStatusQuery.data?.automationConversation ?? null;
   const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
     sandboxStatus: displaySandboxLifecycleStatus,
@@ -618,8 +423,8 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxStatus: displaySandboxLifecycleStatus,
     isStatusPending: sandboxStatusQuery.isPending,
   });
-  const stoppedSessionMessage = resolveStoppedSessionMessageForEntryPhase({
-    phase: sessionEntryPhase,
+  const stoppedSessionMessage = resolveStoppedSessionMessageForWorkbenchEntryPhase({
+    phase: workbenchEntryPhase,
     resumeActionErrorMessage,
   });
   const stoppedSessionState = {
@@ -884,19 +689,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxStatusQuery.refetch,
   ]);
 
-  const sandboxHeaderStatusUi =
-    sandboxStatusReadState === "loading"
-      ? resolveSandboxStatusBadgeUi(null)
-      : resolveSandboxStatusBadgeUi(displaySandboxLifecycleStatus);
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
-  const hasTopAlert = hasSessionTopAlert({
-    hasSandboxStatusError: sandboxStatusQuery.isError,
-    lifecycleErrorMessage: resolvedLifecycleErrorMessage,
-    reconnectMessage:
-      input.mainPanelTransitionState === "stable_chat" ? sessionReconnectMessage : null,
-    sandboxFailureMessage,
-    stoppedSessionMessage: stoppedSessionState.message,
-  });
 
   const requestStoppedSandboxResume = useCallback(async (): Promise<void> => {
     if (
@@ -985,7 +778,6 @@ export function useSessionWorkbenchLifecycleState(input: {
     sessionSnapshot,
     sandboxStatusReadState,
     connectionReadiness,
-    hasTopAlert,
     isResumingStoppedSandbox: isShowingResumeInFlightState,
     requestStoppedSandboxResume,
     sandboxLifecycleStatus: displaySandboxLifecycleStatus,
@@ -995,7 +787,6 @@ export function useSessionWorkbenchLifecycleState(input: {
       isRecovering: codexRecoveryState.kind === "recovering",
       message: sessionReconnectMessage,
     },
-    sandboxHeaderStatusUi,
     shouldAutoResumeOnEntry:
       shouldAttemptInitialStoppedResume || shouldAttemptRecoverableStoppedResume,
     lifecycleErrorMessage: resolvedLifecycleErrorMessage,
