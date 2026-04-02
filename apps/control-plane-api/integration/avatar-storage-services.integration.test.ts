@@ -21,7 +21,7 @@ describe("avatar storage services integration", () => {
     });
 
     await withObjectStoreTestContext(async ({ objectStore }) => {
-      const result = await uploadUserAvatar(
+      const imageObjectKey = await uploadUserAvatar(
         {
           db: fixture.db,
           objectStore,
@@ -37,7 +37,7 @@ describe("avatar storage services integration", () => {
         },
       );
 
-      expect(result.imageObjectKey).toMatch(
+      expect(imageObjectKey).toMatch(
         new RegExp(`^avatars/users/${authenticatedSession.userId}/img_[^/]+-avatar\\.webp$`, "u"),
       );
 
@@ -51,10 +51,10 @@ describe("avatar storage services integration", () => {
 
       expect(storedUser).toEqual({
         image: null,
-        imageObjectKey: result.imageObjectKey,
+        imageObjectKey,
       });
 
-      const storedImage = await readStoredObjectBytes(objectStore, result.imageObjectKey);
+      const storedImage = await readStoredObjectBytes(objectStore, imageObjectKey);
       const storedImageMetadata = await sharp(storedImage).metadata();
 
       expect(storedImageMetadata.format).toBe("webp");
@@ -87,7 +87,7 @@ describe("avatar storage services integration", () => {
         })
         .where(eq(users.id, authenticatedSession.userId));
 
-      const result = await uploadUserAvatar(
+      const imageObjectKey = await uploadUserAvatar(
         {
           db: fixture.db,
           objectStore,
@@ -103,7 +103,7 @@ describe("avatar storage services integration", () => {
         },
       );
 
-      expect(result.imageObjectKey).not.toBe(previousImageObjectKey);
+      expect(imageObjectKey).not.toBe(previousImageObjectKey);
       await expect(objectStore.headObject(previousImageObjectKey)).rejects.toThrow();
     });
   });
@@ -150,7 +150,7 @@ describe("avatar storage services integration", () => {
     });
 
     await withObjectStoreTestContext(async ({ objectStore }) => {
-      const result = await uploadOrganizationLogo(
+      const logoObjectKey = await uploadOrganizationLogo(
         {
           db: fixture.db,
           objectStore,
@@ -167,7 +167,7 @@ describe("avatar storage services integration", () => {
         },
       );
 
-      expect(result.logoObjectKey).toMatch(
+      expect(logoObjectKey).toMatch(
         new RegExp(
           `^avatars/organizations/${authenticatedSession.organizationId}/img_[^/]+-logo\\.webp$`,
           "u",
@@ -184,10 +184,10 @@ describe("avatar storage services integration", () => {
 
       expect(storedOrganization).toEqual({
         logo: null,
-        logoObjectKey: result.logoObjectKey,
+        logoObjectKey,
       });
 
-      const storedLogo = await readStoredObjectBytes(objectStore, result.logoObjectKey);
+      const storedLogo = await readStoredObjectBytes(objectStore, logoObjectKey);
       const storedLogoMetadata = await sharp(storedLogo).metadata();
 
       expect(storedLogoMetadata.format).toBe("webp");

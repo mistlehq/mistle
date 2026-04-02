@@ -3,6 +3,7 @@ import { NotFoundError } from "@mistle/http/errors.js";
 import { S3CompatibleObjectStore } from "@mistle/object-store";
 import { eq, sql } from "drizzle-orm";
 
+import { deleteObjectIgnoringErrors } from "../../media/services/delete-object-ignoring-errors.js";
 import { normalizeUploadedImage } from "../../media/services/normalize-uploaded-image.js";
 import { createUserAvatarObjectKey } from "../../media/services/object-key.js";
 
@@ -12,17 +13,13 @@ export type UploadUserAvatarInput = {
   contentType: string;
 };
 
-export type UploadUserAvatarResult = {
-  imageObjectKey: string;
-};
-
 export async function uploadUserAvatar(
   ctx: {
     db: ControlPlaneDatabase;
     objectStore: S3CompatibleObjectStore;
   },
   input: UploadUserAvatarInput,
-): Promise<UploadUserAvatarResult> {
+): Promise<string> {
   const existingUser = await ctx.db.query.users.findFirst({
     columns: {
       id: true,
@@ -64,16 +61,5 @@ export async function uploadUserAvatar(
     await deleteObjectIgnoringErrors(ctx.objectStore, existingUser.imageObjectKey);
   }
 
-  return {
-    imageObjectKey,
-  };
-}
-
-async function deleteObjectIgnoringErrors(
-  objectStore: S3CompatibleObjectStore,
-  objectKey: string,
-): Promise<void> {
-  try {
-    await objectStore.deleteObject(objectKey);
-  } catch {}
+  return imageObjectKey;
 }

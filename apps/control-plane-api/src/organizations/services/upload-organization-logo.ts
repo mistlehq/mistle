@@ -4,6 +4,7 @@ import { S3CompatibleObjectStore } from "@mistle/object-store";
 import { eq } from "drizzle-orm";
 
 import { parseOrganizationRole } from "../../auth/services/organization-policy.js";
+import { deleteObjectIgnoringErrors } from "../../media/services/delete-object-ignoring-errors.js";
 import { normalizeUploadedImage } from "../../media/services/normalize-uploaded-image.js";
 import { createOrganizationLogoObjectKey } from "../../media/services/object-key.js";
 
@@ -14,17 +15,13 @@ export type UploadOrganizationLogoInput = {
   contentType: string;
 };
 
-export type UploadOrganizationLogoResult = {
-  logoObjectKey: string;
-};
-
 export async function uploadOrganizationLogo(
   ctx: {
     db: ControlPlaneDatabase;
     objectStore: S3CompatibleObjectStore;
   },
   input: UploadOrganizationLogoInput,
-): Promise<UploadOrganizationLogoResult> {
+): Promise<string> {
   const membership = await ctx.db.query.members.findFirst({
     columns: {
       role: true,
@@ -96,16 +93,5 @@ export async function uploadOrganizationLogo(
     await deleteObjectIgnoringErrors(ctx.objectStore, existingOrganization.logoObjectKey);
   }
 
-  return {
-    logoObjectKey,
-  };
-}
-
-async function deleteObjectIgnoringErrors(
-  objectStore: S3CompatibleObjectStore,
-  objectKey: string,
-): Promise<void> {
-  try {
-    await objectStore.deleteObject(objectKey);
-  } catch {}
+  return logoObjectKey;
 }
