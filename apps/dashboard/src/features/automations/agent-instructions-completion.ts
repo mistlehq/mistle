@@ -1,4 +1,10 @@
-import type { Completion, CompletionContext, CompletionResult } from "@codemirror/autocomplete";
+import {
+  insertCompletionText,
+  type Completion,
+  type CompletionContext,
+  type CompletionResult,
+} from "@codemirror/autocomplete";
+import type { EditorView } from "@codemirror/view";
 
 import type { AgentInstructionsEditorToken } from "./agent-instructions-token-catalog.js";
 
@@ -40,7 +46,6 @@ function resolveTemplateTokenContext(input: {
   while (replaceEnd < input.documentText.length) {
     const currentCharacter = input.documentText[replaceEnd] ?? "";
     if (currentCharacter === "}" && input.documentText[replaceEnd + 1] === "}") {
-      replaceEnd += 2;
       break;
     }
 
@@ -57,7 +62,7 @@ function resolveTemplateTokenContext(input: {
   }
 
   return {
-    from: openingOffset,
+    from: openingOffset + 2,
     to: replaceEnd,
     query,
   };
@@ -66,11 +71,22 @@ function resolveTemplateTokenContext(input: {
 function toCompletion(token: AgentInstructionsEditorToken): Completion {
   return {
     label: token.path,
-    detail: token.label,
-    ...(token.description === undefined ? {} : { info: token.description }),
+    ...(token.description === undefined ? { detail: token.label } : { detail: token.description }),
     type: "variable",
-    apply: token.insertText,
+    apply: (view, _completion, from, to) => {
+      applyAgentInstructionCompletion(view, token.path, from, to);
+    },
   };
+}
+
+export function applyAgentInstructionCompletion(
+  view: EditorView,
+  path: string,
+  from: number,
+  to: number,
+): void {
+  const insertTransaction = insertCompletionText(view.state, path, from, to);
+  view.dispatch(insertTransaction);
 }
 
 function compareMatchingTokens(
@@ -136,7 +152,7 @@ export function completeAgentInstructionToken(
     from: resolvedContext.from,
     to: resolvedContext.to,
     options,
-    validFor: /^{{[A-Za-z0-9_.]*}?}?$/,
+    validFor: /^[A-Za-z0-9_.]*$/,
   };
 }
 

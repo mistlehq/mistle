@@ -1,8 +1,12 @@
+// @vitest-environment jsdom
+
 import { CompletionContext } from "@codemirror/autocomplete";
 import { EditorState } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
 import { describe, expect, it } from "vitest";
 
 import {
+  applyAgentInstructionCompletion,
   completeAgentInstructionToken,
   findMatchingAgentInstructionTokens,
   resolveAgentInstructionTemplateQuery,
@@ -26,7 +30,7 @@ describe("resolveAgentInstructionTemplateQuery", () => {
         cursorOffset: "Review {{payload.comm".length,
       }),
     ).toEqual({
-      from: 7,
+      from: 9,
       to: 21,
       query: "payload.comm",
     });
@@ -103,7 +107,55 @@ describe("completeAgentInstructionToken", () => {
       { tokens },
     );
 
-    expect(completionResult?.from).toBe(7);
-    expect(completionResult?.to).toBe(31);
+    expect(completionResult?.from).toBe(9);
+    expect(completionResult?.to).toBe(29);
+  });
+});
+
+describe("applyAgentInstructionCompletion", () => {
+  it("replaces the active token path and leaves the token open", () => {
+    const parent = document.createElement("div");
+    document.body.append(parent);
+    const view = new EditorView({
+      parent,
+      state: EditorState.create({
+        doc: "Review {{payload.com",
+        selection: {
+          anchor: "Review {{payload.com".length,
+        },
+      }),
+    });
+
+    try {
+      applyAgentInstructionCompletion(view, "payload.comment.body", 9, 20);
+
+      expect(view.state.doc.toString()).toBe("Review {{payload.comment.body");
+    } finally {
+      view.destroy();
+      parent.remove();
+    }
+  });
+
+  it("preserves existing closing braces when they are already present", () => {
+    const parent = document.createElement("div");
+    document.body.append(parent);
+    const view = new EditorView({
+      parent,
+      state: EditorState.create({
+        doc: "Review {{payload.com}}",
+        selection: {
+          anchor: "Review {{payload.com".length,
+        },
+      }),
+    });
+
+    try {
+      applyAgentInstructionCompletion(view, "payload.comment.body", 9, 20);
+
+      expect(view.state.doc.toString()).toBe("Review {{payload.comment.body}}");
+    } finally {
+      view.destroy();
+      parent.remove();
+    }
   });
 });
