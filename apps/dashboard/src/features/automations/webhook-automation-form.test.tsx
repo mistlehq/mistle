@@ -4,6 +4,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import {
+  AgentInstructionsNoTriggerHelpText,
+  buildAgentInstructionTokenCatalog,
+} from "./agent-instructions-token-catalog.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import {
   WebhookAutomationForm,
@@ -198,7 +202,7 @@ describe("WebhookAutomationForm", () => {
     const { container } = renderForm("create");
     const currentForm = within(container);
 
-    expect(currentForm.getByLabelText("Agent Instructions")).toBeDefined();
+    expect(currentForm.getByRole("textbox", { name: "Agent Instructions" })).toBeDefined();
     expect(
       currentForm.getAllByText((content) => content.includes("Use Liquid syntax with")).length,
     ).toBeGreaterThan(0);
@@ -214,7 +218,7 @@ describe("WebhookAutomationForm", () => {
 
     const currentForm = within(container);
     const [triggersHeading] = currentForm.getAllByRole("heading", { name: "Triggers" });
-    const inputTemplateField = currentForm.getByLabelText("Agent Instructions");
+    const inputTemplateField = currentForm.getByRole("textbox", { name: "Agent Instructions" });
 
     if (triggersHeading === undefined) {
       throw new Error("Expected triggers heading to be rendered.");
@@ -326,10 +330,10 @@ describe("WebhookAutomationForm", () => {
 
     const currentForm = within(container);
     const automationNameInput = currentForm.getByDisplayValue("Repo triage");
-    const inputTemplateTextarea = currentForm.getByLabelText("Agent Instructions");
+    const inputTemplateEditor = currentForm.getByRole("textbox", { name: "Agent Instructions" });
 
     expect(automationNameInput.getAttribute("aria-invalid")).toBe("true");
-    expect(inputTemplateTextarea.getAttribute("aria-invalid")).toBe("true");
+    expect(inputTemplateEditor.getAttribute("aria-invalid")).toBe("true");
 
     const selectTriggers = container.querySelectorAll('[data-slot="select-trigger"]');
     expect(selectTriggers[0]?.getAttribute("aria-invalid")).toBe("true");
@@ -405,5 +409,27 @@ describe("WebhookAutomationForm", () => {
     expect(
       currentForm.getByText("The selected triggers do not support this automation setup."),
     ).toBeDefined();
+  });
+
+  it("shows the no-trigger helper copy under agent instructions", () => {
+    renderFormWithOptions({
+      mode: "create",
+      values: buildFormValues({
+        triggerIds: [],
+        conversationKeyTemplate: "",
+      }),
+    });
+
+    expect(screen.getByText(AgentInstructionsNoTriggerHelpText)).toBeDefined();
+  });
+
+  it("builds agent instruction tokens from the selected trigger payload paths", () => {
+    const tokens = buildAgentInstructionTokenCatalog({
+      selectedEventOptions: [WebhookEventOptions[0]!],
+    });
+
+    expect(tokens.some((token) => token.path === "payload.repository.full_name")).toBe(true);
+    expect(tokens.some((token) => token.path === "webhookEvent.eventType")).toBe(true);
+    expect(tokens.some((token) => token.path === "automationRun.id")).toBe(true);
   });
 });

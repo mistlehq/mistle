@@ -13,12 +13,16 @@ import {
   SelectTrigger,
   SelectValue,
   Switch,
-  Textarea,
   Notice,
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
 
 import { FormPageFooter, FormPageSection, FormPageStack } from "../shared/form-page.js";
+import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
+import {
+  AgentInstructionsNoTriggerHelpText,
+  buildAgentInstructionTokenCatalog,
+} from "./agent-instructions-token-catalog.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
 import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
@@ -177,6 +181,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       : undefined;
   const isInputTemplateDefault =
     input.values.inputTemplate === DefaultWebhookAutomationInputTemplate;
+  const agentInstructionTokens = buildAgentInstructionTokenCatalog({
+    selectedEventOptions: selectedTriggerOptions,
+  });
 
   return (
     <FormPageStack>
@@ -413,18 +420,21 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
               </div>
             </FieldHeader>
             <FieldContent>
-              <Textarea
-                aria-invalid={input.fieldErrors.inputTemplate !== undefined ? true : undefined}
-                aria-labelledby={inputTemplateLabelId}
-                className="min-h-48 text-sm"
-                id="automation-input-template"
+              <AgentInstructionsEditor
+                ariaLabelledBy={inputTemplateLabelId}
                 disabled={input.isDeleting || input.isSaving}
-                onChange={(event) => {
-                  input.onValueChange("inputTemplate", event.currentTarget.value);
+                invalid={input.fieldErrors.inputTemplate !== undefined}
+                onChange={(nextValue) => {
+                  input.onValueChange("inputTemplate", nextValue);
                 }}
-                rows={8}
+                tokens={agentInstructionTokens}
                 value={input.values.inputTemplate}
               />
+              {input.values.triggerIds.length === 0 ? (
+                <p className="text-muted-foreground mt-2 text-sm">
+                  {AgentInstructionsNoTriggerHelpText}
+                </p>
+              ) : null}
               <FieldError
                 message={
                   shouldRenderInlineFieldError({
