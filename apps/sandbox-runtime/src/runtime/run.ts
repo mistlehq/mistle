@@ -1,7 +1,5 @@
-import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { type Server } from "node:http";
-import { createServer as createHttpsServer, type Server as HttpsServer } from "node:https";
 import { type Readable } from "node:stream";
 
 import { applyRuntimePlan } from "../runtime-plan/index.js";
@@ -21,7 +19,6 @@ import {
   type RuntimeClientProcessManager,
 } from "./processes/runtime-client-process-manager.js";
 import { flattenRuntimeClientProcesses } from "./processes/runtime-client-processes.js";
-import { type CertificateAuthority } from "./proxy/certificate-authority.js";
 import { loadProxyCertificateAuthority } from "./proxy/load-proxy-ca.js";
 import {
   resolveBaselineProxyEnvironment,
@@ -79,161 +76,6 @@ async function closeServer(server: Server): Promise<void> {
   });
 }
 
-async function closeHttpsServer(server: HttpsServer): Promise<void> {
-  if (!server.listening) {
-    return;
-  }
-
-  await new Promise<void>((resolve, reject) => {
-    server.close((error) => {
-      if (error !== undefined) {
-        reject(error);
-        return;
-      }
-
-      resolve();
-    });
-  });
-}
-
-async function listenHttpsProbeServer(
-  certificateAuthority: CertificateAuthority,
-): Promise<{ server: HttpsServer; url: string }> {
-  const targetHost = "localhost";
-  const responseBody = "proxy-probe-ok";
-  const secureContext = certificateAuthority.secureContextForTarget(targetHost);
-  const server = createHttpsServer(
-    {
-      secureContext,
-    },
-    (request, response) => {
-      if (request.method !== "GET" || request.url !== "/__bootstrap_proxy_probe") {
-        response.writeHead(404, {
-          "content-type": "text/plain; charset=utf-8",
-        });
-        response.end("not found");
-        return;
-      }
-
-      response.writeHead(200, {
-        "content-type": "text/plain; charset=utf-8",
-        "content-length": String(responseBody.length),
-      });
-      response.end(responseBody);
-    },
-  );
-
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      server.off("error", reject);
-      resolve();
-    });
-  });
-
-  const address = server.address();
-  if (address === null || typeof address === "string") {
-    await closeHttpsServer(server);
-    throw new Error("https probe server address is unavailable");
-  }
-
-  return {
-    server,
-    url: `https://${targetHost}:${address.port}/__bootstrap_proxy_probe`,
-  };
-}
-
-async function runCurlProbe(input: { proxyUrl: string; targetUrl: string }): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(
-      "curl",
-      [
-        "--fail",
-        "--silent",
-        "--show-error",
-        "--max-time",
-        "5",
-        "--noproxy",
-        "",
-        "--proxy",
-        input.proxyUrl,
-        input.targetUrl,
-      ],
-      {
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
-      stdout += chunk;
-    });
-
-    child.stderr.setEncoding("utf8");
-    child.stderr.on("data", (chunk: string) => {
-      stderr += chunk;
-    });
-
-    child.once("error", (error) => {
-      reject(new Error(`failed to launch curl: ${error.message}`));
-    });
-    child.once("close", (code, signal) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      const output = [stdout.trim(), stderr.trim()].filter((value) => value.length > 0).join("\n");
-      reject(
-        new Error(
-          signal === null
-            ? `curl exited with code ${String(code)}${output.length > 0 ? ` (output=${output})` : ""}`
-            : `curl exited via signal ${signal}${output.length > 0 ? ` (output=${output})` : ""}`,
-        ),
-      );
-    });
-  });
-}
-
-async function runHttpsProxySmokeProbe(input: {
-  certificateAuthority: CertificateAuthority;
-  proxyUrl: string;
-  logger: Logger;
-}): Promise<void> {
-  const targetHost = "localhost";
-  input.logger.logEvent({
-    level: "info",
-    event: "sandbox_runtime_https_proxy_probe_started",
-    fields: {
-      proxyUrl: input.proxyUrl,
-      targetHost,
-    },
-  });
-  const startedAtMs = Date.now();
-  const probeServer = await listenHttpsProbeServer(input.certificateAuthority);
-
-  try {
-    await runCurlProbe({
-      proxyUrl: input.proxyUrl,
-      targetUrl: probeServer.url,
-    });
-  } finally {
-    await closeHttpsServer(probeServer.server);
-  }
-
-  input.logger.logEvent({
-    level: "info",
-    event: "sandbox_runtime_https_proxy_probe_completed",
-    fields: {
-      proxyUrl: input.proxyUrl,
-      targetHost,
-      elapsedMs: Date.now() - startedAtMs,
-    },
-  });
-}
-
 export async function startRuntime(input: RunRuntimeInput): Promise<StartedRuntime> {
   applyCurrentProcessSecurity();
 
@@ -262,7 +104,6 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     | "read_startup_input"
     | "load_proxy_ca"
     | "bind_http_server"
-    | "probe_https_proxy"
     | "skip_runtime_plan"
     | "apply_runtime_plan"
     | "start_runtime_clients"
@@ -368,14 +209,6 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
         tokenizerProxyEgressBaseUrl: config.tokenizerProxyEgressBaseUrl,
       }),
     );
-    if (certificateAuthority !== undefined) {
-      startupStage = "probe_https_proxy";
-      await runHttpsProxySmokeProbe({
-        certificateAuthority,
-        proxyUrl: getBaseUrl(server),
-        logger,
-      });
-    }
 
     if (startupInput.startupMode === RuntimeStartupModes.NEW) {
       // Initial startup owns provisioning the sandbox filesystem from the
