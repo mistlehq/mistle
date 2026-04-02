@@ -52,8 +52,8 @@ export const integrationWebhookEvents = controlPlaneSchema.table(
     finalizedAt: timestamp("finalized_at", { withTimezone: true, mode: "string" }),
   },
   (table) => [
-    uniqueIndex("integration_webhook_events_target_key_external_event_id_uidx").on(
-      table.targetKey,
+    uniqueIndex("integration_webhook_events_source_id_external_event_id_uidx").on(
+      table.integrationWebhookSourceId,
       table.externalEventId,
     ),
     index("integration_webhook_events_organization_id_idx").on(table.organizationId),

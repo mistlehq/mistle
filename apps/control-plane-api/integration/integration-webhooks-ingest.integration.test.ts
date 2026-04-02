@@ -4,6 +4,7 @@ import {
   integrationConnections,
   IntegrationConnectionStatuses,
   integrationTargets,
+  IntegrationWebhookSourceOwnerScopes,
 } from "@mistle/db/control-plane";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
@@ -180,11 +181,27 @@ describe("integration webhooks ingest integration", () => {
     expect(persistedEvent.status).toBe("received");
     expect(persistedEvent.organizationId).toBe(authenticatedSession.organizationId);
     expect(persistedEvent.integrationConnectionId).toBe(connectionId);
+    expect(persistedEvent.integrationWebhookSourceId).toBeDefined();
     expect(persistedEvent.payload).toEqual(payloadObject);
     expect(new Date(String(persistedEvent.sourceOccurredAt)).toISOString()).toBe(
       "2026-03-10T00:00:00.000Z",
     );
     expect(persistedEvent.sourceOrderKey).toBe("2026-03-10T00:00:00Z#00000000000000001001");
+
+    const persistedSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.targetKey, targetKey),
+          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.TARGET),
+        ),
+    });
+
+    expect(persistedSource).toBeDefined();
+    if (persistedSource === undefined) {
+      throw new Error("Expected implicit target webhook source to be created.");
+    }
+
+    expect(persistedEvent.integrationWebhookSourceId).toBe(persistedSource.id);
 
     const workflowRuns = await listWebhookWorkflowRuns({
       databaseUrl: fixture.databaseStack.directUrl,
@@ -399,6 +416,20 @@ describe("integration webhooks ingest integration", () => {
     if (persistedEvent === undefined) {
       throw new Error("Expected persisted webhook event.");
     }
+
+    const persistedSources = await fixture.db.query.integrationWebhookSources.findMany({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.targetKey, targetKey),
+          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.TARGET),
+        ),
+    });
+    expect(persistedSources).toHaveLength(1);
+    const [persistedSource] = persistedSources;
+    if (persistedSource === undefined) {
+      throw new Error("Expected persisted webhook source.");
+    }
+    expect(persistedEvent.integrationWebhookSourceId).toBe(persistedSource.id);
 
     const workflowRuns = await listWebhookWorkflowRuns({
       databaseUrl: fixture.databaseStack.directUrl,

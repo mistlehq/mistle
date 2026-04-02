@@ -2449,11 +2449,11 @@
         }
       },
       "indexes": {
-        "integration_webhook_events_target_key_external_event_id_uidx": {
-          "name": "integration_webhook_events_target_key_external_event_id_uidx",
+        "integration_webhook_events_source_id_external_event_id_uidx": {
+          "name": "integration_webhook_events_source_id_external_event_id_uidx",
           "columns": [
             {
-              "expression": "target_key",
+              "expression": "integration_webhook_source_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

@@ -93,6 +93,11 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(githubCloudDefinition?.redirectHandler).toBeDefined();
+    expect(githubCloudDefinition?.webhookSource).toMatchObject({
+      ownerScope: "target",
+      routingStrategy: "payload",
+      lifecycle: "implicit",
+    });
     expect(githubCloudDefinition?.supportedWebhookEvents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -161,6 +166,11 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(githubEnterpriseServerDefinition?.redirectHandler).toBeDefined();
+    expect(githubEnterpriseServerDefinition?.webhookSource).toMatchObject({
+      ownerScope: "target",
+      routingStrategy: "payload",
+      lifecycle: "implicit",
+    });
     expect(githubEnterpriseServerDefinition?.supportedWebhookEvents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

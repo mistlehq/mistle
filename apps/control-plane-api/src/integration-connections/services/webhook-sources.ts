@@ -163,7 +163,7 @@ function resolveWebhookSourceCapabilityOrThrow(input: {
   };
 }
 
-async function ensureImplicitTargetWebhookSource(input: {
+export async function ensureImplicitTargetWebhookSource(input: {
   db: ControlPlaneDatabase;
   targetKey: string;
   routingStrategy: "payload" | "path";

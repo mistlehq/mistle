@@ -12,7 +12,7 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
   const integrationRegistry = ctx.get("integrationRegistry");
   const openWorkflow = ctx.get("openWorkflow");
   const integrationsConfig = ctx.get("config").integrations;
-  const { targetKey } = ctx.req.valid("param");
+  const { endpointKey, targetKey } = ctx.req.valid("param");
   const rawBody = new Uint8Array(await ctx.req.arrayBuffer());
   const headers = Object.fromEntries(ctx.req.raw.headers.entries());
 
@@ -24,7 +24,7 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
     },
     {
       targetKey,
-      endpointKey: undefined,
+      endpointKey,
       headers,
       rawBody,
     },
