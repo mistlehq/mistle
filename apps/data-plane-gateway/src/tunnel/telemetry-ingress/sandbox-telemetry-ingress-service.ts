@@ -203,7 +203,7 @@ export class SandboxTelemetryIngressService {
           stream: openResult.stream,
         }),
       );
-    } catch {
+    } catch (error) {
       session.closeStream(openResult.stream.streamId);
       input.sendControlMessage(
         createTelemetryOpenError({
