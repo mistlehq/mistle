@@ -10,6 +10,13 @@ const IntegrationConnectionMethodSecretFieldSchema = z
   })
   .strict();
 
+const IntegrationConnectionMethodCreateUiSchema = z
+  .object({
+    submitLabel: z.string().min(1),
+    helperText: z.string().min(1),
+  })
+  .strict();
+
 const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
   z
     .object({
@@ -24,6 +31,11 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
       id: z.string().min(1),
       label: z.string().min(1),
       kind: z.literal("redirect"),
+      ui: z
+        .object({
+          create: IntegrationConnectionMethodCreateUiSchema,
+        })
+        .strict(),
     })
     .strict(),
 ]);

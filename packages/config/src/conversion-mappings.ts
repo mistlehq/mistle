@@ -436,11 +436,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME",
   },
   {
-    configPath: ["apps", "data_plane_worker", "sandbox", "docker", "tracesEndpoint"],
-    tomlPath: ["apps", "data_plane_worker", "sandbox", "docker", "traces_endpoint"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT",
-  },
-  {
     configPath: ["apps", "data_plane_worker", "sandbox", "e2b", "apiKey"],
     tomlPath: ["apps", "data_plane_worker", "sandbox", "e2b", "api_key"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY",

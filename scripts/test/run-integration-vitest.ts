@@ -44,6 +44,10 @@ const IntegrationVitestProjects = [
     packageName: "@mistle/integrations-core",
   },
   {
+    projectName: "@mistle/object-store",
+    packageName: "@mistle/object-store",
+  },
+  {
     projectName: "@mistle/sandbox",
     packageName: "@mistle/sandbox",
   },

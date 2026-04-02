@@ -15,6 +15,7 @@ import configConfig from "./packages/config/vitest.integration.config.ts";
 import dbConfig from "./packages/db/vitest.integration.config.ts";
 import emailsConfig from "./packages/emails/vitest.integration.config.ts";
 import integrationsCoreConfig from "./packages/integrations-core/vitest.integration.config.ts";
+import objectStoreConfig from "./packages/object-store/vitest.integration.config.ts";
 import sandboxConfig from "./packages/sandbox/vitest.integration.config.ts";
 import testHarnessConfig from "./packages/test-harness/vitest.integration.config.ts";
 
@@ -86,6 +87,11 @@ export default defineConfig({
         name: "@mistle/integrations-core",
         root: "./packages/integrations-core",
         config: integrationsCoreConfig,
+      }),
+      createNamedProject({
+        name: "@mistle/object-store",
+        root: "./packages/object-store",
+        config: objectStoreConfig,
       }),
       createNamedProject({
         name: "@mistle/sandbox",

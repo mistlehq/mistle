@@ -4,7 +4,7 @@ import {
   integrationTargets,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { AtlassianConnectionMethodIds } from "@mistle/integrations-definitions";
+import { JiraConnectionMethodIds } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import { CreateFormConnectionBodySchema } from "../src/integration-connections/create-form-connection/schema.js";
@@ -372,34 +372,31 @@ describe("integration connections update form integration", () => {
     });
   });
 
-  it("updates Atlassian service account token connections", async ({ fixture }) => {
-    await upsertAtlassianTarget({ fixture, targetKey: "atlassian-default" });
+  it("updates Jira service account token connections", async ({ fixture }) => {
+    await upsertJiraTarget({ fixture, targetKey: "jira-default" });
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-update-atlassian-service@example.com",
+      email: "integration-connections-update-jira-service@example.com",
     });
 
-    const createResponse = await fixture.request(
-      "/v1/integration/connections/atlassian-default/form",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
-        },
-        body: JSON.stringify({
-          displayName: "Atlassian service account token",
-          methodId: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
-          config: {
-            connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
-            cloud_id: "cloud-id-123",
-          },
-          secrets: {
-            apiKey: "original-atlassian-service-token",
-          },
-        }),
+    const createResponse = await fixture.request("/v1/integration/connections/jira-default/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
       },
-    );
+      body: JSON.stringify({
+        displayName: "Jira service account token",
+        methodId: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+        config: {
+          connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+          cloud_id: "cloud-id-123",
+        },
+        secrets: {
+          apiKey: "original-jira-service-token",
+        },
+      }),
+    });
 
     expect(createResponse.status).toBe(201);
     const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
@@ -413,13 +410,13 @@ describe("integration connections update form integration", () => {
           cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify({
-          displayName: "Atlassian service account token rotated",
+          displayName: "Jira service account token rotated",
           config: {
-            connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+            connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
             cloud_id: "cloud-id-456",
           },
           secrets: {
-            apiKey: "rotated-atlassian-service-token",
+            apiKey: "rotated-jira-service-token",
           },
         }),
       },
@@ -427,42 +424,39 @@ describe("integration connections update form integration", () => {
 
     expect(updateResponse.status).toBe(200);
     const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
-    expect(updatedConnection.displayName).toBe("Atlassian service account token rotated");
+    expect(updatedConnection.displayName).toBe("Jira service account token rotated");
     expect(updatedConnection.config).toEqual({
-      connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+      connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
       cloud_id: "cloud-id-456",
     });
   });
 
-  it("returns 400 when Atlassian personal token updates omit site_url", async ({ fixture }) => {
-    await upsertAtlassianTarget({ fixture, targetKey: "atlassian-default" });
+  it("returns 400 when Jira personal token updates omit site_url", async ({ fixture }) => {
+    await upsertJiraTarget({ fixture, targetKey: "jira-default" });
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-update-atlassian-personal-missing-site-url@example.com",
+      email: "integration-connections-update-jira-personal-missing-site-url@example.com",
     });
 
-    const createResponse = await fixture.request(
-      "/v1/integration/connections/atlassian-default/form",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
-        },
-        body: JSON.stringify({
-          displayName: "Atlassian personal token",
-          methodId: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
-          config: {
-            connection_method: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
-            site_url: "https://mistle.atlassian.net",
-            email: "user@example.com",
-          },
-          secrets: {
-            apiKey: "atlassian-personal-token",
-          },
-        }),
+    const createResponse = await fixture.request("/v1/integration/connections/jira-default/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
       },
-    );
+      body: JSON.stringify({
+        displayName: "Jira personal token",
+        methodId: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
+        config: {
+          connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
+          site_url: "https://mistle.atlassian.net",
+          email: "user@example.com",
+        },
+        secrets: {
+          apiKey: "jira-personal-token",
+        },
+      }),
+    });
 
     expect(createResponse.status).toBe(201);
     const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
@@ -476,9 +470,9 @@ describe("integration connections update form integration", () => {
           cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify({
-          displayName: "Atlassian personal token updated",
+          displayName: "Jira personal token updated",
           config: {
-            connection_method: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+            connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
             email: "user@example.com",
           },
         }),
@@ -491,42 +485,36 @@ describe("integration connections update form integration", () => {
     );
     expect(responseBody).toEqual({
       code: "INVALID_UPDATE_CONNECTION_INPUT",
-      message: `Connection config for method '${AtlassianConnectionMethodIds.PERSONAL_API_TOKEN}' is invalid.`,
+      message: `Connection config for method '${JiraConnectionMethodIds.PERSONAL_API_TOKEN}' is invalid.`,
     });
   });
 
-  it("updates Atlassian service account OAuth client credentials connections", async ({
-    fixture,
-  }) => {
-    await upsertAtlassianTarget({ fixture, targetKey: "atlassian-default" });
+  it("updates Jira service account OAuth client credentials connections", async ({ fixture }) => {
+    await upsertJiraTarget({ fixture, targetKey: "jira-default" });
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-update-atlassian-service-oauth@example.com",
+      email: "integration-connections-update-jira-service-oauth@example.com",
     });
 
-    const createResponse = await fixture.request(
-      "/v1/integration/connections/atlassian-default/form",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
-        },
-        body: JSON.stringify({
-          displayName: "Atlassian service account OAuth client credentials",
-          methodId: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
-          config: {
-            connection_method:
-              AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
-            cloud_id: "cloud-id-123",
-            client_id: "client-id-456",
-          },
-          secrets: {
-            clientSecret: "original-atlassian-client-secret",
-          },
-        }),
+    const createResponse = await fixture.request("/v1/integration/connections/jira-default/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
       },
-    );
+      body: JSON.stringify({
+        displayName: "Jira service account OAuth client credentials",
+        methodId: JiraConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+        config: {
+          connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+          cloud_id: "cloud-id-123",
+          client_id: "client-id-456",
+        },
+        secrets: {
+          clientSecret: "original-jira-client-secret",
+        },
+      }),
+    });
 
     expect(createResponse.status).toBe(201);
     const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
@@ -540,15 +528,14 @@ describe("integration connections update form integration", () => {
           cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify({
-          displayName: "Atlassian service account OAuth client credentials rotated",
+          displayName: "Jira service account OAuth client credentials rotated",
           config: {
-            connection_method:
-              AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+            connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
             cloud_id: "cloud-id-456",
             client_id: "client-id-789",
           },
           secrets: {
-            clientSecret: "rotated-atlassian-client-secret",
+            clientSecret: "rotated-jira-client-secret",
           },
         }),
       },
@@ -557,10 +544,10 @@ describe("integration connections update form integration", () => {
     expect(updateResponse.status).toBe(200);
     const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
     expect(updatedConnection.displayName).toBe(
-      "Atlassian service account OAuth client credentials rotated",
+      "Jira service account OAuth client credentials rotated",
     );
     expect(updatedConnection.config).toEqual({
-      connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+      connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
       cloud_id: "cloud-id-456",
       client_id: "client-id-789",
     });
@@ -616,39 +603,34 @@ describe("integration connections update form integration", () => {
       ciphertext: updatedCredential.ciphertext,
     });
 
-    expect(decryptedClientSecret).toBe("rotated-atlassian-client-secret");
+    expect(decryptedClientSecret).toBe("rotated-jira-client-secret");
   });
 
-  it("returns 400 when Atlassian service account token updates omit cloud_id", async ({
-    fixture,
-  }) => {
-    await upsertAtlassianTarget({ fixture, targetKey: "atlassian-default" });
+  it("returns 400 when Jira service account token updates omit cloud_id", async ({ fixture }) => {
+    await upsertJiraTarget({ fixture, targetKey: "jira-default" });
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-update-atlassian-service-missing-cloud-id@example.com",
+      email: "integration-connections-update-jira-service-missing-cloud-id@example.com",
     });
 
-    const createResponse = await fixture.request(
-      "/v1/integration/connections/atlassian-default/form",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
-        },
-        body: JSON.stringify({
-          displayName: "Atlassian service account token",
-          methodId: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
-          config: {
-            connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
-            cloud_id: "cloud-id-123",
-          },
-          secrets: {
-            apiKey: "atlassian-service-account-token",
-          },
-        }),
+    const createResponse = await fixture.request("/v1/integration/connections/jira-default/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
       },
-    );
+      body: JSON.stringify({
+        displayName: "Jira service account token",
+        methodId: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+        config: {
+          connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+          cloud_id: "cloud-id-123",
+        },
+        secrets: {
+          apiKey: "jira-service-account-token",
+        },
+      }),
+    });
 
     expect(createResponse.status).toBe(201);
     const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
@@ -662,9 +644,9 @@ describe("integration connections update form integration", () => {
           cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify({
-          displayName: "Atlassian service account token rotated",
+          displayName: "Jira service account token rotated",
           config: {
-            connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+            connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
           },
         }),
       },
@@ -676,7 +658,7 @@ describe("integration connections update form integration", () => {
     );
     expect(responseBody).toEqual({
       code: "INVALID_UPDATE_CONNECTION_INPUT",
-      message: `Connection config for method '${AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN}' is invalid.`,
+      message: `Connection config for method '${JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN}' is invalid.`,
     });
   });
 });
@@ -709,7 +691,7 @@ async function upsertOpenAiTarget(input: {
     });
 }
 
-async function upsertAtlassianTarget(input: {
+async function upsertJiraTarget(input: {
   fixture: ControlPlaneApiIntegrationFixture;
   targetKey: string;
 }) {
@@ -717,16 +699,16 @@ async function upsertAtlassianTarget(input: {
     .insert(integrationTargets)
     .values({
       targetKey: input.targetKey,
-      familyId: "atlassian",
-      variantId: "atlassian-default",
+      familyId: "jira",
+      variantId: "jira-default",
       enabled: true,
       config: {},
     })
     .onConflictDoUpdate({
       target: integrationTargets.targetKey,
       set: {
-        familyId: "atlassian",
-        variantId: "atlassian-default",
+        familyId: "jira",
+        variantId: "jira-default",
         enabled: true,
         config: {},
       },

@@ -29,12 +29,28 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
   StartSandboxInstanceWorkflowSpec,
   async ({ input: workflowInput, step }): Promise<StartSandboxInstanceWorkflowOutput> => {
     const ctx = await getWorkflowContext();
+    const logger = ctx.logger.child({
+      workflow: StartSandboxInstanceWorkflowSpec.name,
+      sandboxInstanceId: workflowInput.sandboxInstanceId,
+      organizationId: workflowInput.organizationId,
+      sandboxProfileId: workflowInput.sandboxProfileId,
+      sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+      startedBy: workflowInput.startedBy,
+      source: workflowInput.source,
+    });
 
     async function markSandboxInstanceFailedStep(input: {
       sandboxInstanceId: string;
       failureCode: string;
       failureMessage: string;
     }): Promise<void> {
+      logger.warn(
+        {
+          failureCode: input.failureCode,
+          failureMessage: input.failureMessage,
+        },
+        "Marking sandbox instance as failed during start workflow.",
+      );
       await step.run({ name: "mark-sandbox-instance-failed" }, async () => {
         await markSandboxInstanceFailed(
           {
@@ -56,6 +72,14 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
       if (input.runtimeProvider !== undefined && input.providerSandboxId !== undefined) {
         const runtimeProvider = input.runtimeProvider;
         const providerSandboxId = input.providerSandboxId;
+        logger.warn(
+          {
+            failureCode: input.failureCode,
+            runtimeProvider,
+            providerSandboxId,
+          },
+          "Cleaning up sandbox after start failure.",
+        );
         try {
           await step.run({ name: "destroy-sandbox-after-start-failure" }, async () => {
             await destroySandbox(
@@ -70,6 +94,15 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
             );
           });
         } catch (error) {
+          logger.error(
+            {
+              err: error,
+              failureCode: input.failureCode,
+              runtimeProvider,
+              providerSandboxId,
+            },
+            "Failed to destroy sandbox during start failure cleanup.",
+          );
           destroySandboxError = error;
         }
       }
@@ -82,6 +115,13 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           failureMessage: input.failureMessage,
         });
       } catch (error) {
+        logger.error(
+          {
+            err: error,
+            failureCode: input.failureCode,
+          },
+          "Failed to update sandbox instance status during start failure cleanup.",
+        );
         updateFailedStatusError = error;
       }
 
@@ -111,6 +151,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
     }
 
     const ensuredSandboxInstance = await step.run({ name: "ensure-sandbox-instance" }, async () => {
+      logger.info("Ensuring sandbox instance exists before sandbox startup.");
       const persisted = await ensureSandboxInstance(
         {
           db: ctx.db,
@@ -130,6 +171,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
         throw new Error("Sandbox instance store returned an unexpected sandboxInstanceId.");
       }
 
+      logger.info("Ensured sandbox instance exists.");
       return persisted;
     });
 
@@ -141,6 +183,13 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
 
     try {
       startedSandbox = await step.run({ name: "start-sandbox" }, async () => {
+        logger.info(
+          {
+            image: workflowInput.image,
+            runtimeProvider: ctx.config.sandbox.provider,
+          },
+          "Starting sandbox with provider.",
+        );
         return startSandbox(
           {
             config: ctx.config,
@@ -152,7 +201,15 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           },
         );
       });
+      logger.info(
+        {
+          runtimeProvider: startedSandbox.runtimeProvider,
+          providerSandboxId: startedSandbox.providerSandboxId,
+        },
+        "Sandbox provider start completed.",
+      );
     } catch (error) {
+      logger.error({ err: error }, "Sandbox provider start failed.");
       await markSandboxInstanceFailedStep({
         sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
         failureCode: StartSandboxFailureCodes.SANDBOX_START_FAILED,
@@ -167,6 +224,12 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
 
     try {
       await step.run({ name: "persist-sandbox-provisioning-metadata" }, async () => {
+        logger.info(
+          {
+            providerSandboxId: startedSandbox.providerSandboxId,
+          },
+          "Persisting sandbox provisioning metadata.",
+        );
         await persistSandboxInstanceProvisioning(
           {
             db: ctx.db,
@@ -180,7 +243,20 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           },
         );
       });
+      logger.info(
+        {
+          providerSandboxId: startedSandbox.providerSandboxId,
+        },
+        "Persisted sandbox provisioning metadata.",
+      );
     } catch (error) {
+      logger.error(
+        {
+          err: error,
+          providerSandboxId: startedSandbox.providerSandboxId,
+        },
+        "Failed to persist sandbox provisioning metadata.",
+      );
       try {
         await handleFailedStartup({
           sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
@@ -211,6 +287,12 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
 
     try {
       await step.run({ name: "apply-sandbox-startup-configuration" }, async () => {
+        logger.info(
+          {
+            providerSandboxId: startedSandbox.providerSandboxId,
+          },
+          "Applying sandbox startup configuration.",
+        );
         await applySandboxStartupConfiguration(
           {
             config: ctx.config,
@@ -224,7 +306,20 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           },
         );
       });
+      logger.info(
+        {
+          providerSandboxId: startedSandbox.providerSandboxId,
+        },
+        "Applied sandbox startup configuration.",
+      );
     } catch (error) {
+      logger.error(
+        {
+          err: error,
+          providerSandboxId: startedSandbox.providerSandboxId,
+        },
+        "Failed to apply sandbox startup configuration.",
+      );
       try {
         await handleFailedStartup({
           sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
@@ -258,6 +353,14 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
       didSandboxConnectToTunnel = await step.run(
         { name: "wait-for-sandbox-tunnel-readiness" },
         async () => {
+          logger.info(
+            {
+              providerSandboxId: startedSandbox.providerSandboxId,
+              timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
+              pollIntervalMs: ctx.tunnelReadinessPolicy.pollIntervalMs,
+            },
+            "Waiting for sandbox tunnel readiness.",
+          );
           return waitForSandboxTunnelReadiness(
             {
               runtimeStateReader: ctx.runtimeStateReader,
@@ -271,7 +374,21 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           );
         },
       );
+      logger.info(
+        {
+          providerSandboxId: startedSandbox.providerSandboxId,
+          didSandboxConnectToTunnel,
+        },
+        "Finished waiting for sandbox tunnel readiness.",
+      );
     } catch (error) {
+      logger.error(
+        {
+          err: error,
+          providerSandboxId: startedSandbox.providerSandboxId,
+        },
+        "Failed while waiting for sandbox tunnel readiness.",
+      );
       try {
         await handleFailedStartup({
           sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
@@ -301,6 +418,13 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
     }
 
     if (!didSandboxConnectToTunnel) {
+      logger.error(
+        {
+          providerSandboxId: startedSandbox.providerSandboxId,
+          timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
+        },
+        "Sandbox tunnel readiness timed out.",
+      );
       try {
         await handleFailedStartup({
           sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
@@ -325,6 +449,12 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
 
     try {
       await step.run({ name: "mark-sandbox-instance-running" }, async () => {
+        logger.info(
+          {
+            providerSandboxId: startedSandbox.providerSandboxId,
+          },
+          "Marking sandbox instance as running.",
+        );
         await markSandboxInstanceRunning(
           {
             db: ctx.db,
@@ -334,7 +464,20 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           },
         );
       });
+      logger.info(
+        {
+          providerSandboxId: startedSandbox.providerSandboxId,
+        },
+        "Sandbox start workflow completed successfully.",
+      );
     } catch (error) {
+      logger.error(
+        {
+          err: error,
+          providerSandboxId: startedSandbox.providerSandboxId,
+        },
+        "Failed to mark sandbox instance as running.",
+      );
       try {
         await handleFailedStartup({
           sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,

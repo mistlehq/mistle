@@ -41,7 +41,7 @@
       }
     },
     {
-      "targetKey": "atlassian-default",
+      "targetKey": "jira-default",
       "enabled": true,
       "config": {}
     },

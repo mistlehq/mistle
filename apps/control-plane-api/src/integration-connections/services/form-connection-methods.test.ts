@@ -59,6 +59,12 @@ describe("resolveFormConnectionMethodOrThrow", () => {
             id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
             label: "OAuth",
             kind: "redirect",
+            ui: {
+              create: {
+                submitLabel: "Continue to provider",
+                helperText: "Continue to the provider to complete this connection.",
+              },
+            },
           },
         ],
         invalidInputCode: "INVALID_CREATE_CONNECTION_INPUT",

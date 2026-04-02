@@ -4,6 +4,7 @@ import {
   parseBootstrapControlMessage,
   parseLeaseControlMessage,
   parseStreamControlMessage,
+  parseTelemetryControlMessage,
 } from "./stream-protocol.js";
 
 describe("stream control message parser", () => {
@@ -219,6 +220,82 @@ describe("stream control message parser", () => {
         JSON.stringify({
           type: "stream.complete",
           streamId: "8",
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("parses telemetry control messages", () => {
+    expect(
+      parseTelemetryControlMessage(
+        JSON.stringify({
+          type: "telemetry.open",
+          streamId: 31,
+          signal: "logs",
+          format: "mistle.sandbox-runtime.log.v1",
+        }),
+      ),
+    ).toEqual({
+      type: "telemetry.open",
+      streamId: 31,
+      signal: "logs",
+      format: "mistle.sandbox-runtime.log.v1",
+    });
+
+    expect(
+      parseTelemetryControlMessage(
+        JSON.stringify({
+          type: "telemetry.reset",
+          streamId: 31,
+          code: "telemetry_stream_not_found",
+          message: "stream not found",
+        }),
+      ),
+    ).toEqual({
+      type: "telemetry.reset",
+      streamId: 31,
+      code: "telemetry_stream_not_found",
+      message: "stream not found",
+    });
+  });
+
+  it("allows bootstrap telemetry open and close messages", () => {
+    expect(
+      parseBootstrapControlMessage(
+        JSON.stringify({
+          type: "telemetry.open",
+          streamId: 41,
+          signal: "logs",
+          format: "mistle.sandbox-runtime.log.v1",
+        }),
+      ),
+    ).toEqual({
+      type: "telemetry.open",
+      streamId: 41,
+      signal: "logs",
+      format: "mistle.sandbox-runtime.log.v1",
+    });
+
+    expect(
+      parseBootstrapControlMessage(
+        JSON.stringify({
+          type: "telemetry.close",
+          streamId: 41,
+        }),
+      ),
+    ).toEqual({
+      type: "telemetry.close",
+      streamId: 41,
+    });
+  });
+
+  it("rejects gateway-only telemetry control messages from bootstrap parsing", () => {
+    expect(
+      parseBootstrapControlMessage(
+        JSON.stringify({
+          type: "telemetry.open.ok",
+          streamId: 41,
+          initialWindowBytes: 65536,
         }),
       ),
     ).toBeUndefined();

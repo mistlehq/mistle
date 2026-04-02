@@ -11,7 +11,7 @@ import {
 import { aggregateArtifactEnvironment } from "./artifact-environment.js";
 import { loadRuntimeConfig, type RuntimeConfig } from "./config.js";
 import { createRuntimeHttpServer } from "./http-server.js";
-import { logSandboxRuntimeEvent } from "./logger.js";
+import { BufferedLogger, type Logger } from "./logger.js";
 import { parseListenAddress } from "./parse-listen-address.js";
 import {
   startRuntimeClientProcessManager,
@@ -24,7 +24,7 @@ import {
   resolveBaselineProxyEnvironment,
   applyEnvironmentEntries,
 } from "./proxy/proxy-environment.js";
-import { createProxyServer } from "./proxy/proxy-server.js";
+import { createProxyServer, type ProxyServer } from "./proxy/proxy-server.js";
 import { readStartupInput, DefaultStartupInputMaxBytes } from "./read-startup-input.js";
 import { applyCurrentProcessSecurity } from "./security.js";
 import { type StartupInput } from "./startup-input.js";
@@ -42,6 +42,7 @@ export type StartedRuntime = {
   startupInput: StartupInput;
   server: Server;
   baseUrl: string;
+  logger: Logger;
   unexpectedProcessExit: Promise<RuntimeClientProcessExit>;
   tunnelCompletion: Promise<TunnelCompletion>;
   close: () => Promise<void>;
@@ -86,73 +87,134 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     throw new Error("stdin reader is required");
   }
 
-  const config = loadRuntimeConfig(input.lookupEnv);
-  const startupInput = await readStartupInput({
-    reader: input.stdin,
-    maxBytes: DefaultStartupInputMaxBytes,
-  });
-  const startupStartedAtMs = Date.now();
-  logSandboxRuntimeEvent({
-    level: "info",
-    event: "sandbox_runtime_startup_started",
-    fields: {
-      startupMode: startupInput.startupMode,
-      artifactCount: startupInput.runtimePlan.artifacts.length,
-      workspaceSourceCount: startupInput.runtimePlan.workspaceSources.length,
-      runtimeClientCount: startupInput.runtimePlan.runtimeClients.length,
-      agentRuntimeCount: startupInput.runtimePlan.agentRuntimes.length,
-    },
-  });
+  const logger = new BufferedLogger();
+  let config: RuntimeConfig;
+  let startupInput: StartupInput;
   const state = {
     startupReady: false,
   };
-  const certificateAuthority = loadProxyCertificateAuthority(config);
-  const proxyServer = createProxyServer({
-    runtimePlan: startupInput.runtimePlan,
-    tokenizerProxyEgressBaseUrl: config.tokenizerProxyEgressBaseUrl,
-    egressGrantByRuleId: startupInput.egressGrantByRuleId,
-    ...(certificateAuthority === undefined ? {} : { certificateAuthority }),
-  });
-
-  const listenAddress = parseListenAddress(config.listenAddr);
-  const server = createRuntimeHttpServer({
-    state,
-    proxyServer,
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(listenAddress.port, listenAddress.host, () => {
-      server.off("error", reject);
-      resolve();
-    });
-  }).catch((error: unknown) => {
-    throw new Error(
-      `failed to bind listen addr ${config.listenAddr}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  });
-
-  const restoreProxyEnvironment = applyEnvironmentEntries(
-    resolveBaselineProxyEnvironment({
-      listenAddr: config.listenAddr,
-      tokenizerProxyEgressBaseUrl: config.tokenizerProxyEgressBaseUrl,
-    }),
-  );
+  let proxyServer: ProxyServer | undefined;
+  let server: Server | undefined;
+  let restoreProxyEnvironment: (() => void) | undefined;
   let restoreArtifactEnvironment: (() => void) | undefined;
-
   let processManager: RuntimeClientProcessManager | undefined;
   let tunnelClient: StartedTunnelClient | undefined;
   let startupStage:
+    | "load_runtime_config"
+    | "read_startup_input"
+    | "load_proxy_ca"
+    | "bind_http_server"
     | "skip_runtime_plan"
     | "apply_runtime_plan"
     | "start_runtime_clients"
     | "start_tunnel"
-    | "startup_ready" = "apply_runtime_plan";
+    | "startup_ready" = "load_runtime_config";
+  const startupStartedAtMs = Date.now();
   try {
+    config = loadRuntimeConfig(input.lookupEnv);
+    logger.logEvent({
+      level: "info",
+      event: "sandbox_runtime_config_loaded",
+      fields: {
+        listenAddr: config.listenAddr,
+        tokenizerProxyEgressBaseUrl: config.tokenizerProxyEgressBaseUrl,
+        proxyCaConfigured: config.proxyCaConfigured,
+      },
+    });
+    startupStage = "read_startup_input";
+    startupInput = await readStartupInput({
+      reader: input.stdin,
+      maxBytes: DefaultStartupInputMaxBytes,
+    });
+    logger.logEvent({
+      level: "info",
+      event: "sandbox_runtime_startup_input_loaded",
+      fields: {
+        startupMode: startupInput.startupMode,
+        tunnelGatewayWsUrl: startupInput.tunnelGatewayWsUrl,
+        egressRouteCount: startupInput.runtimePlan.egressRoutes.length,
+        artifactCount: startupInput.runtimePlan.artifacts.length,
+        workspaceSourceCount: startupInput.runtimePlan.workspaceSources.length,
+        runtimeClientCount: startupInput.runtimePlan.runtimeClients.length,
+        agentRuntimeCount: startupInput.runtimePlan.agentRuntimes.length,
+      },
+    });
+    logger.logEvent({
+      level: "info",
+      event: "sandbox_runtime_startup_started",
+      fields: {
+        startupMode: startupInput.startupMode,
+        artifactCount: startupInput.runtimePlan.artifacts.length,
+        workspaceSourceCount: startupInput.runtimePlan.workspaceSources.length,
+        runtimeClientCount: startupInput.runtimePlan.runtimeClients.length,
+        agentRuntimeCount: startupInput.runtimePlan.agentRuntimes.length,
+      },
+    });
+    startupStage = "load_proxy_ca";
+    if (config.proxyCaConfigured) {
+      logger.logEvent({
+        level: "info",
+        event: "sandbox_runtime_proxy_ca_load_started",
+      });
+    } else {
+      logger.logEvent({
+        level: "info",
+        event: "sandbox_runtime_proxy_ca_not_configured",
+      });
+    }
+    const certificateAuthority = loadProxyCertificateAuthority(config);
+    if (certificateAuthority !== undefined) {
+      logger.logEvent({
+        level: "info",
+        event: "sandbox_runtime_proxy_ca_load_completed",
+      });
+    }
+    proxyServer = createProxyServer({
+      runtimePlan: startupInput.runtimePlan,
+      tokenizerProxyEgressBaseUrl: config.tokenizerProxyEgressBaseUrl,
+      egressGrantByRuleId: startupInput.egressGrantByRuleId,
+      ...(certificateAuthority === undefined ? {} : { certificateAuthority }),
+    });
+
+    startupStage = "bind_http_server";
+    const listenAddress = parseListenAddress(config.listenAddr);
+    server = createRuntimeHttpServer({
+      state,
+      proxyServer,
+    });
+    const runtimeServer = server;
+
+    await new Promise<void>((resolve, reject) => {
+      runtimeServer.once("error", reject);
+      runtimeServer.listen(listenAddress.port, listenAddress.host, () => {
+        runtimeServer.off("error", reject);
+        resolve();
+      });
+    }).catch((error: unknown) => {
+      throw new Error(
+        `failed to bind listen addr ${config.listenAddr}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+    logger.logEvent({
+      level: "info",
+      event: "sandbox_runtime_http_server_listening",
+      fields: {
+        baseUrl: getBaseUrl(server),
+      },
+    });
+
+    restoreProxyEnvironment = applyEnvironmentEntries(
+      resolveBaselineProxyEnvironment({
+        listenAddr: config.listenAddr,
+        tokenizerProxyEgressBaseUrl: config.tokenizerProxyEgressBaseUrl,
+      }),
+    );
+
     if (startupInput.startupMode === RuntimeStartupModes.NEW) {
       // Initial startup owns provisioning the sandbox filesystem from the
       // compiled runtime plan before any long-lived processes are relaunched.
-      logSandboxRuntimeEvent({
+      startupStage = "apply_runtime_plan";
+      logger.logEvent({
         level: "info",
         event: "sandbox_runtime_plan_apply_started",
         fields: {
@@ -163,8 +225,9 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
       const applyRuntimePlanStartedAtMs = Date.now();
       await applyRuntimePlan({
         runtimePlan: startupInput.runtimePlan,
+        logger,
       });
-      logSandboxRuntimeEvent({
+      logger.logEvent({
         level: "info",
         event: "sandbox_runtime_plan_apply_completed",
         fields: {
@@ -176,13 +239,17 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
       // so existing sandboxes skip runtime-plan mutation and only relaunch the
       // processes/tunnel that depend on fresh connection material.
       startupStage = "skip_runtime_plan";
+      logger.logEvent({
+        level: "info",
+        event: "sandbox_runtime_plan_apply_skipped",
+      });
     }
     const artifactEnvironment = aggregateArtifactEnvironment(startupInput.runtimePlan.artifacts);
     if (artifactEnvironment !== undefined) {
       restoreArtifactEnvironment = applyEnvironmentEntries(artifactEnvironment);
     }
     startupStage = "start_runtime_clients";
-    logSandboxRuntimeEvent({
+    logger.logEvent({
       level: "info",
       event: "sandbox_runtime_clients_start_started",
       fields: {
@@ -193,7 +260,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     processManager = await startRuntimeClientProcessManager(
       flattenRuntimeClientProcesses(startupInput.runtimePlan.runtimeClients),
     );
-    logSandboxRuntimeEvent({
+    logger.logEvent({
       level: "info",
       event: "sandbox_runtime_clients_start_completed",
       fields: {
@@ -203,7 +270,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     });
     try {
       startupStage = "start_tunnel";
-      logSandboxRuntimeEvent({
+      logger.logEvent({
         level: "info",
         event: "sandbox_tunnel_client_starting",
         fields: {
@@ -218,6 +285,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
         tunnelExchangeToken: startupInput.tunnelExchangeToken,
         agentRuntimes: startupInput.runtimePlan.agentRuntimes,
         runtimeClients: startupInput.runtimePlan.runtimeClients,
+        logger,
       });
     } catch (error) {
       throw new Error(
@@ -226,7 +294,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     }
     state.startupReady = true;
     startupStage = "startup_ready";
-    logSandboxRuntimeEvent({
+    logger.logEvent({
       level: "info",
       event: "sandbox_runtime_startup_ready",
       fields: {
@@ -241,10 +309,15 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
       await processManager.stop().catch(() => undefined);
     }
     restoreArtifactEnvironment?.();
-    restoreProxyEnvironment();
-    await closeServer(server);
+    restoreProxyEnvironment?.();
+    if (server !== undefined) {
+      await closeServer(server).catch(() => undefined);
+    }
+    if (proxyServer !== undefined) {
+      await proxyServer.close().catch(() => undefined);
+    }
 
-    logSandboxRuntimeEvent({
+    logger.logEvent({
       level: "error",
       event: "sandbox_runtime_startup_failed",
       fields: {
@@ -253,13 +326,23 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
       },
     });
 
+    if (error instanceof Error && error.message.startsWith("runtime client process[")) {
+      throw new Error(`failed to start runtime client processes: ${error.message}`);
+    }
+    if (error instanceof Error && error.message.startsWith("failed to start sandbox tunnel:")) {
+      throw error;
+    }
+
     throw new Error(
-      error instanceof Error && error.message.startsWith("runtime client process[")
-        ? `failed to start runtime client processes: ${error.message}`
-        : error instanceof Error && error.message.startsWith("failed to start sandbox tunnel:")
-          ? error.message
-          : `failed to apply runtime plan: ${error instanceof Error ? error.message : String(error)}`,
+      `failed during sandbox runtime startup (${startupStage}): ${error instanceof Error ? error.message : String(error)}`,
     );
+  }
+
+  if (server === undefined) {
+    throw new Error("runtime server is required");
+  }
+  if (proxyServer === undefined) {
+    throw new Error("proxy server is required");
   }
 
   const closed = once(server, "close").then(() => undefined);
@@ -277,6 +360,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     startupInput,
     server,
     baseUrl: getBaseUrl(server),
+    logger,
     unexpectedProcessExit,
     tunnelCompletion: tunnelClient.completion,
     close: async () => {
@@ -289,7 +373,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
       }
 
       restoreArtifactEnvironment?.();
-      restoreProxyEnvironment();
+      restoreProxyEnvironment?.();
     },
     closed,
   };

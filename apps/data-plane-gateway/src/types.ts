@@ -15,6 +15,7 @@ export type DataPlaneGatewayRuntimeConfig = {
   app: DataPlaneGatewayConfig;
   internalAuth: DataPlaneGatewayGlobalConfig["internalAuth"];
   sandbox: DataPlaneGatewayGlobalConfig["sandbox"];
+  telemetry: DataPlaneGatewayGlobalConfig["telemetry"];
 };
 
 export type AppContextBindings = {

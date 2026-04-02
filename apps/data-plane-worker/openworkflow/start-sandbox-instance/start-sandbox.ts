@@ -5,27 +5,16 @@ import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 
 const SandboxRuntimeTokenizerProxyEgressBaseURLEnv =
   "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
-const SandboxRuntimeTelemetryTracesEndpointEnv = "SANDBOX_RUNTIME_TELEMETRY_TRACES_ENDPOINT";
 const SandboxRuntimeSandboxInstanceIDEnv = "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID";
 
 export function createSandboxRuntimeEnv(input: {
   config: DataPlaneWorkerRuntimeConfig;
   sandboxInstanceId: string;
 }): Record<string, string> {
-  const sandboxRuntimeTracesEndpoint =
-    input.config.telemetry.enabled && input.config.sandbox.provider === "docker"
-      ? input.config.app.sandbox.docker?.tracesEndpoint
-      : undefined;
-
   return {
     [SandboxRuntimeTokenizerProxyEgressBaseURLEnv]:
       input.config.app.sandbox.tokenizerProxyEgressBaseUrl,
     [SandboxRuntimeSandboxInstanceIDEnv]: input.sandboxInstanceId,
-    ...(sandboxRuntimeTracesEndpoint === undefined
-      ? {}
-      : {
-          [SandboxRuntimeTelemetryTracesEndpointEnv]: sandboxRuntimeTracesEndpoint,
-        }),
   };
 }
 

@@ -12,6 +12,7 @@ Each workload uses the same main configuration surface:
 - `service`
 - `ingress` where relevant
 - `env`
+- `envOverrides`
 - `secretEnv`
 - `volumeMounts`
 - `volumes`
@@ -34,6 +35,15 @@ ghcr.io/mistlehq
 env:
   - name: NODE_ENV
     value: production
+```
+
+`envOverrides` is a map of environment variable names to replacement values.
+Use it when you need to override one existing env entry, or add a small number of
+extra env vars, without copying the entire `env` list:
+
+```yaml
+envOverrides:
+  MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: ghcr.io/mistlehq/sandbox-base:sha256-tag
 ```
 
 `secretEnv` is a list of Kubernetes Secret references:

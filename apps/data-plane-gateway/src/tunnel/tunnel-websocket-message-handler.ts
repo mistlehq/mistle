@@ -6,12 +6,20 @@ import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import {
   TunnelProtocolTranslator,
   TunnelProtocolViolationError,
+  type TunnelProtocolDelivery,
 } from "./protocol/tunnel-protocol-translator.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
 import { notifyBootstrapPeerOfReleasedInteractiveStreams } from "./tunnel-peer-notifier.js";
 import type { RelayPeerSide } from "./types.js";
 
 export { TunnelProtocolViolationError } from "./protocol/tunnel-protocol-translator.js";
+
+export type TelemetryDelivery = Extract<
+  TunnelProtocolDelivery,
+  {
+    kind: "telemetryOpen" | "telemetryClose" | "telemetryData" | "telemetryInvalidData";
+  }
+>;
 
 /**
  * Normalizes websocket message payloads to the tunnel relay payload types.
@@ -39,6 +47,7 @@ export async function handleTunnelWebSocketMessage(input: {
   clientSessionId: string;
   currentSocket: Pick<WSContext, "send">;
   executionLeaseRepository: ExecutionLeaseRepository;
+  handleTelemetryDelivery?: ((delivery: TelemetryDelivery) => Promise<void>) | undefined;
   interactiveStreamRouter: InteractiveStreamRouter;
   payload: string | ArrayBuffer;
   relayCoordinator: TunnelRelayCoordinator;
@@ -72,7 +81,18 @@ export async function handleTunnelWebSocketMessage(input: {
     return;
   }
 
-  if (translation.delivery.kind === "respond") {
+  if (
+    translation.delivery.kind === "telemetryOpen" ||
+    translation.delivery.kind === "telemetryClose" ||
+    translation.delivery.kind === "telemetryData" ||
+    translation.delivery.kind === "telemetryInvalidData"
+  ) {
+    if (input.handleTelemetryDelivery === undefined) {
+      throw new Error("Telemetry delivery requires a telemetry handler.");
+    }
+
+    await input.handleTelemetryDelivery(translation.delivery);
+  } else if (translation.delivery.kind === "respond") {
     input.currentSocket.send(translation.delivery.payload);
   } else {
     await input.relayCoordinator.forwardPeerMessage({

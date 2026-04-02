@@ -3544,9 +3544,31 @@
                                     "kind": {
                                       "type": "string",
                                       "enum": ["redirect"]
+                                    },
+                                    "ui": {
+                                      "type": "object",
+                                      "properties": {
+                                        "create": {
+                                          "type": "object",
+                                          "properties": {
+                                            "submitLabel": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "helperText": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["submitLabel", "helperText"],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": ["create"],
+                                      "additionalProperties": false
                                     }
                                   },
-                                  "required": ["id", "label", "kind"],
+                                  "required": ["id", "label", "kind", "ui"],
                                   "additionalProperties": false
                                 }
                               ]

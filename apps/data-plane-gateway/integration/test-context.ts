@@ -2,6 +2,9 @@
  * Vitest fixture extension file intentionally uses `vitestIt.extend(...)`.
  */
 
+import { once } from "node:events";
+import { createServer } from "node:http";
+
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
 import {
   createIntegrationRuntimeScopeId,
@@ -50,6 +53,10 @@ export type DataPlaneGatewayIntegrationFixture = {
   databaseStack: DataPlaneGatewayIntegrationDatabaseStack;
   db: DataPlaneDatabase;
   dbPool: Pool;
+  otlpRequests: Array<{
+    body: string;
+    path: string;
+  }>;
 };
 
 type RuntimeStateBackend = DataPlaneGatewayRuntimeConfig["app"]["runtimeState"]["backend"];
@@ -181,6 +188,54 @@ function createRuntimeStateConfig(input: {
   };
 }
 
+async function startOtlpReceiver(): Promise<{
+  close: () => Promise<void>;
+  requests: Array<{
+    body: string;
+    path: string;
+  }>;
+  url: string;
+}> {
+  const requests: Array<{
+    body: string;
+    path: string;
+  }> = [];
+
+  const server = createServer((request, response) => {
+    const chunks: Uint8Array[] = [];
+
+    request.on("data", (chunk: Uint8Array) => {
+      chunks.push(chunk);
+    });
+    request.on("end", () => {
+      requests.push({
+        body: Buffer.concat(chunks).toString("utf8"),
+        path: request.url ?? "/",
+      });
+      response.statusCode = 200;
+      response.setHeader("content-type", "application/json");
+      response.end("{}");
+    });
+  });
+
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected OTLP integration receiver to bind an ephemeral TCP port.");
+  }
+
+  return {
+    requests,
+    url: `http://127.0.0.1:${String(address.port)}`,
+    close: async () => {
+      server.close();
+      await once(server, "close");
+    },
+  };
+}
+
 function createIntegrationIt(backend: RuntimeStateBackend) {
   return vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture }>({
     fixture: [
@@ -194,6 +249,11 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
         });
 
         try {
+          const otlpReceiver = await startOtlpReceiver();
+          cleanupTasks.unshift(async () => {
+            await otlpReceiver.close();
+          });
+
           await resetWorkerDatabaseFromTemplate({
             username: sharedInfraConfig.databaseUsername,
             password: sharedInfraConfig.databasePassword,
@@ -272,6 +332,20 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
                 },
               },
             },
+            telemetry: {
+              enabled: true,
+              debug: false,
+              traces: {
+                endpoint: `${otlpReceiver.url}/v1/traces`,
+              },
+              logs: {
+                endpoint: `${otlpReceiver.url}/v1/logs`,
+              },
+              metrics: {
+                endpoint: `${otlpReceiver.url}/v1/metrics`,
+              },
+              resourceAttributes: "deployment.environment=integration",
+            },
           };
 
           const runtime = createDataPlaneGatewayRuntime(runtimeConfig);
@@ -299,6 +373,7 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
             },
             db,
             dbPool,
+            otlpRequests: otlpReceiver.requests,
           });
         } finally {
           await runCleanupTasks({

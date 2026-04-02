@@ -90,6 +90,12 @@ export type ResolvedIntegrationTargetMetadata = {
         id: string;
         label: string;
         kind: "redirect";
+        ui: {
+          create: {
+            submitLabel: string;
+            helperText: string;
+          };
+        };
       }
   )[];
   supportedWebhookEvents?: ResolvedWebhookEvent[];
@@ -117,6 +123,7 @@ function resolveConnectionMethod(
     id: method.id,
     label: method.label,
     kind: "redirect",
+    ui: method.ui,
   };
 }
 

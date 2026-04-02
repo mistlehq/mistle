@@ -14,7 +14,17 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-export async function applyRuntimeFile(file: RuntimeClientSetupFile): Promise<void> {
+export const RuntimeFileApplyOutcomes = {
+  WRITTEN: "written",
+  SKIPPED_IF_ABSENT: "skipped_if_absent",
+} as const;
+
+export type RuntimeFileApplyOutcome =
+  (typeof RuntimeFileApplyOutcomes)[keyof typeof RuntimeFileApplyOutcomes];
+
+export async function applyRuntimeFile(
+  file: RuntimeClientSetupFile,
+): Promise<RuntimeFileApplyOutcome> {
   const parentDirectory = dirname(file.path);
 
   try {
@@ -27,7 +37,7 @@ export async function applyRuntimeFile(file: RuntimeClientSetupFile): Promise<vo
   }
 
   if (file.writeMode === RuntimeFileWriteMode.IF_ABSENT && (await pathExists(file.path))) {
-    return;
+    return RuntimeFileApplyOutcomes.SKIPPED_IF_ABSENT;
   }
 
   try {
@@ -37,4 +47,6 @@ export async function applyRuntimeFile(file: RuntimeClientSetupFile): Promise<vo
   } catch (error) {
     throw new Error(`failed to write file ${file.path}: ${errorMessage(error)}`);
   }
+
+  return RuntimeFileApplyOutcomes.WRITTEN;
 }
