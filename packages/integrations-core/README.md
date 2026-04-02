@@ -102,6 +102,7 @@ Key fields and what they drive:
 | `oauth2ClientCredentials` (optional)    | OAuth 2.0 client-credentials token exchange behavior              | Machine-to-machine credential resolution             |
 | `redirectHandler` (optional)            | Non-OAuth redirect start/complete behavior                        | Redirect-based connection flows                      |
 | `webhookHandler` (optional)             | Resolve inbound webhook requests to events or immediate responses | Webhook ingest                                       |
+| `webhookSource` (optional)              | Describe inbound webhook source ownership/routing/registration    | Webhook source management + ingest source resolution |
 | `mcp` (optional)                        | Declare one or more MCP servers for this binding                  | MCP collection during compile                        |
 | `mcpConfig` (optional)                  | Declarative MCP config target for an agent                        | Post-compile MCP file update                         |
 | `validateBindingWriteContext(...)`      | Contextual target/connection/binding validation                   | Binding write and compile parity checks              |
@@ -180,6 +181,16 @@ flowchart TD
 - Handler first resolves the inbound request into either an immediate HTTP response or a normalized event.
 - Immediate HTTP response: returned directly and bypasses connection resolution, persistence, and workflow processing.
 - Normalized event: continues through connection resolution and verification (with target and connection secrets), then is persisted and handed to workflow processing.
+
+The framework now distinguishes between two webhook concerns:
+
+- `webhookHandler`
+- runtime request parsing, connection resolution, verification, and event normalization
+
+- `webhookSource`
+- source ownership and routing metadata (`target` vs `connection`, `payload` vs `path`)
+- provider registration lifecycle (`implicit` vs `managed`)
+- source description metadata for higher-level control-plane APIs
 
 ## Built-In Integrations
 

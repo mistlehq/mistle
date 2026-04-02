@@ -1147,6 +1147,126 @@ export type IntegrationWebhookEventDefinition = {
   parameters?: ReadonlyArray<IntegrationWebhookEventParameterDefinition> | undefined;
 };
 
+export type IntegrationWebhookSourceOwnerScope = "target" | "connection";
+
+export const IntegrationWebhookSourceOwnerScopes: {
+  TARGET: IntegrationWebhookSourceOwnerScope;
+  CONNECTION: IntegrationWebhookSourceOwnerScope;
+} = {
+  TARGET: "target",
+  CONNECTION: "connection",
+};
+
+export type IntegrationWebhookSourceRoutingStrategy = "payload" | "path";
+
+export const IntegrationWebhookSourceRoutingStrategies: {
+  PAYLOAD: IntegrationWebhookSourceRoutingStrategy;
+  PATH: IntegrationWebhookSourceRoutingStrategy;
+} = {
+  PAYLOAD: "payload",
+  PATH: "path",
+};
+
+export type IntegrationWebhookSourceLifecycle = "implicit" | "managed";
+
+export const IntegrationWebhookSourceLifecycles: {
+  IMPLICIT: IntegrationWebhookSourceLifecycle;
+  MANAGED: IntegrationWebhookSourceLifecycle;
+} = {
+  IMPLICIT: "implicit",
+  MANAGED: "managed",
+};
+
+export type IntegrationWebhookSourceDescriptor = {
+  displayName: string;
+  callbackUrl?: string | undefined;
+  providerMetadata: Record<string, unknown>;
+};
+
+export type IntegrationWebhookSource = {
+  id: string;
+  targetKey: string;
+  ownerScope: IntegrationWebhookSourceOwnerScope;
+  organizationId?: string | undefined;
+  integrationConnectionId?: string | undefined;
+  displayName?: string | undefined;
+  endpointKey?: string | undefined;
+  remoteRegistrationId?: string | undefined;
+  providerMetadata: Record<string, unknown>;
+};
+
+export type IntegrationWebhookSourceDescribeInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection?:
+    | (IntegrationConnection & {
+        config: TConnectionConfig;
+      })
+    | undefined;
+  source: IntegrationWebhookSource;
+};
+
+export type IntegrationWebhookSourceRegistrationInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection?:
+    | (IntegrationConnection & {
+        config: TConnectionConfig;
+      })
+    | undefined;
+  source: IntegrationWebhookSource;
+  webhookSecret?: string | undefined;
+};
+
+export type IntegrationWebhookSourceRegistrationResult = {
+  remoteRegistrationId?: string | undefined;
+  providerMetadata?: Record<string, unknown> | undefined;
+};
+
+export type IntegrationWebhookSourceCapability<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  ownerScope: IntegrationWebhookSourceOwnerScope;
+  routingStrategy: IntegrationWebhookSourceRoutingStrategy;
+  lifecycle: IntegrationWebhookSourceLifecycle;
+  describeSource(
+    input: IntegrationWebhookSourceDescribeInput<TTargetConfig, TTargetSecrets, TConnectionConfig>,
+  ): MaybePromise<IntegrationWebhookSourceDescriptor>;
+  createRegistration?(
+    input: IntegrationWebhookSourceRegistrationInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<IntegrationWebhookSourceRegistrationResult>;
+  updateRegistration?(
+    input: IntegrationWebhookSourceRegistrationInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<IntegrationWebhookSourceRegistrationResult>;
+  deleteRegistration?(
+    input: IntegrationWebhookSourceRegistrationInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<void>;
+};
+
 export type IntegrationDefinition<
   TTargetConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
     Record<string, unknown>
@@ -1215,6 +1335,11 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,
     Record<string, string>
+  >;
+  webhookSource?: IntegrationWebhookSourceCapability<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    TConnectionConfig
   >;
   resourceDefinitions?: ReadonlyArray<IntegrationResourceDefinition>;
   resourceSyncTriggers?: ReadonlyArray<IntegrationResourceSyncTrigger>;

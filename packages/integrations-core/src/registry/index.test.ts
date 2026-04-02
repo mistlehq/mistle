@@ -6,7 +6,12 @@ import {
   IntegrationDefinitionRegistryError,
 } from "../errors/index.js";
 import type { IntegrationDefinition } from "../types/index.js";
-import { IntegrationConnectionMethodIds } from "../types/index.js";
+import {
+  IntegrationConnectionMethodIds,
+  IntegrationWebhookSourceLifecycles,
+  IntegrationWebhookSourceOwnerScopes,
+  IntegrationWebhookSourceRoutingStrategies,
+} from "../types/index.js";
 import { IntegrationRegistry } from "./index.js";
 
 const ConfigSchema = z.record(z.string(), z.unknown());
@@ -303,5 +308,89 @@ describe("integration registry", () => {
         }),
       }),
     ).toThrow(IntegrationDefinitionRegistryError);
+  });
+
+  it("registers definitions with webhook source capability metadata", () => {
+    const registry = new IntegrationRegistry();
+
+    registry.register({
+      familyId: "github",
+      variantId: "github-cloud",
+      kind: "git",
+      displayName: "GitHub",
+      logoKey: "github",
+      targetConfigSchema: ConfigSchema,
+      targetSecretSchema: EmptySecretsSchema,
+      bindingConfigSchema: ConfigSchema,
+      connectionMethods: GitHubConnectionMethods,
+      webhookSource: {
+        ownerScope: IntegrationWebhookSourceOwnerScopes.TARGET,
+        routingStrategy: IntegrationWebhookSourceRoutingStrategies.PAYLOAD,
+        lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
+        async describeSource(input) {
+          return {
+            displayName: input.source.displayName ?? "GitHub App webhook",
+            callbackUrl: `/v1/integration/webhooks/${input.targetKey}`,
+            providerMetadata: input.source.providerMetadata,
+          };
+        },
+      },
+      compileBinding: () => ({
+        egressRoutes: [],
+        artifacts: [],
+        runtimeClients: [],
+      }),
+    });
+
+    expect(
+      registry.getDefinition({
+        familyId: "github",
+        variantId: "github-cloud",
+      })?.webhookSource,
+    ).toMatchObject({
+      ownerScope: "target",
+      routingStrategy: "payload",
+      lifecycle: "implicit",
+    });
+  });
+
+  it("rejects definitions with invalid webhook source metadata", () => {
+    const registry = new IntegrationRegistry();
+    const definition: IntegrationDefinition = {
+      familyId: "github",
+      variantId: "github-cloud",
+      kind: "git",
+      displayName: "GitHub",
+      logoKey: "github",
+      targetConfigSchema: ConfigSchema,
+      targetSecretSchema: EmptySecretsSchema,
+      bindingConfigSchema: ConfigSchema,
+      connectionMethods: GitHubConnectionMethods,
+      webhookSource: {
+        ownerScope: IntegrationWebhookSourceOwnerScopes.TARGET,
+        routingStrategy: IntegrationWebhookSourceRoutingStrategies.PAYLOAD,
+        lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
+        async describeSource(input) {
+          return {
+            displayName: input.source.displayName ?? "GitHub App webhook",
+            callbackUrl: `/v1/integration/webhooks/${input.targetKey}`,
+            providerMetadata: input.source.providerMetadata,
+          };
+        },
+      },
+      compileBinding: () => ({
+        egressRoutes: [],
+        artifacts: [],
+        runtimeClients: [],
+      }),
+    };
+
+    if (definition.webhookSource === undefined) {
+      throw new Error("Expected webhookSource to be defined.");
+    }
+
+    Reflect.set(definition.webhookSource, "ownerScope", "");
+
+    expect(() => registry.register(definition)).toThrow(IntegrationDefinitionRegistryError);
   });
 });

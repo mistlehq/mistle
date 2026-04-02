@@ -161,6 +161,32 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
       }
     }
   }
+
+  const webhookSource = input.webhookSource;
+  if (webhookSource === undefined) {
+    return;
+  }
+
+  if (webhookSource.ownerScope.trim().length === 0) {
+    throw new IntegrationDefinitionRegistryError(
+      DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+      "Integration definition webhookSource.ownerScope must be non-empty.",
+    );
+  }
+
+  if (webhookSource.routingStrategy.trim().length === 0) {
+    throw new IntegrationDefinitionRegistryError(
+      DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+      "Integration definition webhookSource.routingStrategy must be non-empty.",
+    );
+  }
+
+  if (webhookSource.lifecycle.trim().length === 0) {
+    throw new IntegrationDefinitionRegistryError(
+      DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+      "Integration definition webhookSource.lifecycle must be non-empty.",
+    );
+  }
 }
 
 export class IntegrationRegistry implements IntegrationDefinitionResolver {
