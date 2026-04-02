@@ -44,14 +44,29 @@ const TemplateTokenPattern = /\{\{([A-Za-z0-9_.]+)\}\}/g;
 
 function resolveAgentInstructionsTooltipSpace(view: EditorView) {
   const documentElement = view.dom.ownerDocument.documentElement;
-  const body = view.dom.ownerDocument.body;
 
   return {
     left: 0,
     top: 0,
     right: documentElement.clientWidth,
-    bottom: Math.max(documentElement.clientHeight, documentElement.scrollHeight, body.scrollHeight),
+    bottom: documentElement.clientHeight,
   };
+}
+
+function acceptCompletionOnTab(view: EditorView): boolean {
+  if (completionStatus(view.state) === null) {
+    return false;
+  }
+
+  return acceptCompletion(view);
+}
+
+function supportsDrawSelection(): boolean {
+  if (typeof Range === "undefined") {
+    return false;
+  }
+
+  return typeof Range.prototype.getClientRects === "function";
 }
 
 function createAgentInstructionsEditorTheme(): ReturnType<typeof EditorView.theme> {
@@ -237,7 +252,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
   const extensions = useMemo(
     () => [
       history(),
-      drawSelection(),
+      ...(supportsDrawSelection() ? [drawSelection()] : []),
       EditorState.languageData.of(() => [
         {
           closeBrackets: {
@@ -272,9 +287,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
           },
           {
             key: "Tab",
-            run: acceptCompletion,
-            preventDefault: true,
-            stopPropagation: true,
+            run: acceptCompletionOnTab,
           },
         ]),
       ),
