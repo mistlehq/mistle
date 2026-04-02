@@ -238,10 +238,31 @@ export function useSessionWorkbenchCodexRecovery(input: {
   sandboxStatus: WorkbenchSandboxLifecycleStatus;
   transportState: ReturnType<typeof useCodexSessionState>["lifecycle"]["transportState"];
 }) {
-  const [codexRecoveryState, dispatchCodexRecoveryEvent] = useReducer(reduceCodexRecoveryState, {
-    kind: "idle",
-  });
+  const [codexRecoveryBaseState, dispatchCodexRecoveryEvent] = useReducer(
+    reduceCodexRecoveryState,
+    {
+      kind: "idle",
+    },
+  );
   const lastRecoverableDisconnectIdRef = useRef<number | null>(null);
+
+  const codexRecoveryState =
+    input.transportState === "connected"
+      ? reduceCodexRecoveryState(codexRecoveryBaseState, {
+          type: "session_connected",
+        })
+      : reduceCodexRecoveryState(codexRecoveryBaseState, {
+          type: "sync_observed",
+          observation: {
+            canConnect: input.canConnect,
+            connected: false,
+            hasLifecycleError: input.hasLifecycleError,
+            isStartingSession: input.isStartingSession,
+            isWaitingForAutomationThread: input.isWaitingForAutomationThread,
+            sandboxInstanceId: input.sandboxInstanceId,
+            sandboxStatus: input.sandboxStatus,
+          },
+        });
 
   useEffect(() => {
     if (input.recoverableDisconnect === null) {
@@ -286,29 +307,6 @@ export function useSessionWorkbenchCodexRecovery(input: {
       type: "session_connected",
     });
   }, [input.transportState]);
-
-  useEffect(() => {
-    dispatchCodexRecoveryEvent({
-      type: "sync_observed",
-      observation: {
-        canConnect: input.canConnect,
-        connected: input.transportState === "connected",
-        hasLifecycleError: input.hasLifecycleError,
-        isStartingSession: input.isStartingSession,
-        isWaitingForAutomationThread: input.isWaitingForAutomationThread,
-        sandboxInstanceId: input.sandboxInstanceId,
-        sandboxStatus: input.sandboxStatus,
-      },
-    });
-  }, [
-    input.canConnect,
-    input.hasLifecycleError,
-    input.isStartingSession,
-    input.isWaitingForAutomationThread,
-    input.sandboxInstanceId,
-    input.sandboxStatus,
-    input.transportState,
-  ]);
 
   useEffect(() => {
     if (input.mainPanelTransitionState !== "stable_chat") {
