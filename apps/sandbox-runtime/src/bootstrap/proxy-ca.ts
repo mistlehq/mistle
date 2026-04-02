@@ -29,10 +29,6 @@ type ProxyCaVerificationPaths = {
   certificatesDirectoryPath?: string;
 };
 
-function normalizePem(pem: string): string {
-  return pem.trim();
-}
-
 function buildExecErrorMessage(input: { tool: string; args: string[]; error: unknown }): string {
   if (!(input.error instanceof Error)) {
     return `failed to run ${input.tool}: ${String(input.error)}`;
@@ -140,10 +136,6 @@ async function closeHttpsServer(server: HttpsServer): Promise<void> {
   });
 }
 
-async function createTemporaryVerificationDirectory(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "mistle-proxy-ca-verify-"));
-}
-
 function extractLeafCertificatePem(certificateChainPem: string): string {
   const endMarker = "-----END CERTIFICATE-----";
   const endIndex = certificateChainPem.indexOf(endMarker);
@@ -213,7 +205,7 @@ export async function verifyInstalledProxyCaCertificate(
   const certificatesDirectoryPath =
     paths?.certificatesDirectoryPath ?? SystemCertificatesDirectoryPath;
   const installedCertificatePem = await readFile(installedCertificatePath, "utf8");
-  if (normalizePem(installedCertificatePem) !== normalizePem(certificatePem)) {
+  if (installedCertificatePem.trim() !== certificatePem.trim()) {
     throw new Error(`installed proxy ca certificate at ${installedCertificatePath} did not match`);
   }
 
@@ -231,7 +223,7 @@ export async function verifyInstalledProxyCaCertificate(
   for (const entry of matchingHashEntries) {
     const candidatePath = join(certificatesDirectoryPath, entry);
     const candidatePem = await readFile(candidatePath, "utf8").catch(() => undefined);
-    if (candidatePem !== undefined && normalizePem(candidatePem) === normalizePem(certificatePem)) {
+    if (candidatePem !== undefined && candidatePem.trim() === certificatePem.trim()) {
       return;
     }
   }
@@ -251,7 +243,7 @@ export async function verifyProxyCaTrustChain(
     caPrivateKeyPem: proxyCa.privateKeyPem,
     serverName: "localhost",
   });
-  const verificationDirectory = await createTemporaryVerificationDirectory();
+  const verificationDirectory = await mkdtemp(join(tmpdir(), "mistle-proxy-ca-verify-"));
 
   try {
     const leafCertificatePath = join(verificationDirectory, "leaf.pem");
