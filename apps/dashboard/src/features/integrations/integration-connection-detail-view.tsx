@@ -203,7 +203,7 @@ function EditableConnectionTitle(input: {
       }}
       {...(connectionErrorMessage === undefined
         ? {}
-        : { externalSaveErrorMessage: connectionErrorMessage })}
+        : { saveErrorMessage: connectionErrorMessage })}
     />
   );
 }

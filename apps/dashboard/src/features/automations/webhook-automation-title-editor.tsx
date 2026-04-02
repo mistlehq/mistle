@@ -22,9 +22,7 @@ export function WebhookAutomationTitleEditor(input: {
       validate={(nextValue) => {
         return nextValue.trim().length === 0 ? "Automation name is required." : null;
       }}
-      {...(input.errorMessage === undefined
-        ? {}
-        : { externalSaveErrorMessage: input.errorMessage })}
+      {...(input.errorMessage === undefined ? {} : { saveErrorMessage: input.errorMessage })}
     />
   );
 }

@@ -141,7 +141,7 @@ describe("AutoSaveEditableHeading", () => {
           <AutoSaveEditableHeading
             ariaLabel="Heading"
             editButtonLabel="Edit heading"
-            externalSaveErrorMessage="Could not update heading."
+            saveErrorMessage="Could not update heading."
             initialValue="Repo Maintainer"
             initiallyEditing={true}
             onSave={async () => {}}
@@ -166,7 +166,7 @@ describe("AutoSaveEditableHeading", () => {
       <AutoSaveEditableHeading
         ariaLabel="Heading"
         editButtonLabel="Edit heading"
-        externalSaveErrorMessage="Could not update heading."
+        saveErrorMessage="Could not update heading."
         initialValue="Repo Maintainer"
         onSave={async () => {}}
         validate={() => null}
@@ -185,7 +185,7 @@ describe("AutoSaveEditableHeading", () => {
       const [errorState, setErrorState] = useState<{
         kind: "validation" | "save";
         message: string;
-      }>({
+      } | null>({
         kind: "validation",
         message: "Heading is required.",
       });
@@ -203,12 +203,20 @@ describe("AutoSaveEditableHeading", () => {
           >
             Switch error
           </button>
+          <button
+            onClick={() => {
+              setErrorState(null);
+            }}
+            type="button"
+          >
+            Clear error
+          </button>
           <AutoSaveEditableHeading
             ariaLabel="Heading"
             editButtonLabel="Edit heading"
             initialErrorState={errorState}
             initialValue="Repo Maintainer"
-            initiallyEditing={true}
+            initiallyEditing={errorState !== null}
             onSave={async () => {}}
             validate={() => null}
           />
@@ -220,6 +228,30 @@ describe("AutoSaveEditableHeading", () => {
 
     expect(screen.getByText("Heading is required.")).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Switch error" }));
+    expect(screen.getByText("Could not update heading.")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Clear error" }));
+    expect(screen.queryByText("Could not update heading.")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Heading" })).toBeNull();
+  });
+
+  it("keeps a parent-owned save error visible when escape cancels a changed draft", () => {
+    render(
+      <AutoSaveEditableHeading
+        ariaLabel="Heading"
+        editButtonLabel="Edit heading"
+        saveErrorMessage="Could not update heading."
+        initialValue="Repo Maintainer"
+        onSave={async () => {}}
+        validate={() => null}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Heading" });
+    fireEvent.change(input, { target: { value: "Retry Title" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(screen.getByRole("textbox", { name: "Heading" })).toBeDefined();
+    expect(screen.getByDisplayValue("Repo Maintainer")).toBeDefined();
     expect(screen.getByText("Could not update heading.")).toBeDefined();
   });
 
@@ -246,7 +278,7 @@ describe("AutoSaveEditableHeading", () => {
           successFadeDurationMs={20}
           successVisibleDurationMs={40}
           validate={() => null}
-          {...(errorState === null ? {} : { externalSaveErrorMessage: errorState.message })}
+          {...(errorState === null ? {} : { saveErrorMessage: errorState.message })}
         />
       );
     }

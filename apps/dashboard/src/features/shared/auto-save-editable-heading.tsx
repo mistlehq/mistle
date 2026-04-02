@@ -19,7 +19,7 @@ export type AutoSaveEditableHeadingProps = {
   ariaLabel: string;
   editButtonLabel: string;
   disabled?: boolean;
-  externalSaveErrorMessage?: string;
+  saveErrorMessage?: string;
   placeholder?: string;
   maxWidthClassName?: string;
   headingTag?: "div" | "h1" | "h2";
@@ -39,7 +39,7 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
   const successVisibleDurationMs = input.successVisibleDurationMs ?? 2200;
   const successFadeDurationMs = input.successFadeDurationMs ?? 700;
   const scheduler = input.scheduler ?? systemScheduler;
-  const externalSaveErrorMessage = input.externalSaveErrorMessage;
+  const saveErrorMessage = input.saveErrorMessage;
   const initialErrorKind = input.initialErrorState?.kind ?? null;
   const initialErrorMessage = input.initialErrorState?.message ?? null;
   const [isEditing, setIsEditing] = useState(
@@ -70,35 +70,37 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
   }, [input.initialValue, input.initiallyEditing, scheduler]);
 
   useEffect(() => {
-    if (input.initialErrorState == null) {
-      return;
-    }
-
+    saveSequenceRef.current += 1;
+    clearPendingStatusTimeouts({
+      fadeEndTimeoutRef,
+      fadeStartTimeoutRef,
+      scheduler,
+    });
     setDraftValue(input.initialValue);
     setValue(input.initialValue);
-    setErrorState(input.initialErrorState);
     setStatus("idle");
-    setIsEditing(input.initiallyEditing ?? true);
+    setErrorState(input.initialErrorState ?? null);
+    setIsEditing(input.initiallyEditing ?? input.initialErrorState != null);
   }, [
     initialErrorKind,
     initialErrorMessage,
-    input.initialErrorState,
     input.initialValue,
     input.initiallyEditing,
+    scheduler,
   ]);
 
   useEffect(() => {
-    if (externalSaveErrorMessage === undefined) {
+    if (saveErrorMessage === undefined) {
       return;
     }
 
     setErrorState({
       kind: "save",
-      message: externalSaveErrorMessage,
+      message: saveErrorMessage,
     });
     setStatus("idle");
     setIsEditing(true);
-  }, [externalSaveErrorMessage]);
+  }, [saveErrorMessage]);
 
   useEffect(() => {
     return () => {
@@ -117,10 +119,10 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
 
     const normalizedDraftValue = draftValue.trim();
     if (normalizedDraftValue === value.trim()) {
-      if (externalSaveErrorMessage !== undefined) {
+      if (saveErrorMessage !== undefined) {
         setErrorState({
           kind: "save",
-          message: externalSaveErrorMessage,
+          message: saveErrorMessage,
         });
         setStatus("idle");
         setIsEditing(true);
@@ -223,10 +225,10 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
           }
 
           if (event.key === "Escape" && (input.cancelOnEscape ?? true)) {
-            if (externalSaveErrorMessage !== undefined && draftValue.trim() === value.trim()) {
+            if (saveErrorMessage !== undefined) {
               setErrorState({
                 kind: "save",
-                message: externalSaveErrorMessage,
+                message: saveErrorMessage,
               });
               setStatus("idle");
               setIsEditing(true);
@@ -274,7 +276,14 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
               scheduler,
             });
             setDraftValue(value);
-            setErrorState(null);
+            setErrorState(
+              saveErrorMessage === undefined
+                ? null
+                : {
+                    kind: "save",
+                    message: saveErrorMessage,
+                  },
+            );
             setStatus("idle");
             setIsEditing(true);
           }}
