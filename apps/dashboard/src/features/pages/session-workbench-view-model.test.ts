@@ -27,7 +27,7 @@ describe("resolveSandboxHeaderStatusUi", () => {
         sessionConnectionStatus: "connected",
       } as const,
       expected: {
-        label: "Sandbox failed",
+        label: "Failed",
         variant: "destructive",
       },
     },
@@ -38,7 +38,7 @@ describe("resolveSandboxHeaderStatusUi", () => {
         sessionConnectionStatus: "connecting",
       } as const,
       expected: {
-        label: "Starting sandbox",
+        label: "Starting",
         variant: "outline",
       },
     },
@@ -60,7 +60,7 @@ describe("resolveSandboxHeaderStatusUi", () => {
         sessionConnectionStatus: "reconnecting",
       } as const,
       expected: {
-        label: "Resuming sandbox",
+        label: "Resuming",
         variant: "outline",
       },
     },
@@ -71,7 +71,7 @@ describe("resolveSandboxHeaderStatusUi", () => {
         sessionConnectionStatus: "connected",
       } as const,
       expected: {
-        label: "Sandbox stopped",
+        label: "Stopped",
         variant: "outline",
       },
     },

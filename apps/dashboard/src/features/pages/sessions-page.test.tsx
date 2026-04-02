@@ -264,7 +264,7 @@ describe("SessionsPage", () => {
     );
 
     expect(markup).toContain("View failure details");
-    expect(markup).toContain("Sandbox failed");
+    expect(markup).toContain("Failed");
     expect(markup).not.toContain("sandbox_start_failed");
     expect(markup).not.toContain("Failed to start sandbox runtime.");
     expect(markup).not.toContain("text-destructive whitespace-pre-wrap text-xs");
@@ -272,11 +272,11 @@ describe("SessionsPage", () => {
 
   it("uses the same badge labels as the workbench header mapper", () => {
     expect(resolveSandboxStatusBadgeUi(null).label).toBe("Loading sandbox status");
-    expect(resolveSandboxStatusBadgeUi("pending").label).toBe("Starting sandbox");
-    expect(resolveSandboxStatusBadgeUi("starting").label).toBe("Starting sandbox");
-    expect(resolveSandboxStatusBadgeUi("running").label).toBe("Connected");
-    expect(resolveSandboxStatusBadgeUi("stopped").label).toBe("Sandbox stopped");
-    expect(resolveSandboxStatusBadgeUi("failed").label).toBe("Sandbox failed");
+    expect(resolveSandboxStatusBadgeUi("pending").label).toBe("Pending");
+    expect(resolveSandboxStatusBadgeUi("starting").label).toBe("Starting");
+    expect(resolveSandboxStatusBadgeUi("running").label).toBe("Running");
+    expect(resolveSandboxStatusBadgeUi("stopped").label).toBe("Stopped");
+    expect(resolveSandboxStatusBadgeUi("failed").label).toBe("Failed");
   });
 
   it("routes stopped sessions into the workbench route directly", () => {
