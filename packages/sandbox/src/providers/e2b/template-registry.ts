@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 
-import { Template, type ConnectionOpts } from "e2b";
+import type { ConnectionOpts } from "e2b";
 
-import { E2BClientOperationIds, mapE2BClientError } from "./client-errors.js";
+import { ensureE2BTemplateAlias } from "./template-build.js";
 
 const E2BTemplateAliasPrefix = "mistle-sandbox-base";
 
@@ -41,18 +41,11 @@ export class E2BApiTemplateRegistry implements E2BTemplateRegistry {
   }
 
   async #resolveOrBuildAlias(baseRef: string): Promise<string> {
-    try {
-      const alias = createE2BTemplateAlias(baseRef);
-      const templateExists = await Template.exists(alias, this.#connectionOptions);
+    const result = await ensureE2BTemplateAlias({
+      baseRef,
+      connectionOptions: this.#connectionOptions,
+    });
 
-      if (!templateExists) {
-        const template = Template().fromImage(baseRef);
-        await Template.build(template, alias, this.#connectionOptions);
-      }
-
-      return alias;
-    } catch (error) {
-      throw mapE2BClientError(E2BClientOperationIds.RESOLVE_TEMPLATE_ALIAS, error);
-    }
+    return result.alias;
   }
 }
