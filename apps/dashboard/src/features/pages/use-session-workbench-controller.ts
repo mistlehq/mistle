@@ -29,6 +29,9 @@ import {
 } from "./use-session-workbench-lifecycle-state.js";
 
 type SessionWorkbenchState = {
+  sandboxStatusReadState: ReturnType<
+    typeof useSessionWorkbenchLifecycleState
+  >["sandboxStatusReadState"];
   connectionReadiness: {
     canConnect: boolean;
     reason:
@@ -185,6 +188,7 @@ export function useSessionWorkbenchController(input: {
 
   return {
     workbench: {
+      sandboxStatusReadState: workbenchLifecycleState.sandboxStatusReadState,
       connectionReadiness: workbenchLifecycleState.connectionReadiness,
       stoppedSessionState: workbenchLifecycleState.stoppedSessionState,
       hasTopAlert: workbenchLifecycleState.hasTopAlert,

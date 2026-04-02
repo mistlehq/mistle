@@ -21,6 +21,8 @@ const AutomationSessionPreparationTimeoutMessage =
 const MaxCodexReconnectAttempts = 3;
 const CodexReconnectLimitMessage = `Could not reconnect session after ${String(MaxCodexReconnectAttempts)} attempts.`;
 
+type SandboxStatusReadState = "error" | "loading" | "ready";
+
 type SandboxAutomationConversation = {
   conversationId: string;
   routeId: string | null;
@@ -352,6 +354,27 @@ export function hasFreshSandboxStatusReadSinceRecoveryBoundary(input: {
   return input.currentDataUpdatedAtMs > input.recoveryBoundaryDataUpdatedAtMs;
 }
 
+function resolveSandboxStatusReadState(input: {
+  hasFreshSandboxStatusSinceMount: boolean;
+  hasFreshSandboxStatusSinceRecovery: boolean;
+  hasStatusQueryError: boolean;
+}): SandboxStatusReadState {
+  if (input.hasStatusQueryError) {
+    return "error";
+  }
+
+  return input.hasFreshSandboxStatusSinceMount && input.hasFreshSandboxStatusSinceRecovery
+    ? "ready"
+    : "loading";
+}
+
+function resolveTrustedSandboxStatus(input: {
+  sandboxStatusReadState: SandboxStatusReadState;
+  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed" | null;
+}): "pending" | "starting" | "running" | "stopped" | "failed" | null {
+  return input.sandboxStatusReadState === "ready" ? input.sandboxStatus : null;
+}
+
 export function shouldShowResumeInFlightState(input: {
   hasAttemptedInitialStoppedResume: boolean;
   resumeActionErrorMessage: string | null;
@@ -552,16 +575,22 @@ export function useSessionWorkbenchLifecycleState(input: {
     recoveryBoundaryDataUpdatedAtMs: recoveryStatusBoundaryDataUpdatedAtRef.current,
     currentDataUpdatedAtMs: sandboxStatusQuery.dataUpdatedAt,
   });
-  const hasFreshSandboxStatus =
-    hasFreshSandboxStatusSinceMount && hasFreshSandboxStatusSinceRecovery;
-  const sandboxStatus = hasFreshSandboxStatus ? (sandboxStatusQuery.data?.status ?? null) : null;
+  const sandboxStatusReadState = resolveSandboxStatusReadState({
+    hasFreshSandboxStatusSinceMount,
+    hasFreshSandboxStatusSinceRecovery,
+    hasStatusQueryError: sandboxStatusQuery.isError,
+  });
+  const trustedSandboxStatus = resolveTrustedSandboxStatus({
+    sandboxStatusReadState,
+    sandboxStatus: sandboxStatusQuery.data?.status ?? null,
+  });
   const shouldAttemptRecoverableStoppedResume =
     input.sandboxInstanceId !== null &&
-    sandboxStatus === "stopped" &&
+    trustedSandboxStatus === "stopped" &&
     recoverableDisconnect !== null;
   const shouldAttemptInitialStoppedResume =
     input.sandboxInstanceId !== null &&
-    sandboxStatus === "stopped" &&
+    trustedSandboxStatus === "stopped" &&
     recoverableDisconnect === null &&
     !hasAttemptedInitialStoppedResume;
   const isShowingResumeInFlightState = shouldShowResumeInFlightState({
@@ -570,23 +599,23 @@ export function useSessionWorkbenchLifecycleState(input: {
     shouldAttemptInitialStoppedResume:
       shouldAttemptInitialStoppedResume || shouldAttemptRecoverableStoppedResume,
     isResumingStoppedSandbox,
-    sandboxStatus,
+    sandboxStatus: trustedSandboxStatus,
   });
   const sessionEntryPhase = resolveSessionEntryPhase({
     connectedSession: sessionSnapshot !== null,
     hasResumeInFlightState: isShowingResumeInFlightState,
     isStatusPending: sandboxStatusQuery.isPending,
-    sandboxStatus,
+    sandboxStatus: trustedSandboxStatus,
   });
-  const effectiveSandboxStatus = resolveSandboxStatusForEntryPhase(sessionEntryPhase);
+  const displaySandboxLifecycleStatus = resolveSandboxStatusForEntryPhase(sessionEntryPhase);
   const automationConversation = sandboxStatusQuery.data?.automationConversation ?? null;
   const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
-    sandboxStatus: effectiveSandboxStatus,
+    sandboxStatus: displaySandboxLifecycleStatus,
     automationConversation,
   });
   const connectionReadiness = resolveSessionConnectionReadiness({
     sandboxInstanceId: input.sandboxInstanceId,
-    sandboxStatus: effectiveSandboxStatus,
+    sandboxStatus: displaySandboxLifecycleStatus,
     isStatusPending: sandboxStatusQuery.isPending,
   });
   const stoppedSessionMessage = resolveStoppedSessionMessageForEntryPhase({
@@ -728,7 +757,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     recoveryBaseMessage: codexRecoveryBaseMessage,
     recoveryErrorMessage: codexRecoveryErrorMessage,
     reconnectAttemptCount: codexReconnectAttemptCount,
-    sandboxStatus: effectiveSandboxStatus,
+    sandboxStatus: displaySandboxLifecycleStatus,
   });
 
   useEffect(() => {
@@ -741,12 +770,12 @@ export function useSessionWorkbenchLifecycleState(input: {
         isStartingSession,
         isWaitingForAutomationThread,
         sandboxInstanceId: input.sandboxInstanceId,
-        sandboxStatus: effectiveSandboxStatus,
+        sandboxStatus: displaySandboxLifecycleStatus,
       },
     });
   }, [
     connectionReadiness.canConnect,
-    effectiveSandboxStatus,
+    displaySandboxLifecycleStatus,
     input.sandboxInstanceId,
     isStartingSession,
     isWaitingForAutomationThread,
@@ -855,7 +884,10 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxStatusQuery.refetch,
   ]);
 
-  const sandboxHeaderStatusUi = resolveSandboxStatusBadgeUi(effectiveSandboxStatus);
+  const sandboxHeaderStatusUi =
+    sandboxStatusReadState === "loading"
+      ? resolveSandboxStatusBadgeUi(null)
+      : resolveSandboxStatusBadgeUi(displaySandboxLifecycleStatus);
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: sandboxStatusQuery.isError,
@@ -869,7 +901,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   const requestStoppedSandboxResume = useCallback(async (): Promise<void> => {
     if (
       input.sandboxInstanceId === null ||
-      sandboxStatus !== "stopped" ||
+      trustedSandboxStatus !== "stopped" ||
       isResumingStoppedSandbox
     ) {
       return;
@@ -945,17 +977,18 @@ export function useSessionWorkbenchLifecycleState(input: {
     input.queryClient,
     input.sandboxInstanceId,
     isResumingStoppedSandbox,
-    sandboxStatus,
+    trustedSandboxStatus,
     sandboxStatusQuery.refetch,
   ]);
 
   return {
     sessionSnapshot,
+    sandboxStatusReadState,
     connectionReadiness,
     hasTopAlert,
     isResumingStoppedSandbox: isShowingResumeInFlightState,
     requestStoppedSandboxResume,
-    sandboxLifecycleStatus: effectiveSandboxStatus,
+    sandboxLifecycleStatus: displaySandboxLifecycleStatus,
     sandboxFailureMessage,
     sandboxStatusQuery,
     sessionReconnectState: {

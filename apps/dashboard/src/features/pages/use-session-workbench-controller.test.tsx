@@ -66,6 +66,7 @@ describe("useSessionWorkbenchController", () => {
     });
 
     expect(Object.keys(result.current)).toEqual(["workbench", "conversationPane"]);
+    expect(result.current.workbench.sandboxStatusReadState).toBe("loading");
     expect(result.current.workbench.connectionReadiness).toEqual({
       canConnect: false,
       reason: "missing-session",
