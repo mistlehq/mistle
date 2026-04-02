@@ -79,10 +79,6 @@ async function closeServer(server: Server): Promise<void> {
   });
 }
 
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 async function closeHttpsServer(server: HttpsServer): Promise<void> {
   if (!server.listening) {
     return;
@@ -354,7 +350,9 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
         resolve();
       });
     }).catch((error: unknown) => {
-      throw new Error(`failed to bind listen addr ${config.listenAddr}: ${describeError(error)}`);
+      throw new Error(
+        `failed to bind listen addr ${config.listenAddr}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     });
     logger.logEvent({
       level: "info",
@@ -503,7 +501,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     }
 
     throw new Error(
-      `failed during sandbox runtime startup (${startupStage}): ${describeError(error)}`,
+      `failed during sandbox runtime startup (${startupStage}): ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
