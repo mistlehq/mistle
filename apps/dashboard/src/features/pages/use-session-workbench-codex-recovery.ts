@@ -220,6 +220,42 @@ export function resolveCodexReconnectMessage(input: {
   return `${input.recoveryBaseMessage} Reconnecting session${input.reconnectAttemptCount > 0 ? ` (attempt ${String(input.reconnectAttemptCount)} of ${String(MaxCodexReconnectAttempts)})` : ""}.`;
 }
 
+export function resolveCodexRecoveryStateForRender(input: {
+  baseState: CodexRecoveryState;
+  canConnect: boolean;
+  hasLifecycleError: boolean;
+  isStartingSession: boolean;
+  isWaitingForAutomationThread: boolean;
+  previousSandboxInstanceId: string | null;
+  sandboxInstanceId: string | null;
+  sandboxStatus: WorkbenchSandboxLifecycleStatus;
+  transportState: ReturnType<typeof useCodexSessionState>["lifecycle"]["transportState"];
+}): CodexRecoveryState {
+  const sandboxScopedState =
+    input.previousSandboxInstanceId === input.sandboxInstanceId
+      ? input.baseState
+      : reduceCodexRecoveryState(input.baseState, {
+          type: "sandbox_changed",
+        });
+
+  return input.transportState === "connected"
+    ? reduceCodexRecoveryState(sandboxScopedState, {
+        type: "session_connected",
+      })
+    : reduceCodexRecoveryState(sandboxScopedState, {
+        type: "sync_observed",
+        observation: {
+          canConnect: input.canConnect,
+          connected: false,
+          hasLifecycleError: input.hasLifecycleError,
+          isStartingSession: input.isStartingSession,
+          isWaitingForAutomationThread: input.isWaitingForAutomationThread,
+          sandboxInstanceId: input.sandboxInstanceId,
+          sandboxStatus: input.sandboxStatus,
+        },
+      });
+}
+
 export function useSessionWorkbenchCodexRecovery(input: {
   canConnect: boolean;
   connectSession: ReturnType<typeof useCodexSessionState>["lifecycle"]["connectSession"];
@@ -245,24 +281,18 @@ export function useSessionWorkbenchCodexRecovery(input: {
     },
   );
   const lastRecoverableDisconnectIdRef = useRef<number | null>(null);
-
-  const codexRecoveryState =
-    input.transportState === "connected"
-      ? reduceCodexRecoveryState(codexRecoveryBaseState, {
-          type: "session_connected",
-        })
-      : reduceCodexRecoveryState(codexRecoveryBaseState, {
-          type: "sync_observed",
-          observation: {
-            canConnect: input.canConnect,
-            connected: false,
-            hasLifecycleError: input.hasLifecycleError,
-            isStartingSession: input.isStartingSession,
-            isWaitingForAutomationThread: input.isWaitingForAutomationThread,
-            sandboxInstanceId: input.sandboxInstanceId,
-            sandboxStatus: input.sandboxStatus,
-          },
-        });
+  const previousSandboxInstanceIdRef = useRef(input.sandboxInstanceId);
+  const codexRecoveryState = resolveCodexRecoveryStateForRender({
+    baseState: codexRecoveryBaseState,
+    canConnect: input.canConnect,
+    hasLifecycleError: input.hasLifecycleError,
+    isStartingSession: input.isStartingSession,
+    isWaitingForAutomationThread: input.isWaitingForAutomationThread,
+    previousSandboxInstanceId: previousSandboxInstanceIdRef.current,
+    sandboxInstanceId: input.sandboxInstanceId,
+    sandboxStatus: input.sandboxStatus,
+    transportState: input.transportState,
+  });
 
   useEffect(() => {
     if (input.recoverableDisconnect === null) {
@@ -348,6 +378,7 @@ export function useSessionWorkbenchCodexRecovery(input: {
   ]);
 
   useEffect(() => {
+    previousSandboxInstanceIdRef.current = input.sandboxInstanceId;
     dispatchCodexRecoveryEvent({
       type: "sandbox_changed",
     });

@@ -14,6 +14,7 @@ import {
   isActiveResumeRequest,
   reduceCodexRecoveryState,
   resolveSandboxStatusReadState,
+  resolveCodexRecoveryStateForRender,
   resolveCodexReconnectMessage,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
@@ -241,6 +242,33 @@ describe("useSessionWorkbenchController", () => {
       ...waitingRecovery,
       recoveryStrategy: "reconnect_transport",
       reconnectCommand: "reconnect_transport",
+    });
+  });
+
+  it("clears stale recovery state before render-time reconnect logic for a new sandbox", () => {
+    expect(
+      resolveCodexRecoveryStateForRender({
+        baseState: {
+          kind: "recovering",
+          baseMessage: "Sandbox session stream reset.",
+          errorMessage: null,
+          targetThreadId: "thread_old",
+          recoveryStrategy: "reopen_stream",
+          reconnectAttemptCount: 0,
+          reconnectCommand: "reopen_stream",
+          recoverableDisconnectId: 1,
+        },
+        canConnect: true,
+        hasLifecycleError: false,
+        isStartingSession: false,
+        isWaitingForAutomationThread: false,
+        previousSandboxInstanceId: "sbi_old",
+        sandboxInstanceId: "sbi_new",
+        sandboxStatus: "running",
+        transportState: "detached",
+      }),
+    ).toEqual({
+      kind: "idle",
     });
   });
 
@@ -736,6 +764,38 @@ describe("useSessionWorkbenchController", () => {
         resumeActionErrorMessage: "Conflict",
       }),
     ).toBeNull();
+  });
+
+  it("keeps the stopped-sandbox resume callback stable across rerenders when inputs are unchanged", () => {
+    const queryClient = createControllerQueryClient({
+      gcTime: Infinity,
+      refetchOnMount: false,
+      staleTime: Infinity,
+    });
+    seedSandboxInstanceStatusQuery({
+      queryClient,
+      sandboxInstanceId: "sbi_resume_stable",
+      sandboxStatus: {
+        failureCode: null,
+        failureMessage: null,
+        id: "sbi_resume_stable",
+        runtimePlan: null,
+        automationConversation: null,
+        status: "stopped",
+      },
+    });
+
+    const { result, rerender } = renderSessionWorkbenchController({
+      queryClient,
+      sandboxInstanceId: "sbi_resume_stable",
+    });
+    const initialResumeRequest = result.current.workbench.requestStoppedSandboxResume;
+
+    rerender({
+      sandboxInstanceId: "sbi_resume_stable",
+    });
+
+    expect(result.current.workbench.requestStoppedSandboxResume).toBe(initialResumeRequest);
   });
 
   it("accepts resume completions only for the active request on the same sandbox", () => {

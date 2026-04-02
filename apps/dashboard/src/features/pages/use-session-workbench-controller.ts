@@ -24,6 +24,7 @@ import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js"
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 import {
   reduceCodexRecoveryState,
+  resolveCodexRecoveryStateForRender,
   resolveCodexReconnectMessage,
 } from "./use-session-workbench-codex-recovery.js";
 import {
@@ -117,6 +118,7 @@ export {
   resolveSandboxStatusReadState,
   reduceCodexRecoveryState,
   resolveAutomationSessionPreparationTimeoutDelayMs,
+  resolveCodexRecoveryStateForRender,
   resolveCodexReconnectMessage,
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveWorkbenchEntryPhase,
