@@ -5,8 +5,7 @@ import type { IntegrationConnectionResource } from "../integrations/integrations
  *
  * Contract:
  * - `vertical` is the default and stacks labels above controls.
- * - `horizontal` renders rows using the shared horizontal field classes from
- *   `integration-form-theme.tsx`.
+ * - `horizontal` renders rows using the shared `Field` horizontal layout.
  * - individual fields may opt out of the horizontal row treatment by setting
  *   `ui:options.layout` to `"stacked"` in their uiSchema.
  */

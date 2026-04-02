@@ -61,9 +61,6 @@ function resolveSelectWidgetOptions(input: {
 }
 
 export const IntegrationHorizontalFieldGroupClassName = "gap-6 flex flex-col";
-export const IntegrationHorizontalFieldLayoutClassName =
-  "w-full gap-2 md:flex-row md:items-start md:gap-4 md:[&>[data-slot=field-label]]:w-40 md:[&>[data-slot=field-label]]:shrink-0 md:[&>[data-slot=field-label]]:pt-2 md:[&>[data-slot=field-content]]:min-w-0 md:[&>[data-slot=field-content]]:w-full md:[&>[data-slot=field-content]]:basis-0 md:[&>[data-slot=field-content]]:flex-1";
-export const IntegrationStackedFieldLayoutClassName = "w-full";
 export const IntegrationSelectContentClassName =
   "w-max min-w-(--anchor-width) max-w-[min(32rem,calc(100vw-2rem))]";
 
@@ -431,10 +428,7 @@ function IntegrationFieldTemplate(
 
   return (
     <Field
-      className={cn(
-        props.classNames,
-        layout === "vertical" ? IntegrationStackedFieldLayoutClassName : undefined,
-      )}
+      className={cn(props.classNames, layout === "horizontal" ? "gap-2" : undefined)}
       contentWidth={layout === "horizontal" ? "fill" : undefined}
       data-invalid={hasErrors || undefined}
       orientation={layout}

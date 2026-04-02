@@ -19,7 +19,6 @@ import { PlusIcon } from "@phosphor-icons/react";
 import type { IntegrationFormContext } from "../forms/integration-form-context.js";
 import {
   IntegrationHorizontalFieldGroupClassName,
-  IntegrationHorizontalFieldLayoutClassName,
   IntegrationSelectContentClassName,
 } from "../forms/integration-form-theme.js";
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
@@ -70,7 +69,7 @@ export function SandboxProfileBindingDialog(input: {
             <DialogTitle>{input.state.mode === "add" ? "Add binding" : "Edit binding"}</DialogTitle>
           </DialogHeader>
           <div className={IntegrationHorizontalFieldGroupClassName}>
-            <Field className={IntegrationHorizontalFieldLayoutClassName} orientation="vertical">
+            <Field className="gap-2" contentWidth="fill" orientation="horizontal">
               <FieldLabel htmlFor="add-binding-connection">Connection</FieldLabel>
               <FieldContent>
                 <Select
