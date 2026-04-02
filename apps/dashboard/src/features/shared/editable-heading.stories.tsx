@@ -54,7 +54,7 @@ function StoryHarness(input: {
 }
 
 const meta = {
-  title: "Dashboard/Shared/EditableHeading",
+  title: "Dashboard/Forms/EditableHeading",
   component: StoryHarness,
   decorators: [withDashboardPageWidth],
   parameters: {

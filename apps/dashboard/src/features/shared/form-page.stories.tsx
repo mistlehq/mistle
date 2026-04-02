@@ -46,7 +46,7 @@ function FormPageStoryPreview(): React.JSX.Element {
 }
 
 const meta = {
-  title: "Dashboard/Shared/FormPage",
+  title: "Dashboard/Forms/FormPage",
   component: FormPageStoryPreview,
   decorators: [withDashboardCenteredSurface],
   parameters: {
