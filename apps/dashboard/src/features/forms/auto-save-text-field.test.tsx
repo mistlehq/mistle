@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { systemSleeper } from "@mistle/time";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AutoSaveTextField } from "./auto-save-text-field.js";
@@ -20,7 +20,6 @@ describe("AutoSaveTextField", () => {
         initialValue="Mistle Developer"
         label="Display name"
         onSave={async (nextValue) => {
-          await systemSleeper.sleep(10);
           savedValues.push(nextValue);
         }}
         successFadeDurationMs={20}
@@ -85,7 +84,6 @@ describe("AutoSaveTextField", () => {
         initialValue="Mistle Developer"
         label="Display name"
         onSave={async () => {
-          await systemSleeper.sleep(10);
           throw new Error("Could not update display name.");
         }}
         validate={() => null}
@@ -100,5 +98,93 @@ describe("AutoSaveTextField", () => {
     await waitFor(() => {
       expect(screen.getByText("Could not update display name.")).toBeTruthy();
     });
+  });
+
+  it("disables the input while saving", async () => {
+    let resolveSave: (() => void) | undefined;
+
+    render(
+      <AutoSaveTextField
+        id="display-name"
+        initialValue="Mistle Developer"
+        label="Display name"
+        onSave={() =>
+          new Promise<void>((resolve) => {
+            resolveSave = resolve;
+          })
+        }
+        successFadeDurationMs={20}
+        successVisibleDurationMs={40}
+        validate={() => null}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Display name" });
+    fireEvent.change(input, { target: { value: "Mistle Storybook" } });
+    fireEvent.blur(input);
+
+    expect(screen.getByRole("textbox", { name: "Display name" })).toHaveProperty("disabled", true);
+
+    const finishSave = resolveSave;
+    if (finishSave === undefined) {
+      throw new Error("Expected save resolver to be captured.");
+    }
+    finishSave();
+
+    await waitFor(() => {
+      expect(screen.queryByText("Saved", { selector: ".sr-only" })).toBeNull();
+    });
+  });
+
+  it("ignores a stale save result after the field is reset from props", async () => {
+    let resolveSave: (() => void) | undefined;
+
+    function ResetHarness(): React.JSX.Element {
+      const [value, setValue] = useState("Mistle Developer");
+
+      return (
+        <div>
+          <button
+            onClick={() => {
+              setValue("Server Value");
+            }}
+            type="button"
+          >
+            Reset
+          </button>
+          <AutoSaveTextField
+            id="display-name"
+            initialValue={value}
+            label="Display name"
+            onSave={() =>
+              new Promise<void>((resolve) => {
+                resolveSave = resolve;
+              })
+            }
+            validate={() => null}
+          />
+        </div>
+      );
+    }
+
+    render(<ResetHarness />);
+
+    const input = screen.getByRole("textbox", { name: "Display name" });
+    fireEvent.change(input, { target: { value: "Client Value" } });
+    fireEvent.blur(input);
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+
+    const finishSave = resolveSave;
+    if (finishSave === undefined) {
+      throw new Error("Expected save resolver to be captured.");
+    }
+    finishSave();
+
+    await waitFor(() => {
+      const inputElement = screen.getByRole("textbox", { name: "Display name" });
+      expect(inputElement).toHaveProperty("value", "Server Value");
+    });
+
+    expect(screen.queryByText("Saved", { selector: ".sr-only" })).toBeNull();
   });
 });

@@ -35,6 +35,8 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
   const successVisibleDurationMs = input.successVisibleDurationMs ?? 2200;
   const successFadeDurationMs = input.successFadeDurationMs ?? 700;
   const scheduler = input.scheduler ?? systemScheduler;
+  const initialErrorKind = input.initialErrorState?.kind ?? null;
+  const initialErrorMessage = input.initialErrorState?.message ?? null;
   const [draftValue, setDraftValue] = useState(input.initialValue);
   const [committedValue, setCommittedValue] = useState(input.initialValue);
   const [errorState, setErrorState] = useState<AutoSaveTextFieldErrorState | null>(
@@ -46,11 +48,17 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
   const fadeEndTimeoutRef = useRef<TimerHandle | null>(null);
 
   useEffect(() => {
+    saveSequenceRef.current += 1;
+    clearPendingStatusTimeouts({
+      fadeEndTimeoutRef,
+      fadeStartTimeoutRef,
+      scheduler,
+    });
     setDraftValue(input.initialValue);
     setCommittedValue(input.initialValue);
     setErrorState(input.initialErrorState ?? null);
     setStatus("idle");
-  }, [input.initialErrorState, input.initialValue]);
+  }, [initialErrorKind, initialErrorMessage, input.initialValue, scheduler]);
 
   useEffect(() => {
     return () => {
@@ -136,6 +144,7 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
       <FieldContent>
         <AutoSaveInputSurface
           ariaLabel={input.label}
+          disabled={input.disabled === true || status === "saving"}
           id={input.id}
           onBlur={() => {
             void handleCommit();
@@ -153,7 +162,6 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
           }}
           saveStatus={showStatus && errorState === null ? status : "idle"}
           value={draftValue}
-          {...(input.disabled === undefined ? {} : { disabled: input.disabled })}
           {...(errorState === null ? {} : { errorMessage: errorState.message })}
           {...(input.placeholder === undefined ? {} : { placeholder: input.placeholder })}
         />
