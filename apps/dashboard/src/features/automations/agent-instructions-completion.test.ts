@@ -82,11 +82,23 @@ describe("completeAgentInstructionToken", () => {
     expect(matchingTokens.map((token) => token.path)).toContain("payload.comment.body");
   });
 
-  it("replaces a full existing token span when already inside one", () => {
+  it("returns null when the caret is inside an existing token but not at the trailing edge", () => {
     const completionResult = completeAgentInstructionToken(
       createCompletionContext({
         documentText: "Review {{payload.comment.body}} now",
         cursorOffset: "Review {{payload.com".length,
+      }),
+      { tokens },
+    );
+
+    expect(completionResult).toBeNull();
+  });
+
+  it("replaces a full existing token span at the trailing edge", () => {
+    const completionResult = completeAgentInstructionToken(
+      createCompletionContext({
+        documentText: "Review {{payload.comment.body}} now",
+        cursorOffset: "Review {{payload.comment.body".length,
       }),
       { tokens },
     );
