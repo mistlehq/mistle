@@ -161,6 +161,68 @@ describe("AutoSaveEditableHeading", () => {
     expect(screen.getByDisplayValue("Retry Title")).toBeDefined();
   });
 
+  it("keeps an external save error visible on blur when the user has not changed the value", () => {
+    render(
+      <AutoSaveEditableHeading
+        ariaLabel="Heading"
+        editButtonLabel="Edit heading"
+        externalSaveErrorMessage="Could not update heading."
+        initialValue="Repo Maintainer"
+        onSave={async () => {}}
+        validate={() => null}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Heading" });
+    fireEvent.blur(input);
+
+    expect(screen.getByRole("textbox", { name: "Heading" })).toBeDefined();
+    expect(screen.getByText("Could not update heading.")).toBeDefined();
+  });
+
+  it("updates the seeded error when initialErrorState changes in place", () => {
+    function InitialErrorHarness(): React.JSX.Element {
+      const [errorState, setErrorState] = useState<{
+        kind: "validation" | "save";
+        message: string;
+      }>({
+        kind: "validation",
+        message: "Heading is required.",
+      });
+
+      return (
+        <div>
+          <button
+            onClick={() => {
+              setErrorState({
+                kind: "save",
+                message: "Could not update heading.",
+              });
+            }}
+            type="button"
+          >
+            Switch error
+          </button>
+          <AutoSaveEditableHeading
+            ariaLabel="Heading"
+            editButtonLabel="Edit heading"
+            initialErrorState={errorState}
+            initialValue="Repo Maintainer"
+            initiallyEditing={true}
+            onSave={async () => {}}
+            validate={() => null}
+          />
+        </div>
+      );
+    }
+
+    render(<InitialErrorHarness />);
+
+    expect(screen.getByText("Heading is required.")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Switch error" }));
+    expect(screen.getByText("Could not update heading.")).toBeDefined();
+  });
+
   it("preserves the retry draft when an external save error is cleared before retry", async () => {
     function RetryHarness(): React.JSX.Element {
       const [value, setValue] = useState("Repo Maintainer");

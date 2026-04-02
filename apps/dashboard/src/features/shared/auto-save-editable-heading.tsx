@@ -40,6 +40,8 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
   const successFadeDurationMs = input.successFadeDurationMs ?? 700;
   const scheduler = input.scheduler ?? systemScheduler;
   const externalSaveErrorMessage = input.externalSaveErrorMessage;
+  const initialErrorKind = input.initialErrorState?.kind ?? null;
+  const initialErrorMessage = input.initialErrorState?.message ?? null;
   const [isEditing, setIsEditing] = useState(
     input.initiallyEditing ?? input.initialErrorState != null,
   );
@@ -66,6 +68,24 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
     setErrorState(input.initialErrorState ?? null);
     setStatus("idle");
   }, [input.initialValue, input.initiallyEditing, scheduler]);
+
+  useEffect(() => {
+    if (input.initialErrorState == null) {
+      return;
+    }
+
+    setDraftValue(input.initialValue);
+    setValue(input.initialValue);
+    setErrorState(input.initialErrorState);
+    setStatus("idle");
+    setIsEditing(input.initiallyEditing ?? true);
+  }, [
+    initialErrorKind,
+    initialErrorMessage,
+    input.initialErrorState,
+    input.initialValue,
+    input.initiallyEditing,
+  ]);
 
   useEffect(() => {
     if (externalSaveErrorMessage === undefined) {
@@ -97,6 +117,17 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
 
     const normalizedDraftValue = draftValue.trim();
     if (normalizedDraftValue === value.trim()) {
+      if (externalSaveErrorMessage !== undefined) {
+        setErrorState({
+          kind: "save",
+          message: externalSaveErrorMessage,
+        });
+        setStatus("idle");
+        setIsEditing(true);
+        setDraftValue(value);
+        return;
+      }
+
       setErrorState(null);
       setStatus("idle");
       setIsEditing(false);
@@ -192,6 +223,17 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
           }
 
           if (event.key === "Escape" && (input.cancelOnEscape ?? true)) {
+            if (externalSaveErrorMessage !== undefined && draftValue.trim() === value.trim()) {
+              setErrorState({
+                kind: "save",
+                message: externalSaveErrorMessage,
+              });
+              setStatus("idle");
+              setIsEditing(true);
+              setDraftValue(value);
+              return;
+            }
+
             clearPendingStatusTimeouts({
               fadeEndTimeoutRef,
               fadeStartTimeoutRef,
