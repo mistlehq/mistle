@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import type { paths } from "../../lib/control-plane-api/generated/schema.js";
-
 const KeysetPageSchema = z
   .object({
     after: z.string().min(1),
@@ -95,11 +93,33 @@ export type WebhookAutomationListItem = z.infer<typeof WebhookAutomationListItem
 export type WebhookAutomationsListResult = z.infer<typeof WebhookAutomationsListResultSchema>;
 export type DeleteWebhookAutomationResult = z.infer<typeof DeleteWebhookAutomationResultSchema>;
 
-export type CreateWebhookAutomationInput =
-  paths["/v1/automations/webhooks"]["post"]["requestBody"]["content"]["application/json"];
+export type CreateWebhookAutomationInput = {
+  conversationKeyTemplate: string;
+  enabled: boolean;
+  eventTypes: string[] | null;
+  idempotencyKeyTemplate: string | null;
+  inputTemplate: string;
+  integrationConnectionId: string;
+  name: string;
+  payloadFilter: Record<string, unknown> | null;
+  target: {
+    sandboxProfileId: string;
+  };
+};
 
-export type UpdateWebhookAutomationPatch =
-  paths["/v1/automations/webhooks/{automationId}"]["patch"]["requestBody"]["content"]["application/json"];
+export type UpdateWebhookAutomationPatch = {
+  conversationKeyTemplate?: string;
+  enabled?: boolean;
+  eventTypes?: string[] | null;
+  idempotencyKeyTemplate?: string | null;
+  inputTemplate?: string;
+  integrationConnectionId?: string;
+  name?: string;
+  payloadFilter?: Record<string, unknown> | null;
+  target?: {
+    sandboxProfileId: string;
+  };
+};
 
 export type UpdateWebhookAutomationInput = {
   automationId: string;
