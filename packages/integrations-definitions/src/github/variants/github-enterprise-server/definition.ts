@@ -68,6 +68,12 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
       id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       label: "GitHub App installation",
       kind: "redirect",
+      ui: {
+        create: {
+          submitLabel: "Install GitHub App",
+          helperText: "Continue to GitHub to install the app and finish connecting this account.",
+        },
+      },
       configSchema: GitHubAppInstallationConnectionConfigSchema,
     },
   ],

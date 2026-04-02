@@ -1,6 +1,6 @@
 import { systemScheduler } from "@mistle/time";
 
-import { logSandboxRuntimeEvent } from "../runtime/logger.js";
+import type { Logger } from "../runtime/logger.js";
 
 const TUNNEL_TOKEN_EXCHANGE_ROUTE_SUFFIX = "/token-exchange";
 const TUNNEL_RECONNECT_DELAY_MS = 1_000;
@@ -228,6 +228,7 @@ export async function runTunnelTokenExchangeLoop(input: {
   signal: AbortSignal;
   gatewayWsUrl: string;
   tokens: TunnelTokens;
+  logger: Logger;
   now?: () => Date;
   sleep?: (delayMs: number, signal: AbortSignal) => Promise<void>;
 }): Promise<void> {
@@ -263,7 +264,7 @@ export async function runTunnelTokenExchangeLoop(input: {
     try {
       await exchangeTunnelTokensNow(input.gatewayWsUrl, input.tokens);
     } catch (error) {
-      logSandboxRuntimeEvent({
+      input.logger.logEvent({
         level: "warn",
         event: "sandbox_tunnel_token_exchange_failed",
         fields: {

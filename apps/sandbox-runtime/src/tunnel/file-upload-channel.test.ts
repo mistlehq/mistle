@@ -11,6 +11,7 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
+import { BufferedLogger } from "../runtime/logger.js";
 import type { ActiveTunnelStreamRelay, ActiveTunnelStreamRelayResult } from "./active-relay.js";
 import { AsyncQueue } from "./async-queue.js";
 import type { TunnelSocketMessage } from "./connect-request.js";
@@ -269,6 +270,7 @@ async function startFileUploadStreamHarness(input: {
     onConnection: (socket, tempRoot) => {
       void handleFileUploadStream({
         attachmentRootPath: tempRoot,
+        logger: new BufferedLogger(),
         messages,
         signal: input.signal ?? new AbortController().signal,
         streamId: input.streamId,
@@ -439,6 +441,7 @@ describe("handleFileUploadStream", () => {
     wsServer.on("connection", (socket) => {
       void handleFileUploadStream({
         attachmentRootPath: tempRoot,
+        logger: new BufferedLogger(),
         messages,
         signal: signalController.signal,
         streamId: 21,
@@ -517,6 +520,7 @@ describe("handleFileUploadConnectRequest", () => {
           }),
           streamId: 19,
           relayResultQueue,
+          logger: new BufferedLogger(),
         });
       },
       tempRootPrefix: "mistle-file-upload-connect-invalid-test-",
@@ -555,6 +559,7 @@ describe("handleFileUploadConnectRequest", () => {
           streamId: 23,
           relayResultQueue: new AsyncQueue<ActiveTunnelStreamRelayResult>(),
           attachmentRootPath,
+          logger: new BufferedLogger(),
         }).catch(() => undefined);
       },
       tempRootPrefix: "mistle-file-upload-connect-threadid-test-",
@@ -595,6 +600,7 @@ describe("handleFileUploadConnectRequest", () => {
           streamId: 11,
           relayResultQueue,
           attachmentRootPath,
+          logger: new BufferedLogger(),
         })
           .then((relay) => {
             if (relay === undefined) {

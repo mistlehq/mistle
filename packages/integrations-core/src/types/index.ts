@@ -277,6 +277,11 @@ export type IntegrationResolvedTarget<
   secrets: TTargetSecrets;
 };
 
+export type IntegrationConnectionMethodCreateUi = {
+  submitLabel: string;
+  helperText: string;
+};
+
 type IntegrationConnectionMethodDefinitionBase<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -292,6 +297,9 @@ type IntegrationConnectionMethodDefinitionBase<
     TBindingConfig,
     TConnectionConfig
   >;
+  ui?: {
+    create?: IntegrationConnectionMethodCreateUi;
+  };
 };
 
 export type IntegrationFormConnectionMethodDefinition<
@@ -322,6 +330,9 @@ export type IntegrationRedirectConnectionMethodDefinition<
 > & {
   kind: "redirect";
   secretFields?: never;
+  ui: {
+    create: IntegrationConnectionMethodCreateUi;
+  };
 };
 
 export type IntegrationConnectionMethodDefinition<

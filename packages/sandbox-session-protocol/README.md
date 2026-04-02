@@ -1,6 +1,10 @@
 # @mistle/sandbox-session-protocol
 
-Shared TypeScript types and binary frame codecs for the interactive sandbox stream protocol.
+Shared TypeScript types and binary frame codecs for the sandbox tunnel protocol, including:
+
+- interactive stream control messages
+- telemetry control messages
+- execution lease messages
 
 ## Commands
 

@@ -26,6 +26,34 @@ function createDeferredPromise<T>() {
   };
 }
 
+function createGitHubTarget() {
+  return {
+    targetKey: "github",
+    familyId: "github",
+    variantId: "github-cloud",
+    enabled: true,
+    config: {},
+    displayName: "GitHub",
+    description: "Bring GitHub into Mistle.",
+    connectionMethods: [
+      {
+        id: "github-app-installation",
+        label: "GitHub App installation",
+        kind: "redirect" as const,
+        ui: {
+          create: {
+            submitLabel: "Install GitHub App",
+            helperText: "Continue to GitHub to install the app and finish connecting this account.",
+          },
+        },
+      },
+    ],
+    targetHealth: {
+      configStatus: "valid" as const,
+    },
+  };
+}
+
 function createIntegrationsRouter(): ReturnType<typeof createMemoryRouter> {
   return createMemoryRouter(
     createRoutesFromElements(
@@ -75,27 +103,7 @@ describe("IntegrationsPage resource refresh concurrency", () => {
           response.writeHead(200, { "content-type": "application/json" });
           response.end(
             JSON.stringify({
-              items: [
-                {
-                  targetKey: "github",
-                  familyId: "github",
-                  variantId: "github-cloud",
-                  enabled: true,
-                  config: {},
-                  displayName: "GitHub",
-                  description: "Bring GitHub into Mistle.",
-                  connectionMethods: [
-                    {
-                      id: "github-app-installation",
-                      label: "GitHub App installation",
-                      kind: "redirect",
-                    },
-                  ],
-                  targetHealth: {
-                    configStatus: "valid",
-                  },
-                },
-              ],
+              items: [createGitHubTarget()],
               nextPage: null,
               previousPage: null,
               totalResults: 1,
@@ -273,27 +281,7 @@ describe("IntegrationsPage resource refresh concurrency", () => {
           response.writeHead(200, { "content-type": "application/json" });
           response.end(
             JSON.stringify({
-              items: [
-                {
-                  targetKey: "github",
-                  familyId: "github",
-                  variantId: "github-cloud",
-                  enabled: true,
-                  config: {},
-                  displayName: "GitHub",
-                  description: "Bring GitHub into Mistle.",
-                  connectionMethods: [
-                    {
-                      id: "github-app-installation",
-                      label: "GitHub App installation",
-                      kind: "redirect",
-                    },
-                  ],
-                  targetHealth: {
-                    configStatus: "valid",
-                  },
-                },
-              ],
+              items: [createGitHubTarget()],
               nextPage: null,
               previousPage: null,
               totalResults: 1,

@@ -8,13 +8,18 @@ import {
   trace,
   type Span,
 } from "@opentelemetry/api";
-import { logs, SeverityNumber } from "@opentelemetry/api-logs";
+import { logs, SeverityNumber, type LogRecord } from "@opentelemetry/api-logs";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import type { PgRequestHookInformation } from "@opentelemetry/instrumentation-pg";
-import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { NodeSDK } from "@opentelemetry/sdk-node";
+import { BatchLogRecordProcessor, LoggerProvider } from "@opentelemetry/sdk-logs";
+import { NodeSDK, resources } from "@opentelemetry/sdk-node";
+
+import { parseOtlpResourceAttributes } from "./otlp-config.js";
+
+export { SeverityNumber } from "@opentelemetry/api-logs";
+export type { LogRecord } from "@opentelemetry/api-logs";
 
 const TELEMETRY_STATE_SYMBOL = Symbol.for("@mistle/telemetry/state");
 const ENABLED_ENV = "MISTLE_TELEMETRY_ENABLED";
@@ -63,9 +68,9 @@ type TelemetryConfig =
   | {
       enabled: true;
       debug: boolean;
-      tracesEndpoint: string;
-      logsEndpoint: string;
-      metricsEndpoint: string;
+      traces: EnabledTelemetrySignalRuntimeConfig;
+      logs: EnabledTelemetrySignalRuntimeConfig;
+      metrics: EnabledTelemetrySignalRuntimeConfig;
     };
 
 export type InitializeTelemetryInput = {
@@ -104,6 +109,11 @@ export type TelemetryRuntimeConfig = DisabledTelemetryRuntimeConfig | EnabledTel
 export type TelemetryHandle = {
   enabled: boolean;
   serviceName: string;
+  shutdown: () => Promise<void>;
+};
+
+export type OtlpLogForwarder = {
+  emit: (record: LogRecord) => void;
   shutdown: () => Promise<void>;
 };
 
@@ -313,9 +323,15 @@ function readTelemetryConfig(env: NodeJS.ProcessEnv): TelemetryConfig {
   return {
     enabled: true,
     debug,
-    tracesEndpoint: resolveRequiredEndpoint(env, OTLP_TRACES_ENDPOINT_ENV),
-    logsEndpoint: resolveRequiredEndpoint(env, OTLP_LOGS_ENDPOINT_ENV),
-    metricsEndpoint: resolveRequiredEndpoint(env, OTLP_METRICS_ENDPOINT_ENV),
+    traces: {
+      endpoint: resolveRequiredEndpoint(env, OTLP_TRACES_ENDPOINT_ENV),
+    },
+    logs: {
+      endpoint: resolveRequiredEndpoint(env, OTLP_LOGS_ENDPOINT_ENV),
+    },
+    metrics: {
+      endpoint: resolveRequiredEndpoint(env, OTLP_METRICS_ENDPOINT_ENV),
+    },
   };
 }
 
@@ -359,6 +375,37 @@ async function shutdownEnabledTelemetry(
   await state.shutdownPromise;
 }
 
+export function createOtlpLogForwarder(input: {
+  serviceName: string;
+  resourceAttributes?: string | undefined;
+  logs: EnabledTelemetrySignalRuntimeConfig;
+}): OtlpLogForwarder {
+  const serviceName = input.serviceName.trim();
+  if (serviceName.length === 0) {
+    throw new Error("Telemetry serviceName is required.");
+  }
+
+  const loggerProvider = new LoggerProvider({
+    resource: resources.resourceFromAttributes(
+      parseOtlpResourceAttributes({
+        serviceName,
+        resourceAttributes: input.resourceAttributes,
+      }),
+    ),
+    processors: [new BatchLogRecordProcessor(new OTLPLogExporter({ url: input.logs.endpoint }))],
+  });
+  const logger = loggerProvider.getLogger(serviceName);
+
+  return {
+    emit: (record) => {
+      logger.emit(record);
+    },
+    shutdown: async () => {
+      await loggerProvider.shutdown();
+    },
+  };
+}
+
 export function initializeTelemetry(input: InitializeTelemetryInput): TelemetryHandle {
   const serviceName = input.serviceName.trim();
   if (serviceName.length === 0) {
@@ -397,22 +444,16 @@ export function initializeTelemetry(input: InitializeTelemetryInput): TelemetryH
     return createDisabledTelemetryHandle(serviceName);
   }
 
-  process.env[OTLP_TRACES_ENDPOINT_ENV] = config.tracesEndpoint;
-  process.env[OTLP_LOGS_ENDPOINT_ENV] = config.logsEndpoint;
-  process.env[OTLP_METRICS_ENDPOINT_ENV] = config.metricsEndpoint;
+  process.env[OTLP_TRACES_ENDPOINT_ENV] = config.traces.endpoint;
+  process.env[OTLP_LOGS_ENDPOINT_ENV] = config.logs.endpoint;
+  process.env[OTLP_METRICS_ENDPOINT_ENV] = config.metrics.endpoint;
   configureDefaultNodeInstrumentations();
 
   const sdk = new NodeSDK({
     serviceName,
-    traceExporter: new OTLPTraceExporter({
-      url: config.tracesEndpoint,
-    }),
+    traceExporter: new OTLPTraceExporter({ url: config.traces.endpoint }),
     logRecordProcessors: [
-      new BatchLogRecordProcessor(
-        new OTLPLogExporter({
-          url: config.logsEndpoint,
-        }),
-      ),
+      new BatchLogRecordProcessor(new OTLPLogExporter({ url: config.logs.endpoint })),
     ],
     instrumentations: [
       getNodeAutoInstrumentations({

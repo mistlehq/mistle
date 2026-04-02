@@ -131,6 +131,47 @@ const StreamWindowSchema = z.object({
   bytes: PositiveIntegerSchema,
 });
 
+const TelemetrySignalSchema = z.enum(["logs"]);
+const TelemetryFormatSchema = z.literal("mistle.sandbox-runtime.log.v1");
+
+const TelemetryOpenSchema = z.object({
+  type: z.literal("telemetry.open"),
+  streamId: PositiveIntegerSchema,
+  signal: TelemetrySignalSchema,
+  format: TelemetryFormatSchema,
+});
+
+const TelemetryOpenOKSchema = z.object({
+  type: z.literal("telemetry.open.ok"),
+  streamId: PositiveIntegerSchema,
+  initialWindowBytes: PositiveIntegerSchema,
+});
+
+const TelemetryOpenErrorSchema = z.object({
+  type: z.literal("telemetry.open.error"),
+  streamId: PositiveIntegerSchema,
+  code: NonEmptyStringSchema,
+  message: NonEmptyStringSchema,
+});
+
+const TelemetryWindowSchema = z.object({
+  type: z.literal("telemetry.window"),
+  streamId: PositiveIntegerSchema,
+  bytes: PositiveIntegerSchema,
+});
+
+const TelemetryCloseSchema = z.object({
+  type: z.literal("telemetry.close"),
+  streamId: PositiveIntegerSchema,
+});
+
+const TelemetryResetSchema = z.object({
+  type: z.literal("telemetry.reset"),
+  streamId: PositiveIntegerSchema,
+  code: NonEmptyStringSchema,
+  message: NonEmptyStringSchema,
+});
+
 const LeaseMetadataSchema = z.record(z.string(), z.unknown());
 
 const ExecutionLeaseSchema = z.object({
@@ -301,6 +342,15 @@ const LeaseControlMessageSchema = z.discriminatedUnion("type", [
   LeaseRenewSchema,
 ]);
 
+const TelemetryControlMessageSchema = z.discriminatedUnion("type", [
+  TelemetryOpenSchema,
+  TelemetryOpenOKSchema,
+  TelemetryOpenErrorSchema,
+  TelemetryWindowSchema,
+  TelemetryCloseSchema,
+  TelemetryResetSchema,
+]);
+
 const BootstrapControlMessageSchema = z.discriminatedUnion("type", [
   StreamOpenOKSchema,
   StreamOpenErrorSchema,
@@ -308,6 +358,8 @@ const BootstrapControlMessageSchema = z.discriminatedUnion("type", [
   StreamCompleteSchema,
   StreamResetSchema,
   StreamWindowSchema,
+  TelemetryOpenSchema,
+  TelemetryCloseSchema,
   LeaseCreateSchema,
   LeaseRenewSchema,
 ]);
@@ -351,6 +403,15 @@ export type StreamComplete = z.infer<typeof StreamCompleteSchema>;
 export type StreamReset = z.infer<typeof StreamResetSchema>;
 export type StreamWindow = z.infer<typeof StreamWindowSchema>;
 export type StreamControlMessage = z.infer<typeof StreamControlMessageSchema>;
+export type TelemetrySignal = z.infer<typeof TelemetrySignalSchema>;
+export type TelemetryFormat = z.infer<typeof TelemetryFormatSchema>;
+export type TelemetryOpen = z.infer<typeof TelemetryOpenSchema>;
+export type TelemetryOpenOK = z.infer<typeof TelemetryOpenOKSchema>;
+export type TelemetryOpenError = z.infer<typeof TelemetryOpenErrorSchema>;
+export type TelemetryWindow = z.infer<typeof TelemetryWindowSchema>;
+export type TelemetryClose = z.infer<typeof TelemetryCloseSchema>;
+export type TelemetryReset = z.infer<typeof TelemetryResetSchema>;
+export type TelemetryControlMessage = z.infer<typeof TelemetryControlMessageSchema>;
 export type ExecutionLease = z.infer<typeof ExecutionLeaseSchema>;
 export type LeaseCreate = z.infer<typeof LeaseCreateSchema>;
 export type LeaseRenew = z.infer<typeof LeaseRenewSchema>;
@@ -404,6 +465,16 @@ export function parseLeaseControlMessage(payload: string): LeaseControlMessage |
   return result.success ? result.data : undefined;
 }
 
+export function parseTelemetryControlMessage(payload: string): TelemetryControlMessage | undefined {
+  const parsedPayload = parseJSON(payload);
+  if (parsedPayload === undefined) {
+    return undefined;
+  }
+
+  const result = TelemetryControlMessageSchema.safeParse(parsedPayload);
+  return result.success ? result.data : undefined;
+}
+
 export function parseBootstrapControlMessage(payload: string): BootstrapControlMessage | undefined {
   const parsedPayload = parseJSON(payload);
   if (parsedPayload === undefined) {
@@ -425,4 +496,7 @@ export function parsePublishControlMessage(payload: string): PublishControlMessa
 }
 
 export type PublishControlMessage = z.infer<typeof PublishControlMessageSchema>;
-export type SandboxSessionControlMessage = StreamControlMessage | LeaseControlMessage;
+export type SandboxSessionControlMessage =
+  | StreamControlMessage
+  | TelemetryControlMessage
+  | LeaseControlMessage;

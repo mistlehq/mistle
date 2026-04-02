@@ -8,6 +8,7 @@ import { systemScheduler } from "@mistle/time";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
+import { BufferedLogger } from "../src/runtime/logger.js";
 import { AsyncQueue } from "../src/tunnel/async-queue.js";
 import { startTunnelClient } from "../src/tunnel/client.js";
 import type { TunnelSocketMessage } from "../src/tunnel/connect-request.js";
@@ -259,6 +260,7 @@ async function createUploadHarness(input?: { threadId?: string }): Promise<Uploa
         bootstrapToken: "bootstrap-token",
         tunnelExchangeToken: "exchange-token",
         agentRuntimes: [],
+        logger: new BufferedLogger(),
         runtimeClients: [],
       });
 
