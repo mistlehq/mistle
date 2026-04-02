@@ -90,8 +90,9 @@ export function parseSandboxTelemetryLogLine(line: string): ParsedSandboxTelemet
     });
   }
 
+  const parsedEntries = new Map(Object.entries(parsedValue));
   const extraFields: Record<string, SandboxTelemetryLogValue> = {};
-  for (const [fieldName, fieldValue] of Object.entries(parsedValue)) {
+  for (const [fieldName, fieldValue] of parsedEntries) {
     if (ReservedSandboxTelemetryFields.has(fieldName)) {
       continue;
     }
@@ -107,9 +108,9 @@ export function parseSandboxTelemetryLogLine(line: string): ParsedSandboxTelemet
   }
 
   return {
-    timestamp: parseTimestamp(parsedValue.timestamp),
-    level: parseLevel(parsedValue.level),
-    event: parseEvent(parsedValue.event),
+    timestamp: parseTimestamp(parsedEntries.get("timestamp")),
+    level: parseLevel(parsedEntries.get("level")),
+    event: parseEvent(parsedEntries.get("event")),
     extraFields,
   };
 }
