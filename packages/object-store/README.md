@@ -3,9 +3,9 @@
 Shared S3-compatible object storage primitives for Mistle.
 
 Use this package instead of wiring AWS SDK S3 clients directly in app code. It
-provides a small storage boundary that later application code can depend on
-without leaking provider-specific commands and response types across the
-workspace.
+provides a small storage boundary that binds a bucket and exposes a narrow
+subset of S3-compatible operations while staying close to the underlying AWS SDK
+response types.
 
 ## Public API
 
@@ -14,9 +14,7 @@ Exported from [`src/index.ts`](./src/index.ts):
 - `ObjectStore`
 - `PutObjectInput`
 - `ReadObjectInput`
-- `ReadObjectResult`
 - `HeadObjectInput`
-- `HeadObjectResult`
 - `DeleteObjectInput`
 - `S3CompatibleObjectStore`
 - `S3CompatibleObjectStoreConfig`
@@ -47,6 +45,8 @@ const object = await objectStore.readObject({
   objectKey: "avatars/users/usr_123/avatar.webp",
 });
 
+const bytes = await object.Body?.transformToByteArray();
+
 await objectStore.deleteObject({
   objectKey: "avatars/users/usr_123/avatar.webp",
 });
@@ -58,8 +58,8 @@ await objectStore.deleteObject({
 - Application code should depend on the `ObjectStore` interface, not AWS SDK
   commands directly.
 - Provider-specific details should stay inside this package.
-- This package normalizes method shape and object bytes, but surfaces
-  backend-native S3-compatible errors instead of wrapping them.
+- This package keeps its method surface small, but it surfaces backend-native
+  S3-compatible errors and stays close to the underlying S3 command outputs.
 
 ## Testing
 

@@ -1,3 +1,10 @@
+import type {
+  DeleteObjectCommandOutput,
+  GetObjectCommandOutput,
+  HeadObjectCommandOutput,
+  PutObjectCommandOutput,
+} from "@aws-sdk/client-s3";
+
 export type PutObjectInput = {
   objectKey: string;
   body: Uint8Array;
@@ -9,18 +16,8 @@ export type HeadObjectInput = {
   objectKey: string;
 };
 
-export type HeadObjectResult = {
-  contentType: string | undefined;
-  contentLength: number | undefined;
-};
-
 export type ReadObjectInput = {
   objectKey: string;
-};
-
-export type ReadObjectResult = {
-  bytes: Uint8Array;
-  contentType: string | undefined;
 };
 
 export type DeleteObjectInput = {
@@ -28,8 +25,8 @@ export type DeleteObjectInput = {
 };
 
 export interface ObjectStore {
-  putObject(input: PutObjectInput): Promise<void>;
-  headObject(input: HeadObjectInput): Promise<HeadObjectResult>;
-  readObject(input: ReadObjectInput): Promise<ReadObjectResult>;
-  deleteObject(input: DeleteObjectInput): Promise<void>;
+  putObject(input: PutObjectInput): Promise<PutObjectCommandOutput>;
+  headObject(input: HeadObjectInput): Promise<HeadObjectCommandOutput>;
+  readObject(input: ReadObjectInput): Promise<GetObjectCommandOutput>;
+  deleteObject(input: DeleteObjectInput): Promise<DeleteObjectCommandOutput>;
 }

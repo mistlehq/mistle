@@ -9,12 +9,10 @@ import {
 
 import type {
   DeleteObjectInput,
-  HeadObjectInput,
-  HeadObjectResult,
   ObjectStore,
   PutObjectInput,
+  HeadObjectInput,
   ReadObjectInput,
-  ReadObjectResult,
 } from "./object-store.js";
 
 export type S3CompatibleObjectStoreConfig = {
@@ -24,23 +22,6 @@ export type S3CompatibleObjectStoreConfig = {
   forcePathStyle?: NonNullable<S3ClientConfig["forcePathStyle"]>;
   credentials?: S3ClientConfig["credentials"];
 };
-
-type ByteArrayReadable = {
-  transformToByteArray: () => Promise<Uint8Array>;
-};
-
-function hasTransformToByteArray(body: unknown): body is ByteArrayReadable {
-  if (typeof body !== "object" || body === null) {
-    return false;
-  }
-
-  if (!("transformToByteArray" in body)) {
-    return false;
-  }
-
-  const candidate = body.transformToByteArray;
-  return typeof candidate === "function";
-}
 
 export class S3CompatibleObjectStore implements ObjectStore {
   readonly #bucketName: string;
@@ -65,8 +46,8 @@ export class S3CompatibleObjectStore implements ObjectStore {
     });
   }
 
-  async putObject(input: PutObjectInput): Promise<void> {
-    await this.#client.send(
+  async putObject(input: PutObjectInput) {
+    return await this.#client.send(
       new PutObjectCommand({
         Body: input.body,
         Bucket: this.#bucketName,
@@ -77,40 +58,26 @@ export class S3CompatibleObjectStore implements ObjectStore {
     );
   }
 
-  async headObject(input: HeadObjectInput): Promise<HeadObjectResult> {
-    const response = await this.#client.send(
+  async headObject(input: HeadObjectInput) {
+    return await this.#client.send(
       new HeadObjectCommand({
         Bucket: this.#bucketName,
         Key: input.objectKey,
       }),
     );
-
-    return {
-      contentLength: response.ContentLength,
-      contentType: response.ContentType,
-    };
   }
 
-  async readObject(input: ReadObjectInput): Promise<ReadObjectResult> {
-    const response = await this.#client.send(
+  async readObject(input: ReadObjectInput) {
+    return await this.#client.send(
       new GetObjectCommand({
         Bucket: this.#bucketName,
         Key: input.objectKey,
       }),
     );
-
-    if (!hasTransformToByteArray(response.Body)) {
-      throw new Error(`Expected object body for key "${input.objectKey}" to be readable.`);
-    }
-
-    return {
-      bytes: await response.Body.transformToByteArray(),
-      contentType: response.ContentType,
-    };
   }
 
-  async deleteObject(input: DeleteObjectInput): Promise<void> {
-    await this.#client.send(
+  async deleteObject(input: DeleteObjectInput) {
+    return await this.#client.send(
       new DeleteObjectCommand({
         Bucket: this.#bucketName,
         Key: input.objectKey,
