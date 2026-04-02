@@ -1,17 +1,55 @@
 import { type QueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
-import {
-  type SandboxLifecycleStatus,
-  shouldShowResumeInFlightState,
-} from "./session-workbench-state.js";
+import { type SandboxLifecycleStatus } from "./session-workbench-state.js";
 
 type ResumeRequestGuard = {
   requestId: number;
   sandboxInstanceId: string;
 };
+
+type StoppedResumeLocalState = {
+  sandboxInstanceId: string | null;
+  hasAttemptedInitialStoppedResume: boolean;
+  isResumingStoppedSandbox: boolean;
+  resumeActionErrorMessage: string | null;
+};
+
+type StoppedResumeRefs = {
+  sandboxInstanceId: string | null;
+  activeResumeRequest: ResumeRequestGuard | null;
+  resumeIdempotencyKey: string | null;
+  nextResumeRequestId: number;
+};
+
+function createStoppedResumeLocalState(sandboxInstanceId: string | null): StoppedResumeLocalState {
+  return {
+    sandboxInstanceId,
+    hasAttemptedInitialStoppedResume: false,
+    isResumingStoppedSandbox: false,
+    resumeActionErrorMessage: null,
+  };
+}
+
+function resolveStoppedResumeLocalState(
+  state: StoppedResumeLocalState,
+  sandboxInstanceId: string | null,
+): StoppedResumeLocalState {
+  return state.sandboxInstanceId === sandboxInstanceId
+    ? state
+    : createStoppedResumeLocalState(sandboxInstanceId);
+}
+
+function createStoppedResumeRefs(sandboxInstanceId: string | null): StoppedResumeRefs {
+  return {
+    sandboxInstanceId,
+    activeResumeRequest: null,
+    resumeIdempotencyKey: null,
+    nextResumeRequestId: 0,
+  };
+}
 
 function resolveResumeFailureMessage(error: unknown): string {
   if (error instanceof SandboxProfilesApiError) {
@@ -50,140 +88,134 @@ export function seedSandboxInstanceStatusQuery(input: {
 
 export function useSessionWorkbenchStoppedResume(input: {
   clearLifecycleErrorMessage: () => void;
-  hasRecoverableDisconnect: boolean;
   onResumeSucceeded: () => void;
   queryClient: QueryClient;
   refetchSandboxStatus: () => Promise<unknown>;
   sandboxInstanceId: string | null;
-  trustedSandboxStatus: SandboxLifecycleStatus | null;
 }) {
-  const [hasAttemptedInitialStoppedResume, setHasAttemptedInitialStoppedResume] = useState(false);
-  const [isResumingStoppedSandbox, setIsResumingStoppedSandbox] = useState(false);
-  const [resumeActionErrorMessage, setResumeActionErrorMessage] = useState<string | null>(null);
-  const activeResumeRequestRef = useRef<ResumeRequestGuard | null>(null);
-  const resumeIdempotencyKeyRef = useRef<string | null>(null);
-  const nextResumeRequestIdRef = useRef(0);
+  const [rawLocalState, setRawLocalState] = useState(() =>
+    createStoppedResumeLocalState(input.sandboxInstanceId),
+  );
+  const localState = resolveStoppedResumeLocalState(rawLocalState, input.sandboxInstanceId);
+  const refs = useRef(createStoppedResumeRefs(input.sandboxInstanceId));
+  if (refs.current.sandboxInstanceId !== input.sandboxInstanceId) {
+    refs.current = createStoppedResumeRefs(input.sandboxInstanceId);
+  }
 
-  useEffect(() => {
-    setHasAttemptedInitialStoppedResume(false);
-    setIsResumingStoppedSandbox(false);
-    setResumeActionErrorMessage(null);
-    activeResumeRequestRef.current = null;
-    resumeIdempotencyKeyRef.current = null;
-    nextResumeRequestIdRef.current = 0;
-  }, [input.sandboxInstanceId]);
+  const updateLocalState = useCallback(
+    (updater: (state: StoppedResumeLocalState) => StoppedResumeLocalState): void => {
+      setRawLocalState((state) =>
+        updater(resolveStoppedResumeLocalState(state, input.sandboxInstanceId)),
+      );
+    },
+    [input.sandboxInstanceId],
+  );
 
-  const shouldAttemptRecoverableStoppedResume =
-    input.sandboxInstanceId !== null &&
-    input.trustedSandboxStatus === "stopped" &&
-    input.hasRecoverableDisconnect;
-  const shouldAttemptInitialStoppedResume =
-    input.sandboxInstanceId !== null &&
-    input.trustedSandboxStatus === "stopped" &&
-    !input.hasRecoverableDisconnect &&
-    !hasAttemptedInitialStoppedResume;
-  const isShowingResumeInFlightState = shouldShowResumeInFlightState({
-    hasAttemptedInitialStoppedResume,
-    resumeActionErrorMessage,
-    shouldAttemptInitialStoppedResume:
-      shouldAttemptInitialStoppedResume || shouldAttemptRecoverableStoppedResume,
-    isResumingStoppedSandbox,
-    sandboxStatus: input.trustedSandboxStatus,
-  });
-
-  const requestStoppedSandboxResume = useCallback(async (): Promise<void> => {
-    if (
-      input.sandboxInstanceId === null ||
-      input.trustedSandboxStatus !== "stopped" ||
-      isResumingStoppedSandbox
-    ) {
-      return;
-    }
-
-    const idempotencyKey = resumeIdempotencyKeyRef.current ?? crypto.randomUUID();
-    resumeIdempotencyKeyRef.current = idempotencyKey;
-    const requestId = nextResumeRequestIdRef.current + 1;
-    nextResumeRequestIdRef.current = requestId;
-    activeResumeRequestRef.current = {
-      requestId,
-      sandboxInstanceId: input.sandboxInstanceId,
-    };
-    setHasAttemptedInitialStoppedResume(true);
-    setResumeActionErrorMessage(null);
-
-    input.clearLifecycleErrorMessage();
-    setIsResumingStoppedSandbox(true);
-    try {
-      const resumedSandboxStatus = await resumeSandboxInstance({
-        instanceId: input.sandboxInstanceId,
-        idempotencyKey,
-      });
+  const requestStoppedSandboxResume = useCallback(
+    async (inputState: { trustedSandboxStatus: SandboxLifecycleStatus | null }): Promise<void> => {
       if (
-        !isActiveResumeRequest({
-          activeRequest: activeResumeRequestRef.current,
-          requestId,
-          sandboxInstanceId: input.sandboxInstanceId,
-        })
+        input.sandboxInstanceId === null ||
+        inputState.trustedSandboxStatus !== "stopped" ||
+        localState.isResumingStoppedSandbox
       ) {
         return;
       }
 
-      seedSandboxInstanceStatusQuery({
-        queryClient: input.queryClient,
+      const idempotencyKey = refs.current.resumeIdempotencyKey ?? crypto.randomUUID();
+      refs.current.resumeIdempotencyKey = idempotencyKey;
+      const requestId = refs.current.nextResumeRequestId + 1;
+      refs.current.nextResumeRequestId = requestId;
+      refs.current.activeResumeRequest = {
+        requestId,
         sandboxInstanceId: input.sandboxInstanceId,
-        sandboxStatus: resumedSandboxStatus,
-      });
-      if (resumedSandboxStatus.status !== "stopped") {
-        resumeIdempotencyKeyRef.current = null;
-      }
+      };
+      updateLocalState((state) => ({
+        ...state,
+        hasAttemptedInitialStoppedResume: true,
+        resumeActionErrorMessage: null,
+      }));
 
       input.clearLifecycleErrorMessage();
-      input.onResumeSucceeded();
-      void input.refetchSandboxStatus().catch(() => {});
-    } catch (error) {
-      if (
-        !isActiveResumeRequest({
-          activeRequest: activeResumeRequestRef.current,
-          requestId,
-          sandboxInstanceId: input.sandboxInstanceId,
-        })
-      ) {
-        return;
-      }
+      updateLocalState((state) => ({
+        ...state,
+        isResumingStoppedSandbox: true,
+      }));
+      try {
+        const resumedSandboxStatus = await resumeSandboxInstance({
+          instanceId: input.sandboxInstanceId,
+          idempotencyKey,
+        });
+        if (
+          !isActiveResumeRequest({
+            activeRequest: refs.current.activeResumeRequest,
+            requestId,
+            sandboxInstanceId: input.sandboxInstanceId,
+          })
+        ) {
+          return;
+        }
 
-      if (error instanceof SandboxProfilesApiError && error.status < 500) {
-        resumeIdempotencyKeyRef.current = null;
-      }
-      setResumeActionErrorMessage(resolveResumeFailureMessage(error));
-    } finally {
-      if (
-        isActiveResumeRequest({
-          activeRequest: activeResumeRequestRef.current,
-          requestId,
+        seedSandboxInstanceStatusQuery({
+          queryClient: input.queryClient,
           sandboxInstanceId: input.sandboxInstanceId,
-        })
-      ) {
-        activeResumeRequestRef.current = null;
-        setIsResumingStoppedSandbox(false);
+          sandboxStatus: resumedSandboxStatus,
+        });
+        if (resumedSandboxStatus.status !== "stopped") {
+          refs.current.resumeIdempotencyKey = null;
+        }
+
+        input.clearLifecycleErrorMessage();
+        input.onResumeSucceeded();
+        void input.refetchSandboxStatus().catch(() => {});
+      } catch (error) {
+        if (
+          !isActiveResumeRequest({
+            activeRequest: refs.current.activeResumeRequest,
+            requestId,
+            sandboxInstanceId: input.sandboxInstanceId,
+          })
+        ) {
+          return;
+        }
+
+        if (error instanceof SandboxProfilesApiError && error.status < 500) {
+          refs.current.resumeIdempotencyKey = null;
+        }
+        updateLocalState((state) => ({
+          ...state,
+          resumeActionErrorMessage: resolveResumeFailureMessage(error),
+        }));
+      } finally {
+        if (
+          isActiveResumeRequest({
+            activeRequest: refs.current.activeResumeRequest,
+            requestId,
+            sandboxInstanceId: input.sandboxInstanceId,
+          })
+        ) {
+          refs.current.activeResumeRequest = null;
+          updateLocalState((state) => ({
+            ...state,
+            isResumingStoppedSandbox: false,
+          }));
+        }
       }
-    }
-  }, [
-    input.clearLifecycleErrorMessage,
-    input.onResumeSucceeded,
-    input.queryClient,
-    input.refetchSandboxStatus,
-    input.sandboxInstanceId,
-    input.trustedSandboxStatus,
-    isResumingStoppedSandbox,
-  ]);
+    },
+    [
+      input.clearLifecycleErrorMessage,
+      input.onResumeSucceeded,
+      input.queryClient,
+      input.refetchSandboxStatus,
+      input.sandboxInstanceId,
+      localState.isResumingStoppedSandbox,
+      updateLocalState,
+    ],
+  );
 
   return {
-    hasAttemptedInitialStoppedResume,
-    isShowingResumeInFlightState,
-    isResumingStoppedSandbox,
+    hasAttemptedInitialStoppedResume: localState.hasAttemptedInitialStoppedResume,
+    isResumingStoppedSandbox: localState.isResumingStoppedSandbox,
     requestStoppedSandboxResume,
-    resumeActionErrorMessage,
-    shouldAttemptInitialStoppedResume,
-    shouldAttemptRecoverableStoppedResume,
+    resumeActionErrorMessage: localState.resumeActionErrorMessage,
   };
 }
