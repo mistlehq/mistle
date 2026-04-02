@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
-const DEV_COMPOSE_PATH = resolve(REPO_ROOT, "infra", "local", "docker-compose.yml");
+const DEV_COMPOSE_PATH = resolve(REPO_ROOT, "dev", "docker-compose.yml");
 const SANDBOX_PROVIDER_LABEL = "mistle.sandbox.provider=docker";
 const INCLUDE_VOLUMES_FLAG = "--volumes";
 const REMOVE_LOCAL_IMAGES_FLAG = "--rmi-local";

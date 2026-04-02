@@ -35,32 +35,32 @@ export type PreparedTestHarnessDockerAppBuild = {
 export const PreparedTestHarnessDockerAppBuilds: readonly PreparedTestHarnessDockerAppBuild[] = [
   {
     appName: "controlPlaneApi",
-    dockerfileRelativePath: "Dockerfile.test",
+    dockerfileRelativePath: "docker/Dockerfile.test",
     dockerTarget: "control-plane-api-test-runtime",
   },
   {
     appName: "controlPlaneWorker",
-    dockerfileRelativePath: "Dockerfile.test",
+    dockerfileRelativePath: "docker/Dockerfile.test",
     dockerTarget: "control-plane-worker-test-runtime",
   },
   {
     appName: "dataPlaneApi",
-    dockerfileRelativePath: "Dockerfile.test",
+    dockerfileRelativePath: "docker/Dockerfile.test",
     dockerTarget: "data-plane-api-test-runtime",
   },
   {
     appName: "dataPlaneGateway",
-    dockerfileRelativePath: "Dockerfile.test",
+    dockerfileRelativePath: "docker/Dockerfile.test",
     dockerTarget: "data-plane-gateway-test-runtime",
   },
   {
     appName: "dataPlaneWorker",
-    dockerfileRelativePath: "Dockerfile.test",
+    dockerfileRelativePath: "docker/Dockerfile.test",
     dockerTarget: "data-plane-worker-test-runtime",
   },
   {
     appName: "tokenizerProxy",
-    dockerfileRelativePath: "Dockerfile.test",
+    dockerfileRelativePath: "docker/Dockerfile.test",
     dockerTarget: "tokenizer-proxy-test-runtime",
   },
 ] as const;

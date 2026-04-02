@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - ".github/workflows/publish-service-images.yml"
-      - "Dockerfile"
+      - "docker/Dockerfile"
       - "docker/apps/**"
       - "apps/control-plane-api/**"
       - "apps/control-plane-worker/**"
@@ -142,7 +142,7 @@ jobs:
           docker build \
             --platform linux/amd64 \
             --target "${IMAGE_TARGET}" \
-            --file Dockerfile \
+            --file docker/Dockerfile \
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.title=${{ matrix.component }}" \

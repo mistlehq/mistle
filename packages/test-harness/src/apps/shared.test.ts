@@ -6,7 +6,7 @@ describe("createDockerBuildCommandArgs", () => {
   it("creates docker build args for a target image without build args", () => {
     expect(
       createDockerBuildCommandArgs({
-        dockerfileRelativePath: "Dockerfile.test",
+        dockerfileRelativePath: "docker/Dockerfile.test",
         dockerTarget: "data-plane-gateway-test-runtime",
         imageName: "mistle-test-target-123",
         buildArgs: undefined,
@@ -17,7 +17,7 @@ describe("createDockerBuildCommandArgs", () => {
       "--target",
       "data-plane-gateway-test-runtime",
       "-f",
-      "Dockerfile.test",
+      "docker/Dockerfile.test",
       "-t",
       "mistle-test-target-123",
       ".",
@@ -27,7 +27,7 @@ describe("createDockerBuildCommandArgs", () => {
   it("includes sorted build args before the docker target selection", () => {
     expect(
       createDockerBuildCommandArgs({
-        dockerfileRelativePath: "Dockerfile.test",
+        dockerfileRelativePath: "docker/Dockerfile.test",
         dockerTarget: "data-plane-api-test-runtime",
         imageName: "mistle-test-target-456",
         buildArgs: {
@@ -45,7 +45,7 @@ describe("createDockerBuildCommandArgs", () => {
       "--target",
       "data-plane-api-test-runtime",
       "-f",
-      "Dockerfile.test",
+      "docker/Dockerfile.test",
       "-t",
       "mistle-test-target-456",
       ".",

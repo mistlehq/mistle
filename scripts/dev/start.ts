@@ -10,8 +10,8 @@ import { parse as parseToml } from "smol-toml";
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
 const DEV_CONFIG_PATH = resolve(REPO_ROOT, "config", "config.development.toml");
-const DEV_COMPOSE_PATH = resolve(REPO_ROOT, "infra", "local", "docker-compose.yml");
-const DEV_CLOUDFLARED_CONFIG_DIR = resolve(REPO_ROOT, "infra", "local", ".generated");
+const DEV_COMPOSE_PATH = resolve(REPO_ROOT, "dev", "docker-compose.yml");
+const DEV_CLOUDFLARED_CONFIG_DIR = resolve(REPO_ROOT, "dev", ".generated");
 const DEV_CLOUDFLARED_CONFIG_PATH = resolve(DEV_CLOUDFLARED_CONFIG_DIR, "cloudflared-config.yml");
 
 const TUNNEL_SERVICE_NAME = "tunnel";

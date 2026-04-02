@@ -5,7 +5,7 @@ import type { StartedWorkspaceApp } from "./shared.js";
 const TokenizerProxyDefinition: DockerHttpAppDefinition = {
   appName: "tokenizer-proxy",
   distEntrypointRelativePath: "apps/tokenizer-proxy/dist/index.js",
-  dockerfileRelativePath: "Dockerfile.test",
+  dockerfileRelativePath: "docker/Dockerfile.test",
   dockerTarget: "tokenizer-proxy-test-runtime",
   containerPort: 5205,
   networkAlias: "tokenizer-proxy",

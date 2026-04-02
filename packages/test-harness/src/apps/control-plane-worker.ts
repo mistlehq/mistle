@@ -10,7 +10,7 @@ import {
 
 const ControlPlaneWorkerDefinition = {
   appName: "control-plane-worker",
-  dockerfileRelativePath: "Dockerfile.test",
+  dockerfileRelativePath: "docker/Dockerfile.test",
   dockerTarget: "control-plane-worker-test-runtime",
   networkAlias: "control-plane-worker",
   containerPort: 5101,

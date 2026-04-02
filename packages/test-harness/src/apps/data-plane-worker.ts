@@ -10,7 +10,7 @@ import {
 
 const DataPlaneWorkerDefinition = {
   appName: "data-plane-worker",
-  dockerfileRelativePath: "Dockerfile.test",
+  dockerfileRelativePath: "docker/Dockerfile.test",
   dockerTarget: "data-plane-worker-test-runtime",
   networkAlias: "data-plane-worker",
   containerPort: 5201,

@@ -5,7 +5,7 @@ import type { StartedWorkspaceApp } from "./shared.js";
 const ControlPlaneApiDefinition: DockerHttpAppDefinition = {
   appName: "control-plane-api",
   distEntrypointRelativePath: "apps/control-plane-api/dist/index.js",
-  dockerfileRelativePath: "Dockerfile.test",
+  dockerfileRelativePath: "docker/Dockerfile.test",
   dockerTarget: "control-plane-api-test-runtime",
   containerPort: 5100,
   networkAlias: "control-plane-api",

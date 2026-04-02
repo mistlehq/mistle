@@ -1,5 +1,5 @@
 # Repo-local Helm smoke-test values for OrbStack Kubernetes plus
-# infra/local/docker-compose.yml. This is intentionally not a generic
+# dev/docker-compose.yml. This is intentionally not a generic
 # self-hosting example.
 global:
   namespaceOverride: mistle
