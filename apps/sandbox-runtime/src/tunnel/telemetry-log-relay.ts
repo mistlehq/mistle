@@ -10,7 +10,11 @@ import {
 } from "@mistle/sandbox-session-protocol";
 import type WebSocket from "ws";
 
-import { formatSandboxRuntimeLogLine, type SandboxRuntimeLogLevel } from "../runtime/logger.js";
+import {
+  addSandboxRuntimeLogLineListener,
+  formatSandboxRuntimeLogLine,
+  type SandboxRuntimeLogLevel,
+} from "../runtime/logger.js";
 import { writeBinaryDataFrame } from "./messages.js";
 import { TelemetryLogBuffer } from "./telemetry-log-buffer.js";
 import { sendWebSocketMessage } from "./websocket.js";
@@ -46,6 +50,7 @@ export class TelemetryLogRelay {
   readonly #encoder = new TextEncoder();
   readonly #buffer: TelemetryLogBuffer;
   #flushPromise: Promise<void> | undefined;
+  #removeLogLineListener: (() => void) | undefined;
   #state: TelemetryRelayState = "disconnected";
   #tunnelSocket: WebSocket | undefined;
 
@@ -57,6 +62,10 @@ export class TelemetryLogRelay {
     this.#tunnelSocket = tunnelSocket;
     this.#buffer.clear();
     this.#state = "opening";
+    this.#removeLogLineListener?.();
+    this.#removeLogLineListener = addSandboxRuntimeLogLineListener((line) => {
+      this.enqueueLogLine(line);
+    });
 
     const telemetryOpen: TelemetryOpen = {
       type: "telemetry.open",
@@ -81,6 +90,8 @@ export class TelemetryLogRelay {
       return;
     }
 
+    this.#removeLogLineListener?.();
+    this.#removeLogLineListener = undefined;
     const shouldSendClose = this.#state === "opening" || this.#state === "open";
     this.#tunnelSocket = undefined;
     this.#state = "disconnected";

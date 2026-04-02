@@ -6,6 +6,8 @@ export type SandboxRuntimeLogFields = Readonly<Record<string, SandboxRuntimeLogV
 
 export type SandboxRuntimeLogLineListener = (line: string) => void;
 
+const MaxBufferedSandboxRuntimeLogLines = 512;
+const bufferedLogLines: string[] = [];
 const logLineListeners = new Set<SandboxRuntimeLogLineListener>();
 
 export function formatSandboxRuntimeLogLine(input: {
@@ -32,11 +34,20 @@ export function formatSandboxRuntimeLogLine(input: {
 export function addSandboxRuntimeLogLineListener(
   listener: SandboxRuntimeLogLineListener,
 ): () => void {
+  for (const line of bufferedLogLines) {
+    listener(line);
+  }
+
   logLineListeners.add(listener);
 
   return () => {
     logLineListeners.delete(listener);
   };
+}
+
+export function resetSandboxRuntimeLoggerForTest(): void {
+  bufferedLogLines.length = 0;
+  logLineListeners.clear();
 }
 
 export function logSandboxRuntimeEvent(input: {
@@ -52,6 +63,10 @@ export function logSandboxRuntimeEvent(input: {
   });
 
   process.stderr.write(line);
+  bufferedLogLines.push(line);
+  if (bufferedLogLines.length > MaxBufferedSandboxRuntimeLogLines) {
+    bufferedLogLines.splice(0, bufferedLogLines.length - MaxBufferedSandboxRuntimeLogLines);
+  }
   for (const listener of logLineListeners) {
     listener(line);
   }

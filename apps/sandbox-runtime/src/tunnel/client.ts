@@ -2,7 +2,7 @@ import type { CompiledAgentRuntime, CompiledRuntimeClient } from "@mistle/integr
 import { systemScheduler } from "@mistle/time";
 import type WebSocket from "ws";
 
-import { addSandboxRuntimeLogLineListener, logSandboxRuntimeEvent } from "../runtime/logger.js";
+import { logSandboxRuntimeEvent } from "../runtime/logger.js";
 import { createAbortRace, ignorePromiseRejectionAfterAbort } from "./abortable-race.js";
 import {
   finishActiveTunnelStreamRelay,
@@ -361,127 +361,120 @@ async function runTunnelClientLoop(input: {
 }): Promise<void> {
   const executionLeases = new ExecutionLeaseEngine();
   const telemetryLogRelay = new TelemetryLogRelay();
-  const removeLogLineListener = addSandboxRuntimeLogLineListener((line) => {
-    telemetryLogRelay.enqueueLogLine(line);
-  });
 
-  try {
-    void runTunnelTokenExchangeLoop({
-      signal: input.signal,
-      gatewayWsUrl: input.gatewayWsUrl,
-      tokens: input.tokens,
-    }).catch(() => undefined);
+  void runTunnelTokenExchangeLoop({
+    signal: input.signal,
+    gatewayWsUrl: input.gatewayWsUrl,
+    tokens: input.tokens,
+  }).catch(() => undefined);
 
-    for (let dialAttempt = 1; !input.signal.aborted; dialAttempt += 1) {
-      if (dialAttempt > 1) {
-        try {
-          await exchangeTunnelTokensNow(input.gatewayWsUrl, input.tokens);
-        } catch (error) {
-          logSandboxRuntimeEvent({
-            level: "warn",
-            event: "sandbox_tunnel_token_exchange_before_redial_failed",
-            fields: {
-              dialAttempt,
-              message: error instanceof Error ? error.message : describeUnknownError(error),
-            },
-          });
-          await waitForReconnect(input.signal, nextTunnelReconnectDelay());
-          continue;
-        }
-      }
-
-      let tunnelSocket: WebSocket;
-      let tunnelMessages: AsyncQueue<TunnelSocketMessage>;
+  for (let dialAttempt = 1; !input.signal.aborted; dialAttempt += 1) {
+    if (dialAttempt > 1) {
       try {
-        logSandboxRuntimeEvent({
-          level: "info",
-          event: "sandbox_tunnel_connect_attempt_started",
-          fields: {
-            dialAttempt,
-          },
-        });
-        const parsedUrl = parseGatewayUrl(input.gatewayWsUrl);
-        parsedUrl.searchParams.set("bootstrap_token", input.tokens.currentBootstrapToken());
-        const connectedTunnel = await connectWebSocketWithMessageQueue({
-          url: parsedUrl.toString(),
-          signal: input.signal,
-        });
-        tunnelSocket = connectedTunnel.socket;
-        tunnelMessages = connectedTunnel.messages;
-        telemetryLogRelay.attachTunnelConnection(tunnelSocket);
-        logSandboxRuntimeEvent({
-          level: "info",
-          event: "sandbox_tunnel_connect_attempt_succeeded",
-          fields: {
-            dialAttempt,
-          },
-        });
+        await exchangeTunnelTokensNow(input.gatewayWsUrl, input.tokens);
       } catch (error) {
         logSandboxRuntimeEvent({
           level: "warn",
-          event: "sandbox_tunnel_connect_attempt_failed",
+          event: "sandbox_tunnel_token_exchange_before_redial_failed",
           fields: {
             dialAttempt,
-            retryDelayMs: nextTunnelReconnectDelay(),
             message: error instanceof Error ? error.message : describeUnknownError(error),
           },
         });
         await waitForReconnect(input.signal, nextTunnelReconnectDelay());
         continue;
       }
+    }
 
-      executionLeases.attachTunnelConnection(tunnelSocket);
-
-      let connectionError: unknown;
-      try {
-        await handleTunnelConnection({
-          signal: input.signal,
-          tunnelSocket,
-          tunnelMessages,
-          executionLeases,
-          telemetryLogRelay,
-          agentRuntimes: input.agentRuntimes,
-          runtimeClients: input.runtimeClients,
-        });
-      } catch (error) {
-        connectionError = error;
-      } finally {
-        executionLeases.detachTunnelConnection(tunnelSocket);
-        telemetryLogRelay.detachTunnelConnection(tunnelSocket);
-        await closeWebSocket(tunnelSocket).catch(() => undefined);
-      }
-
-      if (input.signal.aborted) {
-        return;
-      }
-      if (connectionError === undefined) {
-        logSandboxRuntimeEvent({
-          level: "info",
-          event: "sandbox_tunnel_connection_closed_cleanly",
-          fields: {
-            dialAttempt,
-          },
-        });
-        return;
-      }
-      if (!(connectionError instanceof Error)) {
-        throw new Error(describeUnknownError(connectionError));
-      }
-
+    let tunnelSocket: WebSocket;
+    let tunnelMessages: AsyncQueue<TunnelSocketMessage>;
+    try {
+      logSandboxRuntimeEvent({
+        level: "info",
+        event: "sandbox_tunnel_connect_attempt_started",
+        fields: {
+          dialAttempt,
+        },
+      });
+      const parsedUrl = parseGatewayUrl(input.gatewayWsUrl);
+      parsedUrl.searchParams.set("bootstrap_token", input.tokens.currentBootstrapToken());
+      const connectedTunnel = await connectWebSocketWithMessageQueue({
+        url: parsedUrl.toString(),
+        signal: input.signal,
+      });
+      tunnelSocket = connectedTunnel.socket;
+      tunnelMessages = connectedTunnel.messages;
+      telemetryLogRelay.attachTunnelConnection(tunnelSocket);
+      logSandboxRuntimeEvent({
+        level: "info",
+        event: "sandbox_tunnel_connect_attempt_succeeded",
+        fields: {
+          dialAttempt,
+        },
+      });
+    } catch (error) {
       logSandboxRuntimeEvent({
         level: "warn",
-        event: "sandbox_tunnel_connection_lost",
+        event: "sandbox_tunnel_connect_attempt_failed",
         fields: {
           dialAttempt,
           retryDelayMs: nextTunnelReconnectDelay(),
-          message: connectionError.message,
+          message: error instanceof Error ? error.message : describeUnknownError(error),
         },
       });
       await waitForReconnect(input.signal, nextTunnelReconnectDelay());
       continue;
     }
-  } finally {
-    removeLogLineListener();
+
+    executionLeases.attachTunnelConnection(tunnelSocket);
+
+    let connectionError: unknown;
+    try {
+      await handleTunnelConnection({
+        signal: input.signal,
+        tunnelSocket,
+        tunnelMessages,
+        executionLeases,
+        telemetryLogRelay,
+        agentRuntimes: input.agentRuntimes,
+        runtimeClients: input.runtimeClients,
+      });
+    } catch (error) {
+      connectionError = error;
+    } finally {
+      executionLeases.detachTunnelConnection(tunnelSocket);
+      telemetryLogRelay.detachTunnelConnection(tunnelSocket);
+      await closeWebSocket(tunnelSocket).catch(() => undefined);
+    }
+
+    if (input.signal.aborted) {
+      return;
+    }
+    if (connectionError === undefined) {
+      logSandboxRuntimeEvent({
+        level: "info",
+        event: "sandbox_tunnel_connection_closed_cleanly",
+        fields: {
+          dialAttempt,
+        },
+      });
+      return;
+    }
+    if (!(connectionError instanceof Error)) {
+      throw new Error(describeUnknownError(connectionError));
+    }
+
+    logSandboxRuntimeEvent({
+      level: "warn",
+      event: "sandbox_tunnel_connection_lost",
+      fields: {
+        dialAttempt,
+        retryDelayMs: nextTunnelReconnectDelay(),
+        message: connectionError.message,
+      },
+    });
+    await waitForReconnect(input.signal, nextTunnelReconnectDelay());
+    continue;
   }
 }
 

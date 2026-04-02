@@ -1,10 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   addSandboxRuntimeLogLineListener,
   formatSandboxRuntimeLogLine,
   logSandboxRuntimeEvent,
+  resetSandboxRuntimeLoggerForTest,
 } from "./logger.js";
+
+beforeEach(() => {
+  resetSandboxRuntimeLoggerForTest();
+  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("formatSandboxRuntimeLogLine", () => {
   it("serializes a newline-delimited JSON log line", () => {
@@ -27,7 +37,12 @@ describe("formatSandboxRuntimeLogLine", () => {
 });
 
 describe("addSandboxRuntimeLogLineListener", () => {
-  it("registers and removes listeners", () => {
+  it("replays backlog snapshot lines and then emits live lines until removed", () => {
+    logSandboxRuntimeEvent({
+      level: "info",
+      event: "sandbox_runtime_backlog_line",
+    });
+
     const observedLines: string[] = [];
     const removeListener = addSandboxRuntimeLogLineListener((line) => {
       observedLines.push(line);
@@ -43,7 +58,27 @@ describe("addSandboxRuntimeLogLineListener", () => {
       event: "sandbox_runtime_log_listener_removed",
     });
 
-    expect(observedLines).toHaveLength(1);
-    expect(observedLines[0]).toContain('"event":"sandbox_runtime_log_listener_registered"');
+    expect(observedLines).toHaveLength(2);
+    expect(observedLines[0]).toContain('"event":"sandbox_runtime_backlog_line"');
+    expect(observedLines[1]).toContain('"event":"sandbox_runtime_log_listener_registered"');
+  });
+
+  it("drops the oldest buffered lines once the backlog reaches 512 entries", () => {
+    for (let index = 0; index < 513; index += 1) {
+      logSandboxRuntimeEvent({
+        level: "info",
+        event: `sandbox_runtime_backlog_${String(index)}`,
+      });
+    }
+
+    const observedLines: string[] = [];
+    const removeListener = addSandboxRuntimeLogLineListener((line) => {
+      observedLines.push(line);
+    });
+    removeListener();
+
+    expect(observedLines).toHaveLength(512);
+    expect(observedLines[0]).toContain('"event":"sandbox_runtime_backlog_1"');
+    expect(observedLines.at(-1)).toContain('"event":"sandbox_runtime_backlog_512"');
   });
 });
