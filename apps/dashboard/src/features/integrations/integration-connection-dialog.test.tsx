@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { AtlassianConnectionMethodIds } from "@mistle/integrations-definitions";
+import { JiraConnectionMethodIds } from "@mistle/integrations-definitions";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -105,17 +105,17 @@ function createUpdateRedirectDialog(
   };
 }
 
-function createAtlassianCreateDialog(
+function createJiraCreateDialog(
   method: Extract<IntegrationConnectionDialogState, { mode: "create" }>["methods"][number],
 ): Extract<IntegrationConnectionDialogState, { mode: "create" }> {
   return {
     methods: [method],
     mode: "create",
     targetConfig: {},
-    targetDisplayName: "Atlassian",
-    targetFamilyId: "atlassian",
-    targetKey: "atlassian-default",
-    targetVariantId: "atlassian-default",
+    targetDisplayName: "Jira",
+    targetFamilyId: "jira",
+    targetKey: "jira-default",
+    targetVariantId: "jira-default",
   };
 }
 
@@ -264,9 +264,9 @@ describe("IntegrationConnectionDialog", () => {
     },
   );
 
-  it("renders Atlassian personal token configuration fields", () => {
-    const dialog = createAtlassianCreateDialog({
-      id: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+  it("renders Jira personal token configuration fields", () => {
+    const dialog = createJiraCreateDialog({
+      id: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
       label: "Personal API token",
       kind: "form",
       secretFields: [
@@ -281,15 +281,15 @@ describe("IntegrationConnectionDialog", () => {
 
     const configForm = resolveConnectionMethodFormUiModel({
       dialog,
-      methodId: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+      methodId: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
       currentValue: {},
     });
 
     renderDialog({
       configForm,
-      connectionDisplayNamePlaceholder: "Atlassian connection",
+      connectionDisplayNamePlaceholder: "Jira connection",
       dialog,
-      methodId: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+      methodId: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
     });
 
     expect(screen.getByLabelText(/Site URL/)).toBeTruthy();
@@ -363,9 +363,9 @@ describe("IntegrationConnectionDialog", () => {
     expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
   });
 
-  it("does not throw while resolving Atlassian personal token fields for an incomplete site url", () => {
-    const dialog = createAtlassianCreateDialog({
-      id: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+  it("does not throw while resolving Jira personal token fields for an incomplete site url", () => {
+    const dialog = createJiraCreateDialog({
+      id: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
       label: "Personal API token",
       kind: "form",
       secretFields: [
@@ -381,9 +381,9 @@ describe("IntegrationConnectionDialog", () => {
     expect(() =>
       resolveConnectionMethodFormUiModel({
         dialog,
-        methodId: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+        methodId: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
         currentValue: {
-          connection_method: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+          connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
           site_url: "https://",
         },
       }),
@@ -391,9 +391,9 @@ describe("IntegrationConnectionDialog", () => {
 
     const configForm = resolveConnectionMethodFormUiModel({
       dialog,
-      methodId: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+      methodId: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
       currentValue: {
-        connection_method: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+        connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
         site_url: "https://",
       },
     });
@@ -404,9 +404,9 @@ describe("IntegrationConnectionDialog", () => {
     });
   });
 
-  it("renders Atlassian service account token configuration fields", () => {
-    const dialog = createAtlassianCreateDialog({
-      id: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+  it("renders Jira service account token configuration fields", () => {
+    const dialog = createJiraCreateDialog({
+      id: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
       label: "Service account API token",
       kind: "form",
       secretFields: [
@@ -421,24 +421,24 @@ describe("IntegrationConnectionDialog", () => {
 
     const configForm = resolveConnectionMethodFormUiModel({
       dialog,
-      methodId: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+      methodId: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
       currentValue: {},
     });
 
     renderDialog({
       configForm,
-      connectionDisplayNamePlaceholder: "Atlassian connection",
+      connectionDisplayNamePlaceholder: "Jira connection",
       dialog,
-      methodId: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+      methodId: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
     });
 
     expect(screen.getByLabelText(/Cloud ID/)).toBeTruthy();
     expect(screen.getByPlaceholderText("Enter service account API token")).toBeTruthy();
   });
 
-  it("renders Atlassian service account OAuth client credentials configuration fields", () => {
-    const dialog = createAtlassianCreateDialog({
-      id: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+  it("renders Jira service account OAuth client credentials configuration fields", () => {
+    const dialog = createJiraCreateDialog({
+      id: JiraConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
       label: "Service account OAuth client credentials",
       kind: "form",
       secretFields: [
@@ -453,15 +453,15 @@ describe("IntegrationConnectionDialog", () => {
 
     const configForm = resolveConnectionMethodFormUiModel({
       dialog,
-      methodId: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+      methodId: JiraConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
       currentValue: {},
     });
 
     renderDialog({
       configForm,
-      connectionDisplayNamePlaceholder: "Atlassian connection",
+      connectionDisplayNamePlaceholder: "Jira connection",
       dialog,
-      methodId: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+      methodId: JiraConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
     });
 
     expect(screen.getByLabelText(/Cloud ID/)).toBeTruthy();

@@ -26,9 +26,9 @@ describe("integration targets discovery integration", () => {
       .insert(integrationTargets)
       .values([
         {
-          targetKey: "atlassian-default-it",
-          familyId: "atlassian",
-          variantId: "atlassian-default",
+          targetKey: "jira-default-it",
+          familyId: "jira",
+          variantId: "jira-default",
           enabled: true,
           config: {},
         },
@@ -254,21 +254,21 @@ describe("integration targets discovery integration", () => {
     });
     expect(insertedOpenAiTarget?.config.api_base_url).toBe("https://api.openai.com");
 
-    const insertedAtlassianTarget = allTargets.items.find(
-      (item) => item.targetKey === "atlassian-default-it",
+    const insertedJiraTarget = allTargets.items.find(
+      (item) => item.targetKey === "jira-default-it",
     );
-    expect(insertedAtlassianTarget).toMatchObject({
-      targetKey: "atlassian-default-it",
-      familyId: "atlassian",
-      variantId: "atlassian-default",
+    expect(insertedJiraTarget).toMatchObject({
+      targetKey: "jira-default-it",
+      familyId: "jira",
+      variantId: "jira-default",
       enabled: true,
-      displayName: "Atlassian",
+      displayName: "Jira",
       description:
-        "Access Atlassian REST APIs with personal tokens, service-account tokens, or service-account OAuth client credentials.",
-      logoKey: "atlassian",
+        "Access Jira REST APIs with personal tokens, service-account tokens, or service-account OAuth client credentials.",
+      logoKey: "jira",
       connectionMethods: [
         {
-          id: "atlassian-personal-api-token",
+          id: "jira-personal-api-token",
           label: "Personal API token",
           kind: "form",
           secretFields: [
@@ -281,7 +281,7 @@ describe("integration targets discovery integration", () => {
           ],
         },
         {
-          id: "atlassian-service-account-api-token",
+          id: "jira-service-account-api-token",
           label: "Service account API token",
           kind: "form",
           secretFields: [
@@ -294,7 +294,7 @@ describe("integration targets discovery integration", () => {
           ],
         },
         {
-          id: "atlassian-service-account-oauth-client-credentials",
+          id: "jira-service-account-oauth-client-credentials",
           label: "Service account OAuth client credentials",
           kind: "form",
           secretFields: [

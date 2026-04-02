@@ -1,12 +1,12 @@
 import type { ResolvedIntegrationForm } from "@mistle/integrations-core";
 
-import { AtlassianConnectionMethodIds } from "./auth.js";
+import { JiraConnectionMethodIds } from "./auth.js";
 
-export const AtlassianPersonalApiTokenConnectionConfigForm: ResolvedIntegrationForm = {
+export const JiraPersonalApiTokenConnectionConfigForm: ResolvedIntegrationForm = {
   schema: {
     properties: {
       connection_method: {
-        default: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+        default: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
       },
       site_url: {
         title: "Site URL",
@@ -29,11 +29,11 @@ export const AtlassianPersonalApiTokenConnectionConfigForm: ResolvedIntegrationF
   },
 };
 
-export const AtlassianServiceAccountApiTokenConnectionConfigForm: ResolvedIntegrationForm = {
+export const JiraServiceAccountApiTokenConnectionConfigForm: ResolvedIntegrationForm = {
   schema: {
     properties: {
       connection_method: {
-        default: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+        default: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
       },
       cloud_id: {
         title: "Cloud ID",
@@ -45,17 +45,17 @@ export const AtlassianServiceAccountApiTokenConnectionConfigForm: ResolvedIntegr
       "ui:widget": "hidden",
     },
     cloud_id: {
-      "ui:placeholder": "Your Atlassian cloud ID",
+      "ui:placeholder": "Your Jira cloud ID",
     },
   },
 };
 
-export const AtlassianServiceAccountOauthClientCredentialsConnectionConfigForm: ResolvedIntegrationForm =
+export const JiraServiceAccountOauthClientCredentialsConnectionConfigForm: ResolvedIntegrationForm =
   {
     schema: {
       properties: {
         connection_method: {
-          default: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+          default: JiraConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
         },
         cloud_id: {
           title: "Cloud ID",
@@ -70,10 +70,10 @@ export const AtlassianServiceAccountOauthClientCredentialsConnectionConfigForm: 
         "ui:widget": "hidden",
       },
       cloud_id: {
-        "ui:placeholder": "Your Atlassian cloud ID",
+        "ui:placeholder": "Your Jira cloud ID",
       },
       client_id: {
-        "ui:placeholder": "Your Atlassian OAuth 2.0 client ID",
+        "ui:placeholder": "Your Jira OAuth 2.0 client ID",
       },
     },
   };

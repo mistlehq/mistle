@@ -9,9 +9,9 @@ import {
 describe("integrations-definitions index", () => {
   it("registers built-in integration definitions in a registry", () => {
     const registry = createIntegrationRegistry();
-    const atlassianDefinition = registry.getDefinition({
-      familyId: "atlassian",
-      variantId: "atlassian-default",
+    const jiraDefinition = registry.getDefinition({
+      familyId: "jira",
+      variantId: "jira-default",
     });
     const openAiDefinition = registry.getDefinition({
       familyId: "openai",
@@ -30,20 +30,20 @@ describe("integrations-definitions index", () => {
       variantId: "linear-default",
     });
 
-    expect(atlassianDefinition).toMatchObject({
-      familyId: "atlassian",
-      variantId: "atlassian-default",
+    expect(jiraDefinition).toMatchObject({
+      familyId: "jira",
+      variantId: "jira-default",
       kind: "connector",
-      displayName: "Atlassian",
+      displayName: "Jira",
       connectionMethods: [
         {
-          id: "atlassian-personal-api-token",
+          id: "jira-personal-api-token",
           label: "Personal API token",
           kind: "form",
           secretFields: [{ name: "apiKey", label: "Personal API token", inputType: "password" }],
         },
         {
-          id: "atlassian-service-account-api-token",
+          id: "jira-service-account-api-token",
           label: "Service account API token",
           kind: "form",
           secretFields: [
@@ -51,7 +51,7 @@ describe("integrations-definitions index", () => {
           ],
         },
         {
-          id: "atlassian-service-account-oauth-client-credentials",
+          id: "jira-service-account-oauth-client-credentials",
           label: "Service account OAuth client credentials",
           kind: "form",
           secretFields: [
@@ -198,7 +198,7 @@ describe("integrations-definitions index", () => {
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
-      "atlassian::atlassian-default",
+      "jira::jira-default",
       "github::github-cloud",
       "github::github-enterprise-server",
       "linear::linear-default",

@@ -1,17 +1,17 @@
 import { resolveIntegrationForm } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { resolveAtlassianBindingConfigForm } from "./binding-config-form.js";
-import { AtlassianBindingConfigSchema } from "./binding-config-schema.js";
+import { resolveJiraBindingConfigForm } from "./binding-config-form.js";
+import { JiraBindingConfigSchema } from "./binding-config-schema.js";
 
-describe("atlassian binding config forms", () => {
+describe("jira binding config forms", () => {
   it("resolves optional Jira CLI tool selection", () => {
     const resolvedForm = resolveIntegrationForm({
-      schema: AtlassianBindingConfigSchema,
-      form: resolveAtlassianBindingConfigForm,
+      schema: JiraBindingConfigSchema,
+      form: resolveJiraBindingConfigForm,
       context: {
-        familyId: "atlassian",
-        variantId: "atlassian-default",
+        familyId: "jira",
+        variantId: "jira-default",
         kind: "connector",
       },
     });

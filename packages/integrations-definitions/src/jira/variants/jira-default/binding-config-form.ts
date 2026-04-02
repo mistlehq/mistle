@@ -1,11 +1,11 @@
 import type { IntegrationFormContext, ResolvedIntegrationForm } from "@mistle/integrations-core";
 
-import { AtlassianToolIds } from "./tool-ids.js";
+import { JiraToolIds } from "./tool-ids.js";
 
-type AtlassianBindingFormContext = IntegrationFormContext;
+type JiraBindingFormContext = IntegrationFormContext;
 
-export function resolveAtlassianBindingConfigForm(
-  _input: AtlassianBindingFormContext,
+export function resolveJiraBindingConfigForm(
+  _input: JiraBindingFormContext,
 ): ResolvedIntegrationForm {
   return {
     schema: {
@@ -16,7 +16,7 @@ export function resolveAtlassianBindingConfigForm(
           items: {
             oneOf: [
               {
-                const: AtlassianToolIds.JIRA_CLI,
+                const: JiraToolIds.JIRA_CLI,
                 title: "Jira CLI (jira)",
               },
             ],

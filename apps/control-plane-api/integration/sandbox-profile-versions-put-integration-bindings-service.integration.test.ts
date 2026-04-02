@@ -534,20 +534,18 @@ describe("sandbox profile version put integration bindings service integration",
     });
   });
 
-  it("defaults Atlassian binding tool selections to an empty array on write", async ({
-    fixture,
-  }) => {
+  it("defaults Jira binding tool selections to an empty array on write", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-put-bindings-atlassian@example.com",
+      email: "integration-sandbox-profile-version-put-bindings-jira@example.com",
     });
 
-    await insertAtlassianBindingValidationFixture({
+    await insertJiraBindingValidationFixture({
       fixture,
       organizationId: authenticatedSession.organizationId,
-      profileId: "sbp_put_bindings_atlassian_001",
+      profileId: "sbp_put_bindings_jira_001",
       profileVersion: 1,
-      connectionId: "icn_put_bindings_atlassian_001",
-      targetKey: "atlassian-default-put-bindings-accessible",
+      connectionId: "icn_put_bindings_jira_001",
+      targetKey: "jira-default-put-bindings-accessible",
     });
 
     const result = await putProfileVersionIntegrationBindings(
@@ -556,11 +554,11 @@ describe("sandbox profile version put integration bindings service integration",
       },
       {
         organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_put_bindings_atlassian_001",
+        profileId: "sbp_put_bindings_jira_001",
         profileVersion: 1,
         bindings: [
           {
-            connectionId: "icn_put_bindings_atlassian_001",
+            connectionId: "icn_put_bindings_jira_001",
             kind: IntegrationBindingKinds.CONNECTOR,
             config: {},
           },
@@ -577,9 +575,9 @@ describe("sandbox profile version put integration bindings service integration",
       await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
         where: (table, { and, eq }) =>
           and(
-            eq(table.sandboxProfileId, "sbp_put_bindings_atlassian_001"),
+            eq(table.sandboxProfileId, "sbp_put_bindings_jira_001"),
             eq(table.sandboxProfileVersion, 1),
-            eq(table.connectionId, "icn_put_bindings_atlassian_001"),
+            eq(table.connectionId, "icn_put_bindings_jira_001"),
           ),
       });
 
@@ -831,7 +829,7 @@ async function insertGitHubBindingValidationFixture(input: {
   });
 }
 
-async function insertAtlassianBindingValidationFixture(input: {
+async function insertJiraBindingValidationFixture(input: {
   fixture: ControlPlaneApiIntegrationFixture;
   organizationId: string;
   profileId: string;
@@ -843,8 +841,8 @@ async function insertAtlassianBindingValidationFixture(input: {
     .insert(integrationTargets)
     .values({
       targetKey: input.targetKey,
-      familyId: "atlassian",
-      variantId: "atlassian-default",
+      familyId: "jira",
+      variantId: "jira-default",
       enabled: true,
       config: {},
     })
@@ -855,7 +853,7 @@ async function insertAtlassianBindingValidationFixture(input: {
     .values({
       id: input.profileId,
       organizationId: input.organizationId,
-      displayName: "Atlassian Binding Validation",
+      displayName: "Jira Binding Validation",
       status: IntegrationConnectionStatuses.ACTIVE,
     })
     .onConflictDoNothing();
@@ -870,9 +868,9 @@ async function insertAtlassianBindingValidationFixture(input: {
     id: input.connectionId,
     organizationId: input.organizationId,
     targetKey: input.targetKey,
-    displayName: "Atlassian Connection",
+    displayName: "Jira Connection",
     config: {
-      connection_method: "atlassian-personal-api-token",
+      connection_method: "jira-personal-api-token",
       site_url: "https://mistle.atlassian.net",
       email: "user@example.com",
     },

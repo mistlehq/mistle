@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildAtlassianClientCredentialsRequestBody,
-  parseAtlassianClientCredentialsResponse,
+  buildJiraClientCredentialsRequestBody,
+  parseJiraClientCredentialsResponse,
   resolveAccessTokenExpiresAt,
 } from "./oauth2-client-credentials.js";
 
-describe("buildAtlassianClientCredentialsRequestBody", () => {
+describe("buildJiraClientCredentialsRequestBody", () => {
   it("builds the expected client credentials token exchange request body", () => {
-    const requestBody = buildAtlassianClientCredentialsRequestBody({
+    const requestBody = buildJiraClientCredentialsRequestBody({
       clientId: "client-id-123",
       clientSecret: "client-secret-456",
     });
@@ -19,10 +19,10 @@ describe("buildAtlassianClientCredentialsRequestBody", () => {
   });
 });
 
-describe("parseAtlassianClientCredentialsResponse", () => {
-  it("parses the Atlassian client credentials token response", () => {
+describe("parseJiraClientCredentialsResponse", () => {
+  it("parses the Jira client credentials token response", () => {
     expect(
-      parseAtlassianClientCredentialsResponse({
+      parseJiraClientCredentialsResponse({
         access_token: "access-token-123",
         expires_in: 3600,
         token_type: "Bearer",

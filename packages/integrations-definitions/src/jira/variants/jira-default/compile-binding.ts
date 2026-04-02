@@ -5,20 +5,17 @@ import {
 } from "@mistle/integrations-core";
 
 import {
-  AtlassianCredentialSecretTypes,
-  AtlassianConnectionMethodIds,
-  AtlassianConnectionConfigSchema,
-  normalizeAtlassianBaseUrl,
-  resolveAtlassianCredentialSecretType,
+  JiraCredentialSecretTypes,
+  JiraConnectionMethodIds,
+  JiraConnectionConfigSchema,
+  normalizeJiraBaseUrl,
+  resolveJiraCredentialSecretType,
 } from "./auth.js";
-import type { AtlassianBindingConfig } from "./binding-config-schema.js";
-import type { AtlassianTargetConfig } from "./target-config-schema.js";
-import { AtlassianToolIds } from "./tool-ids.js";
+import type { JiraBindingConfig } from "./binding-config-schema.js";
+import type { JiraTargetConfig } from "./target-config-schema.js";
+import { JiraToolIds } from "./tool-ids.js";
 
-export type AtlassianCompileBindingInput = CompileBindingInput<
-  AtlassianTargetConfig,
-  AtlassianBindingConfig
->;
+export type JiraCompileBindingInput = CompileBindingInput<JiraTargetConfig, JiraBindingConfig>;
 
 const JiraCliArtifactKey = "jira-cli";
 const JiraCliArtifactName = "Jira CLI";
@@ -65,15 +62,13 @@ function resolveMatchFromBaseUrl(baseUrl: string): {
   };
 }
 
-export function compileAtlassianBinding(input: AtlassianCompileBindingInput): CompileBindingResult {
-  const parsedConnectionConfig = AtlassianConnectionConfigSchema.parse(input.connection.config);
-  const credentialSecretType = resolveAtlassianCredentialSecretType(input.connection.config);
-  const includesJiraCli = input.binding.config.tools.includes(AtlassianToolIds.JIRA_CLI);
+export function compileJiraBinding(input: JiraCompileBindingInput): CompileBindingResult {
+  const parsedConnectionConfig = JiraConnectionConfigSchema.parse(input.connection.config);
+  const credentialSecretType = resolveJiraCredentialSecretType(input.connection.config);
+  const includesJiraCli = input.binding.config.tools.includes(JiraToolIds.JIRA_CLI);
 
-  if (
-    parsedConnectionConfig.connection_method === AtlassianConnectionMethodIds.PERSONAL_API_TOKEN
-  ) {
-    const upstreamBaseUrl = normalizeAtlassianBaseUrl(parsedConnectionConfig.site_url);
+  if (parsedConnectionConfig.connection_method === JiraConnectionMethodIds.PERSONAL_API_TOKEN) {
+    const upstreamBaseUrl = normalizeJiraBaseUrl(parsedConnectionConfig.site_url);
 
     return {
       egressRoutes: [
@@ -102,7 +97,7 @@ export function compileAtlassianBinding(input: AtlassianCompileBindingInput): Co
 
   if (
     parsedConnectionConfig.connection_method ===
-    AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS
+    JiraConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS
   ) {
     return {
       egressRoutes: [
@@ -117,8 +112,8 @@ export function compileAtlassianBinding(input: AtlassianCompileBindingInput): Co
           },
           credentialResolver: {
             connectionId: input.connection.id,
-            secretType: AtlassianCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
-            purpose: AtlassianCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
+            secretType: JiraCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
+            purpose: JiraCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
           },
         },
       ],

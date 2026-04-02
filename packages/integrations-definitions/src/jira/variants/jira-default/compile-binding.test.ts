@@ -1,8 +1,8 @@
 import type { RuntimeArtifactCommand, RuntimeArtifactSpec } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { AtlassianConnectionMethodIds } from "./auth.js";
-import { compileAtlassianBinding } from "./compile-binding.js";
+import { JiraConnectionMethodIds } from "./auth.js";
+import { compileJiraBinding } from "./compile-binding.js";
 
 function artifactBinPath(name: string): string {
   return `/usr/local/bin/${name}`;
@@ -50,7 +50,7 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 1,
-      targetKey: "atlassian-default",
+      targetKey: "jira-default",
       bindingId: "ibd_123",
     },
   };
@@ -64,16 +64,16 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
   };
 }
 
-describe("compileAtlassianBinding", () => {
-  it("builds the expected Atlassian personal token egress route and optional jira artifact", () => {
-    const compiled = compileAtlassianBinding({
+describe("compileJiraBinding", () => {
+  it("builds the expected Jira personal token egress route and optional jira artifact", () => {
+    const compiled = compileJiraBinding({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 1,
-      targetKey: "atlassian-default",
+      targetKey: "jira-default",
       target: {
-        familyId: "atlassian",
-        variantId: "atlassian-default",
+        familyId: "jira",
+        variantId: "jira-default",
         enabled: true,
         config: {},
         secrets: {},
@@ -82,7 +82,7 @@ describe("compileAtlassianBinding", () => {
         id: "icn_personal",
         status: "active",
         config: {
-          connection_method: AtlassianConnectionMethodIds.PERSONAL_API_TOKEN,
+          connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
           site_url: "https://mistle.atlassian.net",
           email: "user@example.com",
         },
@@ -139,15 +139,15 @@ describe("compileAtlassianBinding", () => {
     expect(compiled.runtimeClients).toEqual([]);
   });
 
-  it("builds the expected Atlassian service account token egress route and jira artifact env", () => {
-    const compiled = compileAtlassianBinding({
+  it("builds the expected Jira service account token egress route and jira artifact env", () => {
+    const compiled = compileJiraBinding({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 1,
-      targetKey: "atlassian-default",
+      targetKey: "jira-default",
       target: {
-        familyId: "atlassian",
-        variantId: "atlassian-default",
+        familyId: "jira",
+        variantId: "jira-default",
         enabled: true,
         config: {},
         secrets: {},
@@ -156,7 +156,7 @@ describe("compileAtlassianBinding", () => {
         id: "icn_service_account",
         status: "active",
         config: {
-          connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+          connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
           cloud_id: "cloud-id-123",
         },
       },
@@ -199,15 +199,15 @@ describe("compileAtlassianBinding", () => {
     expect(compiled.runtimeClients).toEqual([]);
   });
 
-  it("builds the expected Atlassian service account oauth client credentials egress route and jira artifact env", () => {
-    const compiled = compileAtlassianBinding({
+  it("builds the expected Jira service account oauth client credentials egress route and jira artifact env", () => {
+    const compiled = compileJiraBinding({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 1,
-      targetKey: "atlassian-default",
+      targetKey: "jira-default",
       target: {
-        familyId: "atlassian",
-        variantId: "atlassian-default",
+        familyId: "jira",
+        variantId: "jira-default",
         enabled: true,
         config: {},
         secrets: {},
@@ -216,7 +216,7 @@ describe("compileAtlassianBinding", () => {
         id: "icn_service_account_oauth",
         status: "active",
         config: {
-          connection_method: AtlassianConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
+          connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
           cloud_id: "cloud-id-123",
           client_id: "client-id-456",
         },

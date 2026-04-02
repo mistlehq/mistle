@@ -5,13 +5,13 @@ import type {
 import { z } from "zod";
 
 import {
-  AtlassianServiceAccountOauthClientCredentialsConnectionConfigSchema,
-  type AtlassianConnectionConfig,
+  JiraServiceAccountOauthClientCredentialsConnectionConfigSchema,
+  type JiraConnectionConfig,
 } from "./auth.js";
 
-const AtlassianOauthTokenEndpoint = "https://auth.atlassian.com/oauth/token";
+const JiraOauthTokenEndpoint = "https://auth.atlassian.com/oauth/token";
 
-const AtlassianOauthTokenResponseSchema = z
+const JiraOauthTokenResponseSchema = z
   .object({
     access_token: z.string().min(1),
     expires_in: z.number().int().positive(),
@@ -20,9 +20,9 @@ const AtlassianOauthTokenResponseSchema = z
   })
   .strict();
 
-type AtlassianOauthTokenResponse = z.output<typeof AtlassianOauthTokenResponseSchema>;
+type JiraOauthTokenResponse = z.output<typeof JiraOauthTokenResponseSchema>;
 
-export function buildAtlassianClientCredentialsRequestBody(input: {
+export function buildJiraClientCredentialsRequestBody(input: {
   clientId: string;
   clientSecret: string;
 }): URLSearchParams {
@@ -33,10 +33,8 @@ export function buildAtlassianClientCredentialsRequestBody(input: {
   return params;
 }
 
-export function parseAtlassianClientCredentialsResponse(
-  input: unknown,
-): AtlassianOauthTokenResponse {
-  return AtlassianOauthTokenResponseSchema.parse(input);
+export function parseJiraClientCredentialsResponse(input: unknown): JiraOauthTokenResponse {
+  return JiraOauthTokenResponseSchema.parse(input);
 }
 
 export function resolveAccessTokenExpiresAt(input: {
@@ -46,23 +44,21 @@ export function resolveAccessTokenExpiresAt(input: {
   return new Date(input.issuedAt.getTime() + input.expiresInSeconds * 1000).toISOString();
 }
 
-export async function exchangeAtlassianClientCredentials(
+export async function exchangeJiraClientCredentials(
   input: IntegrationOAuth2ClientCredentialsExchangeInput<
     Record<string, unknown>,
     Record<string, string>,
-    AtlassianConnectionConfig
+    JiraConnectionConfig
   >,
 ): Promise<IntegrationOAuth2ClientCredentialsExchangeResult> {
   const parsedConnectionConfig =
-    AtlassianServiceAccountOauthClientCredentialsConnectionConfigSchema.parse(
-      input.connection.config,
-    );
-  const requestBody = buildAtlassianClientCredentialsRequestBody({
+    JiraServiceAccountOauthClientCredentialsConnectionConfigSchema.parse(input.connection.config);
+  const requestBody = buildJiraClientCredentialsRequestBody({
     clientId: parsedConnectionConfig.client_id,
     clientSecret: input.clientSecret,
   });
 
-  const response = await fetch(AtlassianOauthTokenEndpoint, {
+  const response = await fetch(JiraOauthTokenEndpoint, {
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded",
@@ -73,11 +69,11 @@ export async function exchangeAtlassianClientCredentials(
   if (!response.ok) {
     const responseText = await response.text();
     throw new Error(
-      `Atlassian OAuth2 client-credentials exchange failed (${response.status}): ${responseText}`,
+      `Jira OAuth2 client-credentials exchange failed (${response.status}): ${responseText}`,
     );
   }
 
-  const parsedResponse = parseAtlassianClientCredentialsResponse(await response.json());
+  const parsedResponse = parseJiraClientCredentialsResponse(await response.json());
 
   return {
     accessToken: parsedResponse.access_token,
