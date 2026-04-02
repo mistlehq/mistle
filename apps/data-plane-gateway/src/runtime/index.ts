@@ -40,7 +40,7 @@ import { StoreBackedSandboxOwnerResolver } from "../tunnel/ownership/store-backe
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
 import { registerSandboxTunnelTokenExchangeRoute } from "../tunnel/register-sandbox-tunnel-token-exchange-route.js";
 import {
-  NoopSandboxTelemetryIngressSink,
+  createSandboxTelemetryIngressSink,
   SandboxTelemetryIngressService,
 } from "../tunnel/telemetry-ingress/index.js";
 import { InMemoryTunnelSessionRegistryAdapter } from "../tunnel/tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
@@ -131,9 +131,12 @@ export function createDataPlaneGatewayRuntime(
     systemScheduler,
     OWNER_LEASE_RENEW_INTERVAL_MS,
   );
-  const telemetryIngressService = new SandboxTelemetryIngressService(
-    new NoopSandboxTelemetryIngressSink(),
-  );
+  const telemetryIngressSink = createSandboxTelemetryIngressSink({
+    clock: systemClock,
+    gatewayNodeId: nodeId,
+    telemetry: config.telemetry,
+  });
+  const telemetryIngressService = new SandboxTelemetryIngressService(telemetryIngressSink);
   const dataPlaneClient = createDataPlaneSandboxInstancesClient({
     baseUrl: config.app.dataPlaneApi.baseUrl,
     serviceToken: config.internalAuth.serviceToken,
@@ -216,6 +219,7 @@ export function createDataPlaneGatewayRuntime(
 
   async function stopRuntimeResources(): Promise<void> {
     await closeWebSocketServer(nodeWebSocket.wss);
+    await telemetryIngressService.shutdown();
 
     if (startedServer !== undefined) {
       await startedServer.close();
