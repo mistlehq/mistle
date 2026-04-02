@@ -187,29 +187,12 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const WithSelectedTriggers: Story = {
+export const Playground: Story = {
   args: {
-    value: [
-      "Review the webhook event and decide what action to take.",
-      "",
-      "Event type: {{webhookEvent.eventType}}",
-      "Comment: {{payload.comment.body}}",
-      "Author: {{payload.sender.login}}",
-    ].join("\n"),
-    withSelectedTriggers: true,
+    value: "",
   },
-};
-
-export const NoTriggerSelected: Story = {
-  args: {
-    value: [
-      "Review the webhook event and decide what action to take.",
-      "",
-      "Event type: {{webhookEvent.eventType}}",
-      "Payload: {{payload}}",
-    ].join("\n"),
-    showNoTriggerCopy: true,
-    withSelectedTriggers: false,
+  render: function RenderStory(): React.JSX.Element {
+    return <PrototypeHarness />;
   },
 };
 
@@ -234,8 +217,17 @@ export const Disabled: Story = {
   },
 };
 
-export const Prototype: Story = {
-  render: function RenderStory(): React.JSX.Element {
-    return <PrototypeHarness />;
+export const Highlighting: Story = {
+  args: {
+    value: [
+      "Recognized tokens should show the valid color:",
+      "{{payload.comment.body}}",
+      "{{webhookEvent.eventType}}",
+      "",
+      "Unknown complete tokens should show the error color:",
+      "{{payload.not_real}}",
+      "{{webhookEvent.notARealField}}",
+    ].join("\n"),
+    withSelectedTriggers: true,
   },
 };

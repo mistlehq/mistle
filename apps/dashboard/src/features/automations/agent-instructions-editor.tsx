@@ -1,7 +1,15 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { Prec } from "@codemirror/state";
-import { drawSelection, EditorView, keymap } from "@codemirror/view";
+import { type Extension, Prec } from "@codemirror/state";
+import {
+  Decoration,
+  type DecorationSet,
+  drawSelection,
+  EditorView,
+  keymap,
+  ViewPlugin,
+  type ViewUpdate as CodeMirrorViewUpdate,
+} from "@codemirror/view";
 import { cn } from "@mistle/ui";
 import type { EditorView as CodeMirrorEditorView, ViewUpdate } from "@uiw/react-codemirror";
 import CodeMirror from "@uiw/react-codemirror";
@@ -43,6 +51,7 @@ const SuggestionPopoverGap = 6;
 const SuggestionPopoverMaxHeight = 256;
 const SuggestionPopoverRowHeight = 44;
 const SuggestionPopoverVerticalPadding = 8;
+const TemplateTokenPattern = /\{\{([A-Za-z0-9_.]+)\}\}/g;
 
 function createAgentInstructionsEditorTheme(): ReturnType<typeof EditorView.theme> {
   return EditorView.theme({
@@ -72,7 +81,68 @@ function createAgentInstructionsEditorTheme(): ReturnType<typeof EditorView.them
     ".cm-selectionBackground, ::selection": {
       backgroundColor: "hsl(var(--accent) / 0.45)",
     },
+    ".cm-agent-token-valid": {
+      color: "var(--agent-token-valid)",
+    },
+    ".cm-agent-token-invalid": {
+      color: "var(--agent-token-invalid)",
+    },
   });
+}
+
+function createTemplateTokenHighlightExtension(
+  tokens: readonly AgentInstructionsEditorToken[],
+): Extension {
+  const knownPaths = new Set(tokens.map((token) => token.path));
+
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+
+      constructor(view: EditorView) {
+        this.decorations = buildTemplateTokenDecorations(view, knownPaths);
+      }
+
+      update(update: CodeMirrorViewUpdate): void {
+        if (update.docChanged || update.viewportChanged) {
+          this.decorations = buildTemplateTokenDecorations(update.view, knownPaths);
+        }
+      }
+    },
+    {
+      decorations: (value) => value.decorations,
+    },
+  ).extension;
+}
+
+function buildTemplateTokenDecorations(
+  view: EditorView,
+  knownPaths: ReadonlySet<string>,
+): DecorationSet {
+  const ranges: ReturnType<ReturnType<typeof Decoration.mark>["range"]>[] = [];
+
+  for (const { from, to } of view.visibleRanges) {
+    const visibleText = view.state.doc.sliceString(from, to);
+    TemplateTokenPattern.lastIndex = 0;
+
+    let match: RegExpExecArray | null = TemplateTokenPattern.exec(visibleText);
+    while (match !== null) {
+      const fullMatch = match[0];
+      const tokenPath = match[1] ?? "";
+      const matchFrom = from + match.index;
+      const matchTo = matchFrom + fullMatch.length;
+
+      ranges.push(
+        Decoration.mark({
+          class: knownPaths.has(tokenPath) ? "cm-agent-token-valid" : "cm-agent-token-invalid",
+        }).range(matchFrom, matchTo),
+      );
+
+      match = TemplateTokenPattern.exec(visibleText);
+    }
+  }
+
+  return Decoration.set(ranges, true);
 }
 
 function resolveSuggestionState(input: {
@@ -284,6 +354,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
       drawSelection(),
       markdown(),
       EditorView.lineWrapping,
+      createTemplateTokenHighlightExtension(rankedTokens),
       Prec.highest(
         keymap.of([
           {

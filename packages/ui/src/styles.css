@@ -24,6 +24,8 @@
   --accent: oklch(0.967 0.001 286.375);
   --accent-foreground: oklch(0.21 0.006 285.885);
   --destructive: oklch(0.62 0.2 27.325);
+  --agent-token-valid: var(--color-blue-700);
+  --agent-token-invalid: var(--color-red-600);
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
   --ring: oklch(0.705 0.015 286.067);
@@ -41,6 +43,11 @@
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.705 0.015 286.067);
+}
+
+.dark {
+  --agent-token-valid: var(--color-blue-300);
+  --agent-token-invalid: var(--color-red-400);
 }
 
 @theme inline {
