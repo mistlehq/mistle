@@ -6,17 +6,18 @@ import type React from "react";
 import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
 import { FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { FormPageFrame } from "../shared/page-frame.js";
-import { AutoSaveTextField } from "./auto-save-text-field.js";
+import { AutoSaveTextField, type AutoSaveTextFieldErrorState } from "./auto-save-text-field.js";
 
 type StoryHarnessProps = {
   initialValue: string;
   description?: string;
   placeholder?: string;
-  shouldFailSave?: boolean;
+  errorMode?: "none" | "save" | "validation";
 };
 
 function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
-  const [shouldFailSave, setShouldFailSave] = useState(input.shouldFailSave ?? false);
+  const [errorMode, setErrorMode] = useState(input.errorMode ?? "none");
+  const initialErrorState = resolveStoryErrorState(errorMode);
 
   return (
     <FormPageFrame
@@ -31,13 +32,14 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
                 input.description ??
                 "Shown across the dashboard. Saving begins when focus leaves the field."
               }
+              initialErrorState={initialErrorState}
               id="storybook-auto-save-display-name"
               initialValue={input.initialValue}
               label="Display name"
               onSave={async (nextValue) => {
                 await systemSleeper.sleep(900);
 
-                if (shouldFailSave || nextValue.trim().toLowerCase() === "explode") {
+                if (nextValue.trim().toLowerCase() === "explode") {
                   throw new Error("Could not update display name.");
                 }
               }}
@@ -54,17 +56,42 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
                 return null;
               }}
             />
-
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                checked={shouldFailSave}
-                onChange={(event) => {
-                  setShouldFailSave(event.target.checked);
-                }}
-                type="checkbox"
-              />
-              Force the next save to fail
-            </label>
+            <div className="flex items-center gap-4 text-sm">
+              <span className="font-medium">Error preview</span>
+              <label className="flex items-center gap-2">
+                <input
+                  checked={errorMode === "none"}
+                  name="error-mode"
+                  onChange={() => {
+                    setErrorMode("none");
+                  }}
+                  type="radio"
+                />
+                None
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  checked={errorMode === "validation"}
+                  name="error-mode"
+                  onChange={() => {
+                    setErrorMode("validation");
+                  }}
+                  type="radio"
+                />
+                Validation
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  checked={errorMode === "save"}
+                  name="error-mode"
+                  onChange={() => {
+                    setErrorMode("save");
+                  }}
+                  type="radio"
+                />
+                Save
+              </label>
+            </div>
           </div>
         </FormPageSection>
       </FormPageStack>
@@ -91,17 +118,22 @@ export const Default: Story = {
   },
 };
 
-export const WithLongerDescription: Story = {
-  args: {
-    description:
-      "This mirrors settings forms where a single text field commits on blur instead of showing an external save bar.",
-    initialValue: "Jonathan Low",
-  },
-};
+function resolveStoryErrorState(
+  errorMode: StoryHarnessProps["errorMode"],
+): AutoSaveTextFieldErrorState | null {
+  if (errorMode === "validation") {
+    return {
+      kind: "validation",
+      message: "Display name is required.",
+    };
+  }
 
-export const SaveFailure: Story = {
-  args: {
-    initialValue: "Operations Team",
-    shouldFailSave: true,
-  },
-};
+  if (errorMode === "save") {
+    return {
+      kind: "save",
+      message: "Could not update display name.",
+    };
+  }
+
+  return null;
+}

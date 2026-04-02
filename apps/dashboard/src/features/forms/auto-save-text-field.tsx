@@ -3,7 +3,6 @@ import {
   Field,
   FieldContent,
   FieldDescription,
-  FieldError,
   FieldHeader,
   FieldLabel,
   Input,
@@ -13,11 +12,16 @@ import { ArrowClockwiseIcon, CheckCircleIcon } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 
 type AutoSaveStatus = "idle" | "saving" | "saved" | "saved-fading";
+export type AutoSaveTextFieldErrorState = {
+  kind: "validation" | "save";
+  message: string;
+};
 
 export type AutoSaveTextFieldProps = {
   id: string;
   label: string;
   initialValue: string;
+  initialErrorState?: AutoSaveTextFieldErrorState | null;
   description?: string;
   placeholder?: string;
   disabled?: boolean;
@@ -34,7 +38,9 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
   const scheduler = input.scheduler ?? systemScheduler;
   const [draftValue, setDraftValue] = useState(input.initialValue);
   const [committedValue, setCommittedValue] = useState(input.initialValue);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<AutoSaveTextFieldErrorState | null>(
+    input.initialErrorState ?? null,
+  );
   const [status, setStatus] = useState<AutoSaveStatus>("idle");
   const saveSequenceRef = useRef(0);
   const fadeStartTimeoutRef = useRef<TimerHandle | null>(null);
@@ -43,9 +49,9 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
   useEffect(() => {
     setDraftValue(input.initialValue);
     setCommittedValue(input.initialValue);
-    setErrorMessage(null);
+    setErrorState(input.initialErrorState ?? null);
     setStatus("idle");
-  }, [input.initialValue]);
+  }, [input.initialErrorState, input.initialValue]);
 
   useEffect(() => {
     return () => {
@@ -70,14 +76,17 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
 
     const validationMessage = input.validate(draftValue);
     if (validationMessage !== null) {
-      setErrorMessage(validationMessage);
+      setErrorState({
+        kind: "validation",
+        message: validationMessage,
+      });
       setStatus("idle");
       return;
     }
 
     const currentSaveSequence = saveSequenceRef.current + 1;
     saveSequenceRef.current = currentSaveSequence;
-    setErrorMessage(null);
+    setErrorState(null);
     setStatus("saving");
 
     try {
@@ -108,11 +117,14 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
       }
 
       setStatus("idle");
-      setErrorMessage(getErrorMessage(error));
+      setErrorState({
+        kind: "save",
+        message: getErrorMessage(error),
+      });
     }
   }
 
-  const showStatus = status !== "idle";
+  const showStatus = status !== "idle" || errorState !== null;
 
   return (
     <Field contentWidth="fill" orientation="horizontal">
@@ -123,37 +135,64 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
         )}
       </FieldHeader>
       <FieldContent>
-        <Input
-          aria-invalid={errorMessage !== null}
-          disabled={input.disabled}
-          id={input.id}
-          onBlur={() => {
-            void handleCommit();
-          }}
-          onChange={(event) => {
-            setDraftValue(event.target.value);
-            if (errorMessage !== null) {
-              setErrorMessage(null);
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.currentTarget.blur();
-            }
-          }}
-          placeholder={input.placeholder}
-          value={draftValue}
-        />
-        <div aria-live="polite" className="min-h-5" role="status">
-          {showStatus ? <AutoSaveStatusIndicator status={status} /> : null}
+        <div className="relative">
+          <Input
+            aria-invalid={errorState !== null}
+            className={showStatus && errorState === null ? "pr-9" : undefined}
+            disabled={input.disabled}
+            id={input.id}
+            onBlur={() => {
+              void handleCommit();
+            }}
+            onChange={(event) => {
+              setDraftValue(event.target.value);
+              if (errorState !== null) {
+                setErrorState(null);
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+            }}
+            placeholder={input.placeholder}
+            value={draftValue}
+          />
+          {showStatus && errorState === null ? (
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+              <AutoSaveInputIndicator status={status} />
+            </div>
+          ) : null}
         </div>
-        {errorMessage === null ? null : <FieldError errors={[{ message: errorMessage }]} />}
+        <div aria-live="polite" className="min-h-5" role="status">
+          {errorState === null ? null : <AutoSaveStatusIndicator errorState={errorState} />}
+        </div>
       </FieldContent>
     </Field>
   );
 }
 
-function AutoSaveStatusIndicator(input: { status: AutoSaveStatus }): React.JSX.Element {
+function AutoSaveStatusIndicator(input: {
+  errorState: AutoSaveTextFieldErrorState;
+}): React.JSX.Element {
+  if (input.errorState.kind === "save") {
+    return (
+      <div className="flex items-center justify-end text-xs text-destructive">
+        <span>{input.errorState.message}</span>
+      </div>
+    );
+  }
+
+  if (input.errorState.kind === "validation") {
+    return (
+      <div className="flex items-center justify-end text-xs text-destructive">
+        <span>{input.errorState.message}</span>
+      </div>
+    );
+  }
+}
+
+function AutoSaveInputIndicator(input: { status: AutoSaveStatus }): React.JSX.Element | null {
   if (input.status === "saving") {
     return (
       <div className="text-muted-foreground flex items-center justify-end">
@@ -163,17 +202,21 @@ function AutoSaveStatusIndicator(input: { status: AutoSaveStatus }): React.JSX.E
     );
   }
 
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-end text-emerald-700 transition-opacity duration-700",
-        input.status === "saved" ? "opacity-100" : "opacity-0",
-      )}
-    >
-      <CheckCircleIcon aria-hidden className="size-3.5" weight="fill" />
-      <span className="sr-only">Saved</span>
-    </div>
-  );
+  if (input.status === "saved" || input.status === "saved-fading") {
+    return (
+      <div
+        className={cn(
+          "flex items-center justify-end text-emerald-700 transition-opacity duration-700",
+          input.status === "saved" ? "opacity-100" : "opacity-0",
+        )}
+      >
+        <CheckCircleIcon aria-hidden className="size-4" weight="fill" />
+        <span className="sr-only">Saved</span>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function scheduleSavedStateReset(input: {
