@@ -12,11 +12,14 @@ import {
 } from "./telemetry-control-messages.js";
 
 export type ActiveBootstrapTelemetryStream = {
+  consumedSinceLastWindowGrantBytes: number;
   format: TelemetryFormat;
   remainingWindowBytes: number;
   signal: TelemetrySignal;
   streamId: number;
 };
+
+const TelemetryWindowGrantBatchBytes = 16 * 1024;
 
 type OpenBootstrapTelemetryStreamResult =
   | {
@@ -44,7 +47,10 @@ export class BootstrapTelemetrySession {
   readonly #streamsById = new Map<number, ActiveBootstrapTelemetryStream>();
   readonly #streamIdsBySignal = new Map<TelemetrySignal, number>();
 
-  public constructor(private readonly initialWindowBytes: number = DefaultStreamWindowBytes) {}
+  public constructor(
+    private readonly initialWindowBytes: number = DefaultStreamWindowBytes,
+    private readonly windowGrantBatchBytes: number = TelemetryWindowGrantBatchBytes,
+  ) {}
 
   public openStream(input: {
     format: TelemetryFormat;
@@ -76,6 +82,7 @@ export class BootstrapTelemetrySession {
     }
 
     const stream: ActiveBootstrapTelemetryStream = {
+      consumedSinceLastWindowGrantBytes: 0,
       format: input.format,
       remainingWindowBytes: this.initialWindowBytes,
       signal: input.signal,
@@ -143,28 +150,30 @@ export class BootstrapTelemetrySession {
     }
 
     stream.remainingWindowBytes -= input.payloadByteLength;
+    stream.consumedSinceLastWindowGrantBytes += input.payloadByteLength;
     return {
       kind: "ok",
       stream,
     };
   }
 
-  public restoreWindow(input: {
-    bytes: number;
+  public grantWindowIfNeeded(input: {
     streamId: number;
   }): ReturnType<typeof createTelemetryWindow> | undefined {
-    if (input.bytes === 0) {
-      return undefined;
-    }
-
     const stream = this.#streamsById.get(input.streamId);
     if (stream === undefined) {
       return undefined;
     }
 
-    stream.remainingWindowBytes += input.bytes;
+    if (stream.consumedSinceLastWindowGrantBytes < this.windowGrantBatchBytes) {
+      return undefined;
+    }
+
+    const grantedBytes = stream.consumedSinceLastWindowGrantBytes;
+    stream.consumedSinceLastWindowGrantBytes = 0;
+    stream.remainingWindowBytes += grantedBytes;
     return createTelemetryWindow({
-      bytes: input.bytes,
+      bytes: grantedBytes,
       streamId: input.streamId,
     });
   }

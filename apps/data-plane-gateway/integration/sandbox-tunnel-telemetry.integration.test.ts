@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import { encodeDataFrame, PayloadKindRawBytes } from "@mistle/sandbox-session-protocol";
+import { systemSleeper } from "@mistle/time";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 
@@ -61,10 +62,29 @@ async function connectBootstrapSocket(input: {
   });
 }
 
+async function waitForCondition(
+  predicate: () => boolean,
+  timeoutMs: number,
+  failureMessage: string,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (predicate()) {
+      return;
+    }
+
+    await systemSleeper.sleep(10);
+  }
+
+  throw new Error(failureMessage);
+}
+
 describe("sandbox tunnel telemetry ingress integration", () => {
   it(
-    "accepts telemetry.open with the gateway local no-op sink",
+    "forwards sandbox telemetry log lines to OTLP through the gateway sink",
     async ({ fixture }) => {
+      fixture.otlpRequests.length = 0;
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
         fixture,
@@ -93,6 +113,58 @@ describe("sandbox tunnel telemetry ingress integration", () => {
         }),
         isBinary: false,
       });
+
+      await sendWebSocketMessage(
+        bootstrapSocket,
+        Buffer.from(
+          encodeDataFrame({
+            streamId: 41,
+            payloadKind: PayloadKindRawBytes,
+            payload: Buffer.from(
+              '{"timestamp":"2026-04-02T09:00:00.000Z","level":"warn","event":"sandbox_runtime_slow_start","elapsedMs":1200,"startupMode":"warm","retryable":false,"reason":null}\n',
+              "utf8",
+            ),
+          }),
+        ),
+      );
+
+      await waitForCondition(
+        () => fixture.otlpRequests.length === 1,
+        10_000,
+        "Expected a forwarded OTLP log export request.",
+      );
+
+      const otlpRequest = fixture.otlpRequests[0];
+
+      expect(otlpRequest).toEqual({
+        body: otlpRequest?.body,
+        path: "/v1/logs",
+      });
+      expect(otlpRequest?.body).toContain("@mistle/sandbox-runtime");
+      expect(otlpRequest?.body).toContain('"service.name"');
+      expect(otlpRequest?.body).toContain('"deployment.environment"');
+      expect(otlpRequest?.body).toContain('"integration"');
+      expect(otlpRequest?.body).toContain('"mistle.telemetry.ingest"');
+      expect(otlpRequest?.body).toContain('"gateway-tunnel"');
+      expect(otlpRequest?.body).toContain('"severityNumber":13');
+      expect(otlpRequest?.body).toContain('"severityText":"WARN"');
+      expect(otlpRequest?.body).toContain('"mistle.sandbox.instance.id"');
+      expect(otlpRequest?.body).toContain(sandboxInstanceId);
+      expect(otlpRequest?.body).toContain('"mistle.gateway.node.id"');
+      expect(otlpRequest?.body).toContain('"mistle.tunnel.relay_session_id"');
+      expect(otlpRequest?.body).toContain('"mistle.telemetry.transport"');
+      expect(otlpRequest?.body).toContain('"bootstrap_tunnel"');
+      expect(otlpRequest?.body).toContain('"mistle.telemetry.signal"');
+      expect(otlpRequest?.body).toContain('"logs"');
+      expect(otlpRequest?.body).toContain('"mistle.sandbox.log.event"');
+      expect(otlpRequest?.body).toContain('"sandbox_runtime_slow_start"');
+      expect(otlpRequest?.body).toContain('"mistle.sandbox.log.elapsedMs"');
+      expect(otlpRequest?.body).toContain('"intValue":1200');
+      expect(otlpRequest?.body).toContain('"mistle.sandbox.log.startupMode"');
+      expect(otlpRequest?.body).toContain('"warm"');
+      expect(otlpRequest?.body).toContain('"mistle.sandbox.log.retryable"');
+      expect(otlpRequest?.body).toContain('"boolValue":false');
+      expect(otlpRequest?.body).toContain('"mistle.sandbox.log.reason"');
 
       await closeWebSocket(bootstrapSocket);
     },

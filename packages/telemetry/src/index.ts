@@ -18,6 +18,9 @@ import { NodeSDK, resources } from "@opentelemetry/sdk-node";
 
 import { buildOtlpHttpExporterConfig, parseOtlpResourceAttributes } from "./otlp-config.js";
 
+export { SeverityNumber } from "@opentelemetry/api-logs";
+export type { LogRecord } from "@opentelemetry/api-logs";
+
 const TELEMETRY_STATE_SYMBOL = Symbol.for("@mistle/telemetry/state");
 const ENABLED_ENV = "MISTLE_TELEMETRY_ENABLED";
 const DEBUG_ENV = "MISTLE_TELEMETRY_DEBUG";
