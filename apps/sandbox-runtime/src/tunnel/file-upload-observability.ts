@@ -1,10 +1,6 @@
 import { FileUploadResetCodes } from "@mistle/sandbox-session-protocol";
 
-import {
-  type SandboxRuntimeLogFields,
-  type SandboxRuntimeLogLevel,
-  logSandboxRuntimeEvent,
-} from "../runtime/logger.js";
+import { type LogFields, type LogLevel } from "../runtime/logger.js";
 
 export const FileUploadFailureClasses = {
   AUTHENTICITY_FAILURE: "authenticity_failure",
@@ -34,8 +30,8 @@ export type FileUploadObservabilityContext = {
 
 type FileUploadTerminalLogEntry = {
   event: string;
-  fields: SandboxRuntimeLogFields;
-  level: SandboxRuntimeLogLevel;
+  fields: LogFields;
+  level: LogLevel;
 };
 
 type FileUploadRejectedOutcome =
@@ -92,7 +88,7 @@ function classifyValidationResetCode(code: string): FileUploadFailureClass {
   return FileUploadFailureClasses.RUNTIME_STORAGE_FAILURE;
 }
 
-function createBaseLogFields(input: FileUploadObservabilityContext): SandboxRuntimeLogFields {
+function createBaseLogFields(input: FileUploadObservabilityContext): LogFields {
   return {
     declaredMimeType: input.declaredMimeType,
     declaredSizeBytes: input.declaredSizeBytes,
@@ -186,11 +182,4 @@ export function createFileUploadTerminalLogEntry(input: {
         },
       };
   }
-}
-
-export function logFileUploadTerminalEvent(input: {
-  context: FileUploadObservabilityContext;
-  outcome: FileUploadTerminalOutcome;
-}): void {
-  logSandboxRuntimeEvent(createFileUploadTerminalLogEntry(input));
 }

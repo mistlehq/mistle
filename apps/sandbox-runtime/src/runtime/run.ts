@@ -11,7 +11,7 @@ import {
 import { aggregateArtifactEnvironment } from "./artifact-environment.js";
 import { loadRuntimeConfig, type RuntimeConfig } from "./config.js";
 import { createRuntimeHttpServer } from "./http-server.js";
-import { logSandboxRuntimeEvent } from "./logger.js";
+import { BufferedLogger } from "./logger.js";
 import { parseListenAddress } from "./parse-listen-address.js";
 import {
   startRuntimeClientProcessManager,
@@ -86,13 +86,14 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     throw new Error("stdin reader is required");
   }
 
+  const logger = new BufferedLogger();
   const config = loadRuntimeConfig(input.lookupEnv);
   const startupInput = await readStartupInput({
     reader: input.stdin,
     maxBytes: DefaultStartupInputMaxBytes,
   });
   const startupStartedAtMs = Date.now();
-  logSandboxRuntimeEvent({
+  logger.logEvent({
     level: "info",
     event: "sandbox_runtime_startup_started",
     fields: {
@@ -152,7 +153,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     if (startupInput.startupMode === RuntimeStartupModes.NEW) {
       // Initial startup owns provisioning the sandbox filesystem from the
       // compiled runtime plan before any long-lived processes are relaunched.
-      logSandboxRuntimeEvent({
+      logger.logEvent({
         level: "info",
         event: "sandbox_runtime_plan_apply_started",
         fields: {
@@ -164,7 +165,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
       await applyRuntimePlan({
         runtimePlan: startupInput.runtimePlan,
       });
-      logSandboxRuntimeEvent({
+      logger.logEvent({
         level: "info",
         event: "sandbox_runtime_plan_apply_completed",
         fields: {
@@ -182,7 +183,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
       restoreArtifactEnvironment = applyEnvironmentEntries(artifactEnvironment);
     }
     startupStage = "start_runtime_clients";
-    logSandboxRuntimeEvent({
+    logger.logEvent({
       level: "info",
       event: "sandbox_runtime_clients_start_started",
       fields: {
@@ -193,7 +194,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     processManager = await startRuntimeClientProcessManager(
       flattenRuntimeClientProcesses(startupInput.runtimePlan.runtimeClients),
     );
-    logSandboxRuntimeEvent({
+    logger.logEvent({
       level: "info",
       event: "sandbox_runtime_clients_start_completed",
       fields: {
@@ -203,7 +204,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     });
     try {
       startupStage = "start_tunnel";
-      logSandboxRuntimeEvent({
+      logger.logEvent({
         level: "info",
         event: "sandbox_tunnel_client_starting",
         fields: {
@@ -218,6 +219,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
         tunnelExchangeToken: startupInput.tunnelExchangeToken,
         agentRuntimes: startupInput.runtimePlan.agentRuntimes,
         runtimeClients: startupInput.runtimePlan.runtimeClients,
+        logger,
       });
     } catch (error) {
       throw new Error(
@@ -226,7 +228,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     }
     state.startupReady = true;
     startupStage = "startup_ready";
-    logSandboxRuntimeEvent({
+    logger.logEvent({
       level: "info",
       event: "sandbox_runtime_startup_ready",
       fields: {
@@ -244,7 +246,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     restoreProxyEnvironment();
     await closeServer(server);
 
-    logSandboxRuntimeEvent({
+    logger.logEvent({
       level: "error",
       event: "sandbox_runtime_startup_failed",
       fields: {

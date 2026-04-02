@@ -1,20 +1,11 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import {
-  addLogLineListener,
-  formatSandboxRuntimeLogLine,
-  logSandboxRuntimeEvent,
-  resetLoggerForTest,
-} from "./logger.js";
+import { BufferedLogger, formatLogLine } from "./logger.js";
 
-beforeEach(() => {
-  resetLoggerForTest();
-});
-
-describe("formatSandboxRuntimeLogLine", () => {
+describe("formatLogLine", () => {
   it("serializes a newline-delimited JSON log line", () => {
     expect(
-      formatSandboxRuntimeLogLine({
+      formatLogLine({
         timestamp: new Date("2026-03-23T08:00:00.000Z"),
         level: "info",
         event: "sandbox_runtime_startup_ready",
@@ -31,24 +22,26 @@ describe("formatSandboxRuntimeLogLine", () => {
   });
 });
 
-describe("addLogLineListener", () => {
+describe("BufferedLogger", () => {
   it("replays backlog snapshot lines and then emits live lines until removed", () => {
-    logSandboxRuntimeEvent({
+    const logger = new BufferedLogger();
+
+    logger.logEvent({
       level: "info",
       event: "sandbox_runtime_backlog_line",
     });
 
     const observedLines: string[] = [];
-    const removeListener = addLogLineListener((line) => {
+    const removeListener = logger.addLogLineListener((line) => {
       observedLines.push(line);
     });
 
-    logSandboxRuntimeEvent({
+    logger.logEvent({
       level: "info",
       event: "sandbox_runtime_log_listener_registered",
     });
     removeListener();
-    logSandboxRuntimeEvent({
+    logger.logEvent({
       level: "info",
       event: "sandbox_runtime_log_listener_removed",
     });
@@ -59,15 +52,17 @@ describe("addLogLineListener", () => {
   });
 
   it("drops the oldest buffered lines once the backlog reaches 512 entries", () => {
+    const logger = new BufferedLogger();
+
     for (let index = 0; index < 513; index += 1) {
-      logSandboxRuntimeEvent({
+      logger.logEvent({
         level: "info",
         event: `sandbox_runtime_backlog_${String(index)}`,
       });
     }
 
     const observedLines: string[] = [];
-    const removeListener = addLogLineListener((line) => {
+    const removeListener = logger.addLogLineListener((line) => {
       observedLines.push(line);
     });
     removeListener();

@@ -10,11 +10,7 @@ import {
 } from "@mistle/sandbox-session-protocol";
 import type WebSocket from "ws";
 
-import {
-  addLogLineListener,
-  formatSandboxRuntimeLogLine,
-  type SandboxRuntimeLogLevel,
-} from "../runtime/logger.js";
+import { formatLogLine, type LogLevel, type Logger } from "../runtime/logger.js";
 import { writeBinaryDataFrame } from "./messages.js";
 import { TelemetryLogBuffer } from "./telemetry-log-buffer.js";
 import { sendWebSocketMessage } from "./websocket.js";
@@ -32,12 +28,12 @@ type BootstrapTelemetryRelayControlMessage =
 type TelemetryRelayState = "disconnected" | "opening" | "open" | "disabled";
 
 function writeTelemetryRelayDiagnostic(input: {
-  level: SandboxRuntimeLogLevel;
+  level: LogLevel;
   event: string;
   fields?: Record<string, string | number | boolean | null>;
 }): void {
   process.stderr.write(
-    formatSandboxRuntimeLogLine({
+    formatLogLine({
       timestamp: new Date(),
       level: input.level,
       event: input.event,
@@ -49,12 +45,14 @@ function writeTelemetryRelayDiagnostic(input: {
 export class TelemetryLogRelay {
   readonly #encoder = new TextEncoder();
   readonly #buffer: TelemetryLogBuffer;
+  readonly #logger: Logger;
   #flushPromise: Promise<void> | undefined;
   #removeLogLineListener: (() => void) | undefined;
   #state: TelemetryRelayState = "disconnected";
   #tunnelSocket: WebSocket | undefined;
 
-  public constructor(maxBufferedBytes: number = MaxStreamWindowBytes) {
+  public constructor(logger: Logger, maxBufferedBytes: number = MaxStreamWindowBytes) {
+    this.#logger = logger;
     this.#buffer = new TelemetryLogBuffer(maxBufferedBytes);
   }
 
@@ -63,7 +61,7 @@ export class TelemetryLogRelay {
     this.#buffer.clear();
     this.#state = "opening";
     this.#removeLogLineListener?.();
-    this.#removeLogLineListener = addLogLineListener((line) => {
+    this.#removeLogLineListener = this.#logger.addLogLineListener((line) => {
       this.enqueueLogLine(line);
     });
 

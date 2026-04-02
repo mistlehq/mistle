@@ -10,6 +10,7 @@ import {
 } from "@mistle/sandbox-session-protocol";
 import type WebSocket from "ws";
 
+import type { Logger } from "../runtime/logger.js";
 import type { ActiveTunnelStreamRelay, ActiveTunnelStreamRelayResult } from "./active-relay.js";
 import { AsyncQueue } from "./async-queue.js";
 import {
@@ -21,7 +22,7 @@ import {
 import {
   classifyUploadMetadataError,
   createFileUploadObservabilityContext,
-  logFileUploadTerminalEvent,
+  createFileUploadTerminalLogEntry,
 } from "./file-upload-observability.js";
 import {
   CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
@@ -60,6 +61,7 @@ function isPathWithinRoot(input: { candidatePath: string; rootPath: string }): b
 
 export async function handleFileUploadStream(input: {
   attachmentRootPath: string;
+  logger: Logger;
   messages: AsyncQueue<TunnelSocketMessage>;
   mimeType: string;
   originalFilename: string;
@@ -86,8 +88,10 @@ export async function handleFileUploadStream(input: {
     ...baseLogContext,
     receivedBytes,
   });
-  const logTerminalOutcome: typeof logFileUploadTerminalEvent = (terminalInput) => {
-    logFileUploadTerminalEvent(terminalInput);
+  const logTerminalOutcome = (
+    terminalInput: Parameters<typeof createFileUploadTerminalLogEntry>[0],
+  ) => {
+    input.logger.logEvent(createFileUploadTerminalLogEntry(terminalInput));
     didLogTerminalOutcome = true;
   };
   const rejectUpload = async (reset: { code: string; message: string }): Promise<void> => {
@@ -303,6 +307,7 @@ export async function handleFileUploadConnectRequest(input: {
   streamId: number;
   relayResultQueue: AsyncQueue<ActiveTunnelStreamRelayResult>;
   attachmentRootPath?: string;
+  logger: Logger;
 }): Promise<ActiveTunnelStreamRelay | undefined> {
   let connectRequest;
   try {
@@ -329,14 +334,16 @@ export async function handleFileUploadConnectRequest(input: {
     threadId: connectRequest.channel.threadId,
   });
   const rejectUploadOpen = async (errorMessage: string): Promise<void> => {
-    logFileUploadTerminalEvent({
-      context: logContext,
-      outcome: {
-        kind: "rejected",
-        errorMessage,
-        failureClass: classifyUploadMetadataError(errorMessage),
-      },
-    });
+    input.logger.logEvent(
+      createFileUploadTerminalLogEntry({
+        context: logContext,
+        outcome: {
+          kind: "rejected",
+          errorMessage,
+          failureClass: classifyUploadMetadataError(errorMessage),
+        },
+      }),
+    );
     await writeStreamOpenError(input.tunnelSocket, {
       type: "stream.open.error",
       streamId: input.streamId,
@@ -365,6 +372,7 @@ export async function handleFileUploadConnectRequest(input: {
 
   void handleFileUploadStream({
     attachmentRootPath: input.attachmentRootPath ?? "/tmp/attachments",
+    logger: input.logger,
     messages: relay.messages,
     mimeType: connectRequest.channel.mimeType,
     originalFilename: connectRequest.channel.originalFilename,

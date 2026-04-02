@@ -2,7 +2,7 @@ import type { CompiledAgentRuntime, CompiledRuntimeClient } from "@mistle/integr
 import { systemScheduler } from "@mistle/time";
 import type WebSocket from "ws";
 
-import { logSandboxRuntimeEvent } from "../runtime/logger.js";
+import type { Logger } from "../runtime/logger.js";
 import { createAbortRace, ignorePromiseRejectionAfterAbort } from "./abortable-race.js";
 import {
   finishActiveTunnelStreamRelay,
@@ -69,6 +69,7 @@ export type StartTunnelClientInput = {
   tunnelExchangeToken: string;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
+  logger: Logger;
 };
 
 function describeUnknownError(error: unknown): string {
@@ -143,6 +144,7 @@ async function handleTunnelConnection(input: {
   telemetryLogRelay: TelemetryLogRelay;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
+  logger: Logger;
 }): Promise<void> {
   const connectionAbortController = new AbortController();
   const abortConnection = (): void => {
@@ -312,6 +314,7 @@ async function handleTunnelConnection(input: {
               streamId: connectRequest.streamId,
               relayResultQueue,
               attachmentRootPath: FileUploadAttachmentRootPath,
+              logger: input.logger,
             });
             if (relay !== undefined) {
               activeRelaysByStreamId.set(connectRequest.streamId, relay);
@@ -358,14 +361,16 @@ async function runTunnelClientLoop(input: {
   tokens: TunnelTokens;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
+  logger: Logger;
 }): Promise<void> {
   const executionLeases = new ExecutionLeaseEngine();
-  const telemetryLogRelay = new TelemetryLogRelay();
+  const telemetryLogRelay = new TelemetryLogRelay(input.logger);
 
   void runTunnelTokenExchangeLoop({
     signal: input.signal,
     gatewayWsUrl: input.gatewayWsUrl,
     tokens: input.tokens,
+    logger: input.logger,
   }).catch(() => undefined);
 
   for (let dialAttempt = 1; !input.signal.aborted; dialAttempt += 1) {
@@ -373,7 +378,7 @@ async function runTunnelClientLoop(input: {
       try {
         await exchangeTunnelTokensNow(input.gatewayWsUrl, input.tokens);
       } catch (error) {
-        logSandboxRuntimeEvent({
+        input.logger.logEvent({
           level: "warn",
           event: "sandbox_tunnel_token_exchange_before_redial_failed",
           fields: {
@@ -389,7 +394,7 @@ async function runTunnelClientLoop(input: {
     let tunnelSocket: WebSocket;
     let tunnelMessages: AsyncQueue<TunnelSocketMessage>;
     try {
-      logSandboxRuntimeEvent({
+      input.logger.logEvent({
         level: "info",
         event: "sandbox_tunnel_connect_attempt_started",
         fields: {
@@ -405,7 +410,7 @@ async function runTunnelClientLoop(input: {
       tunnelSocket = connectedTunnel.socket;
       tunnelMessages = connectedTunnel.messages;
       telemetryLogRelay.attachTunnelConnection(tunnelSocket);
-      logSandboxRuntimeEvent({
+      input.logger.logEvent({
         level: "info",
         event: "sandbox_tunnel_connect_attempt_succeeded",
         fields: {
@@ -413,7 +418,7 @@ async function runTunnelClientLoop(input: {
         },
       });
     } catch (error) {
-      logSandboxRuntimeEvent({
+      input.logger.logEvent({
         level: "warn",
         event: "sandbox_tunnel_connect_attempt_failed",
         fields: {
@@ -438,6 +443,7 @@ async function runTunnelClientLoop(input: {
         telemetryLogRelay,
         agentRuntimes: input.agentRuntimes,
         runtimeClients: input.runtimeClients,
+        logger: input.logger,
       });
     } catch (error) {
       connectionError = error;
@@ -451,7 +457,7 @@ async function runTunnelClientLoop(input: {
       return;
     }
     if (connectionError === undefined) {
-      logSandboxRuntimeEvent({
+      input.logger.logEvent({
         level: "info",
         event: "sandbox_tunnel_connection_closed_cleanly",
         fields: {
@@ -464,7 +470,7 @@ async function runTunnelClientLoop(input: {
       throw new Error(describeUnknownError(connectionError));
     }
 
-    logSandboxRuntimeEvent({
+    input.logger.logEvent({
       level: "warn",
       event: "sandbox_tunnel_connection_lost",
       fields: {
@@ -497,6 +503,7 @@ export function startTunnelClient(input: StartTunnelClientInput): StartedTunnelC
     tokens,
     agentRuntimes: input.agentRuntimes,
     runtimeClients: input.runtimeClients,
+    logger: input.logger,
   });
 
   const completion = runPromise
