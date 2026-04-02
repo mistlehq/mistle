@@ -26,18 +26,6 @@ export type PutObjectInput = {
   cacheControl?: string;
 };
 
-export type HeadObjectInput = {
-  objectKey: string;
-};
-
-export type ReadObjectInput = {
-  objectKey: string;
-};
-
-export type DeleteObjectInput = {
-  objectKey: string;
-};
-
 export class S3CompatibleObjectStore {
   readonly #bucketName: string;
   readonly #client: S3Client;
@@ -73,29 +61,29 @@ export class S3CompatibleObjectStore {
     );
   }
 
-  async headObject(input: HeadObjectInput): Promise<HeadObjectCommandOutput> {
+  async headObject(objectKey: string): Promise<HeadObjectCommandOutput> {
     return await this.#client.send(
       new HeadObjectCommand({
         Bucket: this.#bucketName,
-        Key: input.objectKey,
+        Key: objectKey,
       }),
     );
   }
 
-  async readObject(input: ReadObjectInput): Promise<GetObjectCommandOutput> {
+  async readObject(objectKey: string): Promise<GetObjectCommandOutput> {
     return await this.#client.send(
       new GetObjectCommand({
         Bucket: this.#bucketName,
-        Key: input.objectKey,
+        Key: objectKey,
       }),
     );
   }
 
-  async deleteObject(input: DeleteObjectInput): Promise<DeleteObjectCommandOutput> {
+  async deleteObject(objectKey: string): Promise<DeleteObjectCommandOutput> {
     return await this.#client.send(
       new DeleteObjectCommand({
         Bucket: this.#bucketName,
-        Key: input.objectKey,
+        Key: objectKey,
       }),
     );
   }

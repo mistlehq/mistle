@@ -69,16 +69,12 @@ describe("S3-compatible object store integration", () => {
       objectKey,
     });
 
-    const headObjectResponse = await objectStore.headObject({
-      objectKey,
-    });
+    const headObjectResponse = await objectStore.headObject(objectKey);
 
     expect(headObjectResponse.ContentLength).toBe(objectBytes.byteLength);
     expect(headObjectResponse.ContentType).toBe("image/webp");
 
-    const readObjectResponse = await objectStore.readObject({
-      objectKey,
-    });
+    const readObjectResponse = await objectStore.readObject(objectKey);
 
     expect(readObjectResponse.ContentType).toBe("image/webp");
     expect(hasTransformToByteArray(readObjectResponse.Body)).toBe(true);
@@ -88,15 +84,9 @@ describe("S3-compatible object store integration", () => {
 
     await expect(readObjectResponse.Body.transformToByteArray()).resolves.toEqual(objectBytes);
 
-    await objectStore.deleteObject({
-      objectKey,
-    });
+    await objectStore.deleteObject(objectKey);
 
-    await expect(
-      objectStore.headObject({
-        objectKey,
-      }),
-    ).rejects.toMatchObject({
+    await expect(objectStore.headObject(objectKey)).rejects.toMatchObject({
       name: "NotFound",
     });
 

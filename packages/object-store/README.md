@@ -12,9 +12,6 @@ response types.
 Exported from [`src/index.ts`](./src/index.ts):
 
 - `PutObjectInput`
-- `ReadObjectInput`
-- `HeadObjectInput`
-- `DeleteObjectInput`
 - `S3CompatibleObjectStore`
 - `S3CompatibleObjectStoreConfig`
 
@@ -40,15 +37,11 @@ await objectStore.putObject({
   contentType: "image/webp",
 });
 
-const object = await objectStore.readObject({
-  objectKey: "avatars/users/usr_123/avatar.webp",
-});
+const object = await objectStore.readObject("avatars/users/usr_123/avatar.webp");
 
 const bytes = await object.Body?.transformToByteArray();
 
-await objectStore.deleteObject({
-  objectKey: "avatars/users/usr_123/avatar.webp",
-});
+await objectStore.deleteObject("avatars/users/usr_123/avatar.webp");
 ```
 
 ## Design Constraints
