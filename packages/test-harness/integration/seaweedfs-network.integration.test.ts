@@ -23,4 +23,15 @@ describe("SeaweedFS S3 service network integration", () => {
       await network.stop();
     }
   }, 60_000);
+
+  test("fails fast on permanent bucket configuration errors", async () => {
+    await expect(
+      startSeaweedfsS3({
+        bucketName: "Invalid_Bucket_Name",
+        startupTimeoutMs: 5_000,
+      }),
+    ).rejects.toMatchObject({
+      name: "InvalidBucketName",
+    });
+  }, 60_000);
 });

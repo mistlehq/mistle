@@ -1,9 +1,9 @@
 import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3";
-import { systemClock, systemSleeper } from "@mistle/time";
 import { GenericContainer, type StartedNetwork, type StartedTestContainer } from "testcontainers";
 
 import { registerProcessCleanupTask } from "../../cleanup/index.js";
 import { stopContainerIgnoringMissing } from "../../docker/cleanup.js";
+import { pollUntilReady } from "../../readiness/poll-until-ready.js";
 
 const SEAWEEDFS_IMAGE = "chrislusf/seaweedfs:4.17_full";
 const SEAWEEDFS_S3_PORT = 8333;
@@ -155,32 +155,37 @@ async function ensureBucketExists(input: {
     region: SEAWEEDFS_REGION,
   });
 
-  const deadline = systemClock.nowMs() + input.startupTimeoutMs;
-
-  while (systemClock.nowMs() < deadline) {
-    try {
+  await pollUntilReady({
+    createTimeoutError: (lastError) =>
+      new Error(
+        `Timed out waiting for SeaweedFS S3 bucket "${input.bucketName}" within ${input.startupTimeoutMs}ms.`,
+        {
+          cause: lastError,
+        },
+      ),
+    intervalMs: SEAWEEDFS_POLL_INTERVAL_MS,
+    poll: async () => {
       await client.send(
         new CreateBucketCommand({
           Bucket: input.bucketName,
         }),
       );
-      return;
-    } catch (error) {
+    },
+    shouldRetry: (error) => {
       if (hasErrorName(error, "BucketAlreadyOwnedByYou")) {
-        return;
+        return false;
       }
 
-      if (systemClock.nowMs() + SEAWEEDFS_POLL_INTERVAL_MS >= deadline) {
-        throw error;
-      }
-
-      await systemSleeper.sleep(SEAWEEDFS_POLL_INTERVAL_MS);
+      return isRetryableSeaweedfsStartupError(error);
+    },
+    timeoutMs: input.startupTimeoutMs,
+  }).catch((error: unknown) => {
+    if (hasErrorName(error, "BucketAlreadyOwnedByYou")) {
+      return;
     }
-  }
 
-  throw new Error(
-    `Timed out waiting for SeaweedFS S3 bucket "${input.bucketName}" within ${input.startupTimeoutMs}ms.`,
-  );
+    throw error;
+  });
 }
 
 function hasErrorName(error: unknown, expectedName: string): boolean {
@@ -193,4 +198,73 @@ function hasErrorName(error: unknown, expectedName: string): boolean {
   }
 
   return error.name === expectedName;
+}
+
+function isRetryableSeaweedfsStartupError(error: unknown): boolean {
+  const httpStatusCode = getHttpStatusCode(error);
+  if (httpStatusCode !== undefined) {
+    return httpStatusCode >= 500;
+  }
+
+  const errorName = getErrorName(error);
+  if (
+    errorName === "TimeoutError" ||
+    errorName === "NetworkingError" ||
+    errorName === "ECONNREFUSED" ||
+    errorName === "ECONNRESET" ||
+    errorName === "ETIMEDOUT"
+  ) {
+    return true;
+  }
+
+  const errorCode = getErrorCode(error);
+  return (
+    errorCode === "ECONNREFUSED" ||
+    errorCode === "ECONNRESET" ||
+    errorCode === "ETIMEDOUT" ||
+    errorCode === "EPIPE"
+  );
+}
+
+function getErrorName(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null) {
+    return undefined;
+  }
+
+  if (!("name" in error) || typeof error.name !== "string") {
+    return undefined;
+  }
+
+  return error.name;
+}
+
+function getErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null) {
+    return undefined;
+  }
+
+  if (!("code" in error) || typeof error.code !== "string") {
+    return undefined;
+  }
+
+  return error.code;
+}
+
+function getHttpStatusCode(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null) {
+    return undefined;
+  }
+
+  if (!("$metadata" in error) || typeof error.$metadata !== "object" || error.$metadata === null) {
+    return undefined;
+  }
+
+  if (
+    !("httpStatusCode" in error.$metadata) ||
+    typeof error.$metadata.httpStatusCode !== "number"
+  ) {
+    return undefined;
+  }
+
+  return error.$metadata.httpStatusCode;
 }
