@@ -46,7 +46,6 @@ function SessionWorkbenchPageContent(input: {
     : (workbench.primaryPanelState.disabledReason ?? "Open Codex CLI");
   const showResumeButton = shouldShowResumeAction({
     requiresManualResume: workbench.stoppedSessionState.requiresManualResume,
-    isResumingStoppedSandbox: workbench.isResumingStoppedSandbox,
   });
   const headerActions = useMemo(
     () => (

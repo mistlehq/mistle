@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
+import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import {
   buildOptimisticSessions,
   resolveSessionResultsSummary,
@@ -263,10 +264,18 @@ describe("SessionsPage", () => {
     );
 
     expect(markup).toContain("View failure details");
-    expect(markup).toContain("Failed");
+    expect(markup).toContain("Sandbox failed");
     expect(markup).not.toContain("sandbox_start_failed");
     expect(markup).not.toContain("Failed to start sandbox runtime.");
     expect(markup).not.toContain("text-destructive whitespace-pre-wrap text-xs");
+  });
+
+  it("uses the same badge labels as the workbench header mapper", () => {
+    expect(resolveSandboxStatusBadgeUi("pending").label).toBe("Starting sandbox");
+    expect(resolveSandboxStatusBadgeUi("starting").label).toBe("Starting sandbox");
+    expect(resolveSandboxStatusBadgeUi("running").label).toBe("Connected");
+    expect(resolveSandboxStatusBadgeUi("stopped").label).toBe("Sandbox stopped");
+    expect(resolveSandboxStatusBadgeUi("failed").label).toBe("Sandbox failed");
   });
 
   it("routes stopped sessions into the workbench route directly", () => {
