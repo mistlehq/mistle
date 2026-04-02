@@ -10,11 +10,6 @@ export type SandboxAutomationConversation = {
   providerConversationId: string | null;
 } | null;
 
-export type ResumeRequestGuard = {
-  requestId: number;
-  sandboxInstanceId: string;
-};
-
 export type WorkbenchEntryPhase =
   | "connecting"
   | "loading"
@@ -195,17 +190,5 @@ export function resolveStoppedSessionMessageForWorkbenchEntryPhase(input: {
   return (
     input.resumeActionErrorMessage ??
     "This sandbox is stopped. Resume it to reconnect chat and terminal."
-  );
-}
-
-export function isActiveResumeRequest(input: {
-  activeRequest: ResumeRequestGuard | null;
-  requestId: number;
-  sandboxInstanceId: string;
-}): boolean {
-  return (
-    input.activeRequest !== null &&
-    input.activeRequest.requestId === input.requestId &&
-    input.activeRequest.sandboxInstanceId === input.sandboxInstanceId
   );
 }

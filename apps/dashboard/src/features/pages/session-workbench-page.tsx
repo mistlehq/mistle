@@ -5,6 +5,10 @@ import { useLocation, useParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
+import {
+  resolveSandboxStatusBadgeUi,
+  type SandboxStatusBadgeUi,
+} from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
   SessionConversationBottomPanel,
@@ -16,12 +20,40 @@ import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
 } from "./session-workbench-page-view.js";
-import {
-  hasSessionTopAlert,
-  resolveSessionWorkbenchHeaderStatusUi,
-  shouldShowResumeAction,
-} from "./session-workbench-view-model.js";
+import type {
+  SandboxStatusReadState,
+  WorkbenchSandboxLifecycleStatus,
+} from "./session-workbench-state.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
+
+export function hasSessionTopAlert(input: {
+  hasSandboxStatusError: boolean;
+  lifecycleErrorMessage: string | null;
+  reconnectMessage: string | null;
+  sandboxFailureMessage: string | null;
+  stoppedSessionMessage: string | null;
+}): boolean {
+  return (
+    input.hasSandboxStatusError ||
+    input.lifecycleErrorMessage !== null ||
+    input.reconnectMessage !== null ||
+    input.sandboxFailureMessage !== null ||
+    input.stoppedSessionMessage !== null
+  );
+}
+
+export function resolveSessionWorkbenchHeaderStatusUi(input: {
+  sandboxLifecycleStatus: WorkbenchSandboxLifecycleStatus;
+  sandboxStatusReadState: SandboxStatusReadState;
+}): SandboxStatusBadgeUi {
+  return input.sandboxStatusReadState === "loading"
+    ? resolveSandboxStatusBadgeUi(null)
+    : resolveSandboxStatusBadgeUi(input.sandboxLifecycleStatus);
+}
+
+export function shouldShowResumeAction(input: { requiresManualResume: boolean }): boolean {
+  return input.requiresManualResume;
+}
 
 export function SessionWorkbenchPage(): React.JSX.Element {
   const location = useLocation();

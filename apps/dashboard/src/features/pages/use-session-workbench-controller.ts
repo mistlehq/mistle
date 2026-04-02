@@ -12,7 +12,6 @@ import {
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   hasFreshSandboxStatusReadSinceRecoveryBoundary,
-  isActiveResumeRequest,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveWorkbenchEntryPhase,
@@ -23,12 +22,17 @@ import {
 import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 import {
-  getSandboxInstanceStatusQueryKey,
   reduceCodexRecoveryState,
   resolveCodexReconnectMessage,
-  seedSandboxInstanceStatusQuery,
+} from "./use-session-workbench-codex-recovery.js";
+import {
+  getSandboxInstanceStatusQueryKey,
   useSessionWorkbenchLifecycleState,
 } from "./use-session-workbench-lifecycle-state.js";
+import {
+  isActiveResumeRequest,
+  seedSandboxInstanceStatusQuery,
+} from "./use-session-workbench-stopped-resume.js";
 
 type SessionWorkbenchState = {
   sandboxStatusReadState: ReturnType<
