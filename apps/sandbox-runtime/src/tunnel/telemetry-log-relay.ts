@@ -11,7 +11,7 @@ import {
 import type WebSocket from "ws";
 
 import {
-  addSandboxRuntimeLogLineListener,
+  addLogLineListener,
   formatSandboxRuntimeLogLine,
   type SandboxRuntimeLogLevel,
 } from "../runtime/logger.js";
@@ -63,7 +63,7 @@ export class TelemetryLogRelay {
     this.#buffer.clear();
     this.#state = "opening";
     this.#removeLogLineListener?.();
-    this.#removeLogLineListener = addSandboxRuntimeLogLineListener((line) => {
+    this.#removeLogLineListener = addLogLineListener((line) => {
       this.enqueueLogLine(line);
     });
 

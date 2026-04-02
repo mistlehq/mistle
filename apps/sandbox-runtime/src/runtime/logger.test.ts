@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
-  addSandboxRuntimeLogLineListener,
+  addLogLineListener,
   formatSandboxRuntimeLogLine,
   logSandboxRuntimeEvent,
-  resetSandboxRuntimeLoggerForTest,
+  resetLoggerForTest,
 } from "./logger.js";
 
 beforeEach(() => {
-  resetSandboxRuntimeLoggerForTest();
+  resetLoggerForTest();
 });
 
 describe("formatSandboxRuntimeLogLine", () => {
@@ -31,7 +31,7 @@ describe("formatSandboxRuntimeLogLine", () => {
   });
 });
 
-describe("addSandboxRuntimeLogLineListener", () => {
+describe("addLogLineListener", () => {
   it("replays backlog snapshot lines and then emits live lines until removed", () => {
     logSandboxRuntimeEvent({
       level: "info",
@@ -39,7 +39,7 @@ describe("addSandboxRuntimeLogLineListener", () => {
     });
 
     const observedLines: string[] = [];
-    const removeListener = addSandboxRuntimeLogLineListener((line) => {
+    const removeListener = addLogLineListener((line) => {
       observedLines.push(line);
     });
 
@@ -67,7 +67,7 @@ describe("addSandboxRuntimeLogLineListener", () => {
     }
 
     const observedLines: string[] = [];
-    const removeListener = addSandboxRuntimeLogLineListener((line) => {
+    const removeListener = addLogLineListener((line) => {
       observedLines.push(line);
     });
     removeListener();

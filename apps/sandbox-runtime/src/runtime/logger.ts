@@ -4,11 +4,11 @@ export type SandboxRuntimeLogValue = string | number | boolean | null;
 
 export type SandboxRuntimeLogFields = Readonly<Record<string, SandboxRuntimeLogValue>>;
 
-export type SandboxRuntimeLogLineListener = (line: string) => void;
+export type LogLineListener = (line: string) => void;
 
-const MaxBufferedSandboxRuntimeLogLines = 512;
+const MaxBufferedLogLines = 512;
 const bufferedLogLines: string[] = [];
-const logLineListeners = new Set<SandboxRuntimeLogLineListener>();
+const logLineListeners = new Set<LogLineListener>();
 
 export function formatSandboxRuntimeLogLine(input: {
   timestamp: Date;
@@ -31,9 +31,7 @@ export function formatSandboxRuntimeLogLine(input: {
   return `${JSON.stringify(payload)}\n`;
 }
 
-export function addSandboxRuntimeLogLineListener(
-  listener: SandboxRuntimeLogLineListener,
-): () => void {
+export function addLogLineListener(listener: LogLineListener): () => void {
   for (const line of bufferedLogLines) {
     listener(line);
   }
@@ -45,7 +43,7 @@ export function addSandboxRuntimeLogLineListener(
   };
 }
 
-export function resetSandboxRuntimeLoggerForTest(): void {
+export function resetLoggerForTest(): void {
   bufferedLogLines.length = 0;
   logLineListeners.clear();
 }
@@ -64,8 +62,8 @@ export function logSandboxRuntimeEvent(input: {
 
   process.stderr.write(line);
   bufferedLogLines.push(line);
-  if (bufferedLogLines.length > MaxBufferedSandboxRuntimeLogLines) {
-    bufferedLogLines.splice(0, bufferedLogLines.length - MaxBufferedSandboxRuntimeLogLines);
+  if (bufferedLogLines.length > MaxBufferedLogLines) {
+    bufferedLogLines.splice(0, bufferedLogLines.length - MaxBufferedLogLines);
   }
   for (const listener of logLineListeners) {
     listener(line);
