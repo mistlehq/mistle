@@ -1,8 +1,10 @@
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
+import type { MistleLogger } from "@mistle/logging";
 import type { SandboxAdapter, SandboxRuntimeControl } from "@mistle/sandbox";
 import { systemClock, systemSleeper, type Clock, type Sleeper } from "@mistle/time";
 import { Pool } from "pg";
 
+import { logger } from "../../logger.js";
 import { createSandboxRuntimeStateReader } from "../../runtime-state/create-sandbox-runtime-state-reader.js";
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "./config.js";
@@ -14,6 +16,7 @@ import {
 
 export type WorkflowContext = {
   config: DataPlaneWorkerRuntimeConfig;
+  logger: MistleLogger;
   db: DataPlaneDatabase;
   dbPool: Pool;
   sandboxAdapter: SandboxAdapter;
@@ -63,6 +66,7 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
 
     return {
       config,
+      logger,
       db: createDataPlaneDatabase(dbPool),
       dbPool,
       sandboxAdapter: createSandboxRuntimeAdapter(config),
