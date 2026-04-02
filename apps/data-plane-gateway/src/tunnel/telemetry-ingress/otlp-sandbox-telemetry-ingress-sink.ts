@@ -2,6 +2,7 @@ import { createOtlpLogForwarder, type OtlpLogForwarder } from "@mistle/telemetry
 import type { Clock } from "@mistle/time";
 
 import type { DataPlaneGatewayGlobalConfig } from "../../types.js";
+import { NoopSandboxTelemetryIngressSink } from "./noop-sandbox-telemetry-ingress-sink.js";
 import type {
   SandboxTelemetryIngressSink,
   SandboxTelemetryIngressStream,
@@ -11,7 +12,6 @@ import {
   parseSandboxTelemetryLogLine,
   toSandboxTelemetryLogRecord,
 } from "./sandbox-telemetry-log-line.js";
-import { NoopSandboxTelemetryIngressSink } from "./noop-sandbox-telemetry-ingress-sink.js";
 
 type ActiveOtlpSandboxTelemetryStream = SandboxTelemetryIngressStream & {
   lineDecoder: SandboxTelemetryLogLineDecoder;
