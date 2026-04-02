@@ -19,8 +19,7 @@ export type AutoSaveTextFieldErrorState = AutoSaveErrorState;
 export type AutoSaveTextFieldProps = {
   id: string;
   label: string;
-  initialValue: string;
-  initialErrorState?: AutoSaveTextFieldErrorState | null;
+  savedValue: string;
   description?: string;
   placeholder?: string;
   disabled?: boolean;
@@ -35,13 +34,9 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
   const successVisibleDurationMs = input.successVisibleDurationMs ?? 2200;
   const successFadeDurationMs = input.successFadeDurationMs ?? 700;
   const scheduler = input.scheduler ?? systemScheduler;
-  const initialErrorKind = input.initialErrorState?.kind ?? null;
-  const initialErrorMessage = input.initialErrorState?.message ?? null;
-  const [draftValue, setDraftValue] = useState(input.initialValue);
-  const [committedValue, setCommittedValue] = useState(input.initialValue);
-  const [errorState, setErrorState] = useState<AutoSaveTextFieldErrorState | null>(
-    input.initialErrorState ?? null,
-  );
+  const [draftValue, setDraftValue] = useState(input.savedValue);
+  const [committedValue, setCommittedValue] = useState(input.savedValue);
+  const [errorState, setErrorState] = useState<AutoSaveTextFieldErrorState | null>(null);
   const [status, setStatus] = useState<AutoSaveStatus>("idle");
   const saveSequenceRef = useRef(0);
   const fadeStartTimeoutRef = useRef<TimerHandle | null>(null);
@@ -54,11 +49,11 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
       fadeStartTimeoutRef,
       scheduler,
     });
-    setDraftValue(input.initialValue);
-    setCommittedValue(input.initialValue);
-    setErrorState(input.initialErrorState ?? null);
+    setDraftValue(input.savedValue);
+    setCommittedValue(input.savedValue);
+    setErrorState(null);
     setStatus("idle");
-  }, [initialErrorKind, initialErrorMessage, input.initialValue, scheduler]);
+  }, [input.savedValue, scheduler]);
 
   useEffect(() => {
     return () => {

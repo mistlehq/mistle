@@ -146,12 +146,14 @@ describe("AutoSaveEditableHeading", () => {
   it("keeps retry text across rerenders with the same error message", () => {
     function ErrorHarness(): React.JSX.Element {
       const [revision, setRevision] = useState(0);
+      const [saveError, setSaveError] = useState("Could not update heading.");
 
       return (
         <div>
           <button
             onClick={() => {
               setRevision((current) => current + 1);
+              setSaveError("Could not update heading.");
             }}
             type="button"
           >
@@ -160,9 +162,8 @@ describe("AutoSaveEditableHeading", () => {
           <AutoSaveEditableHeading
             ariaLabel="Heading"
             editButtonLabel="Edit heading"
-            saveError="Could not update heading."
+            saveError={saveError}
             savedValue="Repo Maintainer"
-            initiallyEditing={true}
             onSave={async () => {}}
             validate={() => null}
           />
@@ -197,60 +198,6 @@ describe("AutoSaveEditableHeading", () => {
 
     expect(screen.getByRole("textbox", { name: "Heading" })).toBeDefined();
     expect(screen.getByText("Could not update heading.")).toBeDefined();
-  });
-
-  it("updates the seeded error when initialErrorState changes in place", () => {
-    function InitialErrorHarness(): React.JSX.Element {
-      const [errorState, setErrorState] = useState<{
-        kind: "validation" | "save";
-        message: string;
-      } | null>({
-        kind: "validation",
-        message: "Heading is required.",
-      });
-
-      return (
-        <div>
-          <button
-            onClick={() => {
-              setErrorState({
-                kind: "save",
-                message: "Could not update heading.",
-              });
-            }}
-            type="button"
-          >
-            Switch error
-          </button>
-          <button
-            onClick={() => {
-              setErrorState(null);
-            }}
-            type="button"
-          >
-            Clear error
-          </button>
-          <AutoSaveEditableHeading
-            ariaLabel="Heading"
-            editButtonLabel="Edit heading"
-            initialErrorState={errorState}
-            savedValue="Repo Maintainer"
-            initiallyEditing={errorState !== null}
-            onSave={async () => {}}
-            validate={() => null}
-          />
-        </div>
-      );
-    }
-
-    render(<InitialErrorHarness />);
-
-    expect(screen.getByText("Heading is required.")).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Switch error" }));
-    expect(screen.getByText("Could not update heading.")).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Clear error" }));
-    expect(screen.queryByText("Could not update heading.")).toBeNull();
-    expect(screen.queryByRole("textbox", { name: "Heading" })).toBeNull();
   });
 
   it("keeps a parent-owned save error visible when escape cancels a changed draft", () => {

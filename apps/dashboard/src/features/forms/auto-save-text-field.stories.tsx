@@ -1,23 +1,18 @@
 import { systemSleeper } from "@mistle/time";
 import { FieldDescription } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
 import type React from "react";
 
 import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
-import { AutoSaveTextField, type AutoSaveTextFieldErrorState } from "./auto-save-text-field.js";
+import { AutoSaveTextField } from "./auto-save-text-field.js";
 
 type StoryHarnessProps = {
-  initialValue: string;
+  savedValue: string;
   description?: string;
   placeholder?: string;
-  errorMode?: "none" | "save" | "validation";
 };
 
 function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
-  const [errorMode, setErrorMode] = useState(input.errorMode ?? "none");
-  const initialErrorState = resolveStoryErrorState(errorMode);
-
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 rounded-xl border bg-white p-6">
       <AutoSaveTextField
@@ -25,9 +20,8 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
           input.description ??
           "Shown across the dashboard. Saving begins when focus leaves the field."
         }
-        initialErrorState={initialErrorState}
         id="storybook-auto-save-display-name"
-        initialValue={input.initialValue}
+        savedValue={input.savedValue}
         label="Display name"
         onSave={async (nextValue) => {
           await systemSleeper.sleep(900);
@@ -51,42 +45,6 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
       />
 
       <div className="flex flex-col gap-2 text-sm">
-        <div className="flex flex-wrap items-center gap-4">
-          <span className="font-medium">Error preview</span>
-          <label className="flex items-center gap-2">
-            <input
-              checked={errorMode === "none"}
-              name="error-mode"
-              onChange={() => {
-                setErrorMode("none");
-              }}
-              type="radio"
-            />
-            None
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              checked={errorMode === "validation"}
-              name="error-mode"
-              onChange={() => {
-                setErrorMode("validation");
-              }}
-              type="radio"
-            />
-            Validation
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              checked={errorMode === "save"}
-              name="error-mode"
-              onChange={() => {
-                setErrorMode("save");
-              }}
-              type="radio"
-            />
-            Save
-          </label>
-        </div>
         <FieldDescription>
           <span className="block">
             Validation error: choose <strong>Validation</strong>, or type fewer than 3 characters
@@ -118,26 +76,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    initialValue: "Mistle Developer",
+    savedValue: "Mistle Developer",
   },
 };
-
-function resolveStoryErrorState(
-  errorMode: StoryHarnessProps["errorMode"],
-): AutoSaveTextFieldErrorState | null {
-  if (errorMode === "validation") {
-    return {
-      kind: "validation",
-      message: "Display name is required.",
-    };
-  }
-
-  if (errorMode === "save") {
-    return {
-      kind: "save",
-      message: "Could not update display name.",
-    };
-  }
-
-  return null;
-}

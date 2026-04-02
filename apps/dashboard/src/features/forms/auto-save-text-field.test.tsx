@@ -26,7 +26,7 @@ describe("AutoSaveTextField", () => {
     render(
       <AutoSaveTextField
         id="display-name"
-        initialValue="Mistle Developer"
+        savedValue="Mistle Developer"
         label="Display name"
         onSave={async (nextValue) => {
           savedValues.push(nextValue);
@@ -63,7 +63,7 @@ describe("AutoSaveTextField", () => {
     render(
       <AutoSaveTextField
         id="display-name"
-        initialValue="Mistle Developer"
+        savedValue="Mistle Developer"
         label="Display name"
         onSave={async () => {
           saveCount += 1;
@@ -90,7 +90,7 @@ describe("AutoSaveTextField", () => {
     render(
       <AutoSaveTextField
         id="display-name"
-        initialValue="Mistle Developer"
+        savedValue="Mistle Developer"
         label="Display name"
         onSave={async () => {
           throw new Error("Could not update display name.");
@@ -115,7 +115,7 @@ describe("AutoSaveTextField", () => {
     render(
       <AutoSaveTextField
         id="display-name"
-        initialValue="Mistle Developer"
+        savedValue="Mistle Developer"
         label="Display name"
         onSave={() =>
           new Promise<void>((resolve) => {
@@ -163,7 +163,7 @@ describe("AutoSaveTextField", () => {
           </button>
           <AutoSaveTextField
             id="display-name"
-            initialValue={value}
+            savedValue={value}
             label="Display name"
             onSave={() =>
               new Promise<void>((resolve) => {

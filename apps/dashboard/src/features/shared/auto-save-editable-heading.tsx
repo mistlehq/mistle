@@ -26,8 +26,6 @@ type EditableHeadingAction =
   | {
       type: "reset-from-props";
       savedValue: string;
-      initiallyEditing: boolean;
-      initialErrorState: AutoSaveErrorState | null;
     }
   | {
       type: "apply-parent-save-error";
@@ -70,16 +68,12 @@ type EditableHeadingAction =
       type: "saved-fade-ended";
     };
 
-function createEditableHeadingState(input: {
-  savedValue: string;
-  initiallyEditing: boolean;
-  initialErrorState: AutoSaveErrorState | null;
-}): EditableHeadingState {
+function createEditableHeadingState(input: { savedValue: string }): EditableHeadingState {
   return {
-    isEditing: input.initiallyEditing,
+    isEditing: false,
     draftValue: input.savedValue,
     value: input.savedValue,
-    errorState: input.initialErrorState,
+    errorState: null,
     status: "idle",
   };
 }
@@ -92,8 +86,6 @@ function editableHeadingReducer(
     case "reset-from-props":
       return createEditableHeadingState({
         savedValue: action.savedValue,
-        initiallyEditing: action.initiallyEditing,
-        initialErrorState: action.initialErrorState,
       });
     case "apply-parent-save-error":
       return {
@@ -202,8 +194,6 @@ export type AutoSaveEditableHeadingProps = {
   headingClassName?: string;
   inputClassName?: string;
   cancelOnEscape?: boolean;
-  initiallyEditing?: boolean;
-  initialErrorState?: AutoSaveErrorState | null;
   validate: (nextValue: string) => string | null;
   onSave: (nextValue: string) => Promise<void> | void;
   successVisibleDurationMs?: number;
@@ -225,14 +215,10 @@ function useAutoSaveEditableHeadingState(input: AutoSaveEditableHeadingProps): {
   const successFadeDurationMs = input.successFadeDurationMs ?? 700;
   const scheduler = input.scheduler ?? systemScheduler;
   const saveError = input.saveError;
-  const initialErrorKind = input.initialErrorState?.kind ?? null;
-  const initialErrorMessage = input.initialErrorState?.message ?? null;
   const [state, dispatch] = useReducer(
     editableHeadingReducer,
     {
       savedValue: input.savedValue,
-      initiallyEditing: input.initiallyEditing ?? input.initialErrorState != null,
-      initialErrorState: input.initialErrorState ?? null,
     },
     createEditableHeadingState,
   );
@@ -250,10 +236,8 @@ function useAutoSaveEditableHeadingState(input: AutoSaveEditableHeadingProps): {
     dispatch({
       type: "reset-from-props",
       savedValue: input.savedValue,
-      initiallyEditing: input.initiallyEditing ?? input.initialErrorState != null,
-      initialErrorState: input.initialErrorState ?? null,
     });
-  }, [initialErrorKind, initialErrorMessage, input.savedValue, input.initiallyEditing, scheduler]);
+  }, [input.savedValue, scheduler]);
 
   useEffect(() => {
     if (saveError === undefined) {

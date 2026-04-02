@@ -1,11 +1,9 @@
 import { systemSleeper } from "@mistle/time";
 import { FieldDescription } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
 import type React from "react";
 
 import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
-import type { AutoSaveErrorState } from "./auto-save-behavior.js";
 import {
   AutoSaveEditableHeading,
   type AutoSaveEditableHeadingProps,
@@ -15,21 +13,17 @@ type StoryHarnessProps = Pick<
   AutoSaveEditableHeadingProps,
   "savedValue" | "placeholder" | "maxWidthClassName" | "headingClassName" | "inputClassName"
 > & {
-  errorMode?: "none" | "save" | "validation";
+  saveError?: string;
 };
 
 function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
-  const [errorMode, setErrorMode] = useState(input.errorMode ?? "none");
-  const initialErrorState = resolveStoryErrorState(errorMode);
-
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 rounded-xl border bg-white p-6">
       <AutoSaveEditableHeading
         ariaLabel="Display name"
         editButtonLabel="Edit display name"
         headingClassName={input.headingClassName}
-        initialErrorState={initialErrorState}
-        initiallyEditing={initialErrorState !== null}
+        {...(input.saveError === undefined ? {} : { saveError: input.saveError })}
         savedValue={input.savedValue}
         inputClassName={input.inputClassName}
         maxWidthClassName={input.maxWidthClassName}
@@ -55,49 +49,14 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
       />
 
       <div className="flex flex-col gap-2 text-sm">
-        <div className="flex flex-wrap items-center gap-4">
-          <span className="font-medium">Error preview</span>
-          <label className="flex items-center gap-2">
-            <input
-              checked={errorMode === "none"}
-              name="error-mode"
-              onChange={() => {
-                setErrorMode("none");
-              }}
-              type="radio"
-            />
-            None
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              checked={errorMode === "validation"}
-              name="error-mode"
-              onChange={() => {
-                setErrorMode("validation");
-              }}
-              type="radio"
-            />
-            Validation
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              checked={errorMode === "save"}
-              name="error-mode"
-              onChange={() => {
-                setErrorMode("save");
-              }}
-              type="radio"
-            />
-            Save
-          </label>
-        </div>
         <FieldDescription>
           <span className="block">
-            Validation error: choose <strong>Validation</strong>, or click the pencil, clear the
-            value, and blur.
+            Validation error: click the pencil, clear the value, and blur.
           </span>
           <span className="block">
-            Save error: choose <strong>Save</strong>, or click the pencil, type
+            Save error: pass{" "}
+            <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">saveError</code>
+            or click the pencil, type
             <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">explode</code>
             and blur.
           </span>
@@ -125,23 +84,3 @@ export const Default: Story = {
     savedValue: "Repo Maintainer",
   },
 };
-
-function resolveStoryErrorState(
-  errorMode: StoryHarnessProps["errorMode"],
-): AutoSaveErrorState | null {
-  if (errorMode === "validation") {
-    return {
-      kind: "validation",
-      message: "Display name is required.",
-    };
-  }
-
-  if (errorMode === "save") {
-    return {
-      kind: "save",
-      message: "Could not update display name.",
-    };
-  }
-
-  return null;
-}
