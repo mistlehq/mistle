@@ -16,7 +16,7 @@ import type { PgRequestHookInformation } from "@opentelemetry/instrumentation-pg
 import { BatchLogRecordProcessor, LoggerProvider } from "@opentelemetry/sdk-logs";
 import { NodeSDK, resources } from "@opentelemetry/sdk-node";
 
-import { buildOtlpHttpExporterConfig, parseOtlpResourceAttributes } from "./otlp-config.js";
+import { parseOtlpResourceAttributes } from "./otlp-config.js";
 
 const TELEMETRY_STATE_SYMBOL = Symbol.for("@mistle/telemetry/state");
 const ENABLED_ENV = "MISTLE_TELEMETRY_ENABLED";
@@ -389,9 +389,7 @@ export function createOtlpLogForwarder(input: {
         resourceAttributes: input.resourceAttributes,
       }),
     ),
-    processors: [
-      new BatchLogRecordProcessor(new OTLPLogExporter(buildOtlpHttpExporterConfig(input.logs))),
-    ],
+    processors: [new BatchLogRecordProcessor(new OTLPLogExporter({ url: input.logs.endpoint }))],
   });
   const logger = loggerProvider.getLogger(serviceName);
 
@@ -450,9 +448,9 @@ export function initializeTelemetry(input: InitializeTelemetryInput): TelemetryH
 
   const sdk = new NodeSDK({
     serviceName,
-    traceExporter: new OTLPTraceExporter(buildOtlpHttpExporterConfig(config.traces)),
+    traceExporter: new OTLPTraceExporter({ url: config.traces.endpoint }),
     logRecordProcessors: [
-      new BatchLogRecordProcessor(new OTLPLogExporter(buildOtlpHttpExporterConfig(config.logs))),
+      new BatchLogRecordProcessor(new OTLPLogExporter({ url: config.logs.endpoint })),
     ],
     instrumentations: [
       getNodeAutoInstrumentations({

@@ -1,13 +1,3 @@
-export type OtlpSignalRuntimeConfig = {
-  endpoint: string;
-};
-
-export function buildOtlpHttpExporterConfig(input: OtlpSignalRuntimeConfig): { url: string } {
-  return {
-    url: input.endpoint,
-  };
-}
-
 export function parseOtlpResourceAttributes(input: {
   resourceAttributes: string | undefined;
   serviceName: string;
