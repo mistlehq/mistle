@@ -1,62 +1,38 @@
-import { useState } from "react";
-
-import { EditableHeading } from "../shared/editable-heading.js";
+import { AutoSaveEditableHeading } from "../shared/auto-save-editable-heading.js";
 
 export function WebhookAutomationTitleEditor(input: {
   title: string;
   saveDisabled: boolean;
-  onCommit: (nextValue: string) => void;
+  onCommit: (nextValue: string) => Promise<void> | void;
   errorMessage: string | undefined;
 }): React.JSX.Element {
   return (
-    <WebhookAutomationEditableTitle
-      key={input.title}
-      errorMessage={input.errorMessage}
-      onCommit={input.onCommit}
-      saveDisabled={input.saveDisabled}
-      title={input.title}
-    />
-  );
-}
-
-function WebhookAutomationEditableTitle(input: {
-  title: string;
-  saveDisabled: boolean;
-  onCommit: (nextValue: string) => void;
-  errorMessage: string | undefined;
-}): React.JSX.Element {
-  const [draftValue, setDraftValue] = useState(input.title);
-  const [isEditing, setIsEditing] = useState(false);
-
-  function commitDraft(): void {
-    setIsEditing(false);
-    input.onCommit(draftValue);
-  }
-
-  function cancelEdit(): void {
-    setDraftValue(input.title);
-    setIsEditing(false);
-  }
-
-  return (
-    <EditableHeading
+    <AutoSaveEditableHeading
       ariaLabel="Automation name"
-      cancelOnEscape={true}
-      draftValue={draftValue}
       editButtonLabel="Edit automation name"
-      errorMessage={input.errorMessage}
+      key={input.title}
+      initialValue={input.title}
       inputClassName="text-base font-medium"
-      isEditing={isEditing}
       maxWidthClassName="max-w-4xl"
-      onCancel={cancelEdit}
-      onCommit={commitDraft}
-      onDraftValueChange={setDraftValue}
-      onEditStart={() => {
-        setIsEditing(true);
+      onSave={async (nextValue) => {
+        if (input.saveDisabled) {
+          return;
+        }
+
+        await input.onCommit(nextValue.trim());
       }}
       placeholder="Automation name"
-      saveDisabled={input.saveDisabled}
-      value={input.title}
+      validate={(nextValue) => {
+        return nextValue.trim().length === 0 ? "Automation name is required." : null;
+      }}
+      {...(input.errorMessage === undefined
+        ? {}
+        : {
+            initialErrorState: {
+              kind: "save" as const,
+              message: input.errorMessage,
+            },
+          })}
     />
   );
 }

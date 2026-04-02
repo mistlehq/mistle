@@ -1,4 +1,6 @@
 import { systemScheduler, type Scheduler, type TimerHandle } from "@mistle/time";
+import { Button, Notice } from "@mistle/ui";
+import { PencilSimpleIcon } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -8,7 +10,7 @@ import {
   type AutoSaveErrorState,
 } from "./auto-save-behavior.js";
 import type { AutoSaveInputVisualStatus } from "./auto-save-input-surface.js";
-import { EditableHeading } from "./editable-heading.js";
+import { PageTitleField } from "./page-title-field.js";
 
 type AutoSaveStatus = AutoSaveInputVisualStatus;
 
@@ -25,7 +27,7 @@ export type AutoSaveEditableHeadingProps = {
   initiallyEditing?: boolean;
   initialErrorState?: AutoSaveErrorState | null;
   validate: (nextValue: string) => string | null;
-  onSave: (nextValue: string) => Promise<void>;
+  onSave: (nextValue: string) => Promise<void> | void;
   successVisibleDurationMs?: number;
   successFadeDurationMs?: number;
   scheduler?: Scheduler;
@@ -71,10 +73,12 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
       return;
     }
 
-    if (draftValue === value) {
+    const normalizedDraftValue = draftValue.trim();
+    if (normalizedDraftValue === value.trim()) {
       setErrorState(null);
       setStatus("idle");
       setIsEditing(false);
+      setDraftValue(value);
       return;
     }
 
@@ -100,13 +104,14 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
     setStatus("saving");
 
     try {
-      await input.onSave(draftValue);
+      await input.onSave(normalizedDraftValue);
 
       if (saveSequenceRef.current !== currentSaveSequence) {
         return;
       }
 
-      setValue(draftValue);
+      setDraftValue(normalizedDraftValue);
+      setValue(normalizedDraftValue);
       setStatus("saved");
       scheduleSavedStateReset({
         fadeEndTimeoutRef,
@@ -136,56 +141,86 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
   }
 
   const showStatus = status !== "idle" || errorState !== null;
+  const containerClassName = `w-full ${input.maxWidthClassName ?? "max-w-2xl"} space-y-2`;
+  const HeadingTag = input.headingTag ?? "h1";
+  const headingClassName = input.headingClassName ?? "text-xl font-semibold leading-none";
+  const headingToneClassName = errorState === null ? "" : " text-destructive";
+
+  if (isEditing) {
+    return (
+      <PageTitleField
+        ariaLabel={input.ariaLabel}
+        autoFocus={true}
+        fieldId="editable-heading-input"
+        label={input.ariaLabel}
+        onBlur={() => {
+          void handleCommit();
+        }}
+        onChange={(nextValue) => {
+          setDraftValue(nextValue);
+          if (errorState !== null) {
+            setErrorState(null);
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+            return;
+          }
+
+          if (event.key === "Escape" && (input.cancelOnEscape ?? true)) {
+            clearPendingStatusTimeouts({
+              fadeEndTimeoutRef,
+              fadeStartTimeoutRef,
+              scheduler,
+            });
+            setDraftValue(value);
+            setErrorState(null);
+            setStatus("idle");
+            setIsEditing(false);
+          }
+        }}
+        saveStatus={showStatus && errorState === null ? status : "idle"}
+        showLabel={false}
+        value={draftValue}
+        {...(input.inputClassName === undefined ? {} : { className: input.inputClassName })}
+        {...(errorState === null ? {} : { errorMessage: errorState.message })}
+        {...(input.maxWidthClassName === undefined
+          ? {}
+          : { maxWidthClassName: input.maxWidthClassName })}
+        {...(input.placeholder === undefined ? {} : { placeholder: input.placeholder })}
+      />
+    );
+  }
 
   return (
-    <EditableHeading
-      ariaLabel={input.ariaLabel}
-      cancelOnEscape={input.cancelOnEscape}
-      draftValue={draftValue}
-      editButtonLabel={input.editButtonLabel}
-      errorMessage={errorState?.message}
-      {...(input.headingClassName === undefined
-        ? {}
-        : { headingClassName: input.headingClassName })}
-      {...(input.headingTag === undefined ? {} : { headingTag: input.headingTag })}
-      {...(input.inputClassName === undefined ? {} : { inputClassName: input.inputClassName })}
-      isEditing={isEditing}
-      maxWidthClassName={input.maxWidthClassName}
-      onCancel={() => {
-        clearPendingStatusTimeouts({
-          fadeEndTimeoutRef,
-          fadeStartTimeoutRef,
-          scheduler,
-        });
-        setDraftValue(value);
-        setErrorState(null);
-        setStatus("idle");
-        setIsEditing(false);
-      }}
-      onCommit={() => {
-        void handleCommit();
-      }}
-      onDraftValueChange={(nextValue) => {
-        setDraftValue(nextValue);
-        if (errorState !== null) {
-          setErrorState(null);
-        }
-      }}
-      onEditStart={() => {
-        clearPendingStatusTimeouts({
-          fadeEndTimeoutRef,
-          fadeStartTimeoutRef,
-          scheduler,
-        });
-        setDraftValue(value);
-        setErrorState(null);
-        setStatus("idle");
-        setIsEditing(true);
-      }}
-      placeholder={input.placeholder}
-      saveDisabled={status === "saving"}
-      saveStatus={showStatus && errorState === null ? status : "idle"}
-      value={value}
-    />
+    <div className={containerClassName}>
+      <div className="flex max-w-full items-center gap-1">
+        <HeadingTag className={`min-w-0 ${headingClassName}${headingToneClassName}`}>
+          {value}
+        </HeadingTag>
+        <Button
+          aria-label={input.editButtonLabel}
+          disabled={status === "saving"}
+          onClick={() => {
+            clearPendingStatusTimeouts({
+              fadeEndTimeoutRef,
+              fadeStartTimeoutRef,
+              scheduler,
+            });
+            setDraftValue(value);
+            setErrorState(null);
+            setStatus("idle");
+            setIsEditing(true);
+          }}
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          <PencilSimpleIcon aria-hidden className="size-4" />
+        </Button>
+      </div>
+      {errorState === null ? null : <Notice variant="alert">{errorState.message}</Notice>}
+    </div>
   );
 }

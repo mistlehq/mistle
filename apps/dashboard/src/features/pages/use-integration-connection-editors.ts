@@ -14,8 +14,9 @@ export function useIntegrationConnectionEditors(input: {
   queryKey: readonly ["settings", "integrations", "directory"];
 }) {
   const queryClient = useQueryClient();
-  const [editingConnectionNameId, setEditingConnectionNameId] = useState<string | null>(null);
-  const [connectionNameError, setConnectionNameError] = useState<string | undefined>(undefined);
+  const [connectionNameErrorById, setConnectionNameErrorById] = useState<
+    Readonly<Record<string, string | undefined>>
+  >({});
   const [editingApiKeyConnectionId, setEditingApiKeyConnectionId] = useState<string | null>(null);
   const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [apiKeyError, setApiKeyError] = useState<string | undefined>(undefined);
@@ -158,60 +159,41 @@ export function useIntegrationConnectionEditors(input: {
       input.connections.length === 0
         ? undefined
         : {
-            connectionIdWithError: editingConnectionNameId,
-            ...(connectionNameError === undefined ? {} : { errorMessage: connectionNameError }),
-            onCommit: (connectionId: string, draftValue: string) => {
+            errorByConnectionId: connectionNameErrorById,
+            onSave: async (connectionId: string, draftValue: string) => {
               const editingConnection =
                 input.connections.find((connection) => connection.id === connectionId) ?? null;
               if (editingConnection === null) {
                 throw new Error("Editing connection is required.");
               }
 
-              const normalizedDraft = draftValue.trim();
-              if (normalizedDraft.length === 0) {
-                setEditingConnectionNameId(connectionId);
-                setConnectionNameError("Connection name is required.");
+              if (draftValue === editingConnection.displayName) {
                 return;
               }
 
-              if (normalizedDraft === editingConnection.displayName) {
-                setEditingConnectionNameId(null);
-                setConnectionNameError(undefined);
-                return;
-              }
+              setConnectionNameErrorById((current) => ({
+                ...current,
+                [connectionId]: undefined,
+              }));
 
-              setEditingConnectionNameId(connectionId);
-              setConnectionNameError(undefined);
-              updateConnectionNameMutation.mutate(
-                {
+              try {
+                await updateConnectionNameMutation.mutateAsync({
                   connectionId: editingConnection.id,
-                  displayName: normalizedDraft,
-                },
-                {
-                  onError: (error) => {
-                    setConnectionNameError(
-                      resolveApiErrorMessage({
-                        error,
-                        fallbackMessage: "Could not update connection.",
-                      }),
-                    );
-                  },
-                  onSuccess: () => {
-                    setEditingConnectionNameId(null);
-                    setConnectionNameError(undefined);
-                  },
-                },
-              );
+                  displayName: draftValue,
+                });
+              } catch (error) {
+                const errorMessage = resolveApiErrorMessage({
+                  error,
+                  fallbackMessage: "Could not update connection.",
+                });
+
+                setConnectionNameErrorById((current) => ({
+                  ...current,
+                  [connectionId]: errorMessage,
+                }));
+                throw new Error(errorMessage);
+              }
             },
-            onEditStart: () => {
-              setEditingConnectionNameId(null);
-              setConnectionNameError(undefined);
-            },
-            onEditCancel: () => {
-              setEditingConnectionNameId(null);
-              setConnectionNameError(undefined);
-            },
-            saveDisabled: updateConnectionNameMutation.isPending,
           },
   };
 }

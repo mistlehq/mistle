@@ -127,8 +127,6 @@ describe("IntegrationConnectionDetailView", () => {
   });
 
   it("starts title editing for the clicked connection", () => {
-    let editStarts = 0;
-
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -154,13 +152,8 @@ describe("IntegrationConnectionDetailView", () => {
           },
         ]}
         titleEditor={{
-          connectionIdWithError: null,
-          onCommit: () => {},
-          onEditCancel: () => {},
-          onEditStart: () => {
-            editStarts += 1;
-          },
-          saveDisabled: false,
+          errorByConnectionId: {},
+          onSave: async () => {},
         }}
       />,
     );
@@ -171,7 +164,6 @@ describe("IntegrationConnectionDetailView", () => {
       throw new Error("Expected a second edit connection name button.");
     }
     fireEvent.click(secondEditButton);
-    expect(editStarts).toBe(1);
     expect(screen.getByDisplayValue("Archive Mirror")).toBeTruthy();
   });
 

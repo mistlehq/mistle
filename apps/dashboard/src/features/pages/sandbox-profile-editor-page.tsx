@@ -24,7 +24,7 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { EditableHeading } from "../shared/editable-heading.js";
+import { AutoSaveEditableHeading } from "../shared/auto-save-editable-heading.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import {
   createDefaultBindingConfig,
@@ -573,28 +573,16 @@ function LoadedSandboxProfileMetaSection(input: {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <EditableHeading
+        <AutoSaveEditableHeading
           ariaLabel="Profile name"
-          cancelOnEscape={true}
-          draftValue={metaState.profileNameDraft}
           editButtonLabel="Edit profile name"
-          errorMessage={undefined}
-          isEditing={metaState.isEditingProfileName}
-          maxWidthClassName={undefined}
-          onCancel={metaState.onProfileNameEditCancel}
-          onCommit={metaState.onProfileNameEditCommit}
-          onDraftValueChange={metaState.onProfileNameDraftChange}
-          onEditStart={metaState.onProfileNameEditStart}
-          placeholder={undefined}
-          saveDisabled={metaState.isUpdating}
-          value={metaState.pageTitle}
+          initialValue={metaState.pageTitle}
+          onSave={metaState.onProfileNameSave}
+          validate={(nextValue) => {
+            return nextValue.trim().length === 0 ? "Profile name is required." : null;
+          }}
         />
       </div>
-      {metaState.saveError ? (
-        <Notice title="Update failed" variant="alert">
-          {metaState.saveError}
-        </Notice>
-      ) : null}
     </>
   );
 }
