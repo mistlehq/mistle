@@ -375,8 +375,8 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
           },
           {
             key: "Escape",
-            run: () => {
-              if (activeSuggestionState === null) {
+            run: (editorView) => {
+              if (activeSuggestionStateRef.current === null) {
                 return false;
               }
 
@@ -384,6 +384,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
               setSelectedSuggestionIndex(0);
               setSuggestionPopoverPosition(null);
               setSuggestionInteractionMode("pointer");
+              editorView.focus();
               return true;
             },
           },
@@ -406,6 +407,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
       input.invalid,
       acceptSelectedSuggestion,
       moveSelectedSuggestion,
+      rankedTokens,
     ],
   );
 
