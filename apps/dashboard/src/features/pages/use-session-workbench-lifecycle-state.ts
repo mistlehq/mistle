@@ -867,7 +867,6 @@ export function useSessionWorkbenchLifecycleState(input: {
   });
   const sandboxHeaderStatusUi = resolveSandboxHeaderStatusUi({
     sandboxLifecycleStatus: effectiveSandboxStatus,
-    sessionConnectionStatus,
   });
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({
