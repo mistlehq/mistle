@@ -16,12 +16,14 @@ concurrency:
 
 jobs:
   changes:
-    name: Detect SEA packaging changes
+    name: Detect CI lane changes
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: read
     outputs:
+      ts: ${{ steps.filter.outputs.ts }}
+      rust: ${{ steps.filter.outputs.rust }}
       sandbox_runtime_sea: ${{ steps.filter.outputs.sandbox_runtime_sea }}
 
     steps:
@@ -33,6 +35,41 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
+            ts:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/ci-daily-integration.yml'
+              - '.envrc'
+              - 'apps/**'
+              - 'packages/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'package.json'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - 'turbo.json'
+              - 'tsconfig.base.json'
+              - '!apps/sandbox-runtime/**'
+              - '!packages/sandbox-rs-napi/**'
+            rust:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/ci-daily-integration.yml'
+              - '.envrc'
+              - 'apps/sandbox-runtime/**'
+              - 'packages/sandbox-rs-napi/**'
+              - 'packages/integrations-core/**'
+              - 'packages/integrations-definitions/**'
+              - 'packages/sandbox-session-protocol/**'
+              - 'packages/time/**'
+              - 'scripts/**'
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'package.json'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - 'turbo.json'
+              - 'tsconfig.base.json'
             sandbox_runtime_sea:
               - '.github/workflows/ci.yml'
               - '.github/workflows/ci-daily-integration.yml'
@@ -51,10 +88,79 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'tsconfig.base.json'
 
-  static:
-    name: Format, Lint, Typecheck
+  static-ts:
+    name: TS Static
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 60
+    needs:
+      - changes
+    if: needs.changes.outputs.ts == 'true'
+    env:
+      CI: true
+      TURBO_TELEMETRY_DISABLED: "1"
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Restore pnpm store cache
+        id: static-ts-pnpm-store-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Restore Turbo local cache
+        id: static-ts-turbo-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-ts-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.workflow }}-static-ts-
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies in Nix shell
+        run: nix develop --command pnpm install --frozen-lockfile
+
+      - name: Save pnpm store cache
+        if: steps.static-ts-pnpm-store-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Generate integration config
+        run: nix develop --command bash -lc "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
+
+      - name: Build workspace in Nix shell
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=!@mistle/sandbox-runtime --filter=!@mistle/sandbox-rs-napi"
+
+      - name: Run TS static checks in Nix shell
+        run: nix develop --command bash -lc "pnpm format:check && pnpm lint:ts && pnpm lint:sql && pnpm typecheck:ts"
+
+      - name: Save Turbo local cache
+        if: ${{ always() && !cancelled() && steps.static-ts-turbo-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-ts-${{ github.sha }}
+
+  static-rust:
+    name: Rust Static
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 60
+    needs:
+      - changes
+    if: needs.changes.outputs.rust == 'true'
     env:
       CI: true
       TURBO_TELEMETRY_DISABLED: "1"
@@ -79,7 +185,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Restore pnpm store cache
-        id: static-pnpm-store-cache
+        id: static-rust-pnpm-store-cache
         uses: actions/cache/restore@v5
         with:
           path: ~/.local/share/pnpm/store
@@ -88,20 +194,20 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Restore Turbo local cache
-        id: static-turbo-cache
+        id: static-rust-turbo-cache
         uses: actions/cache/restore@v5
         with:
           path: .turbo/cache
-          key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-rust-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-turbo-${{ github.workflow }}-
+            ${{ runner.os }}-turbo-${{ github.workflow }}-static-rust-
             ${{ runner.os }}-turbo-
 
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
 
       - name: Save pnpm store cache
-        if: steps.static-pnpm-store-cache.outputs.cache-hit != 'true'
+        if: steps.static-rust-pnpm-store-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: ~/.local/share/pnpm/store
@@ -112,17 +218,17 @@ jobs:
 
       - name: Build workspace in Nix shell
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm build"
+        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=@mistle/sandbox-runtime --filter=@mistle/sandbox-rs-napi"
 
-      - name: Run static checks in Nix shell
-        run: nix develop --command bash -lc "pnpm format:check && pnpm lint && pnpm lint:sql && pnpm typecheck"
+      - name: Run Rust static checks in Nix shell
+        run: nix develop --command bash -lc "pnpm lint:rust && pnpm typecheck:rust"
 
       - name: Save Turbo local cache
-        if: ${{ always() && !cancelled() && steps.static-turbo-cache.outputs.cache-hit != 'true' }}
+        if: ${{ always() && !cancelled() && steps.static-rust-turbo-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5
         with:
           path: .turbo/cache
-          key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-rust-${{ github.sha }}
 
   knip:
     name: Knip
@@ -159,10 +265,75 @@ jobs:
       - name: Run knip in Nix shell
         run: nix develop --command pnpm lint:knip
 
-  test:
-    name: Test
+  test-ts:
+    name: TS Test
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 60
+    needs:
+      - changes
+    if: needs.changes.outputs.ts == 'true'
+    env:
+      CI: true
+      TURBO_TELEMETRY_DISABLED: "1"
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Restore pnpm store cache
+        id: test-ts-pnpm-store-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Restore Turbo local cache
+        id: test-ts-turbo-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies in Nix shell
+        run: nix develop --command pnpm install --frozen-lockfile
+
+      - name: Save pnpm store cache
+        if: steps.test-ts-pnpm-store-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Generate integration config
+        run: nix develop --command bash -lc "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
+
+      - name: Run TS tests in Nix shell
+        run: nix develop --command pnpm test:ts
+
+      - name: Save Turbo local cache
+        if: ${{ always() && !cancelled() && steps.test-ts-turbo-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-${{ github.sha }}
+
+  test-rust:
+    name: Rust Test
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 60
+    needs:
+      - changes
+    if: needs.changes.outputs.rust == 'true'
     env:
       CI: true
       TURBO_TELEMETRY_DISABLED: "1"
@@ -187,7 +358,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Restore pnpm store cache
-        id: test-pnpm-store-cache
+        id: test-rust-pnpm-store-cache
         uses: actions/cache/restore@v5
         with:
           path: ~/.local/share/pnpm/store
@@ -196,20 +367,20 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Restore Turbo local cache
-        id: test-turbo-cache
+        id: test-rust-turbo-cache
         uses: actions/cache/restore@v5
         with:
           path: .turbo/cache
-          key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-rust-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-turbo-${{ github.workflow }}-
+            ${{ runner.os }}-turbo-${{ github.workflow }}-test-rust-
             ${{ runner.os }}-turbo-
 
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
 
       - name: Save pnpm store cache
-        if: steps.test-pnpm-store-cache.outputs.cache-hit != 'true'
+        if: steps.test-rust-pnpm-store-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: ~/.local/share/pnpm/store
@@ -218,15 +389,15 @@ jobs:
       - name: Generate integration config
         run: nix develop --command bash -lc "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
-      - name: Run tests in Nix shell
-        run: nix develop --command pnpm test
+      - name: Run Rust tests in Nix shell
+        run: nix develop --command pnpm test:rust
 
       - name: Save Turbo local cache
-        if: ${{ always() && !cancelled() && steps.test-turbo-cache.outputs.cache-hit != 'true' }}
+        if: ${{ always() && !cancelled() && steps.test-rust-turbo-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5
         with:
           path: .turbo/cache
-          key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-rust-${{ github.sha }}
 
   sandbox-runtime-sea-linux:
     name: Sandbox Runtime SEA (Linux)
@@ -253,8 +424,10 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - changes
-      - static
-      - test
+      - static-ts
+      - static-rust
+      - test-ts
+      - test-rust
       - sandbox-runtime-sea-linux
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     permissions:
@@ -264,8 +437,10 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ github.token }}
       SEA_CHANGES_RESULT: ${{ needs.changes.result }}
-      STATIC_RESULT: ${{ needs.static.result }}
-      TEST_RESULT: ${{ needs.test.result }}
+      TS_STATIC_RESULT: ${{ needs.static-ts.result }}
+      RUST_STATIC_RESULT: ${{ needs.static-rust.result }}
+      TS_TEST_RESULT: ${{ needs.test-ts.result }}
+      RUST_TEST_RESULT: ${{ needs.test-rust.result }}
       SEA_RESULT: ${{ needs.sandbox-runtime-sea-linux.result }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       WORKFLOW_NAME: ${{ github.workflow }}
@@ -288,22 +463,22 @@ jobs:
           import urllib.error
           import urllib.request
 
-          static_result = os.environ["STATIC_RESULT"]
-          test_result = os.environ["TEST_RESULT"]
           sea_changes_result = os.environ["SEA_CHANGES_RESULT"]
+          lane_results = [
+              os.environ["TS_STATIC_RESULT"],
+              os.environ["RUST_STATIC_RESULT"],
+              os.environ["TS_TEST_RESULT"],
+              os.environ["RUST_TEST_RESULT"],
+          ]
           sea_result = os.environ["SEA_RESULT"]
-          sea_ok = sea_result in {"success", "skipped"}
+          success_like_results = {"success", "skipped"}
           if sea_changes_result == "cancelled":
               workflow_result = "cancelled"
           elif sea_changes_result != "success":
               workflow_result = "failure"
-          elif static_result == "success" and test_result == "success" and sea_ok:
+          elif all(result in success_like_results for result in lane_results) and sea_result in success_like_results:
               workflow_result = "success"
-          elif (
-              static_result == "cancelled"
-              or test_result == "cancelled"
-              or sea_result == "cancelled"
-          ):
+          elif any(result == "cancelled" for result in [*lane_results, sea_result]):
               workflow_result = "cancelled"
           else:
               workflow_result = "failure"
