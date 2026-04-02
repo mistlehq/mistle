@@ -3,6 +3,8 @@ import {
   type ExecutionLease,
   type LeaseCreate,
   type LeaseRenew,
+  type TelemetryClose,
+  type TelemetryOpen,
   type StreamClose,
   type StreamComplete,
   type StreamEventMessage,
@@ -100,6 +102,17 @@ export function writeLeaseRenew(socket: WebSocket, leaseId: string): Promise<voi
   };
 
   return writeTextJsonMessage(socket, message);
+}
+
+export function writeTelemetryOpen(socket: WebSocket, telemetryOpen: TelemetryOpen): Promise<void> {
+  return writeTextJsonMessage(socket, telemetryOpen);
+}
+
+export function writeTelemetryClose(
+  socket: WebSocket,
+  telemetryClose: TelemetryClose,
+): Promise<void> {
+  return writeTextJsonMessage(socket, telemetryClose);
 }
 
 export function writeBinaryDataFrame(
