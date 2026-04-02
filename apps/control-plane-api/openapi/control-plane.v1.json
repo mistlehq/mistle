@@ -82,6 +82,7 @@
                                 "type": "string",
                                 "enum": [
                                   "MISSING_TARGET_METADATA",
+                                  "MISSING_WEBHOOK_SOURCE",
                                   "MISSING_INTEGRATION_CONNECTION",
                                   "MISSING_SANDBOX_PROFILE"
                                 ]
@@ -269,7 +270,7 @@
                   "enabled": {
                     "type": "boolean"
                   },
-                  "integrationConnectionId": {
+                  "integrationWebhookSourceId": {
                     "type": "string",
                     "minLength": 1
                   },
@@ -315,7 +316,7 @@
                 },
                 "required": [
                   "name",
-                  "integrationConnectionId",
+                  "integrationWebhookSourceId",
                   "inputTemplate",
                   "conversationKeyTemplate",
                   "target"
@@ -348,7 +349,7 @@
                     "enabled": {
                       "type": "boolean"
                     },
-                    "integrationConnectionId": {
+                    "integrationWebhookSourceId": {
                       "type": "string",
                       "minLength": 1
                     },
@@ -408,7 +409,7 @@
                     "kind",
                     "name",
                     "enabled",
-                    "integrationConnectionId",
+                    "integrationWebhookSourceId",
                     "eventTypes",
                     "payloadFilter",
                     "inputTemplate",
@@ -435,8 +436,8 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "INVALID_CONNECTION_REFERENCE",
-                            "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
+                            "INVALID_WEBHOOK_SOURCE_REFERENCE",
+                            "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE",
                             "INVALID_SANDBOX_PROFILE_REFERENCE",
                             "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
                           ]
@@ -554,7 +555,7 @@
                     "enabled": {
                       "type": "boolean"
                     },
-                    "integrationConnectionId": {
+                    "integrationWebhookSourceId": {
                       "type": "string",
                       "minLength": 1
                     },
@@ -614,7 +615,7 @@
                     "kind",
                     "name",
                     "enabled",
-                    "integrationConnectionId",
+                    "integrationWebhookSourceId",
                     "eventTypes",
                     "payloadFilter",
                     "inputTemplate",
@@ -747,7 +748,7 @@
                   "enabled": {
                     "type": "boolean"
                   },
-                  "integrationConnectionId": {
+                  "integrationWebhookSourceId": {
                     "type": "string",
                     "minLength": 1
                   },
@@ -818,7 +819,7 @@
                     "enabled": {
                       "type": "boolean"
                     },
-                    "integrationConnectionId": {
+                    "integrationWebhookSourceId": {
                       "type": "string",
                       "minLength": 1
                     },
@@ -878,7 +879,7 @@
                     "kind",
                     "name",
                     "enabled",
-                    "integrationConnectionId",
+                    "integrationWebhookSourceId",
                     "eventTypes",
                     "payloadFilter",
                     "inputTemplate",
@@ -905,8 +906,8 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "INVALID_CONNECTION_REFERENCE",
-                            "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
+                            "INVALID_WEBHOOK_SOURCE_REFERENCE",
+                            "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE",
                             "INVALID_SANDBOX_PROFILE_REFERENCE",
                             "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
                           ]
@@ -2472,6 +2473,33 @@
                     }
                   },
                   "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Webhook source is still referenced locally.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "WEBHOOK_SOURCE_HAS_AUTOMATIONS"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
