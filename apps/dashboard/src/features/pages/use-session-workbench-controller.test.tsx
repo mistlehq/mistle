@@ -86,7 +86,6 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.terminalPanelState.panelSize).toBe(DEFAULT_TERMINAL_PANEL_SIZE);
     expect(result.current.workbench.lifecycleErrorMessage).toBeNull();
     expect(result.current.workbench.sandboxLifecycleStatus).toBeNull();
-    expect(result.current.workbench.sessionConnectionStatus).toBeNull();
     expect(result.current.workbench.sandboxFailureMessage).toBeNull();
     expect(result.current.conversationPane.chatState.entries).toEqual([]);
     expect(result.current.conversationPane.composerStateInput.bootstrap.phase).toEqual({

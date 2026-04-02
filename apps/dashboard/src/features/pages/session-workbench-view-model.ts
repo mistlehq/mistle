@@ -4,12 +4,6 @@ import {
   type WorkbenchSandboxLifecycleStatus,
 } from "./sandbox-status-presentation.js";
 
-export type WorkbenchSessionConnectionStatus =
-  | "connected"
-  | "connecting"
-  | "error"
-  | "reconnecting";
-
 export function resolveSandboxHeaderStatusUi(input: {
   sandboxLifecycleStatus: WorkbenchSandboxLifecycleStatus;
 }): SandboxStatusBadgeUi {
