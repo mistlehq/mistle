@@ -1,17 +1,13 @@
 import { systemScheduler, type Scheduler, type TimerHandle } from "@mistle/time";
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldHeader,
-  FieldLabel,
-  Input,
-  cn,
-} from "@mistle/ui";
-import { ArrowClockwiseIcon, CheckCircleIcon } from "@phosphor-icons/react";
+import { Field, FieldContent, FieldDescription, FieldHeader, FieldLabel } from "@mistle/ui";
 import { useEffect, useRef, useState } from "react";
 
-type AutoSaveStatus = "idle" | "saving" | "saved" | "saved-fading";
+import {
+  AutoSaveInputSurface,
+  type AutoSaveInputVisualStatus,
+} from "../shared/auto-save-input-surface.js";
+
+type AutoSaveStatus = AutoSaveInputVisualStatus;
 export type AutoSaveTextFieldErrorState = {
   kind: "validation" | "save";
   message: string;
@@ -135,90 +131,32 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
         )}
       </FieldHeader>
       <FieldContent>
-        <div className="relative">
-          <Input
-            aria-invalid={errorState !== null}
-            className={showStatus && errorState === null ? "pr-9" : undefined}
-            disabled={input.disabled}
-            id={input.id}
-            onBlur={() => {
-              void handleCommit();
-            }}
-            onChange={(event) => {
-              setDraftValue(event.target.value);
-              if (errorState !== null) {
-                setErrorState(null);
-              }
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.currentTarget.blur();
-              }
-            }}
-            placeholder={input.placeholder}
-            value={draftValue}
-          />
-          {showStatus && errorState === null ? (
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-              <AutoSaveInputIndicator status={status} />
-            </div>
-          ) : null}
-        </div>
-        <div aria-live="polite" className="min-h-5" role="status">
-          {errorState === null ? null : <AutoSaveStatusIndicator errorState={errorState} />}
-        </div>
+        <AutoSaveInputSurface
+          ariaLabel={input.label}
+          id={input.id}
+          onBlur={() => {
+            void handleCommit();
+          }}
+          onChange={(nextValue) => {
+            setDraftValue(nextValue);
+            if (errorState !== null) {
+              setErrorState(null);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.currentTarget.blur();
+            }
+          }}
+          saveStatus={showStatus && errorState === null ? status : "idle"}
+          value={draftValue}
+          {...(input.disabled === undefined ? {} : { disabled: input.disabled })}
+          {...(errorState === null ? {} : { errorMessage: errorState.message })}
+          {...(input.placeholder === undefined ? {} : { placeholder: input.placeholder })}
+        />
       </FieldContent>
     </Field>
   );
-}
-
-function AutoSaveStatusIndicator(input: {
-  errorState: AutoSaveTextFieldErrorState;
-}): React.JSX.Element | null {
-  if (input.errorState.kind === "save") {
-    return (
-      <div className="flex items-center justify-end text-xs text-destructive">
-        <span>{input.errorState.message}</span>
-      </div>
-    );
-  }
-
-  if (input.errorState.kind === "validation") {
-    return (
-      <div className="flex items-center justify-end text-xs text-destructive">
-        <span>{input.errorState.message}</span>
-      </div>
-    );
-  }
-
-  return null;
-}
-
-function AutoSaveInputIndicator(input: { status: AutoSaveStatus }): React.JSX.Element | null {
-  if (input.status === "saving") {
-    return (
-      <div className="text-muted-foreground flex items-center justify-end">
-        <ArrowClockwiseIcon aria-hidden className="size-3.5 animate-spin" />
-        <span className="sr-only">Saving</span>
-      </div>
-    );
-  }
-
-  if (input.status === "saved" || input.status === "saved-fading") {
-    return (
-      <div
-        className={cn(
-          "flex items-center justify-end text-emerald-700 transition-opacity duration-700",
-          input.status === "saved" ? "opacity-100" : "opacity-0",
-        )}
-      >
-        <CheckCircleIcon aria-hidden className="size-4" weight="fill" />
-        <span className="sr-only">Saved</span>
-      </div>
-    );
-  }
-
-  return null;
 }
 
 function scheduleSavedStateReset(input: {

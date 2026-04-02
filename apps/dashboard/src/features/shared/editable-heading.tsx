@@ -1,6 +1,7 @@
 import { Button, Notice } from "@mistle/ui";
 import { PencilSimpleIcon } from "@phosphor-icons/react";
 
+import type { AutoSaveInputVisualStatus } from "./auto-save-input-surface.js";
 import { PageTitleField } from "./page-title-field.js";
 
 export function EditableHeading(input: {
@@ -12,6 +13,7 @@ export function EditableHeading(input: {
   placeholder: string | undefined;
   errorMessage: string | undefined;
   saveDisabled: boolean;
+  saveStatus?: AutoSaveInputVisualStatus;
   cancelOnEscape: boolean | undefined;
   maxWidthClassName: string | undefined;
   headingTag?: "div" | "h1" | "h2";
@@ -48,6 +50,7 @@ export function EditableHeading(input: {
         }}
         showLabel={false}
         value={input.draftValue}
+        saveStatus={input.saveStatus ?? (input.saveDisabled ? "saving" : "idle")}
         {...(input.inputClassName === undefined ? {} : { className: input.inputClassName })}
         {...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage })}
         {...(input.maxWidthClassName === undefined

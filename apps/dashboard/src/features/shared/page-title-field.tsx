@@ -1,4 +1,5 @@
-import { Input, Notice } from "@mistle/ui";
+import type { AutoSaveInputVisualStatus } from "./auto-save-input-surface.js";
+import { AutoSaveInputSurface } from "./auto-save-input-surface.js";
 
 export function PageTitleField(input: {
   fieldId: string;
@@ -11,6 +12,7 @@ export function PageTitleField(input: {
   maxWidthClassName?: string;
   className?: string;
   autoFocus?: boolean;
+  saveStatus?: AutoSaveInputVisualStatus;
   onBlur?: () => void;
   onChange: (nextValue: string) => void;
   onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -24,23 +26,19 @@ export function PageTitleField(input: {
           {input.label}
         </label>
       ) : null}
-      <Input
-        aria-label={input.ariaLabel}
-        aria-invalid={input.errorMessage === undefined ? undefined : true}
-        autoFocus={input.autoFocus}
-        className={`h-10 w-full py-0 text-xl font-semibold leading-none ${input.className ?? ""}`}
+      <AutoSaveInputSurface
+        ariaLabel={input.ariaLabel}
         id={input.fieldId}
-        onBlur={input.onBlur}
-        onChange={(event) => {
-          input.onChange(event.currentTarget.value);
-        }}
-        onKeyDown={input.onKeyDown}
-        placeholder={input.placeholder}
+        inputClassName={`h-10 w-full py-0 text-xl font-semibold leading-none ${input.className ?? ""}`}
+        onChange={input.onChange}
         value={input.value}
+        {...(input.autoFocus === undefined ? {} : { autoFocus: input.autoFocus })}
+        {...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage })}
+        {...(input.onBlur === undefined ? {} : { onBlur: input.onBlur })}
+        {...(input.onKeyDown === undefined ? {} : { onKeyDown: input.onKeyDown })}
+        {...(input.placeholder === undefined ? {} : { placeholder: input.placeholder })}
+        {...(input.saveStatus === undefined ? {} : { saveStatus: input.saveStatus })}
       />
-      {input.errorMessage === undefined ? null : (
-        <Notice variant="alert">{input.errorMessage}</Notice>
-      )}
     </div>
   );
 }
