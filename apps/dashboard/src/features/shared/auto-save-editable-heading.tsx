@@ -37,7 +37,6 @@ type EditableHeadingAction =
     }
   | {
       type: "enter-edit-mode";
-      saveError: string | undefined;
     }
   | {
       type: "show-parent-save-error";
@@ -102,18 +101,13 @@ function editableHeadingReducer(
         ...state,
         draftValue: action.draftValue,
         errorState: null,
+        status: "idle",
       };
     case "enter-edit-mode":
       return {
         ...state,
         draftValue: state.value,
-        errorState:
-          action.saveError === undefined
-            ? null
-            : {
-                kind: "save",
-                message: action.saveError,
-              },
+        errorState: null,
         isEditing: true,
         status: "idle",
       };
@@ -196,6 +190,7 @@ export type AutoSaveEditableHeadingProps = {
   cancelOnEscape?: boolean;
   validate: (nextValue: string) => string | null;
   onSave: (nextValue: string) => Promise<void> | void;
+  onEditStart?: () => void;
   successVisibleDurationMs?: number;
   successFadeDurationMs?: number;
   scheduler?: Scheduler;
@@ -343,6 +338,11 @@ function useAutoSaveEditableHeadingState(input: AutoSaveEditableHeadingProps): {
   }
 
   function handleDraftChange(nextValue: string): void {
+    clearPendingStatusTimeouts({
+      fadeEndTimeoutRef,
+      fadeStartTimeoutRef,
+      scheduler,
+    });
     dispatch({
       type: "change-draft",
       draftValue: nextValue,
@@ -355,14 +355,6 @@ function useAutoSaveEditableHeadingState(input: AutoSaveEditableHeadingProps): {
       fadeStartTimeoutRef,
       scheduler,
     });
-    if (saveError !== undefined) {
-      dispatch({
-        type: "show-parent-save-error",
-        saveError,
-      });
-      return;
-    }
-
     dispatch({
       type: "cancel-edit",
     });
@@ -374,9 +366,9 @@ function useAutoSaveEditableHeadingState(input: AutoSaveEditableHeadingProps): {
       fadeStartTimeoutRef,
       scheduler,
     });
+    input.onEditStart?.();
     dispatch({
       type: "enter-edit-mode",
-      saveError,
     });
   }
 

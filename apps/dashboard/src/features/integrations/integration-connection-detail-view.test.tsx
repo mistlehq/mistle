@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { IntegrationConnectionDetailView } from "./integration-connection-detail-view.js";
@@ -127,6 +128,8 @@ describe("IntegrationConnectionDetailView", () => {
   });
 
   it("starts title editing for the clicked connection", () => {
+    let startedEditingConnectionId: string | null = null;
+
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -153,6 +156,9 @@ describe("IntegrationConnectionDetailView", () => {
         ]}
         titleEditor={{
           disabled: false,
+          onStartEditing: (connectionId) => {
+            startedEditingConnectionId = connectionId;
+          },
           saveErrorByConnectionId: {},
           onSave: async () => {},
         }}
@@ -165,7 +171,60 @@ describe("IntegrationConnectionDetailView", () => {
       throw new Error("Expected a second edit connection name button.");
     }
     fireEvent.click(secondEditButton);
+    expect(startedEditingConnectionId).toBe("icn_github_archive");
     expect(screen.getByDisplayValue("Archive Mirror")).toBeTruthy();
+  });
+
+  it("clears a stale connection save error when a new edit session starts", () => {
+    function ErrorHarness(): React.JSX.Element {
+      const [saveErrorByConnectionId, setSaveErrorByConnectionId] = useState<
+        Readonly<Record<string, string | undefined>>
+      >({
+        icn_github_primary: "Could not update connection.",
+      });
+
+      return (
+        <IntegrationConnectionDetailView
+          connections={[
+            {
+              id: "icn_github_primary",
+              bindingCount: 0,
+              canDelete: true,
+              displayName: "Engineering GitHub",
+              authMethodId: "github-app-installation",
+              authMethodLabel: "GitHub App installation",
+              status: "active",
+              resources: [],
+            },
+          ]}
+          titleEditor={{
+            disabled: false,
+            onStartEditing: (connectionId) => {
+              setSaveErrorByConnectionId((current) => ({
+                ...current,
+                [connectionId]: undefined,
+              }));
+            },
+            saveErrorByConnectionId,
+            onSave: async () => {},
+          }}
+        />
+      );
+    }
+
+    render(<ErrorHarness />);
+
+    expect(screen.getByText("Could not update connection.")).toBeTruthy();
+
+    const input = screen.getByRole("textbox", { name: "Connection name" });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(screen.queryByText("Could not update connection.")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit connection name" }));
+
+    expect(screen.getByRole("textbox", { name: "Connection name" })).toBeTruthy();
+    expect(screen.queryByText("Could not update connection.")).toBeNull();
   });
 
   it("renders a masked api key row for api key connections", () => {

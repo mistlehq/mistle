@@ -53,6 +53,7 @@ export type IntegrationConnectionDetailViewProps = {
     | {
         disabled: boolean;
         saveErrorByConnectionId: Readonly<Record<string, string | undefined>>;
+        onStartEditing: (connectionId: string) => void;
         onSave: (connectionId: string, draftValue: string) => Promise<void> | void;
       }
     | undefined;
@@ -194,6 +195,9 @@ function EditableConnectionTitle(input: {
       headingClassName="text-base font-semibold leading-tight"
       savedValue={input.connection.displayName}
       maxWidthClassName="max-w-3xl"
+      onEditStart={() => {
+        input.titleEditor.onStartEditing(input.connection.id);
+      }}
       onSave={async (nextValue) => {
         await input.titleEditor.onSave(input.connection.id, nextValue.trim());
       }}

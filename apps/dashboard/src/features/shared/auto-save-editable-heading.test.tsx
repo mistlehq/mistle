@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -200,7 +201,7 @@ describe("AutoSaveEditableHeading", () => {
     expect(screen.getByText("Could not update heading.")).toBeDefined();
   });
 
-  it("keeps a parent-owned save error visible when escape cancels a changed draft", () => {
+  it("leaves edit mode when escape cancels a changed draft after a parent-owned save error", () => {
     render(
       <AutoSaveEditableHeading
         ariaLabel="Heading"
@@ -216,9 +217,8 @@ describe("AutoSaveEditableHeading", () => {
     fireEvent.change(input, { target: { value: "Retry Title" } });
     fireEvent.keyDown(input, { key: "Escape" });
 
-    expect(screen.getByRole("textbox", { name: "Heading" })).toBeDefined();
-    expect(screen.getByDisplayValue("Repo Maintainer")).toBeDefined();
-    expect(screen.getByText("Could not update heading.")).toBeDefined();
+    expect(screen.queryByRole("textbox", { name: "Heading" })).toBeNull();
+    expect(screen.getByText("Repo Maintainer")).toBeDefined();
   });
 
   it("preserves the retry draft when an external save error is cleared before retry", async () => {
@@ -312,5 +312,48 @@ describe("AutoSaveEditableHeading", () => {
     });
 
     expect(screen.queryByText("Client Title")).toBeNull();
+  });
+
+  it("does not auto-close a new draft after a prior save succeeded", async () => {
+    const clock = createMutableClock(0);
+    const scheduler = createManualScheduler(clock);
+
+    render(
+      <AutoSaveEditableHeading
+        ariaLabel="Heading"
+        editButtonLabel="Edit heading"
+        savedValue="Repo Maintainer"
+        onSave={async () => {}}
+        scheduler={scheduler}
+        successFadeDurationMs={20}
+        successVisibleDurationMs={40}
+        validate={() => null}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit heading" }));
+    const input = screen.getByRole("textbox", { name: "Heading" });
+    fireEvent.change(input, { target: { value: "New Title" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(getSaveState({ label: "Heading" })).toBe("saved");
+    });
+    expect(scheduler.pendingCount()).toBe(2);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Heading" }), {
+      target: { value: "Second Title" },
+    });
+
+    expect(getSaveState({ label: "Heading" })).toBe("idle");
+    expect(scheduler.pendingCount()).toBe(0);
+
+    clock.advanceMs(40);
+    expect(scheduler.runDue()).toBe(0);
+
+    expect(screen.getByRole("textbox", { name: "Heading" })).toHaveProperty(
+      "value",
+      "Second Title",
+    );
   });
 });
