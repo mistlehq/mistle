@@ -11,6 +11,15 @@ describe("AutoSaveEditableHeading", () => {
     cleanup();
   });
 
+  function getSaveState(input: { label: string }): string | null {
+    return (
+      screen
+        .getByRole("textbox", { name: input.label })
+        .closest("[data-save-state]")
+        ?.getAttribute("data-save-state") ?? null
+    );
+  }
+
   it("shows a validation error and stays in edit mode when the value is invalid", async () => {
     render(
       <AutoSaveEditableHeading
@@ -53,7 +62,7 @@ describe("AutoSaveEditableHeading", () => {
     fireEvent.change(input, { target: { value: "New Title" } });
     fireEvent.blur(input);
 
-    expect(screen.getByText("Saving")).toBeDefined();
+    expect(getSaveState({ label: "Heading" })).toBe("saving");
 
     await waitFor(() => {
       expect(screen.queryByRole("textbox", { name: "Heading" })).toBeNull();
@@ -132,10 +141,7 @@ describe("AutoSaveEditableHeading", () => {
           <AutoSaveEditableHeading
             ariaLabel="Heading"
             editButtonLabel="Edit heading"
-            initialErrorState={{
-              kind: "save",
-              message: "Could not update heading.",
-            }}
+            externalSaveErrorMessage="Could not update heading."
             initialValue="Repo Maintainer"
             initiallyEditing={true}
             onSave={async () => {}}
@@ -170,7 +176,6 @@ describe("AutoSaveEditableHeading", () => {
         <AutoSaveEditableHeading
           ariaLabel="Heading"
           editButtonLabel="Edit heading"
-          initialErrorState={errorState}
           initialValue={value}
           onSave={async (nextValue) => {
             setErrorState(null);
@@ -179,6 +184,7 @@ describe("AutoSaveEditableHeading", () => {
           successFadeDurationMs={20}
           successVisibleDurationMs={40}
           validate={() => null}
+          {...(errorState === null ? {} : { externalSaveErrorMessage: errorState.message })}
         />
       );
     }

@@ -19,9 +19,10 @@ export function AutoSaveInputSurface(input: {
 }): React.JSX.Element {
   const saveStatus = input.saveStatus ?? "idle";
   const showIndicator = saveStatus !== "idle" && input.errorMessage === undefined;
+  const saveState = input.errorMessage === undefined ? saveStatus : "error";
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-save-state={saveState}>
       <div className="relative">
         <Input
           aria-invalid={input.errorMessage === undefined ? undefined : true}

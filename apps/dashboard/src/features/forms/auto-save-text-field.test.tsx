@@ -11,6 +11,15 @@ describe("AutoSaveTextField", () => {
     cleanup();
   });
 
+  function getSaveState(): string | null {
+    return (
+      screen
+        .getByRole("textbox", { name: "Display name" })
+        .closest("[data-save-state]")
+        ?.getAttribute("data-save-state") ?? null
+    );
+  }
+
   it("validates and saves on blur, then clears the saved status after it fades", async () => {
     const savedValues: string[] = [];
 
@@ -35,14 +44,14 @@ describe("AutoSaveTextField", () => {
     fireEvent.change(input, { target: { value: "Mistle Storybook" } });
     fireEvent.blur(input);
 
-    expect(screen.getByText("Saving", { selector: ".sr-only" })).toBeTruthy();
+    expect(getSaveState()).toBe("saving");
 
     await waitFor(() => {
-      expect(screen.getByText("Saved", { selector: ".sr-only" })).toBeTruthy();
+      expect(getSaveState()).toBe("saved");
     });
 
     await waitFor(() => {
-      expect(screen.queryByText("Saved", { selector: ".sr-only" })).toBeNull();
+      expect(getSaveState()).toBe("idle");
     });
 
     expect(savedValues).toEqual(["Mistle Storybook"]);
@@ -132,7 +141,7 @@ describe("AutoSaveTextField", () => {
     finishSave();
 
     await waitFor(() => {
-      expect(screen.queryByText("Saved", { selector: ".sr-only" })).toBeNull();
+      expect(getSaveState()).toBe("idle");
     });
   });
 
@@ -185,6 +194,6 @@ describe("AutoSaveTextField", () => {
       expect(inputElement).toHaveProperty("value", "Server Value");
     });
 
-    expect(screen.queryByText("Saved", { selector: ".sr-only" })).toBeNull();
+    expect(getSaveState()).toBe("idle");
   });
 });

@@ -24,12 +24,7 @@ export function WebhookAutomationTitleEditor(input: {
       }}
       {...(input.errorMessage === undefined
         ? {}
-        : {
-            initialErrorState: {
-              kind: "save" as const,
-              message: input.errorMessage,
-            },
-          })}
+        : { externalSaveErrorMessage: input.errorMessage })}
     />
   );
 }
