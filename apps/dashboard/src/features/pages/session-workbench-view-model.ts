@@ -1,15 +1,3 @@
-import {
-  resolveSandboxStatusBadgeUi,
-  type SandboxStatusBadgeUi,
-  type WorkbenchSandboxLifecycleStatus,
-} from "./sandbox-status-presentation.js";
-
-export function resolveSandboxHeaderStatusUi(input: {
-  sandboxLifecycleStatus: WorkbenchSandboxLifecycleStatus;
-}): SandboxStatusBadgeUi {
-  return resolveSandboxStatusBadgeUi(input.sandboxLifecycleStatus);
-}
-
 export function hasSessionTopAlert(input: {
   hasSandboxStatusError: boolean;
   lifecycleErrorMessage: string | null;

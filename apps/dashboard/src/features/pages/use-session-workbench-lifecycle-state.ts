@@ -10,11 +10,9 @@ import {
 } from "../sessions/session-connect-policy.js";
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
+import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
-import {
-  hasSessionTopAlert,
-  resolveSandboxHeaderStatusUi,
-} from "./session-workbench-view-model.js";
+import { hasSessionTopAlert } from "./session-workbench-view-model.js";
 
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
 const AutomationSessionPreparationTimeoutMs = 30_000;
@@ -857,9 +855,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxStatusQuery.refetch,
   ]);
 
-  const sandboxHeaderStatusUi = resolveSandboxHeaderStatusUi({
-    sandboxLifecycleStatus: effectiveSandboxStatus,
-  });
+  const sandboxHeaderStatusUi = resolveSandboxStatusBadgeUi(effectiveSandboxStatus);
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: sandboxStatusQuery.isError,
