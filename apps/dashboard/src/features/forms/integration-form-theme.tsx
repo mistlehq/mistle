@@ -523,10 +523,6 @@ const IntegrationTheme = {
   widgets: IntegrationFormWidgets,
 };
 
-export const IntegrationForm = withTheme<JsonObject, RJSFSchema, IntegrationFormContext>(
-  IntegrationTheme,
-);
-
 export const IntegrationFormWithoutSubmit = withTheme<
   JsonObject,
   RJSFSchema,

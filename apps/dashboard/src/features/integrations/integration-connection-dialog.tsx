@@ -12,10 +12,11 @@ import {
   RadioGroupItem,
 } from "@mistle/ui";
 import type { IChangeEvent } from "@rjsf/core";
-import type { RJSFSchema, UiSchema } from "@rjsf/utils";
+import type { RJSFSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 
 import { IntegrationFormWithoutSubmit } from "../forms/integration-form-theme.js";
+import type { ConnectionMethodFormUiModel } from "../pages/use-integration-connection-dialog-state-helpers.js";
 import type { IntegrationConnectionMethod as ServiceIntegrationConnectionMethod } from "./integrations-service-shared.js";
 
 export type IntegrationConnectionMethod = ServiceIntegrationConnectionMethod;
@@ -50,22 +51,6 @@ type UpdateIntegrationConnectionDialogState = {
 export type IntegrationConnectionDialogState =
   | CreateIntegrationConnectionDialogState
   | UpdateIntegrationConnectionDialogState;
-
-type ConnectionMethodFormUiModel =
-  | {
-      mode: "none";
-    }
-  | {
-      mode: "form";
-      schema: RJSFSchema;
-      uiSchema: UiSchema<Record<string, unknown>, RJSFSchema>;
-      value: Record<string, unknown>;
-      visiblePropertyKeys: readonly string[];
-    }
-  | {
-      mode: "unsupported";
-      message: string;
-    };
 
 type IntegrationConnectionDialogProps = {
   configForm: ConnectionMethodFormUiModel;
