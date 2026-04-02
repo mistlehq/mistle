@@ -348,6 +348,19 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
     return applySuggestion(selectedToken);
   }, [applySuggestion]);
 
+  const closeActiveSuggestion = useCallback((editorView: EditorView): boolean => {
+    if (activeSuggestionStateRef.current === null) {
+      return false;
+    }
+
+    setActiveSuggestionState(null);
+    setSelectedSuggestionIndex(0);
+    setSuggestionPopoverPosition(null);
+    setSuggestionInteractionMode("pointer");
+    editorView.focus();
+    return true;
+  }, []);
+
   const extensions = useMemo(
     () => [
       history(),
@@ -355,6 +368,22 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
       markdown(),
       EditorView.lineWrapping,
       createTemplateTokenHighlightExtension(rankedTokens),
+      EditorView.domEventHandlers({
+        keydown: (event, editorView) => {
+          if (event.key !== "Escape") {
+            return false;
+          }
+
+          const didCloseSuggestion = closeActiveSuggestion(editorView);
+          if (!didCloseSuggestion) {
+            return false;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+          return true;
+        },
+      }),
       Prec.highest(
         keymap.of([
           {
@@ -375,18 +404,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
           },
           {
             key: "Escape",
-            run: (editorView) => {
-              if (activeSuggestionStateRef.current === null) {
-                return false;
-              }
-
-              setActiveSuggestionState(null);
-              setSelectedSuggestionIndex(0);
-              setSuggestionPopoverPosition(null);
-              setSuggestionInteractionMode("pointer");
-              editorView.focus();
-              return true;
-            },
+            run: closeActiveSuggestion,
           },
           ...defaultKeymap,
           ...historyKeymap,
@@ -406,6 +424,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
       input.disabled,
       input.invalid,
       acceptSelectedSuggestion,
+      closeActiveSuggestion,
       moveSelectedSuggestion,
       rankedTokens,
     ],
