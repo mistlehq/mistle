@@ -10,6 +10,8 @@ operations while staying close to the underlying AWS SDK response types.
 
 Exported from [`src/index.ts`](./src/index.ts):
 
+- `CreatePresignedPutUrlInput`
+- `PresignedPutUrl`
 - `PutObjectInput`
 - `S3CompatibleObjectStore`
 - `S3CompatibleObjectStoreConfig`
@@ -36,6 +38,18 @@ await objectStore.putObject({
   ContentType: "image/webp",
 });
 
+const presignedPut = await objectStore.createPresignedPutUrl({
+  objectKey: "avatars/users/usr_123/avatar-upload.webp",
+  expiresInSeconds: 60,
+  ContentType: "image/webp",
+});
+
+await fetch(presignedPut.url, {
+  method: presignedPut.method,
+  headers: presignedPut.headers,
+  body: new TextEncoder().encode("upload"),
+});
+
 const object = await objectStore.readObject("avatars/users/usr_123/avatar.webp");
 
 const bytes = await object.Body?.transformToByteArray();
@@ -52,6 +66,7 @@ objectStore.destroy();
   wiring raw S3 commands directly throughout the codebase.
 - Bucket binding and S3-compatible client wiring should stay inside this
   package.
+- Presigned `PUT` upload URLs are supported for direct-to-storage uploads.
 - This package keeps its method surface small, but it surfaces backend-native
   S3-compatible errors and stays close to the underlying S3 command outputs.
 

@@ -11,6 +11,7 @@ import {
   S3Client,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export type S3CompatibleObjectStoreConfig = {
   bucketName: string;
@@ -24,6 +25,17 @@ export type PutObjectInput = {
   objectKey: string;
   Body: NonNullable<PutObjectCommandInput["Body"]>;
 } & Pick<PutObjectCommandInput, "ContentType" | "CacheControl">;
+
+export type CreatePresignedPutUrlInput = {
+  objectKey: string;
+  expiresInSeconds: number;
+} & Pick<PutObjectCommandInput, "ContentType" | "CacheControl">;
+
+export type PresignedPutUrl = {
+  url: string;
+  method: "PUT";
+  headers: Record<string, string>;
+};
 
 export class S3CompatibleObjectStore {
   readonly #bucketName: string;
@@ -85,6 +97,28 @@ export class S3CompatibleObjectStore {
         Key: objectKey,
       }),
     );
+  }
+
+  async createPresignedPutUrl(input: CreatePresignedPutUrlInput): Promise<PresignedPutUrl> {
+    const command = new PutObjectCommand({
+      Bucket: this.#bucketName,
+      CacheControl: input.CacheControl,
+      ContentType: input.ContentType,
+      Key: input.objectKey,
+    });
+
+    const url = await getSignedUrl(this.#client, command, {
+      expiresIn: input.expiresInSeconds,
+    });
+
+    return {
+      headers: {
+        ...(input.CacheControl === undefined ? {} : { "cache-control": input.CacheControl }),
+        ...(input.ContentType === undefined ? {} : { "content-type": input.ContentType }),
+      },
+      method: "PUT",
+      url,
+    };
   }
 
   destroy(): void {

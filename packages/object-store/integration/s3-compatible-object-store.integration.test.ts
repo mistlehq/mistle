@@ -111,4 +111,65 @@ describe("S3-compatible object store integration", () => {
       await seaweedfs.stop();
     }
   }, 60_000);
+
+  test("creates presigned put URLs that upload successfully to SeaweedFS", async () => {
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "object-store-presigned-put",
+    });
+
+    const objectStore = new S3CompatibleObjectStore({
+      bucketName: seaweedfs.bucketName,
+      credentials: {
+        accessKeyId: seaweedfs.accessKeyId,
+        secretAccessKey: seaweedfs.secretAccessKey,
+      },
+      endpoint: seaweedfs.endpoint,
+      region: seaweedfs.region,
+    });
+
+    const objectKey = "avatars/users/usr_presigned/avatar.webp";
+    const objectBytes = new TextEncoder().encode("presigned-upload");
+
+    try {
+      const presignedPut = await objectStore.createPresignedPutUrl({
+        CacheControl: "public, max-age=120",
+        ContentType: "image/webp",
+        expiresInSeconds: 60,
+        objectKey,
+      });
+
+      expect(presignedPut.method).toBe("PUT");
+      expect(presignedPut.headers).toEqual({
+        "cache-control": "public, max-age=120",
+        "content-type": "image/webp",
+      });
+
+      const uploadResponse = await fetch(presignedPut.url, {
+        body: objectBytes,
+        headers: presignedPut.headers,
+        method: presignedPut.method,
+      });
+
+      expect(uploadResponse.status).toBe(200);
+
+      const headObjectResponse = await objectStore.headObject(objectKey);
+      expect(headObjectResponse.ContentLength).toBe(objectBytes.byteLength);
+      expect(headObjectResponse.ContentType).toBe("image/webp");
+      expect(headObjectResponse.CacheControl).toBe("public, max-age=120");
+
+      const readObjectResponse = await objectStore.readObject(objectKey);
+      expect(typeof readObjectResponse.Body?.transformToByteArray).toBe("function");
+      if (
+        readObjectResponse.Body === undefined ||
+        typeof readObjectResponse.Body.transformToByteArray !== "function"
+      ) {
+        throw new Error("Expected presigned upload object body to support transformToByteArray().");
+      }
+
+      await expect(readObjectResponse.Body.transformToByteArray()).resolves.toEqual(objectBytes);
+    } finally {
+      objectStore.destroy();
+      await seaweedfs.stop();
+    }
+  }, 60_000);
 });
