@@ -1,11 +1,10 @@
 import { systemSleeper } from "@mistle/time";
+import { FieldDescription } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import type React from "react";
 
 import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
-import { FormPageSection, FormPageStack } from "../shared/form-page.js";
-import { FormPageFrame } from "../shared/page-frame.js";
 import { AutoSaveTextField, type AutoSaveTextFieldErrorState } from "./auto-save-text-field.js";
 
 type StoryHarnessProps = {
@@ -20,82 +19,87 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
   const initialErrorState = resolveStoryErrorState(errorMode);
 
   return (
-    <FormPageFrame
-      description="Single-field editor that validates and saves automatically when focus leaves."
-      title="Display name"
-    >
-      <FormPageStack>
-        <FormPageSection>
-          <div className="flex flex-col gap-4 p-4">
-            <AutoSaveTextField
-              description={
-                input.description ??
-                "Shown across the dashboard. Saving begins when focus leaves the field."
-              }
-              initialErrorState={initialErrorState}
-              id="storybook-auto-save-display-name"
-              initialValue={input.initialValue}
-              label="Display name"
-              onSave={async (nextValue) => {
-                await systemSleeper.sleep(900);
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 rounded-xl border bg-white p-6">
+      <AutoSaveTextField
+        description={
+          input.description ??
+          "Shown across the dashboard. Saving begins when focus leaves the field."
+        }
+        initialErrorState={initialErrorState}
+        id="storybook-auto-save-display-name"
+        initialValue={input.initialValue}
+        label="Display name"
+        onSave={async (nextValue) => {
+          await systemSleeper.sleep(900);
 
-                if (nextValue.trim().toLowerCase() === "explode") {
-                  throw new Error("Could not update display name.");
-                }
+          if (nextValue.trim().toLowerCase() === "explode") {
+            throw new Error("Could not update display name.");
+          }
+        }}
+        placeholder={input.placeholder ?? "Display name"}
+        validate={(nextValue) => {
+          if (nextValue.trim().length === 0) {
+            return "Display name is required.";
+          }
+
+          if (nextValue.trim().length < 3) {
+            return "Display name must be at least 3 characters.";
+          }
+
+          return null;
+        }}
+      />
+
+      <div className="flex flex-col gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="font-medium">Error preview</span>
+          <label className="flex items-center gap-2">
+            <input
+              checked={errorMode === "none"}
+              name="error-mode"
+              onChange={() => {
+                setErrorMode("none");
               }}
-              placeholder={input.placeholder ?? "Display name"}
-              validate={(nextValue) => {
-                if (nextValue.trim().length === 0) {
-                  return "Display name is required.";
-                }
-
-                if (nextValue.trim().length < 3) {
-                  return "Display name must be at least 3 characters.";
-                }
-
-                return null;
-              }}
+              type="radio"
             />
-            <div className="flex items-center gap-4 text-sm">
-              <span className="font-medium">Error preview</span>
-              <label className="flex items-center gap-2">
-                <input
-                  checked={errorMode === "none"}
-                  name="error-mode"
-                  onChange={() => {
-                    setErrorMode("none");
-                  }}
-                  type="radio"
-                />
-                None
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  checked={errorMode === "validation"}
-                  name="error-mode"
-                  onChange={() => {
-                    setErrorMode("validation");
-                  }}
-                  type="radio"
-                />
-                Validation
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  checked={errorMode === "save"}
-                  name="error-mode"
-                  onChange={() => {
-                    setErrorMode("save");
-                  }}
-                  type="radio"
-                />
-                Save
-              </label>
-            </div>
-          </div>
-        </FormPageSection>
-      </FormPageStack>
-    </FormPageFrame>
+            None
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              checked={errorMode === "validation"}
+              name="error-mode"
+              onChange={() => {
+                setErrorMode("validation");
+              }}
+              type="radio"
+            />
+            Validation
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              checked={errorMode === "save"}
+              name="error-mode"
+              onChange={() => {
+                setErrorMode("save");
+              }}
+              type="radio"
+            />
+            Save
+          </label>
+        </div>
+        <FieldDescription>
+          <span className="block">
+            Validation error: choose <strong>Validation</strong>, or type fewer than 3 characters
+            and blur.
+          </span>
+          <span className="block">
+            Save error: choose <strong>Save</strong>, or type
+            <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">explode</code>
+            and blur.
+          </span>
+        </FieldDescription>
+      </div>
+    </div>
   );
 }
 

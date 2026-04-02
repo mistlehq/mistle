@@ -174,7 +174,7 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
 
 function AutoSaveStatusIndicator(input: {
   errorState: AutoSaveTextFieldErrorState;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   if (input.errorState.kind === "save") {
     return (
       <div className="flex items-center justify-end text-xs text-destructive">
@@ -190,6 +190,8 @@ function AutoSaveStatusIndicator(input: {
       </div>
     );
   }
+
+  return null;
 }
 
 function AutoSaveInputIndicator(input: { status: AutoSaveStatus }): React.JSX.Element | null {
