@@ -7,7 +7,7 @@ import {
 } from "@mistle/sandbox-session-protocol";
 
 import { logger } from "../../logger.js";
-import type { LocalTelemetryDelivery } from "../tunnel-websocket-message-handler.js";
+import type { TelemetryDelivery } from "../tunnel-websocket-message-handler.js";
 import {
   BootstrapTelemetrySession,
   type ActiveBootstrapTelemetryStream,
@@ -50,7 +50,7 @@ export class SandboxTelemetryIngressService {
   public constructor(private readonly sink: SandboxTelemetryIngressSink) {}
 
   public async handleDelivery(input: {
-    delivery: LocalTelemetryDelivery;
+    delivery: TelemetryDelivery;
     relaySessionId: string;
     sandboxInstanceId: string;
     sendControlMessage: (message: TelemetryControlMessage) => void;
@@ -149,7 +149,7 @@ export class SandboxTelemetryIngressService {
   }
 
   private async handleOpen(input: {
-    delivery: Extract<LocalTelemetryDelivery, { kind: "telemetryOpen" }>;
+    delivery: Extract<TelemetryDelivery, { kind: "telemetryOpen" }>;
     relaySessionId: string;
     sandboxInstanceId: string;
     sendControlMessage: (message: TelemetryControlMessage) => void;
@@ -193,7 +193,7 @@ export class SandboxTelemetryIngressService {
   }
 
   private async handleData(input: {
-    delivery: Extract<LocalTelemetryDelivery, { kind: "telemetryData" }>;
+    delivery: Extract<TelemetryDelivery, { kind: "telemetryData" }>;
     relaySessionId: string;
     sandboxInstanceId: string;
     sendControlMessage: (message: TelemetryControlMessage) => void;

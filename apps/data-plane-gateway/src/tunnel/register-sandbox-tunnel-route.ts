@@ -269,7 +269,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               clientSessionId: relaySessionId,
               currentSocket: ws,
               executionLeaseRepository,
-              handleLocalTelemetryDelivery: async (delivery) => {
+              handleTelemetryDelivery: async (delivery) => {
                 await input.telemetryIngressService.handleDelivery({
                   delivery,
                   relaySessionId,
