@@ -27,7 +27,7 @@ import { useMemo } from "react";
 import {
   completeAgentInstructionToken,
   rankAgentInstructionTokensForMatching,
-  resolveAgentInstructionTemplateQuery,
+  resolveTemplateTokenContext,
 } from "./agent-instructions-completion.js";
 import type { AgentInstructionsEditorToken } from "./agent-instructions-token-catalog.js";
 
@@ -307,7 +307,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
           return;
         }
 
-        const templateQuery = resolveAgentInstructionTemplateQuery({
+        const templateQuery = resolveTemplateTokenContext({
           documentText: update.state.doc.toString(),
           cursorOffset: mainSelection.head,
         });

@@ -18,7 +18,7 @@ function isTemplatePathCharacter(character: string): boolean {
   return /^[A-Za-z0-9_.]$/.test(character);
 }
 
-function resolveTemplateTokenContext(input: {
+export function resolveTemplateTokenContext(input: {
   documentText: string;
   cursorOffset: number;
 }): ActiveTemplateTokenContext | null {
@@ -65,17 +65,6 @@ function resolveTemplateTokenContext(input: {
     from: openingOffset + 2,
     to: replaceEnd,
     query,
-  };
-}
-
-function toCompletion(token: AgentInstructionsEditorToken): Completion {
-  return {
-    label: token.path,
-    ...(token.description === undefined ? { detail: token.label } : { detail: token.description }),
-    type: "variable",
-    apply: (view, _completion, from, to) => {
-      applyAgentInstructionCompletion(view, token.path, from, to);
-    },
   };
 }
 
@@ -142,7 +131,18 @@ export function completeAgentInstructionToken(
   const options = findMatchingAgentInstructionTokens({
     query: resolvedContext.query,
     tokens: input.tokens,
-  }).map(toCompletion);
+  }).map(
+    (token): Completion => ({
+      label: token.path,
+      ...(token.description === undefined
+        ? { detail: token.label }
+        : { detail: token.description }),
+      type: "variable",
+      apply: (view, _completion, from, to) => {
+        applyAgentInstructionCompletion(view, token.path, from, to);
+      },
+    }),
+  );
 
   if (options.length === 0) {
     return null;
@@ -154,11 +154,4 @@ export function completeAgentInstructionToken(
     options,
     validFor: /^[A-Za-z0-9_.]*$/,
   };
-}
-
-export function resolveAgentInstructionTemplateQuery(input: {
-  documentText: string;
-  cursorOffset: number;
-}): { from: number; to: number; query: string } | null {
-  return resolveTemplateTokenContext(input);
 }

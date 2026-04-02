@@ -9,7 +9,7 @@ import {
   applyAgentInstructionCompletion,
   completeAgentInstructionToken,
   findMatchingAgentInstructionTokens,
-  resolveAgentInstructionTemplateQuery,
+  resolveTemplateTokenContext,
 } from "./agent-instructions-completion.js";
 import { buildAgentInstructionTokenCatalog } from "./agent-instructions-token-catalog.js";
 import { createGithubIssueCommentCreatedEventOption } from "./webhook-automation-test-fixtures.js";
@@ -22,10 +22,10 @@ function createCompletionContext(input: { documentText: string; cursorOffset: nu
   return new CompletionContext(state, input.cursorOffset, true);
 }
 
-describe("resolveAgentInstructionTemplateQuery", () => {
+describe("resolveTemplateTokenContext", () => {
   it("finds the active template token query", () => {
     expect(
-      resolveAgentInstructionTemplateQuery({
+      resolveTemplateTokenContext({
         documentText: "Review {{payload.comm",
         cursorOffset: "Review {{payload.comm".length,
       }),
@@ -38,7 +38,7 @@ describe("resolveAgentInstructionTemplateQuery", () => {
 
   it("returns null outside liquid token context", () => {
     expect(
-      resolveAgentInstructionTemplateQuery({
+      resolveTemplateTokenContext({
         documentText: "Review payload",
         cursorOffset: "Review payload".length,
       }),
