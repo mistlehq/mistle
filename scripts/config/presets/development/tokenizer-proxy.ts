@@ -11,14 +11,6 @@ export const tokenizerProxyDevelopmentPreset = {
         control_plane_api: {
           base_url: "http://localhost:5100",
         },
-        credential_resolver: {
-          request_timeout_ms: 3000,
-        },
-        cache: {
-          max_entries: 8192,
-          default_ttl_seconds: 300,
-          refresh_skew_seconds: 30,
-        },
       },
     },
   },

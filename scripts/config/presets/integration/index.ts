@@ -48,7 +48,6 @@ const DOCKER_PRESET: IntegrationProviderPreset = {
           tokenizer_proxy_egress_base_url: "http://tokenizer-proxy:5205/tokenizer-proxy/egress",
           docker: {
             socket_path: "/var/run/docker.sock",
-            traces_endpoint: "http://host.testcontainers.internal:4318/v1/traces",
           },
         },
       },

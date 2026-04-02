@@ -26,7 +26,6 @@ export const dataPlaneWorkerDevelopmentPreset = {
           docker: {
             socket_path: "/var/run/docker.sock",
             network_name: "mistle-sandbox-dev",
-            traces_endpoint: "http://otel-lgtm:4318/v1/traces",
           },
           e2b: {
             api_key: "replace-with-e2b-api-key",
