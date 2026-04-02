@@ -126,7 +126,7 @@ export class SandboxTelemetryIngressService {
         sandboxInstanceId: input.sandboxInstanceId,
         stream,
       });
-    } catch {
+    } catch (error) {
       input.sendControlMessage(
         this.toTelemetryReset({
           error,
@@ -203,7 +203,7 @@ export class SandboxTelemetryIngressService {
           stream: openResult.stream,
         }),
       );
-    } catch (error) {
+    } catch {
       session.closeStream(openResult.stream.streamId);
       input.sendControlMessage(
         createTelemetryOpenError({
