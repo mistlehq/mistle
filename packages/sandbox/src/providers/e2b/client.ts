@@ -11,6 +11,10 @@ import {
 } from "./client-errors.js";
 import type { E2BSandboxConfig } from "./config.js";
 import {
+  createE2BSandboxConnectOptions,
+  createE2BSandboxCreateOptions,
+} from "./sandbox-options.js";
+import {
   E2BApplyStartupRequestSchema,
   E2BDestroySandboxRequestSchema,
   E2BInspectSandboxRequestSchema,
@@ -33,8 +37,6 @@ const SupervisorSocketPath = "/run/mistle/startup-config.sock";
 const SupervisorTokenPath = "/run/mistle/startup-config.token";
 const SupervisorReadinessPollIntervalMs = 100;
 const SupervisorReadinessPollAttempts = 100;
-const E2BTemplateAliasMetadataKey = "mistle_template_alias";
-
 export type E2BStartSandboxResponse = {
   sandboxId: string;
 };
@@ -145,16 +147,14 @@ export class E2BApiClient implements E2BClient {
     const templateAlias = await this.#templateRegistry.resolveAlias(parsedRequest.imageRef);
 
     try {
-      const sandbox = await Sandbox.create(templateAlias, {
-        ...this.#connectionOptions,
-        lifecycle: {
-          onTimeout: "pause",
-        },
-        metadata: {
-          [E2BTemplateAliasMetadataKey]: templateAlias,
-        },
-        envs: withRequiredSandboxRuntimeEnv(parsedRequest.env),
-      });
+      const sandbox = await Sandbox.create(
+        templateAlias,
+        createE2BSandboxCreateOptions({
+          connectionOptions: this.#connectionOptions,
+          templateAlias,
+          envs: withRequiredSandboxRuntimeEnv(parsedRequest.env),
+        }),
+      );
 
       return {
         sandboxId: sandbox.sandboxId,
@@ -189,7 +189,10 @@ export class E2BApiClient implements E2BClient {
     const parsedRequest = E2BResumeSandboxRequestSchema.parse(request);
 
     try {
-      const sandbox = await Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions);
+      const sandbox = await Sandbox.connect(
+        parsedRequest.sandboxId,
+        createE2BSandboxConnectOptions(this.#connectionOptions),
+      );
       return {
         sandboxId: sandbox.sandboxId,
       };
