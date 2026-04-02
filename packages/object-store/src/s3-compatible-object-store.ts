@@ -1,19 +1,15 @@
 import {
   DeleteObjectCommand,
+  type DeleteObjectCommandOutput,
   GetObjectCommand,
+  type GetObjectCommandOutput,
   HeadObjectCommand,
+  type HeadObjectCommandOutput,
   PutObjectCommand,
+  type PutObjectCommandOutput,
   S3Client,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
-
-import type {
-  DeleteObjectInput,
-  ObjectStore,
-  PutObjectInput,
-  HeadObjectInput,
-  ReadObjectInput,
-} from "./object-store.js";
 
 export type S3CompatibleObjectStoreConfig = {
   bucketName: string;
@@ -23,7 +19,26 @@ export type S3CompatibleObjectStoreConfig = {
   credentials?: S3ClientConfig["credentials"];
 };
 
-export class S3CompatibleObjectStore implements ObjectStore {
+export type PutObjectInput = {
+  objectKey: string;
+  body: Uint8Array;
+  contentType: string;
+  cacheControl?: string;
+};
+
+export type HeadObjectInput = {
+  objectKey: string;
+};
+
+export type ReadObjectInput = {
+  objectKey: string;
+};
+
+export type DeleteObjectInput = {
+  objectKey: string;
+};
+
+export class S3CompatibleObjectStore {
   readonly #bucketName: string;
   readonly #client: S3Client;
 
@@ -46,7 +61,7 @@ export class S3CompatibleObjectStore implements ObjectStore {
     });
   }
 
-  async putObject(input: PutObjectInput) {
+  async putObject(input: PutObjectInput): Promise<PutObjectCommandOutput> {
     return await this.#client.send(
       new PutObjectCommand({
         Body: input.body,
@@ -58,7 +73,7 @@ export class S3CompatibleObjectStore implements ObjectStore {
     );
   }
 
-  async headObject(input: HeadObjectInput) {
+  async headObject(input: HeadObjectInput): Promise<HeadObjectCommandOutput> {
     return await this.#client.send(
       new HeadObjectCommand({
         Bucket: this.#bucketName,
@@ -67,7 +82,7 @@ export class S3CompatibleObjectStore implements ObjectStore {
     );
   }
 
-  async readObject(input: ReadObjectInput) {
+  async readObject(input: ReadObjectInput): Promise<GetObjectCommandOutput> {
     return await this.#client.send(
       new GetObjectCommand({
         Bucket: this.#bucketName,
@@ -76,7 +91,7 @@ export class S3CompatibleObjectStore implements ObjectStore {
     );
   }
 
-  async deleteObject(input: DeleteObjectInput) {
+  async deleteObject(input: DeleteObjectInput): Promise<DeleteObjectCommandOutput> {
     return await this.#client.send(
       new DeleteObjectCommand({
         Bucket: this.#bucketName,

@@ -11,7 +11,6 @@ response types.
 
 Exported from [`src/index.ts`](./src/index.ts):
 
-- `ObjectStore`
 - `PutObjectInput`
 - `ReadObjectInput`
 - `HeadObjectInput`
@@ -55,8 +54,8 @@ await objectStore.deleteObject({
 ## Design Constraints
 
 - S3-compatible storage only for now.
-- Application code should depend on the `ObjectStore` interface, not AWS SDK
-  commands directly.
+- Application code should depend on `S3CompatibleObjectStore` rather than
+  wiring raw S3 commands directly throughout the codebase.
 - Provider-specific details should stay inside this package.
 - This package keeps its method surface small, but it surfaces backend-native
   S3-compatible errors and stays close to the underlying S3 command outputs.
