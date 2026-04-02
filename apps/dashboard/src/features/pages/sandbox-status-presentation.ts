@@ -13,7 +13,7 @@ export function resolveSandboxStatusBadgeUi(
 ): SandboxStatusBadgeUi {
   if (sandboxLifecycleStatus === null) {
     return {
-      label: "Loading sandbox status",
+      label: "Loading status",
       variant: "outline",
     };
   }

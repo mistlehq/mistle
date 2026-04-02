@@ -49,7 +49,7 @@ describe("resolveSandboxHeaderStatusUi", () => {
         sessionConnectionStatus: null,
       } as const,
       expected: {
-        label: "Loading sandbox status",
+        label: "Loading status",
         variant: "outline",
       },
     },
