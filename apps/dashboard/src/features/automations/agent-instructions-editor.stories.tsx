@@ -77,7 +77,7 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
   );
 }
 
-function PrototypeHarness(): React.JSX.Element {
+function PlaygroundHarness(): React.JSX.Element {
   const [value, setValue] = useState("");
   const [includeIssueComment, setIncludeIssueComment] = useState(true);
   const [includePullRequest, setIncludePullRequest] = useState(true);
@@ -144,7 +144,7 @@ function PrototypeHarness(): React.JSX.Element {
         <Field>
           <FieldHeader>
             <div className="space-y-1">
-              <FieldLabel id="prototype-agent-instructions-label">Agent Instructions</FieldLabel>
+              <FieldLabel id="playground-agent-instructions-label">Agent Instructions</FieldLabel>
               <FieldDescription>
                 <span className="block">Type inside the editor as if this were the real form.</span>
                 <span className="block">
@@ -155,7 +155,7 @@ function PrototypeHarness(): React.JSX.Element {
           </FieldHeader>
           <FieldContent>
             <AgentInstructionsEditor
-              ariaLabelledBy="prototype-agent-instructions-label"
+              ariaLabelledBy="playground-agent-instructions-label"
               disabled={disabled}
               invalid={invalid}
               onChange={setValue}
@@ -192,7 +192,7 @@ export const Playground: Story = {
     value: "",
   },
   render: function RenderStory(): React.JSX.Element {
-    return <PrototypeHarness />;
+    return <PlaygroundHarness />;
   },
 };
 
