@@ -1,8 +1,7 @@
-import { Button } from "@mistle/ui";
+import { Button, Notice } from "@mistle/ui";
 import { PencilSimpleIcon } from "@phosphor-icons/react";
 
 import { PageTitleField } from "./page-title-field.js";
-import { StatusBox } from "./status-box.js";
 
 export function EditableHeading(input: {
   value: string;
@@ -77,7 +76,7 @@ export function EditableHeading(input: {
         </Button>
       </div>
       {input.errorMessage === undefined ? null : (
-        <StatusBox tone="destructive">{input.errorMessage}</StatusBox>
+        <Notice variant="alert">{input.errorMessage}</Notice>
       )}
     </div>
   );

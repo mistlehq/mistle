@@ -1,6 +1,5 @@
 export * from "./components/ui/accordion.js";
 export * from "./components/ui/alert-dialog.js";
-export * from "./components/ui/alert.js";
 export * from "./components/ui/aspect-ratio.js";
 export * from "./components/ui/avatar.js";
 export * from "./components/ui/badge.js";
@@ -33,6 +32,7 @@ export * from "./components/ui/menubar.js";
 export * from "./components/ui/more-actions-menu.js";
 export * from "./components/ui/native-select.js";
 export * from "./components/ui/navigation-menu.js";
+export * from "./components/ui/notice.js";
 export * from "./components/ui/pagination.js";
 export * from "./components/ui/popover.js";
 export * from "./components/ui/progress.js";

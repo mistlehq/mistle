@@ -1,8 +1,7 @@
-import { Field, FieldContent, FieldHeader, FieldLabel, Input, Skeleton } from "@mistle/ui";
+import { Field, FieldContent, FieldHeader, FieldLabel, Input, Skeleton, Notice } from "@mistle/ui";
 
 import { SaveActions } from "../settings/save-actions.js";
-import { FormPageSection, FormPageShell } from "../shared/form-page.js";
-import { StatusBox } from "../shared/status-box.js";
+import { FormPageSection, FormPageStack } from "../shared/form-page.js";
 
 export type OrganizationGeneralSettingsPageViewProps = {
   hasDirtyChanges: boolean;
@@ -23,7 +22,7 @@ export function OrganizationGeneralSettingsPageView(
 ): React.JSX.Element {
   if (props.isLoading) {
     return (
-      <FormPageShell className="pt-0">
+      <FormPageStack>
         <FormPageSection>
           <div className="flex flex-col gap-4 p-4">
             <div className="flex flex-col gap-2">
@@ -41,26 +40,24 @@ export function OrganizationGeneralSettingsPageView(
             </div>
           </div>
         </FormPageSection>
-      </FormPageShell>
+      </FormPageStack>
     );
   }
 
   if (props.loadErrorMessage) {
     return (
-      <FormPageShell className="pt-0">
+      <FormPageStack>
         <FormPageSection>
           <div className="flex flex-col gap-3 p-4">
-            <StatusBox tone="destructive">
-              {props.loadErrorMessage} Please try again later.
-            </StatusBox>
+            <Notice variant="alert">{props.loadErrorMessage} Please try again later.</Notice>
           </div>
         </FormPageSection>
-      </FormPageShell>
+      </FormPageStack>
     );
   }
 
   return (
-    <FormPageShell className="pt-0">
+    <FormPageStack>
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
           <p aria-live="polite" className="sr-only" role="status">
@@ -68,11 +65,11 @@ export function OrganizationGeneralSettingsPageView(
           </p>
 
           {props.saveErrorMessage !== null || props.nameErrorMessage !== null ? (
-            <StatusBox tone="destructive">
+            <Notice variant="alert">
               {props.saveErrorMessage !== null
                 ? `${props.saveErrorMessage} Please try again later.`
                 : props.nameErrorMessage}
-            </StatusBox>
+            </Notice>
           ) : null}
 
           <Field contentWidth="fill" orientation="horizontal">
@@ -99,6 +96,6 @@ export function OrganizationGeneralSettingsPageView(
         saveSuccess={props.saveSuccess}
         saving={props.isSaving}
       />
-    </FormPageShell>
+    </FormPageStack>
   );
 }

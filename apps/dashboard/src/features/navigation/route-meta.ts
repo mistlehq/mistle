@@ -9,6 +9,8 @@ export type RouteTextValue = string | ((input: RouteTextResolverInput) => string
 export type RouteHrefValue = string | ((input: RouteTextResolverInput) => string | null);
 
 export type AppRouteHandle = {
+  appShellInsetOwner?: "app-shell" | "child";
+  appShellViewportMode?: "document" | "workspace";
   breadcrumb?: RouteTextValue;
   breadcrumbTo?: RouteHrefValue;
   breadcrumbClickable?: boolean;
@@ -16,7 +18,6 @@ export type AppRouteHandle = {
   description?: RouteTextValue;
   headerIcon?: (input: RouteTextResolverInput) => React.ReactNode;
   hideBreadcrumb?: boolean;
-  settingsLayoutVariant?: "default" | "form";
 };
 
 export type AppBreadcrumb = {
@@ -26,10 +27,11 @@ export type AppBreadcrumb = {
 };
 
 export type AppPageMeta = {
+  appShellInsetOwner: "app-shell" | "child";
+  appShellViewportMode: "document" | "workspace";
   title: string | null;
   headerIcon: React.ReactNode | null;
   supportingText: string | null;
-  settingsLayoutVariant: "default" | "form";
 };
 
 type MatchLike = {
@@ -91,6 +93,8 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   }
 
   const parsedHandle: AppRouteHandle = {};
+  const appShellInsetOwner = handle["appShellInsetOwner"];
+  const appShellViewportMode = handle["appShellViewportMode"];
   const breadcrumb = handle["breadcrumb"];
   const breadcrumbTo = handle["breadcrumbTo"];
   const breadcrumbClickable = handle["breadcrumbClickable"];
@@ -98,7 +102,14 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   const description = handle["description"];
   const headerIcon = handle["headerIcon"];
   const hideBreadcrumb = handle["hideBreadcrumb"];
-  const settingsLayoutVariant = handle["settingsLayoutVariant"];
+
+  if (appShellInsetOwner === "app-shell" || appShellInsetOwner === "child") {
+    parsedHandle.appShellInsetOwner = appShellInsetOwner;
+  }
+
+  if (appShellViewportMode === "document" || appShellViewportMode === "workspace") {
+    parsedHandle.appShellViewportMode = appShellViewportMode;
+  }
 
   if (isRouteTextValue(breadcrumb)) {
     parsedHandle.breadcrumb = breadcrumb;
@@ -128,19 +139,16 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
     parsedHandle.hideBreadcrumb = hideBreadcrumb;
   }
 
-  if (settingsLayoutVariant === "default" || settingsLayoutVariant === "form") {
-    parsedHandle.settingsLayoutVariant = settingsLayoutVariant;
-  }
-
   if (
+    parsedHandle.appShellInsetOwner === undefined &&
+    parsedHandle.appShellViewportMode === undefined &&
     parsedHandle.breadcrumb === undefined &&
     parsedHandle.breadcrumbTo === undefined &&
     parsedHandle.breadcrumbClickable === undefined &&
     parsedHandle.title === undefined &&
     parsedHandle.description === undefined &&
     parsedHandle.headerIcon === undefined &&
-    parsedHandle.hideBreadcrumb === undefined &&
-    parsedHandle.settingsLayoutVariant === undefined
+    parsedHandle.hideBreadcrumb === undefined
   ) {
     return null;
   }
@@ -247,7 +255,8 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
       title: null,
       headerIcon: null,
       supportingText: null,
-      settingsLayoutVariant: "default",
+      appShellInsetOwner: "app-shell",
+      appShellViewportMode: "document",
     };
   }
 
@@ -272,7 +281,8 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
         title,
         headerIcon,
         supportingText,
-        settingsLayoutVariant: handle.settingsLayoutVariant ?? "default",
+        appShellInsetOwner: handle.appShellInsetOwner ?? "app-shell",
+        appShellViewportMode: handle.appShellViewportMode ?? "document",
       };
     }
   }
@@ -281,6 +291,7 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
     title: null,
     headerIcon: null,
     supportingText: null,
-    settingsLayoutVariant: "default",
+    appShellInsetOwner: "app-shell",
+    appShellViewportMode: "document",
   };
 }

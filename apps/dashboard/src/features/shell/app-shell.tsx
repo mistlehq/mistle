@@ -7,6 +7,7 @@ import { authClient } from "../../lib/auth/client.js";
 import { ErrorNotice } from "../auth/error-notice.js";
 import { resolveErrorMessage } from "../auth/messages.js";
 import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
+import { useAppPageMeta } from "../navigation/route-meta.js";
 import { SidebarNavGroups } from "../navigation/sidebar-nav-groups.js";
 import type { SidebarNavGroup } from "../navigation/sidebar-nav-model.js";
 import {
@@ -59,8 +60,22 @@ function SessionsNavIcon(props: {
   return <TerminalIcon {...props} />;
 }
 
+type AppShellFrame = Pick<
+  React.ComponentProps<typeof AppShellView>,
+  | "breadcrumbs"
+  | "contentInsetOwner"
+  | "showBreadcrumbs"
+  | "sidebarContent"
+  | "sidebarFooterContent"
+  | "sidebarHeaderClassName"
+  | "sidebarHeaderContent"
+  | "topLoadingBar"
+  | "viewportMode"
+>;
+
 export function AppShell(): React.JSX.Element {
   const organizationSummary = useOrganizationSummary();
+  const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -77,8 +92,6 @@ export function AppShell(): React.JSX.Element {
   const inSessions =
     location.pathname === "/sessions" || location.pathname.startsWith("/sessions/");
   const inSessionDetail = location.pathname.startsWith("/sessions/");
-  const showBreadcrumbs =
-    inSettings || inSandboxProfiles || inAutomations || inDashboardRoot || inSessions;
 
   useEffect(() => {
     if (!isSettingsPath(location.pathname)) {
@@ -111,50 +124,97 @@ export function AppShell(): React.JSX.Element {
     await navigate(SETTINGS_DEFAULT_PATH);
   }
 
+  const appShellFrame = resolveAppShellFrame({
+    handleBackToApp: () => {
+      void handleBackToApp();
+    },
+    handleNavigateToSettings: () => {
+      void handleNavigateToSettings();
+    },
+    handleSignOut: () => {
+      void handleSignOut();
+    },
+    inAutomations,
+    inDashboardRoot,
+    inSandboxProfiles,
+    inSessionDetail,
+    inSessions,
+    inSettings,
+    isSigningOut,
+    locationPathname: location.pathname,
+    organizationErrorMessage: organizationSummary.organizationErrorMessage,
+    organizationName: organizationSummary.organizationName ?? "",
+    pageMeta,
+    signOutError,
+  });
+
   return (
     <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
-      <AppShellView
-        breadcrumbs={showBreadcrumbs ? <AppBreadcrumbs /> : null}
-        headerActions={headerActions}
-        isSessionDetail={inSessionDetail}
-        mainContent={<Outlet />}
-        showBreadcrumbs={showBreadcrumbs}
-        sidebarContent={
-          inSettings ? (
-            <SettingsSectionNav />
-          ) : (
-            <SidebarNavGroups
-              groups={MAIN_NAV_GROUPS}
-              pathname={location.pathname}
-              showGroupLabel={false}
-            />
-          )
-        }
-        sidebarFooterContent={<ErrorNotice message={signOutError} />}
-        sidebarHeaderContent={
-          inSettings ? (
-            <SettingsBackButton
-              onBack={() => {
-                void handleBackToApp();
-              }}
-            />
-          ) : (
-            <OrganizationMenuTrigger
-              isSigningOut={isSigningOut}
-              onNavigateToSettings={() => {
-                void handleNavigateToSettings();
-              }}
-              onSignOut={() => {
-                void handleSignOut();
-              }}
-              organizationErrorMessage={organizationSummary.organizationErrorMessage}
-              organizationName={organizationSummary.organizationName}
-            />
-          )
-        }
-        topLoadingBar={<TopLoadingBar />}
-        {...(inSettings ? { sidebarHeaderClassName: "pb-0" } : {})}
-      />
+      <AppShellView headerActions={headerActions} mainContent={<Outlet />} {...appShellFrame} />
     </AppShellHeaderActionsContext.Provider>
   );
+}
+
+function resolveAppShellFrame(input: {
+  handleBackToApp: () => void;
+  handleNavigateToSettings: () => void;
+  handleSignOut: () => void;
+  inAutomations: boolean;
+  inDashboardRoot: boolean;
+  inSandboxProfiles: boolean;
+  inSessionDetail: boolean;
+  inSessions: boolean;
+  inSettings: boolean;
+  isSigningOut: boolean;
+  locationPathname: string;
+  organizationErrorMessage: string | null;
+  organizationName: string;
+  pageMeta: ReturnType<typeof useAppPageMeta>;
+  signOutError: string | null;
+}): AppShellFrame {
+  const showBreadcrumbs =
+    input.inSettings ||
+    input.inSandboxProfiles ||
+    input.inAutomations ||
+    input.inDashboardRoot ||
+    input.inSessions;
+
+  if (input.inSettings) {
+    return {
+      breadcrumbs: showBreadcrumbs ? <AppBreadcrumbs /> : null,
+      contentInsetOwner: "child",
+      showBreadcrumbs,
+      sidebarContent: <SettingsSectionNav />,
+      sidebarFooterContent: <ErrorNotice message={input.signOutError} />,
+      sidebarHeaderClassName: "pb-0",
+      sidebarHeaderContent: <SettingsBackButton onBack={input.handleBackToApp} />,
+      topLoadingBar: <TopLoadingBar />,
+      viewportMode: input.pageMeta.appShellViewportMode,
+    };
+  }
+
+  return {
+    breadcrumbs: showBreadcrumbs ? <AppBreadcrumbs /> : null,
+    contentInsetOwner: input.pageMeta.appShellInsetOwner,
+    showBreadcrumbs,
+    sidebarContent: (
+      <SidebarNavGroups
+        groups={MAIN_NAV_GROUPS}
+        pathname={input.locationPathname}
+        showGroupLabel={false}
+      />
+    ),
+    sidebarFooterContent: <ErrorNotice message={input.signOutError} />,
+    sidebarHeaderContent: (
+      <OrganizationMenuTrigger
+        isSigningOut={input.isSigningOut}
+        onNavigateToSettings={input.handleNavigateToSettings}
+        onSignOut={input.handleSignOut}
+        organizationErrorMessage={input.organizationErrorMessage}
+        organizationName={input.organizationName}
+      />
+    ),
+    topLoadingBar: <TopLoadingBar />,
+    viewportMode: input.inSessionDetail ? "workspace" : input.pageMeta.appShellViewportMode,
+  };
 }

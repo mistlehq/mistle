@@ -1,8 +1,6 @@
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   Button,
+  Notice,
   Skeleton,
   Table,
   TableBody,
@@ -187,15 +185,17 @@ export function WebhookAutomationListView(
       {input.isLoading ? (
         <LoadingState />
       ) : input.errorMessage !== null ? (
-        <Alert variant="destructive">
-          <AlertTitle>Could not load automations</AlertTitle>
-          <AlertDescription className="flex flex-col items-start gap-3">
-            <span>{input.errorMessage}</span>
+        <Notice
+          action={
             <Button onClick={input.onRetry} type="button" variant="outline">
               Retry
             </Button>
-          </AlertDescription>
-        </Alert>
+          }
+          title="Could not load automations"
+          variant="alert"
+        >
+          {input.errorMessage}
+        </Notice>
       ) : (
         <>
           {input.items.length > 0 ? (

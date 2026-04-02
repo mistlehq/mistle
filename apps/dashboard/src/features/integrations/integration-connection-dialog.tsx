@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Notice,
   RadioGroup,
   RadioGroupItem,
 } from "@mistle/ui";
@@ -88,6 +89,17 @@ type IntegrationConnectionDialogProps = {
   onSubmit: () => void;
   pending: boolean;
   secrets: Record<string, string>;
+};
+
+function HiddenSubmitButton(): null {
+  return null;
+}
+
+const DialogFormTemplates = {
+  ...IntegrationFormTemplates,
+  ButtonTemplates: {
+    SubmitButton: HiddenSubmitButton,
+  },
 };
 
 function formatIntegrationConnectionMethodLabel(method: IntegrationConnectionMethod): string {
@@ -195,7 +207,7 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
                 }}
                 schema={props.configForm.schema}
                 showErrorList={false}
-                templates={IntegrationFormTemplates}
+                templates={DialogFormTemplates}
                 uiSchema={props.configForm.uiSchema}
                 validator={validator}
                 widgets={IntegrationFormWidgets}
@@ -235,12 +247,10 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
             </div>
           ) : props.configForm.mode === "unsupported" ? (
             <p className="text-destructive text-sm">{props.configForm.message}</p>
+          ) : !isUpdateMode ? (
+            <Notice>Continue to start the connection flow.</Notice>
           ) : (
-            <p className="text-muted-foreground text-sm">
-              {isUpdateMode
-                ? "Save to update this connection."
-                : "Continue to start the connection flow."}
-            </p>
+            <p className="text-muted-foreground text-sm">Save to update this connection.</p>
           )}
 
           {props.connectError ? (

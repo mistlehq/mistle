@@ -33,7 +33,10 @@ import {
   resolveEligibleProfileAutomationConnectionIds,
 } from "./webhook-automation-option-builders.js";
 import { applyWebhookAutomationTriggerParameterDefaults } from "./webhook-automation-trigger-parameters.js";
-import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
+import {
+  resolveSelectedWebhookAutomationEventOptions,
+  type WebhookAutomationTriggerPickerDisabledState,
+} from "./webhook-automation-trigger-picker.js";
 import { AUTOMATIONS_QUERY_KEY_PREFIX } from "./webhook-automations-query-keys.js";
 import {
   createWebhookAutomation,
@@ -57,7 +60,7 @@ type WebhookAutomationOption = {
 
 type SelectedProfileTriggerState = {
   selectableConnectionIds: readonly string[];
-  disabledReason: string | null;
+  disabledState: WebhookAutomationTriggerPickerDisabledState | null;
 };
 
 const NoProfileSelectedMessage = "Select a sandbox profile to choose triggers.";
@@ -91,21 +94,30 @@ export function resolveSelectedProfileTriggerState(input: {
   if (input.selectedProfileId.trim().length === 0) {
     return {
       selectableConnectionIds: [],
-      disabledReason: NoProfileSelectedMessage,
+      disabledState: {
+        reason: NoProfileSelectedMessage,
+        variant: "default",
+      },
     };
   }
 
   if (input.bindingErrorMessage !== null) {
     return {
       selectableConnectionIds: [],
-      disabledReason: input.bindingErrorMessage,
+      disabledState: {
+        reason: input.bindingErrorMessage,
+        variant: "alert",
+      },
     };
   }
 
   if (input.isBindingDataPending || !input.hasBindingData) {
     return {
       selectableConnectionIds: [],
-      disabledReason: "Loading profile bindings...",
+      disabledState: {
+        reason: "Loading profile bindings...",
+        variant: "default",
+      },
     };
   }
 
@@ -117,7 +129,13 @@ export function resolveSelectedProfileTriggerState(input: {
 
   return {
     selectableConnectionIds,
-    disabledReason: selectableConnectionIds.length === 0 ? InvalidProfileBindingMessage : null,
+    disabledState:
+      selectableConnectionIds.length === 0
+        ? {
+            reason: InvalidProfileBindingMessage,
+            variant: "default",
+          }
+        : null,
   };
 }
 
@@ -349,7 +367,7 @@ export function useLoadedWebhookAutomationEditorState(
   connectionOptions: readonly WebhookAutomationOption[];
   sandboxProfileOptions: readonly WebhookAutomationOption[];
   webhookEventOptions: readonly WebhookAutomationEventOption[];
-  triggerPickerDisabledReason: string | null;
+  triggerPickerDisabledState: WebhookAutomationTriggerPickerDisabledState | null;
   values: WebhookAutomationFormValues;
   fieldErrors: Partial<Record<keyof WebhookAutomationFormValues, string>>;
   validationSummaryError: string | null;
@@ -549,7 +567,7 @@ export function useLoadedWebhookAutomationEditorState(
     connectionOptions: input.connectionOptions,
     sandboxProfileOptions: input.sandboxProfileOptions,
     webhookEventOptions,
-    triggerPickerDisabledReason: selectedProfileTriggerState.disabledReason,
+    triggerPickerDisabledState: selectedProfileTriggerState.disabledState,
     values: formValues,
     fieldErrors,
     validationSummaryError,

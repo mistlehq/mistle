@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { MembersDirectoryTable } from "./members-directory-table.js";
@@ -9,6 +9,15 @@ describe("MembersDirectoryTable interaction", () => {
   afterEach(() => {
     cleanup();
   });
+
+  function getInvitationRow(): HTMLElement {
+    const invitationRow = screen.getAllByRole("row")[1];
+    if (invitationRow === undefined) {
+      throw new Error("Expected invitation row.");
+    }
+
+    return invitationRow;
+  }
 
   const baseProps = {
     capabilities: null,
@@ -131,8 +140,11 @@ describe("MembersDirectoryTable interaction", () => {
       />,
     );
 
-    expect(screen.queryByLabelText("Invitation actions")).toBeNull();
-    expect(screen.getByText("Sending...")).toBeTruthy();
+    const invitationRow = getInvitationRow();
+    expect(within(invitationRow).queryByLabelText("Invitation actions")).toBeNull();
+    expect(within(invitationRow).getByRole("status").getAttribute("data-feedback-state")).toBe(
+      "resend_invite_pending",
+    );
   });
 
   it("shows sent state then allows returning to invitation actions", () => {
@@ -161,8 +173,11 @@ describe("MembersDirectoryTable interaction", () => {
       />,
     );
 
-    expect(screen.getByText("Sent")).toBeTruthy();
-    expect(screen.queryByLabelText("Invitation actions")).toBeNull();
+    const invitationRow = getInvitationRow();
+    expect(within(invitationRow).queryByLabelText("Invitation actions")).toBeNull();
+    expect(within(invitationRow).getByRole("status").getAttribute("data-feedback-state")).toBe(
+      "resend_invite_completed",
+    );
 
     rerender(
       <MembersDirectoryTable
@@ -214,8 +229,11 @@ describe("MembersDirectoryTable interaction", () => {
       />,
     );
 
-    expect(screen.getByText("Revoked")).toBeTruthy();
-    expect(screen.queryByLabelText("Invitation actions")).toBeNull();
+    const invitationRow = getInvitationRow();
+    expect(within(invitationRow).queryByLabelText("Invitation actions")).toBeNull();
+    expect(within(invitationRow).getByRole("status").getAttribute("data-feedback-state")).toBe(
+      "revoke_invitation_completed",
+    );
   });
 
   it("shows filtered empty state when rows exist but no row matches", () => {

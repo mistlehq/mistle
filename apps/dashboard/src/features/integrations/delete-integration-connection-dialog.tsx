@@ -1,6 +1,12 @@
-import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@mistle/ui";
-
-import { StatusBox } from "../shared/status-box.js";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Notice,
+} from "@mistle/ui";
 
 type DeleteIntegrationConnectionDialogProps = {
   connectionName: string;
@@ -32,9 +38,9 @@ export function DeleteIntegrationConnectionDialog(
           </p>
 
           {input.errorMessage === null ? null : (
-            <StatusBox title="Delete failed" tone="destructive">
+            <Notice title="Delete failed" variant="alert">
               {input.errorMessage}
-            </StatusBox>
+            </Notice>
           )}
         </div>
 

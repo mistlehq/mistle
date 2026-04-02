@@ -1,3 +1,5 @@
+import { Notice } from "@mistle/ui";
+
 import { MemberInviteDialog } from "../settings/members/member-invite-dialog.js";
 import { MemberRoleChangeDialog } from "../settings/members/member-role-change-dialog.js";
 import type {
@@ -16,7 +18,6 @@ import {
   MembersLoadErrorState,
   MembersLoadingState,
 } from "../settings/members/members-query-states.js";
-import { StatusBox } from "../shared/status-box.js";
 
 export type OrganizationMembersSettingsPageViewProps = {
   capabilities: MembershipCapabilities | null;
@@ -70,10 +71,10 @@ export function OrganizationMembersSettingsPageView(
     <div className="flex flex-col gap-4">
       {props.capabilitiesErrorMessage ? (
         <div className="flex flex-col gap-3">
-          <StatusBox title="Could not load membership permissions" tone="destructive">
+          <Notice title="Could not load membership permissions" variant="alert">
             Invite and role management actions are unavailable until this loads. Please try again
             later.
-          </StatusBox>
+          </Notice>
         </div>
       ) : null}
 

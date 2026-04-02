@@ -18,7 +18,7 @@ function createReadyState(
 }
 
 const meta = {
-  title: "Dashboard/Forms/IntegrationResourceStringArrayWidgetView",
+  title: "Dashboard/RJSF/IntegrationResourceStringArrayWidgetView",
   component: IntegrationResourceStringArrayWidgetView,
   decorators: [withDashboardPageWidth],
   args: {

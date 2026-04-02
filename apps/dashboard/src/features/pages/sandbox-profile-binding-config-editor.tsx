@@ -1,7 +1,7 @@
 import { applySchemaDefaultsToFormData, resolveIntegrationForm } from "@mistle/integrations-core";
 import { createDefinitionsBundle } from "@mistle/integrations-definitions";
 import { createIntegrationFormRegistry } from "@mistle/integrations-definitions/forms";
-import { Alert, AlertDescription, AlertTitle, Button } from "@mistle/ui";
+import { Button, Notice } from "@mistle/ui";
 import Form, { type IChangeEvent } from "@rjsf/core";
 import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
@@ -465,10 +465,9 @@ export function SandboxProfileBindingConfigEditor(input: {
   if (configUiModel.mode === "unsupported") {
     return (
       <div className="gap-2 flex flex-col">
-        <Alert variant="destructive">
-          <AlertTitle>Unsupported binding config</AlertTitle>
-          <AlertDescription>{configUiModel.message}</AlertDescription>
-        </Alert>
+        <Notice title="Unsupported binding config" variant="alert">
+          {configUiModel.message}
+        </Notice>
         <div>
           <Button
             onClick={() => {

@@ -30,7 +30,6 @@ describe("WebhookAutomationTitleEditor", () => {
       />,
     );
 
-    expect(screen.getByText("New automation name")).toBeDefined();
     expect(screen.queryByDisplayValue("Unsaved title")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Edit automation name" }));

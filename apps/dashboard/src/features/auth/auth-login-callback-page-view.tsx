@@ -1,6 +1,5 @@
-import { Button, Spinner } from "@mistle/ui";
+import { Button, Spinner, Notice } from "@mistle/ui";
 
-import { StatusBox } from "../shared/status-box.js";
 import { AuthPageShell, AuthPageWidths } from "./auth-page-shell.js";
 
 type AuthLoginCallbackPageViewProps = {
@@ -30,7 +29,7 @@ export function AuthLoginCallbackPageView(
         ) : (
           <>
             {props.callbackError === null ? null : (
-              <StatusBox tone="destructive">{props.callbackError}</StatusBox>
+              <Notice variant="alert">{props.callbackError}</Notice>
             )}
             <Button onClick={props.onBackToLogin} type="button" variant="outline">
               Back to login

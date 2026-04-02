@@ -7,9 +7,11 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
+  DialogShortcut,
   DialogTitle,
   DialogTrigger,
 } from "./dialog.js";
+import { Input } from "./input.js";
 
 export default {
   title: "UI/Dialog",
@@ -109,6 +111,70 @@ export const LockedWhileBusy = {
               </Button>
               <Button disabled type="button">
                 Deleting...
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  },
+};
+
+export const SingleFieldForm = {
+  render: function Render() {
+    const [open, setOpen] = useState(true);
+    const [value, setValue] = useState("");
+    const [submittedValue, setSubmittedValue] = useState<string | null>(null);
+
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Dialog onOpenChange={setOpen} open={open}>
+          <DialogTrigger render={<Button type="button" variant="outline" />}>
+            {open ? "Dialog open" : "Reopen dialog"}
+          </DialogTrigger>
+          <DialogContent
+            formProps={{
+              onSubmit: (event) => {
+                event.preventDefault();
+                const trimmedValue = value.trim();
+
+                if (trimmedValue.length === 0) {
+                  return;
+                }
+
+                setSubmittedValue(trimmedValue);
+              },
+            }}
+          >
+            <DialogHeader variant="sectioned">
+              <DialogTitle>Create profile</DialogTitle>
+              <DialogDescription>
+                Press Enter in a single-field dialog to trigger the primary action through native
+                form submission.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Input
+                autoFocus
+                onChange={(event) => {
+                  setValue(event.currentTarget.value);
+                }}
+                placeholder="Profile name"
+                value={value}
+              />
+              <p className="text-muted-foreground text-sm">
+                {submittedValue === null
+                  ? "Nothing submitted yet."
+                  : `Last submitted value: ${submittedValue}`}
+              </p>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setOpen(false)} type="button" variant="outline">
+                Cancel
+              </Button>
+              <Button disabled={value.trim().length === 0} type="submit">
+                Create
+                <DialogShortcut aria-label="Enter" />
               </Button>
             </DialogFooter>
           </DialogContent>

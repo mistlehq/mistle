@@ -3,10 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   getOrganizationGeneral,
   updateOrganizationGeneral,
 } from "../settings/organization/organization-general-service.js";
+import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { OrganizationGeneralSettingsPageView } from "./organization-general-settings-page-view.js";
@@ -31,10 +33,12 @@ function settingsOrganizationGeneralQueryKey(
 }
 
 export function OrganizationGeneralSettingsPage(): React.JSX.Element {
+  const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const organizationId = useRequiredOrganizationId();
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const { title, description } = resolvePageFrameText(pageMeta, "General");
 
   const organizationQuery = useQuery({
     queryKey: settingsOrganizationGeneralQueryKey(organizationId),
@@ -110,37 +114,39 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
   });
 
   return (
-    <OrganizationGeneralSettingsEditor
-      key={
-        organizationQuery.data === undefined
-          ? "loading"
-          : `${organizationQuery.data.slug}:${organizationQuery.data.name}`
-      }
-      isLoading={organizationQuery.isPending}
-      isSaving={saveMutation.isPending}
-      loadErrorMessage={
-        organizationQuery.isError
-          ? resolveApiErrorMessage({
-              error: organizationQuery.error,
-              fallbackMessage: "Could not load organization settings.",
-            })
-          : null
-      }
-      onResetFeedback={() => {
-        setSaveError(null);
-        setShowSaveSuccess(false);
-      }}
-      onSaveChanges={(name) => {
-        setSaveError(null);
-        setShowSaveSuccess(false);
-        void saveMutation.mutateAsync({
-          name: name.trim(),
-        });
-      }}
-      organization={organizationQuery.data}
-      saveErrorMessage={saveError}
-      saveSuccess={showSaveSuccess}
-    />
+    <FormPageFrame description={description} title={title}>
+      <OrganizationGeneralSettingsEditor
+        key={
+          organizationQuery.data === undefined
+            ? "loading"
+            : `${organizationQuery.data.slug}:${organizationQuery.data.name}`
+        }
+        isLoading={organizationQuery.isPending}
+        isSaving={saveMutation.isPending}
+        loadErrorMessage={
+          organizationQuery.isError
+            ? resolveApiErrorMessage({
+                error: organizationQuery.error,
+                fallbackMessage: "Could not load organization settings.",
+              })
+            : null
+        }
+        onResetFeedback={() => {
+          setSaveError(null);
+          setShowSaveSuccess(false);
+        }}
+        onSaveChanges={(name) => {
+          setSaveError(null);
+          setShowSaveSuccess(false);
+          void saveMutation.mutateAsync({
+            name: name.trim(),
+          });
+        }}
+        organization={organizationQuery.data}
+        saveErrorMessage={saveError}
+        saveSuccess={showSaveSuccess}
+      />
+    </FormPageFrame>
   );
 }
 

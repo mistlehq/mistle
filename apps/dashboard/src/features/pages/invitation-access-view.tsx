@@ -1,7 +1,6 @@
-import { Button, Card, CardContent } from "@mistle/ui";
+import { Button, Card, CardContent, Notice } from "@mistle/ui";
 
 import { AuthStatusPage } from "../auth/auth-status-page.js";
-import { StatusBox } from "../shared/status-box.js";
 import { formatInvitationRole } from "./invitation-accept-state.js";
 
 type InvitationAccessViewProps = {
@@ -44,9 +43,9 @@ export function InvitationAccessView(props: InvitationAccessViewProps): React.JS
         </CardContent>
       </Card>
       {props.mutationError === null ? null : (
-        <StatusBox title="Something went wrong" tone="destructive">
+        <Notice title="Something went wrong" variant="alert">
           {props.mutationError}
-        </StatusBox>
+        </Notice>
       )}
       <div className="flex flex-col gap-4">
         <Button

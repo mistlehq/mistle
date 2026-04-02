@@ -118,9 +118,10 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       triggerParameterValues: {},
     });
     expect(result.current.formError).toBeNull();
-    expect(result.current.triggerPickerDisabledReason).toBe(
-      "Select a sandbox profile to choose triggers.",
-    );
+    expect(result.current.triggerPickerDisabledState).toEqual({
+      reason: "Select a sandbox profile to choose triggers.",
+      variant: "default",
+    });
   });
 
   it("marks profiles without trigger-capable bindings as unavailable for automations", () => {
@@ -132,8 +133,11 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         bindingErrorMessage: null,
         bindings: [createBinding()],
         directoryData: createDirectoryData(),
-      }).disabledReason,
-    ).toBe("The selected profile has no bindings with automation triggers.");
+      }).disabledState,
+    ).toEqual({
+      reason: "The selected profile has no bindings with automation triggers.",
+      variant: "default",
+    });
   });
 
   it("surfaces binding query failures instead of showing a loading state", () => {
@@ -145,8 +149,11 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         bindingErrorMessage: "Could not load profile bindings.",
         bindings: [],
         directoryData: createDirectoryData(),
-      }).disabledReason,
-    ).toBe("Could not load profile bindings.");
+      }).disabledState,
+    ).toEqual({
+      reason: "Could not load profile bindings.",
+      variant: "alert",
+    });
   });
 
   it("preserves selected triggers when the sandbox profile changes", () => {

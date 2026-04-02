@@ -1,4 +1,4 @@
-import { Button } from "@mistle/ui";
+import { Button, Notice } from "@mistle/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -7,7 +7,6 @@ import { AuthPageShell, AuthPageWidths } from "../auth/auth-page-shell.js";
 import { AuthStatusPage } from "../auth/auth-status-page.js";
 import { EmailStage } from "../auth/email-stage.js";
 import { OtpStage } from "../auth/otp-stage.js";
-import { StatusBox } from "../shared/status-box.js";
 import { SESSION_QUERY_KEY, useSessionQuery } from "../shell/session-query.js";
 import {
   acceptInvitationAndSetActiveOrganization,
@@ -35,7 +34,7 @@ function renderInvitationErrorState(message: string): React.JSX.Element {
       maxWidthClass={AuthPageWidths.LG}
       title="Oops, something went wrong"
     >
-      <StatusBox tone="destructive">{message}</StatusBox>
+      <Notice variant="alert">{message}</Notice>
     </AuthStatusPage>
   );
 }
@@ -237,9 +236,9 @@ export function InvitationAcceptPage(): React.JSX.Element {
           </Button>
         }
       >
-        <StatusBox tone="neutral">
+        <Notice>
           <p className="text-center">You now have access to {pageState.organizationName}.</p>
-        </StatusBox>
+        </Notice>
       </AuthStatusPage>
     );
   }
@@ -247,9 +246,9 @@ export function InvitationAcceptPage(): React.JSX.Element {
   if (pageState.kind === "declined") {
     return (
       <AuthStatusPage align="center" maxWidthClass={AuthPageWidths.XL} title="Invitation declined">
-        <StatusBox tone="neutral">
+        <Notice>
           <p className="text-center">You declined this invitation.</p>
-        </StatusBox>
+        </Notice>
       </AuthStatusPage>
     );
   }

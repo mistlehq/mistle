@@ -46,8 +46,8 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "View" }));
     expect(selectedTargetKey).toBe("github");
-    expect(screen.getByText("Available Integrations")).toBeTruthy();
-    expect(screen.getByText("Connected")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "View" })).toBeTruthy();
   });
 
   it("renders load errors without a retry action", () => {
@@ -93,8 +93,8 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
       />,
     );
 
-    expect(screen.queryByText("Available Integrations")).toBeNull();
-    expect(screen.queryByText("Connected")).toBeNull();
-    expect(screen.getByText("GitHub connection detail")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "View" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Integration detail" })).toBeTruthy();
   });
 });

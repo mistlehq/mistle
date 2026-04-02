@@ -167,7 +167,8 @@ describe("app routing breadcrumb integration", () => {
 
     expect(markup).toContain('href="/sandbox-profiles"');
     expect(markup).toContain("Sandbox Profiles");
-    expect(markup).toContain("sbp_abc");
+    expect(markup).toContain("Edit profile");
+    expect(markup).not.toContain("sbp_abc");
     expect(markup).toContain('data-slot="meta-title">Edit profile');
     expect(markup).toContain("Edit sandbox profile configuration.");
   });
@@ -209,14 +210,26 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain('href="/automations"');
     expect(markup).toContain("Create");
     expect(markup).toContain('data-slot="meta-title">Create automation');
-    expect(markup).toContain("Create a webhook automation.");
+    expect(markup).not.toContain("Create a webhook automation.");
 
     await router.navigate("/automations/aut_123");
     markup = renderToStaticMarkup(<RouterProvider router={router} />);
 
     expect(markup).toContain('href="/automations"');
-    expect(markup).toContain("aut_123");
-    expect(markup).toContain('data-slot="meta-title">Edit automation');
-    expect(markup).toContain("Edit webhook automation configuration.");
+    expect(markup).toContain("Edit automation");
+    expect(markup).not.toContain("aut_123");
+    expect(markup).toContain('data-slot="meta-title"></p>');
+    expect(markup).toContain('data-slot="meta-description"></p>');
+  });
+
+  it("does not render supporting description text for create automation", () => {
+    const router = createMemoryRouter(automationRoutes, {
+      initialEntries: ["/automations/new"],
+    });
+    const markup = renderToStaticMarkup(<RouterProvider router={router} />);
+
+    expect(markup).toContain('data-slot="meta-title">Create automation');
+    expect(markup).toContain('data-slot="meta-description"></p>');
+    expect(markup).not.toContain("Create a webhook automation.");
   });
 });

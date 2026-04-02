@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
@@ -85,15 +85,22 @@ describe("AutomationsPage", () => {
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
   });
 
-  it("renders the result summary even when there is only one page", () => {
+  it("renders the seeded automation without pagination when there is only one page", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
     });
 
-    seedAutomationsList(queryClient, createListResult([createWebhookAutomationListItem()]));
+    seedAutomationsList(
+      queryClient,
+      createListResult([
+        createWebhookAutomationListItem({
+          name: "Single automation",
+        }),
+      ]),
+    );
 
-    const markup = renderToStaticMarkup(
+    render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
           <AutomationsPage />
@@ -101,9 +108,9 @@ describe("AutomationsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(markup).toContain("Showing 1 of 1");
-    expect(markup).not.toContain(">Previous<");
-    expect(markup).not.toContain(">Next<");
+    expect(screen.getByRole("button", { name: "Single automation" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
   });
 
   it("does not render the result summary when the automation query is in error", () => {
@@ -149,7 +156,7 @@ describe("AutomationsPage", () => {
     expect(markup).toContain(">Next<");
   });
 
-  it("updates the result summary when the list is filtered client-side", () => {
+  it("updates the result summary when the list is filtered client-side", async () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
@@ -158,7 +165,9 @@ describe("AutomationsPage", () => {
     seedAutomationsList(
       queryClient,
       createListResult([
-        createWebhookAutomationListItem(),
+        createWebhookAutomationListItem({
+          name: "Alpha automation",
+        }),
         createWebhookAutomationListItem({
           id: "aut_456",
           name: "Backlog sync",
@@ -167,7 +176,7 @@ describe("AutomationsPage", () => {
       ]),
     );
 
-    render(
+    const rendered = render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
           <AutomationsPage />
@@ -175,12 +184,19 @@ describe("AutomationsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Showing 2 of 2")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Alpha automation" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Backlog sync" })).toBeDefined();
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Search automations" }), {
-      target: { value: "Backlog" },
+    fireEvent.change(
+      within(rendered.container).getByRole("textbox", { name: "Search automations" }),
+      {
+        target: { value: "Backlog" },
+      },
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Alpha automation" })).toBeNull();
     });
-
-    expect(screen.getByText("Showing 1 of 2")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Backlog sync" })).toBeDefined();
   });
 });

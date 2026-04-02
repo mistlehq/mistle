@@ -55,7 +55,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const WithErrorStatusBoxes: Story = {
+export const WithErrorNoticees: Story = {
   args: {
     alerts: [
       {
@@ -70,7 +70,7 @@ export const WithErrorStatusBoxes: Story = {
   },
 };
 
-export const WithCliEntryFailureStatusBox: Story = {
+export const WithCliEntryFailureNotice: Story = {
   args: {
     alerts: [
       {
@@ -81,7 +81,7 @@ export const WithCliEntryFailureStatusBox: Story = {
   },
 };
 
-export const WithChatRestoreFailureStatusBox: Story = {
+export const WithChatRestoreFailureNotice: Story = {
   args: {
     alerts: [
       {
@@ -109,7 +109,7 @@ export const WithNonImageCapableModelWarning: Story = {
   },
 };
 
-export const WithUnavailableModelStatusBox: Story = {
+export const WithUnavailableModelNotice: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
       composerViewModel: {
@@ -120,7 +120,7 @@ export const WithUnavailableModelStatusBox: Story = {
   },
 };
 
-export const WithLoadingSelectedModelStatusBox: Story = {
+export const WithLoadingSelectedModelNotice: Story = {
   args: {
     primaryBottomPanel: createStorySessionBottomPanel({
       composerViewModel: {

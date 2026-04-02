@@ -1,4 +1,4 @@
-import { Alert, AlertDescription, AlertTitle } from "@mistle/ui";
+import { Notice } from "@mistle/ui";
 
 type ErrorNoticeProps = {
   message: string | null;
@@ -10,9 +10,8 @@ export function ErrorNotice(props: ErrorNoticeProps): React.JSX.Element | null {
   }
 
   return (
-    <Alert aria-atomic="true" aria-live="assertive" variant="destructive">
-      <AlertTitle>Something went wrong</AlertTitle>
-      <AlertDescription>{props.message}</AlertDescription>
-    </Alert>
+    <Notice aria-atomic="true" title="Something went wrong" variant="alert">
+      {props.message}
+    </Notice>
   );
 }

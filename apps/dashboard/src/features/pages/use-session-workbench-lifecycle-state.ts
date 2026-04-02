@@ -857,10 +857,8 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxStatusQuery.refetch,
   ]);
 
-  const sandboxStatusLabel =
-    effectiveSandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
   const sandboxHeaderStatusUi = resolveSandboxHeaderStatusUi({
-    sandboxLifecycleStatus: sandboxStatusLabel.toLowerCase(),
+    sandboxLifecycleStatus: effectiveSandboxStatus,
   });
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({

@@ -47,6 +47,17 @@ describe("createEgressGrantByRuleId", () => {
           defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
           internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+          publish: {
+            baseDomain: "mistle.example.test",
+            access: {
+              tokenSecret: "integration-publish-token-secret",
+              tokenIssuer: "integration-control-plane-api",
+              tokenAudience: "integration-data-plane-gateway",
+            },
+            session: {
+              cookieSigningSecret: "integration-publish-cookie-secret",
+            },
+          },
           connect: {
             tokenSecret: "integration-connect-secret",
             tokenIssuer: "integration-control-plane-api",

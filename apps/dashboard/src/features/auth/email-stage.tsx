@@ -1,6 +1,6 @@
+import { Notice } from "@mistle/ui";
 import type React from "react";
 
-import { StatusBox } from "../shared/status-box.js";
 import { EmailStepForm } from "./email-step-form.js";
 
 type EmailStageProps = {
@@ -21,9 +21,7 @@ export function EmailStage(props: EmailStageProps): React.JSX.Element {
   return (
     <div className="gap-4 pt-1 flex flex-col">
       {props.beforeForm === undefined ? null : props.beforeForm}
-      {props.authError === null ? null : (
-        <StatusBox tone="destructive">{props.authError}</StatusBox>
-      )}
+      {props.authError === null ? null : <Notice variant="alert">{props.authError}</Notice>}
       <EmailStepForm
         email={props.email}
         isSendingOtp={props.isSendingOtp}
@@ -34,9 +32,7 @@ export function EmailStage(props: EmailStageProps): React.JSX.Element {
         {...(props.submitLabel === undefined ? {} : { submitLabel: props.submitLabel })}
       />
       {props.afterForm === undefined ? null : props.afterForm}
-      {props.footerError === null ? null : (
-        <StatusBox tone="destructive">{props.footerError}</StatusBox>
-      )}
+      {props.footerError === null ? null : <Notice variant="alert">{props.footerError}</Notice>}
     </div>
   );
 }

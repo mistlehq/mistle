@@ -14,20 +14,26 @@ const SidebarWidthStyle: React.CSSProperties & Record<`--${string}`, string> = {
   "--sidebar-width": DASHBOARD_SIDEBAR_WIDTH,
 };
 
-type AppShellViewProps = {
+export interface AppShellViewProps {
   sidebarHeaderClassName?: string;
   sidebarHeaderContent: React.ReactNode;
   sidebarContent: React.ReactNode;
   sidebarFooterContent: React.ReactNode;
   breadcrumbs: React.ReactNode | null;
+  contentInsetOwner: "app-shell" | "child";
   headerActions: React.ReactNode | null;
   mainContent: React.ReactNode;
   topLoadingBar: React.ReactNode;
-  isSessionDetail: boolean;
+  viewportMode: "document" | "workspace";
   showBreadcrumbs: boolean;
-};
+}
 
 export function AppShellView(input: AppShellViewProps): React.JSX.Element {
+  const contentContainerClassName = resolveContentContainerClassName({
+    contentInsetOwner: input.contentInsetOwner,
+    viewportMode: input.viewportMode,
+  });
+
   return (
     <SidebarProvider style={SidebarWidthStyle}>
       <Sidebar>
@@ -41,7 +47,7 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
 
       <SidebarInset
         className={
-          input.isSessionDetail
+          input.viewportMode === "workspace"
             ? "from-background to-muted/20 h-svh overflow-hidden bg-linear-to-b"
             : "from-background to-muted/20 min-h-svh bg-linear-to-b"
         }
@@ -58,16 +64,25 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
             <div className="ml-4 shrink-0">{input.headerActions}</div>
           )}
         </header>
-        <div
-          className={
-            input.isSessionDetail
-              ? "min-w-0 flex min-h-0 flex-1 flex-col overflow-hidden"
-              : "min-w-0 flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-6"
-          }
-        >
+        <div className={contentContainerClassName}>
           <div className="min-w-0 min-h-0 flex-1">{input.mainContent}</div>
         </div>
       </SidebarInset>
     </SidebarProvider>
   );
+}
+
+function resolveContentContainerClassName(input: {
+  contentInsetOwner: AppShellViewProps["contentInsetOwner"];
+  viewportMode: AppShellViewProps["viewportMode"];
+}): string {
+  if (input.viewportMode === "workspace") {
+    return "min-w-0 flex min-h-0 flex-1 flex-col overflow-hidden";
+  }
+
+  if (input.contentInsetOwner === "child") {
+    return "min-w-0 flex min-h-0 flex-1 flex-col overflow-hidden";
+  }
+
+  return "min-w-0 flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-6";
 }

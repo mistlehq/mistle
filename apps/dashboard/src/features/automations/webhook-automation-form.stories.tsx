@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
-import { FormPageShell } from "../shared/form-page.js";
+import { FormPageFrame } from "../shared/page-frame.js";
 import {
   WebhookAutomationForm,
   type WebhookAutomationEventOption,
@@ -14,6 +14,7 @@ import {
 } from "./webhook-automation-form.js";
 import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
+import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
 
 const GitHubConnectionId = "conn_github_prod";
 const StripeConnectionId = "conn_stripe_prod";
@@ -428,7 +429,7 @@ function StoryHarness(input: {
   isSaving?: boolean;
   isDeleting?: boolean;
   onDelete?: (() => void) | null;
-  triggerPickerDisabledReason?: string | null;
+  triggerPickerDisabledState?: WebhookAutomationTriggerPickerDisabledState | null;
   connectionOptions?: readonly WebhookAutomationFormOption[];
   sandboxProfileOptions?: readonly WebhookAutomationFormOption[];
   webhookEventOptions?: readonly WebhookAutomationEventOption[];
@@ -455,7 +456,7 @@ function StoryHarness(input: {
           }));
         }}
         sandboxProfileOptions={input.sandboxProfileOptions ?? SandboxProfileOptions}
-        triggerPickerDisabledReason={input.triggerPickerDisabledReason ?? null}
+        triggerPickerDisabledState={input.triggerPickerDisabledState ?? null}
         webhookEventOptions={input.webhookEventOptions ?? GitHubWebhookEventOptions}
         values={values}
       />
@@ -479,14 +480,17 @@ type Story = StoryObj<typeof meta>;
 export const CreatePageLayout: Story = {
   args: {
     mode: "create",
-    triggerPickerDisabledReason: "Select a sandbox profile to choose triggers.",
+    triggerPickerDisabledState: {
+      reason: "Select a sandbox profile to choose triggers.",
+      variant: "default",
+    },
     values: EmptyCreateValues,
   },
   render: function RenderStory(args): React.JSX.Element {
     return (
-      <FormPageShell>
+      <FormPageFrame title="Create automation">
         <StoryHarness {...args} />
-      </FormPageShell>
+      </FormPageFrame>
     );
   },
 };
@@ -499,9 +503,9 @@ export const EditPageLayout: Story = {
   },
   render: function RenderStory(args): React.JSX.Element {
     return (
-      <FormPageShell>
+      <FormPageFrame title="">
         <StoryHarness {...args} />
-      </FormPageShell>
+      </FormPageFrame>
     );
   },
 };
@@ -545,7 +549,10 @@ export const Saving: Story = {
 export const NoTriggersAvailable: Story = {
   args: {
     mode: "create",
-    triggerPickerDisabledReason: "The selected profile has no bindings with automation triggers.",
+    triggerPickerDisabledState: {
+      reason: "The selected profile has no bindings with automation triggers.",
+      variant: "default",
+    },
     values: {
       ...EmptyCreateValues,
       sandboxProfileId: "sbp_repo_maintainer",
@@ -557,7 +564,10 @@ export const NoTriggersAvailable: Story = {
 export const LoadingProfileBindings: Story = {
   args: {
     mode: "create",
-    triggerPickerDisabledReason: "Loading profile bindings...",
+    triggerPickerDisabledState: {
+      reason: "Loading profile bindings...",
+      variant: "default",
+    },
     values: {
       ...EmptyCreateValues,
       sandboxProfileId: "sbp_repo_maintainer",
@@ -570,7 +580,10 @@ export const ProfileBindingsLoadFailure: Story = {
   args: {
     mode: "edit",
     onDelete: function onDelete() {},
-    triggerPickerDisabledReason: "Could not load profile bindings.",
+    triggerPickerDisabledState: {
+      reason: "Could not load profile bindings.",
+      variant: "alert",
+    },
     values: ExistingAutomationValues,
   },
 };

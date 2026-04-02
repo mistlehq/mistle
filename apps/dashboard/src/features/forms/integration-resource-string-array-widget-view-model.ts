@@ -21,7 +21,7 @@ export type IntegrationResourceWidgetViewModel = {
 };
 
 export type IntegrationResourceWidgetMessageSection = {
-  tone: "default" | "destructive";
+  variant: "default" | "alert";
   message: string;
   detail?: string | undefined;
   items?: readonly string[] | undefined;
@@ -144,7 +144,7 @@ export function buildIntegrationResourceWidgetViewModel(input: {
 
   if (input.refreshErrorMessage !== null) {
     messageSections.push({
-      tone: "destructive",
+      variant: "alert",
       message: "Refresh failed.",
       detail: "Please try again.",
     });
@@ -152,7 +152,7 @@ export function buildIntegrationResourceWidgetViewModel(input: {
 
   if (input.unavailableSelectedHandlesCount > 0 && input.unavailableSelectedHandles) {
     messageSections.push({
-      tone: "destructive",
+      variant: "alert",
       message: "The selected resources are no longer available:",
       items: input.unavailableSelectedHandles,
     });
@@ -160,13 +160,13 @@ export function buildIntegrationResourceWidgetViewModel(input: {
 
   if (syncFailureState.message !== null) {
     messageSections.push({
-      tone: "destructive",
+      variant: "alert",
       message: syncFailureState.message,
       ...(syncFailureState.detail === null ? {} : { detail: syncFailureState.detail }),
     });
   } else if (!hasVisibleItems && input.listState.mode !== "loading") {
     messageSections.push({
-      tone: "default",
+      variant: "default",
       message: emptyMessage,
     });
   }

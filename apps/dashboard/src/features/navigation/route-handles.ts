@@ -138,19 +138,14 @@ function resolveSandboxProfileDetailBreadcrumb(input: RouteTextResolverInput): s
 
   const profileId = input.params["profileId"];
   if (profileId === undefined || profileId.trim().length === 0) {
-    return "Profile";
+    return "Edit profile";
   }
 
-  return profileId;
+  return "Edit profile";
 }
 
-function resolveAutomationDetailBreadcrumb(input: RouteTextResolverInput): string {
-  const automationId = input.params["automationId"];
-  if (automationId === undefined || automationId.trim().length === 0) {
-    return "Automation";
-  }
-
-  return automationId;
+function resolveAutomationDetailBreadcrumb(_input: RouteTextResolverInput): string {
+  return "Edit automation";
 }
 
 export const ROUTE_HANDLES = {
@@ -180,11 +175,13 @@ export const ROUTE_HANDLES = {
     description: "Manage sandbox profile configuration.",
   },
   sandboxProfilesNew: {
+    appShellInsetOwner: "child",
     breadcrumb: "Create",
     title: "Create",
     description: "Create a sandbox profile.",
   },
   sandboxProfilesDetail: {
+    appShellInsetOwner: "child",
     breadcrumb: resolveSandboxProfileDetailBreadcrumb,
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
@@ -195,14 +192,16 @@ export const ROUTE_HANDLES = {
     description: "Manage webhook automations.",
   },
   automationsNew: {
+    appShellInsetOwner: "child",
     breadcrumb: "Create",
     title: "Create automation",
-    description: "Create a webhook automation.",
+    description: "",
   },
   automationsDetail: {
+    appShellInsetOwner: "child",
     breadcrumb: resolveAutomationDetailBreadcrumb,
-    title: "Edit automation",
-    description: "Edit webhook automation configuration.",
+    title: "",
+    description: "",
   },
   settings: {
     breadcrumb: "Settings",
@@ -223,7 +222,6 @@ export const ROUTE_HANDLES = {
     breadcrumb: "Profile",
     title: "Profile",
     description: "",
-    settingsLayoutVariant: "form",
   },
   settingsOrganization: {
     breadcrumb: "Organization",
@@ -233,7 +231,6 @@ export const ROUTE_HANDLES = {
     breadcrumb: "General",
     title: "General",
     description: "",
-    settingsLayoutVariant: "form",
   },
   settingsOrganizationMembers: {
     breadcrumb: "Members",

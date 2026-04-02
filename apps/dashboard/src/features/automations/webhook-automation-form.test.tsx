@@ -19,6 +19,7 @@ import {
   GitHubConnectionLabel,
   RepoMaintainerSandboxProfileId,
 } from "./webhook-automation-test-fixtures.js";
+import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
 
 const ConnectionOptions: readonly WebhookAutomationFormOption[] = [
   {
@@ -96,7 +97,7 @@ describe("WebhookAutomationForm", () => {
   function renderFormWithOptions(input: {
     mode?: "create" | "edit";
     values?: WebhookAutomationFormValues;
-    triggerPickerDisabledReason?: string | null;
+    triggerPickerDisabledState?: WebhookAutomationTriggerPickerDisabledState | null;
     webhookEventOptions?: typeof WebhookEventOptions;
     onValueChange?: (
       key: keyof WebhookAutomationFormValues,
@@ -117,7 +118,7 @@ describe("WebhookAutomationForm", () => {
           onSubmit={() => {}}
           onValueChange={input.onValueChange ?? (() => {})}
           sandboxProfileOptions={SandboxProfileOptions}
-          triggerPickerDisabledReason={input.triggerPickerDisabledReason ?? null}
+          triggerPickerDisabledState={input.triggerPickerDisabledState ?? null}
           webhookEventOptions={input.webhookEventOptions ?? WebhookEventOptions}
           values={input.values ?? FormValues}
         />
@@ -153,9 +154,19 @@ describe("WebhookAutomationForm", () => {
   });
 
   it("shows connector-defined conversation grouping choices", () => {
-    renderForm("create");
+    const { container } = renderForm("create");
 
-    expect(screen.getAllByText("Group events by").length).toBeGreaterThan(0);
+    const groupingFieldCandidate = within(container)
+      .getAllByText("Group events by")[0]
+      ?.closest('[role="group"]');
+    if (groupingFieldCandidate === null) {
+      throw new Error("Expected conversation grouping field.");
+    }
+    if (!(groupingFieldCandidate instanceof HTMLElement)) {
+      throw new Error("Expected conversation grouping field.");
+    }
+
+    expect(within(groupingFieldCandidate).getByRole("combobox")).toBeDefined();
   });
 
   it("hides conversation grouping when no triggers are selected", () => {
@@ -167,7 +178,7 @@ describe("WebhookAutomationForm", () => {
       }),
     });
 
-    expect(container.textContent?.includes("Group events by")).toBe(false);
+    expect(within(container).queryByText("Group events by")).toBeNull();
   });
 
   it("does not inject an unsupported current conversation grouping option", () => {
@@ -193,7 +204,6 @@ describe("WebhookAutomationForm", () => {
     ).toBeGreaterThan(0);
     expect(currentForm.getAllByText("{{webhookEvent.eventType}}").length).toBeGreaterThan(0);
     expect(currentForm.getAllByText("{{payload}}").length).toBeGreaterThan(0);
-    expect(currentForm.queryByText("Basics")).toBeNull();
     expect(currentForm.queryByRole("heading", { name: "Agent Instructions" })).toBeNull();
   });
 
@@ -254,7 +264,7 @@ describe("WebhookAutomationForm", () => {
     expect(nextInputTemplate).toBe(DefaultWebhookAutomationInputTemplate);
   });
 
-  it("renders a fixed create title and a separate automation name field", () => {
+  it("renders the automation name field without an inline edit-name control on create", () => {
     const { container } = renderFormWithOptions({
       mode: "create",
       values: buildFormValues({
@@ -263,8 +273,7 @@ describe("WebhookAutomationForm", () => {
     });
     const form = within(container);
 
-    expect(form.getAllByRole("heading", { name: "Create Automation" }).length).toBeGreaterThan(0);
-    expect(form.getByText("Automation name")).toBeDefined();
+    expect(form.getByLabelText("Automation name")).toBeDefined();
     expect(form.queryByDisplayValue("Your automation")).toBeNull();
     expect(form.queryByRole("button", { name: "Edit automation name" })).toBeNull();
   });
@@ -272,7 +281,10 @@ describe("WebhookAutomationForm", () => {
   it("shows the selected-profile trigger binding message when triggers are unavailable", () => {
     renderFormWithOptions({
       mode: "create",
-      triggerPickerDisabledReason: "The selected profile has no bindings with automation triggers.",
+      triggerPickerDisabledState: {
+        reason: "The selected profile has no bindings with automation triggers.",
+        variant: "default",
+      },
       webhookEventOptions: [],
       values: buildFormValues({
         triggerIds: [],
@@ -305,7 +317,7 @@ describe("WebhookAutomationForm", () => {
           onSubmit={() => {}}
           onValueChange={() => {}}
           sandboxProfileOptions={SandboxProfileOptions}
-          triggerPickerDisabledReason={null}
+          triggerPickerDisabledState={null}
           webhookEventOptions={WebhookEventOptions}
           values={FormValues}
         />
@@ -344,7 +356,7 @@ describe("WebhookAutomationForm", () => {
           onSubmit={() => {}}
           onValueChange={() => {}}
           sandboxProfileOptions={SandboxProfileOptions}
-          triggerPickerDisabledReason={null}
+          triggerPickerDisabledState={null}
           webhookEventOptions={WebhookEventOptions}
           values={{
             ...FormValues,
@@ -380,7 +392,7 @@ describe("WebhookAutomationForm", () => {
           onSubmit={() => {}}
           onValueChange={() => {}}
           sandboxProfileOptions={SandboxProfileOptions}
-          triggerPickerDisabledReason={null}
+          triggerPickerDisabledState={null}
           webhookEventOptions={WebhookEventOptions}
           values={FormValues}
         />

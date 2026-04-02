@@ -14,9 +14,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Notice,
 } from "@mistle/ui";
 
-import { StatusBox } from "../../shared/status-box.js";
 import { MemberInviteChipInput } from "./member-invite-chip-input.js";
 import { MemberInviteResultsView } from "./member-invite-results-view.js";
 import type { InviteMemberResponse, OrganizationRole } from "./members-api.js";
@@ -152,15 +152,15 @@ function OpenMemberInviteDialog(input: {
         )}
 
         {!input.canExecute ? (
-          <StatusBox title="Invites are disabled" tone="destructive">
+          <Notice title="Invites are disabled" variant="alert">
             You do not have permission to invite members in this organization.
-          </StatusBox>
+          </Notice>
         ) : null}
 
         {form.dialogError ? (
-          <StatusBox title="Request failed" tone="destructive">
+          <Notice title="Request failed" variant="alert">
             {form.dialogError}
-          </StatusBox>
+          </Notice>
         ) : null}
 
         <DialogFooter>

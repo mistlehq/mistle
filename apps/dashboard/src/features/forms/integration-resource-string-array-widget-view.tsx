@@ -1,9 +1,8 @@
-import { Button, Input, ScrollArea } from "@mistle/ui";
+import { Button, Input, ScrollArea, Notice } from "@mistle/ui";
 import { ArrowClockwiseIcon } from "@phosphor-icons/react";
 import { useCallback } from "react";
 
 import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
-import { StatusBox } from "../shared/status-box.js";
 import {
   buildIntegrationResourceWidgetViewModel,
   type IntegrationResourceListViewState,
@@ -33,20 +32,17 @@ export type IntegrationResourceStringArrayWidgetViewProps = {
 
 function IntegrationResourceMessageSection(input: {
   message: string;
-  tone: "default" | "destructive";
+  variant: "default" | "alert";
   detail?: string | undefined;
   children?: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <StatusBox
-      tone={input.tone === "destructive" ? "destructive" : "neutral"}
-      title={input.message}
-    >
+    <Notice title={input.message} variant={input.variant}>
       <div className="flex flex-col gap-1">
         {input.detail === undefined ? null : <p>{input.detail}</p>}
         {input.children}
       </div>
-    </StatusBox>
+    </Notice>
   );
 }
 
@@ -149,9 +145,9 @@ export function IntegrationResourceStringArrayWidgetView(
           {viewModel.messageSections.map((section) => (
             <IntegrationResourceMessageSection
               detail={section.detail}
-              key={`${section.tone}:${section.message}`}
+              key={`${section.variant}:${section.message}`}
               message={section.message}
-              tone={section.tone}
+              variant={section.variant}
             >
               {section.items === undefined ? null : (
                 <ul className="list-disc pl-5">

@@ -1,4 +1,4 @@
-import { Alert, AlertDescription, AlertTitle, Button } from "@mistle/ui";
+import { Button, Notice } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router";
 
@@ -13,7 +13,9 @@ import { toWebhookAutomationFormValues } from "../automations/webhook-automation
 import { WebhookAutomationForm } from "../automations/webhook-automation-form.js";
 import { webhookAutomationDetailQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { getWebhookAutomation } from "../automations/webhook-automations-service.js";
-import { FormPageSection, FormPageShell } from "../shared/form-page.js";
+import { useAppPageMeta } from "../navigation/route-meta.js";
+import { FormPageSection } from "../shared/form-page.js";
+import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 
 type WebhookAutomationEditorPageProps = {
   mode: "create" | "edit";
@@ -22,10 +24,17 @@ type WebhookAutomationEditorPageProps = {
 export function WebhookAutomationEditorPage(
   input: WebhookAutomationEditorPageProps,
 ): React.JSX.Element {
+  const pageMeta = useAppPageMeta();
   const navigate = useNavigate();
   const params = useParams();
+  const fallbackTitle = input.mode === "create" ? "Create automation" : "Edit automation";
+  const { title, description } = resolvePageFrameText(pageMeta, fallbackTitle);
   if (input.mode === "create") {
-    return <CreateWebhookAutomationEditor navigate={navigate} />;
+    return (
+      <FormPageFrame description={description} title={title}>
+        <CreateWebhookAutomationEditor navigate={navigate} />
+      </FormPageFrame>
+    );
   }
 
   const automationId = params["automationId"];
@@ -33,7 +42,11 @@ export function WebhookAutomationEditorPage(
     throw new Error("Automation id is required.");
   }
 
-  return <EditWebhookAutomationEditor automationId={automationId} navigate={navigate} />;
+  return (
+    <FormPageFrame description={description} title={title}>
+      <EditWebhookAutomationEditor automationId={automationId} navigate={navigate} />
+    </FormPageFrame>
+  );
 }
 
 function renderWebhookAutomationEditorError(input: {
@@ -42,13 +55,12 @@ function renderWebhookAutomationEditorError(input: {
   onBack: () => void;
 }): React.JSX.Element {
   return (
-    <FormPageShell className="-my-6">
+    <>
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
-          <Alert variant="destructive">
-            <AlertTitle>{input.title}</AlertTitle>
-            <AlertDescription>{input.description}</AlertDescription>
-          </Alert>
+          <Notice title={input.title} variant="alert">
+            {input.description}
+          </Notice>
           <div>
             <Button onClick={input.onBack} type="button" variant="outline">
               Back to automations
@@ -56,17 +68,17 @@ function renderWebhookAutomationEditorError(input: {
           </div>
         </div>
       </FormPageSection>
-    </FormPageShell>
+    </>
   );
 }
 
 function renderWebhookAutomationEditorLoading(): React.JSX.Element {
   return (
-    <FormPageShell className="-my-6">
+    <>
       <FormPageSection>
         <div className="p-4">Loading automation…</div>
       </FormPageSection>
-    </FormPageShell>
+    </>
   );
 }
 
@@ -197,7 +209,7 @@ function LoadedWebhookAutomationEditor(input: {
   const state = useLoadedWebhookAutomationEditorState(input);
 
   return (
-    <FormPageShell className="-my-6">
+    <>
       <WebhookAutomationForm
         connectionOptions={state.connectionOptions}
         fieldErrors={state.fieldErrors}
@@ -210,7 +222,7 @@ function LoadedWebhookAutomationEditor(input: {
         onSubmit={state.onSubmit}
         onValueChange={state.onValueChange}
         sandboxProfileOptions={state.sandboxProfileOptions}
-        triggerPickerDisabledReason={state.triggerPickerDisabledReason}
+        triggerPickerDisabledState={state.triggerPickerDisabledState}
         webhookEventOptions={state.webhookEventOptions}
         values={state.values}
       />
@@ -225,6 +237,6 @@ function LoadedWebhookAutomationEditor(input: {
           onOpenChange={state.onDeleteDialogOpenChange}
         />
       ) : null}
-    </FormPageShell>
+    </>
   );
 }

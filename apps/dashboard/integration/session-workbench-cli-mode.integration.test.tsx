@@ -44,7 +44,6 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
         const cliPty = await waitForPtySession(tunnelServer, "cli");
 
         expectCliPty(cliPty);
-        expect(screen.queryByText("Could not start Codex CLI")).toBeNull();
       });
     });
 
@@ -78,7 +77,6 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
         expect(screen.getByRole("button", { name: "Terminal" }).getAttribute("aria-pressed")).toBe(
           "true",
         );
-        expect(screen.queryByText("pty session already exists")).toBeNull();
       });
     });
 

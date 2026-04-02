@@ -45,6 +45,17 @@ describe("parseConfigRecord", () => {
             tokenIssuer: "data-plane-worker",
             tokenAudience: "tokenizer-proxy",
           },
+          publish: {
+            baseDomain: "mistle.example.test",
+            access: {
+              tokenSecret: "test-publish-token-secret",
+              tokenIssuer: "control-plane-api",
+              tokenAudience: "data-plane-gateway",
+            },
+            session: {
+              cookieSigningSecret: "test-publish-cookie-secret",
+            },
+          },
         },
       },
       apps: {
@@ -229,6 +240,17 @@ describe("parseConfigRecord", () => {
             tokenIssuer: "data-plane-worker",
             tokenAudience: "tokenizer-proxy",
           },
+          publish: {
+            baseDomain: "mistle.example.test",
+            access: {
+              tokenSecret: "test-publish-token-secret",
+              tokenIssuer: "control-plane-api",
+              tokenAudience: "data-plane-gateway",
+            },
+            session: {
+              cookieSigningSecret: "test-publish-cookie-secret",
+            },
+          },
         },
       },
       apps: {
@@ -412,6 +434,17 @@ describe("parseConfigRecord", () => {
             tokenSecret: "test-egress-token-secret",
             tokenIssuer: "data-plane-worker",
             tokenAudience: "tokenizer-proxy",
+          },
+          publish: {
+            baseDomain: "mistle.example.test",
+            access: {
+              tokenSecret: "test-publish-token-secret",
+              tokenIssuer: "control-plane-api",
+              tokenAudience: "data-plane-gateway",
+            },
+            session: {
+              cookieSigningSecret: "test-publish-cookie-secret",
+            },
           },
         },
       },

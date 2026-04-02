@@ -1,6 +1,4 @@
-import { Button, Field, FieldContent, Input } from "@mistle/ui";
-
-import { StatusBox } from "../shared/status-box.js";
+import { Button, Field, FieldContent, Input, Notice } from "@mistle/ui";
 
 type NoOrganizationAccessViewContentProps = {
   organizationName: string;
@@ -19,11 +17,11 @@ export function NoOrganizationAccessViewContent(
   return (
     <>
       {props.organizationNameError === null ? null : (
-        <StatusBox tone="destructive">{props.organizationNameError}</StatusBox>
+        <Notice variant="alert">{props.organizationNameError}</Notice>
       )}
 
       {props.createOrganizationError === null ? null : (
-        <StatusBox tone="destructive">{props.createOrganizationError}</StatusBox>
+        <Notice variant="alert">{props.createOrganizationError}</Notice>
       )}
 
       <form className="flex flex-col gap-4" onSubmit={props.onCreateOrganization}>

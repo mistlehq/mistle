@@ -1,6 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle, Skeleton } from "@mistle/ui";
-
-import { StatusBox } from "../../shared/status-box.js";
+import { Card, CardContent, CardHeader, CardTitle, Skeleton, Notice } from "@mistle/ui";
 
 export function MembersLoadingState(): React.JSX.Element {
   return (
@@ -41,7 +39,7 @@ export function MembersLoadErrorState(input: { message: string }): React.JSX.Ele
         <CardTitle>Members</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <StatusBox tone="destructive">{input.message} Please try again later.</StatusBox>
+        <Notice variant="alert">{input.message} Please try again later.</Notice>
       </CardContent>
     </Card>
   );

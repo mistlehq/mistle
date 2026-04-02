@@ -1,7 +1,4 @@
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   Button,
   Card,
   CardContent,
@@ -9,14 +6,17 @@ import {
   FieldContent,
   FieldLabel,
   Input,
+  Notice,
   Skeleton,
 } from "@mistle/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { SyntheticEvent } from "react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import type { IntegrationFormContext } from "../forms/integration-form-context.js";
+import { useAppPageMeta } from "../navigation/route-meta.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
   sandboxProfileDetailQueryKey,
@@ -25,6 +25,7 @@ import {
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { EditableHeading } from "../shared/editable-heading.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import {
   createDefaultBindingConfig,
   resolveBindingKindFromTarget,
@@ -273,34 +274,27 @@ export function IntegrationsEditorSection(
   return (
     <div className="gap-4 flex flex-col">
       {props.integrationBindingsQuery.isError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Could not load integration bindings</AlertTitle>
-          <AlertDescription>
-            {resolveApiErrorMessage({
-              error: props.integrationBindingsQuery.error,
-              fallbackMessage: "Could not load sandbox profile integration bindings.",
-            })}
-          </AlertDescription>
-        </Alert>
+        <Notice title="Could not load integration bindings" variant="alert">
+          {resolveApiErrorMessage({
+            error: props.integrationBindingsQuery.error,
+            fallbackMessage: "Could not load sandbox profile integration bindings.",
+          })}
+        </Notice>
       ) : null}
 
       {props.integrationDirectoryQuery.isError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Could not load integration connections</AlertTitle>
-          <AlertDescription>
-            {resolveApiErrorMessage({
-              error: props.integrationDirectoryQuery.error,
-              fallbackMessage: "Could not load integration connections.",
-            })}
-          </AlertDescription>
-        </Alert>
+        <Notice title="Could not load integration connections" variant="alert">
+          {resolveApiErrorMessage({
+            error: props.integrationDirectoryQuery.error,
+            fallbackMessage: "Could not load integration connections.",
+          })}
+        </Notice>
       ) : null}
 
       {props.integrationSaveError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Save failed</AlertTitle>
-          <AlertDescription>{props.integrationSaveError}</AlertDescription>
-        </Alert>
+        <Notice title="Save failed" variant="alert">
+          {props.integrationSaveError}
+        </Notice>
       ) : null}
 
       {BindingSectionKinds.map((kind) => (
@@ -349,8 +343,10 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
 }
 
 function CreateSandboxProfileEditorPage(): React.JSX.Element {
+  const pageMeta = useAppPageMeta();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { title, description } = resolvePageFrameText(pageMeta, "Create");
   const metaState = useCreateSandboxProfileMetaState({
     navigate,
     invalidateSandboxProfiles: async () => {
@@ -360,56 +356,60 @@ function CreateSandboxProfileEditorPage(): React.JSX.Element {
     },
   });
 
+  function handleCreateProfileSubmit(event: SyntheticEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    metaState.onCreate();
+  }
+
   return (
-    <div className="gap-4 flex flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">{metaState.pageTitle}</h1>
+    <PageFrame description={description} title={title}>
+      <div className="gap-4 flex flex-col">
+        {metaState.saveError ? (
+          <Notice title="Create failed" variant="alert">
+            {metaState.saveError}
+          </Notice>
+        ) : null}
+
+        <Card>
+          <CardContent className="pt-4">
+            <form className="gap-4 flex flex-col" onSubmit={handleCreateProfileSubmit}>
+              <Field>
+                <FieldLabel htmlFor="sandbox-profile-display-name">
+                  <span className="inline-flex items-center gap-0.5">
+                    Profile Name
+                    <span aria-hidden="true" className="text-destructive">
+                      *
+                    </span>
+                  </span>
+                </FieldLabel>
+                <FieldContent>
+                  <Input
+                    className="w-full max-w-2xl"
+                    id="sandbox-profile-display-name"
+                    onChange={(event) => {
+                      metaState.onDisplayNameChange(event.currentTarget.value);
+                    }}
+                    value={metaState.formState.displayName}
+                  />
+                </FieldContent>
+              </Field>
+
+              <div className="gap-2 flex">
+                <Button
+                  disabled={metaState.isDisplayNameInvalid || metaState.isCreating}
+                  type="submit"
+                >
+                  {metaState.isCreating ? "Creating..." : "Create profile"}
+                </Button>
+                <Button onClick={metaState.onCancelCreate} type="button" variant="outline">
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
-      {metaState.saveError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Create failed</AlertTitle>
-          <AlertDescription>{metaState.saveError}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <Card>
-        <CardContent className="gap-4 flex flex-col pt-4">
-          <Field>
-            <FieldLabel htmlFor="sandbox-profile-display-name">
-              <span className="inline-flex items-center gap-0.5">
-                Profile Name
-                <span aria-hidden="true" className="text-destructive">
-                  *
-                </span>
-              </span>
-            </FieldLabel>
-            <FieldContent>
-              <Input
-                className="w-full max-w-2xl"
-                id="sandbox-profile-display-name"
-                onChange={(event) => {
-                  metaState.onDisplayNameChange(event.currentTarget.value);
-                }}
-                value={metaState.formState.displayName}
-              />
-            </FieldContent>
-          </Field>
-
-          <div className="gap-2 flex">
-            <Button
-              disabled={metaState.isDisplayNameInvalid || metaState.isCreating}
-              onClick={metaState.onCreate}
-              type="button"
-            >
-              {metaState.isCreating ? "Creating..." : "Create profile"}
-            </Button>
-            <Button onClick={metaState.onCancelCreate} type="button" variant="outline">
-              Cancel
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    </PageFrame>
   );
 }
 
@@ -431,20 +431,22 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
 
   if (profileQuery.isPending) {
     return (
-      <div className="gap-4 flex flex-col">
-        <h1 className="text-xl font-semibold">{profileId}</h1>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="gap-3 flex flex-col">
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-48" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <PageFrame title="">
+        <div className="gap-4 flex flex-col">
+          <h1 className="text-xl font-semibold">Edit profile</h1>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="gap-3 flex flex-col">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-48" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </PageFrame>
     );
   }
 
@@ -453,64 +455,66 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
       profileQuery.error instanceof SandboxProfilesApiError && profileQuery.error.status === 404;
 
     return (
-      <div className="gap-4 flex flex-col">
-        <h1 className="text-xl font-semibold">{profileId}</h1>
-        <Card>
-          <CardContent className="gap-3 flex flex-col pt-4">
-            <Alert variant="destructive">
-              <AlertTitle>
-                {isNotFoundError ? "Sandbox profile not found" : "Could not load profile"}
-              </AlertTitle>
-              <AlertDescription>
+      <PageFrame title="">
+        <div className="gap-4 flex flex-col">
+          <h1 className="text-xl font-semibold">Edit profile</h1>
+          <Card>
+            <CardContent className="gap-3 flex flex-col pt-4">
+              <Notice
+                title={isNotFoundError ? "Sandbox profile not found" : "Could not load profile"}
+                variant="alert"
+              >
                 {resolveApiErrorMessage({
                   error: profileQuery.error,
                   fallbackMessage: isNotFoundError
                     ? "The sandbox profile was not found."
                     : "Could not load sandbox profile.",
                 })}
-              </AlertDescription>
-            </Alert>
-            <div>
-              <Button
-                onClick={() => {
-                  void navigate("/sandbox-profiles");
-                }}
-                type="button"
-                variant="outline"
-              >
-                Back to profiles
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              </Notice>
+              <div>
+                <Button
+                  onClick={() => {
+                    void navigate("/sandbox-profiles");
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  Back to profiles
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </PageFrame>
     );
   }
 
   return (
-    <LoadedSandboxProfileEditorPage
-      navigate={navigate}
-      profileId={profileId}
-      profile={profileQuery.data}
-      invalidateSandboxProfiles={async () => {
-        await queryClient.invalidateQueries({
-          queryKey: ["sandbox-profiles"],
-        });
-      }}
-      invalidateProfileDetail={async (invalidateProfileId) => {
-        await queryClient.invalidateQueries({
-          queryKey: sandboxProfileDetailQueryKey(invalidateProfileId),
-        });
-      }}
-      invalidateVersionBindings={async ({ profileId: invalidateProfileId, version }) => {
-        await queryClient.invalidateQueries({
-          queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
-            profileId: invalidateProfileId,
-            version,
-          }),
-        });
-      }}
-    />
+    <PageFrame title="">
+      <LoadedSandboxProfileEditorPage
+        navigate={navigate}
+        profileId={profileId}
+        profile={profileQuery.data}
+        invalidateSandboxProfiles={async () => {
+          await queryClient.invalidateQueries({
+            queryKey: ["sandbox-profiles"],
+          });
+        }}
+        invalidateProfileDetail={async (invalidateProfileId) => {
+          await queryClient.invalidateQueries({
+            queryKey: sandboxProfileDetailQueryKey(invalidateProfileId),
+          });
+        }}
+        invalidateVersionBindings={async ({ profileId: invalidateProfileId, version }) => {
+          await queryClient.invalidateQueries({
+            queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
+              profileId: invalidateProfileId,
+              version,
+            }),
+          });
+        }}
+      />
+    </PageFrame>
   );
 }
 
@@ -587,10 +591,9 @@ function LoadedSandboxProfileMetaSection(input: {
         />
       </div>
       {metaState.saveError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Update failed</AlertTitle>
-          <AlertDescription>{metaState.saveError}</AlertDescription>
-        </Alert>
+        <Notice title="Update failed" variant="alert">
+          {metaState.saveError}
+        </Notice>
       ) : null}
     </>
   );

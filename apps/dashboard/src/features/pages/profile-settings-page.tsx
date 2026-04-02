@@ -3,17 +3,21 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { useAppPageMeta } from "../navigation/route-meta.js";
 import { updateProfileDisplayName } from "../settings/profile/profile-service.js";
+import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
 export function ProfileSettingsPage(): React.JSX.Element {
+  const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const session = useRequiredSession();
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const { title, description } = resolvePageFrameText(pageMeta, "Profile");
 
   useEffect(() => {
     if (!saveSuccess) {
@@ -52,23 +56,25 @@ export function ProfileSettingsPage(): React.JSX.Element {
   const persistedDisplayName = resolveUserDisplayName(session.user);
 
   return (
-    <ProfileSettingsEditor
-      key={`${session.user.email}:${persistedDisplayName}`}
-      email={session.user.email}
-      fieldError={fieldError}
-      onDisplayNameSave={(displayNameDraft) => {
-        setFieldError(null);
-        setSaveSuccess(false);
-        void saveMutation.mutateAsync(displayNameDraft.trim());
-      }}
-      onResetFeedback={() => {
-        setFieldError(null);
-        setSaveSuccess(false);
-      }}
-      persistedDisplayName={persistedDisplayName}
-      saveSuccess={saveSuccess}
-      saving={saveMutation.isPending}
-    />
+    <FormPageFrame description={description} title={title}>
+      <ProfileSettingsEditor
+        key={`${session.user.email}:${persistedDisplayName}`}
+        email={session.user.email}
+        fieldError={fieldError}
+        onDisplayNameSave={(displayNameDraft) => {
+          setFieldError(null);
+          setSaveSuccess(false);
+          void saveMutation.mutateAsync(displayNameDraft.trim());
+        }}
+        onResetFeedback={() => {
+          setFieldError(null);
+          setSaveSuccess(false);
+        }}
+        persistedDisplayName={persistedDisplayName}
+        saveSuccess={saveSuccess}
+        saving={saveMutation.isPending}
+      />
+    </FormPageFrame>
   );
 }
 

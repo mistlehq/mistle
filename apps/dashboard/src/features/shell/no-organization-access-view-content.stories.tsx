@@ -1,8 +1,8 @@
+import { Notice } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 
 import { AuthPageShell, AuthPageWidths } from "../auth/auth-page-shell.js";
-import { StatusBox } from "../shared/status-box.js";
 import { NoOrganizationAccessViewContent } from "./no-organization-access-view-content.js";
 
 const meta = {
@@ -41,7 +41,7 @@ export const ValidationError: Story = {
   render: (args) => (
     <AuthPageShell maxWidthClass={AuthPageWidths.SM} title="Create an organization">
       <div className="grid gap-4">
-        <StatusBox tone="destructive">Organization name is required.</StatusBox>
+        <Notice variant="alert">Organization name is required.</Notice>
         <NoOrganizationAccessViewContent {...args} />
       </div>
     </AuthPageShell>

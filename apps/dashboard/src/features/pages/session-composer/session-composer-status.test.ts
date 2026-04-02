@@ -15,7 +15,7 @@ describe("session-composer-status", () => {
       }),
     ).toEqual({
       message: "Model removed-model is no longer available. Switch to another model to continue.",
-      tone: "error",
+      variant: "alert",
     });
   });
 

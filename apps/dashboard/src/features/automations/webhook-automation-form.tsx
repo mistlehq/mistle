@@ -1,7 +1,4 @@
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   Button,
   Field,
   FieldContent,
@@ -17,17 +14,18 @@ import {
   SelectValue,
   Switch,
   Textarea,
+  Notice,
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
 
-import { FormPageFooter, FormPageHeader, FormPageSection } from "../shared/form-page.js";
-import { StatusBox } from "../shared/status-box.js";
+import { FormPageFooter, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
 import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
+import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
 import type {
   WebhookAutomationEventOption,
@@ -60,7 +58,7 @@ type WebhookAutomationFormProps = {
   connectionOptions: readonly WebhookAutomationFormOption[];
   sandboxProfileOptions: readonly WebhookAutomationFormOption[];
   webhookEventOptions: readonly WebhookAutomationEventOption[];
-  triggerPickerDisabledReason: string | null;
+  triggerPickerDisabledState: WebhookAutomationTriggerPickerDisabledState | null;
   fieldErrors: Partial<Record<WebhookAutomationFormValueKey, string>>;
   validationSummaryError: string | null;
   formError: string | null;
@@ -181,10 +179,8 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
     input.values.inputTemplate === DefaultWebhookAutomationInputTemplate;
 
   return (
-    <div className="flex flex-col gap-6">
-      {input.mode === "create" ? (
-        <FormPageHeader title="Create Automation" />
-      ) : (
+    <FormPageStack>
+      {input.mode === "edit" ? (
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <WebhookAutomationTitleEditor
@@ -217,13 +213,12 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             </Button>
           )}
         </div>
-      )}
+      ) : null}
 
       {input.formError === null ? null : (
-        <Alert variant="destructive">
-          <AlertTitle>Automation could not be saved</AlertTitle>
-          <AlertDescription>{input.formError}</AlertDescription>
-        </Alert>
+        <Notice title="Automation could not be saved" variant="alert">
+          {input.formError}
+        </Notice>
       )}
 
       {input.mode === "edit" ? (
@@ -302,7 +297,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             </div>
             <WebhookAutomationTriggerPickerAddButton
               error={input.fieldErrors.triggerIds}
-              disabledReason={input.triggerPickerDisabledReason}
+              disabledState={input.triggerPickerDisabledState}
               eventOptions={input.webhookEventOptions}
               hasConnectedIntegrations={input.connectionOptions.length > 0}
               onValueChange={(value) => {
@@ -319,7 +314,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             error={input.fieldErrors.triggerIds}
             eventOptions={input.webhookEventOptions}
             hasConnectedIntegrations={input.connectionOptions.length > 0}
-            disabledReason={input.triggerPickerDisabledReason}
+            disabledState={input.triggerPickerDisabledState}
             onTriggerParameterValueChange={({ triggerId, parameterId, value }) => {
               input.onValueChange("triggerParameterValues", {
                 ...input.values.triggerParameterValues,
@@ -447,9 +442,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
       <FormPageFooter>
         {input.validationSummaryError === null ? null : (
-          <StatusBox tone="destructive" variant="subtle">
+          <Notice appearance="subtle" variant="alert">
             {input.validationSummaryError}
-          </StatusBox>
+          </Notice>
         )}
         <Button
           disabled={input.isDeleting || input.isSaving}
@@ -459,6 +454,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           {input.isSaving ? "Saving..." : submitLabel}
         </Button>
       </FormPageFooter>
-    </div>
+    </FormPageStack>
   );
 }

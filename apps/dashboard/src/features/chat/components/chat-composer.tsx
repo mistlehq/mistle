@@ -16,7 +16,7 @@ const REASONING_EFFORT_OPTIONS = ["low", "medium", "high", "xhigh"] as const;
 
 export type ChatComposerStatusMessage = {
   message: string;
-  tone: "error" | "warning";
+  variant: "alert" | "default";
 };
 
 export type ChatComposerViewModel = {

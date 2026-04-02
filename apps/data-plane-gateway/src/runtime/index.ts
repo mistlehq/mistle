@@ -10,6 +10,7 @@ import { createApp, stopApp } from "../app.js";
 import { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { LocalSandboxIdleController } from "../idle/sandbox-idle-controller.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
+import { registerPublishedTargetRoutes } from "../publishing/register-published-target-routes.js";
 import { InMemorySandboxActivityStore } from "../runtime-state/adapters/in-memory-sandbox-activity-store.js";
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
@@ -155,6 +156,9 @@ export function createDataPlaneGatewayRuntime(
     internalAuthServiceToken: config.internalAuth.serviceToken,
     sandboxRuntimeAttachmentStore,
     sandboxOwnerStore,
+  });
+  registerPublishedTargetRoutes({
+    app,
   });
 
   registerSandboxTunnelRoute({

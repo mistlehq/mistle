@@ -12,7 +12,6 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { ROUTE_HANDLES } from "../src/features/navigation/route-handles.js";
 import { IntegrationsPage } from "../src/features/pages/integrations-page.js";
-import { SettingsLayout } from "../src/features/settings/settings-layout.js";
 import { renderDashboardPageIntegration } from "./helpers/dashboard-page.js";
 
 function createDeferredPromise<T>() {
@@ -31,7 +30,7 @@ function createIntegrationsRouter(): ReturnType<typeof createMemoryRouter> {
   return createMemoryRouter(
     createRoutesFromElements(
       <Route element={<Outlet />} path="/">
-        <Route element={<SettingsLayout />} handle={ROUTE_HANDLES.settings} path="settings">
+        <Route element={<Outlet />} handle={ROUTE_HANDLES.settings} path="settings">
           <Route
             element={<Outlet />}
             handle={ROUTE_HANDLES.settingsOrganization}
@@ -196,10 +195,6 @@ describe("IntegrationsPage resource refresh concurrency", () => {
     try {
       const connectionNameMatches = await screen.findAllByText("Engineering GitHub");
       expect(connectionNameMatches.length).toBeGreaterThanOrEqual(1);
-      expect(screen.queryByText("Connected")).toBeNull();
-      expect(screen.queryByText("Available Integrations")).toBeNull();
-      expect(screen.queryByText("Integration connection")).toBeNull();
-      expect(screen.getByText("GitHub")).toBeTruthy();
 
       const repositoriesRefreshButton = await screen.findByRole("button", {
         name: "Refresh repositories",

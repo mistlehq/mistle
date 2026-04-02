@@ -1,27 +1,13 @@
 import { cn } from "@mistle/ui";
 import type { ReactNode } from "react";
 
-export type FormPageShellProps = {
+export type FormPageStackProps = {
   children: ReactNode;
   className?: string;
-  contentClassName?: string;
-  maxWidthClassName?: string;
 };
 
-export function FormPageShell(input: FormPageShellProps): React.JSX.Element {
-  return (
-    <div className={cn("-mx-4 min-h-full bg-muted/30 px-4 py-6", input.className)}>
-      <div
-        className={cn(
-          "mx-auto flex w-full flex-col gap-4",
-          input.maxWidthClassName ?? "max-w-2xl",
-          input.contentClassName,
-        )}
-      >
-        {input.children}
-      </div>
-    </div>
-  );
+export function FormPageStack(input: FormPageStackProps): React.JSX.Element {
+  return <div className={cn("flex flex-col gap-6", input.className)}>{input.children}</div>;
 }
 
 export type FormPageSectionProps = {
@@ -52,7 +38,7 @@ export function FormPageHeader(input: FormPageHeaderProps): React.JSX.Element {
   const hasIcon = input.icon !== undefined && input.icon !== null;
 
   return (
-    <div className="flex items-start justify-between gap-3">
+    <div className="flex items-start justify-between gap-3" data-slot="page-header">
       <div className={cn("flex min-w-0 flex-1 gap-3", hasIcon ? "items-center" : "items-start")}>
         {hasIcon ? <div className="shrink-0">{input.icon}</div> : null}
         <div className="min-w-0 flex-1">
@@ -66,6 +52,7 @@ export function FormPageHeader(input: FormPageHeaderProps): React.JSX.Element {
                   "text-muted-foreground truncate text-sm",
                   hasIcon ? "leading-tight" : null,
                 )}
+                data-slot="page-header-description"
               >
                 {input.description}
               </p>

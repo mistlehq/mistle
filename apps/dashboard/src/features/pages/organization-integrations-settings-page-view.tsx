@@ -1,9 +1,8 @@
-import { Skeleton } from "@mistle/ui";
+import { Skeleton, Notice } from "@mistle/ui";
 import type { ReactNode } from "react";
 
 import { IntegrationSection } from "../integrations/integration-section.js";
 import { IntegrationTile } from "../integrations/integration-tile.js";
-import { StatusBox } from "../shared/status-box.js";
 
 export type OrganizationIntegrationsSettingsPageCard = {
   actionDisabled?: boolean;
@@ -43,28 +42,28 @@ export function OrganizationIntegrationsSettingsPageView(
   if (props.loadErrorMessage !== null) {
     return (
       <div className="flex flex-col gap-3">
-        <StatusBox tone="destructive">{props.loadErrorMessage} Please try again later.</StatusBox>
+        <Notice variant="alert">{props.loadErrorMessage} Please try again later.</Notice>
       </div>
     );
   }
 
   if (props.connectedCards.length === 0 && props.availableCards.length === 0) {
     return (
-      <StatusBox title="No integrations available">
+      <Notice title="No integrations available">
         <p>
           No integration targets are currently configured for this environment. Seed integration
           targets in the control-plane database to populate this page.
         </p>
-      </StatusBox>
+      </Notice>
     );
   }
 
   if (isDetailFocused) {
     return (
-      <div className="w-full gap-4 flex flex-col">
+      <section aria-label="Integration detail" className="w-full gap-4 flex flex-col">
         {props.connectionDialog ?? null}
         {props.detailSurface}
-      </div>
+      </section>
     );
   }
 

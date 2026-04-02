@@ -24,6 +24,7 @@ import {
   TooltipContent,
   TooltipTrigger,
   useComboboxAnchor,
+  Notice,
 } from "@mistle/ui";
 import { InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
@@ -31,7 +32,6 @@ import { useEffect, useId, useState } from "react";
 
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
-import { StatusBox } from "../shared/status-box.js";
 import {
   createSyntheticWebhookAutomationEventOption,
   isWebhookAutomationEventOptionUnavailable,
@@ -52,7 +52,13 @@ type WebhookAutomationTriggerPickerState = {
   groupedAvailableEventOptions: readonly GroupedWebhookAutomationEventOptions[];
   disabled: boolean;
   helperMessage: string | null;
+  helperVariant: "default" | "alert";
   inputPlaceholder: string;
+};
+
+export type WebhookAutomationTriggerPickerDisabledState = {
+  reason: string;
+  variant: "default" | "alert";
 };
 
 export function groupWebhookAutomationEventOptions(
@@ -110,14 +116,15 @@ function resolveWebhookAutomationTriggerPickerState(input: {
   hasConnectedIntegrations: boolean;
   selectedTriggerIds: readonly string[];
   eventOptions: readonly WebhookAutomationEventOption[];
-  disabledReason?: string | null;
+  disabledState?: WebhookAutomationTriggerPickerDisabledState | null;
 }): WebhookAutomationTriggerPickerState {
-  if (input.disabledReason !== undefined && input.disabledReason !== null) {
+  if (input.disabledState !== undefined && input.disabledState !== null) {
     return {
       availableEventOptions: [],
       groupedAvailableEventOptions: [],
       disabled: true,
-      helperMessage: input.disabledReason,
+      helperMessage: input.disabledState.reason,
+      helperVariant: input.disabledState.variant,
       inputPlaceholder: "No triggers available",
     };
   }
@@ -136,6 +143,7 @@ function resolveWebhookAutomationTriggerPickerState(input: {
     helperMessage: input.hasConnectedIntegrations
       ? null
       : "Connect an integration to add triggers.",
+    helperVariant: "default",
     inputPlaceholder: hasAvailableTriggers ? "Add trigger" : "No triggers available",
   };
 }
@@ -145,7 +153,7 @@ export function WebhookAutomationTriggerPicker(input: {
   selectedConnectionId: string;
   selectedTriggerIds: readonly string[];
   eventOptions: readonly WebhookAutomationEventOption[];
-  disabledReason?: string | null;
+  disabledState?: WebhookAutomationTriggerPickerDisabledState | null;
   triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
   error: string | undefined;
   onValueChange: (value: string[]) => void;
@@ -160,7 +168,7 @@ export function WebhookAutomationTriggerPicker(input: {
     hasConnectedIntegrations: input.hasConnectedIntegrations,
     selectedTriggerIds: input.selectedTriggerIds,
     eventOptions: input.eventOptions,
-    ...(input.disabledReason === undefined ? {} : { disabledReason: input.disabledReason }),
+    ...(input.disabledState === undefined ? {} : { disabledState: input.disabledState }),
   });
   const selectedEventOptions = resolveSelectedWebhookAutomationEventOptions({
     eventOptions: input.eventOptions,
@@ -182,14 +190,14 @@ export function WebhookAutomationTriggerPicker(input: {
       )}
 
       {pickerState.helperMessage === null ? null : (
-        <StatusBox tone="destructive">{pickerState.helperMessage}</StatusBox>
+        <Notice variant={pickerState.helperVariant}>{pickerState.helperMessage}</Notice>
       )}
 
       {selectedEventOptions.length === 0 ? (
         pickerState.disabled ? null : (
-          <StatusBox tone={input.error === undefined ? "neutral" : "destructive"}>
+          <Notice variant={input.error === undefined ? "default" : "alert"}>
             {emptyStateMessage}
-          </StatusBox>
+          </Notice>
         )
       ) : (
         <div className="space-y-1.5">
@@ -275,7 +283,7 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
   hasConnectedIntegrations: boolean;
   selectedTriggerIds: readonly string[];
   eventOptions: readonly WebhookAutomationEventOption[];
-  disabledReason?: string | null;
+  disabledState?: WebhookAutomationTriggerPickerDisabledState | null;
   error?: string | undefined;
   onValueChange: (value: string[]) => void;
   variant?: "inline" | "header";
@@ -284,7 +292,7 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
     hasConnectedIntegrations: input.hasConnectedIntegrations,
     selectedTriggerIds: input.selectedTriggerIds,
     eventOptions: input.eventOptions,
-    ...(input.disabledReason === undefined ? {} : { disabledReason: input.disabledReason }),
+    ...(input.disabledState === undefined ? {} : { disabledState: input.disabledState }),
   });
   const [isOpen, setIsOpen] = useState(false);
   const [isSingleTriggerDialogOpen, setIsSingleTriggerDialogOpen] = useState(false);

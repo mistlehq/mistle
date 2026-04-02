@@ -1,6 +1,4 @@
-import { Input } from "@mistle/ui";
-
-import { StatusBox } from "./status-box.js";
+import { Input, Notice } from "@mistle/ui";
 
 export function PageTitleField(input: {
   fieldId: string;
@@ -41,7 +39,7 @@ export function PageTitleField(input: {
         value={input.value}
       />
       {input.errorMessage === undefined ? null : (
-        <StatusBox tone="destructive">{input.errorMessage}</StatusBox>
+        <Notice variant="alert">{input.errorMessage}</Notice>
       )}
     </div>
   );

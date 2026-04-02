@@ -79,6 +79,12 @@ describe("compileCodexRuntime", () => {
       'developer_instructions = "Mistle-managed sandbox context:',
     );
     expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      "prefer the provider CLI available in the environment over ad hoc HTTP requests or raw `curl`",
+    );
+    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      "Use `cmddir search <pattern>` to discover relevant commands progressively before reaching for lower-level approaches.",
+    );
+    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain(
       "Prefer concise answers.",
     );
     expect(compiled.agentRuntimes).toEqual([

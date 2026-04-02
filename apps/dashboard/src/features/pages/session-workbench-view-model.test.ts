@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   hasSessionTopAlert,
   resolveSandboxHeaderStatusUi,
-  resolveStoppedSessionMessage,
   shouldShowResumeAction,
 } from "./session-workbench-view-model.js";
 
@@ -127,42 +126,23 @@ describe("hasSessionTopAlert", () => {
   });
 });
 
-describe("resolveStoppedSessionMessage", () => {
-  it("returns a stopped-session message only for stopped readiness", () => {
-    expect(
-      resolveStoppedSessionMessage({
-        connectionReadinessReason: "stopped",
-      }),
-    ).toBe("This sandbox is stopped. Resume it to reconnect chat and terminal.");
-
-    expect(
-      resolveStoppedSessionMessage({
-        connectionReadinessReason: "ready",
-      }),
-    ).toBeNull();
-  });
-});
-
 describe("shouldShowResumeAction", () => {
   it("shows the resume action only when manual resume is required", () => {
     expect(
       shouldShowResumeAction({
         requiresManualResume: true,
-        isResumingStoppedSandbox: false,
       }),
     ).toBe(true);
 
     expect(
       shouldShowResumeAction({
         requiresManualResume: false,
-        isResumingStoppedSandbox: true,
       }),
     ).toBe(false);
 
     expect(
       shouldShowResumeAction({
         requiresManualResume: false,
-        isResumingStoppedSandbox: false,
       }),
     ).toBe(false);
   });

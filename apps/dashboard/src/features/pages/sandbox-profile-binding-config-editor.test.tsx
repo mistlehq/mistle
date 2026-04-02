@@ -64,9 +64,6 @@ describe("SandboxProfileBindingConfigEditor", () => {
       targets: [target],
     });
 
-    expect(screen.getByText("Default model")).toBeDefined();
-    expect(screen.getByText("Reasoning effort")).toBeDefined();
-    expect(screen.getByText("Additional instructions")).toBeDefined();
     expect(screen.getByLabelText("Default model")).toBeDefined();
     expect(screen.getByLabelText("Reasoning effort")).toBeDefined();
     const additionalInstructionsField = screen

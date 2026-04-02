@@ -1,9 +1,7 @@
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   Badge,
   Button,
+  Notice,
   Table,
   TableBody,
   TableCell,
@@ -38,11 +36,13 @@ import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useCachedRequiredSession } from "../shell/session-context.js";
+import {
+  resolveSandboxStatusBadgeUi,
+  type SandboxLifecycleStatus,
+} from "./sandbox-status-presentation.js";
 
 const SANDBOX_INSTANCE_LIST_LIMIT = 20;
 const SANDBOX_INSTANCE_LIST_MAX_LIMIT = 100;
-
-type SandboxSessionStatus = "pending" | "starting" | "running" | "stopped" | "failed";
 
 function parseListLimit(rawValue: string | null): number {
   if (rawValue === null) {
@@ -88,52 +88,12 @@ export function shouldClearSelectedProfile(input: {
   return !input.selectableProfiles.some((profile) => profile.id === selectedProfileId);
 }
 
-function getSandboxSessionStatusBadgeUi(status: SandboxSessionStatus): {
-  label: string;
-  variant: "secondary" | "outline" | "destructive";
-  className?: string;
-} {
-  if (status === "running") {
-    return {
-      label: "Running",
-      variant: "secondary",
-      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
-    };
-  }
-
-  if (status === "failed") {
-    return {
-      label: "Failed",
-      variant: "destructive",
-    };
-  }
-
-  if (status === "stopped") {
-    return {
-      label: "Stopped",
-      variant: "outline",
-    };
-  }
-
-  if (status === "pending") {
-    return {
-      label: "Pending",
-      variant: "outline",
-    };
-  }
-
-  return {
-    label: "Starting",
-    variant: "outline",
-  };
-}
-
 export function SandboxSessionStatusBadge(input: {
-  status: SandboxSessionStatus;
+  status: SandboxLifecycleStatus;
   failureCode: string | null;
   failureMessage: string | null;
 }): React.JSX.Element {
-  const statusUi = getSandboxSessionStatusBadgeUi(input.status);
+  const statusUi = resolveSandboxStatusBadgeUi(input.status);
 
   if (input.failureMessage === null) {
     return (
@@ -143,10 +103,7 @@ export function SandboxSessionStatusBadge(input: {
     );
   }
 
-  const tooltipMessage =
-    input.failureCode === null
-      ? input.failureMessage
-      : `${input.failureCode}\n${input.failureMessage}`;
+  const tooltipMessage = input.failureMessage;
 
   return (
     <Tooltip>
@@ -155,7 +112,7 @@ export function SandboxSessionStatusBadge(input: {
         render={
           <Badge
             className={statusUi.className}
-            render={<span aria-hidden="true" title={tooltipMessage} />}
+            render={<span aria-hidden="true" />}
             variant={statusUi.variant}
           />
         }
@@ -170,7 +127,7 @@ export function SandboxSessionStatusBadge(input: {
   );
 }
 
-export function shouldUseResumeActionLabel(status: SandboxSessionStatus): boolean {
+export function shouldUseResumeActionLabel(status: SandboxLifecycleStatus): boolean {
   return status === "stopped";
 }
 
@@ -181,7 +138,7 @@ export function buildOptimisticSessions(input: {
     profileVersion: number;
     sandboxInstanceId: string;
     createdAtIso: string;
-    status: SandboxSessionStatus;
+    status: SandboxLifecycleStatus;
     failureCode: string | null;
     failureMessage: string | null;
   }[];
@@ -314,7 +271,7 @@ export function SessionsPage(): React.JSX.Element {
     ...optimisticSessions,
     ...(sandboxInstancesQuery.data?.items ?? []),
   ].sort((left, right) => {
-    const statusRank: Record<SandboxSessionStatus, number> = {
+    const statusRank: Record<SandboxLifecycleStatus, number> = {
       pending: 0,
       starting: 1,
       running: 2,
@@ -476,30 +433,25 @@ export function SessionsPage(): React.JSX.Element {
         </div>
 
         {selectableProfilesQuery.isError ? (
-          <Alert variant="destructive">
-            <AlertTitle>Could not load sandbox profiles</AlertTitle>
-            <AlertDescription>
-              {resolveApiErrorMessage({
-                error: selectableProfilesQuery.error,
-                fallbackMessage: "Could not load sandbox profiles.",
-              })}
-            </AlertDescription>
-          </Alert>
+          <Notice title="Could not load sandbox profiles" variant="alert">
+            {resolveApiErrorMessage({
+              error: selectableProfilesQuery.error,
+              fallbackMessage: "Could not load sandbox profiles.",
+            })}
+          </Notice>
         ) : null}
         {startErrorMessage === null ? null : (
-          <Alert variant="destructive">
-            <AlertTitle>Session start failed</AlertTitle>
-            <AlertDescription>{startErrorMessage}</AlertDescription>
-          </Alert>
+          <Notice title="Session start failed" variant="alert">
+            {startErrorMessage}
+          </Notice>
         )}
       </div>
 
       <div className="flex flex-col gap-3">
         {listErrorMessage === null ? null : (
-          <Alert variant="destructive">
-            <AlertTitle>Could not load sandbox instances</AlertTitle>
-            <AlertDescription>{listErrorMessage}</AlertDescription>
-          </Alert>
+          <Notice title="Could not load sandbox instances" variant="alert">
+            {listErrorMessage}
+          </Notice>
         )}
 
         <div className="flex flex-col gap-3">

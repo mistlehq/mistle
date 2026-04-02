@@ -20,6 +20,11 @@ const sandboxBootstrapTokenAudience = "data-plane-gateway";
 const sandboxEgressTokenSecret = "fixture-egress-token-secret";
 const sandboxEgressTokenIssuer = "data-plane-worker";
 const sandboxEgressTokenAudience = "tokenizer-proxy";
+const sandboxPublishBaseDomain = "mistle.example.test";
+const sandboxPublishAccessTokenSecret = "fixture-publish-token-secret";
+const sandboxPublishAccessTokenIssuer = "control-plane-api";
+const sandboxPublishAccessTokenAudience = "data-plane-gateway";
+const sandboxPublishSessionCookieSigningSecret = "fixture-publish-cookie-secret";
 
 const globalDevelopmentConfig = {
   env: "development",
@@ -45,6 +50,17 @@ const globalDevelopmentConfig = {
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+    publish: {
+      baseDomain: sandboxPublishBaseDomain,
+      access: {
+        tokenSecret: sandboxPublishAccessTokenSecret,
+        tokenIssuer: sandboxPublishAccessTokenIssuer,
+        tokenAudience: sandboxPublishAccessTokenAudience,
+      },
+      session: {
+        cookieSigningSecret: sandboxPublishSessionCookieSigningSecret,
+      },
+    },
     connect: {
       tokenSecret: sandboxConnectTokenSecret,
       tokenIssuer: sandboxConnectTokenIssuer,
@@ -87,6 +103,17 @@ const globalProductionConfig = {
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+    publish: {
+      baseDomain: sandboxPublishBaseDomain,
+      access: {
+        tokenSecret: sandboxPublishAccessTokenSecret,
+        tokenIssuer: sandboxPublishAccessTokenIssuer,
+        tokenAudience: sandboxPublishAccessTokenAudience,
+      },
+      session: {
+        cookieSigningSecret: sandboxPublishSessionCookieSigningSecret,
+      },
+    },
     connect: {
       tokenSecret: sandboxConnectTokenSecret,
       tokenIssuer: sandboxConnectTokenIssuer,

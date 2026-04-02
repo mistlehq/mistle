@@ -30,12 +30,14 @@ function deriveInitials(input: { name: string; fallback: string }): string {
 }
 
 export function OrganizationMenuTrigger(input: {
-  organizationName: string;
+  organizationName: string | null;
   organizationErrorMessage: string | null;
   isSigningOut: boolean;
   onNavigateToSettings: () => void;
   onSignOut: () => void;
 }): React.JSX.Element {
+  const organizationName = input.organizationName ?? "";
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -51,15 +53,15 @@ export function OrganizationMenuTrigger(input: {
         <div className="flex w-full items-center gap-2">
           <Avatar className="h-8 w-8 shrink-0">
             <AvatarFallback>
-              {deriveInitials({ name: input.organizationName, fallback: "O" })}
+              {deriveInitials({ name: organizationName, fallback: "O" })}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
             <p
               className="text-sidebar-foreground truncate text-sm font-medium"
-              title={input.organizationName}
+              title={organizationName}
             >
-              {input.organizationName}
+              {organizationName}
             </p>
           </div>
           <CaretDownIcon aria-hidden className="text-sidebar-foreground/70 h-4 w-4 shrink-0" />

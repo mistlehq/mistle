@@ -10,7 +10,7 @@ import {
 
 export type ComposerStatusMessage = {
   message: string;
-  tone: "error" | "warning";
+  variant: "alert" | "default";
 };
 
 export function resolveComposerBootstrapMessage(input: {
@@ -46,14 +46,14 @@ export function resolveComposerStatusMessage(input: {
   if (input.composerErrorMessage !== null) {
     return {
       message: input.composerErrorMessage,
-      tone: "error",
+      variant: "alert",
     };
   }
 
   if (input.sessionErrorMessage !== null) {
     return {
       message: input.sessionErrorMessage,
-      tone: "error",
+      variant: "alert",
     };
   }
 
@@ -65,7 +65,7 @@ export function resolveComposerStatusMessage(input: {
   if (bootstrapMessage !== null) {
     return {
       message: bootstrapMessage,
-      tone: "error",
+      variant: "alert",
     };
   }
 
@@ -73,7 +73,7 @@ export function resolveComposerStatusMessage(input: {
     if (!supportsImageInspection(input.activeComposerModel)) {
       return {
         message: buildNonImageCapableModelWarningMessage(input.activeComposerModel.displayName),
-        tone: "warning",
+        variant: "default",
       };
     }
   }

@@ -1,9 +1,8 @@
-import { Button } from "@mistle/ui";
+import { Button, Notice } from "@mistle/ui";
 import { PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
-import { StatusBox } from "../shared/status-box.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -116,7 +115,7 @@ export function SandboxProfileBindingCard(input: {
       </dl>
 
       {input.errorMessage === undefined ? null : (
-        <StatusBox tone="destructive">{input.errorMessage}</StatusBox>
+        <Notice variant="alert">{input.errorMessage}</Notice>
       )}
     </div>
   );

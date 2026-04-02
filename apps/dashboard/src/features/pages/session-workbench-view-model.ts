@@ -1,140 +1,13 @@
-import type { CodexSessionConnectionState } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-
-import type { StartSessionStep } from "../session-agents/codex/session-state/index.js";
-
-export type SessionHeaderStatusUi = {
-  label: string;
-  variant: "secondary" | "outline" | "destructive";
-  className?: string;
-};
-
-export type SandboxHeaderStatusUi = SessionHeaderStatusUi;
-
-export function resolveSessionHeaderStatusUi(input: {
-  sandboxStatus: string;
-  agentConnectionState: CodexSessionConnectionState;
-  step: StartSessionStep;
-  hasConnectionError: boolean;
-  isRecoveringSession: boolean;
-}): SessionHeaderStatusUi {
-  if (input.sandboxStatus === "failed") {
-    return {
-      label: "Sandbox failed",
-      variant: "destructive",
-    };
-  }
-
-  if (input.hasConnectionError || input.agentConnectionState === "error") {
-    return {
-      label: "Connection failed",
-      variant: "destructive",
-    };
-  }
-
-  if (input.isRecoveringSession && input.sandboxStatus === "running") {
-    return {
-      label: "Reconnecting session",
-      variant: "outline",
-    };
-  }
-
-  if (input.agentConnectionState === "ready") {
-    return {
-      label: "Connected",
-      variant: "secondary",
-      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
-    };
-  }
-
-  if (input.sandboxStatus === "stopped" && input.step === "idle") {
-    return {
-      label: "Sandbox stopped",
-      variant: "outline",
-    };
-  }
-
-  if (input.sandboxStatus === "resuming") {
-    return {
-      label: "Resuming sandbox",
-      variant: "outline",
-    };
-  }
-
-  if (input.sandboxStatus !== "running") {
-    return {
-      label: "Starting sandbox",
-      variant: "outline",
-    };
-  }
-
-  if (input.agentConnectionState === "opening_agent_stream") {
-    return {
-      label: "Connecting",
-      variant: "outline",
-    };
-  }
-
-  if (input.agentConnectionState === "initializing") {
-    return {
-      label: "Initializing",
-      variant: "outline",
-    };
-  }
-
-  if (
-    input.agentConnectionState === "connecting_socket" ||
-    input.agentConnectionState === "connected_socket" ||
-    input.step === "securing" ||
-    input.step === "connecting"
-  ) {
-    return {
-      label: "Connecting",
-      variant: "outline",
-    };
-  }
-
-  return {
-    label: "Session idle",
-    variant: "outline",
-  };
-}
+import {
+  resolveSandboxStatusBadgeUi,
+  type SandboxStatusBadgeUi,
+  type WorkbenchSandboxLifecycleStatus,
+} from "./sandbox-status-presentation.js";
 
 export function resolveSandboxHeaderStatusUi(input: {
-  sandboxLifecycleStatus: string;
-}): SandboxHeaderStatusUi {
-  if (input.sandboxLifecycleStatus === "failed") {
-    return {
-      label: "Sandbox failed",
-      variant: "destructive",
-    };
-  }
-
-  if (input.sandboxLifecycleStatus === "running") {
-    return {
-      label: "Connected",
-      variant: "secondary",
-      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
-    };
-  }
-
-  if (input.sandboxLifecycleStatus === "stopped") {
-    return {
-      label: "Sandbox stopped",
-      variant: "outline",
-    };
-  }
-
-  if (input.sandboxLifecycleStatus === "resuming") {
-    return {
-      label: "Resuming sandbox",
-      variant: "outline",
-    };
-  }
-
-  return {
-    label: "Starting sandbox",
-    variant: "outline",
-  };
+  sandboxLifecycleStatus: WorkbenchSandboxLifecycleStatus;
+}): SandboxStatusBadgeUi {
+  return resolveSandboxStatusBadgeUi(input.sandboxLifecycleStatus);
 }
 
 export function hasSessionTopAlert(input: {
@@ -153,27 +26,6 @@ export function hasSessionTopAlert(input: {
   );
 }
 
-export function resolveStoppedSessionMessage(input: {
-  connectionReadinessReason:
-    | "failed"
-    | "loading"
-    | "missing-session"
-    | "ready"
-    | "resuming"
-    | "starting"
-    | "stopped"
-    | "unknown";
-}): string | null {
-  if (input.connectionReadinessReason !== "stopped") {
-    return null;
-  }
-
-  return "This sandbox is stopped. Resume it to reconnect chat and terminal.";
-}
-
-export function shouldShowResumeAction(input: {
-  requiresManualResume: boolean;
-  isResumingStoppedSandbox: boolean;
-}): boolean {
+export function shouldShowResumeAction(input: { requiresManualResume: boolean }): boolean {
   return input.requiresManualResume;
 }

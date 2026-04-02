@@ -105,7 +105,7 @@ describe("SandboxProfilesPage", () => {
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
   });
 
-  it("renders the result summary even when there is only one page", () => {
+  it("renders the seeded profile without pagination when there is only one page", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
@@ -114,7 +114,7 @@ describe("SandboxProfilesPage", () => {
       items: [
         {
           createdAt: "2026-03-05T00:00:00.000Z",
-          displayName: "Default Profile",
+          displayName: "Single profile",
           id: "sbp_123",
           organizationId: "org_123",
           status: "active",
@@ -135,7 +135,7 @@ describe("SandboxProfilesPage", () => {
       listResult,
     );
 
-    const markup = renderToStaticMarkup(
+    render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
           <SandboxProfilesPage />
@@ -143,8 +143,8 @@ describe("SandboxProfilesPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(markup).toContain("Showing 1 of 1");
-    expect(markup).not.toContain(">Previous<");
-    expect(markup).not.toContain(">Next<");
+    expect(screen.getByRole("button", { name: "Single profile" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
   });
 });

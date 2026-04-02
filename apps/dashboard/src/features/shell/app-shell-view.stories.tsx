@@ -2,24 +2,111 @@ import { Badge } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ErrorNotice } from "../auth/error-notice.js";
+import { SettingsBackButton } from "../settings/settings-back-button.js";
+import {
+  createOrganizationMembersSettingsFixtureContent,
+  createProfileSettingsFixtureContent,
+  createSettingsFixtureInviteMembersButton,
+} from "../settings/settings-fixtures.js";
+import { SettingsSectionNavView } from "../settings/settings-section-nav-view.js";
+import { FormPageFrame, PageFrame } from "../shared/page-frame.js";
 import { AppShellView } from "./app-shell-view.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 
+/**
+ * AppShellView owns the outer dashboard shell contract.
+ *
+ * Use the two layout dimensions together:
+ * - `contentInsetOwner="app-shell"`: the shell provides the standard outer page inset.
+ * - `contentInsetOwner="child"`: the child page or child shell provides its own outer spacing and framing.
+ * - `viewportMode="document"`: normal document page behavior with regular vertical page flow.
+ * - `viewportMode="workspace"`: viewport-managed application surface with fixed height and child-owned internal scrolling.
+ *
+ * Current usage in the dashboard:
+ * - Standard dashboard pages: `app-shell` + `document`.
+ * - Settings routes: `child` + `document`.
+ * - Session detail routes: `child` + `workspace`.
+ */
 const meta = {
   title: "Dashboard/Shell/AppShellView",
   component: AppShellView,
   tags: ["autodocs"],
+  argTypes: {
+    breadcrumbs: {
+      control: false,
+      description: "Optional header breadcrumb content shown when `showBreadcrumbs` is enabled.",
+    },
+    contentInsetOwner: {
+      control: "inline-radio",
+      description:
+        "`app-shell` means AppShellView provides the outer page inset. `child` means the page or child shell owns outer spacing and framing.",
+      options: ["app-shell", "child"],
+    },
+    headerActions: {
+      control: false,
+      description: "Optional header actions rendered on the right side of the sticky header.",
+    },
+    mainContent: {
+      control: false,
+      description: "Primary page content rendered inside the shell content region.",
+    },
+    showBreadcrumbs: {
+      control: "boolean",
+      description: "Toggles whether the breadcrumb region is shown in the sticky header.",
+    },
+    sidebarContent: {
+      control: false,
+      description: "Main sidebar navigation content.",
+    },
+    sidebarFooterContent: {
+      control: false,
+      description: "Sidebar footer content, typically notices or errors.",
+    },
+    sidebarHeaderClassName: {
+      control: false,
+      description: "Optional className override for the sidebar header wrapper.",
+    },
+    sidebarHeaderContent: {
+      control: false,
+      description: "Sidebar header content, such as the org switcher or settings back button.",
+    },
+    topLoadingBar: {
+      control: false,
+      description: "Top-of-page loading indicator region.",
+    },
+    viewportMode: {
+      control: "inline-radio",
+      description:
+        "`document` is a normal vertically-growing page. `workspace` is a viewport-managed surface with fixed height and child-owned internal scrolling.",
+      options: ["document", "workspace"],
+    },
+  },
   parameters: {
     layout: "fullscreen",
+    controls: {
+      include: [
+        "contentInsetOwner",
+        "viewportMode",
+        "showBreadcrumbs",
+        "breadcrumbs",
+        "headerActions",
+        "mainContent",
+        "sidebarHeaderContent",
+        "sidebarContent",
+        "sidebarFooterContent",
+        "topLoadingBar",
+        "sidebarHeaderClassName",
+      ],
+    },
   },
   args: {
     breadcrumbs: <p className="truncate text-sm">Sessions / Storybook Session</p>,
+    contentInsetOwner: "app-shell",
     headerActions: (
       <Badge className="bg-emerald-600 text-white hover:bg-emerald-600/90" variant="secondary">
         Connected
       </Badge>
     ),
-    isSessionDetail: false,
     mainContent: (
       <div className="rounded-xl border bg-card p-6 shadow-xs">
         <h2 className="font-semibold text-lg">Storybook shell preview</h2>
@@ -47,6 +134,7 @@ const meta = {
       />
     ),
     topLoadingBar: <div className="h-0" />,
+    viewportMode: "document",
   },
 } satisfies Meta<typeof AppShellView>;
 
@@ -56,34 +144,42 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const SessionDetail: Story = {
+export const SettingsProfile: Story = {
   args: {
-    isSessionDetail: true,
+    breadcrumbs: <p className="truncate text-sm">Settings / Profile</p>,
+    contentInsetOwner: "child",
+    headerActions: null,
     mainContent: (
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="min-h-0 flex-1 rounded-xl border bg-card p-6 shadow-xs">
-          <p className="text-sm">Session chat thread surface</p>
-        </div>
-      </div>
+      <FormPageFrame headerActions={null} title="Profile">
+        {createProfileSettingsFixtureContent()}
+      </FormPageFrame>
     ),
+    showBreadcrumbs: true,
+    sidebarContent: <SettingsSectionNavView pathname="/settings/account/profile" />,
+    sidebarFooterContent: <ErrorNotice message={null} />,
+    sidebarHeaderClassName: "pb-0",
+    sidebarHeaderContent: <SettingsBackButton onBack={() => {}} />,
+    topLoadingBar: <div className="h-0" />,
+    viewportMode: "document",
   },
 };
 
-export const SettingsMode: Story = {
+export const SettingsMembers: Story = {
   args: {
-    breadcrumbs: <p className="truncate text-sm">Settings / Members</p>,
+    breadcrumbs: <p className="truncate text-sm">Settings / Organization / Members</p>,
+    contentInsetOwner: "child",
     headerActions: null,
-    sidebarContent: (
-      <div className="space-y-1 px-2">
-        <div className="rounded-md bg-muted px-3 py-2 text-sm">General</div>
-        <div className="rounded-md px-3 py-2 text-sm">Members</div>
-        <div className="rounded-md px-3 py-2 text-sm">Billing</div>
-      </div>
+    mainContent: (
+      <PageFrame headerActions={createSettingsFixtureInviteMembersButton()} title="Members">
+        {createOrganizationMembersSettingsFixtureContent()}
+      </PageFrame>
     ),
-    sidebarHeaderContent: (
-      <button className="h-8 w-full rounded-md px-2 text-left text-sm" type="button">
-        Back
-      </button>
-    ),
+    showBreadcrumbs: true,
+    sidebarContent: <SettingsSectionNavView pathname="/settings/organization/members" />,
+    sidebarFooterContent: <ErrorNotice message={null} />,
+    sidebarHeaderClassName: "pb-0",
+    sidebarHeaderContent: <SettingsBackButton onBack={() => {}} />,
+    topLoadingBar: <div className="h-0" />,
+    viewportMode: "document",
   },
 };

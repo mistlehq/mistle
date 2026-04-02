@@ -47,6 +47,7 @@ function MembersTableActions(input: {
           aria-atomic="true"
           aria-live="polite"
           className={`text-sm font-medium ${feedbackClassName}`}
+          data-feedback-state={input.actionFeedback.state}
           role="status"
         >
           {input.actionFeedback.label}

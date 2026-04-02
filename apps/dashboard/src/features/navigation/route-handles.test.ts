@@ -21,19 +21,21 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.sandboxProfiles.description).toBe("Manage sandbox profile configuration.");
     expect(ROUTE_HANDLES.sandboxProfilesNew.title).toBe("Create");
     expect(ROUTE_HANDLES.sandboxProfilesNew.description).toBe("Create a sandbox profile.");
+    expect(ROUTE_HANDLES.sandboxProfilesNew.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.sandboxProfilesDetail.title).toBe("Edit profile");
     expect(ROUTE_HANDLES.sandboxProfilesDetail.description).toBe(
       "Edit sandbox profile configuration.",
     );
+    expect(ROUTE_HANDLES.sandboxProfilesDetail.appShellInsetOwner).toBe("child");
 
     expect(ROUTE_HANDLES.automations.title).toBe("Automations");
     expect(ROUTE_HANDLES.automations.description).toBe("Manage webhook automations.");
     expect(ROUTE_HANDLES.automationsNew.title).toBe("Create automation");
-    expect(ROUTE_HANDLES.automationsNew.description).toBe("Create a webhook automation.");
-    expect(ROUTE_HANDLES.automationsDetail.title).toBe("Edit automation");
-    expect(ROUTE_HANDLES.automationsDetail.description).toBe(
-      "Edit webhook automation configuration.",
-    );
+    expect(ROUTE_HANDLES.automationsNew.description).toBe("");
+    expect(ROUTE_HANDLES.automationsNew.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.automationsDetail.title).toBe("");
+    expect(ROUTE_HANDLES.automationsDetail.description).toBe("");
+    expect(ROUTE_HANDLES.automationsDetail.appShellInsetOwner).toBe("child");
 
     expect(ROUTE_HANDLES.settingsPersonal.title).toBe("Personal");
     expect(ROUTE_HANDLES.settingsPersonal.description).toBe("");
@@ -131,7 +133,7 @@ describe("route handles", () => {
     expect(detailDescription({ params: {} })).toBe("");
   });
 
-  it("resolves sandbox profile detail breadcrumb with profile id fallback", () => {
+  it("resolves sandbox profile detail breadcrumb with edit fallback", () => {
     const detailBreadcrumb = ROUTE_HANDLES.sandboxProfilesDetail.breadcrumb;
     expect(typeof detailBreadcrumb).toBe("function");
 
@@ -139,8 +141,8 @@ describe("route handles", () => {
       throw new Error("sandboxProfilesDetail breadcrumb must be a function");
     }
 
-    expect(detailBreadcrumb({ params: { profileId: "sbp_123" } })).toBe("sbp_123");
-    expect(detailBreadcrumb({ params: {} })).toBe("Profile");
+    expect(detailBreadcrumb({ params: { profileId: "sbp_123" } })).toBe("Edit profile");
+    expect(detailBreadcrumb({ params: {} })).toBe("Edit profile");
   });
 
   it("resolves session detail breadcrumb with sandbox instance id fallback", () => {
@@ -155,7 +157,7 @@ describe("route handles", () => {
     expect(detailBreadcrumb({ params: {} })).toBe("Session");
   });
 
-  it("resolves automation detail breadcrumb with automation id fallback", () => {
+  it("resolves automation detail breadcrumb with edit fallback", () => {
     const detailBreadcrumb = ROUTE_HANDLES.automationsDetail.breadcrumb;
     expect(typeof detailBreadcrumb).toBe("function");
 
@@ -163,7 +165,7 @@ describe("route handles", () => {
       throw new Error("automationsDetail breadcrumb must be a function");
     }
 
-    expect(detailBreadcrumb({ params: { automationId: "aut_123" } })).toBe("aut_123");
-    expect(detailBreadcrumb({ params: {} })).toBe("Automation");
+    expect(detailBreadcrumb({ params: { automationId: "aut_123" } })).toBe("Edit automation");
+    expect(detailBreadcrumb({ params: {} })).toBe("Edit automation");
   });
 });

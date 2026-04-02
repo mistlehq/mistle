@@ -1,9 +1,8 @@
-import { Badge, Button } from "@mistle/ui";
+import { Badge, Button, Notice } from "@mistle/ui";
 import { ArrowClockwiseIcon, PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { EditableHeading } from "../shared/editable-heading.js";
-import { StatusBox } from "../shared/status-box.js";
 import {
   formatConnectionStatusLabel,
   formatResourceHeading,
@@ -250,9 +249,17 @@ function ConnectionAuthSection(input: {
 
   if (input.authMethodId === "api-key") {
     return (
-      <div className="gap-1 flex flex-col">
+      <div
+        aria-label="Connection authentication"
+        className="gap-1 flex flex-col"
+        data-auth-method-id="api-key"
+      >
         <InlineField label="Auth method" value="API key" />
-        <div className="inline-flex items-center gap-1.5 text-sm">
+        <div
+          aria-label="Masked API key value"
+          className="inline-flex items-center gap-1.5 text-sm"
+          data-api-key-state="masked"
+        >
           <InlineField label="API key" value="**********" />
           {input.onEditApiKey ? (
             <Button
@@ -348,7 +355,7 @@ function ResourceSection(input: {
         ) : null}
       </div>
       {input.resource.lastErrorMessage ? (
-        <StatusBox tone="destructive">{input.resource.lastErrorMessage}</StatusBox>
+        <Notice variant="alert">{input.resource.lastErrorMessage}</Notice>
       ) : null}
       <ResourceItemsPreview
         errorMessage={input.resourceItems?.errorMessage ?? null}
@@ -371,7 +378,7 @@ function ResourceItemsPreview(input: {
   }
 
   if (input.errorMessage !== null) {
-    return <StatusBox tone="destructive">{input.errorMessage}</StatusBox>;
+    return <Notice variant="alert">{input.errorMessage}</Notice>;
   }
 
   if (input.items.length === 0) {
