@@ -74,9 +74,19 @@ app.kubernetes.io/component: {{ .component }}
 {{- end -}}
 
 {{- define "mistle.renderEnv" -}}
-{{- range . }}
+{{- $env := .env | default (list) -}}
+{{- $envOverrides := .envOverrides | default (dict) -}}
+{{- $seen := dict -}}
+{{- range $env }}
 - name: {{ .name }}
-  value: {{ .value | quote }}
+  value: {{ (get $envOverrides .name | default .value) | quote }}
+  {{- $_ := set $seen .name true }}
+{{- end }}
+{{- range $name := keys $envOverrides | sortAlpha }}
+{{- if not (hasKey $seen $name) }}
+- name: {{ $name }}
+  value: {{ get $envOverrides $name | quote }}
+{{- end }}
 {{- end }}
 {{- end -}}
 
@@ -177,10 +187,10 @@ spec:
           volumeMounts:
             {{- include "mistle.renderVolumeMounts" . | nindent 12 }}
           {{- end }}
-          {{- if or $values.env $values.secretEnv }}
+          {{- if or $values.env $values.secretEnv $values.envOverrides }}
           env:
-            {{- if $values.env }}
-            {{- include "mistle.renderEnv" $values.env | nindent 12 }}
+            {{- if or $values.env $values.envOverrides }}
+            {{- include "mistle.renderEnv" (dict "env" $values.env "envOverrides" $values.envOverrides) | nindent 12 }}
             {{- end }}
             {{- if $values.secretEnv }}
             {{- include "mistle.renderSecretEnv" $values.secretEnv | nindent 12 }}

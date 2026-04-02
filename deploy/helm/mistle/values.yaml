@@ -31,6 +31,7 @@ controlPlaneApi:
     pathType: Prefix
     tls: []
   env: []
+  envOverrides: {}
   secretEnv: []
   volumeMounts: []
   volumes: []
@@ -65,6 +66,7 @@ controlPlaneWorker:
     port: 8081
     targetPort: 8081
   env: []
+  envOverrides: {}
   secretEnv: []
   volumeMounts: []
   volumes: []
@@ -89,6 +91,7 @@ dataPlaneApi:
     port: 8082
     targetPort: 8082
   env: []
+  envOverrides: {}
   secretEnv: []
   volumeMounts: []
   volumes: []
@@ -123,6 +126,7 @@ dataPlaneWorker:
     port: 8083
     targetPort: 8083
   env: []
+  envOverrides: {}
   secretEnv: []
   volumeMounts: []
   volumes: []
@@ -155,6 +159,7 @@ dataPlaneGateway:
     pathType: Prefix
     tls: []
   env: []
+  envOverrides: {}
   secretEnv: []
   volumeMounts: []
   volumes: []
@@ -189,6 +194,7 @@ tokenizerProxy:
     port: 8085
     targetPort: 8085
   env: []
+  envOverrides: {}
   secretEnv: []
   volumeMounts: []
   volumes: []
