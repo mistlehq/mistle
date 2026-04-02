@@ -41,6 +41,27 @@ function createLookupEnv(): (key: string) => string | undefined {
   };
 }
 
+function parseLogPayload(line: string): Record<string, unknown> {
+  const payload: unknown = JSON.parse(line);
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    throw new Error("expected log line to be a json object");
+  }
+
+  return Object.fromEntries(Object.entries(payload));
+}
+
+function readBufferedLogPayloads(runtime: StartedRuntime): ReadonlyArray<Record<string, unknown>> {
+  const payloads: Record<string, unknown>[] = [];
+  runtime.logger.addLogLineListener((line) => {
+    payloads.push(parseLogPayload(line));
+  });
+  return payloads;
+}
+
+function hasEvent(payloads: ReadonlyArray<Record<string, unknown>>, eventName: string): boolean {
+  return payloads.some((payload) => payload["event"] === eventName);
+}
+
 afterEach(async () => {
   while (StartedRuntimes.length > 0) {
     const runtime = StartedRuntimes.pop();
@@ -104,8 +125,7 @@ describe("startRuntime", () => {
               "GH_TOKEN": "dummy-token"
             },
             "lifecycle": {
-              "install": [],
-              "remove": []
+              "install": []
             }
           }
         ],
@@ -129,5 +149,27 @@ describe("startRuntime", () => {
     }
 
     expect(process.env.GH_TOKEN).toBe(previousGhToken);
+  });
+
+  it("emits startup progress logs for config, input, and runtime-plan phases", async () => {
+    const runtime = await startRuntime({
+      lookupEnv: createLookupEnv(),
+      stdin: Readable.from([ValidStartupInputJson]),
+    });
+    void runtime.tunnelCompletion.catch(() => undefined);
+
+    try {
+      const payloads = readBufferedLogPayloads(runtime);
+
+      expect(hasEvent(payloads, "sandbox_runtime_config_loaded")).toBe(true);
+      expect(hasEvent(payloads, "sandbox_runtime_startup_input_loaded")).toBe(true);
+      expect(hasEvent(payloads, "sandbox_runtime_proxy_ca_not_configured")).toBe(true);
+      expect(hasEvent(payloads, "sandbox_runtime_http_server_listening")).toBe(true);
+      expect(hasEvent(payloads, "sandbox_runtime_plan_apply_started")).toBe(true);
+      expect(hasEvent(payloads, "sandbox_runtime_plan_apply_completed")).toBe(true);
+      expect(hasEvent(payloads, "sandbox_runtime_startup_ready")).toBe(true);
+    } finally {
+      await runtime.close();
+    }
   });
 });

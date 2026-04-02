@@ -7,6 +7,7 @@ import { RuntimeFileWriteMode, type CompiledRuntimePlan } from "@mistle/integrat
 import { afterEach, describe, expect, it } from "vitest";
 
 import { applyRuntimePlan } from "../src/runtime-plan/index.js";
+import { BufferedLogger } from "../src/runtime/logger.js";
 
 type SeededGitRepository = {
   bareRepositoryPath: string;
@@ -55,6 +56,35 @@ function createRuntimePlan(overrides: Partial<CompiledRuntimePlan>): CompiledRun
     agentRuntimes: [],
     ...overrides,
   };
+}
+
+function parseLogPayload(line: string): Record<string, unknown> {
+  const payload: unknown = JSON.parse(line);
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    throw new Error("expected log line to be a json object");
+  }
+
+  return Object.fromEntries(Object.entries(payload));
+}
+
+function createBufferedLogCapture(): {
+  logger: BufferedLogger;
+  payloads: Record<string, unknown>[];
+} {
+  const logger = new BufferedLogger();
+  const payloads: Record<string, unknown>[] = [];
+  logger.addLogLineListener((line) => {
+    payloads.push(parseLogPayload(line));
+  });
+
+  return {
+    logger,
+    payloads,
+  };
+}
+
+function hasEvent(payloads: ReadonlyArray<Record<string, unknown>>, eventName: string): boolean {
+  return payloads.some((payload) => payload["event"] === eventName);
 }
 
 async function seedBareGitRepository(): Promise<SeededGitRepository> {
@@ -708,5 +738,70 @@ describe("applyRuntimePlan", () => {
         }),
       }),
     ).rejects.toThrow("failed to clone repository");
+  });
+
+  it("emits progress logs for artifact, workspace-source, and runtime-file application", async () => {
+    const repository = await seedBareGitRepository();
+    const runtimeDirectory = await createTemporaryDirectory("mistle-runtime-plan-logs-");
+    const artifactMarkerPath = join(runtimeDirectory, "artifact-marker.txt");
+    const clonePath = join(runtimeDirectory, "workspace", "repos", "mistlehq", "mistle");
+    const runtimeFilePath = join(clonePath, "runtime-config.toml");
+    const { logger, payloads } = createBufferedLogCapture();
+
+    await applyRuntimePlan({
+      logger,
+      runtimePlan: createRuntimePlan({
+        artifacts: [
+          {
+            artifactKey: "artifact_cli",
+            name: "Artifact CLI",
+            lifecycle: {
+              install: [
+                {
+                  args: ["sh", "-euc", 'printf "%s" "$MARKER_CONTENT" > "$MARKER_PATH"'],
+                  env: {
+                    MARKER_CONTENT: "artifact-install",
+                    MARKER_PATH: artifactMarkerPath,
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        workspaceSources: [
+          {
+            sourceKind: "git-clone",
+            resourceKind: "repository",
+            path: clonePath,
+            originUrl: repository.bareRepositoryPath,
+          },
+        ],
+        runtimeClients: [
+          {
+            clientId: "client_codex",
+            setup: {
+              env: {},
+              files: [
+                {
+                  fileId: "file_runtime_config",
+                  path: runtimeFilePath,
+                  mode: 0o600,
+                  content: 'model = "gpt-5.4"',
+                },
+              ],
+            },
+            processes: [],
+            endpoints: [],
+          },
+        ],
+      }),
+    });
+
+    expect(hasEvent(payloads, "sandbox_runtime_plan_artifact_command_started")).toBe(true);
+    expect(hasEvent(payloads, "sandbox_runtime_plan_artifact_command_completed")).toBe(true);
+    expect(hasEvent(payloads, "sandbox_runtime_plan_workspace_source_started")).toBe(true);
+    expect(hasEvent(payloads, "sandbox_runtime_plan_workspace_source_completed")).toBe(true);
+    expect(hasEvent(payloads, "sandbox_runtime_plan_runtime_file_started")).toBe(true);
+    expect(hasEvent(payloads, "sandbox_runtime_plan_runtime_file_completed")).toBe(true);
   });
 });
