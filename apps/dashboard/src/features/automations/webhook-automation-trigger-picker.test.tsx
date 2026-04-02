@@ -12,6 +12,7 @@ import {
   createGithubPullRequestOpenedEventOption,
   GitHubConnectionId,
   GitHubGroupedConnectionLabel,
+  GitHubWebhookSourceId,
 } from "./webhook-automation-test-fixtures.js";
 import {
   groupWebhookAutomationEventOptions,
@@ -127,7 +128,7 @@ describe("WebhookAutomationTriggerPicker", () => {
       selectedConnectionId: GitHubConnectionId,
       selectedTriggerIds: [
         createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.issue_comment.created",
         }),
       ],
@@ -149,7 +150,7 @@ describe("WebhookAutomationTriggerPicker", () => {
       selectedConnectionId: GitHubConnectionId,
       selectedTriggerIds: [
         createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.push.deleted",
         }),
       ],
@@ -169,7 +170,7 @@ describe("WebhookAutomationTriggerPicker", () => {
       selectedConnectionId: GitHubConnectionId,
       selectedTriggerIds: [
         createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.issue_comment.created",
         }),
       ],
@@ -328,13 +329,13 @@ describe("WebhookAutomationTriggerPicker", () => {
       selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
       selectedTriggerIds: [
         createWebhookAutomationTriggerId({
-          connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.pull_request.opened",
         }),
       ],
       triggerParameterValues: {
         [createWebhookAutomationTriggerId({
-          connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.pull_request.opened",
         })]: {
           author: "octocat",
@@ -352,13 +353,13 @@ describe("WebhookAutomationTriggerPicker", () => {
       selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
       selectedTriggerIds: [
         createWebhookAutomationTriggerId({
-          connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.issue_comment.created",
         }),
       ],
       triggerParameterValues: {
         [createWebhookAutomationTriggerId({
-          connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.issue_comment.created",
         })]: {
           target: "exists",
@@ -380,13 +381,13 @@ describe("WebhookAutomationTriggerPicker", () => {
       selectedConnectionId: GitHubConnectionId,
       selectedTriggerIds: [
         createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.issue_comment.created",
         }),
       ],
       triggerParameterValues: {
         [createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.issue_comment.created",
         })]: {
           explicitInvocation: "@mistlebot",
@@ -412,13 +413,13 @@ describe("WebhookAutomationTriggerPicker", () => {
       selectedConnectionId: GitHubConnectionId,
       selectedTriggerIds: [
         createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.issue_comment.created",
         }),
       ],
       triggerParameterValues: {
         [createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.issue_comment.created",
         })]: {
           explicitInvocation: "@review-bot",
@@ -439,7 +440,7 @@ describe("WebhookAutomationTriggerPicker", () => {
       selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
       selectedTriggerIds: [
         createWebhookAutomationTriggerId({
-          connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.issue_comment.created",
         }),
       ],
@@ -460,7 +461,7 @@ describe("WebhookAutomationTriggerPicker", () => {
       selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
       selectedTriggerIds: [
         createWebhookAutomationTriggerId({
-          connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.issue_comment.created",
         }),
       ],
@@ -516,7 +517,7 @@ describe("WebhookAutomationTriggerPicker", () => {
       selectedConnectionId: GitHubConnectionId,
       selectedTriggerIds: [
         createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.issue_comment.created",
         }),
       ],
@@ -617,7 +618,7 @@ describe("WebhookAutomationTriggerPicker", () => {
 
     function StatefulResourceSelection(): React.JSX.Element {
       const triggerId = createWebhookAutomationTriggerId({
-        connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+        webhookSourceId: GitHubWebhookSourceId,
         eventType: "github.pull_request.opened",
       });
       const [triggerParameterValues, setTriggerParameterValues] = useState<
