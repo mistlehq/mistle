@@ -368,22 +368,6 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
       markdown(),
       EditorView.lineWrapping,
       createTemplateTokenHighlightExtension(rankedTokens),
-      EditorView.domEventHandlers({
-        keydown: (event, editorView) => {
-          if (event.key !== "Escape") {
-            return false;
-          }
-
-          const didCloseSuggestion = closeActiveSuggestion(editorView);
-          if (!didCloseSuggestion) {
-            return false;
-          }
-
-          event.preventDefault();
-          event.stopPropagation();
-          return true;
-        },
-      }),
       Prec.highest(
         keymap.of([
           {
@@ -405,6 +389,8 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
           {
             key: "Escape",
             run: closeActiveSuggestion,
+            preventDefault: true,
+            stopPropagation: true,
           },
           ...defaultKeymap,
           ...historyKeymap,
