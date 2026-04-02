@@ -16,10 +16,15 @@ import {
   Textarea,
   cn,
 } from "@mistle/ui";
+import { withTheme } from "@rjsf/core";
 import type {
+  DescriptionFieldProps,
+  FieldErrorProps,
+  FieldHelpProps,
   FieldTemplateProps,
   ObjectFieldTemplateProps,
   RJSFSchema,
+  SubmitButtonProps,
   WidgetProps,
 } from "@rjsf/utils";
 import {
@@ -355,6 +360,42 @@ function resolveFormLayout(input: IntegrationFormContext | undefined): "vertical
   return input?.layout === "horizontal" ? "horizontal" : "vertical";
 }
 
+function IntegrationDescriptionFieldTemplate(
+  props: DescriptionFieldProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element | null {
+  if (
+    (typeof props.description === "string" && props.description.length === 0) ||
+    props.description === undefined
+  ) {
+    return null;
+  }
+
+  return <FieldDescription id={props.id}>{props.description}</FieldDescription>;
+}
+
+function IntegrationFieldHelpTemplate(
+  props: FieldHelpProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element | null {
+  if ((typeof props.help === "string" && props.help.length === 0) || props.help === undefined) {
+    return null;
+  }
+
+  return <FieldDescription>{props.help}</FieldDescription>;
+}
+
+function IntegrationFieldErrorTemplate(
+  props: FieldErrorProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element | null {
+  const stringErrors = (props.errors ?? []).filter(
+    (message): message is string => typeof message === "string",
+  );
+  if (stringErrors.length === 0) {
+    return null;
+  }
+
+  return <FieldError errors={stringErrors.map((message) => ({ message }))} />;
+}
+
 function resolveFieldLayout(
   props: FieldTemplateProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): IntegrationFieldLayout {
@@ -385,9 +426,8 @@ function IntegrationFieldTemplate(
   if (props.hidden) {
     return props.children;
   }
-
-  const errorItems = (props.rawErrors ?? []).map((message) => ({ message }));
   const layout = resolveFieldLayout(props);
+  const hasErrors = (props.rawErrors ?? []).length > 0;
 
   return (
     <Field
@@ -396,7 +436,7 @@ function IntegrationFieldTemplate(
         layout === "vertical" ? IntegrationStackedFieldLayoutClassName : undefined,
       )}
       contentWidth={layout === "horizontal" ? "fill" : undefined}
-      data-invalid={errorItems.length > 0 || undefined}
+      data-invalid={hasErrors || undefined}
       orientation={layout}
       style={props.style}
     >
@@ -406,17 +446,13 @@ function IntegrationFieldTemplate(
             {props.label}
             {props.required ? <span className="text-destructive">*</span> : null}
           </FieldLabel>
-          {typeof props.rawDescription === "string" && props.rawDescription.length > 0 ? (
-            <FieldDescription>{props.rawDescription}</FieldDescription>
-          ) : null}
+          {props.description}
         </FieldHeader>
       ) : null}
       <FieldContent>
         {props.children}
-        <FieldError errors={errorItems} />
-        {typeof props.rawHelp === "string" && props.rawHelp.length > 0 ? (
-          <FieldDescription>{props.rawHelp}</FieldDescription>
-        ) : null}
+        {props.hideError ? null : props.errors}
+        {props.help}
       </FieldContent>
     </Field>
   );
@@ -458,6 +494,9 @@ function IntegrationObjectFieldTemplate(
 }
 
 export const IntegrationFormTemplates = {
+  DescriptionFieldTemplate: IntegrationDescriptionFieldTemplate,
+  FieldErrorTemplate: IntegrationFieldErrorTemplate,
+  FieldHelpTemplate: IntegrationFieldHelpTemplate,
   FieldTemplate: IntegrationFieldTemplate,
   ObjectFieldTemplate: IntegrationObjectFieldTemplate,
 };
@@ -472,3 +511,32 @@ export const IntegrationFormWidgets = {
   "comma-separated-string-array": CommaSeparatedStringArrayWidget,
   "integration-resource-string-array": IntegrationResourceStringArrayWidget,
 };
+
+function HiddenSubmitButton(
+  _props: SubmitButtonProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): null {
+  return null;
+}
+
+const IntegrationTheme = {
+  templates: IntegrationFormTemplates,
+  widgets: IntegrationFormWidgets,
+};
+
+export const IntegrationForm = withTheme<JsonObject, RJSFSchema, IntegrationFormContext>(
+  IntegrationTheme,
+);
+
+export const IntegrationFormWithoutSubmit = withTheme<
+  JsonObject,
+  RJSFSchema,
+  IntegrationFormContext
+>({
+  ...IntegrationTheme,
+  templates: {
+    ...IntegrationFormTemplates,
+    ButtonTemplates: {
+      SubmitButton: HiddenSubmitButton,
+    },
+  },
+});

@@ -11,14 +11,11 @@ import {
   RadioGroup,
   RadioGroupItem,
 } from "@mistle/ui";
-import Form, { type IChangeEvent } from "@rjsf/core";
+import type { IChangeEvent } from "@rjsf/core";
 import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 
-import {
-  IntegrationFormTemplates,
-  IntegrationFormWidgets,
-} from "../forms/integration-form-theme.js";
+import { IntegrationFormWithoutSubmit } from "../forms/integration-form-theme.js";
 import type { IntegrationConnectionMethod as ServiceIntegrationConnectionMethod } from "./integrations-service-shared.js";
 
 export type IntegrationConnectionMethod = ServiceIntegrationConnectionMethod;
@@ -89,17 +86,6 @@ type IntegrationConnectionDialogProps = {
   onSubmit: () => void;
   pending: boolean;
   secrets: Record<string, string>;
-};
-
-function HiddenSubmitButton(): null {
-  return null;
-}
-
-const DialogFormTemplates = {
-  ...IntegrationFormTemplates,
-  ButtonTemplates: {
-    SubmitButton: HiddenSubmitButton,
-  },
 };
 
 function formatIntegrationConnectionMethodLabel(method: IntegrationConnectionMethod): string {
@@ -210,7 +196,7 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
           {props.configForm.mode === "form" && props.configForm.visiblePropertyKeys.length > 0 ? (
             <div className="gap-2 flex flex-col">
               <p className="text-sm font-medium">Configuration</p>
-              <Form
+              <IntegrationFormWithoutSubmit
                 formData={props.configValue}
                 noHtml5Validate
                 onChange={(event: IChangeEvent<Record<string, unknown>, RJSFSchema>) => {
@@ -223,10 +209,8 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
                 }}
                 schema={props.configForm.schema}
                 showErrorList={false}
-                templates={DialogFormTemplates}
                 uiSchema={props.configForm.uiSchema}
                 validator={validator}
-                widgets={IntegrationFormWidgets}
               />
             </div>
           ) : null}

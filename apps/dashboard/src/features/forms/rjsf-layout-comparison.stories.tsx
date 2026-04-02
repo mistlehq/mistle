@@ -13,7 +13,6 @@ import {
   SelectValue,
   Textarea,
 } from "@mistle/ui";
-import Form from "@rjsf/core";
 import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 import type { Meta, StoryObj } from "@storybook/react-vite";
@@ -23,23 +22,12 @@ import type React from "react";
 
 import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
 import type { IntegrationFormContext } from "./integration-form-context.js";
-import { IntegrationFormTemplates, IntegrationFormWidgets } from "./integration-form-theme.js";
+import { IntegrationFormWithoutSubmit } from "./integration-form-theme.js";
 import { RepositoryItems } from "./integration-resource-string-array-widget-story-support.js";
 import type { IntegrationResourceListViewState } from "./integration-resource-string-array-widget-view-model.js";
 import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
 
 type JsonObject = Record<string, unknown>;
-
-function HiddenSubmitButton(): null {
-  return null;
-}
-
-const ComparisonTemplates = {
-  ...IntegrationFormTemplates,
-  ButtonTemplates: {
-    SubmitButton: HiddenSubmitButton,
-  },
-};
 
 function RjsfExampleForm(input: {
   formContext: IntegrationFormContext;
@@ -52,7 +40,7 @@ function RjsfExampleForm(input: {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Form<JsonObject, RJSFSchema, IntegrationFormContext>
+      <IntegrationFormWithoutSubmit
         formContext={input.formContext}
         formData={formData}
         noHtml5Validate
@@ -66,10 +54,8 @@ function RjsfExampleForm(input: {
         }}
         schema={input.schema}
         showErrorList={false}
-        templates={ComparisonTemplates}
         uiSchema={input.uiSchema}
         validator={validator}
-        widgets={IntegrationFormWidgets}
       />
     </QueryClientProvider>
   );

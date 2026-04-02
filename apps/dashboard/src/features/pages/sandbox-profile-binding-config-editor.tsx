@@ -2,15 +2,12 @@ import { applySchemaDefaultsToFormData, resolveIntegrationForm } from "@mistle/i
 import { createDefinitionsBundle } from "@mistle/integrations-definitions";
 import { createIntegrationFormRegistry } from "@mistle/integrations-definitions/forms";
 import { Button, Notice } from "@mistle/ui";
-import Form, { type IChangeEvent } from "@rjsf/core";
+import type { IChangeEvent } from "@rjsf/core";
 import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 
 import type { IntegrationFormContext } from "../forms/integration-form-context.js";
-import {
-  IntegrationFormTemplates,
-  IntegrationFormWidgets,
-} from "../forms/integration-form-theme.js";
+import { IntegrationFormWithoutSubmit } from "../forms/integration-form-theme.js";
 import type { IntegrationConnectionResourceSummary } from "../integrations/integrations-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { isRecord } from "../shared/is-record.js";
@@ -494,8 +491,7 @@ export function SandboxProfileBindingConfigEditor(input: {
   }
 
   return (
-    <Form<JsonObject, RJSFSchema, IntegrationFormContext>
-      children={<></>}
+    <IntegrationFormWithoutSubmit
       formData={configUiModel.value}
       formContext={{
         ...(input.formContext ?? {}),
@@ -519,8 +515,6 @@ export function SandboxProfileBindingConfigEditor(input: {
       showErrorList={false}
       uiSchema={configUiModel.uiSchema}
       validator={validator}
-      templates={IntegrationFormTemplates}
-      widgets={IntegrationFormWidgets}
     />
   );
 }
