@@ -969,6 +969,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     isResumingStoppedSandbox: isShowingResumeInFlightState,
     requestStoppedSandboxResume,
     sandboxLifecycleStatus: effectiveSandboxStatus,
+    sessionConnectionStatus,
     sandboxFailureMessage,
     sandboxStatusQuery,
     sessionReconnectState: {

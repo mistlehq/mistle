@@ -8,6 +8,7 @@ import {
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
+import type { WorkbenchSessionConnectionStatus } from "./session-workbench-view-model.js";
 import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 import {
@@ -55,6 +56,7 @@ type SessionWorkbenchState = {
   ptyState: ReturnType<typeof useSandboxPtyState>;
   requestStoppedSandboxResume: () => Promise<void>;
   sandboxLifecycleStatus: "resuming" | "starting" | "running" | "stopped" | "failed" | null;
+  sessionConnectionStatus: WorkbenchSessionConnectionStatus | null;
   sandboxFailureMessage: string | null;
   sandboxStatusQuery: ReturnType<typeof useSessionWorkbenchLifecycleState>["sandboxStatusQuery"];
   sandboxHeaderStatusUi: ReturnType<
@@ -195,6 +197,7 @@ export function useSessionWorkbenchController(input: {
       cliPtyState,
       requestStoppedSandboxResume: workbenchLifecycleState.requestStoppedSandboxResume,
       sandboxLifecycleStatus: workbenchLifecycleState.sandboxLifecycleStatus,
+      sessionConnectionStatus: workbenchLifecycleState.sessionConnectionStatus,
       sandboxFailureMessage: workbenchLifecycleState.sandboxFailureMessage,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,
       sandboxHeaderStatusUi: workbenchLifecycleState.sandboxHeaderStatusUi,
