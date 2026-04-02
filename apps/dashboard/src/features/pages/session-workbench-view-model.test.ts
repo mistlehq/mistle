@@ -43,6 +43,17 @@ describe("resolveSandboxHeaderStatusUi", () => {
       },
     },
     {
+      description: "shows loading while sandbox status is still being retrieved",
+      input: {
+        sandboxLifecycleStatus: null,
+        sessionConnectionStatus: null,
+      } as const,
+      expected: {
+        label: "Loading sandbox status",
+        variant: "outline",
+      },
+    },
+    {
       description: "shows resuming while a stopped sandbox resume is pending",
       input: {
         sandboxLifecycleStatus: "resuming",

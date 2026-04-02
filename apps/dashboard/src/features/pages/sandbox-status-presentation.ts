@@ -11,6 +11,13 @@ export type SandboxStatusBadgeUi = {
 export function resolveSandboxStatusBadgeUi(
   sandboxLifecycleStatus: WorkbenchSandboxLifecycleStatus,
 ): SandboxStatusBadgeUi {
+  if (sandboxLifecycleStatus === null) {
+    return {
+      label: "Loading sandbox status",
+      variant: "outline",
+    };
+  }
+
   if (sandboxLifecycleStatus === "failed") {
     return {
       label: "Sandbox failed",

@@ -271,6 +271,7 @@ describe("SessionsPage", () => {
   });
 
   it("uses the same badge labels as the workbench header mapper", () => {
+    expect(resolveSandboxStatusBadgeUi(null).label).toBe("Loading sandbox status");
     expect(resolveSandboxStatusBadgeUi("pending").label).toBe("Starting sandbox");
     expect(resolveSandboxStatusBadgeUi("starting").label).toBe("Starting sandbox");
     expect(resolveSandboxStatusBadgeUi("running").label).toBe("Connected");
