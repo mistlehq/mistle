@@ -1,10 +1,12 @@
 import {
+  Button,
   Field,
   FieldContent,
   FieldDescription,
   FieldHeader,
   FieldLabel,
   InlineCode,
+  Switch,
 } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
@@ -75,6 +77,107 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
   );
 }
 
+function PrototypeHarness(): React.JSX.Element {
+  const [value, setValue] = useState("");
+  const [includeIssueComment, setIncludeIssueComment] = useState(true);
+  const [includePullRequest, setIncludePullRequest] = useState(true);
+  const [invalid, setInvalid] = useState(false);
+  const [disabled, setDisabled] = useState(false);
+
+  const selectedEventOptions = [
+    ...(includeIssueComment ? [createGithubIssueCommentCreatedEventOption()] : []),
+    ...(includePullRequest ? [createGithubPullRequestOpenedEventOption()] : []),
+  ];
+  const tokens = buildAgentInstructionTokenCatalog({
+    selectedEventOptions,
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded border bg-white p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="flex items-center gap-2 text-sm">
+            <Switch
+              aria-label="Issue comment trigger enabled"
+              checked={includeIssueComment}
+              onCheckedChange={setIncludeIssueComment}
+            />
+            Issue comment trigger
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <Switch
+              aria-label="Pull request trigger enabled"
+              checked={includePullRequest}
+              onCheckedChange={setIncludePullRequest}
+            />
+            Pull request trigger
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <Switch
+              aria-label="Invalid state enabled"
+              checked={invalid}
+              onCheckedChange={setInvalid}
+            />
+            Invalid state
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <Switch
+              aria-label="Disabled state enabled"
+              checked={disabled}
+              onCheckedChange={setDisabled}
+            />
+            Disabled state
+          </label>
+          <Button
+            onClick={() => {
+              setValue("");
+            }}
+            type="button"
+            variant="outline"
+          >
+            Reset text
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded border bg-white p-4">
+        <Field>
+          <FieldHeader>
+            <div className="space-y-1">
+              <FieldLabel id="prototype-agent-instructions-label">Agent Instructions</FieldLabel>
+              <FieldDescription>
+                <span className="block">Type inside the editor as if this were the real form.</span>
+                <span className="block">
+                  Start with <InlineCode variant="muted">{"{{"}</InlineCode> or{" "}
+                  <InlineCode variant="muted">{"{{payload."}</InlineCode> to inspect completions.
+                </span>
+              </FieldDescription>
+            </div>
+          </FieldHeader>
+          <FieldContent>
+            <AgentInstructionsEditor
+              ariaLabelledBy="prototype-agent-instructions-label"
+              disabled={disabled}
+              invalid={invalid}
+              onChange={setValue}
+              tokens={tokens}
+              value={value}
+            />
+            {selectedEventOptions.length === 0 ? (
+              <p className="text-muted-foreground mt-2 text-sm">
+                {AgentInstructionsNoTriggerHelpText}
+              </p>
+            ) : null}
+            {invalid ? (
+              <p className="text-destructive text-sm">Input template is required.</p>
+            ) : null}
+          </FieldContent>
+        </Field>
+      </div>
+    </div>
+  );
+}
+
 const meta = {
   title: "Dashboard/Automations/AgentInstructionsEditor",
   component: StoryHarness,
@@ -129,5 +232,11 @@ export const Disabled: Story = {
       "Payload: {{payload}}",
     ].join("\n"),
     withSelectedTriggers: true,
+  },
+};
+
+export const Prototype: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    return <PrototypeHarness />;
   },
 };

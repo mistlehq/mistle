@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   completeAgentInstructionToken,
+  findMatchingAgentInstructionTokens,
   resolveAgentInstructionTemplateQuery,
 } from "./agent-instructions-completion.js";
 import { buildAgentInstructionTokenCatalog } from "./agent-instructions-token-catalog.js";
@@ -70,6 +71,15 @@ describe("completeAgentInstructionToken", () => {
     );
 
     expect(completionResult).toBeNull();
+  });
+
+  it("finds matching tokens for a partial payload path", () => {
+    const matchingTokens = findMatchingAgentInstructionTokens({
+      query: "payload.com",
+      tokens,
+    });
+
+    expect(matchingTokens.map((token) => token.path)).toContain("payload.comment.body");
   });
 
   it("replaces a full existing token span when already inside one", () => {

@@ -63,6 +63,31 @@ function toCompletion(token: AgentInstructionsEditorToken): Completion {
   };
 }
 
+export function findMatchingAgentInstructionTokens(input: {
+  query: string;
+  tokens: readonly AgentInstructionsEditorToken[];
+}): readonly AgentInstructionsEditorToken[] {
+  const normalizedQuery = input.query.toLowerCase();
+
+  return input.tokens
+    .filter((token) => token.replacePath.toLowerCase().startsWith(normalizedQuery))
+    .sort((left, right) => {
+      const leftSegmentCount = left.path.split(".").length;
+      const rightSegmentCount = right.path.split(".").length;
+      if (leftSegmentCount !== rightSegmentCount) {
+        return leftSegmentCount - rightSegmentCount;
+      }
+
+      const leftPathLength = left.path.length;
+      const rightPathLength = right.path.length;
+      if (leftPathLength !== rightPathLength) {
+        return leftPathLength - rightPathLength;
+      }
+
+      return left.path.localeCompare(right.path);
+    });
+}
+
 export function completeAgentInstructionToken(
   context: CompletionContext,
   input: {
@@ -77,10 +102,10 @@ export function completeAgentInstructionToken(
     return null;
   }
 
-  const query = resolvedContext.query.toLowerCase();
-  const options = input.tokens
-    .filter((token) => token.replacePath.toLowerCase().startsWith(query))
-    .map(toCompletion);
+  const options = findMatchingAgentInstructionTokens({
+    query: resolvedContext.query,
+    tokens: input.tokens,
+  }).map(toCompletion);
 
   if (options.length === 0) {
     return null;
