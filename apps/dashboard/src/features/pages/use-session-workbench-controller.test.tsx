@@ -13,6 +13,7 @@ import {
   hasFreshSandboxStatusReadSinceRecoveryBoundary,
   isActiveResumeRequest,
   reduceCodexRecoveryState,
+  resolveSandboxStatusReadState,
   resolveCodexReconnectMessage,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
@@ -345,6 +346,24 @@ describe("useSessionWorkbenchController", () => {
         currentDataUpdatedAtMs: 1_000,
       }),
     ).toBe(true);
+  });
+
+  it("keeps sandbox status ready after a transient refetch error when a fresh read already exists", () => {
+    expect(
+      resolveSandboxStatusReadState({
+        hasFreshSandboxStatusSinceMount: true,
+        hasFreshSandboxStatusSinceRecovery: true,
+        hasStatusQueryError: true,
+      }),
+    ).toBe("ready");
+
+    expect(
+      resolveSandboxStatusReadState({
+        hasFreshSandboxStatusSinceMount: false,
+        hasFreshSandboxStatusSinceRecovery: true,
+        hasStatusQueryError: true,
+      }),
+    ).toBe("error");
   });
 
   it("persists terminal panel visibility and size per sandbox instance", () => {

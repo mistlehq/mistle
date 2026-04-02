@@ -81,7 +81,9 @@ export function resolveSandboxStatusReadState(input: {
   hasStatusQueryError: boolean;
 }): SandboxStatusReadState {
   if (input.hasStatusQueryError) {
-    return "error";
+    return input.hasFreshSandboxStatusSinceMount && input.hasFreshSandboxStatusSinceRecovery
+      ? "ready"
+      : "error";
   }
 
   return input.hasFreshSandboxStatusSinceMount && input.hasFreshSandboxStatusSinceRecovery
