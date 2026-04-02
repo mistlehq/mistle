@@ -10,28 +10,6 @@ import {
 const redirectCreateDialog: IntegrationConnectionDialogState = {
   methods: [
     {
-      id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-      label: "GitHub App installation",
-      kind: "redirect",
-      ui: {
-        create: {
-          submitLabel: "Install GitHub App",
-          helperText: "Continue to GitHub to install the app and finish connecting this account.",
-        },
-      },
-    },
-  ],
-  mode: "create",
-  targetConfig: {},
-  targetDisplayName: "GitHub",
-  targetFamilyId: "github",
-  targetKey: "github-cloud",
-  targetVariantId: "github-cloud",
-};
-
-const formCreateDialog: IntegrationConnectionDialogState = {
-  methods: [
-    {
       id: IntegrationConnectionMethodIds.API_KEY,
       label: "API key",
       kind: "form",
@@ -43,6 +21,17 @@ const formCreateDialog: IntegrationConnectionDialogState = {
           inputType: "password",
         },
       ],
+    },
+    {
+      id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      label: "GitHub App installation",
+      kind: "redirect",
+      ui: {
+        create: {
+          submitLabel: "Install GitHub App",
+          helperText: "Continue to GitHub to install the app and finish connecting this account.",
+        },
+      },
     },
   ],
   mode: "create",
@@ -93,12 +82,5 @@ export const RedirectCreate: Story = {};
 export const RedirectCreatePending: Story = {
   args: {
     pending: true,
-  },
-};
-
-export const FormCreate: Story = {
-  args: {
-    dialog: formCreateDialog,
-    methodId: IntegrationConnectionMethodIds.API_KEY,
   },
 };
