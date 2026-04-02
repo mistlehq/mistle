@@ -3,6 +3,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { MemoryRouter } from "react-router";
 
+import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import { SessionsPage } from "./sessions-page.js";
 import {
   buildStoryLaunchableSandboxProfile,
@@ -11,30 +13,23 @@ import {
 } from "./sessions-page.story-fixtures.js";
 
 type SessionsPageStoryArgs = {
-  launchableProfiles?: readonly ReturnType<typeof buildStoryLaunchableSandboxProfile>[];
-  sandboxInstancesList?: {
-    items: readonly ReturnType<typeof buildStorySandboxInstanceListItem>[];
-    nextPage: {
-      after: string;
-      before: null;
-      limit: number;
-    } | null;
-    previousPage: {
-      after: null;
-      before: string;
-      limit: number;
-    } | null;
-    totalResults: number;
-  };
+  launchableProfiles?: LaunchableSandboxProfilesResult["items"];
+  sandboxInstancesList?: SandboxInstancesListResult;
 };
 
 function SessionsPageStory(input: SessionsPageStoryArgs): React.JSX.Element {
-  const [queryClient] = useState(() =>
-    createSessionsPageStoryQueryClient({
-      launchableProfiles: input.launchableProfiles,
-      sandboxInstancesList: input.sandboxInstancesList,
-    }),
-  );
+  const [queryClient] = useState(() => {
+    const storyData = {
+      ...(input.launchableProfiles !== undefined
+        ? { launchableProfiles: input.launchableProfiles }
+        : {}),
+      ...(input.sandboxInstancesList !== undefined
+        ? { sandboxInstancesList: input.sandboxInstancesList }
+        : {}),
+    };
+
+    return createSessionsPageStoryQueryClient(storyData);
+  });
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -141,11 +136,9 @@ export const PaginatedResults: Story = {
       ],
       nextPage: {
         after: "cursor_after_2",
-        before: null,
         limit: 20,
       },
       previousPage: {
-        after: null,
         before: "cursor_before_0",
         limit: 20,
       },

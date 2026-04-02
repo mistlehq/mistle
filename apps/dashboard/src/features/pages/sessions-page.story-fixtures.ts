@@ -58,7 +58,7 @@ export function buildStorySandboxInstanceListItem(
 }
 
 export function createSessionsPageStoryQueryClient(input?: {
-  launchableProfiles?: readonly LaunchableSandboxProfile[];
+  launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
 }): QueryClient {
   const queryClient = new QueryClient({
@@ -72,11 +72,9 @@ export function createSessionsPageStoryQueryClient(input?: {
 
   seedAuthenticatedSession(queryClient);
   queryClient.setQueryData(launchableSandboxProfilesQueryKey(), {
-    items:
-      input?.launchableProfiles ??
-      ([
-        buildStoryLaunchableSandboxProfile({ id: "sbp_profile_alpha" }),
-      ] satisfies readonly LaunchableSandboxProfile[]),
+    items: input?.launchableProfiles ?? [
+      buildStoryLaunchableSandboxProfile({ id: "sbp_profile_alpha" }),
+    ],
   } satisfies LaunchableSandboxProfilesResult);
   queryClient.setQueryData(
     sandboxInstancesListQueryKey({
