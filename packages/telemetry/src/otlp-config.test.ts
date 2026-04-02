@@ -1,53 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  buildOtlpHttpExporterConfig,
-  parseOtlpHeadersJson,
-  parseOtlpResourceAttributes,
-} from "./otlp-config.js";
+import { buildOtlpHttpExporterConfig, parseOtlpResourceAttributes } from "./otlp-config.js";
 
 describe("buildOtlpHttpExporterConfig", () => {
-  it("preserves configured HTTP headers", () => {
+  it("maps the configured endpoint to the OTLP HTTP exporter url", () => {
     expect(
       buildOtlpHttpExporterConfig({
         endpoint: "http://127.0.0.1:4318/v1/logs",
-        headers: {
-          authorization: "Bearer token",
-          "x-scope-orgid": "tenant",
-        },
       }),
     ).toEqual({
       url: "http://127.0.0.1:4318/v1/logs",
-      headers: {
-        authorization: "Bearer token",
-        "x-scope-orgid": "tenant",
-      },
     });
-  });
-});
-
-describe("parseOtlpHeadersJson", () => {
-  it("parses a JSON object of string header values", () => {
-    expect(
-      parseOtlpHeadersJson({
-        envName: "MISTLE_GLOBAL_TELEMETRY_LOGS_HEADERS_JSON",
-        rawValue: '{"authorization":"Bearer token","x-scope-orgid":"tenant"}',
-      }),
-    ).toEqual({
-      authorization: "Bearer token",
-      "x-scope-orgid": "tenant",
-    });
-  });
-
-  it("fails for non-string header values", () => {
-    expect(() =>
-      parseOtlpHeadersJson({
-        envName: "MISTLE_GLOBAL_TELEMETRY_LOGS_HEADERS_JSON",
-        rawValue: '{"authorization":1}',
-      }),
-    ).toThrow(
-      "Invalid MISTLE_GLOBAL_TELEMETRY_LOGS_HEADERS_JSON: header 'authorization' must be a string.",
-    );
   });
 });
 

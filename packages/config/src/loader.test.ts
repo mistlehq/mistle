@@ -13,21 +13,12 @@ describe("parseConfigRecord", () => {
           debug: false,
           traces: {
             endpoint: "http://127.0.0.1:4318/v1/traces",
-            headers: {
-              authorization: "Bearer traces-token",
-            },
           },
           logs: {
             endpoint: "http://127.0.0.1:4318/v1/logs",
-            headers: {
-              "x-scope-orgid": "tenant-a",
-            },
           },
           metrics: {
             endpoint: "http://127.0.0.1:4318/v1/metrics",
-            headers: {
-              authorization: "Bearer metrics-token",
-            },
           },
           resourceAttributes: "deployment.environment=test",
         },

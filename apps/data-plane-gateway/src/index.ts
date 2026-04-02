@@ -8,6 +8,7 @@ const runtime = createDataPlaneGatewayRuntime({
   app: appConfig,
   internalAuth: globalConfig.internalAuth,
   sandbox: globalConfig.sandbox,
+  telemetry: globalConfig.telemetry,
 });
 
 await runtime.start();

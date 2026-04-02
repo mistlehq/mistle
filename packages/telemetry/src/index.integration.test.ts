@@ -6,9 +6,8 @@ import { describe, expect, it } from "vitest";
 import { createOtlpLogForwarder } from "./index.js";
 
 describe("createOtlpLogForwarder", () => {
-  it("sends configured OTLP headers on export", async () => {
+  it("exports OTLP logs to the configured endpoint", async () => {
     const requests: {
-      headers: Record<string, string | undefined>;
       body: string;
     }[] = [];
 
@@ -20,16 +19,6 @@ describe("createOtlpLogForwarder", () => {
       });
       request.on("end", () => {
         requests.push({
-          headers: {
-            authorization:
-              typeof request.headers.authorization === "string"
-                ? request.headers.authorization
-                : undefined,
-            "x-scope-orgid":
-              typeof request.headers["x-scope-orgid"] === "string"
-                ? request.headers["x-scope-orgid"]
-                : undefined,
-          },
           body: Buffer.concat(chunks).toString("utf8"),
         });
         response.statusCode = 200;
@@ -51,10 +40,6 @@ describe("createOtlpLogForwarder", () => {
       resourceAttributes: "deployment.environment=test",
       logs: {
         endpoint: `http://127.0.0.1:${String(address.port)}/v1/logs`,
-        headers: {
-          authorization: "Bearer test-token",
-          "x-scope-orgid": "tenant-a",
-        },
       },
     });
 
@@ -70,10 +55,6 @@ describe("createOtlpLogForwarder", () => {
     }
 
     expect(requests).toHaveLength(1);
-    expect(requests[0]?.headers).toEqual({
-      authorization: "Bearer test-token",
-      "x-scope-orgid": "tenant-a",
-    });
     expect(requests[0]?.body).toContain("@mistle/sandbox-runtime");
     expect(requests[0]?.body).toContain("sandbox runtime started");
   });

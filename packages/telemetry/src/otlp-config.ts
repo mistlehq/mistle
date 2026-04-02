@@ -1,60 +1,11 @@
-export type OtlpHeaders = Record<string, string>;
-
 export type OtlpSignalRuntimeConfig = {
   endpoint: string;
-  headers?: OtlpHeaders | undefined;
 };
 
-export type OtlpHttpExporterConfig =
-  | {
-      url: string;
-    }
-  | {
-      url: string;
-      headers: OtlpHeaders;
-    };
-
-export function buildOtlpHttpExporterConfig(
-  input: OtlpSignalRuntimeConfig,
-): OtlpHttpExporterConfig {
-  if (input.headers === undefined) {
-    return {
-      url: input.endpoint,
-    };
-  }
-
+export function buildOtlpHttpExporterConfig(input: OtlpSignalRuntimeConfig): { url: string } {
   return {
     url: input.endpoint,
-    headers: input.headers,
   };
-}
-
-export function parseOtlpHeadersJson(input: { envName: string; rawValue: string }): OtlpHeaders {
-  let parsedValue: unknown;
-
-  try {
-    parsedValue = JSON.parse(input.rawValue);
-  } catch (error) {
-    throw new Error(
-      `Invalid ${input.envName}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-
-  if (typeof parsedValue !== "object" || parsedValue === null || Array.isArray(parsedValue)) {
-    throw new Error(`Invalid ${input.envName}: expected a JSON object.`);
-  }
-
-  const headers: OtlpHeaders = {};
-
-  for (const [headerName, headerValue] of Object.entries(parsedValue)) {
-    if (typeof headerValue !== "string") {
-      throw new Error(`Invalid ${input.envName}: header '${headerName}' must be a string.`);
-    }
-
-    headers[headerName] = headerValue;
-  }
-
-  return headers;
 }
 
 export function parseOtlpResourceAttributes(input: {

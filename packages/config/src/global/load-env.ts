@@ -1,7 +1,6 @@
 import { createEnvLoader, hasEntries, parseBooleanEnv } from "../core/load-env.js";
 import {
   PartialGlobalTelemetryConfigSchema,
-  PartialGlobalTelemetrySignalConfigSchema,
   PartialGlobalConfigSchema,
   PartialGlobalSandboxConfigSchema,
   PartialGlobalSandboxPublishConfigSchema,
@@ -35,6 +34,27 @@ const loadTelemetryEnv = createEnvLoader<typeof PartialGlobalTelemetryConfigSche
     key: "debug",
     envVar: "MISTLE_GLOBAL_TELEMETRY_DEBUG",
     parse: (value) => parseBooleanEnv(value, "MISTLE_GLOBAL_TELEMETRY_DEBUG"),
+  },
+  {
+    key: "traces",
+    envVar: "MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT",
+    parse: (value) => ({
+      endpoint: value,
+    }),
+  },
+  {
+    key: "logs",
+    envVar: "MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT",
+    parse: (value) => ({
+      endpoint: value,
+    }),
+  },
+  {
+    key: "metrics",
+    envVar: "MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT",
+    parse: (value) => ({
+      endpoint: value,
+    }),
   },
   {
     key: "resourceAttributes",
@@ -137,70 +157,9 @@ const loadSandboxEnv = createEnvLoader<typeof PartialGlobalSandboxConfigSchema>(
   },
 ]);
 
-function parseTelemetryHeadersEnv(value: string, envVar: string): Record<string, string> {
-  let parsedValue: unknown;
-
-  try {
-    parsedValue = JSON.parse(value);
-  } catch (error) {
-    throw new Error(`Invalid ${envVar}: ${error instanceof Error ? error.message : String(error)}`);
-  }
-
-  if (typeof parsedValue !== "object" || parsedValue === null || Array.isArray(parsedValue)) {
-    throw new Error(`Invalid ${envVar}: Expected a JSON object.`);
-  }
-
-  const normalizedValue: Record<string, string> = {};
-
-  for (const [headerName, headerValue] of Object.entries(parsedValue)) {
-    if (typeof headerValue !== "string") {
-      throw new Error(
-        `Invalid ${envVar}: Invalid value for header '${headerName}'. Expected a string.`,
-      );
-    }
-
-    normalizedValue[headerName] = headerValue;
-  }
-
-  return normalizedValue;
-}
-
-function loadTelemetrySignalFromEnv(input: {
-  env: NodeJS.ProcessEnv;
-  endpointEnvVar: string;
-  headersEnvVar: string;
-}): Record<string, unknown> {
-  return createEnvLoader<typeof PartialGlobalTelemetrySignalConfigSchema>([
-    {
-      key: "endpoint",
-      envVar: input.endpointEnvVar,
-    },
-    {
-      key: "headers",
-      envVar: input.headersEnvVar,
-      parse: (value) => parseTelemetryHeadersEnv(value, input.headersEnvVar),
-    },
-  ])(input.env);
-}
-
 export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigInput {
   const partialGlobal = loadGlobalEnv(env);
   const partialTelemetry = loadTelemetryEnv(env);
-  const partialTelemetryTraces = loadTelemetrySignalFromEnv({
-    env,
-    endpointEnvVar: "MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT",
-    headersEnvVar: "MISTLE_GLOBAL_TELEMETRY_TRACES_HEADERS_JSON",
-  });
-  const partialTelemetryLogs = loadTelemetrySignalFromEnv({
-    env,
-    endpointEnvVar: "MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT",
-    headersEnvVar: "MISTLE_GLOBAL_TELEMETRY_LOGS_HEADERS_JSON",
-  });
-  const partialTelemetryMetrics = loadTelemetrySignalFromEnv({
-    env,
-    endpointEnvVar: "MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT",
-    headersEnvVar: "MISTLE_GLOBAL_TELEMETRY_METRICS_HEADERS_JSON",
-  });
   const partialSandbox = loadSandboxEnv(env);
   const partialSandboxBootstrapToken = loadSandboxBootstrapTokenEnv(env);
   const partialSandboxConnectToken = loadSandboxConnectTokenEnv(env);
@@ -209,30 +168,8 @@ export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigIn
   const partialSandboxPublishAccessToken = loadSandboxPublishAccessTokenEnv(env);
   const partialSandboxPublishSession = loadSandboxPublishSessionEnv(env);
 
-  if (
-    hasEntries(partialTelemetry) ||
-    hasEntries(partialTelemetryTraces) ||
-    hasEntries(partialTelemetryLogs) ||
-    hasEntries(partialTelemetryMetrics)
-  ) {
-    partialGlobal.telemetry = {
-      ...partialTelemetry,
-      ...(hasEntries(partialTelemetryTraces)
-        ? {
-            traces: partialTelemetryTraces,
-          }
-        : {}),
-      ...(hasEntries(partialTelemetryLogs)
-        ? {
-            logs: partialTelemetryLogs,
-          }
-        : {}),
-      ...(hasEntries(partialTelemetryMetrics)
-        ? {
-            metrics: partialTelemetryMetrics,
-          }
-        : {}),
-    };
+  if (hasEntries(partialTelemetry)) {
+    partialGlobal.telemetry = partialTelemetry;
   }
 
   if (
