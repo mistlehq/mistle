@@ -31,11 +31,18 @@ type ActiveSuggestionState = {
 };
 
 type SuggestionPopoverPosition = {
+  height: number;
   left: number;
   top: number;
 };
 
 type SuggestionInteractionMode = "keyboard" | "pointer";
+
+const SuggestionPopoverWidth = 320;
+const SuggestionPopoverGap = 6;
+const SuggestionPopoverMaxHeight = 256;
+const SuggestionPopoverRowHeight = 44;
+const SuggestionPopoverVerticalPadding = 8;
 
 function createAgentInstructionsEditorTheme(): ReturnType<typeof EditorView.theme> {
   return EditorView.theme({
@@ -130,7 +137,14 @@ function areSuggestionPopoverPositionsEqual(
     return false;
   }
 
-  return left.left === right.left && left.top === right.top;
+  return left.height === right.height && left.left === right.left && left.top === right.top;
+}
+
+function estimateSuggestionPopoverHeight(optionCount: number): number {
+  return Math.min(
+    SuggestionPopoverMaxHeight,
+    SuggestionPopoverVerticalPadding + optionCount * SuggestionPopoverRowHeight,
+  );
 }
 
 export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): React.JSX.Element {
@@ -326,6 +340,18 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
 
   const handleUpdate = useCallback(
     (update: ViewUpdate): void => {
+      if (!update.view.hasFocus) {
+        if (activeSuggestionStateRef.current !== null) {
+          setActiveSuggestionState(null);
+        }
+        setSelectedSuggestionIndex(0);
+        setSuggestionPopoverPosition((currentPosition) =>
+          currentPosition === null ? currentPosition : null,
+        );
+        setSuggestionInteractionMode("pointer");
+        return;
+      }
+
       if (input.disabled) {
         if (activeSuggestionStateRef.current !== null) {
           setActiveSuggestionState(null);
@@ -378,12 +404,29 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
         const rootRect = rootElement.getBoundingClientRect();
         const horizontalPadding = 12;
         const minLeft = horizontalPadding;
-        const maxLeft = Math.max(minLeft, rootRect.width - 320 - horizontalPadding);
+        const maxLeft = Math.max(
+          minLeft,
+          rootRect.width - SuggestionPopoverWidth - horizontalPadding,
+        );
         const desiredLeft = anchorCoordinates.left - rootRect.left;
+        const estimatedPopoverHeight = estimateSuggestionPopoverHeight(
+          nextSuggestionState.options.length,
+        );
+        const spaceBelow = window.innerHeight - anchorCoordinates.bottom;
+        const spaceAbove = anchorCoordinates.top;
+        const placeAbove =
+          spaceBelow < estimatedPopoverHeight + SuggestionPopoverGap && spaceAbove > spaceBelow;
+        const unclampedTop = placeAbove
+          ? anchorCoordinates.top - rootRect.top - estimatedPopoverHeight - SuggestionPopoverGap
+          : anchorCoordinates.bottom - rootRect.top + SuggestionPopoverGap;
+        const minTop = 8 - rootRect.top;
+        const maxTop = window.innerHeight - 8 - rootRect.top - estimatedPopoverHeight;
+        const nextTop = Math.min(Math.max(unclampedTop, minTop), maxTop);
 
         nextSuggestionPopoverPosition = {
+          height: estimatedPopoverHeight,
           left: Math.min(Math.max(desiredLeft, minLeft), maxLeft),
-          top: anchorCoordinates.bottom - rootRect.top + 6,
+          top: nextTop,
         };
       }
 
@@ -435,11 +478,12 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
           className="border-border bg-popover text-popover-foreground absolute z-20 w-80 rounded-md border text-sm shadow-md"
           data-slot="agent-instructions-suggestions"
           style={{
+            height: `${suggestionPopoverPosition.height}px`,
             left: `${suggestionPopoverPosition.left}px`,
             top: `${suggestionPopoverPosition.top}px`,
           }}
         >
-          <div className="max-h-64 overflow-y-auto p-1" role="listbox">
+          <div className="h-full overflow-y-scroll p-1" role="listbox">
             {activeSuggestionState.options.map((token, index) => (
               <button
                 className={cn(
