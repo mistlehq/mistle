@@ -5,10 +5,11 @@ import { drawSelection, EditorView, keymap } from "@codemirror/view";
 import { cn } from "@mistle/ui";
 import type { EditorView as CodeMirrorEditorView, ViewUpdate } from "@uiw/react-codemirror";
 import CodeMirror from "@uiw/react-codemirror";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   findMatchingAgentInstructionTokens,
+  rankAgentInstructionTokensForMatching,
   resolveAgentInstructionTemplateQuery,
 } from "./agent-instructions-completion.js";
 import type { AgentInstructionsEditorToken } from "./agent-instructions-token-catalog.js";
@@ -94,7 +95,49 @@ function resolveSuggestionState(input: {
   };
 }
 
+function areSuggestionStatesEqual(
+  left: ActiveSuggestionState | null,
+  right: ActiveSuggestionState | null,
+): boolean {
+  if (left === right) {
+    return true;
+  }
+
+  if (left === null || right === null) {
+    return false;
+  }
+
+  if (left.from !== right.from || left.to !== right.to || left.query !== right.query) {
+    return false;
+  }
+
+  if (left.options.length !== right.options.length) {
+    return false;
+  }
+
+  return left.options.every((token, index) => token === right.options[index]);
+}
+
+function areSuggestionPopoverPositionsEqual(
+  left: SuggestionPopoverPosition | null,
+  right: SuggestionPopoverPosition | null,
+): boolean {
+  if (left === right) {
+    return true;
+  }
+
+  if (left === null || right === null) {
+    return false;
+  }
+
+  return left.left === right.left && left.top === right.top;
+}
+
 export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): React.JSX.Element {
+  const rankedTokens = useMemo(
+    () => rankAgentInstructionTokensForMatching(input.tokens),
+    [input.tokens],
+  );
   const [activeSuggestionState, setActiveSuggestionState] = useState<ActiveSuggestionState | null>(
     null,
   );
@@ -106,6 +149,16 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
   const editorViewRef = useRef<CodeMirrorEditorView | null>(null);
   const rootElementRef = useRef<HTMLDivElement | null>(null);
   const suggestionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const activeSuggestionStateRef = useRef<ActiveSuggestionState | null>(null);
+  const selectedSuggestionIndexRef = useRef(0);
+
+  useEffect(() => {
+    activeSuggestionStateRef.current = activeSuggestionState;
+  }, [activeSuggestionState]);
+
+  useEffect(() => {
+    selectedSuggestionIndexRef.current = selectedSuggestionIndex;
+  }, [selectedSuggestionIndex]);
 
   useEffect(() => {
     if (activeSuggestionState === null) {
@@ -131,7 +184,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
 
       const nextOptions = findMatchingAgentInstructionTokens({
         query: currentState.query,
-        tokens: input.tokens,
+        tokens: rankedTokens,
       });
       if (nextOptions.length === 0) {
         setSuggestionPopoverPosition(null);
@@ -143,7 +196,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
         options: nextOptions,
       };
     });
-  }, [input.tokens]);
+  }, [rankedTokens]);
 
   useEffect(() => {
     setSelectedSuggestionIndex((currentIndex) => {
@@ -155,9 +208,9 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
     });
   }, [activeSuggestionState]);
 
-  function applySuggestion(token: AgentInstructionsEditorToken): boolean {
+  const applySuggestion = useCallback((token: AgentInstructionsEditorToken): boolean => {
     const editorView = editorViewRef.current;
-    const suggestionState = activeSuggestionState;
+    const suggestionState = activeSuggestionStateRef.current;
     if (editorView === null || suggestionState === null) {
       return false;
     }
@@ -181,33 +234,35 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
     setSuggestionPopoverPosition(null);
     setSuggestionInteractionMode("pointer");
     return true;
-  }
+  }, []);
 
-  function moveSelectedSuggestion(delta: number): boolean {
-    if (activeSuggestionState === null) {
+  const moveSelectedSuggestion = useCallback((delta: number): boolean => {
+    const suggestionState = activeSuggestionStateRef.current;
+    if (suggestionState === null) {
       return false;
     }
 
     setSuggestionInteractionMode("keyboard");
-    const optionCount = activeSuggestionState.options.length;
+    const optionCount = suggestionState.options.length;
     setSelectedSuggestionIndex(
       (currentIndex) => (currentIndex + delta + optionCount) % optionCount,
     );
     return true;
-  }
+  }, []);
 
-  function acceptSelectedSuggestion(): boolean {
-    if (activeSuggestionState === null) {
+  const acceptSelectedSuggestion = useCallback((): boolean => {
+    const suggestionState = activeSuggestionStateRef.current;
+    if (suggestionState === null) {
       return false;
     }
 
-    const selectedToken = activeSuggestionState.options[selectedSuggestionIndex];
+    const selectedToken = suggestionState.options[selectedSuggestionIndexRef.current];
     if (selectedToken === undefined) {
       return false;
     }
 
     return applySuggestion(selectedToken);
-  }
+  }, [applySuggestion]);
 
   const extensions = useMemo(
     () => [
@@ -261,68 +316,95 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
       createAgentInstructionsEditorTheme(),
     ],
     [
-      acceptSelectedSuggestion,
-      activeSuggestionState,
       input.ariaLabelledBy,
       input.disabled,
       input.invalid,
+      acceptSelectedSuggestion,
       moveSelectedSuggestion,
     ],
   );
 
-  function handleUpdate(update: ViewUpdate): void {
-    if (input.disabled) {
-      setActiveSuggestionState(null);
-      setSelectedSuggestionIndex(0);
-      setSuggestionPopoverPosition(null);
-      setSuggestionInteractionMode("pointer");
-      return;
-    }
+  const handleUpdate = useCallback(
+    (update: ViewUpdate): void => {
+      if (input.disabled) {
+        if (activeSuggestionStateRef.current !== null) {
+          setActiveSuggestionState(null);
+        }
+        setSelectedSuggestionIndex(0);
+        setSuggestionPopoverPosition((currentPosition) =>
+          currentPosition === null ? currentPosition : null,
+        );
+        setSuggestionInteractionMode("pointer");
+        return;
+      }
 
-    const mainSelection = update.state.selection.main;
-    if (!mainSelection.empty) {
-      setActiveSuggestionState(null);
-      setSelectedSuggestionIndex(0);
-      setSuggestionPopoverPosition(null);
-      setSuggestionInteractionMode("pointer");
-      return;
-    }
+      const mainSelection = update.state.selection.main;
+      if (!mainSelection.empty) {
+        if (activeSuggestionStateRef.current !== null) {
+          setActiveSuggestionState(null);
+        }
+        setSelectedSuggestionIndex(0);
+        setSuggestionPopoverPosition((currentPosition) =>
+          currentPosition === null ? currentPosition : null,
+        );
+        setSuggestionInteractionMode("pointer");
+        return;
+      }
 
-    const nextSuggestionState = resolveSuggestionState({
-      documentText: update.state.doc.toString(),
-      cursorOffset: mainSelection.head,
-      tokens: input.tokens,
-    });
-    setActiveSuggestionState(nextSuggestionState);
-
-    if (nextSuggestionState === null) {
-      setSelectedSuggestionIndex(0);
-      setSuggestionPopoverPosition(null);
-      setSuggestionInteractionMode("pointer");
-      return;
-    }
-
-    const anchorCoordinates = update.view.coordsAtPos(mainSelection.head);
-    const rootElement = rootElementRef.current;
-    if (anchorCoordinates === null || rootElement === null) {
-      setSuggestionPopoverPosition(null);
-    } else {
-      const rootRect = rootElement.getBoundingClientRect();
-      const horizontalPadding = 12;
-      const minLeft = horizontalPadding;
-      const maxLeft = Math.max(minLeft, rootRect.width - 320 - horizontalPadding);
-      const desiredLeft = anchorCoordinates.left - rootRect.left;
-
-      setSuggestionPopoverPosition({
-        left: Math.min(Math.max(desiredLeft, minLeft), maxLeft),
-        top: anchorCoordinates.bottom - rootRect.top + 6,
+      const nextSuggestionState = resolveSuggestionState({
+        documentText: update.state.doc.toString(),
+        cursorOffset: mainSelection.head,
+        tokens: rankedTokens,
       });
-    }
+      if (!areSuggestionStatesEqual(activeSuggestionStateRef.current, nextSuggestionState)) {
+        setActiveSuggestionState(nextSuggestionState);
+      }
 
-    setSelectedSuggestionIndex((currentIndex) =>
-      Math.min(currentIndex, nextSuggestionState.options.length - 1),
-    );
-  }
+      if (nextSuggestionState === null) {
+        setSelectedSuggestionIndex(0);
+        setSuggestionPopoverPosition((currentPosition) =>
+          currentPosition === null ? currentPosition : null,
+        );
+        setSuggestionInteractionMode("pointer");
+        return;
+      }
+
+      let nextSuggestionPopoverPosition: SuggestionPopoverPosition | null = null;
+      const anchorCoordinates = update.view.coordsAtPos(mainSelection.head);
+      const rootElement = rootElementRef.current;
+      if (anchorCoordinates === null || rootElement === null) {
+        nextSuggestionPopoverPosition = null;
+      } else {
+        const rootRect = rootElement.getBoundingClientRect();
+        const horizontalPadding = 12;
+        const minLeft = horizontalPadding;
+        const maxLeft = Math.max(minLeft, rootRect.width - 320 - horizontalPadding);
+        const desiredLeft = anchorCoordinates.left - rootRect.left;
+
+        nextSuggestionPopoverPosition = {
+          left: Math.min(Math.max(desiredLeft, minLeft), maxLeft),
+          top: anchorCoordinates.bottom - rootRect.top + 6,
+        };
+      }
+
+      setSuggestionPopoverPosition((currentPosition) => {
+        if (areSuggestionPopoverPositionsEqual(currentPosition, nextSuggestionPopoverPosition)) {
+          return currentPosition;
+        }
+
+        return nextSuggestionPopoverPosition;
+      });
+
+      const nextSelectedSuggestionIndex = Math.min(
+        selectedSuggestionIndexRef.current,
+        nextSuggestionState.options.length - 1,
+      );
+      if (nextSelectedSuggestionIndex !== selectedSuggestionIndexRef.current) {
+        setSelectedSuggestionIndex(nextSelectedSuggestionIndex);
+      }
+    },
+    [input.disabled, rankedTokens],
+  );
 
   return (
     <div className="relative" data-slot="agent-instructions-editor" ref={rootElementRef}>

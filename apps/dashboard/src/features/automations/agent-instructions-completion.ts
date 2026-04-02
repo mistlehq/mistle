@@ -63,29 +63,40 @@ function toCompletion(token: AgentInstructionsEditorToken): Completion {
   };
 }
 
+function compareMatchingTokens(
+  left: AgentInstructionsEditorToken,
+  right: AgentInstructionsEditorToken,
+): number {
+  const leftSegmentCount = left.path.split(".").length;
+  const rightSegmentCount = right.path.split(".").length;
+  if (leftSegmentCount !== rightSegmentCount) {
+    return leftSegmentCount - rightSegmentCount;
+  }
+
+  const leftPathLength = left.path.length;
+  const rightPathLength = right.path.length;
+  if (leftPathLength !== rightPathLength) {
+    return leftPathLength - rightPathLength;
+  }
+
+  return left.path.localeCompare(right.path);
+}
+
+export function rankAgentInstructionTokensForMatching(
+  tokens: readonly AgentInstructionsEditorToken[],
+): readonly AgentInstructionsEditorToken[] {
+  return [...tokens].sort(compareMatchingTokens);
+}
+
 export function findMatchingAgentInstructionTokens(input: {
   query: string;
   tokens: readonly AgentInstructionsEditorToken[];
 }): readonly AgentInstructionsEditorToken[] {
   const normalizedQuery = input.query.toLowerCase();
 
-  return input.tokens
-    .filter((token) => token.replacePath.toLowerCase().startsWith(normalizedQuery))
-    .sort((left, right) => {
-      const leftSegmentCount = left.path.split(".").length;
-      const rightSegmentCount = right.path.split(".").length;
-      if (leftSegmentCount !== rightSegmentCount) {
-        return leftSegmentCount - rightSegmentCount;
-      }
-
-      const leftPathLength = left.path.length;
-      const rightPathLength = right.path.length;
-      if (leftPathLength !== rightPathLength) {
-        return leftPathLength - rightPathLength;
-      }
-
-      return left.path.localeCompare(right.path);
-    });
+  return input.tokens.filter((token) =>
+    token.replacePath.toLowerCase().startsWith(normalizedQuery),
+  );
 }
 
 export function completeAgentInstructionToken(

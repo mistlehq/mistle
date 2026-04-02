@@ -148,8 +148,7 @@ function PrototypeHarness(): React.JSX.Element {
               <FieldDescription>
                 <span className="block">Type inside the editor as if this were the real form.</span>
                 <span className="block">
-                  Start with <InlineCode variant="muted">{"{{"}</InlineCode> or{" "}
-                  <InlineCode variant="muted">{"{{payload."}</InlineCode> to inspect completions.
+                  Start with <InlineCode variant="muted">{"{{"}</InlineCode> to inspect completions.
                 </span>
               </FieldDescription>
             </div>
