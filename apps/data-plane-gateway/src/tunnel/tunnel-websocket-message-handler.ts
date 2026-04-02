@@ -14,7 +14,7 @@ import type { RelayPeerSide } from "./types.js";
 
 export { TunnelProtocolViolationError } from "./protocol/tunnel-protocol-translator.js";
 
-export type LocalTelemetryDelivery = Extract<
+export type TelemetryDelivery = Extract<
   TunnelProtocolDelivery,
   {
     kind: "telemetryOpen" | "telemetryClose" | "telemetryData" | "telemetryInvalidData";
@@ -47,7 +47,7 @@ export async function handleTunnelWebSocketMessage(input: {
   clientSessionId: string;
   currentSocket: Pick<WSContext, "send">;
   executionLeaseRepository: ExecutionLeaseRepository;
-  handleLocalTelemetryDelivery?: ((delivery: LocalTelemetryDelivery) => Promise<void>) | undefined;
+  handleTelemetryDelivery?: ((delivery: TelemetryDelivery) => Promise<void>) | undefined;
   interactiveStreamRouter: InteractiveStreamRouter;
   payload: string | ArrayBuffer;
   relayCoordinator: TunnelRelayCoordinator;
@@ -87,11 +87,11 @@ export async function handleTunnelWebSocketMessage(input: {
     translation.delivery.kind === "telemetryData" ||
     translation.delivery.kind === "telemetryInvalidData"
   ) {
-    if (input.handleLocalTelemetryDelivery === undefined) {
-      throw new Error("Telemetry delivery requires a local telemetry handler.");
+    if (input.handleTelemetryDelivery === undefined) {
+      throw new Error("Telemetry delivery requires a telemetry handler.");
     }
 
-    await input.handleLocalTelemetryDelivery(translation.delivery);
+    await input.handleTelemetryDelivery(translation.delivery);
   } else if (translation.delivery.kind === "respond") {
     input.currentSocket.send(translation.delivery.payload);
   } else {
