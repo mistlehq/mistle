@@ -1,7 +1,9 @@
+import { systemSleeper } from "@mistle/time";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
+import type { AutoSaveInputVisualStatus } from "./auto-save-input-surface.js";
 import { EditableHeading } from "./editable-heading.js";
 
 function StoryHarness(input: {
@@ -11,6 +13,7 @@ function StoryHarness(input: {
   placeholder?: string;
   errorMessage?: string;
   initiallyEditing?: boolean;
+  saveStatus?: AutoSaveInputVisualStatus;
   maxWidthClassName?: string;
   headingTag?: "div" | "h1" | "h2";
   headingClassName?: string;
@@ -19,6 +22,11 @@ function StoryHarness(input: {
   const [isEditing, setIsEditing] = useState(input.initiallyEditing ?? false);
   const [draftValue, setDraftValue] = useState(input.value);
   const [value, setValue] = useState(input.value);
+  const [errorMessage, setErrorMessage] = useState(input.errorMessage);
+  const [saveStatus, setSaveStatus] = useState<AutoSaveInputVisualStatus>(
+    input.saveStatus ?? "idle",
+  );
+  const saveSequenceRef = useRef(0);
 
   return (
     <EditableHeading
@@ -26,7 +34,7 @@ function StoryHarness(input: {
       cancelOnEscape={true}
       draftValue={draftValue}
       editButtonLabel={input.editButtonLabel}
-      errorMessage={input.errorMessage}
+      errorMessage={errorMessage}
       {...(input.headingClassName === undefined
         ? {}
         : { headingClassName: input.headingClassName })}
@@ -34,20 +42,68 @@ function StoryHarness(input: {
       {...(input.inputClassName === undefined ? {} : { inputClassName: input.inputClassName })}
       isEditing={isEditing}
       maxWidthClassName={input.maxWidthClassName}
+      saveStatus={saveStatus}
       onCancel={() => {
         setDraftValue(value);
+        setErrorMessage(input.errorMessage);
+        setSaveStatus(input.saveStatus ?? "idle");
         setIsEditing(false);
       }}
       onCommit={() => {
-        setValue(draftValue.trim().length === 0 ? value : draftValue.trim());
-        setIsEditing(false);
+        if (input.saveStatus !== undefined) {
+          return;
+        }
+
+        const normalizedDraftValue = draftValue.trim();
+        if (normalizedDraftValue.length === 0) {
+          setErrorMessage("Heading is required.");
+          setSaveStatus("idle");
+          return;
+        }
+
+        const currentSaveSequence = saveSequenceRef.current + 1;
+        saveSequenceRef.current = currentSaveSequence;
+        setErrorMessage(undefined);
+        setSaveStatus("saving");
+
+        void (async () => {
+          await systemSleeper.sleep(900);
+
+          if (saveSequenceRef.current !== currentSaveSequence) {
+            return;
+          }
+
+          if (normalizedDraftValue.toLowerCase() === "explode") {
+            setErrorMessage("Could not update heading.");
+            setSaveStatus("idle");
+            return;
+          }
+
+          setValue(normalizedDraftValue);
+          setSaveStatus("saved");
+          await systemSleeper.sleep(500);
+
+          if (saveSequenceRef.current !== currentSaveSequence) {
+            return;
+          }
+
+          setSaveStatus("idle");
+          setIsEditing(false);
+        })();
       }}
-      onDraftValueChange={setDraftValue}
+      onDraftValueChange={(nextValue) => {
+        setDraftValue(nextValue);
+        if (errorMessage !== undefined) {
+          setErrorMessage(undefined);
+        }
+      }}
       onEditStart={() => {
         setIsEditing(true);
+        setErrorMessage(undefined);
+        setSaveStatus(input.saveStatus ?? "idle");
       }}
       placeholder={input.placeholder}
-      saveDisabled={false}
+      saveDisabled={saveStatus === "saving"}
       value={value}
     />
   );
@@ -74,7 +130,7 @@ export const Default: Story = {
   },
 };
 
-export const Editing: Story = {
+export const Saving: Story = {
   args: {
     value: "GitHub pushes to repo triage",
     ariaLabel: "Automation name",
@@ -83,6 +139,7 @@ export const Editing: Story = {
     inputClassName: "text-base font-medium",
     maxWidthClassName: "max-w-4xl",
     placeholder: "Automation name",
+    saveStatus: "saving",
   },
 };
 
