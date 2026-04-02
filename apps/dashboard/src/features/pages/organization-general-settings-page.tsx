@@ -143,7 +143,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
           });
         }}
         organization={organizationQuery.data}
-        saveErrorMessage={saveError}
+        saveError={saveError}
         saveSuccess={showSaveSuccess}
       />
     </FormPageFrame>
@@ -155,7 +155,7 @@ function OrganizationGeneralSettingsEditor(input: {
   isLoading: boolean;
   isSaving: boolean;
   loadErrorMessage: string | null;
-  saveErrorMessage: string | null;
+  saveError: string | null;
   saveSuccess: boolean;
   onSaveChanges: (name: string) => void;
   onResetFeedback: () => void;
@@ -185,7 +185,7 @@ function OrganizationGeneralSettingsEditor(input: {
       onSaveChanges={() => {
         input.onSaveChanges(name);
       }}
-      saveErrorMessage={input.saveErrorMessage}
+      saveError={input.saveError}
       saveSuccess={input.saveSuccess}
     />
   );

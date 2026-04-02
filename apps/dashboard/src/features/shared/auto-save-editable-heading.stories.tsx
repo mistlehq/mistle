@@ -13,7 +13,7 @@ import {
 
 type StoryHarnessProps = Pick<
   AutoSaveEditableHeadingProps,
-  "initialValue" | "placeholder" | "maxWidthClassName" | "headingClassName" | "inputClassName"
+  "savedValue" | "placeholder" | "maxWidthClassName" | "headingClassName" | "inputClassName"
 > & {
   errorMode?: "none" | "save" | "validation";
 };
@@ -30,7 +30,7 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
         headingClassName={input.headingClassName}
         initialErrorState={initialErrorState}
         initiallyEditing={initialErrorState !== null}
-        initialValue={input.initialValue}
+        savedValue={input.savedValue}
         inputClassName={input.inputClassName}
         maxWidthClassName={input.maxWidthClassName}
         onSave={async (nextValue) => {
@@ -122,7 +122,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    initialValue: "Repo Maintainer",
+    savedValue: "Repo Maintainer",
   },
 };
 

@@ -25,7 +25,7 @@ describe("AutoSaveEditableHeading", () => {
       <AutoSaveEditableHeading
         ariaLabel="Heading"
         editButtonLabel="Edit heading"
-        initialValue="Repo Maintainer"
+        savedValue="Repo Maintainer"
         onSave={async () => {}}
         successFadeDurationMs={20}
         successVisibleDurationMs={40}
@@ -49,7 +49,7 @@ describe("AutoSaveEditableHeading", () => {
       <AutoSaveEditableHeading
         ariaLabel="Heading"
         editButtonLabel="Edit heading"
-        initialValue="Repo Maintainer"
+        savedValue="Repo Maintainer"
         onSave={async () => {}}
         successFadeDurationMs={20}
         successVisibleDurationMs={40}
@@ -77,7 +77,7 @@ describe("AutoSaveEditableHeading", () => {
         ariaLabel="Heading"
         disabled={true}
         editButtonLabel="Edit heading"
-        initialValue="Repo Maintainer"
+        savedValue="Repo Maintainer"
         onSave={async () => {}}
         validate={() => null}
       />,
@@ -88,13 +88,32 @@ describe("AutoSaveEditableHeading", () => {
     expect(screen.queryByRole("textbox", { name: "Heading" })).toBeNull();
   });
 
+  it("uses a display-only fallback without seeding the edit input", () => {
+    render(
+      <AutoSaveEditableHeading
+        ariaLabel="Heading"
+        displayText="profile_123"
+        editButtonLabel="Edit heading"
+        savedValue=""
+        onSave={async () => {}}
+        validate={() => null}
+      />,
+    );
+
+    expect(screen.getByText("profile_123")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit heading" }));
+
+    expect(screen.getByRole("textbox", { name: "Heading" })).toHaveProperty("value", "");
+  });
+
   it("disables the input while saving", async () => {
     let resolveSave: (() => void) | undefined;
     render(
       <AutoSaveEditableHeading
         ariaLabel="Heading"
         editButtonLabel="Edit heading"
-        initialValue="Repo Maintainer"
+        savedValue="Repo Maintainer"
         onSave={() =>
           new Promise<void>((resolve) => {
             resolveSave = resolve;
@@ -141,8 +160,8 @@ describe("AutoSaveEditableHeading", () => {
           <AutoSaveEditableHeading
             ariaLabel="Heading"
             editButtonLabel="Edit heading"
-            saveErrorMessage="Could not update heading."
-            initialValue="Repo Maintainer"
+            saveError="Could not update heading."
+            savedValue="Repo Maintainer"
             initiallyEditing={true}
             onSave={async () => {}}
             validate={() => null}
@@ -166,8 +185,8 @@ describe("AutoSaveEditableHeading", () => {
       <AutoSaveEditableHeading
         ariaLabel="Heading"
         editButtonLabel="Edit heading"
-        saveErrorMessage="Could not update heading."
-        initialValue="Repo Maintainer"
+        saveError="Could not update heading."
+        savedValue="Repo Maintainer"
         onSave={async () => {}}
         validate={() => null}
       />,
@@ -215,7 +234,7 @@ describe("AutoSaveEditableHeading", () => {
             ariaLabel="Heading"
             editButtonLabel="Edit heading"
             initialErrorState={errorState}
-            initialValue="Repo Maintainer"
+            savedValue="Repo Maintainer"
             initiallyEditing={errorState !== null}
             onSave={async () => {}}
             validate={() => null}
@@ -239,8 +258,8 @@ describe("AutoSaveEditableHeading", () => {
       <AutoSaveEditableHeading
         ariaLabel="Heading"
         editButtonLabel="Edit heading"
-        saveErrorMessage="Could not update heading."
-        initialValue="Repo Maintainer"
+        saveError="Could not update heading."
+        savedValue="Repo Maintainer"
         onSave={async () => {}}
         validate={() => null}
       />,
@@ -270,7 +289,7 @@ describe("AutoSaveEditableHeading", () => {
         <AutoSaveEditableHeading
           ariaLabel="Heading"
           editButtonLabel="Edit heading"
-          initialValue={value}
+          savedValue={value}
           onSave={async (nextValue) => {
             setErrorState(null);
             setValue(nextValue);
@@ -278,7 +297,7 @@ describe("AutoSaveEditableHeading", () => {
           successFadeDurationMs={20}
           successVisibleDurationMs={40}
           validate={() => null}
-          {...(errorState === null ? {} : { saveErrorMessage: errorState.message })}
+          {...(errorState === null ? {} : { saveError: errorState.message })}
         />
       );
     }
@@ -315,7 +334,7 @@ describe("AutoSaveEditableHeading", () => {
           <AutoSaveEditableHeading
             ariaLabel="Heading"
             editButtonLabel="Edit heading"
-            initialValue={value}
+            savedValue={value}
             onSave={() =>
               new Promise<void>((resolve) => {
                 resolveSave = resolve;

@@ -13,7 +13,7 @@ export type OrganizationGeneralSettingsPageViewProps = {
   onCancelChanges: () => void;
   onNameChange: (nextValue: string) => void;
   onSaveChanges: () => void;
-  saveErrorMessage: string | null;
+  saveError: string | null;
   saveSuccess: boolean;
 };
 
@@ -64,10 +64,10 @@ export function OrganizationGeneralSettingsPageView(
             {props.saveSuccess ? "Organization settings updated." : ""}
           </p>
 
-          {props.saveErrorMessage !== null || props.nameErrorMessage !== null ? (
+          {props.saveError !== null || props.nameErrorMessage !== null ? (
             <Notice variant="alert">
-              {props.saveErrorMessage !== null
-                ? `${props.saveErrorMessage} Please try again later.`
+              {props.saveError !== null
+                ? `${props.saveError} Please try again later.`
                 : props.nameErrorMessage}
             </Notice>
           ) : null}

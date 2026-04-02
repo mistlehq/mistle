@@ -160,7 +160,7 @@ export function useIntegrationConnectionEditors(input: {
         ? undefined
         : {
             disabled: updateConnectionNameMutation.isPending,
-            errorByConnectionId: connectionNameErrorById,
+            saveErrorByConnectionId: connectionNameErrorById,
             onSave: async (connectionId: string, draftValue: string) => {
               const editingConnection =
                 input.connections.find((connection) => connection.id === connectionId) ?? null;

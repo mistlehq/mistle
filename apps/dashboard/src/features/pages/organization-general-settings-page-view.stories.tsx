@@ -17,7 +17,7 @@ const meta = {
     onCancelChanges: () => {},
     onNameChange: () => {},
     onSaveChanges: () => {},
-    saveErrorMessage: null,
+    saveError: null,
     saveSuccess: false,
   },
 } satisfies Meta<typeof OrganizationGeneralSettingsPageView>;
@@ -67,7 +67,7 @@ export const SaveError: Story = {
   args: {
     hasDirtyChanges: true,
     name: "Mistle Storybook Labs",
-    saveErrorMessage: "Could not update organization settings.",
+    saveError: "Could not update organization settings.",
   },
 };
 

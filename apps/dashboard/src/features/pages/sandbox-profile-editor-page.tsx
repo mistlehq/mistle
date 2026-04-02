@@ -575,9 +575,10 @@ function LoadedSandboxProfileMetaSection(input: {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <AutoSaveEditableHeading
           ariaLabel="Profile name"
+          displayText={metaState.pageTitle}
           disabled={metaState.isUpdating}
           editButtonLabel="Edit profile name"
-          initialValue={metaState.pageTitle}
+          savedValue={metaState.formState.displayName}
           onSave={metaState.onProfileNameSave}
           validate={(nextValue) => {
             return nextValue.trim().length === 0 ? "Profile name is required." : null;

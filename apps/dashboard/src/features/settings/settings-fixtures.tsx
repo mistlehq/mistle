@@ -111,7 +111,7 @@ export function createOrganizationGeneralSettingsFixtureContent(): React.JSX.Ele
       onCancelChanges={() => {}}
       onNameChange={() => {}}
       onSaveChanges={() => {}}
-      saveErrorMessage={null}
+      saveError={null}
       saveSuccess={false}
     />
   );

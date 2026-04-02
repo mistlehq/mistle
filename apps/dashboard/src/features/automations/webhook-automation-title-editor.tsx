@@ -4,7 +4,7 @@ export function WebhookAutomationTitleEditor(input: {
   title: string;
   saveDisabled: boolean;
   onCommit: (nextValue: string) => Promise<void> | void;
-  errorMessage: string | undefined;
+  saveError: string | undefined;
 }): React.JSX.Element {
   return (
     <AutoSaveEditableHeading
@@ -12,7 +12,7 @@ export function WebhookAutomationTitleEditor(input: {
       disabled={input.saveDisabled}
       editButtonLabel="Edit automation name"
       key={input.title}
-      initialValue={input.title}
+      savedValue={input.title}
       inputClassName="text-base font-medium"
       maxWidthClassName="max-w-4xl"
       onSave={async (nextValue) => {
@@ -22,7 +22,7 @@ export function WebhookAutomationTitleEditor(input: {
       validate={(nextValue) => {
         return nextValue.trim().length === 0 ? "Automation name is required." : null;
       }}
-      {...(input.errorMessage === undefined ? {} : { saveErrorMessage: input.errorMessage })}
+      {...(input.saveError === undefined ? {} : { saveError: input.saveError })}
     />
   );
 }
