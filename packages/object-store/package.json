@@ -5,7 +5,7 @@
   "exports": {
     ".": {
       "types": "./src/index.ts",
-      "node": "./dist/index.js",
+      "node": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     }

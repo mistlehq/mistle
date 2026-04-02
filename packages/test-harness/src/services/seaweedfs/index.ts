@@ -42,6 +42,7 @@ export async function startSeaweedfsS3(
   const accessKeyId = input.accessKeyId ?? "mistle-access-key";
   const secretAccessKey = input.secretAccessKey ?? "mistle-secret-key";
   const startupTimeoutMs = input.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
+  const networkAlias = input.networkAlias ?? DEFAULT_SEAWEEDFS_NETWORK_ALIAS;
 
   let container: StartedTestContainer | undefined;
   let stopped = false;
@@ -59,17 +60,21 @@ export async function startSeaweedfsS3(
     if (input.network !== undefined) {
       containerDefinition = containerDefinition
         .withNetwork(input.network)
-        .withNetworkAliases(input.networkAlias ?? DEFAULT_SEAWEEDFS_NETWORK_ALIAS);
+        .withNetworkAliases(networkAlias);
     }
 
     container = await containerDefinition.start();
 
-    const endpoint = `http://${container.getHost()}:${String(container.getMappedPort(SEAWEEDFS_S3_PORT))}`;
+    const hostEndpoint = `http://${container.getHost()}:${String(container.getMappedPort(SEAWEEDFS_S3_PORT))}`;
+    const endpoint =
+      input.network === undefined
+        ? hostEndpoint
+        : `http://${networkAlias}:${String(SEAWEEDFS_S3_PORT)}`;
 
     await ensureBucketExists({
       accessKeyId,
       bucketName,
-      endpoint,
+      endpoint: hostEndpoint,
       secretAccessKey,
       startupTimeoutMs,
     });
