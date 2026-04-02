@@ -18,17 +18,15 @@ Exported from [`src/index.ts`](./src/index.ts):
 - `HeadObjectInput`
 - `HeadObjectResult`
 - `DeleteObjectInput`
-- `ObjectStoreObjectNotFoundError`
 - `S3CompatibleObjectStore`
 - `S3CompatibleObjectStoreConfig`
-- `createS3CompatibleObjectStore(...)`
 
 ## Usage
 
 ```ts
-import { createS3CompatibleObjectStore } from "@mistle/object-store";
+import { S3CompatibleObjectStore } from "@mistle/object-store";
 
-const objectStore = createS3CompatibleObjectStore({
+const objectStore = new S3CompatibleObjectStore({
   bucketName: "mistle-media",
   region: "us-east-1",
   endpoint: "http://127.0.0.1:8333",
@@ -60,8 +58,8 @@ await objectStore.deleteObject({
 - Application code should depend on the `ObjectStore` interface, not AWS SDK
   commands directly.
 - Provider-specific details should stay inside this package.
-- Missing objects should fail explicitly with
-  `ObjectStoreObjectNotFoundError`; no fallback behavior is applied.
+- This package normalizes method shape and object bytes, but surfaces
+  backend-native S3-compatible errors instead of wrapping them.
 
 ## Testing
 

@@ -4,9 +4,9 @@ import {
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
+  type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 
-import { ObjectStoreObjectNotFoundError } from "./object-store-error.js";
 import type {
   DeleteObjectInput,
   HeadObjectInput,
@@ -19,36 +19,15 @@ import type {
 
 export type S3CompatibleObjectStoreConfig = {
   bucketName: string;
-  region: string;
-  endpoint?: string;
-  forcePathStyle?: boolean;
-  credentials?: {
-    accessKeyId: string;
-    secretAccessKey: string;
-    sessionToken?: string;
-  };
+  region: NonNullable<S3ClientConfig["region"]>;
+  endpoint?: S3ClientConfig["endpoint"];
+  forcePathStyle?: NonNullable<S3ClientConfig["forcePathStyle"]>;
+  credentials?: S3ClientConfig["credentials"];
 };
 
 type ByteArrayReadable = {
   transformToByteArray: () => Promise<Uint8Array>;
 };
-
-function hasErrorName(error: unknown, names: readonly string[]): boolean {
-  if (typeof error !== "object" || error === null) {
-    return false;
-  }
-
-  if (!("name" in error)) {
-    return false;
-  }
-
-  const { name } = error;
-  return typeof name === "string" && names.includes(name);
-}
-
-function isObjectNotFoundError(error: unknown): boolean {
-  return hasErrorName(error, ["NotFound", "NoSuchKey"]);
-}
 
 function hasTransformToByteArray(body: unknown): body is ByteArrayReadable {
   if (typeof body !== "object" || body === null) {
@@ -99,55 +78,35 @@ export class S3CompatibleObjectStore implements ObjectStore {
   }
 
   async headObject(input: HeadObjectInput): Promise<HeadObjectResult> {
-    try {
-      const response = await this.#client.send(
-        new HeadObjectCommand({
-          Bucket: this.#bucketName,
-          Key: input.objectKey,
-        }),
-      );
+    const response = await this.#client.send(
+      new HeadObjectCommand({
+        Bucket: this.#bucketName,
+        Key: input.objectKey,
+      }),
+    );
 
-      return {
-        contentLength: response.ContentLength,
-        contentType: response.ContentType,
-      };
-    } catch (error) {
-      if (isObjectNotFoundError(error)) {
-        throw new ObjectStoreObjectNotFoundError({
-          objectKey: input.objectKey,
-        });
-      }
-
-      throw error;
-    }
+    return {
+      contentLength: response.ContentLength,
+      contentType: response.ContentType,
+    };
   }
 
   async readObject(input: ReadObjectInput): Promise<ReadObjectResult> {
-    try {
-      const response = await this.#client.send(
-        new GetObjectCommand({
-          Bucket: this.#bucketName,
-          Key: input.objectKey,
-        }),
-      );
+    const response = await this.#client.send(
+      new GetObjectCommand({
+        Bucket: this.#bucketName,
+        Key: input.objectKey,
+      }),
+    );
 
-      if (!hasTransformToByteArray(response.Body)) {
-        throw new Error(`Expected object body for key "${input.objectKey}" to be readable.`);
-      }
-
-      return {
-        bytes: await response.Body.transformToByteArray(),
-        contentType: response.ContentType,
-      };
-    } catch (error) {
-      if (isObjectNotFoundError(error)) {
-        throw new ObjectStoreObjectNotFoundError({
-          objectKey: input.objectKey,
-        });
-      }
-
-      throw error;
+    if (!hasTransformToByteArray(response.Body)) {
+      throw new Error(`Expected object body for key "${input.objectKey}" to be readable.`);
     }
+
+    return {
+      bytes: await response.Body.transformToByteArray(),
+      contentType: response.ContentType,
+    };
   }
 
   async deleteObject(input: DeleteObjectInput): Promise<void> {
@@ -158,10 +117,4 @@ export class S3CompatibleObjectStore implements ObjectStore {
       }),
     );
   }
-}
-
-export function createS3CompatibleObjectStore(
-  input: S3CompatibleObjectStoreConfig,
-): S3CompatibleObjectStore {
-  return new S3CompatibleObjectStore(input);
 }

@@ -1,8 +1,7 @@
 import { startSeaweedfsS3 } from "@mistle/test-harness";
 import { describe, expect, test } from "vitest";
 
-import { ObjectStoreObjectNotFoundError } from "../src/object-store-error.js";
-import { createS3CompatibleObjectStore } from "../src/s3-compatible-object-store.js";
+import { S3CompatibleObjectStore } from "../src/s3-compatible-object-store.js";
 
 describe("S3-compatible object store integration", () => {
   test("writes, reads, heads, and deletes objects against SeaweedFS", async () => {
@@ -10,7 +9,7 @@ describe("S3-compatible object store integration", () => {
       bucketName: "object-store-integration",
     });
 
-    const objectStore = createS3CompatibleObjectStore({
+    const objectStore = new S3CompatibleObjectStore({
       bucketName: seaweedfs.bucketName,
       credentials: {
         accessKeyId: seaweedfs.accessKeyId,
@@ -58,7 +57,9 @@ describe("S3-compatible object store integration", () => {
         objectStore.headObject({
           objectKey,
         }),
-      ).rejects.toBeInstanceOf(ObjectStoreObjectNotFoundError);
+      ).rejects.toMatchObject({
+        name: "NotFound",
+      });
     } finally {
       await seaweedfs.stop();
     }
