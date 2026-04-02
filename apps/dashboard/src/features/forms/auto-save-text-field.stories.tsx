@@ -46,12 +46,9 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
 
       <div className="flex flex-col gap-2 text-sm">
         <FieldDescription>
+          <span className="block">Validation error: type fewer than 3 characters and blur.</span>
           <span className="block">
-            Validation error: choose <strong>Validation</strong>, or type fewer than 3 characters
-            and blur.
-          </span>
-          <span className="block">
-            Save error: choose <strong>Save</strong>, or type
+            Save error: type
             <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">explode</code>
             and blur.
           </span>
