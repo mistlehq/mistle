@@ -4,6 +4,8 @@ import { integrationConnectionResourceStates } from "./integration-connection-re
 import { integrationConnectionResources } from "./integration-connection-resources.js";
 import { integrationConnections } from "./integration-connections.js";
 import { integrationTargets } from "./integration-targets.js";
+import { integrationWebhookEvents } from "./integration-webhook-events.js";
+import { integrationWebhookSources } from "./integration-webhook-sources.js";
 
 export const integrationConnectionsRelations = relations(
   integrationConnections,
@@ -14,6 +16,8 @@ export const integrationConnectionsRelations = relations(
     }),
     resources: many(integrationConnectionResources),
     resourceStates: many(integrationConnectionResourceStates),
+    webhookEvents: many(integrationWebhookEvents),
+    webhookSources: many(integrationWebhookSources),
   }),
 );
 
@@ -39,4 +43,36 @@ export const integrationConnectionResourceStatesRelations = relations(
 
 export const integrationTargetsRelations = relations(integrationTargets, ({ many }) => ({
   connections: many(integrationConnections),
+  webhookEvents: many(integrationWebhookEvents),
+  webhookSources: many(integrationWebhookSources),
 }));
+
+export const integrationWebhookEventsRelations = relations(integrationWebhookEvents, ({ one }) => ({
+  connection: one(integrationConnections, {
+    fields: [integrationWebhookEvents.integrationConnectionId],
+    references: [integrationConnections.id],
+  }),
+  source: one(integrationWebhookSources, {
+    fields: [integrationWebhookEvents.integrationWebhookSourceId],
+    references: [integrationWebhookSources.id],
+  }),
+  target: one(integrationTargets, {
+    fields: [integrationWebhookEvents.targetKey],
+    references: [integrationTargets.targetKey],
+  }),
+}));
+
+export const integrationWebhookSourcesRelations = relations(
+  integrationWebhookSources,
+  ({ many, one }) => ({
+    connection: one(integrationConnections, {
+      fields: [integrationWebhookSources.integrationConnectionId],
+      references: [integrationConnections.id],
+    }),
+    events: many(integrationWebhookEvents),
+    target: one(integrationTargets, {
+      fields: [integrationWebhookSources.targetKey],
+      references: [integrationTargets.targetKey],
+    }),
+  }),
+);

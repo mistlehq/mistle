@@ -30,6 +30,8 @@ export {
   integrationConnectionResourceStatesRelations,
   integrationConnectionsRelations,
   integrationTargetsRelations,
+  integrationWebhookEventsRelations,
+  integrationWebhookSourcesRelations,
 } from "./integration-connection-relations.js";
 export {
   integrationConnectionResources,
@@ -113,6 +115,17 @@ export {
   type IntegrationWebhookEvent,
   type IntegrationWebhookEventStatus,
 } from "./integration-webhook-events.js";
+export {
+  integrationWebhookSources,
+  IntegrationWebhookSourceOwnerScopes,
+  IntegrationWebhookSourceRoutingStrategies,
+  IntegrationWebhookSourceStatuses,
+  type InsertIntegrationWebhookSource,
+  type IntegrationWebhookSource,
+  type IntegrationWebhookSourceOwnerScope,
+  type IntegrationWebhookSourceRoutingStrategy,
+  type IntegrationWebhookSourceStatus,
+} from "./integration-webhook-sources.js";
 export {
   webhookAutomations,
   type InsertWebhookAutomation,
