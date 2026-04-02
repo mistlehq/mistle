@@ -4,29 +4,13 @@ import { describe, expect, test } from "vitest";
 
 import { S3CompatibleObjectStore } from "../src/s3-compatible-object-store.js";
 
-type ByteArrayReadable = {
-  transformToByteArray: () => Promise<Uint8Array>;
-};
-
-function hasTransformToByteArray(body: unknown): body is ByteArrayReadable {
-  if (typeof body !== "object" || body === null) {
-    return false;
-  }
-
-  if (!("transformToByteArray" in body)) {
-    return false;
-  }
-
-  return typeof body.transformToByteArray === "function";
-}
-
 describe("S3-compatible object store integration", () => {
   test("starts SeaweedFS through the harness and performs object-store operations end to end", async () => {
     const seaweedfs = await startSeaweedfsS3({
       bucketName: "object-store-integration",
     });
 
-    const s3Client = new S3Client({
+    const s3ClientConfig = {
       credentials: {
         accessKeyId: seaweedfs.accessKeyId,
         secretAccessKey: seaweedfs.secretAccessKey,
@@ -34,17 +18,13 @@ describe("S3-compatible object store integration", () => {
       endpoint: seaweedfs.endpoint,
       forcePathStyle: true,
       region: seaweedfs.region,
-    });
+    } as const;
+
+    const s3Client = new S3Client(s3ClientConfig);
 
     const objectStore = new S3CompatibleObjectStore({
       bucketName: seaweedfs.bucketName,
-      credentials: {
-        accessKeyId: seaweedfs.accessKeyId,
-        secretAccessKey: seaweedfs.secretAccessKey,
-      },
-      endpoint: seaweedfs.endpoint,
-      forcePathStyle: true,
-      region: seaweedfs.region,
+      ...s3ClientConfig,
     });
 
     const objectKey = "avatars/users/usr_test/avatar.webp";
@@ -77,8 +57,11 @@ describe("S3-compatible object store integration", () => {
     const readObjectResponse = await objectStore.readObject(objectKey);
 
     expect(readObjectResponse.ContentType).toBe("image/webp");
-    expect(hasTransformToByteArray(readObjectResponse.Body)).toBe(true);
-    if (!hasTransformToByteArray(readObjectResponse.Body)) {
+    expect(typeof readObjectResponse.Body?.transformToByteArray).toBe("function");
+    if (
+      readObjectResponse.Body === undefined ||
+      typeof readObjectResponse.Body.transformToByteArray !== "function"
+    ) {
       throw new Error("Expected GetObject response body to support transformToByteArray().");
     }
 
@@ -90,6 +73,7 @@ describe("S3-compatible object store integration", () => {
       name: "NotFound",
     });
 
+    objectStore.destroy();
     await seaweedfs.stop();
 
     await expect(seaweedfs.stop()).rejects.toThrow("SeaweedFS container was already stopped.");

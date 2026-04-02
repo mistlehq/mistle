@@ -50,7 +50,8 @@ objectStore.destroy();
 - S3-compatible storage only for now.
 - Application code should depend on `S3CompatibleObjectStore` rather than
   wiring raw S3 commands directly throughout the codebase.
-- Provider-specific details should stay inside this package.
+- Bucket binding and S3-compatible client wiring should stay inside this
+  package.
 - This package keeps its method surface small, but it surfaces backend-native
   S3-compatible errors and stays close to the underlying S3 command outputs.
 
