@@ -9,20 +9,22 @@ import {
 describe("resolveSandboxHeaderStatusUi", () => {
   it.each([
     {
-      description: "shows connected when the sandbox is running",
+      description:
+        "shows connecting when the sandbox is running but the session is not connected yet",
       input: {
         sandboxLifecycleStatus: "running",
+        sessionConnectionStatus: "connecting",
       } as const,
       expected: {
-        label: "Connected",
-        variant: "secondary",
-        className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+        label: "Connecting",
+        variant: "outline",
       },
     },
     {
       description: "prioritizes sandbox failures over connection state",
       input: {
         sandboxLifecycleStatus: "failed",
+        sessionConnectionStatus: "connected",
       } as const,
       expected: {
         label: "Sandbox failed",
@@ -33,6 +35,7 @@ describe("resolveSandboxHeaderStatusUi", () => {
       description: "shows starting while the sandbox is not yet running",
       input: {
         sandboxLifecycleStatus: "starting",
+        sessionConnectionStatus: "connecting",
       } as const,
       expected: {
         label: "Starting sandbox",
@@ -43,6 +46,7 @@ describe("resolveSandboxHeaderStatusUi", () => {
       description: "shows resuming while a stopped sandbox resume is pending",
       input: {
         sandboxLifecycleStatus: "resuming",
+        sessionConnectionStatus: "reconnecting",
       } as const,
       expected: {
         label: "Resuming sandbox",
@@ -53,6 +57,7 @@ describe("resolveSandboxHeaderStatusUi", () => {
       description: "shows stopped when the sandbox is stopped even if chat state is stale",
       input: {
         sandboxLifecycleStatus: "stopped",
+        sessionConnectionStatus: "connected",
       } as const,
       expected: {
         label: "Sandbox stopped",
@@ -60,14 +65,37 @@ describe("resolveSandboxHeaderStatusUi", () => {
       },
     },
     {
-      description: "ignores session recovery state while the sandbox is running",
+      description: "shows connected when both sandbox and session are connected",
       input: {
         sandboxLifecycleStatus: "running",
+        sessionConnectionStatus: "connected",
       } as const,
       expected: {
         label: "Connected",
         variant: "secondary",
         className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+      },
+    },
+    {
+      description: "shows reconnecting while the session transport is recovering",
+      input: {
+        sandboxLifecycleStatus: "running",
+        sessionConnectionStatus: "reconnecting",
+      } as const,
+      expected: {
+        label: "Reconnecting",
+        variant: "outline",
+      },
+    },
+    {
+      description: "shows a session error while the sandbox is still running",
+      input: {
+        sandboxLifecycleStatus: "running",
+        sessionConnectionStatus: "error",
+      } as const,
+      expected: {
+        label: "Session error",
+        variant: "destructive",
       },
     },
   ])("$description", ({ input, expected }) => {

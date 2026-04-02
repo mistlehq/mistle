@@ -14,6 +14,7 @@ import { type MainPanelTransitionState } from "./session-main-panel-handoff-stat
 import {
   hasSessionTopAlert,
   resolveSandboxHeaderStatusUi,
+  type WorkbenchSessionConnectionStatus,
 } from "./session-workbench-view-model.js";
 
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
@@ -857,8 +858,16 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxStatusQuery.refetch,
   ]);
 
+  const sessionConnectionStatus = resolveWorkbenchSessionConnectionStatus({
+    hasLifecycleError: resolvedLifecycleErrorMessage !== null,
+    isStartingSession,
+    sandboxLifecycleStatus: effectiveSandboxStatus,
+    sessionSnapshot,
+    transportState,
+  });
   const sandboxHeaderStatusUi = resolveSandboxHeaderStatusUi({
     sandboxLifecycleStatus: effectiveSandboxStatus,
+    sessionConnectionStatus,
   });
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
   const hasTopAlert = hasSessionTopAlert({
@@ -972,4 +981,34 @@ export function useSessionWorkbenchLifecycleState(input: {
     lifecycleErrorMessage: resolvedLifecycleErrorMessage,
     stoppedSessionState,
   };
+}
+
+function resolveWorkbenchSessionConnectionStatus(input: {
+  hasLifecycleError: boolean;
+  isStartingSession: boolean;
+  sandboxLifecycleStatus: "resuming" | "starting" | "running" | "stopped" | "failed" | null;
+  sessionSnapshot: ReturnType<typeof useCodexSessionState>["lifecycle"]["sessionSnapshot"];
+  transportState: ReturnType<typeof useCodexSessionState>["lifecycle"]["transportState"];
+}): WorkbenchSessionConnectionStatus | null {
+  if (input.sandboxLifecycleStatus !== "running") {
+    return null;
+  }
+
+  if (input.hasLifecycleError) {
+    return "error";
+  }
+
+  if (input.transportState === "recovering") {
+    return "reconnecting";
+  }
+
+  if (input.transportState === "connected" && input.sessionSnapshot !== null) {
+    return "connected";
+  }
+
+  if (input.isStartingSession || input.transportState === "connecting") {
+    return "connecting";
+  }
+
+  return "connecting";
 }
