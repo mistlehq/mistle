@@ -9,6 +9,7 @@ import {
   integrationCredentials,
   IntegrationCredentialSecretKinds,
   integrationTargets,
+  integrationWebhookSources,
   sandboxProfiles,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
@@ -109,6 +110,7 @@ describe("integration connections list integration", () => {
       automationId: "atm_001",
       automationName: "GitHub webhook automation",
       connectionId: "icn_002",
+      targetKey: "openai-default",
       eventTypes: ["response.created"],
       payloadFilter: {
         type: "response.created",
@@ -369,6 +371,7 @@ describe("integration connections list integration", () => {
       automationId: "atm_delete_automation",
       automationName: "Delete guard automation",
       connectionId: "icn_delete_automation",
+      targetKey: "github_cloud",
       eventTypes: ["issue_comment.created"],
       payloadFilter: {
         action: "created",
@@ -543,6 +546,7 @@ async function insertWebhookAutomationUsage(
     automationId: string;
     automationName: string;
     connectionId: string;
+    targetKey: string;
     eventTypes: string[];
     payloadFilter: Record<string, unknown>;
   },
@@ -554,9 +558,18 @@ async function insertWebhookAutomationUsage(
     name: input.automationName,
     enabled: true,
   });
+  await fixture.db.insert(integrationWebhookSources).values({
+    id: `iws_${input.automationId}`,
+    ownerScope: "connection",
+    organizationId: input.organizationId,
+    integrationConnectionId: input.connectionId,
+    targetKey: input.targetKey,
+    routingStrategy: "payload",
+    status: "active",
+  });
   await fixture.db.insert(webhookAutomations).values({
     automationId: input.automationId,
-    integrationConnectionId: input.connectionId,
+    integrationWebhookSourceId: `iws_${input.automationId}`,
     eventTypes: input.eventTypes,
     payloadFilter: input.payloadFilter,
     inputTemplate: "Handle payload",

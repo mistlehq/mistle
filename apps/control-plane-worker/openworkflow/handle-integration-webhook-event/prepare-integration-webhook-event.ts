@@ -63,6 +63,13 @@ export async function prepareIntegrationWebhookEvent(
       finalized: false,
     });
 
+    if (
+      webhookEvent.integrationWebhookSourceId === null ||
+      webhookEvent.integrationWebhookSourceId === undefined
+    ) {
+      throw new Error(`Webhook event '${webhookEvent.id}' is missing integrationWebhookSourceId.`);
+    }
+
     const resourceSyncKinds = await resolveResourceSyncKindsForWebhookEvent({
       db: ctx.db,
       integrationRegistry: ctx.integrationRegistry,
@@ -77,7 +84,7 @@ export async function prepareIntegrationWebhookEvent(
 
     const resolvedTargets = await resolveWebhookAutomationTargets(ctx.db, {
       organizationId: webhookEvent.organizationId,
-      integrationConnectionId: webhookEvent.integrationConnectionId,
+      integrationWebhookSourceId: webhookEvent.integrationWebhookSourceId,
       eventType: webhookEvent.eventType,
       payload: webhookEvent.payload,
     });

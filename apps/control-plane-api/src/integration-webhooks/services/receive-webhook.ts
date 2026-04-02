@@ -21,6 +21,7 @@ import type {
 } from "@mistle/integrations-core";
 import { and, eq, isNull } from "drizzle-orm";
 
+import { ensureImplicitConnectionWebhookSource } from "../../integration-connections/services/webhook-sources.js";
 import { ensureImplicitTargetWebhookSource } from "../../integration-webhook-sources/services/ensure-implicit-target-webhook-source.js";
 import {
   decryptCredentialUtf8,
@@ -191,12 +192,12 @@ async function resolveWebhookSourceSecretOrThrow(input: {
   }
 }
 
-async function resolveWebhookSourceOrThrow(input: {
+async function resolveWebhookSourceForPreVerificationOrThrow(input: {
   db: AppContext["var"]["db"];
   targetKey: string;
   endpointKey: string | undefined;
   definition: NonNullable<ReturnType<AppContext["var"]["integrationRegistry"]["getDefinition"]>>;
-}): Promise<IntegrationWebhookSource> {
+}): Promise<IntegrationWebhookSource | undefined> {
   const webhookSourceCapability = input.definition.webhookSource;
   if (webhookSourceCapability === undefined) {
     throw new Error(
@@ -232,11 +233,15 @@ async function resolveWebhookSourceOrThrow(input: {
     );
   }
 
-  return ensureImplicitTargetWebhookSource({
-    db: input.db,
-    targetKey: input.targetKey,
-    routingStrategy: webhookSourceCapability.routingStrategy,
-  });
+  if (webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.TARGET) {
+    return ensureImplicitTargetWebhookSource({
+      db: input.db,
+      targetKey: input.targetKey,
+      routingStrategy: webhookSourceCapability.routingStrategy,
+    });
+  }
+
+  return undefined;
 }
 
 function resolveSourceConnectionIdOrThrow(input: { source: IntegrationWebhookSource }): string {
@@ -290,22 +295,32 @@ export async function receiveIntegrationWebhook(
     target,
   });
   const parsedTargetSecrets = definition.targetSecretSchema.parse(resolvedTargetSecrets);
-  const webhookSource = await resolveWebhookSourceOrThrow({
+  const webhookSourceCapability = definition.webhookSource;
+  if (webhookSourceCapability === undefined) {
+    throw new Error(
+      `Integration '${target.familyId}/${target.variantId}' does not define webhookSource capability.`,
+    );
+  }
+
+  let webhookSource = await resolveWebhookSourceForPreVerificationOrThrow({
     db,
     targetKey: input.targetKey,
     endpointKey: input.endpointKey,
     definition,
   });
-  const webhookSourceSecrets = await resolveWebhookSourceSecretOrThrow({
-    db,
-    source: webhookSource,
-    integrationsConfig,
-  });
+  const webhookSourceSecrets =
+    webhookSource === undefined
+      ? {}
+      : await resolveWebhookSourceSecretOrThrow({
+          db,
+          source: webhookSource,
+          integrationsConfig,
+        });
   const activeConnections = await db.query.integrationConnections.findMany({
     where: (table, { and, eq }) =>
       and(
         eq(table.targetKey, input.targetKey),
-        ...(webhookSource.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION
+        ...(webhookSource?.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION
           ? [eq(table.id, resolveSourceConnectionIdOrThrow({ source: webhookSource }))]
           : []),
         eq(table.status, IntegrationConnectionStatuses.ACTIVE),
@@ -389,6 +404,22 @@ export async function receiveIntegrationWebhook(
     throw new Error(
       `Expected resolved webhook connection '${resolvedWebhookRequest.connectionId}' to exist in active connection candidates.`,
     );
+  }
+
+  if (webhookSource === undefined) {
+    if (webhookSourceCapability.ownerScope !== IntegrationWebhookSourceOwnerScopes.CONNECTION) {
+      throw new Error(
+        `Payload-routed webhook source for '${input.targetKey}' could not be resolved before persistence.`,
+      );
+    }
+
+    webhookSource = await ensureImplicitConnectionWebhookSource({
+      db,
+      organizationId: resolvedConnection.organizationId,
+      connectionId: resolvedConnection.id,
+      targetKey: input.targetKey,
+      routingStrategy: webhookSourceCapability.routingStrategy,
+    });
   }
 
   const insertedRows = await db
