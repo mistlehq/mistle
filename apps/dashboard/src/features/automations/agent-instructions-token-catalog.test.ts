@@ -32,12 +32,71 @@ function createGitHubEventOption(input: {
     label: eventDefinition.displayName,
     ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
     payloadReferences:
-      eventDefinition.payloadReferences === undefined ? [] : [...eventDefinition.payloadReferences],
+      eventDefinition.payloadReferences === undefined
+        ? []
+        : eventDefinition.payloadReferences.map((payloadReference) => ({
+            path: [...payloadReference.path],
+            description: payloadReference.description,
+          })),
     conversationKeyOptions:
       eventDefinition.conversationKeyOptions === undefined
         ? []
         : [...eventDefinition.conversationKeyOptions],
-    parameters: eventDefinition.parameters === undefined ? [] : [...eventDefinition.parameters],
+    parameters:
+      eventDefinition.parameters === undefined
+        ? []
+        : eventDefinition.parameters.map((parameter) =>
+            parameter.kind === "resource-select"
+              ? {
+                  id: parameter.id,
+                  label: parameter.label,
+                  kind: parameter.kind,
+                  resourceKind: parameter.resourceKind,
+                  payloadPath: [...parameter.payloadPath],
+                  ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                  ...(parameter.placeholder === undefined
+                    ? {}
+                    : { placeholder: parameter.placeholder }),
+                }
+              : parameter.kind === "enum-select"
+                ? {
+                    id: parameter.id,
+                    label: parameter.label,
+                    kind: parameter.kind,
+                    payloadPath: [...parameter.payloadPath],
+                    matchMode: parameter.matchMode,
+                    options: parameter.options.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    })),
+                    ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                    ...(parameter.placeholder === undefined
+                      ? {}
+                      : { placeholder: parameter.placeholder }),
+                  }
+                : {
+                    id: parameter.id,
+                    label: parameter.label,
+                    kind: parameter.kind,
+                    payloadPath: [...parameter.payloadPath],
+                    ...(parameter.matchMode === undefined
+                      ? {}
+                      : { matchMode: parameter.matchMode }),
+                    ...(parameter.defaultValue === undefined
+                      ? {}
+                      : { defaultValue: parameter.defaultValue }),
+                    ...(parameter.defaultEnabled === undefined
+                      ? {}
+                      : { defaultEnabled: parameter.defaultEnabled }),
+                    ...(parameter.controlVariant === undefined
+                      ? {}
+                      : { controlVariant: parameter.controlVariant }),
+                    ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                    ...(parameter.placeholder === undefined
+                      ? {}
+                      : { placeholder: parameter.placeholder }),
+                  },
+          ),
     ...input.overrides,
   };
 }
@@ -73,12 +132,14 @@ describe("buildAgentInstructionTokenCatalog", () => {
         createGitHubEventOption({ eventType: "github.issue_comment.created" }),
         createGitHubEventOption({
           eventType: "github.pull_request.opened",
-          payloadReferences: [
-            {
-              path: ["comment", "body"],
-              description: "Comment text",
-            },
-          ],
+          overrides: {
+            payloadReferences: [
+              {
+                path: ["comment", "body"],
+                description: "Comment text",
+              },
+            ],
+          },
         }),
       ],
     });
@@ -103,15 +164,17 @@ describe("buildAgentInstructionTokenCatalog", () => {
       selectedEventOptions: [
         createGitHubEventOption({
           eventType: "github.issue_comment.created",
-          payloadReferences: [],
-          parameters: [
-            {
-              id: "unknown-field",
-              label: "unknown field",
-              kind: "string",
-              payloadPath: ["unknown", "field"],
-            },
-          ],
+          overrides: {
+            payloadReferences: [],
+            parameters: [
+              {
+                id: "unknown-field",
+                label: "unknown field",
+                kind: "string",
+                payloadPath: ["unknown", "field"],
+              },
+            ],
+          },
         }),
       ],
     });

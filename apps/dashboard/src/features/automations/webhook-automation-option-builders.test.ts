@@ -6,16 +6,17 @@ import {
   createWebhookAutomationTriggerId,
   resolveEligibleProfileAutomationConnectionIds,
 } from "./webhook-automation-option-builders.js";
+import type { WebhookAutomationPayloadReference } from "./webhook-automation-trigger-types.js";
 
-const GitHubRepositoryFullNamePayloadReference = {
+const GitHubRepositoryFullNamePayloadReference: WebhookAutomationPayloadReference = {
   path: ["repository", "full_name"],
   description: "Repository owner and name",
-} as const;
+};
 
-const GitHubPullRequestNumberPayloadReference = {
+const GitHubPullRequestNumberPayloadReference: WebhookAutomationPayloadReference = {
   path: ["pull_request", "number"],
   description: "Pull request number",
-} as const;
+};
 
 describe("buildWebhookAutomationEventOptions", () => {
   it("returns connection-scoped supported webhook events from all connected integrations", () => {
