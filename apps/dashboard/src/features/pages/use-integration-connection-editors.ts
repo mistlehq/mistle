@@ -14,7 +14,7 @@ export function useIntegrationConnectionEditors(input: {
   queryKey: readonly ["settings", "integrations", "directory"];
 }) {
   const queryClient = useQueryClient();
-  const [connectionNameErrorById, setConnectionNameErrorById] = useState<
+  const [connectionNameErrorMessageById, setConnectionNameErrorMessageById] = useState<
     Readonly<Record<string, string | undefined>>
   >({});
   const [editingApiKeyConnectionId, setEditingApiKeyConnectionId] = useState<string | null>(null);
@@ -160,9 +160,9 @@ export function useIntegrationConnectionEditors(input: {
         ? undefined
         : {
             disabled: updateConnectionNameMutation.isPending,
-            saveErrorByConnectionId: connectionNameErrorById,
+            errorMessageByConnectionId: connectionNameErrorMessageById,
             onStartEditing: (connectionId: string) => {
-              setConnectionNameErrorById((current) => ({
+              setConnectionNameErrorMessageById((current) => ({
                 ...current,
                 [connectionId]: undefined,
               }));
@@ -178,7 +178,7 @@ export function useIntegrationConnectionEditors(input: {
                 return;
               }
 
-              setConnectionNameErrorById((current) => ({
+              setConnectionNameErrorMessageById((current) => ({
                 ...current,
                 [connectionId]: undefined,
               }));
@@ -194,7 +194,7 @@ export function useIntegrationConnectionEditors(input: {
                   fallbackMessage: "Could not update connection.",
                 });
 
-                setConnectionNameErrorById((current) => ({
+                setConnectionNameErrorMessageById((current) => ({
                   ...current,
                   [connectionId]: errorMessage,
                 }));

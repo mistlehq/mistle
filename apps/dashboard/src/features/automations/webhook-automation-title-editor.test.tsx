@@ -11,9 +11,9 @@ describe("WebhookAutomationTitleEditor", () => {
   it("disables edit entry while saves are disabled", () => {
     render(
       <WebhookAutomationTitleEditor
-        saveError={undefined}
+        disabled={true}
+        errorMessage={undefined}
         onCommit={() => {}}
-        saveDisabled={true}
         title="Old automation name"
       />,
     );
@@ -27,9 +27,9 @@ describe("WebhookAutomationTitleEditor", () => {
   it("resets edit state from a keyed remount when the title changes", () => {
     const { rerender } = render(
       <WebhookAutomationTitleEditor
-        saveError={undefined}
+        disabled={false}
+        errorMessage={undefined}
         onCommit={() => {}}
-        saveDisabled={false}
         title="Old automation name"
       />,
     );
@@ -41,9 +41,9 @@ describe("WebhookAutomationTitleEditor", () => {
 
     rerender(
       <WebhookAutomationTitleEditor
-        saveError={undefined}
+        disabled={false}
+        errorMessage={undefined}
         onCommit={() => {}}
-        saveDisabled={false}
         title="New automation name"
       />,
     );

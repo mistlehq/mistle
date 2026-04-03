@@ -142,15 +142,24 @@ export function useEditSandboxProfileMetaState(input: EditInput): {
         return;
       }
 
-      const updatedProfile = await updateMutation.mutateAsync({
-        profileId: input.profileId,
-        changes: {
-          displayName: normalizedDisplayName,
-        },
-      });
+      try {
+        const updatedProfile = await updateMutation.mutateAsync({
+          profileId: input.profileId,
+          changes: {
+            displayName: normalizedDisplayName,
+          },
+        });
 
-      setDisplayName(updatedProfile.displayName);
-      setPersistedDisplayName(updatedProfile.displayName);
+        setDisplayName(updatedProfile.displayName);
+        setPersistedDisplayName(updatedProfile.displayName);
+      } catch (error) {
+        throw new Error(
+          resolveApiErrorMessage({
+            error,
+            fallbackMessage: "Could not update sandbox profile.",
+          }),
+        );
+      }
     },
   };
 }

@@ -1,7 +1,7 @@
 import { systemSleeper } from "@mistle/time";
 import { FieldDescription } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import type React from "react";
+import { useState } from "react";
 
 import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
 import {
@@ -11,20 +11,22 @@ import {
 
 type StoryHarnessProps = Pick<
   AutoSaveEditableHeadingProps,
-  "savedValue" | "placeholder" | "maxWidthClassName" | "headingClassName" | "inputClassName"
+  "value" | "placeholder" | "maxWidthClassName" | "headingClassName" | "inputClassName"
 > & {
-  saveError?: string;
+  errorMessage?: string;
 };
 
 function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
+  const [value, setValue] = useState(input.value);
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 rounded-xl border bg-white p-6">
       <AutoSaveEditableHeading
         ariaLabel="Display name"
         editButtonLabel="Edit display name"
         headingClassName={input.headingClassName}
-        {...(input.saveError === undefined ? {} : { saveError: input.saveError })}
-        savedValue={input.savedValue}
+        {...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage })}
+        value={value}
         inputClassName={input.inputClassName}
         maxWidthClassName={input.maxWidthClassName}
         onSave={async (nextValue) => {
@@ -33,6 +35,8 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
           if (nextValue.trim().toLowerCase() === "explode") {
             throw new Error("Could not update display name.");
           }
+
+          setValue(nextValue);
         }}
         placeholder={input.placeholder ?? "Display name"}
         validate={(nextValue) => {
@@ -55,7 +59,7 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
           </span>
           <span className="block">
             Save error: pass{" "}
-            <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">saveError</code>
+            <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">errorMessage</code>
             or click the pencil, type
             <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">explode</code>
             and blur.
@@ -81,6 +85,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    savedValue: "Repo Maintainer",
+    value: "Repo Maintainer",
   },
 };

@@ -1,18 +1,20 @@
 import { systemSleeper } from "@mistle/time";
 import { FieldDescription } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import type React from "react";
+import { useState } from "react";
 
 import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
 import { AutoSaveTextField } from "./auto-save-text-field.js";
 
 type StoryHarnessProps = {
-  savedValue: string;
+  value: string;
   description?: string;
   placeholder?: string;
 };
 
 function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
+  const [value, setValue] = useState(input.value);
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 rounded-xl border bg-white p-6">
       <AutoSaveTextField
@@ -21,7 +23,7 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
           "Shown across the dashboard. Saving begins when focus leaves the field."
         }
         id="storybook-auto-save-display-name"
-        savedValue={input.savedValue}
+        value={value}
         label="Display name"
         onSave={async (nextValue) => {
           await systemSleeper.sleep(900);
@@ -29,6 +31,8 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
           if (nextValue.trim().toLowerCase() === "explode") {
             throw new Error("Could not update display name.");
           }
+
+          setValue(nextValue);
         }}
         placeholder={input.placeholder ?? "Display name"}
         validate={(nextValue) => {
@@ -73,6 +77,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    savedValue: "Mistle Developer",
+    value: "Mistle Developer",
   },
 };

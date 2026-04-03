@@ -26,7 +26,7 @@ describe("AutoSaveTextField", () => {
     render(
       <AutoSaveTextField
         id="display-name"
-        savedValue="Mistle Developer"
+        value="Mistle Developer"
         label="Display name"
         onSave={async (nextValue) => {
           savedValues.push(nextValue);
@@ -63,7 +63,7 @@ describe("AutoSaveTextField", () => {
     render(
       <AutoSaveTextField
         id="display-name"
-        savedValue="Mistle Developer"
+        value="Mistle Developer"
         label="Display name"
         onSave={async () => {
           saveCount += 1;
@@ -90,7 +90,7 @@ describe("AutoSaveTextField", () => {
     render(
       <AutoSaveTextField
         id="display-name"
-        savedValue="Mistle Developer"
+        value="Mistle Developer"
         label="Display name"
         onSave={async () => {
           throw new Error("Could not update display name.");
@@ -109,24 +109,55 @@ describe("AutoSaveTextField", () => {
     });
   });
 
-  it("disables the input while saving", async () => {
-    let resolveSave: (() => void) | undefined;
-
+  it("reverts whitespace-only edits that do not change the trimmed value", () => {
     render(
       <AutoSaveTextField
         id="display-name"
-        savedValue="Mistle Developer"
+        value="Mistle Developer"
         label="Display name"
-        onSave={() =>
-          new Promise<void>((resolve) => {
-            resolveSave = resolve;
-          })
-        }
-        successFadeDurationMs={20}
-        successVisibleDurationMs={40}
+        onSave={async () => {}}
         validate={() => null}
       />,
     );
+
+    const input = screen.getByRole("textbox", { name: "Display name" });
+    fireEvent.change(input, { target: { value: "  Mistle Developer  " } });
+    fireEvent.blur(input);
+
+    expect(screen.getByRole("textbox", { name: "Display name" })).toHaveProperty(
+      "value",
+      "Mistle Developer",
+    );
+    expect(getSaveState()).toBe("idle");
+  });
+
+  it("disables the input while saving", async () => {
+    let resolveSave: (() => void) | undefined;
+
+    function ControlledHarness(): React.JSX.Element {
+      const [value, setValue] = useState("Mistle Developer");
+
+      return (
+        <AutoSaveTextField
+          id="display-name"
+          label="Display name"
+          onSave={() =>
+            new Promise<void>((resolve) => {
+              resolveSave = () => {
+                setValue("Mistle Storybook");
+                resolve();
+              };
+            })
+          }
+          successFadeDurationMs={20}
+          successVisibleDurationMs={40}
+          validate={() => null}
+          value={value}
+        />
+      );
+    }
+
+    render(<ControlledHarness />);
 
     const input = screen.getByRole("textbox", { name: "Display name" });
     fireEvent.change(input, { target: { value: "Mistle Storybook" } });
@@ -163,7 +194,7 @@ describe("AutoSaveTextField", () => {
           </button>
           <AutoSaveTextField
             id="display-name"
-            savedValue={value}
+            value={value}
             label="Display name"
             onSave={() =>
               new Promise<void>((resolve) => {
@@ -195,5 +226,40 @@ describe("AutoSaveTextField", () => {
     });
 
     expect(getSaveState()).toBe("idle");
+  });
+
+  it("preserves the saved confirmation when the parent applies the new value", async () => {
+    function ControlledHarness(): React.JSX.Element {
+      const [value, setValue] = useState("Mistle Developer");
+
+      return (
+        <AutoSaveTextField
+          id="display-name"
+          label="Display name"
+          onSave={async (nextValue) => {
+            setValue(nextValue);
+          }}
+          successFadeDurationMs={20}
+          successVisibleDurationMs={40}
+          validate={() => null}
+          value={value}
+        />
+      );
+    }
+
+    render(<ControlledHarness />);
+
+    const input = screen.getByRole("textbox", { name: "Display name" });
+    fireEvent.change(input, { target: { value: "Mistle Storybook" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(getSaveState()).toBe("saved");
+    });
+
+    expect(screen.getByRole("textbox", { name: "Display name" })).toHaveProperty(
+      "value",
+      "Mistle Storybook",
+    );
   });
 });

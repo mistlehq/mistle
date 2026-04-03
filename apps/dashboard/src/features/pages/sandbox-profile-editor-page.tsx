@@ -578,7 +578,7 @@ function LoadedSandboxProfileMetaSection(input: {
           displayText={metaState.pageTitle}
           disabled={metaState.isUpdating}
           editButtonLabel="Edit profile name"
-          savedValue={metaState.formState.displayName}
+          value={metaState.formState.displayName}
           onSave={metaState.onProfileNameSave}
           validate={(nextValue) => {
             return nextValue.trim().length === 0 ? "Profile name is required." : null;

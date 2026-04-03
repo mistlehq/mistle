@@ -159,7 +159,7 @@ describe("IntegrationConnectionDetailView", () => {
           onStartEditing: (connectionId) => {
             startedEditingConnectionId = connectionId;
           },
-          saveErrorByConnectionId: {},
+          errorMessageByConnectionId: {},
           onSave: async () => {},
         }}
       />,
@@ -177,7 +177,7 @@ describe("IntegrationConnectionDetailView", () => {
 
   it("clears a stale connection save error when a new edit session starts", () => {
     function ErrorHarness(): React.JSX.Element {
-      const [saveErrorByConnectionId, setSaveErrorByConnectionId] = useState<
+      const [errorMessageByConnectionId, setErrorMessageByConnectionId] = useState<
         Readonly<Record<string, string | undefined>>
       >({
         icn_github_primary: "Could not update connection.",
@@ -200,12 +200,12 @@ describe("IntegrationConnectionDetailView", () => {
           titleEditor={{
             disabled: false,
             onStartEditing: (connectionId) => {
-              setSaveErrorByConnectionId((current) => ({
+              setErrorMessageByConnectionId((current) => ({
                 ...current,
                 [connectionId]: undefined,
               }));
             },
-            saveErrorByConnectionId,
+            errorMessageByConnectionId,
             onSave: async () => {},
           }}
         />

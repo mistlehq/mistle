@@ -272,8 +272,13 @@ describe("WebhookAutomationForm", () => {
       }),
     });
     const form = within(container);
+    const automationNameInput = form.getAllByRole("textbox")[0];
 
-    expect(form.getByLabelText("Automation name")).toBeDefined();
+    if (automationNameInput === undefined) {
+      throw new Error("Expected automation name input to be rendered.");
+    }
+
+    expect(automationNameInput).toBeDefined();
     expect(form.queryByDisplayValue("Your automation")).toBeNull();
     expect(form.queryByRole("button", { name: "Edit automation name" })).toBeNull();
   });

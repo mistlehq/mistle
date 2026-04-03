@@ -1,6 +1,4 @@
 import { systemScheduler, type Scheduler, type TimerHandle } from "@mistle/time";
-import { Button, Notice } from "@mistle/ui";
-import { PencilSimpleIcon } from "@phosphor-icons/react";
 import { useEffect, useReducer, useRef } from "react";
 
 import {
@@ -10,22 +8,22 @@ import {
   type AutoSaveErrorState,
 } from "./auto-save-behavior.js";
 import type { AutoSaveInputVisualStatus } from "./auto-save-input-surface.js";
-import { PageTitleField } from "./page-title-field.js";
+import { EditableHeading } from "./editable-heading.js";
 
 type AutoSaveStatus = AutoSaveInputVisualStatus;
 
 type EditableHeadingState = {
   isEditing: boolean;
   draftValue: string;
-  value: string;
   errorState: AutoSaveErrorState | null;
   status: AutoSaveStatus;
 };
 
 type EditableHeadingAction =
   | {
-      type: "reset-from-props";
-      savedValue: string;
+      type: "sync-from-props";
+      value: string;
+      preserveStatus: boolean;
     }
   | {
       type: "apply-parent-save-error";
@@ -37,13 +35,15 @@ type EditableHeadingAction =
     }
   | {
       type: "enter-edit-mode";
+      value: string;
     }
   | {
       type: "show-parent-save-error";
-      saveError: string;
+      errorMessage: string;
     }
   | {
       type: "cancel-edit";
+      value: string;
     }
   | {
       type: "show-validation-error";
@@ -67,11 +67,10 @@ type EditableHeadingAction =
       type: "saved-fade-ended";
     };
 
-function createEditableHeadingState(input: { savedValue: string }): EditableHeadingState {
+function createEditableHeadingState(input: { value: string }): EditableHeadingState {
   return {
     isEditing: false,
-    draftValue: input.savedValue,
-    value: input.savedValue,
+    draftValue: input.value,
     errorState: null,
     status: "idle",
   };
@@ -82,9 +81,17 @@ function editableHeadingReducer(
   action: EditableHeadingAction,
 ): EditableHeadingState {
   switch (action.type) {
-    case "reset-from-props":
+    case "sync-from-props":
+      if (action.preserveStatus) {
+        return {
+          ...state,
+          draftValue: action.value,
+          errorState: null,
+        };
+      }
+
       return createEditableHeadingState({
-        savedValue: action.savedValue,
+        value: action.value,
       });
     case "apply-parent-save-error":
       return {
@@ -106,7 +113,7 @@ function editableHeadingReducer(
     case "enter-edit-mode":
       return {
         ...state,
-        draftValue: state.value,
+        draftValue: action.value,
         errorState: null,
         isEditing: true,
         status: "idle",
@@ -114,10 +121,9 @@ function editableHeadingReducer(
     case "show-parent-save-error":
       return {
         ...state,
-        draftValue: state.value,
         errorState: {
           kind: "save",
-          message: action.saveError,
+          message: action.errorMessage,
         },
         isEditing: true,
         status: "idle",
@@ -125,7 +131,7 @@ function editableHeadingReducer(
     case "cancel-edit":
       return {
         ...state,
-        draftValue: state.value,
+        draftValue: action.value,
         errorState: null,
         isEditing: false,
         status: "idle",
@@ -149,7 +155,6 @@ function editableHeadingReducer(
       return {
         ...state,
         draftValue: action.value,
-        value: action.value,
         status: "saved",
       };
     case "save-failed":
@@ -176,12 +181,12 @@ function editableHeadingReducer(
 }
 
 export type AutoSaveEditableHeadingProps = {
-  savedValue: string;
+  value: string;
   displayText?: string;
   ariaLabel: string;
   editButtonLabel: string;
   disabled?: boolean;
-  saveError?: string;
+  errorMessage?: string;
   placeholder?: string;
   maxWidthClassName?: string;
   headingTag?: "div" | "h1" | "h2";
@@ -209,41 +214,59 @@ function useAutoSaveEditableHeadingState(input: AutoSaveEditableHeadingProps): {
   const successVisibleDurationMs = input.successVisibleDurationMs ?? 2200;
   const successFadeDurationMs = input.successFadeDurationMs ?? 700;
   const scheduler = input.scheduler ?? systemScheduler;
-  const saveError = input.saveError;
+  const errorMessage = input.errorMessage;
   const [state, dispatch] = useReducer(
     editableHeadingReducer,
     {
-      savedValue: input.savedValue,
+      value: input.value,
     },
     createEditableHeadingState,
   );
   const saveSequenceRef = useRef(0);
+  const previousValueRef = useRef(input.value);
   const fadeStartTimeoutRef = useRef<TimerHandle | null>(null);
   const fadeEndTimeoutRef = useRef<TimerHandle | null>(null);
 
   useEffect(() => {
-    saveSequenceRef.current += 1;
-    clearPendingStatusTimeouts({
-      fadeEndTimeoutRef,
-      fadeStartTimeoutRef,
-      scheduler,
-    });
+    const previousValue = previousValueRef.current;
+    previousValueRef.current = input.value;
+
+    if (input.value === previousValue) {
+      return;
+    }
+
+    const normalizedIncomingValue = input.value.trim();
+    const normalizedDraftValue = state.draftValue.trim();
+    const preserveStatus =
+      (state.status === "saving" || state.status === "saved" || state.status === "saved-fading") &&
+      normalizedIncomingValue === normalizedDraftValue;
+
+    if (!preserveStatus) {
+      saveSequenceRef.current += 1;
+      clearPendingStatusTimeouts({
+        fadeEndTimeoutRef,
+        fadeStartTimeoutRef,
+        scheduler,
+      });
+    }
+
     dispatch({
-      type: "reset-from-props",
-      savedValue: input.savedValue,
+      type: "sync-from-props",
+      value: input.value,
+      preserveStatus,
     });
-  }, [input.savedValue, scheduler]);
+  }, [input.value, scheduler, state.draftValue, state.status]);
 
   useEffect(() => {
-    if (saveError === undefined) {
+    if (errorMessage === undefined) {
       return;
     }
 
     dispatch({
       type: "apply-parent-save-error",
-      message: saveError,
+      message: errorMessage,
     });
-  }, [saveError]);
+  }, [errorMessage]);
 
   useEffect(() => {
     return () => {
@@ -261,17 +284,18 @@ function useAutoSaveEditableHeadingState(input: AutoSaveEditableHeadingProps): {
     }
 
     const normalizedDraftValue = state.draftValue.trim();
-    if (normalizedDraftValue === state.value.trim()) {
-      if (saveError !== undefined) {
+    if (normalizedDraftValue === input.value.trim()) {
+      if (errorMessage !== undefined) {
         dispatch({
           type: "show-parent-save-error",
-          saveError,
+          errorMessage,
         });
         return;
       }
 
       dispatch({
         type: "cancel-edit",
+        value: input.value,
       });
       return;
     }
@@ -357,6 +381,7 @@ function useAutoSaveEditableHeadingState(input: AutoSaveEditableHeadingProps): {
     });
     dispatch({
       type: "cancel-edit",
+      value: input.value,
     });
   }
 
@@ -369,11 +394,12 @@ function useAutoSaveEditableHeadingState(input: AutoSaveEditableHeadingProps): {
     input.onEditStart?.();
     dispatch({
       type: "enter-edit-mode",
+      value: input.value,
     });
   }
 
   return {
-    displayedHeadingValue: input.displayText ?? state.value,
+    displayedHeadingValue: input.displayText ?? input.value,
     headingToneClassName: state.errorState === null ? "" : " text-destructive",
     showStatus: state.status !== "idle" || state.errorState !== null,
     state,
@@ -386,69 +412,32 @@ function useAutoSaveEditableHeadingState(input: AutoSaveEditableHeadingProps): {
 
 export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): React.JSX.Element {
   const heading = useAutoSaveEditableHeadingState(input);
-  const containerClassName = `w-full ${input.maxWidthClassName ?? "max-w-2xl"} space-y-2`;
-  const HeadingTag = input.headingTag ?? "h1";
-  const headingClassName = input.headingClassName ?? "text-xl font-semibold leading-none";
-
-  if (heading.state.isEditing) {
-    return (
-      <PageTitleField
-        ariaLabel={input.ariaLabel}
-        autoFocus={true}
-        fieldId="editable-heading-input"
-        label={input.ariaLabel}
-        disabled={input.disabled === true || heading.state.status === "saving"}
-        onBlur={() => {
-          void heading.onCommit();
-        }}
-        onChange={heading.onChangeDraft}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.currentTarget.blur();
-            return;
-          }
-
-          if (event.key === "Escape" && (input.cancelOnEscape ?? true)) {
-            heading.onCancelEdit();
-          }
-        }}
-        saveStatus={
-          heading.showStatus && heading.state.errorState === null ? heading.state.status : "idle"
-        }
-        showLabel={false}
-        value={heading.state.draftValue}
-        {...(input.inputClassName === undefined ? {} : { className: input.inputClassName })}
-        {...(heading.state.errorState === null
-          ? {}
-          : { errorMessage: heading.state.errorState.message })}
-        {...(input.maxWidthClassName === undefined
-          ? {}
-          : { maxWidthClassName: input.maxWidthClassName })}
-        {...(input.placeholder === undefined ? {} : { placeholder: input.placeholder })}
-      />
-    );
-  }
-
   return (
-    <div className={containerClassName}>
-      <div className="flex max-w-full items-center gap-1">
-        <HeadingTag className={`min-w-0 ${headingClassName}${heading.headingToneClassName}`}>
-          {heading.displayedHeadingValue}
-        </HeadingTag>
-        <Button
-          aria-label={input.editButtonLabel}
-          disabled={input.disabled === true || heading.state.status === "saving"}
-          onClick={heading.onEnterEditMode}
-          size="icon-sm"
-          type="button"
-          variant="ghost"
-        >
-          <PencilSimpleIcon aria-hidden className="size-4" />
-        </Button>
-      </div>
-      {heading.state.errorState === null ? null : (
-        <Notice variant="alert">{heading.state.errorState.message}</Notice>
-      )}
-    </div>
+    <EditableHeading
+      ariaLabel={input.ariaLabel}
+      draftValue={heading.state.draftValue}
+      editButtonLabel={input.editButtonLabel}
+      errorMessage={heading.state.errorState?.message}
+      isEditing={heading.state.isEditing}
+      maxWidthClassName={input.maxWidthClassName}
+      onCancel={heading.onCancelEdit}
+      onCommit={() => {
+        void heading.onCommit();
+      }}
+      onDraftValueChange={heading.onChangeDraft}
+      onEditStart={heading.onEnterEditMode}
+      placeholder={input.placeholder}
+      disabled={input.disabled === true || heading.state.status === "saving"}
+      saveStatus={
+        heading.showStatus && heading.state.errorState === null ? heading.state.status : "idle"
+      }
+      value={heading.displayedHeadingValue}
+      {...(input.cancelOnEscape === undefined ? {} : { cancelOnEscape: input.cancelOnEscape })}
+      {...(input.headingClassName === undefined
+        ? {}
+        : { headingClassName: input.headingClassName })}
+      {...(input.headingTag === undefined ? {} : { headingTag: input.headingTag })}
+      {...(input.inputClassName === undefined ? {} : { inputClassName: input.inputClassName })}
+    />
   );
 }

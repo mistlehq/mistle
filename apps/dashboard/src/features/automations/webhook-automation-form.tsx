@@ -184,7 +184,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <WebhookAutomationTitleEditor
-              saveError={
+              errorMessage={
                 shouldRenderInlineFieldError({
                   key: "name",
                   message: input.fieldErrors.name,
@@ -195,7 +195,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
               onCommit={(nextValue) => {
                 input.onValueChange("name", nextValue);
               }}
-              saveDisabled={input.isDeleting || input.isSaving}
+              disabled={input.isDeleting || input.isSaving}
               title={input.values.name}
             />
           </div>

@@ -26,7 +26,7 @@ describe("AutoSaveEditableHeading", () => {
       <AutoSaveEditableHeading
         ariaLabel="Heading"
         editButtonLabel="Edit heading"
-        savedValue="Repo Maintainer"
+        value="Repo Maintainer"
         onSave={async () => {}}
         successFadeDurationMs={20}
         successVisibleDurationMs={40}
@@ -46,17 +46,25 @@ describe("AutoSaveEditableHeading", () => {
   });
 
   it("returns to display mode after a successful save", async () => {
-    render(
-      <AutoSaveEditableHeading
-        ariaLabel="Heading"
-        editButtonLabel="Edit heading"
-        savedValue="Repo Maintainer"
-        onSave={async () => {}}
-        successFadeDurationMs={20}
-        successVisibleDurationMs={40}
-        validate={() => null}
-      />,
-    );
+    function ControlledHarness(): React.JSX.Element {
+      const [value, setValue] = useState("Repo Maintainer");
+
+      return (
+        <AutoSaveEditableHeading
+          ariaLabel="Heading"
+          editButtonLabel="Edit heading"
+          onSave={async (nextValue) => {
+            setValue(nextValue);
+          }}
+          successFadeDurationMs={20}
+          successVisibleDurationMs={40}
+          validate={() => null}
+          value={value}
+        />
+      );
+    }
+
+    render(<ControlledHarness />);
 
     fireEvent.click(screen.getByRole("button", { name: "Edit heading" }));
     const input = screen.getByRole("textbox", { name: "Heading" });
@@ -78,7 +86,7 @@ describe("AutoSaveEditableHeading", () => {
         ariaLabel="Heading"
         disabled={true}
         editButtonLabel="Edit heading"
-        savedValue="Repo Maintainer"
+        value="Repo Maintainer"
         onSave={async () => {}}
         validate={() => null}
       />,
@@ -95,7 +103,7 @@ describe("AutoSaveEditableHeading", () => {
         ariaLabel="Heading"
         displayText="profile_123"
         editButtonLabel="Edit heading"
-        savedValue=""
+        value=""
         onSave={async () => {}}
         validate={() => null}
       />,
@@ -114,7 +122,7 @@ describe("AutoSaveEditableHeading", () => {
       <AutoSaveEditableHeading
         ariaLabel="Heading"
         editButtonLabel="Edit heading"
-        savedValue="Repo Maintainer"
+        value="Repo Maintainer"
         onSave={() =>
           new Promise<void>((resolve) => {
             resolveSave = resolve;
@@ -147,14 +155,14 @@ describe("AutoSaveEditableHeading", () => {
   it("keeps retry text across rerenders with the same error message", () => {
     function ErrorHarness(): React.JSX.Element {
       const [revision, setRevision] = useState(0);
-      const [saveError, setSaveError] = useState("Could not update heading.");
+      const [errorMessage, setErrorMessage] = useState("Could not update heading.");
 
       return (
         <div>
           <button
             onClick={() => {
               setRevision((current) => current + 1);
-              setSaveError("Could not update heading.");
+              setErrorMessage("Could not update heading.");
             }}
             type="button"
           >
@@ -163,8 +171,8 @@ describe("AutoSaveEditableHeading", () => {
           <AutoSaveEditableHeading
             ariaLabel="Heading"
             editButtonLabel="Edit heading"
-            saveError={saveError}
-            savedValue="Repo Maintainer"
+            errorMessage={errorMessage}
+            value="Repo Maintainer"
             onSave={async () => {}}
             validate={() => null}
           />
@@ -187,8 +195,8 @@ describe("AutoSaveEditableHeading", () => {
       <AutoSaveEditableHeading
         ariaLabel="Heading"
         editButtonLabel="Edit heading"
-        saveError="Could not update heading."
-        savedValue="Repo Maintainer"
+        errorMessage="Could not update heading."
+        value="Repo Maintainer"
         onSave={async () => {}}
         validate={() => null}
       />,
@@ -206,8 +214,8 @@ describe("AutoSaveEditableHeading", () => {
       <AutoSaveEditableHeading
         ariaLabel="Heading"
         editButtonLabel="Edit heading"
-        saveError="Could not update heading."
-        savedValue="Repo Maintainer"
+        errorMessage="Could not update heading."
+        value="Repo Maintainer"
         onSave={async () => {}}
         validate={() => null}
       />,
@@ -236,7 +244,7 @@ describe("AutoSaveEditableHeading", () => {
         <AutoSaveEditableHeading
           ariaLabel="Heading"
           editButtonLabel="Edit heading"
-          savedValue={value}
+          value={value}
           onSave={async (nextValue) => {
             setErrorState(null);
             setValue(nextValue);
@@ -244,7 +252,7 @@ describe("AutoSaveEditableHeading", () => {
           successFadeDurationMs={20}
           successVisibleDurationMs={40}
           validate={() => null}
-          {...(errorState === null ? {} : { saveError: errorState.message })}
+          {...(errorState === null ? {} : { errorMessage: errorState.message })}
         />
       );
     }
@@ -281,7 +289,7 @@ describe("AutoSaveEditableHeading", () => {
           <AutoSaveEditableHeading
             ariaLabel="Heading"
             editButtonLabel="Edit heading"
-            savedValue={value}
+            value={value}
             onSave={() =>
               new Promise<void>((resolve) => {
                 resolveSave = resolve;
@@ -322,7 +330,7 @@ describe("AutoSaveEditableHeading", () => {
       <AutoSaveEditableHeading
         ariaLabel="Heading"
         editButtonLabel="Edit heading"
-        savedValue="Repo Maintainer"
+        value="Repo Maintainer"
         onSave={async () => {}}
         scheduler={scheduler}
         successFadeDurationMs={20}
@@ -355,5 +363,38 @@ describe("AutoSaveEditableHeading", () => {
       "value",
       "Second Title",
     );
+  });
+
+  it("preserves the saved confirmation when the parent applies the new value", async () => {
+    function ControlledHarness(): React.JSX.Element {
+      const [value, setValue] = useState("Repo Maintainer");
+
+      return (
+        <AutoSaveEditableHeading
+          ariaLabel="Heading"
+          editButtonLabel="Edit heading"
+          onSave={async (nextValue) => {
+            setValue(nextValue);
+          }}
+          successFadeDurationMs={20}
+          successVisibleDurationMs={40}
+          validate={() => null}
+          value={value}
+        />
+      );
+    }
+
+    render(<ControlledHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit heading" }));
+    const input = screen.getByRole("textbox", { name: "Heading" });
+    fireEvent.change(input, { target: { value: "New Title" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(getSaveState({ label: "Heading" })).toBe("saved");
+    });
+
+    expect(screen.getByRole("textbox", { name: "Heading" })).toHaveProperty("value", "New Title");
   });
 });

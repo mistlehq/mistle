@@ -52,7 +52,7 @@ export type IntegrationConnectionDetailViewProps = {
   titleEditor?:
     | {
         disabled: boolean;
-        saveErrorByConnectionId: Readonly<Record<string, string | undefined>>;
+        errorMessageByConnectionId: Readonly<Record<string, string | undefined>>;
         onStartEditing: (connectionId: string) => void;
         onSave: (connectionId: string, draftValue: string) => Promise<void> | void;
       }
@@ -185,7 +185,7 @@ function EditableConnectionTitle(input: {
   connection: IntegrationConnectionDetailItem;
   titleEditor: NonNullable<IntegrationConnectionDetailViewProps["titleEditor"]>;
 }): React.JSX.Element {
-  const connectionSaveError = input.titleEditor.saveErrorByConnectionId[input.connection.id];
+  const connectionErrorMessage = input.titleEditor.errorMessageByConnectionId[input.connection.id];
 
   return (
     <AutoSaveEditableHeading
@@ -193,7 +193,7 @@ function EditableConnectionTitle(input: {
       disabled={input.titleEditor.disabled}
       editButtonLabel="Edit connection name"
       headingClassName="text-base font-semibold leading-tight"
-      savedValue={input.connection.displayName}
+      value={input.connection.displayName}
       maxWidthClassName="max-w-3xl"
       onEditStart={() => {
         input.titleEditor.onStartEditing(input.connection.id);
@@ -205,7 +205,7 @@ function EditableConnectionTitle(input: {
       validate={(nextValue) => {
         return nextValue.trim().length === 0 ? "Connection name is required." : null;
       }}
-      {...(connectionSaveError === undefined ? {} : { saveError: connectionSaveError })}
+      {...(connectionErrorMessage === undefined ? {} : { errorMessage: connectionErrorMessage })}
     />
   );
 }

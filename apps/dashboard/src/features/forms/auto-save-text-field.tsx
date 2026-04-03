@@ -19,7 +19,7 @@ export type AutoSaveTextFieldErrorState = AutoSaveErrorState;
 export type AutoSaveTextFieldProps = {
   id: string;
   label: string;
-  savedValue: string;
+  value: string;
   description?: string;
   placeholder?: string;
   disabled?: boolean;
@@ -34,26 +34,41 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
   const successVisibleDurationMs = input.successVisibleDurationMs ?? 2200;
   const successFadeDurationMs = input.successFadeDurationMs ?? 700;
   const scheduler = input.scheduler ?? systemScheduler;
-  const [draftValue, setDraftValue] = useState(input.savedValue);
-  const [committedValue, setCommittedValue] = useState(input.savedValue);
+  const [draftValue, setDraftValue] = useState(input.value);
   const [errorState, setErrorState] = useState<AutoSaveTextFieldErrorState | null>(null);
   const [status, setStatus] = useState<AutoSaveStatus>("idle");
   const saveSequenceRef = useRef(0);
+  const previousValueRef = useRef(input.value);
   const fadeStartTimeoutRef = useRef<TimerHandle | null>(null);
   const fadeEndTimeoutRef = useRef<TimerHandle | null>(null);
 
   useEffect(() => {
-    saveSequenceRef.current += 1;
-    clearPendingStatusTimeouts({
-      fadeEndTimeoutRef,
-      fadeStartTimeoutRef,
-      scheduler,
-    });
-    setDraftValue(input.savedValue);
-    setCommittedValue(input.savedValue);
-    setErrorState(null);
-    setStatus("idle");
-  }, [input.savedValue, scheduler]);
+    const previousValue = previousValueRef.current;
+    previousValueRef.current = input.value;
+
+    if (input.value === previousValue) {
+      return;
+    }
+
+    const normalizedIncomingValue = input.value.trim();
+    const normalizedDraftValue = draftValue.trim();
+    const preserveStatus =
+      (status === "saving" || status === "saved" || status === "saved-fading") &&
+      normalizedIncomingValue === normalizedDraftValue;
+
+    if (!preserveStatus) {
+      saveSequenceRef.current += 1;
+      clearPendingStatusTimeouts({
+        fadeEndTimeoutRef,
+        fadeStartTimeoutRef,
+        scheduler,
+      });
+      setErrorState(null);
+      setStatus("idle");
+    }
+
+    setDraftValue(input.value);
+  }, [draftValue, input.value, scheduler, status]);
 
   useEffect(() => {
     return () => {
@@ -66,7 +81,14 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
   }, [scheduler]);
 
   async function handleCommit(): Promise<void> {
-    if (input.disabled || status === "saving" || draftValue === committedValue) {
+    if (input.disabled || status === "saving") {
+      return;
+    }
+
+    if (draftValue.trim() === input.value.trim()) {
+      setDraftValue(input.value);
+      setErrorState(null);
+      setStatus("idle");
       return;
     }
 
@@ -98,7 +120,6 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
         return;
       }
 
-      setCommittedValue(draftValue);
       setStatus("saved");
       scheduleSavedStateReset({
         fadeEndTimeoutRef,
@@ -146,8 +167,14 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
           }}
           onChange={(nextValue) => {
             setDraftValue(nextValue);
-            if (errorState !== null) {
+            if (errorState !== null || status !== "idle") {
               setErrorState(null);
+              setStatus("idle");
+              clearPendingStatusTimeouts({
+                fadeEndTimeoutRef,
+                fadeStartTimeoutRef,
+                scheduler,
+              });
             }
           }}
           onKeyDown={(event) => {
