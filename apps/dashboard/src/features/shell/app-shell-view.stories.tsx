@@ -1,6 +1,7 @@
 import { Badge } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { createDashboardMemoryRouterDecorator } from "../../storybook/decorators.js";
 import { ErrorNotice } from "../auth/error-notice.js";
 import { SettingsBackButton } from "../settings/settings-back-button.js";
 import {
@@ -145,6 +146,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const SettingsProfile: Story = {
+  decorators: [createDashboardMemoryRouterDecorator(["/settings/account/profile"])],
   args: {
     breadcrumbs: <p className="truncate text-sm">Settings / Profile</p>,
     contentInsetOwner: "child",
@@ -165,6 +167,7 @@ export const SettingsProfile: Story = {
 };
 
 export const SettingsMembers: Story = {
+  decorators: [createDashboardMemoryRouterDecorator(["/settings/organization/members"])],
   args: {
     breadcrumbs: <p className="truncate text-sm">Settings / Organization / Members</p>,
     contentInsetOwner: "child",
