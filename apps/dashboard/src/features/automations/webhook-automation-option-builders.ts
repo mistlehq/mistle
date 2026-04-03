@@ -189,6 +189,14 @@ function buildSelectableWebhookAutomationEventOptions(input: {
         label: eventDefinition.displayName,
         availability: "available",
         ...(target.logoKey === undefined ? {} : { logoKey: target.logoKey }),
+        ...(eventDefinition.payloadReferences === undefined
+          ? {}
+          : {
+              payloadReferences: eventDefinition.payloadReferences.map((payloadReference) => ({
+                path: [...payloadReference.path],
+                description: payloadReference.description,
+              })),
+            }),
         ...(eventDefinition.conversationKeyOptions === undefined
           ? {}
           : {

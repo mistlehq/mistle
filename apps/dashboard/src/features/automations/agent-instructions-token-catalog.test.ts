@@ -21,14 +21,15 @@ describe("buildAgentInstructionTokenCatalog", () => {
     expect(tokens.some((token) => token.path === "payload")).toBe(true);
   });
 
-  it("derives payload tokens from selected event parameters only", () => {
+  it("derives payload tokens from selected event payload references", () => {
     const tokens = buildAgentInstructionTokenCatalog({
       selectedEventOptions: [createGithubIssueCommentCreatedEventOption()],
     });
 
     expect(tokens.some((token) => token.path === "payload.comment.body")).toBe(true);
+    expect(tokens.some((token) => token.path === "payload.repository.full_name")).toBe(true);
     expect(tokens.some((token) => token.path === "payload.issue.pull_request")).toBe(true);
-    expect(tokens.some((token) => token.path === "payload.sender.login")).toBe(false);
+    expect(tokens.some((token) => token.path === "payload.sender.login")).toBe(true);
   });
 
   it("deduplicates repeated payload paths across selected events", () => {
@@ -36,13 +37,10 @@ describe("buildAgentInstructionTokenCatalog", () => {
       selectedEventOptions: [
         createGithubIssueCommentCreatedEventOption(),
         createGithubPullRequestOpenedEventOption({
-          parameters: [
+          payloadReferences: [
             {
-              id: "repository",
-              label: "repository",
-              kind: "resource-select",
-              resourceKind: "repository",
-              payloadPath: ["comment", "body"],
+              path: ["comment", "body"],
+              description: "Comment text",
             },
           ],
         }),
@@ -52,7 +50,7 @@ describe("buildAgentInstructionTokenCatalog", () => {
     expect(tokens.filter((token) => token.path === "payload.comment.body")).toHaveLength(1);
   });
 
-  it("uses curated semantic descriptions for known payload paths", () => {
+  it("uses payload reference descriptions", () => {
     const tokens = buildAgentInstructionTokenCatalog({
       selectedEventOptions: [createGithubIssueCommentCreatedEventOption()],
     });
@@ -62,10 +60,11 @@ describe("buildAgentInstructionTokenCatalog", () => {
     );
   });
 
-  it("omits the description for unknown payload paths", () => {
+  it("does not derive payload tokens from trigger parameters", () => {
     const tokens = buildAgentInstructionTokenCatalog({
       selectedEventOptions: [
         createGithubIssueCommentCreatedEventOption({
+          payloadReferences: [],
           parameters: [
             {
               id: "unknown-field",
@@ -78,9 +77,7 @@ describe("buildAgentInstructionTokenCatalog", () => {
       ],
     });
 
-    expect(tokens.find((token) => token.path === "payload.unknown.field")?.description).toBe(
-      undefined,
-    );
+    expect(tokens.some((token) => token.path === "payload.unknown.field")).toBe(false);
   });
 
   it("keeps shared runtime groups ahead of payload tokens", () => {

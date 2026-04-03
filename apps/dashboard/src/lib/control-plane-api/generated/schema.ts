@@ -1875,6 +1875,10 @@ export interface paths {
                         prefix?: string;
                       }
                   )[];
+                  payloadReferences?: {
+                    description: string;
+                    path: string[];
+                  }[];
                   providerEventType: string;
                 }[];
                 targetHealth: {

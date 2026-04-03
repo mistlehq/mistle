@@ -160,6 +160,28 @@ export function createGithubIssueCommentCreatedEventOption(
         template: "{{payload.repository.full_name}}",
       },
     ],
+    payloadReferences: [
+      {
+        path: ["repository", "full_name"],
+        description: "Repository owner and name",
+      },
+      {
+        path: ["issue", "number"],
+        description: "Issue number",
+      },
+      {
+        path: ["issue", "pull_request"],
+        description: "Present when the issue is a pull request",
+      },
+      {
+        path: ["comment", "body"],
+        description: "Comment text",
+      },
+      {
+        path: ["sender", "login"],
+        description: "GitHub username of the sender",
+      },
+    ],
     parameters: [
       {
         id: "explicitInvocation",
@@ -222,6 +244,24 @@ export function createGithubPullRequestOpenedEventOption(
         label: "Repository",
         description: "Events from the same repository go to the same conversation.",
         template: "{{payload.repository.full_name}}",
+      },
+    ],
+    payloadReferences: [
+      {
+        path: ["repository", "full_name"],
+        description: "Repository owner and name",
+      },
+      {
+        path: ["pull_request", "number"],
+        description: "Pull request number",
+      },
+      {
+        path: ["pull_request", "body"],
+        description: "Pull request description",
+      },
+      {
+        path: ["sender", "login"],
+        description: "GitHub username of the sender",
       },
     ],
     parameters: [

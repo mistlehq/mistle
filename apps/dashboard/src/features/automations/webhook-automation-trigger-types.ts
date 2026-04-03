@@ -50,6 +50,11 @@ export type WebhookAutomationConversationKeyOption = {
   template: string;
 };
 
+export type WebhookAutomationPayloadReference = {
+  path: string[];
+  description: string;
+};
+
 export type WebhookAutomationEventOption = {
   id: string;
   eventType: string;
@@ -60,6 +65,7 @@ export type WebhookAutomationEventOption = {
   category?: string;
   logoKey?: string;
   availability?: WebhookAutomationEventOptionAvailability;
+  payloadReferences?: readonly WebhookAutomationPayloadReference[];
   conversationKeyOptions?: readonly WebhookAutomationConversationKeyOption[];
   parameters?: readonly WebhookAutomationEventParameterOption[];
 };

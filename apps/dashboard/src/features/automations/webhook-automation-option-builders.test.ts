@@ -44,6 +44,12 @@ describe("buildWebhookAutomationEventOptions", () => {
                 providerEventType: "issue_comment",
                 displayName: "Issue comment created",
                 category: "Issues",
+                payloadReferences: [
+                  {
+                    path: ["repository", "full_name"],
+                    description: "Repository owner and name",
+                  },
+                ],
                 conversationKeyOptions: [
                   {
                     id: "issue",
@@ -58,6 +64,16 @@ describe("buildWebhookAutomationEventOptions", () => {
                 providerEventType: "pull_request",
                 displayName: "Pull request opened",
                 category: "Pull requests",
+                payloadReferences: [
+                  {
+                    path: ["repository", "full_name"],
+                    description: "Repository owner and name",
+                  },
+                  {
+                    path: ["pull_request", "number"],
+                    description: "Pull request number",
+                  },
+                ],
                 conversationKeyOptions: [
                   {
                     id: "pull-request",
@@ -114,6 +130,16 @@ describe("buildWebhookAutomationEventOptions", () => {
         connectionId: "conn_github",
         connectionLabel: "GitHub - GitHub Engineering",
         label: "Pull request opened",
+        payloadReferences: [
+          {
+            path: ["repository", "full_name"],
+            description: "Repository owner and name",
+          },
+          {
+            path: ["pull_request", "number"],
+            description: "Pull request number",
+          },
+        ],
         conversationKeyOptions: [
           {
             id: "pull-request",
@@ -135,6 +161,12 @@ describe("buildWebhookAutomationEventOptions", () => {
         connectionId: "conn_github",
         connectionLabel: "GitHub - GitHub Engineering",
         label: "Issue comment created",
+        payloadReferences: [
+          {
+            path: ["repository", "full_name"],
+            description: "Repository owner and name",
+          },
+        ],
         conversationKeyOptions: [
           {
             id: "issue",

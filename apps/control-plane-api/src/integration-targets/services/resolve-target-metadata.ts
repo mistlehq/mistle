@@ -3,6 +3,7 @@ import type {
   IntegrationConnectionMethodDefinition,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
+  IntegrationWebhookPayloadReference,
 } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 
@@ -60,6 +61,10 @@ type ResolvedWebhookEvent = {
   providerEventType: string;
   displayName: string;
   category?: string;
+  payloadReferences?: {
+    path: string[];
+    description: string;
+  }[];
   conversationKeyOptions?: {
     id: string;
     label: string;
@@ -144,6 +149,15 @@ function cloneWebhookEventConversationKeyOptions(
   }));
 }
 
+function cloneWebhookEventPayloadReferences(
+  payloadReferences: readonly IntegrationWebhookPayloadReference[],
+): NonNullable<ResolvedWebhookEvent["payloadReferences"]> {
+  return payloadReferences.map((payloadReference) => ({
+    path: [...payloadReference.path],
+    description: payloadReference.description,
+  }));
+}
+
 function cloneWebhookEventParameter(
   parameter: IntegrationWebhookEventParameterDefinition,
 ): ResolvedWebhookEventParameter {
@@ -197,6 +211,11 @@ function cloneWebhookEvents(
     providerEventType: eventDefinition.providerEventType,
     displayName: eventDefinition.displayName,
     ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
+    ...(eventDefinition.payloadReferences === undefined
+      ? {}
+      : {
+          payloadReferences: cloneWebhookEventPayloadReferences(eventDefinition.payloadReferences),
+        }),
     ...(eventDefinition.conversationKeyOptions === undefined
       ? {}
       : {
