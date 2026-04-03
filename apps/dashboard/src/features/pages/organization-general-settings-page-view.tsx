@@ -5,10 +5,10 @@ import { FormPageSection, FormPageStack } from "../shared/form-page.js";
 
 export type OrganizationGeneralSettingsPageViewProps = {
   isLoading: boolean;
-  isSaving: boolean;
   loadErrorMessage: string | null;
   name: string;
   onSaveChanges: (name: string) => Promise<void>;
+  isSaving: boolean;
 };
 
 export function OrganizationGeneralSettingsPageView(

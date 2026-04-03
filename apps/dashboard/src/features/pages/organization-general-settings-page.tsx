@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
@@ -7,6 +7,7 @@ import {
   updateOrganizationGeneral,
 } from "../settings/organization/organization-general-service.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { useAutoSaveAction } from "../shared/use-auto-save-action.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { OrganizationGeneralSettingsPageView } from "./organization-general-settings-page-view.js";
@@ -15,10 +16,6 @@ const SETTINGS_ORGANIZATION_GENERAL_QUERY_KEY_PREFIX: readonly [
   "settings",
   "organization-general",
 ] = ["settings", "organization-general"];
-
-type OrganizationFormState = {
-  name: string;
-};
 
 function settingsOrganizationGeneralQueryKey(
   organizationId: string,
@@ -44,27 +41,27 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
       }),
   });
 
-  const saveMutation = useMutation({
-    mutationFn: async (nextState: OrganizationFormState) => {
+  const saveAction = useAutoSaveAction({
+    save: async (name: string) => {
       const currentOrganization = organizationQuery.data;
       if (currentOrganization === undefined) {
         throw new Error("Organization settings data is required.");
       }
 
-      return updateOrganizationGeneral({
+      await updateOrganizationGeneral({
         organizationId,
-        name: nextState.name,
+        name,
         slug: currentOrganization.slug,
       });
     },
-    onSuccess: async (_result, variables) => {
+    afterSave: async (name) => {
       const currentOrganization = organizationQuery.data;
       if (currentOrganization === undefined) {
         throw new Error("Organization settings data is required.");
       }
 
       queryClient.setQueryData(organizationSummaryQueryKey(organizationId), {
-        name: variables.name,
+        name,
         slug: currentOrganization.slug,
       });
 
@@ -92,7 +89,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
             : `${organizationId}:${organizationQuery.data.slug}`
         }
         isLoading={organizationQuery.isPending}
-        isSaving={saveMutation.isPending}
+        isSaving={saveAction.isSaving}
         loadErrorMessage={
           organizationQuery.isError
             ? resolveApiErrorMessage({
@@ -103,9 +100,16 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         }
         name={organizationQuery.data?.name ?? ""}
         onSaveChanges={async (name) => {
-          await saveMutation.mutateAsync({
-            name: name.trim(),
-          });
+          try {
+            await saveAction.run(name.trim());
+          } catch (error) {
+            throw new Error(
+              resolveApiErrorMessage({
+                error,
+                fallbackMessage: "Could not update organization settings.",
+              }),
+            );
+          }
         }}
       />
     </FormPageFrame>

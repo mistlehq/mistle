@@ -8,6 +8,7 @@ import {
   updateIntegrationConnection,
 } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import { useAutoSaveAction } from "../shared/use-auto-save-action.js";
 
 export function useIntegrationConnectionEditors(input: {
   connections: readonly IntegrationConnection[];
@@ -23,10 +24,11 @@ export function useIntegrationConnectionEditors(input: {
   const [deletingConnectionId, setDeletingConnectionId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const updateConnectionNameMutation = useMutation({
-    mutationFn: async (payload: { connectionId: string; displayName: string }) =>
-      updateIntegrationConnection(payload),
-    onSuccess: async () => {
+  const updateConnectionNameAction = useAutoSaveAction({
+    save: async (payload: { connectionId: string; displayName: string }) => {
+      await updateIntegrationConnection(payload);
+    },
+    afterSave: async () => {
       await queryClient.invalidateQueries({
         queryKey: input.queryKey,
       });
@@ -159,7 +161,7 @@ export function useIntegrationConnectionEditors(input: {
       input.connections.length === 0
         ? undefined
         : {
-            disabled: updateConnectionNameMutation.isPending,
+            disabled: updateConnectionNameAction.isSaving,
             errorMessageByConnectionId: connectionNameErrorMessageById,
             onStartEditing: (connectionId: string) => {
               setConnectionNameErrorMessageById((current) => ({
@@ -184,7 +186,7 @@ export function useIntegrationConnectionEditors(input: {
               }));
 
               try {
-                await updateConnectionNameMutation.mutateAsync({
+                await updateConnectionNameAction.run({
                   connectionId: editingConnection.id,
                   displayName: draftValue,
                 });

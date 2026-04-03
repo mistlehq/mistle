@@ -6,6 +6,7 @@ import {
   createSandboxProfile,
   updateSandboxProfile,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
+import { useAutoSaveAction } from "../shared/use-auto-save-action.js";
 
 type SandboxProfileEditorFormState = {
   displayName: string;
@@ -100,27 +101,21 @@ export function useEditSandboxProfileMetaState(input: EditInput): {
   const [displayName, setDisplayName] = useState(input.loadedProfile.displayName);
   const [persistedDisplayName, setPersistedDisplayName] = useState(input.loadedProfile.displayName);
 
-  const updateMutation = useMutation({
-    mutationFn: async (updateInput: {
-      profileId: string;
-      changes: Partial<SandboxProfileEditorFormState>;
-    }) =>
-      updateSandboxProfile({
+  const updateAction = useAutoSaveAction({
+    save: async (normalizedDisplayName: string) => {
+      const updatedProfile = await updateSandboxProfile({
         payload: {
-          profileId: updateInput.profileId,
-          ...(updateInput.changes.displayName === undefined
-            ? {}
-            : { displayName: updateInput.changes.displayName }),
+          profileId: input.profileId,
+          displayName: normalizedDisplayName,
         },
-      }),
-    onSuccess: async (updatedProfile, variables) => {
-      if (variables.changes.displayName !== undefined) {
-        setDisplayName(updatedProfile.displayName);
-        setPersistedDisplayName(updatedProfile.displayName);
-      }
+      });
 
+      setDisplayName(updatedProfile.displayName);
+      setPersistedDisplayName(updatedProfile.displayName);
+    },
+    afterSave: async () => {
       await input.invalidateSandboxProfiles();
-      await input.invalidateProfileDetail(updatedProfile.id);
+      await input.invalidateProfileDetail(input.profileId);
     },
   });
 
@@ -132,7 +127,7 @@ export function useEditSandboxProfileMetaState(input: EditInput): {
       displayName,
     },
     pageTitle: editTitleProfileName,
-    isUpdating: updateMutation.isPending,
+    isUpdating: updateAction.isSaving,
     onDisplayNameChange: (nextValue) => {
       setDisplayName(nextValue);
     },
@@ -143,15 +138,7 @@ export function useEditSandboxProfileMetaState(input: EditInput): {
       }
 
       try {
-        const updatedProfile = await updateMutation.mutateAsync({
-          profileId: input.profileId,
-          changes: {
-            displayName: normalizedDisplayName,
-          },
-        });
-
-        setDisplayName(updatedProfile.displayName);
-        setPersistedDisplayName(updatedProfile.displayName);
+        await updateAction.run(normalizedDisplayName);
       } catch (error) {
         throw new Error(
           resolveApiErrorMessage({

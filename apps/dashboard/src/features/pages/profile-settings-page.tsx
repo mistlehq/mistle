@@ -1,8 +1,10 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
+import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { updateProfileDisplayName } from "../settings/profile/profile-service.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { useAutoSaveAction } from "../shared/use-auto-save-action.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
@@ -14,9 +16,11 @@ export function ProfileSettingsPage(): React.JSX.Element {
   const session = useRequiredSession();
   const { title, description } = resolvePageFrameText(pageMeta, "Profile");
 
-  const saveMutation = useMutation({
-    mutationFn: async (displayName: string) => updateProfileDisplayName({ displayName }),
-    onSuccess: async () => {
+  const saveAction = useAutoSaveAction({
+    save: async (displayName: string) => {
+      await updateProfileDisplayName({ displayName });
+    },
+    afterSave: async () => {
       await queryClient.refetchQueries({
         queryKey: SESSION_QUERY_KEY,
       });
@@ -31,9 +35,18 @@ export function ProfileSettingsPage(): React.JSX.Element {
         displayName={persistedDisplayName}
         email={session.user.email}
         onSaveChanges={async (displayNameDraft) => {
-          await saveMutation.mutateAsync(displayNameDraft.trim());
+          try {
+            await saveAction.run(displayNameDraft.trim());
+          } catch (error) {
+            throw new Error(
+              resolveApiErrorMessage({
+                error,
+                fallbackMessage: "Could not update profile.",
+              }),
+            );
+          }
         }}
-        saving={saveMutation.isPending}
+        saving={saveAction.isSaving}
       />
     </FormPageFrame>
   );
