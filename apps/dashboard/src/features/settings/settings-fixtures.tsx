@@ -86,14 +86,9 @@ export function createProfileSettingsFixtureContent(): React.JSX.Element {
   return (
     <ProfileSettingsPageView
       displayName="Mistle Developer"
-      displayNameDraft="Mistle Developer"
       email="developer@mistle.so"
       fieldError={null}
-      hasDirtyChanges={false}
-      onCancelChanges={() => {}}
-      onDisplayNameChange={() => {}}
-      onSaveChanges={() => {}}
-      saveSuccess={false}
+      onSaveChanges={async () => {}}
       saving={false}
     />
   );
@@ -102,17 +97,12 @@ export function createProfileSettingsFixtureContent(): React.JSX.Element {
 export function createOrganizationGeneralSettingsFixtureContent(): React.JSX.Element {
   return (
     <OrganizationGeneralSettingsPageView
-      hasDirtyChanges={false}
       isLoading={false}
       isSaving={false}
       loadErrorMessage={null}
       name="Mistle Labs"
-      nameErrorMessage={null}
-      onCancelChanges={() => {}}
-      onNameChange={() => {}}
-      onSaveChanges={() => {}}
+      onSaveChanges={async () => {}}
       saveError={null}
-      saveSuccess={false}
     />
   );
 }

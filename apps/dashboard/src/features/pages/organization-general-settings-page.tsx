@@ -1,6 +1,5 @@
-import { systemScheduler } from "@mistle/time";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
@@ -36,8 +35,6 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const organizationId = useRequiredOrganizationId();
-  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const { title, description } = resolvePageFrameText(pageMeta, "General");
 
   const organizationQuery = useQuery({
@@ -47,20 +44,6 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         organizationId,
       }),
   });
-
-  useEffect(() => {
-    if (!showSaveSuccess) {
-      return;
-    }
-
-    const timeoutHandle = systemScheduler.schedule(() => {
-      setShowSaveSuccess(false);
-    }, 2000);
-
-    return () => {
-      systemScheduler.cancel(timeoutHandle);
-    };
-  }, [showSaveSuccess]);
 
   const saveMutation = useMutation({
     mutationFn: async (nextState: OrganizationFormState) => {
@@ -98,18 +81,6 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
       await queryClient.invalidateQueries({
         queryKey: organizationSummaryQueryKey(organizationId),
       });
-
-      setShowSaveSuccess(true);
-      setSaveError(null);
-    },
-    onError: (error: unknown) => {
-      setSaveError(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not update organization settings.",
-        }),
-      );
-      setShowSaveSuccess(false);
     },
   });
 
@@ -131,20 +102,12 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
               })
             : null
         }
-        onResetFeedback={() => {
-          setSaveError(null);
-          setShowSaveSuccess(false);
-        }}
-        onSaveChanges={(name) => {
-          setSaveError(null);
-          setShowSaveSuccess(false);
-          void saveMutation.mutateAsync({
+        onSaveChanges={async (name) => {
+          await saveMutation.mutateAsync({
             name: name.trim(),
           });
         }}
         organization={organizationQuery.data}
-        saveError={saveError}
-        saveSuccess={showSaveSuccess}
       />
     </FormPageFrame>
   );
@@ -155,38 +118,31 @@ function OrganizationGeneralSettingsEditor(input: {
   isLoading: boolean;
   isSaving: boolean;
   loadErrorMessage: string | null;
-  saveError: string | null;
-  saveSuccess: boolean;
-  onSaveChanges: (name: string) => void;
-  onResetFeedback: () => void;
+  onSaveChanges: (name: string) => Promise<void>;
 }): React.JSX.Element {
-  const [name, setName] = useState(input.organization?.name ?? "");
-  const normalizedName = name.trim();
-  const persistedName = input.organization?.name ?? "";
-  const hasDirtyChanges = normalizedName !== persistedName.trim();
-  const hasNameError = normalizedName.length === 0;
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   return (
     <OrganizationGeneralSettingsPageView
-      hasDirtyChanges={hasDirtyChanges}
       isLoading={input.isLoading}
       isSaving={input.isSaving}
       loadErrorMessage={input.loadErrorMessage}
-      name={name}
-      nameErrorMessage={hasNameError ? "Organization name is required." : null}
-      onCancelChanges={() => {
-        setName(persistedName);
-        input.onResetFeedback();
+      name={input.organization?.name ?? ""}
+      onSaveChanges={async (name) => {
+        setSaveError(null);
+
+        try {
+          await input.onSaveChanges(name);
+        } catch (error) {
+          setSaveError(
+            resolveApiErrorMessage({
+              error,
+              fallbackMessage: "Could not update organization settings.",
+            }),
+          );
+        }
       }}
-      onNameChange={(nextValue) => {
-        setName(nextValue);
-        input.onResetFeedback();
-      }}
-      onSaveChanges={() => {
-        input.onSaveChanges(name);
-      }}
-      saveError={input.saveError}
-      saveSuccess={input.saveSuccess}
+      saveError={saveError}
     />
   );
 }

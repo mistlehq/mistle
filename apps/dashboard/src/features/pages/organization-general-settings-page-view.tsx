@@ -1,20 +1,15 @@
-import { Field, FieldContent, FieldHeader, FieldLabel, Input, Skeleton, Notice } from "@mistle/ui";
+import { Skeleton, Notice } from "@mistle/ui";
 
-import { SaveActions } from "../settings/save-actions.js";
+import { AutoSaveTextField } from "../forms/auto-save-text-field.js";
 import { FormPageSection, FormPageStack } from "../shared/form-page.js";
 
 export type OrganizationGeneralSettingsPageViewProps = {
-  hasDirtyChanges: boolean;
   isLoading: boolean;
   isSaving: boolean;
   loadErrorMessage: string | null;
   name: string;
-  nameErrorMessage: string | null;
-  onCancelChanges: () => void;
-  onNameChange: (nextValue: string) => void;
-  onSaveChanges: () => void;
+  onSaveChanges: (name: string) => Promise<void>;
   saveError: string | null;
-  saveSuccess: boolean;
 };
 
 export function OrganizationGeneralSettingsPageView(
@@ -33,10 +28,6 @@ export function OrganizationGeneralSettingsPageView(
               <Skeleton className="h-4 w-16" />
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-3 w-64" />
-            </div>
-            <div className="flex gap-2">
-              <Skeleton className="h-9 w-20" />
-              <Skeleton className="h-9 w-20" />
             </div>
           </div>
         </FormPageSection>
@@ -60,42 +51,20 @@ export function OrganizationGeneralSettingsPageView(
     <FormPageStack>
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
-          <p aria-live="polite" className="sr-only" role="status">
-            {props.saveSuccess ? "Organization settings updated." : ""}
-          </p>
-
-          {props.saveError !== null || props.nameErrorMessage !== null ? (
-            <Notice variant="alert">
-              {props.saveError !== null
-                ? `${props.saveError} Please try again later.`
-                : props.nameErrorMessage}
-            </Notice>
-          ) : null}
-
-          <Field contentWidth="fill" orientation="horizontal">
-            <FieldHeader>
-              <FieldLabel htmlFor="organization-name">Organization name</FieldLabel>
-            </FieldHeader>
-            <FieldContent>
-              <Input
-                aria-invalid={props.nameErrorMessage !== null ? true : undefined}
-                id="organization-name"
-                onChange={(event) => props.onNameChange(event.currentTarget.value)}
-                value={props.name}
-              />
-            </FieldContent>
-          </Field>
+          {props.saveError !== null ? <Notice variant="alert">{props.saveError}</Notice> : null}
+          <AutoSaveTextField
+            description="Used across the workspace and organization settings."
+            disabled={props.isSaving}
+            id="organization-name"
+            label="Organization name"
+            onSave={props.onSaveChanges}
+            validate={(nextValue) => {
+              return nextValue.trim().length === 0 ? "Organization name is required." : null;
+            }}
+            value={props.name}
+          />
         </div>
       </FormPageSection>
-
-      <SaveActions
-        cancelDisabled={!props.hasDirtyChanges || props.isSaving}
-        onCancel={props.onCancelChanges}
-        onSave={props.onSaveChanges}
-        saveDisabled={!props.hasDirtyChanges || props.nameErrorMessage !== null || props.isSaving}
-        saveSuccess={props.saveSuccess}
-        saving={props.isSaving}
-      />
     </FormPageStack>
   );
 }

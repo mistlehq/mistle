@@ -1,6 +1,5 @@
-import { systemScheduler } from "@mistle/time";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
@@ -15,23 +14,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const session = useRequiredSession();
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [fieldError, setFieldError] = useState<string | null>(null);
   const { title, description } = resolvePageFrameText(pageMeta, "Profile");
-
-  useEffect(() => {
-    if (!saveSuccess) {
-      return;
-    }
-
-    const timeoutHandle = systemScheduler.schedule(() => {
-      setSaveSuccess(false);
-    }, 2000);
-
-    return () => {
-      systemScheduler.cancel(timeoutHandle);
-    };
-  }, [saveSuccess]);
 
   const saveMutation = useMutation({
     mutationFn: async (displayName: string) => updateProfileDisplayName({ displayName }),
@@ -39,17 +22,6 @@ export function ProfileSettingsPage(): React.JSX.Element {
       await queryClient.refetchQueries({
         queryKey: SESSION_QUERY_KEY,
       });
-      setFieldError(null);
-      setSaveSuccess(true);
-    },
-    onError: (error: unknown) => {
-      setFieldError(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not update profile.",
-        }),
-      );
-      setSaveSuccess(false);
     },
   });
 
@@ -60,18 +32,10 @@ export function ProfileSettingsPage(): React.JSX.Element {
       <ProfileSettingsEditor
         key={`${session.user.email}:${persistedDisplayName}`}
         email={session.user.email}
-        fieldError={fieldError}
-        onDisplayNameSave={(displayNameDraft) => {
-          setFieldError(null);
-          setSaveSuccess(false);
-          void saveMutation.mutateAsync(displayNameDraft.trim());
-        }}
-        onResetFeedback={() => {
-          setFieldError(null);
-          setSaveSuccess(false);
+        onDisplayNameSave={async (displayNameDraft) => {
+          await saveMutation.mutateAsync(displayNameDraft.trim());
         }}
         persistedDisplayName={persistedDisplayName}
-        saveSuccess={saveSuccess}
         saving={saveMutation.isPending}
       />
     </FormPageFrame>
@@ -81,37 +45,30 @@ export function ProfileSettingsPage(): React.JSX.Element {
 function ProfileSettingsEditor(input: {
   persistedDisplayName: string;
   email: string;
-  fieldError: string | null;
-  saveSuccess: boolean;
   saving: boolean;
-  onDisplayNameSave: (displayNameDraft: string) => void;
-  onResetFeedback: () => void;
+  onDisplayNameSave: (displayNameDraft: string) => Promise<void>;
 }): React.JSX.Element {
-  const [displayNameDraft, setDisplayNameDraft] = useState(input.persistedDisplayName);
-
-  const normalizedDisplayName = displayNameDraft.trim();
-  const hasDirtyChanges = normalizedDisplayName !== input.persistedDisplayName.trim();
-  const displayName = normalizedDisplayName.length > 0 ? normalizedDisplayName : input.email;
+  const [fieldError, setFieldError] = useState<string | null>(null);
 
   return (
     <ProfileSettingsPageView
-      displayName={displayName}
-      displayNameDraft={displayNameDraft}
+      displayName={input.persistedDisplayName}
       email={input.email}
-      fieldError={input.fieldError}
-      hasDirtyChanges={hasDirtyChanges}
-      onCancelChanges={() => {
-        setDisplayNameDraft(input.persistedDisplayName);
-        input.onResetFeedback();
+      fieldError={fieldError}
+      onSaveChanges={async (displayNameDraft) => {
+        setFieldError(null);
+
+        try {
+          await input.onDisplayNameSave(displayNameDraft);
+        } catch (error) {
+          setFieldError(
+            resolveApiErrorMessage({
+              error,
+              fallbackMessage: "Could not update profile.",
+            }),
+          );
+        }
       }}
-      onDisplayNameChange={(nextValue) => {
-        setDisplayNameDraft(nextValue);
-        input.onResetFeedback();
-      }}
-      onSaveChanges={() => {
-        input.onDisplayNameSave(displayNameDraft);
-      }}
-      saveSuccess={input.saveSuccess}
       saving={input.saving}
     />
   );
