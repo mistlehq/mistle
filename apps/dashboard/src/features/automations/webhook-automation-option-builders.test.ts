@@ -7,6 +7,16 @@ import {
   resolveEligibleProfileAutomationConnectionIds,
 } from "./webhook-automation-option-builders.js";
 
+const GitHubRepositoryFullNamePayloadReference = {
+  path: ["repository", "full_name"],
+  description: "Repository owner and name",
+} as const;
+
+const GitHubPullRequestNumberPayloadReference = {
+  path: ["pull_request", "number"],
+  description: "Pull request number",
+} as const;
+
 describe("buildWebhookAutomationEventOptions", () => {
   it("returns connection-scoped supported webhook events from all connected integrations", () => {
     expect(
@@ -44,12 +54,7 @@ describe("buildWebhookAutomationEventOptions", () => {
                 providerEventType: "issue_comment",
                 displayName: "Issue comment created",
                 category: "Issues",
-                payloadReferences: [
-                  {
-                    path: ["repository", "full_name"],
-                    description: "Repository owner and name",
-                  },
-                ],
+                payloadReferences: [GitHubRepositoryFullNamePayloadReference],
                 conversationKeyOptions: [
                   {
                     id: "issue",
@@ -65,14 +70,8 @@ describe("buildWebhookAutomationEventOptions", () => {
                 displayName: "Pull request opened",
                 category: "Pull requests",
                 payloadReferences: [
-                  {
-                    path: ["repository", "full_name"],
-                    description: "Repository owner and name",
-                  },
-                  {
-                    path: ["pull_request", "number"],
-                    description: "Pull request number",
-                  },
+                  GitHubRepositoryFullNamePayloadReference,
+                  GitHubPullRequestNumberPayloadReference,
                 ],
                 conversationKeyOptions: [
                   {
@@ -131,14 +130,8 @@ describe("buildWebhookAutomationEventOptions", () => {
         connectionLabel: "GitHub - GitHub Engineering",
         label: "Pull request opened",
         payloadReferences: [
-          {
-            path: ["repository", "full_name"],
-            description: "Repository owner and name",
-          },
-          {
-            path: ["pull_request", "number"],
-            description: "Pull request number",
-          },
+          GitHubRepositoryFullNamePayloadReference,
+          GitHubPullRequestNumberPayloadReference,
         ],
         conversationKeyOptions: [
           {
@@ -161,12 +154,7 @@ describe("buildWebhookAutomationEventOptions", () => {
         connectionId: "conn_github",
         connectionLabel: "GitHub - GitHub Engineering",
         label: "Issue comment created",
-        payloadReferences: [
-          {
-            path: ["repository", "full_name"],
-            description: "Repository owner and name",
-          },
-        ],
+        payloadReferences: [GitHubRepositoryFullNamePayloadReference],
         conversationKeyOptions: [
           {
             id: "issue",

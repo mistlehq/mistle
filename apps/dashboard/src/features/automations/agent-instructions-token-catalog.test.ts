@@ -1,13 +1,46 @@
+import { GitHubCloudDefinition } from "@mistle/integrations-definitions";
 import { describe, expect, it } from "vitest";
 
 import {
   AgentInstructionTokenGroups,
   buildAgentInstructionTokenCatalog,
 } from "./agent-instructions-token-catalog.js";
-import {
-  createGithubIssueCommentCreatedEventOption,
-  createGithubPullRequestOpenedEventOption,
-} from "./webhook-automation-test-fixtures.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
+import { GitHubConnectionId, GitHubConnectionLabel } from "./webhook-automation-test-fixtures.js";
+import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
+
+function createGitHubEventOption(input: {
+  eventType: string;
+  overrides?: Partial<WebhookAutomationEventOption>;
+}): WebhookAutomationEventOption {
+  const eventDefinition = GitHubCloudDefinition.supportedWebhookEvents?.find(
+    (candidate) => candidate.eventType === input.eventType,
+  );
+
+  if (eventDefinition === undefined) {
+    throw new Error(`Missing GitHub event definition for '${input.eventType}'.`);
+  }
+
+  return {
+    id: createWebhookAutomationTriggerId({
+      connectionId: GitHubConnectionId,
+      eventType: eventDefinition.eventType,
+    }),
+    eventType: eventDefinition.eventType,
+    connectionId: GitHubConnectionId,
+    connectionLabel: GitHubConnectionLabel,
+    label: eventDefinition.displayName,
+    ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
+    payloadReferences:
+      eventDefinition.payloadReferences === undefined ? [] : [...eventDefinition.payloadReferences],
+    conversationKeyOptions:
+      eventDefinition.conversationKeyOptions === undefined
+        ? []
+        : [...eventDefinition.conversationKeyOptions],
+    parameters: eventDefinition.parameters === undefined ? [] : [...eventDefinition.parameters],
+    ...input.overrides,
+  };
+}
 
 describe("buildAgentInstructionTokenCatalog", () => {
   it("always includes shared runtime tokens", () => {
@@ -23,7 +56,9 @@ describe("buildAgentInstructionTokenCatalog", () => {
 
   it("derives payload tokens from selected event payload references", () => {
     const tokens = buildAgentInstructionTokenCatalog({
-      selectedEventOptions: [createGithubIssueCommentCreatedEventOption()],
+      selectedEventOptions: [
+        createGitHubEventOption({ eventType: "github.issue_comment.created" }),
+      ],
     });
 
     expect(tokens.some((token) => token.path === "payload.comment.body")).toBe(true);
@@ -35,8 +70,9 @@ describe("buildAgentInstructionTokenCatalog", () => {
   it("deduplicates repeated payload paths across selected events", () => {
     const tokens = buildAgentInstructionTokenCatalog({
       selectedEventOptions: [
-        createGithubIssueCommentCreatedEventOption(),
-        createGithubPullRequestOpenedEventOption({
+        createGitHubEventOption({ eventType: "github.issue_comment.created" }),
+        createGitHubEventOption({
+          eventType: "github.pull_request.opened",
           payloadReferences: [
             {
               path: ["comment", "body"],
@@ -52,7 +88,9 @@ describe("buildAgentInstructionTokenCatalog", () => {
 
   it("uses payload reference descriptions", () => {
     const tokens = buildAgentInstructionTokenCatalog({
-      selectedEventOptions: [createGithubIssueCommentCreatedEventOption()],
+      selectedEventOptions: [
+        createGitHubEventOption({ eventType: "github.issue_comment.created" }),
+      ],
     });
 
     expect(tokens.find((token) => token.path === "payload.comment.body")?.description).toBe(
@@ -63,7 +101,8 @@ describe("buildAgentInstructionTokenCatalog", () => {
   it("does not derive payload tokens from trigger parameters", () => {
     const tokens = buildAgentInstructionTokenCatalog({
       selectedEventOptions: [
-        createGithubIssueCommentCreatedEventOption({
+        createGitHubEventOption({
+          eventType: "github.issue_comment.created",
           payloadReferences: [],
           parameters: [
             {
@@ -82,7 +121,9 @@ describe("buildAgentInstructionTokenCatalog", () => {
 
   it("keeps shared runtime groups ahead of payload tokens", () => {
     const tokens = buildAgentInstructionTokenCatalog({
-      selectedEventOptions: [createGithubIssueCommentCreatedEventOption()],
+      selectedEventOptions: [
+        createGitHubEventOption({ eventType: "github.issue_comment.created" }),
+      ],
     });
 
     const firstPayloadIndex = tokens.findIndex(

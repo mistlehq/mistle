@@ -12,6 +12,112 @@ export const GitHubConnectionLabel = "GitHub Engineering";
 export const GitHubGroupedConnectionLabel = "GitHub - GitHub Engineering";
 export const RepoMaintainerSandboxProfileId = "sbp_01kkk1mbmxfetvga8kcmw612jj";
 
+const GitHubRepositoryConversationKeyOption = {
+  id: "repository",
+  label: "Repository",
+  description: "Events from the same repository go to the same conversation.",
+  template: "{{payload.repository.full_name}}",
+} as const;
+
+const GitHubIssueConversationKeyOption = {
+  id: "issue",
+  label: "Issue",
+  description: "Events from the same issue go to the same conversation.",
+  template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
+} as const;
+
+const GitHubPullRequestConversationKeyOption = {
+  id: "pull-request",
+  label: "Pull request",
+  description: "Events from the same pull request go to the same conversation.",
+  template: "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
+} as const;
+
+const GitHubPayloadReferences = {
+  REPOSITORY_FULL_NAME: {
+    path: ["repository", "full_name"],
+    description: "Repository owner and name",
+  },
+  ISSUE_NUMBER: {
+    path: ["issue", "number"],
+    description: "Issue number",
+  },
+  ISSUE_PULL_REQUEST: {
+    path: ["issue", "pull_request"],
+    description: "Present when the issue is a pull request",
+  },
+  COMMENT_BODY: {
+    path: ["comment", "body"],
+    description: "Comment text",
+  },
+  PULL_REQUEST_NUMBER: {
+    path: ["pull_request", "number"],
+    description: "Pull request number",
+  },
+  PULL_REQUEST_BODY: {
+    path: ["pull_request", "body"],
+    description: "Pull request description",
+  },
+  SENDER_LOGIN: {
+    path: ["sender", "login"],
+    description: "GitHub username of the sender",
+  },
+} as const;
+
+const GitHubExplicitCommentInvocationParameter = {
+  id: "explicitInvocation",
+  label: "explicit mention",
+  kind: "string",
+  payloadPath: ["comment", "body"],
+  matchMode: "contains_token",
+  defaultValue: "@mistlebot",
+  defaultEnabled: true,
+  controlVariant: "explicit-invocation",
+  placeholder: 'Require "@mistlebot"',
+} as const;
+
+const GitHubIssueCommentTargetParameter = {
+  id: "target",
+  label: "comment target",
+  kind: "enum-select",
+  payloadPath: ["issue", "pull_request"],
+  matchMode: "exists",
+  options: [
+    {
+      value: "exists",
+      label: "pull request",
+    },
+    {
+      value: "not_exists",
+      label: "issue",
+    },
+  ],
+  prefix: "in",
+  placeholder: "Any comment target",
+} as const;
+
+const GitHubExplicitPullRequestInvocationParameter = {
+  id: "explicitInvocation",
+  label: "explicit mention",
+  kind: "string",
+  payloadPath: ["pull_request", "body"],
+  matchMode: "contains_token",
+  defaultValue: "@mistlebot",
+  defaultEnabled: true,
+  controlVariant: "explicit-invocation",
+  placeholder: 'Require "@mistlebot"',
+} as const;
+
+const GitHubAuthorParameter = {
+  id: "author",
+  label: "author",
+  kind: "resource-select",
+  resourceKind: "user",
+  payloadPath: ["sender", "login"],
+  prefix: "by",
+  placeholder: "Any author",
+} as const;
+
 export function createWebhookAutomationListEvent(
   overrides?: Partial<WebhookAutomationListEvent>,
 ): WebhookAutomationListEvent {
@@ -147,73 +253,17 @@ export function createGithubIssueCommentCreatedEventOption(
     category: "Issues",
     logoKey: "github",
     conversationKeyOptions: [
-      {
-        id: "issue",
-        label: "Issue",
-        description: "Events from the same issue go to the same conversation.",
-        template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
-      },
-      {
-        id: "repository",
-        label: "Repository",
-        description: "Events from the same repository go to the same conversation.",
-        template: "{{payload.repository.full_name}}",
-      },
+      GitHubIssueConversationKeyOption,
+      GitHubRepositoryConversationKeyOption,
     ],
     payloadReferences: [
-      {
-        path: ["repository", "full_name"],
-        description: "Repository owner and name",
-      },
-      {
-        path: ["issue", "number"],
-        description: "Issue number",
-      },
-      {
-        path: ["issue", "pull_request"],
-        description: "Present when the issue is a pull request",
-      },
-      {
-        path: ["comment", "body"],
-        description: "Comment text",
-      },
-      {
-        path: ["sender", "login"],
-        description: "GitHub username of the sender",
-      },
+      GitHubPayloadReferences.REPOSITORY_FULL_NAME,
+      GitHubPayloadReferences.ISSUE_NUMBER,
+      GitHubPayloadReferences.ISSUE_PULL_REQUEST,
+      GitHubPayloadReferences.COMMENT_BODY,
+      GitHubPayloadReferences.SENDER_LOGIN,
     ],
-    parameters: [
-      {
-        id: "explicitInvocation",
-        label: "explicit mention",
-        kind: "string",
-        payloadPath: ["comment", "body"],
-        matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
-        controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
-      },
-      {
-        id: "target",
-        label: "comment target",
-        kind: "enum-select",
-        payloadPath: ["issue", "pull_request"],
-        matchMode: "exists",
-        options: [
-          {
-            value: "exists",
-            label: "pull request",
-          },
-          {
-            value: "not_exists",
-            label: "issue",
-          },
-        ],
-        prefix: "in",
-        placeholder: "Any comment target",
-      },
-    ],
+    parameters: [GitHubExplicitCommentInvocationParameter, GitHubIssueCommentTargetParameter],
     ...overrides,
   };
 }
@@ -233,59 +283,16 @@ export function createGithubPullRequestOpenedEventOption(
     category: "Pull requests",
     logoKey: "github",
     conversationKeyOptions: [
-      {
-        id: "pull-request",
-        label: "Pull request",
-        description: "Events from the same pull request go to the same conversation.",
-        template: "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
-      },
-      {
-        id: "repository",
-        label: "Repository",
-        description: "Events from the same repository go to the same conversation.",
-        template: "{{payload.repository.full_name}}",
-      },
+      GitHubPullRequestConversationKeyOption,
+      GitHubRepositoryConversationKeyOption,
     ],
     payloadReferences: [
-      {
-        path: ["repository", "full_name"],
-        description: "Repository owner and name",
-      },
-      {
-        path: ["pull_request", "number"],
-        description: "Pull request number",
-      },
-      {
-        path: ["pull_request", "body"],
-        description: "Pull request description",
-      },
-      {
-        path: ["sender", "login"],
-        description: "GitHub username of the sender",
-      },
+      GitHubPayloadReferences.REPOSITORY_FULL_NAME,
+      GitHubPayloadReferences.PULL_REQUEST_NUMBER,
+      GitHubPayloadReferences.PULL_REQUEST_BODY,
+      GitHubPayloadReferences.SENDER_LOGIN,
     ],
-    parameters: [
-      {
-        id: "explicitInvocation",
-        label: "explicit mention",
-        kind: "string",
-        payloadPath: ["pull_request", "body"],
-        matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
-        controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
-      },
-      {
-        id: "author",
-        label: "author",
-        kind: "resource-select",
-        resourceKind: "user",
-        payloadPath: ["sender", "login"],
-        prefix: "by",
-        placeholder: "Any author",
-      },
-    ],
+    parameters: [GitHubExplicitPullRequestInvocationParameter, GitHubAuthorParameter],
     ...overrides,
   };
 }
