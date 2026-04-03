@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import type { OpenWorkflow } from "openworkflow";
 
 import { AUTH_ROUTE_BASE_PATH } from "./constants.js";
+import { createMediaSessionPlugin } from "./plugins/media-session.js";
 import { createAuthProviders } from "./providers/index.js";
 import { applyActiveOrganizationToSession } from "./services/apply-active-organization-to-session.js";
 import { createInitialOrganizationCredentialKey } from "./services/create-initial-organization-credential-key.js";
@@ -16,6 +17,7 @@ import { createSendVerificationOTPService } from "./services/create-send-verific
 export type ControlPlaneAuthConfig = {
   authBaseUrl: string;
   dashboardBaseUrl: string;
+  mediaPublicBaseUrl: string;
   authSecret: string;
   authTrustedOrigins: string[];
   authOTPLength: number;
@@ -87,6 +89,13 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
     }),
     user: {
       modelName: "users",
+      additionalFields: {
+        imageObjectKey: {
+          type: "string",
+          required: false,
+          input: false,
+        },
+      },
     },
     session: {
       modelName: "sessions",
@@ -169,6 +178,9 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
             modelName: "teamMembers",
           },
         },
+      }),
+      createMediaSessionPlugin({
+        mediaPublicBaseUrl: config.mediaPublicBaseUrl,
       }),
       ...providers.options.plugins,
     ],

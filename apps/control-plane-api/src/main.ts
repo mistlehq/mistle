@@ -27,6 +27,7 @@ export async function createControlPlaneApiRuntime(
       config: {
         authBaseUrl: config.auth.baseUrl,
         dashboardBaseUrl: config.dashboard.baseUrl,
+        mediaPublicBaseUrl: config.media.publicBaseUrl,
         authSecret: config.auth.secret,
         authTrustedOrigins: config.auth.trustedOrigins,
         authOTPLength: config.auth.otpLength,

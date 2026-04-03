@@ -213,6 +213,9 @@ export const it = vitestIt.extend<{
           dashboard: {
             baseUrl: "http://localhost:5173",
           },
+          media: {
+            publicBaseUrl: "https://cdn.integration.test",
+          },
           auth: {
             baseUrl: "http://localhost:3000",
             secret: "integration-auth-secret",

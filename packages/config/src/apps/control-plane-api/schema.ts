@@ -39,6 +39,12 @@ export const ControlPlaneApiDashboardConfigSchema = z
   })
   .strict();
 
+export const ControlPlaneApiMediaConfigSchema = z
+  .object({
+    publicBaseUrl: z.string().min(1),
+  })
+  .strict();
+
 export const ControlPlaneApiWorkflowConfigSchema = z
   .object({
     databaseUrl: z.string().min(1),
@@ -84,6 +90,7 @@ export const ControlPlaneApiConfigSchema = z
     database: ControlPlaneApiDatabaseConfigSchema,
     auth: ControlPlaneApiAuthConfigSchema,
     dashboard: ControlPlaneApiDashboardConfigSchema,
+    media: ControlPlaneApiMediaConfigSchema,
     workflow: ControlPlaneApiWorkflowConfigSchema,
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema,
     integrations: ControlPlaneApiIntegrationsConfigSchema,
@@ -96,6 +103,7 @@ export const PartialControlPlaneApiConfigSchema = z
     database: ControlPlaneApiDatabaseConfigSchema.partial().optional(),
     auth: ControlPlaneApiAuthConfigSchema.partial().optional(),
     dashboard: ControlPlaneApiDashboardConfigSchema.partial().optional(),
+    media: ControlPlaneApiMediaConfigSchema.partial().optional(),
     workflow: ControlPlaneApiWorkflowConfigSchema.partial().optional(),
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema.partial().optional(),
     integrations: ControlPlaneApiIntegrationsConfigObjectSchema.partial().optional(),

@@ -132,3 +132,38 @@ describe("control-plane api auth google config", () => {
     ).toThrow("clientSecret");
   });
 });
+
+describe("control-plane api media config", () => {
+  it("loads media config from env", () => {
+    const loaded = loadControlPlaneApiFromEnv({
+      MISTLE_APPS_CONTROL_PLANE_API_MEDIA_PUBLIC_BASE_URL: "https://cdn.mistle.test",
+    });
+
+    expect(loaded.media).toEqual({
+      publicBaseUrl: "https://cdn.mistle.test",
+    });
+  });
+
+  it("loads media config from toml", () => {
+    const loaded = loadControlPlaneApiFromToml({
+      apps: {
+        control_plane_api: {
+          media: {
+            public_base_url: "https://cdn.mistle.test",
+          },
+          auth: {},
+          server: {},
+          database: {},
+          dashboard: {},
+          workflow: {},
+          data_plane_api: {},
+          integrations: {},
+        },
+      },
+    });
+
+    expect(loaded.media).toEqual({
+      publicBaseUrl: "https://cdn.mistle.test",
+    });
+  });
+});

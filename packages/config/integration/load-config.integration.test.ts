@@ -169,6 +169,9 @@ const controlPlaneApiEnvConfig = {
   dashboard: {
     baseUrl: "http://127.0.0.1:5173",
   },
+  media: {
+    publicBaseUrl: "https://cdn.mistle.test",
+  },
   workflow: {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     namespaceId: "development",
@@ -193,6 +196,9 @@ const controlPlaneApiFixtureConfig = {
   workflow: {
     ...controlPlaneApiEnvConfig.workflow,
     namespaceId: "fixture",
+  },
+  media: {
+    publicBaseUrl: "https://cdn.mistle.fixture",
   },
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5300",

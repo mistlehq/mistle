@@ -58,6 +58,9 @@ otp_allowed_attempts = 3
 [apps.control_plane_api.dashboard]
 base_url = "http://127.0.0.1:5173"
 
+[apps.control_plane_api.media]
+public_base_url = "https://cdn.mistle.fixture"
+
 [apps.control_plane_api.workflow]
 database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle"
 namespace_id = "fixture"

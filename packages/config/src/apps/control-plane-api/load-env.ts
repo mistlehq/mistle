@@ -7,6 +7,7 @@ import {
   ControlPlaneApiDataPlaneApiConfigSchema,
   ControlPlaneApiDatabaseConfigSchema,
   ControlPlaneApiIntegrationsConfigSchema,
+  ControlPlaneApiMediaConfigSchema,
   ControlPlaneApiServerConfigSchema,
   ControlPlaneApiWorkflowConfigSchema,
   PartialControlPlaneApiConfigSchema,
@@ -74,6 +75,13 @@ const loadDashboardEnv = createEnvLoader<typeof ControlPlaneApiDashboardConfigSc
   {
     key: "baseUrl",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL",
+  },
+]);
+
+const loadMediaEnv = createEnvLoader<typeof ControlPlaneApiMediaConfigSchema>([
+  {
+    key: "publicBaseUrl",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_MEDIA_PUBLIC_BASE_URL",
   },
 ]);
 
@@ -162,6 +170,11 @@ export function loadControlPlaneApiFromEnv(
   const dashboard = loadDashboardEnv(env);
   if (hasEntries(dashboard)) {
     partialConfig.dashboard = dashboard;
+  }
+
+  const media = loadMediaEnv(env);
+  if (hasEntries(media)) {
+    partialConfig.media = media;
   }
 
   const workflow = loadWorkflowEnv(env);

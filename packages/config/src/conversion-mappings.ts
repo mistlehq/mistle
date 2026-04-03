@@ -169,6 +169,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL",
   },
   {
+    configPath: ["apps", "control_plane_api", "media", "publicBaseUrl"],
+    tomlPath: ["apps", "control_plane_api", "media", "public_base_url"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_MEDIA_PUBLIC_BASE_URL",
+  },
+  {
     configPath: ["apps", "control_plane_api", "auth", "secret"],
     tomlPath: ["apps", "control_plane_api", "auth", "secret"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_SECRET",

@@ -64,6 +64,9 @@ describe("parseConfigRecord", () => {
             host: "127.0.0.1",
             port: 5000,
           },
+          media: {
+            publicBaseUrl: "https://cdn.mistle.test",
+          },
           database: {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
             migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
@@ -258,6 +261,9 @@ describe("parseConfigRecord", () => {
             host: "127.0.0.1",
             port: 5000,
           },
+          media: {
+            publicBaseUrl: "https://cdn.mistle.test",
+          },
           database: {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
             migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
@@ -451,6 +457,9 @@ describe("parseConfigRecord", () => {
           server: {
             host: "127.0.0.1",
             port: 5000,
+          },
+          media: {
+            publicBaseUrl: "https://cdn.mistle.test",
           },
           database: {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",

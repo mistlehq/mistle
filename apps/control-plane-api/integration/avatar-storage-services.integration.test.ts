@@ -108,6 +108,69 @@ describe("avatar storage services integration", () => {
     });
   });
 
+  it("does not leave an orphaned object behind when avatar replacements overlap", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "avatar-upload-race@example.com",
+    });
+
+    await withObjectStoreTestContext(async ({ objectStore }) => {
+      const [firstImageObjectKey, secondImageObjectKey] = await Promise.all([
+        uploadUserAvatar(
+          {
+            db: fixture.db,
+            objectStore,
+          },
+          {
+            actorUserId: authenticatedSession.userId,
+            body: await createTestImage({
+              width: 1024,
+              height: 768,
+              format: "png",
+            }),
+            contentType: "image/png",
+          },
+        ),
+        uploadUserAvatar(
+          {
+            db: fixture.db,
+            objectStore,
+          },
+          {
+            actorUserId: authenticatedSession.userId,
+            body: await createTestImage({
+              width: 768,
+              height: 1024,
+              format: "jpeg",
+            }),
+            contentType: "image/jpeg",
+          },
+        ),
+      ]);
+
+      const storedUser = await fixture.db.query.users.findFirst({
+        columns: {
+          image: true,
+          imageObjectKey: true,
+        },
+        where: (table, { eq }) => eq(table.id, authenticatedSession.userId),
+      });
+      if (storedUser === undefined || storedUser.imageObjectKey === null) {
+        throw new Error("Expected overlapping avatar uploads to persist a final avatar.");
+      }
+
+      expect([firstImageObjectKey, secondImageObjectKey]).toContain(storedUser?.imageObjectKey);
+      expect(storedUser.image).toBeNull();
+
+      const orphanedObjectKey =
+        storedUser.imageObjectKey === firstImageObjectKey
+          ? secondImageObjectKey
+          : firstImageObjectKey;
+      await expect(objectStore.headObject(orphanedObjectKey)).rejects.toThrow();
+    });
+  });
+
   it("rejects user avatar uploads smaller than the minimum dimensions", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
       email: "avatar-upload-too-small@example.com",
@@ -134,11 +197,96 @@ describe("avatar storage services integration", () => {
 
       const storedUser = await fixture.db.query.users.findFirst({
         columns: {
+          image: true,
           imageObjectKey: true,
         },
         where: (table, { eq }) => eq(table.id, authenticatedSession.userId),
       });
-      expect(storedUser?.imageObjectKey).toBeNull();
+      expect(storedUser).toEqual({
+        image: null,
+        imageObjectKey: null,
+      });
+    });
+  });
+
+  it("rejects malformed user avatar bytes for supported content types", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "avatar-upload-malformed@example.com",
+    });
+
+    await withObjectStoreTestContext(async ({ objectStore }) => {
+      await expect(
+        uploadUserAvatar(
+          {
+            db: fixture.db,
+            objectStore,
+          },
+          {
+            actorUserId: authenticatedSession.userId,
+            body: Uint8Array.from([0x89, 0x50, 0x4e, 0x47]),
+            contentType: "image/png",
+          },
+        ),
+      ).rejects.toMatchObject({
+        code: "INVALID_IMAGE_FORMAT",
+        message: "Uploaded image bytes must decode to a PNG, JPEG, or WebP file.",
+      });
+
+      const storedUser = await fixture.db.query.users.findFirst({
+        columns: {
+          image: true,
+          imageObjectKey: true,
+        },
+        where: (table, { eq }) => eq(table.id, authenticatedSession.userId),
+      });
+      expect(storedUser).toEqual({
+        image: null,
+        imageObjectKey: null,
+      });
+    });
+  });
+
+  it("returns a resolved avatar URL from the session after upload", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "avatar-session-read@example.com",
+    });
+
+    await withObjectStoreTestContext(async ({ objectStore }) => {
+      const imageObjectKey = await uploadUserAvatar(
+        {
+          db: fixture.db,
+          objectStore,
+        },
+        {
+          actorUserId: authenticatedSession.userId,
+          body: await createTestImage({
+            width: 640,
+            height: 640,
+            format: "png",
+          }),
+          contentType: "image/png",
+        },
+      );
+
+      const sessionResponse = await fixture.request("/v1/auth/get-session", {
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      });
+
+      expect(sessionResponse.status).toBe(200);
+      const sessionPayload: unknown = await sessionResponse.json();
+      const sessionRecord = asRecord(sessionPayload);
+      if (sessionRecord === null) {
+        throw new Error("Expected get-session to return an object payload.");
+      }
+
+      const user = asRecord(sessionRecord.user);
+      if (user === null) {
+        throw new Error("Expected get-session to include a user payload.");
+      }
+
+      expect(user.image).toBe(`${fixture.config.media.publicBaseUrl}/${imageObjectKey}`);
     });
   });
 
@@ -182,12 +330,13 @@ describe("avatar storage services integration", () => {
         where: (table, { eq }) => eq(table.id, authenticatedSession.organizationId),
       });
 
+      const storedLogo = await readStoredObjectBytes(objectStore, logoObjectKey);
+
       expect(storedOrganization).toEqual({
-        logo: null,
+        logo: createInlineImageDataUrl(storedLogo),
         logoObjectKey,
       });
 
-      const storedLogo = await readStoredObjectBytes(objectStore, logoObjectKey);
       const storedLogoMetadata = await sharp(storedLogo).metadata();
 
       expect(storedLogoMetadata.format).toBe("webp");
@@ -227,6 +376,46 @@ describe("avatar storage services integration", () => {
           },
         ),
       ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+  });
+
+  it("rejects malformed organization logo bytes for supported content types", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "organization-logo-malformed@example.com",
+    });
+
+    await withObjectStoreTestContext(async ({ objectStore }) => {
+      await expect(
+        uploadOrganizationLogo(
+          {
+            db: fixture.db,
+            objectStore,
+          },
+          {
+            actorUserId: authenticatedSession.userId,
+            organizationId: authenticatedSession.organizationId,
+            body: Uint8Array.from([0x89, 0x50, 0x4e, 0x47]),
+            contentType: "image/png",
+          },
+        ),
+      ).rejects.toMatchObject({
+        code: "INVALID_IMAGE_FORMAT",
+        message: "Uploaded image bytes must decode to a PNG, JPEG, or WebP file.",
+      });
+
+      const storedOrganization = await fixture.db.query.organizations.findFirst({
+        columns: {
+          logo: true,
+          logoObjectKey: true,
+        },
+        where: (table, { eq }) => eq(table.id, authenticatedSession.organizationId),
+      });
+      expect(storedOrganization).toEqual({
+        logo: null,
+        logoObjectKey: null,
+      });
     });
   });
 });
@@ -286,6 +475,10 @@ async function createTestImage(input: {
   return Uint8Array.from(await pipeline.webp().toBuffer());
 }
 
+function createInlineImageDataUrl(imageBytes: Uint8Array): string {
+  return `data:image/webp;base64,${Buffer.from(imageBytes).toString("base64")}`;
+}
+
 async function readStoredObjectBytes(
   objectStore: S3CompatibleObjectStore,
   objectKey: string,
@@ -296,4 +489,12 @@ async function readStoredObjectBytes(
   }
 
   return object.Body.transformToByteArray();
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  return Object.fromEntries(Object.entries(value));
 }

@@ -151,6 +151,7 @@ describe("auth google linking integration", () => {
         config: {
           authBaseUrl: fixture.config.auth.baseUrl,
           dashboardBaseUrl: fixture.config.dashboard.baseUrl,
+          mediaPublicBaseUrl: fixture.config.media.publicBaseUrl,
           authSecret: fixture.config.auth.secret,
           authTrustedOrigins: fixture.config.auth.trustedOrigins,
           authOTPLength: fixture.config.auth.otpLength,
@@ -244,6 +245,7 @@ describe("auth google linking integration", () => {
         config: {
           authBaseUrl: fixture.config.auth.baseUrl,
           dashboardBaseUrl: fixture.config.dashboard.baseUrl,
+          mediaPublicBaseUrl: fixture.config.media.publicBaseUrl,
           authSecret: fixture.config.auth.secret,
           authTrustedOrigins: fixture.config.auth.trustedOrigins,
           authOTPLength: fixture.config.auth.otpLength,
@@ -399,6 +401,7 @@ describe("auth google linking integration", () => {
         config: {
           authBaseUrl: fixture.config.auth.baseUrl,
           dashboardBaseUrl: fixture.config.dashboard.baseUrl,
+          mediaPublicBaseUrl: fixture.config.media.publicBaseUrl,
           authSecret: fixture.config.auth.secret,
           authTrustedOrigins: fixture.config.auth.trustedOrigins,
           authOTPLength: fixture.config.auth.otpLength,

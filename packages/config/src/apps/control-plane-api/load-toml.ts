@@ -14,6 +14,7 @@ export function loadControlPlaneApiFromToml(
   const database = asObjectRecord(controlPlaneApi.database);
   const auth = asObjectRecord(controlPlaneApi.auth);
   const dashboard = asObjectRecord(controlPlaneApi.dashboard);
+  const media = asObjectRecord(controlPlaneApi.media);
   const workflow = asObjectRecord(controlPlaneApi.workflow);
   const dataPlaneApi = asObjectRecord(controlPlaneApi.data_plane_api);
   const integrations = asObjectRecord(controlPlaneApi.integrations);
@@ -45,6 +46,9 @@ export function loadControlPlaneApiFromToml(
     },
     dashboard: {
       baseUrl: dashboard.base_url,
+    },
+    media: {
+      publicBaseUrl: media.public_base_url,
     },
     workflow: {
       databaseUrl: workflow.database_url,
