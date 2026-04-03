@@ -22,21 +22,6 @@ export type AgentInstructionsEditorToken = {
 export const AgentInstructionsNoTriggerHelpText =
   "Select a trigger to unlock event-specific payload fields.";
 
-const PayloadTokenDescriptions = {
-  "payload.comment.body": "Comment text",
-  "payload.comment.html_url": "URL to the comment",
-  "payload.issue.body": "Issue description",
-  "payload.issue.number": "Issue number",
-  "payload.issue.pull_request": "Present when the issue is a pull request",
-  "payload.issue.title": "Issue title",
-  "payload.pull_request.base.ref": "Base branch name",
-  "payload.pull_request.body": "Pull request description",
-  "payload.pull_request.head.ref": "Head branch name",
-  "payload.ref": "Git ref for the event",
-  "payload.repository.full_name": "Repository owner and name",
-  "payload.sender.login": "GitHub username of the sender",
-} as const;
-
 const SharedAgentInstructionTokens: readonly AgentInstructionsEditorToken[] = [
   createSharedToken({
     path: "webhookEvent.eventType",
@@ -106,28 +91,18 @@ function createSharedToken(input: {
 
 function createPayloadToken(input: {
   path: string;
-  label: string;
-  description?: string;
+  description: string;
   sourceEventType: string;
 }): AgentInstructionsEditorToken {
   return {
     path: input.path,
     insertText: `{{${input.path}}}`,
-    label: input.label,
+    label: input.path,
     group: AgentInstructionTokenGroups.PAYLOAD,
-    ...(input.description === undefined ? {} : { description: input.description }),
+    description: input.description,
     sourceEventType: input.sourceEventType,
     replacePath: input.path,
   };
-}
-
-function createPayloadParameterLabel(input: { parameterLabel: string; path: string }): string {
-  if (input.parameterLabel.trim().length > 0) {
-    return input.parameterLabel;
-  }
-
-  const segments = input.path.split(".");
-  return segments[segments.length - 1] ?? input.path;
 }
 
 function compareTokenGroups(
@@ -153,23 +128,15 @@ export function buildAgentInstructionTokenCatalog(input: {
   }
 
   for (const eventOption of input.selectedEventOptions) {
-    for (const parameter of eventOption.parameters ?? []) {
-      const path = `payload.${parameter.payloadPath.join(".")}`;
-      const existingToken = tokensByPath.get(path);
+    for (const payloadReference of eventOption.payloadReferences ?? []) {
+      const path = `payload.${payloadReference.path.join(".")}`;
       const nextToken = createPayloadToken({
         path,
-        label: createPayloadParameterLabel({
-          parameterLabel: parameter.label,
-          path,
-        }),
-        description: PayloadTokenDescriptions[path as keyof typeof PayloadTokenDescriptions],
+        description: payloadReference.description,
         sourceEventType: eventOption.eventType,
       });
 
-      if (
-        existingToken === undefined ||
-        (existingToken.description === undefined && nextToken.description !== undefined)
-      ) {
+      if (!tokensByPath.has(path)) {
         tokensByPath.set(path, nextToken);
       }
     }

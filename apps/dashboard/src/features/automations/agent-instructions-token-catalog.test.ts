@@ -4,10 +4,7 @@ import {
   AgentInstructionTokenGroups,
   buildAgentInstructionTokenCatalog,
 } from "./agent-instructions-token-catalog.js";
-import {
-  createGithubIssueCommentCreatedEventOption,
-  createGithubPullRequestOpenedEventOption,
-} from "./webhook-automation-test-fixtures.js";
+import { createGitHubEventOption } from "./webhook-automation-test-fixtures.js";
 
 describe("buildAgentInstructionTokenCatalog", () => {
   it("always includes shared runtime tokens", () => {
@@ -21,30 +18,33 @@ describe("buildAgentInstructionTokenCatalog", () => {
     expect(tokens.some((token) => token.path === "payload")).toBe(true);
   });
 
-  it("derives payload tokens from selected event parameters only", () => {
+  it("derives payload tokens from selected event payload references", () => {
     const tokens = buildAgentInstructionTokenCatalog({
-      selectedEventOptions: [createGithubIssueCommentCreatedEventOption()],
+      selectedEventOptions: [
+        createGitHubEventOption({ eventType: "github.issue_comment.created" }),
+      ],
     });
 
     expect(tokens.some((token) => token.path === "payload.comment.body")).toBe(true);
+    expect(tokens.some((token) => token.path === "payload.repository.full_name")).toBe(true);
     expect(tokens.some((token) => token.path === "payload.issue.pull_request")).toBe(true);
-    expect(tokens.some((token) => token.path === "payload.sender.login")).toBe(false);
+    expect(tokens.some((token) => token.path === "payload.sender.login")).toBe(true);
   });
 
   it("deduplicates repeated payload paths across selected events", () => {
     const tokens = buildAgentInstructionTokenCatalog({
       selectedEventOptions: [
-        createGithubIssueCommentCreatedEventOption(),
-        createGithubPullRequestOpenedEventOption({
-          parameters: [
-            {
-              id: "repository",
-              label: "repository",
-              kind: "resource-select",
-              resourceKind: "repository",
-              payloadPath: ["comment", "body"],
-            },
-          ],
+        createGitHubEventOption({ eventType: "github.issue_comment.created" }),
+        createGitHubEventOption({
+          eventType: "github.pull_request.opened",
+          overrides: {
+            payloadReferences: [
+              {
+                path: ["comment", "body"],
+                description: "Comment text",
+              },
+            ],
+          },
         }),
       ],
     });
@@ -52,9 +52,11 @@ describe("buildAgentInstructionTokenCatalog", () => {
     expect(tokens.filter((token) => token.path === "payload.comment.body")).toHaveLength(1);
   });
 
-  it("uses curated semantic descriptions for known payload paths", () => {
+  it("uses payload reference descriptions", () => {
     const tokens = buildAgentInstructionTokenCatalog({
-      selectedEventOptions: [createGithubIssueCommentCreatedEventOption()],
+      selectedEventOptions: [
+        createGitHubEventOption({ eventType: "github.issue_comment.created" }),
+      ],
     });
 
     expect(tokens.find((token) => token.path === "payload.comment.body")?.description).toBe(
@@ -62,30 +64,34 @@ describe("buildAgentInstructionTokenCatalog", () => {
     );
   });
 
-  it("omits the description for unknown payload paths", () => {
+  it("does not derive payload tokens from trigger parameters", () => {
     const tokens = buildAgentInstructionTokenCatalog({
       selectedEventOptions: [
-        createGithubIssueCommentCreatedEventOption({
-          parameters: [
-            {
-              id: "unknown-field",
-              label: "unknown field",
-              kind: "string",
-              payloadPath: ["unknown", "field"],
-            },
-          ],
+        createGitHubEventOption({
+          eventType: "github.issue_comment.created",
+          overrides: {
+            payloadReferences: [],
+            parameters: [
+              {
+                id: "unknown-field",
+                label: "unknown field",
+                kind: "string",
+                payloadPath: ["unknown", "field"],
+              },
+            ],
+          },
         }),
       ],
     });
 
-    expect(tokens.find((token) => token.path === "payload.unknown.field")?.description).toBe(
-      undefined,
-    );
+    expect(tokens.some((token) => token.path === "payload.unknown.field")).toBe(false);
   });
 
   it("keeps shared runtime groups ahead of payload tokens", () => {
     const tokens = buildAgentInstructionTokenCatalog({
-      selectedEventOptions: [createGithubIssueCommentCreatedEventOption()],
+      selectedEventOptions: [
+        createGitHubEventOption({ eventType: "github.issue_comment.created" }),
+      ],
     });
 
     const firstPayloadIndex = tokens.findIndex(

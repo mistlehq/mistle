@@ -73,6 +73,16 @@ export const IntegrationTargetSchema = z
             providerEventType: z.string().min(1),
             displayName: z.string().min(1),
             category: z.string().min(1).optional(),
+            payloadReferences: z
+              .array(
+                z
+                  .object({
+                    path: z.array(z.string().min(1)).min(1),
+                    description: z.string().min(1),
+                  })
+                  .strict(),
+              )
+              .optional(),
             conversationKeyOptions: z
               .array(
                 z

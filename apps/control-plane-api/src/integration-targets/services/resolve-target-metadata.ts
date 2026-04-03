@@ -60,6 +60,10 @@ type ResolvedWebhookEvent = {
   providerEventType: string;
   displayName: string;
   category?: string;
+  payloadReferences?: {
+    path: string[];
+    description: string;
+  }[];
   conversationKeyOptions?: {
     id: string;
     label: string;
@@ -127,23 +131,6 @@ function resolveConnectionMethod(
   };
 }
 
-function cloneWebhookEventParameters(
-  parameters: readonly IntegrationWebhookEventParameterDefinition[],
-): ResolvedWebhookEventParameter[] {
-  return parameters.map((parameter) => cloneWebhookEventParameter(parameter));
-}
-
-function cloneWebhookEventConversationKeyOptions(
-  options: NonNullable<IntegrationWebhookEventDefinition["conversationKeyOptions"]>,
-): NonNullable<ResolvedWebhookEvent["conversationKeyOptions"]> {
-  return options.map((option) => ({
-    id: option.id,
-    label: option.label,
-    description: option.description,
-    template: option.template,
-  }));
-}
-
 function cloneWebhookEventParameter(
   parameter: IntegrationWebhookEventParameterDefinition,
 ): ResolvedWebhookEventParameter {
@@ -197,17 +184,30 @@ function cloneWebhookEvents(
     providerEventType: eventDefinition.providerEventType,
     displayName: eventDefinition.displayName,
     ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
+    ...(eventDefinition.payloadReferences === undefined
+      ? {}
+      : {
+          payloadReferences: eventDefinition.payloadReferences.map((payloadReference) => ({
+            path: [...payloadReference.path],
+            description: payloadReference.description,
+          })),
+        }),
     ...(eventDefinition.conversationKeyOptions === undefined
       ? {}
       : {
-          conversationKeyOptions: cloneWebhookEventConversationKeyOptions(
-            eventDefinition.conversationKeyOptions,
-          ),
+          conversationKeyOptions: eventDefinition.conversationKeyOptions.map((option) => ({
+            id: option.id,
+            label: option.label,
+            description: option.description,
+            template: option.template,
+          })),
         }),
     ...(eventDefinition.parameters === undefined
       ? {}
       : {
-          parameters: cloneWebhookEventParameters(eventDefinition.parameters),
+          parameters: eventDefinition.parameters.map((parameter) =>
+            cloneWebhookEventParameter(parameter),
+          ),
         }),
   }));
 }

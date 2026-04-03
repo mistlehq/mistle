@@ -1,5 +1,7 @@
+import { GitHubCloudDefinition } from "@mistle/integrations-definitions";
+
 import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-types.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
+import { createWebhookAutomationEventOption } from "./webhook-automation-option-builders.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 import type {
   WebhookAutomationListEvent,
@@ -11,6 +13,29 @@ export const GitHubConnectionId = "icn_01kkk1g84mfetvga8a4b853k27";
 export const GitHubConnectionLabel = "GitHub Engineering";
 export const GitHubGroupedConnectionLabel = "GitHub - GitHub Engineering";
 export const RepoMaintainerSandboxProfileId = "sbp_01kkk1mbmxfetvga8kcmw612jj";
+
+export function createGitHubEventOption(input: {
+  eventType: string;
+  overrides?: Partial<WebhookAutomationEventOption>;
+}): WebhookAutomationEventOption {
+  const eventDefinition = GitHubCloudDefinition.supportedWebhookEvents?.find(
+    (candidate) => candidate.eventType === input.eventType,
+  );
+
+  if (eventDefinition === undefined) {
+    throw new Error(`Missing GitHub event definition for '${input.eventType}'.`);
+  }
+
+  return {
+    ...createWebhookAutomationEventOption({
+      eventDefinition,
+      connectionId: GitHubConnectionId,
+      connectionLabel: GitHubConnectionLabel,
+      logoKey: "github",
+    }),
+    ...input.overrides,
+  };
+}
 
 export function createWebhookAutomationListEvent(
   overrides?: Partial<WebhookAutomationListEvent>,
@@ -135,117 +160,17 @@ export function createRowLevelIssueWebhookAutomationListItemViewModel(): Webhook
 export function createGithubIssueCommentCreatedEventOption(
   overrides?: Partial<WebhookAutomationEventOption>,
 ): WebhookAutomationEventOption {
-  return {
-    id: createWebhookAutomationTriggerId({
-      connectionId: GitHubConnectionId,
-      eventType: "github.issue_comment.created",
-    }),
+  return createGitHubEventOption({
     eventType: "github.issue_comment.created",
-    connectionId: GitHubConnectionId,
-    connectionLabel: GitHubConnectionLabel,
-    label: "Issue comment created",
-    category: "Issues",
-    logoKey: "github",
-    conversationKeyOptions: [
-      {
-        id: "issue",
-        label: "Issue",
-        description: "Events from the same issue go to the same conversation.",
-        template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
-      },
-      {
-        id: "repository",
-        label: "Repository",
-        description: "Events from the same repository go to the same conversation.",
-        template: "{{payload.repository.full_name}}",
-      },
-    ],
-    parameters: [
-      {
-        id: "explicitInvocation",
-        label: "explicit mention",
-        kind: "string",
-        payloadPath: ["comment", "body"],
-        matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
-        controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
-      },
-      {
-        id: "target",
-        label: "comment target",
-        kind: "enum-select",
-        payloadPath: ["issue", "pull_request"],
-        matchMode: "exists",
-        options: [
-          {
-            value: "exists",
-            label: "pull request",
-          },
-          {
-            value: "not_exists",
-            label: "issue",
-          },
-        ],
-        prefix: "in",
-        placeholder: "Any comment target",
-      },
-    ],
-    ...overrides,
-  };
+    ...(overrides === undefined ? {} : { overrides }),
+  });
 }
 
 export function createGithubPullRequestOpenedEventOption(
   overrides?: Partial<WebhookAutomationEventOption>,
 ): WebhookAutomationEventOption {
-  return {
-    id: createWebhookAutomationTriggerId({
-      connectionId: GitHubConnectionId,
-      eventType: "github.pull_request.opened",
-    }),
+  return createGitHubEventOption({
     eventType: "github.pull_request.opened",
-    connectionId: GitHubConnectionId,
-    connectionLabel: GitHubConnectionLabel,
-    label: "Pull request opened",
-    category: "Pull requests",
-    logoKey: "github",
-    conversationKeyOptions: [
-      {
-        id: "pull-request",
-        label: "Pull request",
-        description: "Events from the same pull request go to the same conversation.",
-        template: "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
-      },
-      {
-        id: "repository",
-        label: "Repository",
-        description: "Events from the same repository go to the same conversation.",
-        template: "{{payload.repository.full_name}}",
-      },
-    ],
-    parameters: [
-      {
-        id: "explicitInvocation",
-        label: "explicit mention",
-        kind: "string",
-        payloadPath: ["pull_request", "body"],
-        matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
-        controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
-      },
-      {
-        id: "author",
-        label: "author",
-        kind: "resource-select",
-        resourceKind: "user",
-        payloadPath: ["sender", "login"],
-        prefix: "by",
-        placeholder: "Any author",
-      },
-    ],
-    ...overrides,
-  };
+    ...(overrides === undefined ? {} : { overrides }),
+  });
 }

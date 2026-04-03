@@ -1,3 +1,5 @@
+import type { IntegrationWebhookEventDefinition } from "@mistle/integrations-core";
+
 import type {
   IntegrationConnection,
   IntegrationTarget,
@@ -43,6 +45,112 @@ export function createWebhookAutomationTriggerId(input: {
   eventType: string;
 }): string {
   return `${input.connectionId}::${input.eventType}`;
+}
+
+export function createWebhookAutomationEventOption(input: {
+  eventDefinition: IntegrationWebhookEventDefinition;
+  connectionId: string;
+  connectionLabel: string;
+  availability?: WebhookAutomationEventOptionAvailability;
+  logoKey?: string;
+  categoryPrefix?: string;
+}): WebhookAutomationEventOption {
+  const category =
+    input.eventDefinition.category === undefined
+      ? undefined
+      : input.categoryPrefix === undefined
+        ? input.eventDefinition.category
+        : `${input.categoryPrefix} / ${input.eventDefinition.category}`;
+
+  return {
+    id: createWebhookAutomationTriggerId({
+      connectionId: input.connectionId,
+      eventType: input.eventDefinition.eventType,
+    }),
+    eventType: input.eventDefinition.eventType,
+    connectionId: input.connectionId,
+    connectionLabel: input.connectionLabel,
+    label: input.eventDefinition.displayName,
+    ...(input.availability === undefined ? {} : { availability: input.availability }),
+    ...(input.logoKey === undefined ? {} : { logoKey: input.logoKey }),
+    ...(input.eventDefinition.payloadReferences === undefined
+      ? {}
+      : {
+          payloadReferences: input.eventDefinition.payloadReferences.map((payloadReference) => ({
+            path: [...payloadReference.path],
+            description: payloadReference.description,
+          })),
+        }),
+    ...(input.eventDefinition.conversationKeyOptions === undefined
+      ? {}
+      : {
+          conversationKeyOptions: input.eventDefinition.conversationKeyOptions.map(
+            (conversationKeyOption) => ({
+              id: conversationKeyOption.id,
+              label: conversationKeyOption.label,
+              description: conversationKeyOption.description,
+              template: conversationKeyOption.template,
+            }),
+          ),
+        }),
+    ...(category === undefined ? {} : { category }),
+    ...(input.eventDefinition.parameters === undefined
+      ? {}
+      : {
+          parameters: input.eventDefinition.parameters.map((parameter) =>
+            parameter.kind === "resource-select"
+              ? {
+                  id: parameter.id,
+                  label: parameter.label,
+                  kind: parameter.kind,
+                  resourceKind: parameter.resourceKind,
+                  payloadPath: [...parameter.payloadPath],
+                  ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                  ...(parameter.placeholder === undefined
+                    ? {}
+                    : { placeholder: parameter.placeholder }),
+                }
+              : parameter.kind === "enum-select"
+                ? {
+                    id: parameter.id,
+                    label: parameter.label,
+                    kind: parameter.kind,
+                    payloadPath: [...parameter.payloadPath],
+                    matchMode: parameter.matchMode,
+                    options: parameter.options.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    })),
+                    ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                    ...(parameter.placeholder === undefined
+                      ? {}
+                      : { placeholder: parameter.placeholder }),
+                  }
+                : {
+                    id: parameter.id,
+                    label: parameter.label,
+                    kind: parameter.kind,
+                    payloadPath: [...parameter.payloadPath],
+                    ...(parameter.matchMode === undefined
+                      ? {}
+                      : { matchMode: parameter.matchMode }),
+                    ...(parameter.defaultValue === undefined
+                      ? {}
+                      : { defaultValue: parameter.defaultValue }),
+                    ...(parameter.defaultEnabled === undefined
+                      ? {}
+                      : { defaultEnabled: parameter.defaultEnabled }),
+                    ...(parameter.controlVariant === undefined
+                      ? {}
+                      : { controlVariant: parameter.controlVariant }),
+                    ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                    ...(parameter.placeholder === undefined
+                      ? {}
+                      : { placeholder: parameter.placeholder }),
+                  },
+          ),
+        }),
+  };
 }
 
 export function buildWebhookAutomationConnectionOptions(input: {
@@ -175,92 +283,19 @@ function buildSelectableWebhookAutomationEventOptions(input: {
     }
 
     for (const eventDefinition of target.supportedWebhookEvents ?? []) {
-      supportedEventOptions.push({
-        id: createWebhookAutomationTriggerId({
+      supportedEventOptions.push(
+        createWebhookAutomationEventOption({
+          eventDefinition,
           connectionId: connection.id,
-          eventType: eventDefinition.eventType,
+          connectionLabel: formatWebhookAutomationTriggerGroupLabel({
+            integrationDisplayName: target.displayName,
+            connectionDisplayName: connection.displayName,
+          }),
+          availability: "available",
+          ...(target.logoKey === undefined ? {} : { logoKey: target.logoKey }),
+          categoryPrefix: connection.displayName,
         }),
-        eventType: eventDefinition.eventType,
-        connectionId: connection.id,
-        connectionLabel: formatWebhookAutomationTriggerGroupLabel({
-          integrationDisplayName: target.displayName,
-          connectionDisplayName: connection.displayName,
-        }),
-        label: eventDefinition.displayName,
-        availability: "available",
-        ...(target.logoKey === undefined ? {} : { logoKey: target.logoKey }),
-        ...(eventDefinition.conversationKeyOptions === undefined
-          ? {}
-          : {
-              conversationKeyOptions: eventDefinition.conversationKeyOptions.map(
-                (conversationKeyOption) => ({
-                  id: conversationKeyOption.id,
-                  label: conversationKeyOption.label,
-                  description: conversationKeyOption.description,
-                  template: conversationKeyOption.template,
-                }),
-              ),
-            }),
-        ...(eventDefinition.category === undefined
-          ? {}
-          : { category: `${connection.displayName} / ${eventDefinition.category}` }),
-        ...(eventDefinition.parameters === undefined
-          ? {}
-          : {
-              parameters: eventDefinition.parameters.map((parameter) =>
-                parameter.kind === "resource-select"
-                  ? {
-                      id: parameter.id,
-                      label: parameter.label,
-                      kind: parameter.kind,
-                      resourceKind: parameter.resourceKind,
-                      payloadPath: [...parameter.payloadPath],
-                      ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-                      ...(parameter.placeholder === undefined
-                        ? {}
-                        : { placeholder: parameter.placeholder }),
-                    }
-                  : parameter.kind === "enum-select"
-                    ? {
-                        id: parameter.id,
-                        label: parameter.label,
-                        kind: parameter.kind,
-                        payloadPath: [...parameter.payloadPath],
-                        matchMode: parameter.matchMode,
-                        options: parameter.options.map((option) => ({
-                          value: option.value,
-                          label: option.label,
-                        })),
-                        ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-                        ...(parameter.placeholder === undefined
-                          ? {}
-                          : { placeholder: parameter.placeholder }),
-                      }
-                    : {
-                        id: parameter.id,
-                        label: parameter.label,
-                        kind: parameter.kind,
-                        payloadPath: [...parameter.payloadPath],
-                        ...(parameter.matchMode === undefined
-                          ? {}
-                          : { matchMode: parameter.matchMode }),
-                        ...(parameter.defaultValue === undefined
-                          ? {}
-                          : { defaultValue: parameter.defaultValue }),
-                        ...(parameter.defaultEnabled === undefined
-                          ? {}
-                          : { defaultEnabled: parameter.defaultEnabled }),
-                        ...(parameter.controlVariant === undefined
-                          ? {}
-                          : { controlVariant: parameter.controlVariant }),
-                        ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-                        ...(parameter.placeholder === undefined
-                          ? {}
-                          : { placeholder: parameter.placeholder }),
-                      },
-              ),
-            }),
-      });
+      );
     }
   }
 

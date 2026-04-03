@@ -1092,6 +1092,11 @@ export type IntegrationWebhookEventParameterOptionDefinition = {
   label: string;
 };
 
+export type IntegrationWebhookPayloadReference = {
+  path: ReadonlyArray<string>;
+  description: string;
+};
+
 export type IntegrationWebhookEventParameterDefinition =
   | {
       id: string;
@@ -1130,6 +1135,7 @@ export type IntegrationWebhookEventDefinition = {
   providerEventType: string;
   displayName: string;
   category?: string | undefined;
+  payloadReferences?: ReadonlyArray<IntegrationWebhookPayloadReference> | undefined;
   conversationKeyOptions?:
     | ReadonlyArray<{
         id: string;
