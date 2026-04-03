@@ -32,80 +32,85 @@ const GitHubPushBranchConversationKeyOption = {
   template: "{{payload.repository.full_name}}:branch:{{payload.ref}}",
 } as const;
 
-function createGitHubPayloadReference(input: {
-  path: ReadonlyArray<string>;
-  description: string;
-}): IntegrationWebhookPayloadReference {
-  return {
-    path: [...input.path],
-    description: input.description,
-  };
-}
+const GitHubPayloadReferences = {
+  REPOSITORY_FULL_NAME: {
+    path: ["repository", "full_name"],
+    description: "Repository owner and name",
+  },
+  ISSUE_NUMBER: {
+    path: ["issue", "number"],
+    description: "Issue number",
+  },
+  ISSUE_TITLE: {
+    path: ["issue", "title"],
+    description: "Issue title",
+  },
+  ISSUE_BODY: {
+    path: ["issue", "body"],
+    description: "Issue description",
+  },
+  ISSUE_PULL_REQUEST: {
+    path: ["issue", "pull_request"],
+    description: "Present when the issue is a pull request",
+  },
+  PULL_REQUEST_NUMBER: {
+    path: ["pull_request", "number"],
+    description: "Pull request number",
+  },
+  PULL_REQUEST_BODY: {
+    path: ["pull_request", "body"],
+    description: "Pull request description",
+  },
+  PULL_REQUEST_BASE_REF: {
+    path: ["pull_request", "base", "ref"],
+    description: "Base branch name",
+  },
+  PULL_REQUEST_HEAD_REF: {
+    path: ["pull_request", "head", "ref"],
+    description: "Head branch name",
+  },
+  COMMENT_BODY: {
+    path: ["comment", "body"],
+    description: "Comment text",
+  },
+  REVIEW_BODY: {
+    path: ["review", "body"],
+    description: "Pull request review body",
+  },
+  SENDER_LOGIN: {
+    path: ["sender", "login"],
+    description: "GitHub username of the sender",
+  },
+  REF: {
+    path: ["ref"],
+    description: "Git ref for the event",
+  },
+} as const satisfies Record<string, IntegrationWebhookPayloadReference>;
 
-const GitHubRepositoryFullNamePayloadReference = createGitHubPayloadReference({
-  path: ["repository", "full_name"],
-  description: "Repository owner and name",
-});
-
-const GitHubIssueNumberPayloadReference = createGitHubPayloadReference({
-  path: ["issue", "number"],
-  description: "Issue number",
-});
-
-const GitHubIssueTitlePayloadReference = createGitHubPayloadReference({
-  path: ["issue", "title"],
-  description: "Issue title",
-});
-
-const GitHubIssueBodyPayloadReference = createGitHubPayloadReference({
-  path: ["issue", "body"],
-  description: "Issue description",
-});
-
-const GitHubIssuePullRequestPayloadReference = createGitHubPayloadReference({
-  path: ["issue", "pull_request"],
-  description: "Present when the issue is a pull request",
-});
-
-const GitHubPullRequestNumberPayloadReference = createGitHubPayloadReference({
-  path: ["pull_request", "number"],
-  description: "Pull request number",
-});
-
-const GitHubPullRequestBodyPayloadReference = createGitHubPayloadReference({
-  path: ["pull_request", "body"],
-  description: "Pull request description",
-});
-
-const GitHubPullRequestBaseRefPayloadReference = createGitHubPayloadReference({
-  path: ["pull_request", "base", "ref"],
-  description: "Base branch name",
-});
-
-const GitHubPullRequestHeadRefPayloadReference = createGitHubPayloadReference({
-  path: ["pull_request", "head", "ref"],
-  description: "Head branch name",
-});
-
-const GitHubCommentBodyPayloadReference = createGitHubPayloadReference({
-  path: ["comment", "body"],
-  description: "Comment text",
-});
-
-const GitHubSenderLoginPayloadReference = createGitHubPayloadReference({
-  path: ["sender", "login"],
-  description: "GitHub username of the sender",
-});
-
-const GitHubReviewBodyPayloadReference = createGitHubPayloadReference({
-  path: ["review", "body"],
-  description: "Pull request review body",
-});
-
-const GitHubRefPayloadReference = createGitHubPayloadReference({
-  path: ["ref"],
-  description: "Git ref for the event",
-});
+const GitHubPayloadReferenceGroups = {
+  ISSUE_CORE: [
+    GitHubPayloadReferences.REPOSITORY_FULL_NAME,
+    GitHubPayloadReferences.ISSUE_NUMBER,
+    GitHubPayloadReferences.ISSUE_TITLE,
+    GitHubPayloadReferences.ISSUE_BODY,
+    GitHubPayloadReferences.SENDER_LOGIN,
+  ],
+  ISSUE_COMMENT_CORE: [
+    GitHubPayloadReferences.REPOSITORY_FULL_NAME,
+    GitHubPayloadReferences.ISSUE_NUMBER,
+    GitHubPayloadReferences.ISSUE_TITLE,
+    GitHubPayloadReferences.ISSUE_PULL_REQUEST,
+    GitHubPayloadReferences.COMMENT_BODY,
+    GitHubPayloadReferences.SENDER_LOGIN,
+  ],
+  PULL_REQUEST_CORE: [
+    GitHubPayloadReferences.REPOSITORY_FULL_NAME,
+    GitHubPayloadReferences.PULL_REQUEST_NUMBER,
+    GitHubPayloadReferences.PULL_REQUEST_BODY,
+    GitHubPayloadReferences.PULL_REQUEST_BASE_REF,
+    GitHubPayloadReferences.SENDER_LOGIN,
+  ],
+} as const satisfies Record<string, readonly IntegrationWebhookPayloadReference[]>;
 
 const GitHubRepositoryParameter: IntegrationWebhookEventParameterDefinition = {
   id: "repository",
@@ -236,13 +241,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "issues",
     displayName: "Issue opened",
     category: "Issues",
-    payloadReferences: [
-      GitHubRepositoryFullNamePayloadReference,
-      GitHubIssueNumberPayloadReference,
-      GitHubIssueTitlePayloadReference,
-      GitHubIssueBodyPayloadReference,
-      GitHubSenderLoginPayloadReference,
-    ],
+    payloadReferences: GitHubPayloadReferenceGroups.ISSUE_CORE,
     conversationKeyOptions: [
       GitHubIssueConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
@@ -258,13 +257,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "issues",
     displayName: "Issue closed",
     category: "Issues",
-    payloadReferences: [
-      GitHubRepositoryFullNamePayloadReference,
-      GitHubIssueNumberPayloadReference,
-      GitHubIssueTitlePayloadReference,
-      GitHubIssueBodyPayloadReference,
-      GitHubSenderLoginPayloadReference,
-    ],
+    payloadReferences: GitHubPayloadReferenceGroups.ISSUE_CORE,
     conversationKeyOptions: [
       GitHubIssueConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
@@ -276,13 +269,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "issues",
     displayName: "Issue reopened",
     category: "Issues",
-    payloadReferences: [
-      GitHubRepositoryFullNamePayloadReference,
-      GitHubIssueNumberPayloadReference,
-      GitHubIssueTitlePayloadReference,
-      GitHubIssueBodyPayloadReference,
-      GitHubSenderLoginPayloadReference,
-    ],
+    payloadReferences: GitHubPayloadReferenceGroups.ISSUE_CORE,
     conversationKeyOptions: [
       GitHubIssueConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
@@ -294,14 +281,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "issue_comment",
     displayName: "Issue comment created",
     category: "Issues",
-    payloadReferences: [
-      GitHubRepositoryFullNamePayloadReference,
-      GitHubIssueNumberPayloadReference,
-      GitHubIssueTitlePayloadReference,
-      GitHubIssuePullRequestPayloadReference,
-      GitHubCommentBodyPayloadReference,
-      GitHubSenderLoginPayloadReference,
-    ],
+    payloadReferences: GitHubPayloadReferenceGroups.ISSUE_COMMENT_CORE,
     conversationKeyOptions: [
       GitHubIssueConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
@@ -318,13 +298,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "pull_request",
     displayName: "Pull request opened",
     category: "Pull requests",
-    payloadReferences: [
-      GitHubRepositoryFullNamePayloadReference,
-      GitHubPullRequestNumberPayloadReference,
-      GitHubPullRequestBodyPayloadReference,
-      GitHubPullRequestBaseRefPayloadReference,
-      GitHubSenderLoginPayloadReference,
-    ],
+    payloadReferences: GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
     conversationKeyOptions: [
       GitHubPullRequestConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
@@ -341,13 +315,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "pull_request",
     displayName: "Pull request closed",
     category: "Pull requests",
-    payloadReferences: [
-      GitHubRepositoryFullNamePayloadReference,
-      GitHubPullRequestNumberPayloadReference,
-      GitHubPullRequestBodyPayloadReference,
-      GitHubPullRequestBaseRefPayloadReference,
-      GitHubSenderLoginPayloadReference,
-    ],
+    payloadReferences: GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
     conversationKeyOptions: [
       GitHubPullRequestConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
@@ -359,13 +327,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "pull_request",
     displayName: "Pull request reopened",
     category: "Pull requests",
-    payloadReferences: [
-      GitHubRepositoryFullNamePayloadReference,
-      GitHubPullRequestNumberPayloadReference,
-      GitHubPullRequestBodyPayloadReference,
-      GitHubPullRequestBaseRefPayloadReference,
-      GitHubSenderLoginPayloadReference,
-    ],
+    payloadReferences: GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
     conversationKeyOptions: [
       GitHubPullRequestConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
@@ -378,12 +340,8 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     displayName: "Pull request updated",
     category: "Pull requests",
     payloadReferences: [
-      GitHubRepositoryFullNamePayloadReference,
-      GitHubPullRequestNumberPayloadReference,
-      GitHubPullRequestBodyPayloadReference,
-      GitHubPullRequestBaseRefPayloadReference,
-      GitHubPullRequestHeadRefPayloadReference,
-      GitHubSenderLoginPayloadReference,
+      ...GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
+      GitHubPayloadReferences.PULL_REQUEST_HEAD_REF,
     ],
     conversationKeyOptions: [
       GitHubPullRequestConversationKeyOption,
@@ -402,11 +360,11 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     displayName: "Pull request review submitted",
     category: "Pull requests",
     payloadReferences: [
-      GitHubRepositoryFullNamePayloadReference,
-      GitHubPullRequestNumberPayloadReference,
-      GitHubPullRequestBaseRefPayloadReference,
-      GitHubReviewBodyPayloadReference,
-      GitHubSenderLoginPayloadReference,
+      GitHubPayloadReferences.REPOSITORY_FULL_NAME,
+      GitHubPayloadReferences.PULL_REQUEST_NUMBER,
+      GitHubPayloadReferences.PULL_REQUEST_BASE_REF,
+      GitHubPayloadReferences.REVIEW_BODY,
+      GitHubPayloadReferences.SENDER_LOGIN,
     ],
     conversationKeyOptions: [
       GitHubPullRequestConversationKeyOption,
@@ -425,11 +383,11 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     displayName: "Pull request review comment created",
     category: "Pull requests",
     payloadReferences: [
-      GitHubRepositoryFullNamePayloadReference,
-      GitHubPullRequestNumberPayloadReference,
-      GitHubPullRequestBaseRefPayloadReference,
-      GitHubCommentBodyPayloadReference,
-      GitHubSenderLoginPayloadReference,
+      GitHubPayloadReferences.REPOSITORY_FULL_NAME,
+      GitHubPayloadReferences.PULL_REQUEST_NUMBER,
+      GitHubPayloadReferences.PULL_REQUEST_BASE_REF,
+      GitHubPayloadReferences.COMMENT_BODY,
+      GitHubPayloadReferences.SENDER_LOGIN,
     ],
     conversationKeyOptions: [
       GitHubPullRequestConversationKeyOption,
@@ -447,7 +405,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "push",
     displayName: "New push to branch",
     category: "Push",
-    payloadReferences: [GitHubRepositoryFullNamePayloadReference, GitHubRefPayloadReference],
+    payloadReferences: [GitHubPayloadReferences.REPOSITORY_FULL_NAME, GitHubPayloadReferences.REF],
     conversationKeyOptions: [
       GitHubPushBranchConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
@@ -459,7 +417,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "check_suite",
     displayName: "CI completed",
     category: "Checks",
-    payloadReferences: [GitHubRepositoryFullNamePayloadReference],
+    payloadReferences: [GitHubPayloadReferences.REPOSITORY_FULL_NAME],
     conversationKeyOptions: [GitHubRepositoryConversationKeyOption],
     parameters: [GitHubRepositoryParameter],
   }),
