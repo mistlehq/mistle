@@ -49,14 +49,19 @@ function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** Label above control, full-width children; base layout for `horizontal` on narrow viewports. */
+const fieldOrientationVerticalClasses =
+  "gap-2.5 flex-col [&>*]:w-full [&>.sr-only]:w-auto [&_[data-slot=select-trigger]]:w-full";
+
+/** Row layout from `md` viewport breakpoint. */
+const fieldOrientationHorizontalClasses =
+  "md:flex-row md:items-start md:gap-4 md:[&>[data-slot=field-label],&>[data-slot=field-header]]:w-40 md:[&>[data-slot=field-label],&>[data-slot=field-header]]:shrink-0 md:[&>[data-slot=field-label],&>[data-slot=field-header]]:pt-2 md:[&>[data-slot=field-content]]:min-w-0 md:[&_[data-slot=select-trigger]]:w-fit md:has-[>[role=checkbox]+[data-slot=field-content]]:items-center md:has-[>[role=radio]+[data-slot=field-content]]:items-center md:has-[>[role=switch]+[data-slot=field-content]]:items-center md:has-[>[role=checkbox]+[data-slot=field-content]]:[&>[role=checkbox]]:mt-px md:has-[>[role=radio]+[data-slot=field-content]]:[&>[role=radio]]:mt-px md:has-[>[role=switch]+[data-slot=field-content]]:[&>[role=switch]]:mt-px";
+
 const fieldVariants = cva("data-[invalid=true]:text-destructive group/field flex w-full", {
   variants: {
     orientation: {
-      vertical: "gap-2.5 flex-col [&>*]:w-full [&>.sr-only]:w-auto",
-      horizontal:
-        "flex-row items-start gap-4 [&>[data-slot=field-label],&>[data-slot=field-header]]:w-40 [&>[data-slot=field-label],&>[data-slot=field-header]]:shrink-0 [&>[data-slot=field-label],&>[data-slot=field-header]]:pt-2 [&>[data-slot=field-content]]:min-w-0 has-[>[role=checkbox]+[data-slot=field-content]]:items-center has-[>[role=radio]+[data-slot=field-content]]:items-center has-[>[role=switch]+[data-slot=field-content]]:items-center has-[>[role=checkbox]+[data-slot=field-content]]:[&>[role=checkbox]]:mt-px has-[>[role=radio]+[data-slot=field-content]]:[&>[role=radio]]:mt-px has-[>[role=switch]+[data-slot=field-content]]:[&>[role=switch]]:mt-px",
-      responsive:
-        "gap-2.5 flex-col [&>*]:w-full [&>.sr-only]:w-auto @md/field-group:flex-row @md/field-group:items-center @md/field-group:[&>*]:w-auto @md/field-group:[&>[data-slot=field-label],&>[data-slot=field-header]]:flex-auto @md/field-group:has-[>[data-slot=field-header]>[data-slot=field-description]]:items-start @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+      vertical: fieldOrientationVerticalClasses,
+      horizontal: cn(fieldOrientationVerticalClasses, fieldOrientationHorizontalClasses),
     },
     contentWidth: {
       fit: "",
@@ -68,7 +73,7 @@ const fieldVariants = cva("data-[invalid=true]:text-destructive group/field flex
       orientation: "horizontal",
       contentWidth: "fit",
       className:
-        "[&>[data-slot=field-content]]:flex-1 [&>[data-slot=field-content]]:items-end [&>[data-slot=field-content]>*]:max-w-full [&>[data-slot=field-content]>[data-slot=field-error]]:self-stretch [&>[data-slot=field-content]_[data-slot=select-trigger]:not([class*='w-'])]:w-auto [&>[data-slot=field-content]_[data-slot=select-trigger]:not([class*='min-w-'])]:min-w-40 [&>[data-slot=field-content]_[data-slot=select-trigger]]:max-w-full",
+        "md:[&>[data-slot=field-content]]:flex-1 md:[&>[data-slot=field-content]]:items-end [&>[data-slot=field-content]>*]:max-w-full md:[&>[data-slot=field-content]>[data-slot=field-error]]:self-stretch md:[&>[data-slot=field-content]_[data-slot=select-trigger]:not([class*='w-'])]:w-auto md:[&>[data-slot=field-content]_[data-slot=select-trigger]:not([class*='min-w-'])]:min-w-40 md:[&>[data-slot=field-content]_[data-slot=select-trigger]]:max-w-full",
     },
     {
       orientation: "horizontal",
