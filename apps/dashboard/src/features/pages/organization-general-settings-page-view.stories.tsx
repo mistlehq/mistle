@@ -13,7 +13,6 @@ const meta = {
     loadErrorMessage: null,
     name: "Mistle Labs",
     onSaveChanges: async () => {},
-    saveError: null,
   },
 } satisfies Meta<typeof OrganizationGeneralSettingsPageView>;
 
@@ -32,19 +31,5 @@ export const Loading: Story = {
 export const LoadError: Story = {
   args: {
     loadErrorMessage: "Could not load organization settings.",
-  },
-};
-
-export const Saving: Story = {
-  args: {
-    isSaving: true,
-    name: "Mistle Storybook Labs",
-  },
-};
-
-export const SaveError: Story = {
-  args: {
-    name: "Mistle Storybook Labs",
-    saveError: "Could not update organization settings.",
   },
 };

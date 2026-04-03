@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
@@ -86,12 +85,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
 
   return (
     <FormPageFrame description={description} title={title}>
-      <OrganizationGeneralSettingsEditor
-        key={
-          organizationQuery.data === undefined
-            ? "loading"
-            : `${organizationQuery.data.slug}:${organizationQuery.data.name}`
-        }
+      <OrganizationGeneralSettingsPageView
         isLoading={organizationQuery.isPending}
         isSaving={saveMutation.isPending}
         loadErrorMessage={
@@ -102,47 +96,13 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
               })
             : null
         }
+        name={organizationQuery.data?.name ?? ""}
         onSaveChanges={async (name) => {
           await saveMutation.mutateAsync({
             name: name.trim(),
           });
         }}
-        organization={organizationQuery.data}
       />
     </FormPageFrame>
-  );
-}
-
-function OrganizationGeneralSettingsEditor(input: {
-  organization: { name: string; slug: string } | undefined;
-  isLoading: boolean;
-  isSaving: boolean;
-  loadErrorMessage: string | null;
-  onSaveChanges: (name: string) => Promise<void>;
-}): React.JSX.Element {
-  const [saveError, setSaveError] = useState<string | null>(null);
-
-  return (
-    <OrganizationGeneralSettingsPageView
-      isLoading={input.isLoading}
-      isSaving={input.isSaving}
-      loadErrorMessage={input.loadErrorMessage}
-      name={input.organization?.name ?? ""}
-      onSaveChanges={async (name) => {
-        setSaveError(null);
-
-        try {
-          await input.onSaveChanges(name);
-        } catch (error) {
-          setSaveError(
-            resolveApiErrorMessage({
-              error,
-              fallbackMessage: "Could not update organization settings.",
-            }),
-          );
-        }
-      }}
-      saveError={saveError}
-    />
   );
 }

@@ -87,7 +87,6 @@ export function createProfileSettingsFixtureContent(): React.JSX.Element {
     <ProfileSettingsPageView
       displayName="Mistle Developer"
       email="developer@mistle.so"
-      fieldError={null}
       onSaveChanges={async () => {}}
       saving={false}
     />
@@ -102,7 +101,6 @@ export function createOrganizationGeneralSettingsFixtureContent(): React.JSX.Ele
       loadErrorMessage={null}
       name="Mistle Labs"
       onSaveChanges={async () => {}}
-      saveError={null}
     />
   );
 }

@@ -9,7 +9,6 @@ export type OrganizationGeneralSettingsPageViewProps = {
   loadErrorMessage: string | null;
   name: string;
   onSaveChanges: (name: string) => Promise<void>;
-  saveError: string | null;
 };
 
 export function OrganizationGeneralSettingsPageView(
@@ -51,7 +50,6 @@ export function OrganizationGeneralSettingsPageView(
     <FormPageStack>
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
-          {props.saveError !== null ? <Notice variant="alert">{props.saveError}</Notice> : null}
           <AutoSaveTextField
             description="Used across the workspace and organization settings."
             disabled={props.isSaving}

@@ -1,7 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 
-import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { updateProfileDisplayName } from "../settings/profile/profile-service.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
@@ -29,47 +27,14 @@ export function ProfileSettingsPage(): React.JSX.Element {
 
   return (
     <FormPageFrame description={description} title={title}>
-      <ProfileSettingsEditor
-        key={`${session.user.email}:${persistedDisplayName}`}
+      <ProfileSettingsPageView
+        displayName={persistedDisplayName}
         email={session.user.email}
-        onDisplayNameSave={async (displayNameDraft) => {
+        onSaveChanges={async (displayNameDraft) => {
           await saveMutation.mutateAsync(displayNameDraft.trim());
         }}
-        persistedDisplayName={persistedDisplayName}
         saving={saveMutation.isPending}
       />
     </FormPageFrame>
-  );
-}
-
-function ProfileSettingsEditor(input: {
-  persistedDisplayName: string;
-  email: string;
-  saving: boolean;
-  onDisplayNameSave: (displayNameDraft: string) => Promise<void>;
-}): React.JSX.Element {
-  const [fieldError, setFieldError] = useState<string | null>(null);
-
-  return (
-    <ProfileSettingsPageView
-      displayName={input.persistedDisplayName}
-      email={input.email}
-      fieldError={fieldError}
-      onSaveChanges={async (displayNameDraft) => {
-        setFieldError(null);
-
-        try {
-          await input.onDisplayNameSave(displayNameDraft);
-        } catch (error) {
-          setFieldError(
-            resolveApiErrorMessage({
-              error,
-              fallbackMessage: "Could not update profile.",
-            }),
-          );
-        }
-      }}
-      saving={input.saving}
-    />
   );
 }

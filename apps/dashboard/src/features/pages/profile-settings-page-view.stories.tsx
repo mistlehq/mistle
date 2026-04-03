@@ -10,7 +10,6 @@ const meta = {
   args: {
     displayName: "Mistle Developer",
     email: "developer@mistle.so",
-    fieldError: null,
     onSaveChanges: async () => {},
     saving: false,
   },
@@ -21,17 +20,3 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
-
-export const Saving: Story = {
-  args: {
-    displayName: "Mistle Dashboard Team",
-    saving: true,
-  },
-};
-
-export const SaveError: Story = {
-  args: {
-    displayName: "Mistle Dashboard Team",
-    fieldError: "Could not update profile.",
-  },
-};
