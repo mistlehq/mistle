@@ -1,105 +1,10 @@
-import { GitHubCloudDefinition } from "@mistle/integrations-definitions";
 import { describe, expect, it } from "vitest";
 
 import {
   AgentInstructionTokenGroups,
   buildAgentInstructionTokenCatalog,
 } from "./agent-instructions-token-catalog.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
-import { GitHubConnectionId, GitHubConnectionLabel } from "./webhook-automation-test-fixtures.js";
-import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
-
-function createGitHubEventOption(input: {
-  eventType: string;
-  overrides?: Partial<WebhookAutomationEventOption>;
-}): WebhookAutomationEventOption {
-  const eventDefinition = GitHubCloudDefinition.supportedWebhookEvents?.find(
-    (candidate) => candidate.eventType === input.eventType,
-  );
-
-  if (eventDefinition === undefined) {
-    throw new Error(`Missing GitHub event definition for '${input.eventType}'.`);
-  }
-
-  return {
-    id: createWebhookAutomationTriggerId({
-      connectionId: GitHubConnectionId,
-      eventType: eventDefinition.eventType,
-    }),
-    eventType: eventDefinition.eventType,
-    connectionId: GitHubConnectionId,
-    connectionLabel: GitHubConnectionLabel,
-    label: eventDefinition.displayName,
-    ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
-    payloadReferences:
-      eventDefinition.payloadReferences === undefined
-        ? []
-        : eventDefinition.payloadReferences.map((payloadReference) => ({
-            path: [...payloadReference.path],
-            description: payloadReference.description,
-          })),
-    conversationKeyOptions:
-      eventDefinition.conversationKeyOptions === undefined
-        ? []
-        : [...eventDefinition.conversationKeyOptions],
-    parameters:
-      eventDefinition.parameters === undefined
-        ? []
-        : eventDefinition.parameters.map((parameter) =>
-            parameter.kind === "resource-select"
-              ? {
-                  id: parameter.id,
-                  label: parameter.label,
-                  kind: parameter.kind,
-                  resourceKind: parameter.resourceKind,
-                  payloadPath: [...parameter.payloadPath],
-                  ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-                  ...(parameter.placeholder === undefined
-                    ? {}
-                    : { placeholder: parameter.placeholder }),
-                }
-              : parameter.kind === "enum-select"
-                ? {
-                    id: parameter.id,
-                    label: parameter.label,
-                    kind: parameter.kind,
-                    payloadPath: [...parameter.payloadPath],
-                    matchMode: parameter.matchMode,
-                    options: parameter.options.map((option) => ({
-                      value: option.value,
-                      label: option.label,
-                    })),
-                    ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-                    ...(parameter.placeholder === undefined
-                      ? {}
-                      : { placeholder: parameter.placeholder }),
-                  }
-                : {
-                    id: parameter.id,
-                    label: parameter.label,
-                    kind: parameter.kind,
-                    payloadPath: [...parameter.payloadPath],
-                    ...(parameter.matchMode === undefined
-                      ? {}
-                      : { matchMode: parameter.matchMode }),
-                    ...(parameter.defaultValue === undefined
-                      ? {}
-                      : { defaultValue: parameter.defaultValue }),
-                    ...(parameter.defaultEnabled === undefined
-                      ? {}
-                      : { defaultEnabled: parameter.defaultEnabled }),
-                    ...(parameter.controlVariant === undefined
-                      ? {}
-                      : { controlVariant: parameter.controlVariant }),
-                    ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-                    ...(parameter.placeholder === undefined
-                      ? {}
-                      : { placeholder: parameter.placeholder }),
-                  },
-          ),
-    ...input.overrides,
-  };
-}
+import { createGitHubEventOption } from "./webhook-automation-test-fixtures.js";
 
 describe("buildAgentInstructionTokenCatalog", () => {
   it("always includes shared runtime tokens", () => {

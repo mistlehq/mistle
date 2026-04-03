@@ -1,7 +1,7 @@
 import { GitHubCloudDefinition } from "@mistle/integrations-definitions";
 
 import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-types.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
+import { createWebhookAutomationEventOption } from "./webhook-automation-option-builders.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 import type {
   WebhookAutomationListEvent,
@@ -14,7 +14,7 @@ export const GitHubConnectionLabel = "GitHub Engineering";
 export const GitHubGroupedConnectionLabel = "GitHub - GitHub Engineering";
 export const RepoMaintainerSandboxProfileId = "sbp_01kkk1mbmxfetvga8kcmw612jj";
 
-function createGitHubEventOption(input: {
+export function createGitHubEventOption(input: {
   eventType: string;
   overrides?: Partial<WebhookAutomationEventOption>;
 }): WebhookAutomationEventOption {
@@ -27,87 +27,12 @@ function createGitHubEventOption(input: {
   }
 
   return {
-    id: createWebhookAutomationTriggerId({
+    ...createWebhookAutomationEventOption({
+      eventDefinition,
       connectionId: GitHubConnectionId,
-      eventType: eventDefinition.eventType,
+      connectionLabel: GitHubConnectionLabel,
+      logoKey: "github",
     }),
-    eventType: eventDefinition.eventType,
-    connectionId: GitHubConnectionId,
-    connectionLabel: GitHubConnectionLabel,
-    label: eventDefinition.displayName,
-    ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
-    logoKey: "github",
-    conversationKeyOptions:
-      eventDefinition.conversationKeyOptions === undefined
-        ? []
-        : eventDefinition.conversationKeyOptions.map((option) => ({
-            id: option.id,
-            label: option.label,
-            description: option.description,
-            template: option.template,
-          })),
-    payloadReferences:
-      eventDefinition.payloadReferences === undefined
-        ? []
-        : eventDefinition.payloadReferences.map((payloadReference) => ({
-            path: [...payloadReference.path],
-            description: payloadReference.description,
-          })),
-    parameters:
-      eventDefinition.parameters === undefined
-        ? []
-        : eventDefinition.parameters.map((parameter) =>
-            parameter.kind === "resource-select"
-              ? {
-                  id: parameter.id,
-                  label: parameter.label,
-                  kind: parameter.kind,
-                  resourceKind: parameter.resourceKind,
-                  payloadPath: [...parameter.payloadPath],
-                  ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-                  ...(parameter.placeholder === undefined
-                    ? {}
-                    : { placeholder: parameter.placeholder }),
-                }
-              : parameter.kind === "enum-select"
-                ? {
-                    id: parameter.id,
-                    label: parameter.label,
-                    kind: parameter.kind,
-                    payloadPath: [...parameter.payloadPath],
-                    matchMode: parameter.matchMode,
-                    options: parameter.options.map((option) => ({
-                      value: option.value,
-                      label: option.label,
-                    })),
-                    ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-                    ...(parameter.placeholder === undefined
-                      ? {}
-                      : { placeholder: parameter.placeholder }),
-                  }
-                : {
-                    id: parameter.id,
-                    label: parameter.label,
-                    kind: parameter.kind,
-                    payloadPath: [...parameter.payloadPath],
-                    ...(parameter.matchMode === undefined
-                      ? {}
-                      : { matchMode: parameter.matchMode }),
-                    ...(parameter.defaultValue === undefined
-                      ? {}
-                      : { defaultValue: parameter.defaultValue }),
-                    ...(parameter.defaultEnabled === undefined
-                      ? {}
-                      : { defaultEnabled: parameter.defaultEnabled }),
-                    ...(parameter.controlVariant === undefined
-                      ? {}
-                      : { controlVariant: parameter.controlVariant }),
-                    ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-                    ...(parameter.placeholder === undefined
-                      ? {}
-                      : { placeholder: parameter.placeholder }),
-                  },
-          ),
     ...input.overrides,
   };
 }
