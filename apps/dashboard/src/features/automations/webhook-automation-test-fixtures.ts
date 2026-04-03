@@ -1,3 +1,5 @@
+import { GitHubCloudDefinition } from "@mistle/integrations-definitions";
+
 import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-types.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
@@ -12,111 +14,103 @@ export const GitHubConnectionLabel = "GitHub Engineering";
 export const GitHubGroupedConnectionLabel = "GitHub - GitHub Engineering";
 export const RepoMaintainerSandboxProfileId = "sbp_01kkk1mbmxfetvga8kcmw612jj";
 
-const GitHubRepositoryConversationKeyOption = {
-  id: "repository",
-  label: "Repository",
-  description: "Events from the same repository go to the same conversation.",
-  template: "{{payload.repository.full_name}}",
-} as const;
+function createGitHubEventOption(input: {
+  eventType: string;
+  overrides?: Partial<WebhookAutomationEventOption>;
+}): WebhookAutomationEventOption {
+  const eventDefinition = GitHubCloudDefinition.supportedWebhookEvents?.find(
+    (candidate) => candidate.eventType === input.eventType,
+  );
 
-const GitHubIssueConversationKeyOption = {
-  id: "issue",
-  label: "Issue",
-  description: "Events from the same issue go to the same conversation.",
-  template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
-} as const;
+  if (eventDefinition === undefined) {
+    throw new Error(`Missing GitHub event definition for '${input.eventType}'.`);
+  }
 
-const GitHubPullRequestConversationKeyOption = {
-  id: "pull-request",
-  label: "Pull request",
-  description: "Events from the same pull request go to the same conversation.",
-  template: "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
-} as const;
-
-const GitHubPayloadReferences = {
-  REPOSITORY_FULL_NAME: {
-    path: ["repository", "full_name"],
-    description: "Repository owner and name",
-  },
-  ISSUE_NUMBER: {
-    path: ["issue", "number"],
-    description: "Issue number",
-  },
-  ISSUE_PULL_REQUEST: {
-    path: ["issue", "pull_request"],
-    description: "Present when the issue is a pull request",
-  },
-  COMMENT_BODY: {
-    path: ["comment", "body"],
-    description: "Comment text",
-  },
-  PULL_REQUEST_NUMBER: {
-    path: ["pull_request", "number"],
-    description: "Pull request number",
-  },
-  PULL_REQUEST_BODY: {
-    path: ["pull_request", "body"],
-    description: "Pull request description",
-  },
-  SENDER_LOGIN: {
-    path: ["sender", "login"],
-    description: "GitHub username of the sender",
-  },
-} as const;
-
-const GitHubExplicitCommentInvocationParameter = {
-  id: "explicitInvocation",
-  label: "explicit mention",
-  kind: "string",
-  payloadPath: ["comment", "body"],
-  matchMode: "contains_token",
-  defaultValue: "@mistlebot",
-  defaultEnabled: true,
-  controlVariant: "explicit-invocation",
-  placeholder: 'Require "@mistlebot"',
-} as const;
-
-const GitHubIssueCommentTargetParameter = {
-  id: "target",
-  label: "comment target",
-  kind: "enum-select",
-  payloadPath: ["issue", "pull_request"],
-  matchMode: "exists",
-  options: [
-    {
-      value: "exists",
-      label: "pull request",
-    },
-    {
-      value: "not_exists",
-      label: "issue",
-    },
-  ],
-  prefix: "in",
-  placeholder: "Any comment target",
-} as const;
-
-const GitHubExplicitPullRequestInvocationParameter = {
-  id: "explicitInvocation",
-  label: "explicit mention",
-  kind: "string",
-  payloadPath: ["pull_request", "body"],
-  matchMode: "contains_token",
-  defaultValue: "@mistlebot",
-  defaultEnabled: true,
-  controlVariant: "explicit-invocation",
-  placeholder: 'Require "@mistlebot"',
-} as const;
-
-const GitHubAuthorParameter = {
-  id: "author",
-  label: "author",
-  kind: "resource-select",
-  resourceKind: "user",
-  payloadPath: ["sender", "login"],
-  prefix: "by",
-  placeholder: "Any author",
-} as const;
+  return {
+    id: createWebhookAutomationTriggerId({
+      connectionId: GitHubConnectionId,
+      eventType: eventDefinition.eventType,
+    }),
+    eventType: eventDefinition.eventType,
+    connectionId: GitHubConnectionId,
+    connectionLabel: GitHubConnectionLabel,
+    label: eventDefinition.displayName,
+    ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
+    logoKey: "github",
+    conversationKeyOptions:
+      eventDefinition.conversationKeyOptions === undefined
+        ? []
+        : eventDefinition.conversationKeyOptions.map((option) => ({
+            id: option.id,
+            label: option.label,
+            description: option.description,
+            template: option.template,
+          })),
+    payloadReferences:
+      eventDefinition.payloadReferences === undefined
+        ? []
+        : eventDefinition.payloadReferences.map((payloadReference) => ({
+            path: [...payloadReference.path],
+            description: payloadReference.description,
+          })),
+    parameters:
+      eventDefinition.parameters === undefined
+        ? []
+        : eventDefinition.parameters.map((parameter) =>
+            parameter.kind === "resource-select"
+              ? {
+                  id: parameter.id,
+                  label: parameter.label,
+                  kind: parameter.kind,
+                  resourceKind: parameter.resourceKind,
+                  payloadPath: [...parameter.payloadPath],
+                  ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                  ...(parameter.placeholder === undefined
+                    ? {}
+                    : { placeholder: parameter.placeholder }),
+                }
+              : parameter.kind === "enum-select"
+                ? {
+                    id: parameter.id,
+                    label: parameter.label,
+                    kind: parameter.kind,
+                    payloadPath: [...parameter.payloadPath],
+                    matchMode: parameter.matchMode,
+                    options: parameter.options.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    })),
+                    ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                    ...(parameter.placeholder === undefined
+                      ? {}
+                      : { placeholder: parameter.placeholder }),
+                  }
+                : {
+                    id: parameter.id,
+                    label: parameter.label,
+                    kind: parameter.kind,
+                    payloadPath: [...parameter.payloadPath],
+                    ...(parameter.matchMode === undefined
+                      ? {}
+                      : { matchMode: parameter.matchMode }),
+                    ...(parameter.defaultValue === undefined
+                      ? {}
+                      : { defaultValue: parameter.defaultValue }),
+                    ...(parameter.defaultEnabled === undefined
+                      ? {}
+                      : { defaultEnabled: parameter.defaultEnabled }),
+                    ...(parameter.controlVariant === undefined
+                      ? {}
+                      : { controlVariant: parameter.controlVariant }),
+                    ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                    ...(parameter.placeholder === undefined
+                      ? {}
+                      : { placeholder: parameter.placeholder }),
+                  },
+          ),
+    ...input.overrides,
+  };
+}
 
 export function createWebhookAutomationListEvent(
   overrides?: Partial<WebhookAutomationListEvent>,
@@ -241,58 +235,17 @@ export function createRowLevelIssueWebhookAutomationListItemViewModel(): Webhook
 export function createGithubIssueCommentCreatedEventOption(
   overrides?: Partial<WebhookAutomationEventOption>,
 ): WebhookAutomationEventOption {
-  return {
-    id: createWebhookAutomationTriggerId({
-      connectionId: GitHubConnectionId,
-      eventType: "github.issue_comment.created",
-    }),
+  return createGitHubEventOption({
     eventType: "github.issue_comment.created",
-    connectionId: GitHubConnectionId,
-    connectionLabel: GitHubConnectionLabel,
-    label: "Issue comment created",
-    category: "Issues",
-    logoKey: "github",
-    conversationKeyOptions: [
-      GitHubIssueConversationKeyOption,
-      GitHubRepositoryConversationKeyOption,
-    ],
-    payloadReferences: [
-      GitHubPayloadReferences.REPOSITORY_FULL_NAME,
-      GitHubPayloadReferences.ISSUE_NUMBER,
-      GitHubPayloadReferences.ISSUE_PULL_REQUEST,
-      GitHubPayloadReferences.COMMENT_BODY,
-      GitHubPayloadReferences.SENDER_LOGIN,
-    ],
-    parameters: [GitHubExplicitCommentInvocationParameter, GitHubIssueCommentTargetParameter],
-    ...overrides,
-  };
+    ...(overrides === undefined ? {} : { overrides }),
+  });
 }
 
 export function createGithubPullRequestOpenedEventOption(
   overrides?: Partial<WebhookAutomationEventOption>,
 ): WebhookAutomationEventOption {
-  return {
-    id: createWebhookAutomationTriggerId({
-      connectionId: GitHubConnectionId,
-      eventType: "github.pull_request.opened",
-    }),
+  return createGitHubEventOption({
     eventType: "github.pull_request.opened",
-    connectionId: GitHubConnectionId,
-    connectionLabel: GitHubConnectionLabel,
-    label: "Pull request opened",
-    category: "Pull requests",
-    logoKey: "github",
-    conversationKeyOptions: [
-      GitHubPullRequestConversationKeyOption,
-      GitHubRepositoryConversationKeyOption,
-    ],
-    payloadReferences: [
-      GitHubPayloadReferences.REPOSITORY_FULL_NAME,
-      GitHubPayloadReferences.PULL_REQUEST_NUMBER,
-      GitHubPayloadReferences.PULL_REQUEST_BODY,
-      GitHubPayloadReferences.SENDER_LOGIN,
-    ],
-    parameters: [GitHubExplicitPullRequestInvocationParameter, GitHubAuthorParameter],
-    ...overrides,
-  };
+    ...(overrides === undefined ? {} : { overrides }),
+  });
 }
