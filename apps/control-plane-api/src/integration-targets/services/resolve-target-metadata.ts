@@ -3,7 +3,6 @@ import type {
   IntegrationConnectionMethodDefinition,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
-  IntegrationWebhookPayloadReference,
 } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 
@@ -132,32 +131,6 @@ function resolveConnectionMethod(
   };
 }
 
-function cloneWebhookEventParameters(
-  parameters: readonly IntegrationWebhookEventParameterDefinition[],
-): ResolvedWebhookEventParameter[] {
-  return parameters.map((parameter) => cloneWebhookEventParameter(parameter));
-}
-
-function cloneWebhookEventConversationKeyOptions(
-  options: NonNullable<IntegrationWebhookEventDefinition["conversationKeyOptions"]>,
-): NonNullable<ResolvedWebhookEvent["conversationKeyOptions"]> {
-  return options.map((option) => ({
-    id: option.id,
-    label: option.label,
-    description: option.description,
-    template: option.template,
-  }));
-}
-
-function cloneWebhookEventPayloadReferences(
-  payloadReferences: readonly IntegrationWebhookPayloadReference[],
-): NonNullable<ResolvedWebhookEvent["payloadReferences"]> {
-  return payloadReferences.map((payloadReference) => ({
-    path: [...payloadReference.path],
-    description: payloadReference.description,
-  }));
-}
-
 function cloneWebhookEventParameter(
   parameter: IntegrationWebhookEventParameterDefinition,
 ): ResolvedWebhookEventParameter {
@@ -214,19 +187,27 @@ function cloneWebhookEvents(
     ...(eventDefinition.payloadReferences === undefined
       ? {}
       : {
-          payloadReferences: cloneWebhookEventPayloadReferences(eventDefinition.payloadReferences),
+          payloadReferences: eventDefinition.payloadReferences.map((payloadReference) => ({
+            path: [...payloadReference.path],
+            description: payloadReference.description,
+          })),
         }),
     ...(eventDefinition.conversationKeyOptions === undefined
       ? {}
       : {
-          conversationKeyOptions: cloneWebhookEventConversationKeyOptions(
-            eventDefinition.conversationKeyOptions,
-          ),
+          conversationKeyOptions: eventDefinition.conversationKeyOptions.map((option) => ({
+            id: option.id,
+            label: option.label,
+            description: option.description,
+            template: option.template,
+          })),
         }),
     ...(eventDefinition.parameters === undefined
       ? {}
       : {
-          parameters: cloneWebhookEventParameters(eventDefinition.parameters),
+          parameters: eventDefinition.parameters.map((parameter) =>
+            cloneWebhookEventParameter(parameter),
+          ),
         }),
   }));
 }
