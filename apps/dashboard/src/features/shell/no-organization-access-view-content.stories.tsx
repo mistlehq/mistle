@@ -1,4 +1,3 @@
-import { Notice } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 
@@ -38,14 +37,6 @@ export const ValidationError: Story = {
   args: {
     organizationNameError: "Organization name is required.",
   },
-  render: (args) => (
-    <AuthPageShell maxWidthClass={AuthPageWidths.SM} title="Create an organization">
-      <div className="grid gap-4">
-        <Notice variant="alert">Organization name is required.</Notice>
-        <NoOrganizationAccessViewContent {...args} />
-      </div>
-    </AuthPageShell>
-  ),
   play: async ({ canvasElement }): Promise<void> => {
     const canvas = within(canvasElement);
     const input = canvas.getByPlaceholderText("Organization name");
