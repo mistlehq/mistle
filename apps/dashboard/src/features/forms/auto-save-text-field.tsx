@@ -148,6 +148,14 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
   }
 
   const showStatus = status !== "idle" || errorState !== null;
+  const liveMessage =
+    errorState !== null
+      ? ""
+      : status === "saving"
+        ? "Saving"
+        : status === "saved" || status === "saved-fading"
+          ? "Saved"
+          : "";
 
   return (
     <Field contentWidth="fill" orientation="horizontal">
@@ -158,6 +166,9 @@ export function AutoSaveTextField(input: AutoSaveTextFieldProps): React.JSX.Elem
         )}
       </FieldHeader>
       <FieldContent>
+        <p aria-live="polite" className="sr-only" role="status">
+          {liveMessage}
+        </p>
         <AutoSaveInputSurface
           ariaLabel={input.label}
           disabled={input.disabled === true || status === "saving"}

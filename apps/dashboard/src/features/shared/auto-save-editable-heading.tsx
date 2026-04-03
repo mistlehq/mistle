@@ -412,32 +412,46 @@ function useAutoSaveEditableHeadingState(input: AutoSaveEditableHeadingProps): {
 
 export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): React.JSX.Element {
   const heading = useAutoSaveEditableHeadingState(input);
+  const liveMessage =
+    heading.state.errorState !== null
+      ? ""
+      : heading.state.status === "saving"
+        ? "Saving"
+        : heading.state.status === "saved" || heading.state.status === "saved-fading"
+          ? "Saved"
+          : "";
+
   return (
-    <EditableHeading
-      ariaLabel={input.ariaLabel}
-      draftValue={heading.state.draftValue}
-      editButtonLabel={input.editButtonLabel}
-      errorMessage={heading.state.errorState?.message}
-      isEditing={heading.state.isEditing}
-      maxWidthClassName={input.maxWidthClassName}
-      onCancel={heading.onCancelEdit}
-      onCommit={() => {
-        void heading.onCommit();
-      }}
-      onDraftValueChange={heading.onChangeDraft}
-      onEditStart={heading.onEnterEditMode}
-      placeholder={input.placeholder}
-      disabled={input.disabled === true || heading.state.status === "saving"}
-      saveStatus={
-        heading.showStatus && heading.state.errorState === null ? heading.state.status : "idle"
-      }
-      value={heading.displayedHeadingValue}
-      {...(input.cancelOnEscape === undefined ? {} : { cancelOnEscape: input.cancelOnEscape })}
-      {...(input.headingClassName === undefined
-        ? {}
-        : { headingClassName: input.headingClassName })}
-      {...(input.headingTag === undefined ? {} : { headingTag: input.headingTag })}
-      {...(input.inputClassName === undefined ? {} : { inputClassName: input.inputClassName })}
-    />
+    <>
+      <p aria-live="polite" className="sr-only" role="status">
+        {liveMessage}
+      </p>
+      <EditableHeading
+        ariaLabel={input.ariaLabel}
+        draftValue={heading.state.draftValue}
+        editButtonLabel={input.editButtonLabel}
+        errorMessage={heading.state.errorState?.message}
+        isEditing={heading.state.isEditing}
+        maxWidthClassName={input.maxWidthClassName}
+        onCancel={heading.onCancelEdit}
+        onCommit={() => {
+          void heading.onCommit();
+        }}
+        onDraftValueChange={heading.onChangeDraft}
+        onEditStart={heading.onEnterEditMode}
+        placeholder={input.placeholder}
+        disabled={input.disabled === true || heading.state.status === "saving"}
+        saveStatus={
+          heading.showStatus && heading.state.errorState === null ? heading.state.status : "idle"
+        }
+        value={heading.displayedHeadingValue}
+        {...(input.cancelOnEscape === undefined ? {} : { cancelOnEscape: input.cancelOnEscape })}
+        {...(input.headingClassName === undefined
+          ? {}
+          : { headingClassName: input.headingClassName })}
+        {...(input.headingTag === undefined ? {} : { headingTag: input.headingTag })}
+        {...(input.inputClassName === undefined ? {} : { inputClassName: input.inputClassName })}
+      />
+    </>
   );
 }
