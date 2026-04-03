@@ -100,16 +100,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         }
         name={organizationQuery.data?.name ?? ""}
         onSaveChanges={async (name) => {
-          try {
-            await saveAction.run(name.trim());
-          } catch (error) {
-            throw new Error(
-              resolveApiErrorMessage({
-                error,
-                fallbackMessage: "Could not update organization settings.",
-              }),
-            );
-          }
+          await saveAction.run(name.trim());
         }}
       />
     </FormPageFrame>

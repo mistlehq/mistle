@@ -184,6 +184,7 @@ export function useIntegrationConnectionEditors(input: {
                 ...current,
                 [connectionId]: undefined,
               }));
+              updateConnectionNameAction.clearError();
 
               try {
                 await updateConnectionNameAction.run({
@@ -191,16 +192,18 @@ export function useIntegrationConnectionEditors(input: {
                   displayName: draftValue,
                 });
               } catch (error) {
-                const errorMessage = resolveApiErrorMessage({
-                  error,
-                  fallbackMessage: "Could not update connection.",
-                });
+                const errorMessage =
+                  error instanceof Error ? error.message : updateConnectionNameAction.errorMessage;
 
                 setConnectionNameErrorMessageById((current) => ({
                   ...current,
-                  [connectionId]: errorMessage,
+                  [connectionId]: errorMessage ?? undefined,
                 }));
-                throw new Error(errorMessage);
+                if (error instanceof Error) {
+                  throw error;
+                }
+
+                throw error;
               }
             },
           },

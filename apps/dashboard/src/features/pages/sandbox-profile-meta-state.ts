@@ -137,16 +137,7 @@ export function useEditSandboxProfileMetaState(input: EditInput): {
         return;
       }
 
-      try {
-        await updateAction.run(normalizedDisplayName);
-      } catch (error) {
-        throw new Error(
-          resolveApiErrorMessage({
-            error,
-            fallbackMessage: "Could not update sandbox profile.",
-          }),
-        );
-      }
+      await updateAction.run(normalizedDisplayName);
     },
   };
 }

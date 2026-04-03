@@ -36,10 +36,11 @@ describe("useAutoSaveAction", () => {
 
     expect(savedValues).toEqual(["updated name"]);
     expect(sideEffects).toEqual(["after:updated name"]);
+    expect(result.current.errorMessage).toBeNull();
     expect(result.current.isSaving).toBe(false);
   });
 
-  it("surfaces save errors and does not run success side effects", async () => {
+  it("surfaces save errors, stores the message, and does not run success side effects", async () => {
     const queryClient = createTestQueryClient();
     const sideEffects: string[] = [];
 
@@ -66,7 +67,43 @@ describe("useAutoSaveAction", () => {
       }),
     ).rejects.toThrow("save failed");
     expect(sideEffects).toEqual([]);
+    await waitFor(() => {
+      expect(result.current.errorMessage).toBe("save failed");
+    });
     expect(result.current.isSaving).toBe(false);
+  });
+
+  it("clears stored errors when requested", async () => {
+    const queryClient = createTestQueryClient();
+
+    const { result } = renderHook(
+      () =>
+        useAutoSaveAction({
+          save: async () => {
+            throw new Error("save failed");
+          },
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await expect(
+      act(async () => {
+        await result.current.run("updated name");
+      }),
+    ).rejects.toThrow("save failed");
+    await waitFor(() => {
+      expect(result.current.errorMessage).toBe("save failed");
+    });
+
+    act(() => {
+      result.current.clearError();
+    });
+
+    expect(result.current.errorMessage).toBeNull();
   });
 
   it("reports saving state while the mutation is in flight", async () => {
@@ -101,6 +138,59 @@ describe("useAutoSaveAction", () => {
     });
     await waitFor(() => {
       expect(result.current.isSaving).toBe(false);
+    });
+  });
+
+  it("does not invent a fallback error message by default", async () => {
+    const queryClient = createTestQueryClient();
+
+    const { result } = renderHook(
+      () =>
+        useAutoSaveAction({
+          save: async () => {
+            throw {};
+          },
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await expect(
+      act(async () => {
+        await result.current.run("updated name");
+      }),
+    ).rejects.toEqual({});
+    expect(result.current.errorMessage).toBeNull();
+  });
+
+  it("uses an explicit fallback message when one is provided", async () => {
+    const queryClient = createTestQueryClient();
+
+    const { result } = renderHook(
+      () =>
+        useAutoSaveAction({
+          fallbackMessage: "Could not save changes.",
+          save: async () => {
+            throw {};
+          },
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await expect(
+      act(async () => {
+        await result.current.run("updated name");
+      }),
+    ).rejects.toThrow("Could not save changes.");
+    await waitFor(() => {
+      expect(result.current.errorMessage).toBe("Could not save changes.");
     });
   });
 });

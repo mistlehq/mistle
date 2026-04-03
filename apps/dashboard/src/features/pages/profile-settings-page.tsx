@@ -1,6 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
 
-import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { updateProfileDisplayName } from "../settings/profile/profile-service.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
@@ -35,16 +34,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
         displayName={persistedDisplayName}
         email={session.user.email}
         onSaveChanges={async (displayNameDraft) => {
-          try {
-            await saveAction.run(displayNameDraft.trim());
-          } catch (error) {
-            throw new Error(
-              resolveApiErrorMessage({
-                error,
-                fallbackMessage: "Could not update profile.",
-              }),
-            );
-          }
+          await saveAction.run(displayNameDraft.trim());
         }}
         saving={saveAction.isSaving}
       />
