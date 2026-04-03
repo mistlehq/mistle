@@ -86,6 +86,11 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
   return (
     <FormPageFrame description={description} title={title}>
       <OrganizationGeneralSettingsPageView
+        key={
+          organizationQuery.data === undefined
+            ? `loading:${organizationId}`
+            : `${organizationId}:${organizationQuery.data.slug}`
+        }
         isLoading={organizationQuery.isPending}
         isSaving={saveMutation.isPending}
         loadErrorMessage={
