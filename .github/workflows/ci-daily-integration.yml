@@ -70,7 +70,7 @@ jobs:
           secret-path: /integration-tests
 
       - name: Generate integration config
-        run: nix develop --command pnpm run config:init:integration
+        run: nix develop --command bash -lc "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
       - name: Run daily integration suite in Nix shell
         env:

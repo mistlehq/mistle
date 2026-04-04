@@ -33,6 +33,17 @@ token_secret = "fixture-egress-token-secret"
 token_issuer = "data-plane-worker"
 token_audience = "tokenizer-proxy"
 
+[global.sandbox.publish]
+base_domain = "mistle.example.test"
+
+[global.sandbox.publish.access]
+token_secret = "fixture-publish-token-secret"
+token_issuer = "control-plane-api"
+token_audience = "data-plane-gateway"
+
+[global.sandbox.publish.session]
+cookie_signing_secret = "fixture-publish-cookie-secret"
+
 [global.sandbox]
 provider = "docker"
 default_base_image = "127.0.0.1:5001/mistle/sandbox-base:dev"

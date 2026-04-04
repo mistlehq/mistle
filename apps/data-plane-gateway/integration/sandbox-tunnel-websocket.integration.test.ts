@@ -12,6 +12,7 @@ import {
   decodeDataFrame,
   encodeDataFrame,
   parseStreamControlMessage,
+  parseTelemetryControlMessage,
   PayloadKindRawBytes,
   PayloadKindWebSocketBinary,
   PayloadKindWebSocketText,
@@ -42,6 +43,19 @@ function parseStreamMessage(data: string | Buffer): StreamControlMessage {
   const parsedPayload = parseStreamControlMessage(data);
   if (parsedPayload === undefined) {
     throw new Error("Expected websocket message payload to be a valid stream control message.");
+  }
+
+  return parsedPayload;
+}
+
+function parseTelemetryMessage(data: string | Buffer) {
+  if (typeof data !== "string") {
+    throw new Error("Expected websocket message data to be a string.");
+  }
+
+  const parsedPayload = parseTelemetryControlMessage(data);
+  if (parsedPayload === undefined) {
+    throw new Error("Expected websocket message payload to be a valid telemetry control message.");
   }
 
   return parsedPayload;
@@ -162,7 +176,7 @@ describe("sandbox tunnel websocket integration", () => {
   );
 
   it(
-    "responds to the bootstrap peer when an interactive data frame is not bound",
+    "responds to the bootstrap peer when telemetry data arrives before a telemetry stream is opened",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -215,11 +229,11 @@ describe("sandbox tunnel websocket integration", () => {
         const bootstrapReset = await bootstrapResetPromise;
 
         expect(bootstrapReset.isBinary).toBe(false);
-        expect(parseStreamMessage(bootstrapReset.data)).toEqual({
-          type: "stream.reset",
+        expect(parseTelemetryMessage(bootstrapReset.data)).toEqual({
+          type: "telemetry.reset",
           streamId: 1,
-          code: "interactive_stream_not_found",
-          message: "Interactive stream is not bound on this tunnel session.",
+          code: "telemetry_stream_not_found",
+          message: "Telemetry stream 1 is not open on this bootstrap session.",
         });
         await clientNoMessagePromise;
       } finally {

@@ -52,6 +52,12 @@ function createGatewayEnvironment(input: {
     MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_SECRET: "integration-egress-token-secret",
     MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_ISSUER: "integration-data-plane-worker",
     MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE: "integration-tokenizer-proxy",
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_BASE_DOMAIN: "mistle.example.test",
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: "integration-publish-token-secret",
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER: "integration-control-plane-api",
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE: IntegrationBootstrapTokenAudience,
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET:
+      "integration-publish-cookie-secret",
     MISTLE_APPS_DATA_PLANE_GATEWAY_HOST: host,
     MISTLE_APPS_DATA_PLANE_GATEWAY_PORT: String(input.port),
     MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL: input.databaseUrl,
