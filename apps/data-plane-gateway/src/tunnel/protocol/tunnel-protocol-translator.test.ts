@@ -547,6 +547,27 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
+  it("keeps bootstrap keepalive state messages local to the gateway", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: JSON.stringify({
+          type: "keepalive.state",
+          ttlMs: 30_000,
+          active: true,
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "drop",
+      },
+    });
+  });
+
   it("responds with a reset and releases the binding when connection binary data is invalid for the channel", async () => {
     const { router, translator } = await createTranslatorHarness();
 

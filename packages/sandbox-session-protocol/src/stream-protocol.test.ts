@@ -343,6 +343,22 @@ describe("stream control message parser", () => {
     });
   });
 
+  it("parses bootstrap keepalive state messages", () => {
+    expect(
+      parseBootstrapControlMessage(
+        JSON.stringify({
+          type: "keepalive.state",
+          ttlMs: 30_000,
+          active: true,
+        }),
+      ),
+    ).toEqual({
+      type: "keepalive.state",
+      ttlMs: 30_000,
+      active: true,
+    });
+  });
+
   it("keeps stream and bootstrap control parsers scoped correctly", () => {
     const leaseCreatePayload = JSON.stringify({
       type: "lease.create",
@@ -362,6 +378,30 @@ describe("stream control message parser", () => {
         source: "codex",
       },
     });
+
+    expect(
+      parseBootstrapControlMessage(
+        JSON.stringify({
+          type: "keepalive.state",
+          ttlMs: 30_000,
+          active: false,
+        }),
+      ),
+    ).toEqual({
+      type: "keepalive.state",
+      ttlMs: 30_000,
+      active: false,
+    });
+
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
+          type: "keepalive.state",
+          ttlMs: 30_000,
+          active: false,
+        }),
+      ),
+    ).toBeUndefined();
 
     expect(
       parseBootstrapControlMessage(

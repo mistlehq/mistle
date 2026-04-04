@@ -294,6 +294,10 @@ function assertBootstrapControlMessageAllowed(message: BootstrapControlMessage):
     return;
   }
 
+  if (message.type === "keepalive.state") {
+    return;
+  }
+
   if (isBootstrapStreamControlMessageAllowed(message)) {
     return;
   }
@@ -562,12 +566,18 @@ export class TunnelProtocolTranslator {
       throw new TunnelProtocolViolationError(createUnsupportedTextPayloadErrorMessage("bootstrap"));
     }
     assertBootstrapControlMessageAllowed(controlMessage);
-    if (controlMessage.type === "lease.create" || controlMessage.type === "lease.renew") {
+    if (
+      controlMessage.type === "lease.create" ||
+      controlMessage.type === "lease.renew" ||
+      controlMessage.type === "keepalive.state"
+    ) {
       return createTranslation({
         delivery: {
           kind: "drop",
         },
-        executionLeaseControlMessage: controlMessage,
+        ...(controlMessage.type === "keepalive.state"
+          ? {}
+          : { executionLeaseControlMessage: controlMessage }),
       });
     }
 

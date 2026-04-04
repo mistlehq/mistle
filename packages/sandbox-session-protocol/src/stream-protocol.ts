@@ -192,6 +192,12 @@ const LeaseRenewSchema = z.object({
   leaseId: NonEmptyStringSchema,
 });
 
+const SandboxKeepaliveStateSchema = z.object({
+  type: z.literal("keepalive.state"),
+  ttlMs: PositiveIntegerSchema,
+  active: z.boolean(),
+});
+
 const LiveListenerOwnerSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("sandbox-runtime"),
@@ -360,6 +366,7 @@ const BootstrapControlMessageSchema = z.discriminatedUnion("type", [
   StreamWindowSchema,
   TelemetryOpenSchema,
   TelemetryCloseSchema,
+  SandboxKeepaliveStateSchema,
   LeaseCreateSchema,
   LeaseRenewSchema,
 ]);
