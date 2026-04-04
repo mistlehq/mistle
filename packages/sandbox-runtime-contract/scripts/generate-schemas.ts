@@ -36,39 +36,8 @@ const SchemaOutputs = [
   },
 ] as const;
 
-function isPrimitiveJsonValue(value: unknown): value is string | number | boolean | null {
-  return value === null || ["string", "number", "boolean"].includes(typeof value);
-}
-
-function formatJsonValue(value: unknown, indentLevel = 0): string {
-  if (isPrimitiveJsonValue(value)) {
-    return JSON.stringify(value);
-  }
-
-  if (Array.isArray(value)) {
-    if (value.every(isPrimitiveJsonValue)) {
-      return `[${value.map((item) => JSON.stringify(item)).join(", ")}]`;
-    }
-
-    const childIndent = "  ".repeat(indentLevel + 1);
-    const currentIndent = "  ".repeat(indentLevel);
-    const entries = value.map((item) => `${childIndent}${formatJsonValue(item, indentLevel + 1)}`);
-
-    return `[\n${entries.join(",\n")}\n${currentIndent}]`;
-  }
-
-  const currentIndent = "  ".repeat(indentLevel);
-  const childIndent = "  ".repeat(indentLevel + 1);
-  const entries = Object.entries(value as Record<string, unknown>).map(
-    ([key, entryValue]) =>
-      `${childIndent}${JSON.stringify(key)}: ${formatJsonValue(entryValue, indentLevel + 1)}`,
-  );
-
-  return `{\n${entries.join(",\n")}\n${currentIndent}}`;
-}
-
 await Promise.all(
   SchemaOutputs.map(({ outputPath, schema }) =>
-    writeFile(outputPath, `${formatJsonValue(schema)}\n`),
+    writeFile(outputPath, `${JSON.stringify(schema, null, 2)}\n`),
   ),
 );
