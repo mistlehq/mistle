@@ -1,5 +1,7 @@
 use std::fmt;
 
+pub mod protocol;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SandboxdCommand {
     Serve,
@@ -33,9 +35,7 @@ impl fmt::Display for ParseSandboxdCommandError {
 
 impl std::error::Error for ParseSandboxdCommandError {}
 
-pub fn parse_sandboxd_command<I, S>(
-    args: I,
-) -> Result<SandboxdCommand, ParseSandboxdCommandError>
+pub fn parse_sandboxd_command<I, S>(args: I) -> Result<SandboxdCommand, ParseSandboxdCommandError>
 where
     I: IntoIterator<Item = S>,
     S: Into<String>,
