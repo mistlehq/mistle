@@ -96,6 +96,7 @@ async function buildWorkspaceDependencies() {
     "@mistle/integrations-core",
     "@mistle/integrations-definitions",
     "@mistle/sandbox-rs-napi",
+    "@mistle/sandbox-runtime-contract",
     "@mistle/sandbox-session-client",
     "@mistle/sandbox-session-protocol",
     "@mistle/time",
