@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { MemoryRouter } from "react-router";
 
+import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybook/decorators.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import { SessionsPage } from "./sessions-page.js";
@@ -33,22 +33,19 @@ function SessionsPageStory(input: SessionsPageStoryArgs): React.JSX.Element {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <div className="mx-auto w-full max-w-6xl px-6 py-8">
-          <SessionsPage />
-        </div>
-      </MemoryRouter>
+      <SessionsPage />
     </QueryClientProvider>
   );
 }
 
 const meta = {
-  title: "Dashboard/Pages/SessionsPage",
+  title: "Dashboard/Sessions/Page",
   component: SessionsPageStory,
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",
   },
+  decorators: [withDashboardPageStory, withDashboardMemoryRouter],
   args: {
     launchableProfiles: [
       buildStoryLaunchableSandboxProfile({

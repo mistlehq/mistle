@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import { noop } from "../chat/components/chat-story-support.js";
 import {
   SessionComposerFixturePropsForLoadingModel,
@@ -27,7 +28,7 @@ type SessionWorkbenchPageViewStoryArgs = React.ComponentProps<typeof SessionWork
 };
 
 const meta = {
-  title: "Dashboard/Pages/SessionWorkbenchPageView",
+  title: "Dashboard/Sessions/SessionWorkbench/PageView",
   component: SessionWorkbenchPageView,
   tags: ["autodocs"],
   parameters: {
@@ -49,6 +50,7 @@ const meta = {
     },
   },
   decorators: [
+    withDashboardWorkspaceStory,
     function StoryDecorator(Story, context): React.JSX.Element {
       return (
         <SessionWorkbenchStoryChrome headerStatusUi={context.args.headerStatusUi}>

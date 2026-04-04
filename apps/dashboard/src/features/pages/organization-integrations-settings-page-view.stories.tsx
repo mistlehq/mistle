@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardPageWidth } from "../../storybook/decorators.js";
+import { withDashboardPageStory } from "../../storybook/decorators.js";
 import {
   OrganizationIntegrationsSettingsPageView,
   type OrganizationIntegrationsSettingsPageCard,
@@ -58,9 +58,9 @@ const AvailableCards: readonly OrganizationIntegrationsSettingsPageCard[] = [
 ] as const;
 
 const meta = {
-  title: "Dashboard/Pages/OrganizationIntegrationsSettingsPageView",
+  title: "Dashboard/Settings/OrganizationIntegrations/PageView",
   component: OrganizationIntegrationsSettingsPageView,
-  decorators: [withDashboardPageWidth],
+  decorators: [withDashboardPageStory],
   args: {
     availableCards: AvailableCards,
     connectedCards: ConnectedCards,

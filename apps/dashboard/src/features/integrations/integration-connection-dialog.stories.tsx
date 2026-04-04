@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import {
   IntegrationConnectionDialog,
   IntegrationConnectionMethodIds,
@@ -43,9 +43,9 @@ const redirectCreateDialog: IntegrationConnectionDialogState = {
 };
 
 const meta = {
-  title: "Dashboard/Integrations/IntegrationConnectionDialog",
+  title: "Dashboard/Integrations/Connection/Dialog",
   component: IntegrationConnectionDialog,
-  decorators: [withDashboardCenteredSurface],
+  decorators: [withDashboardCenteredStory],
   parameters: {
     layout: "fullscreen",
   },

@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { DeleteIntegrationConnectionDialog } from "./delete-integration-connection-dialog.js";
 
 const meta = {
-  title: "Dashboard/Integrations/DeleteIntegrationConnectionDialog",
+  title: "Dashboard/Integrations/Connection/DeleteDialog",
   component: DeleteIntegrationConnectionDialog,
-  decorators: [withDashboardCenteredSurface],
+  decorators: [withDashboardCenteredStory],
   parameters: {
     layout: "fullscreen",
   },

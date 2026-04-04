@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { DeleteWebhookAutomationDialog } from "./delete-webhook-automation-dialog.js";
 
 const meta = {
-  title: "Dashboard/Automations/DeleteWebhookAutomationDialog",
+  title: "Dashboard/Automations/WebhookAutomation/DeleteDialog",
   component: DeleteWebhookAutomationDialog,
-  decorators: [withDashboardCenteredSurface],
+  decorators: [withDashboardCenteredStory],
   parameters: {
     layout: "fullscreen",
   },

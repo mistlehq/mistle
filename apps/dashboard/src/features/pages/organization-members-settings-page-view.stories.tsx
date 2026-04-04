@@ -4,7 +4,7 @@ import { useState } from "react";
 import type React from "react";
 import { expect, userEvent, within } from "storybook/test";
 
-import { withDashboardPageWidth } from "../../storybook/decorators.js";
+import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { RoleChangeDialogState } from "../settings/members/members-capability-policy.js";
 import type { MembersDirectoryInvitationActionState } from "../settings/members/members-directory-model.js";
 import { OrganizationMembersSettingsPageView } from "./organization-members-settings-page-view.js";
@@ -14,10 +14,10 @@ import {
 } from "./organization-members-settings-page-view.story-fixtures.js";
 
 const meta = {
-  title: "Dashboard/Pages/OrganizationMembersSettingsPageView",
+  title: "Dashboard/Settings/OrganizationMembers/PageView",
   component: OrganizationMembersSettingsPageView,
   decorators: [
-    withDashboardPageWidth,
+    withDashboardPageStory,
     function HeaderDecorator(Story, context): React.JSX.Element {
       const args = context.args;
 

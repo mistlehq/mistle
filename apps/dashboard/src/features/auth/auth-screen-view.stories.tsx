@@ -1,14 +1,14 @@
 import { Separator } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardMemoryRouter } from "../../storybook/decorators.js";
+import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybook/decorators.js";
 import { AuthScreenView } from "./auth-screen-view.js";
 import { GoogleSignInButton } from "./google-sign-in-button.js";
 
 const meta = {
-  title: "Dashboard/Auth/AuthScreenView",
+  title: "Dashboard/Auth/ScreenView",
   component: AuthScreenView,
-  decorators: [withDashboardMemoryRouter],
+  decorators: [withDashboardPageStory, withDashboardMemoryRouter],
   parameters: {
     layout: "fullscreen",
   },

@@ -1,6 +1,7 @@
 import { Badge } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import {
   resolveSandboxStatusBadgeUi,
   type WorkbenchSandboxLifecycleStatus,
@@ -32,15 +33,16 @@ function SandboxStatusBadgePreview(input: {
 }
 
 const meta = {
-  title: "Dashboard/Pages/SandboxStatusPresentation",
+  title: "Dashboard/Sessions/SessionWorkbench/StatusPresentation",
   component: SandboxStatusBadgePreview,
   tags: ["autodocs"],
   args: {
     statuses: ["pending", "starting", "running", "stopped", "failed", "resuming", null],
   },
   parameters: {
-    layout: "centered",
+    layout: "fullscreen",
   },
+  decorators: [withDashboardWorkspaceStory],
 } satisfies Meta<typeof SandboxStatusBadgePreview>;
 
 export default meta;

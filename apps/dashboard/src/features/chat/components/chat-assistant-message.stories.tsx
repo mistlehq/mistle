@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ChatAssistantMessage } from "./chat-assistant-message.js";
 
 const meta = {
-  title: "Dashboard/Chat/ChatAssistantMessage",
+  title: "Dashboard/Chat/AssistantMessage",
   component: ChatAssistantMessage,
   tags: ["autodocs"],
   parameters: {

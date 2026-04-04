@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardPageWidth } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { SandboxIntegrationBindingKinds } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { SandboxProfileBindingCard } from "./sandbox-profile-binding-card.js";
 import type {
@@ -40,9 +40,9 @@ const Row: SandboxProfileBindingEditorRow = {
 };
 
 const meta = {
-  title: "Dashboard/Pages/SandboxProfileBindingCard",
+  title: "Dashboard/SandboxProfiles/Integrations/BindingCard",
   component: SandboxProfileBindingCard,
-  decorators: [withDashboardPageWidth],
+  decorators: [withDashboardCenteredStory],
   args: {
     availableConnections: AvailableConnections,
     availableTargets: AvailableTargets,

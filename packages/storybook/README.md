@@ -20,6 +20,22 @@ This package hosts the single Storybook for the Mistle monorepo.
 - Do not story components that require auth, session bootstrapping, React Query wiring, live service clients, runtime env setup, or more than trivial `MemoryRouter` support.
 - If a component is worth storying but depends on runtime state, split out a view component first.
 
+## Dashboard Story Naming
+
+- Use top-level dashboard product areas in alphabetical order.
+- Add a feature subgroup only when it improves finding related stories.
+- Use leaf names that describe the surface type instead of repeating the product area name.
+- Prefer `PageView` for prop-driven presentational page stories.
+- Reserve `Page` for runtime or container-shaped page stories.
+- Prefer consistent surface suffixes such as `Dialog`, `Panel`, `Section`, `Field`, `ListView`, `DetailView`, and `Tile`.
+
+## Dashboard Story Decorators
+
+- Use `withDashboardCenteredStory` for isolated component previews such as dialogs, cards, tiles, fields, and other intentionally staged surfaces.
+- Use `withDashboardPageStory` for document-flow pages. This decorator should not add fake width, padding, or centering that changes perceived page layout.
+- Use `withDashboardWorkspaceStory` for viewport-managed app surfaces such as session workbenches and split-pane shells.
+- Let the real component or shell own layout spacing. Decorators should provide Storybook-safe framing, not substitute for production layout.
+
 ## Placement
 
 - Use `*.stories.tsx`.

@@ -8,7 +8,7 @@ import { ChatCommandBlock } from "./chat-command-block.js";
 import { noopRespondToServerRequest } from "./chat-story-support.js";
 
 const meta = {
-  title: "Dashboard/Chat/ChatCommandBlock",
+  title: "Dashboard/Chat/CommandBlock",
   component: ChatCommandBlock,
   tags: ["autodocs"],
   parameters: {

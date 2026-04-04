@@ -20,7 +20,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import type React from "react";
 
-import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import type { IntegrationFormContext } from "./integration-form-context.js";
 import { IntegrationFormWithoutSubmit } from "./integration-form-theme.js";
 import { RepositoryItems } from "./integration-resource-string-array-widget-story-support.js";
@@ -62,15 +62,15 @@ function RjsfExampleForm(input: {
 }
 
 function ComparisonBlock(input: {
+  caseTitle: string;
   description: string;
   manual: React.ReactNode;
   rjsf: React.ReactNode;
-  title: string;
 }): React.JSX.Element {
   return (
     <section className="gap-4 flex flex-col">
       <div className="gap-1 flex flex-col">
-        <h2 className="text-base font-semibold">{input.title}</h2>
+        <h2 className="text-base font-semibold">{input.caseTitle}</h2>
         <p className="text-muted-foreground text-sm">{input.description}</p>
       </div>
       <div className="gap-6 grid md:grid-cols-2">
@@ -88,10 +88,10 @@ function ComparisonBlock(input: {
 }
 
 type ComparisonCase = {
+  caseTitle: string;
   description: string;
   manual: React.ReactNode;
   rjsf: React.ReactNode;
-  title: string;
 };
 
 function createReadyState(items: typeof RepositoryItems): IntegrationResourceListViewState {
@@ -488,35 +488,35 @@ function RjsfLayoutComparisonStory(input: { caseItem?: ComparisonCase }): React.
               "Hidden schema-only fields should stay invisible while visible text and password rows match the hand-built field system.",
             manual: <ManualTextAndPasswordFields />,
             rjsf: <RjsfTextAndPasswordFields />,
-            title: "Text, Password, and Hidden Fields",
+            caseTitle: "Text, Password, and Hidden Fields",
           },
           {
             description:
               "Baseline horizontal row composition. Tune the RJSF theme until label alignment, width behavior, and field spacing match the hand-built pattern.",
             manual: <ManualHorizontalField />,
             rjsf: <RjsfHorizontalField />,
-            title: "Horizontal Field",
+            caseTitle: "Horizontal Field",
           },
           {
             description:
               "Mixed layout pattern: compact rows remain horizontal while large text areas become stacked. This is the RJSF equivalent of how forms like Create Automation mix orientations.",
             manual: <ManualMixedLayout />,
             rjsf: <RjsfMixedLayout />,
-            title: "Mixed Layout",
+            caseTitle: "Mixed Layout",
           },
           {
             description:
               "Checkbox-array handling should stay visually aligned with grouped manual controls.",
             manual: <ManualCheckboxGroup />,
             rjsf: <RjsfCheckboxGroup />,
-            title: "Checkbox Group",
+            caseTitle: "Checkbox Group",
           },
           {
             description:
               "The resource picker is a custom RJSF widget. Keep its standalone view and schema-driven rendering aligned.",
             manual: <ManualResourcePicker />,
             rjsf: <RjsfResourcePicker />,
-            title: "Resource Picker",
+            caseTitle: "Resource Picker",
           },
         ]
       : [input.caseItem];
@@ -540,10 +540,10 @@ function RjsfLayoutComparisonStory(input: { caseItem?: ComparisonCase }): React.
       {comparisonCases.map((caseItem) => (
         <ComparisonBlock
           description={caseItem.description}
-          key={caseItem.title}
+          key={caseItem.caseTitle}
           manual={caseItem.manual}
           rjsf={caseItem.rjsf}
-          title={caseItem.title}
+          caseTitle={caseItem.caseTitle}
         />
       ))}
     </div>
@@ -551,9 +551,9 @@ function RjsfLayoutComparisonStory(input: { caseItem?: ComparisonCase }): React.
 }
 
 const meta = {
-  title: "Dashboard/RJSF/LayoutComparison",
+  title: "Dashboard/Forms/RjsfLayoutComparison",
   component: RjsfLayoutComparisonStory,
-  decorators: [withDashboardCenteredSurface],
+  decorators: [withDashboardCenteredStory],
   parameters: {
     layout: "fullscreen",
   },
@@ -578,7 +578,7 @@ export const TextPasswordAndHiddenFields: Story = {
             "Hidden schema-only fields should stay invisible while visible text and password rows match the hand-built field system.",
           manual: <ManualTextAndPasswordFields />,
           rjsf: <RjsfTextAndPasswordFields />,
-          title: "Text, Password, and Hidden Fields",
+          caseTitle: "Text, Password, and Hidden Fields",
         }}
       />
     );
@@ -594,7 +594,7 @@ export const HorizontalField: Story = {
             "Baseline horizontal row composition. Tune the RJSF theme until label alignment, width behavior, and field spacing match the hand-built pattern.",
           manual: <ManualHorizontalField />,
           rjsf: <RjsfHorizontalField />,
-          title: "Horizontal Field",
+          caseTitle: "Horizontal Field",
         }}
       />
     );
@@ -610,7 +610,7 @@ export const MixedLayout: Story = {
             "Mixed layout pattern: compact rows remain horizontal while large text areas become stacked. This is the RJSF equivalent of how forms like Create Automation mix orientations.",
           manual: <ManualMixedLayout />,
           rjsf: <RjsfMixedLayout />,
-          title: "Mixed Layout",
+          caseTitle: "Mixed Layout",
         }}
       />
     );
@@ -626,7 +626,7 @@ export const CheckboxGroup: Story = {
             "Checkbox-array handling should stay visually aligned with grouped manual controls.",
           manual: <ManualCheckboxGroup />,
           rjsf: <RjsfCheckboxGroup />,
-          title: "Checkbox Group",
+          caseTitle: "Checkbox Group",
         }}
       />
     );
@@ -642,7 +642,7 @@ export const ResourcePicker: Story = {
             "The resource picker is a custom RJSF widget. Keep its standalone view and schema-driven rendering aligned.",
           manual: <ManualResourcePicker />,
           rjsf: <RjsfResourcePicker />,
-          title: "Resource Picker",
+          caseTitle: "Resource Picker",
         }}
       />
     );

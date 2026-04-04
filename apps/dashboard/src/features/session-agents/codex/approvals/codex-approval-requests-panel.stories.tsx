@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { withDashboardWorkspaceStory } from "../../../../storybook/decorators.js";
 import { noopRespondToServerRequest } from "../../../chat/components/chat-story-support.js";
 import {
   createCodexFixturePanelEntriesWithResponseErrors,
@@ -8,12 +9,13 @@ import {
 import { CodexApprovalRequestsPanel } from "./codex-approval-requests-panel.js";
 
 const meta = {
-  title: "Dashboard/Codex/CodexApprovalRequestsPanel",
+  title: "Dashboard/Sessions/SessionWorkbench/ApprovalRequestsPanel",
   component: CodexApprovalRequestsPanel,
   tags: ["autodocs"],
   parameters: {
-    layout: "padded",
+    layout: "fullscreen",
   },
+  decorators: [withDashboardWorkspaceStory],
   args: {
     entries: CodexFixturePanelEntries,
     isRespondingToServerRequest: false,

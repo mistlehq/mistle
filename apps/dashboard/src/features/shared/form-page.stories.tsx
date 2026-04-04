@@ -9,7 +9,7 @@ import {
 } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "./form-page.js";
 import { FormPageFrame } from "./page-frame.js";
 
@@ -48,7 +48,7 @@ function FormPageStoryPreview(): React.JSX.Element {
 const meta = {
   title: "Dashboard/Forms/FormPage",
   component: FormPageStoryPreview,
-  decorators: [withDashboardCenteredSurface],
+  decorators: [withDashboardCenteredStory],
   parameters: {
     layout: "fullscreen",
   },

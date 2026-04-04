@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
 
-import { withDashboardPageWidth } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
 import { useIntegrationResourceStringArrayWidgetStoryState } from "./integration-resource-string-array-widget-story-harness.js";
 import { RepositoryItems } from "./integration-resource-string-array-widget-story-support.js";
@@ -18,9 +18,9 @@ function createReadyState(
 }
 
 const meta = {
-  title: "Dashboard/RJSF/IntegrationResourceStringArrayWidgetView",
+  title: "Dashboard/Forms/IntegrationResourceStringArrayWidgetView",
   component: IntegrationResourceStringArrayWidgetView,
-  decorators: [withDashboardPageWidth],
+  decorators: [withDashboardCenteredStory],
   args: {
     id: "storybook-repositories",
     label: "Repositories",

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import {
   CodexFixtureChatThreadEntriesWithStructuredPlan,
   CodexFixtureChatThreadEntriesWithThinkingGroup,
@@ -19,7 +20,7 @@ import {
 import { SessionConversationMainContent } from "./session-conversation-pane.js";
 import {
   createStorySessionBottomPanel,
-  renderSessionWorkbenchStory,
+  renderSessionWorkbenchContentStory,
   StorySessionConversationPaneArgs,
   type SessionConversationStoryArgs,
 } from "./session-story-support.js";
@@ -32,7 +33,7 @@ const baseArgs = {
 };
 
 const meta = {
-  title: "Dashboard/Pages/SessionConversationPane",
+  title: "Dashboard/Sessions/SessionWorkbench/ConversationPane",
   component: SessionConversationMainContent,
   tags: ["autodocs"],
   parameters: {
@@ -40,8 +41,9 @@ const meta = {
   },
   args: baseArgs,
   decorators: [
+    withDashboardWorkspaceStory,
     function StoryDecorator(Story, context): React.JSX.Element {
-      return renderSessionWorkbenchStory({
+      return renderSessionWorkbenchContentStory({
         mainContent: <Story />,
         primaryBottomPanel: createStorySessionBottomPanel(context.args),
       });

@@ -138,7 +138,7 @@ export function renderSessionWorkbenchStory(input: {
   );
 }
 
-export function SessionWorkbenchStoryChrome(input: {
+export function renderSessionWorkbenchStoryWithChrome(input: {
   children: React.ReactNode;
   headerStatusUi?: SandboxStatusBadgeUi;
 }): React.JSX.Element {
@@ -158,4 +158,29 @@ export function SessionWorkbenchStoryChrome(input: {
       <div className="h-[calc(100vh-3rem)]">{input.children}</div>
     </div>
   );
+}
+
+export function SessionWorkbenchStoryChrome(input: {
+  children: React.ReactNode;
+  headerStatusUi?: SandboxStatusBadgeUi;
+}): React.JSX.Element {
+  return renderSessionWorkbenchStoryWithChrome(input);
+}
+
+export function renderSessionWorkbenchContentStory(input: {
+  alerts?: readonly SessionWorkbenchAlert[];
+  headerStatusUi?: SandboxStatusBadgeUi;
+  isSecondaryPanelVisible?: boolean;
+  mainContent: React.ReactNode;
+  mainContentLayout?: React.ComponentProps<typeof SessionWorkbenchPageView>["mainContentLayout"];
+  onSecondaryPanelResize?: (size: number) => void;
+  primaryBottomPanel: React.ReactNode;
+  secondaryPanel?: React.ReactNode;
+  secondaryPanelSize?: number;
+  sandboxInstanceId?: string | null;
+}): React.JSX.Element {
+  return renderSessionWorkbenchStoryWithChrome({
+    ...(input.headerStatusUi === undefined ? {} : { headerStatusUi: input.headerStatusUi }),
+    children: renderSessionWorkbenchStory(input),
+  });
 }

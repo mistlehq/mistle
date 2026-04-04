@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardPageWidth } from "../../storybook/decorators.js";
+import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
 const meta = {
-  title: "Dashboard/Pages/ProfileSettingsPageView",
+  title: "Dashboard/Settings/Profile/PageView",
   component: ProfileSettingsPageView,
-  decorators: [withDashboardPageWidth],
+  decorators: [withDashboardPageStory],
   args: {
     displayName: "Mistle Developer",
     email: "developer@mistle.so",

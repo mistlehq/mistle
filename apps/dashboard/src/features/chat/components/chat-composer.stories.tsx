@@ -17,7 +17,7 @@ import {
 } from "./chat-story-support.js";
 
 const meta = {
-  title: "Dashboard/Chat/ChatComposer",
+  title: "Dashboard/Chat/Composer",
   component: ChatComposer,
   tags: ["autodocs"],
   parameters: {

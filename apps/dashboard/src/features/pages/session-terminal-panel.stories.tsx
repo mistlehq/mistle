@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useMemo, useState } from "react";
 
+import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import { type UseSandboxPtyStateResult } from "../sessions/use-sandbox-pty-state.js";
 import {
   createStorySessionBottomPanel,
   createStorySessionMainContent,
-  renderSessionWorkbenchStory,
-  SessionWorkbenchStoryChrome,
+  renderSessionWorkbenchContentStory,
   StorySandboxInstanceId,
 } from "./session-story-support.js";
 import { SessionTerminalPanel } from "./session-terminal-panel.js";
@@ -100,47 +100,44 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
     };
   }, [errorMessage, lifecycleState, outputChunks]);
 
-  return (
-    <SessionWorkbenchStoryChrome>
-      {renderSessionWorkbenchStory({
-        alerts: [],
-        isSecondaryPanelVisible: isTerminalVisible,
-        mainContent: createStorySessionMainContent(),
-        onSecondaryPanelResize: setPanelSize,
-        primaryBottomPanel: createStorySessionBottomPanel(),
-        secondaryPanel: (
-          <SessionTerminalPanel
-            isResumingSandbox={false}
-            isConnectionReady={true}
-            isVisible={isTerminalVisible}
-            onHide={() => {
-              setIsTerminalVisible(false);
-            }}
-            onDisconnectTerminal={() => {
-              setIsTerminalVisible(false);
-            }}
-            onRequestSandboxResume={async () => {
-              return;
-            }}
-            ptyState={ptyState}
-            sandboxStatus="running"
-            sandboxInstanceId={StorySandboxInstanceId}
-          />
-        ),
-        secondaryPanelSize: panelSize,
-        sandboxInstanceId: StorySandboxInstanceId,
-      })}
-    </SessionWorkbenchStoryChrome>
-  );
+  return renderSessionWorkbenchContentStory({
+    alerts: [],
+    isSecondaryPanelVisible: isTerminalVisible,
+    mainContent: createStorySessionMainContent(),
+    onSecondaryPanelResize: setPanelSize,
+    primaryBottomPanel: createStorySessionBottomPanel(),
+    secondaryPanel: (
+      <SessionTerminalPanel
+        isResumingSandbox={false}
+        isConnectionReady={true}
+        isVisible={isTerminalVisible}
+        onHide={() => {
+          setIsTerminalVisible(false);
+        }}
+        onDisconnectTerminal={() => {
+          setIsTerminalVisible(false);
+        }}
+        onRequestSandboxResume={async () => {
+          return;
+        }}
+        ptyState={ptyState}
+        sandboxStatus="running"
+        sandboxInstanceId={StorySandboxInstanceId}
+      />
+    ),
+    secondaryPanelSize: panelSize,
+    sandboxInstanceId: StorySandboxInstanceId,
+  });
 }
 
 const meta = {
-  title: "Dashboard/Pages/SessionTerminalPanel",
+  title: "Dashboard/Sessions/SessionWorkbench/TerminalPanel",
   component: StoryTerminalWorkbench,
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",
   },
+  decorators: [withDashboardWorkspaceStory],
   args: {
     initialErrorMessage: null,
     initialOutput: "",

@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { withDashboardPageWidth } from "../../storybook/decorators.js";
+import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { FormPageFrame } from "../shared/page-frame.js";
 import {
@@ -465,9 +465,9 @@ function StoryHarness(input: {
 }
 
 const meta = {
-  title: "Dashboard/Automations/WebhookAutomationForm",
+  title: "Dashboard/Automations/WebhookAutomation/Form",
   component: StoryHarness,
-  decorators: [withDashboardPageWidth],
+  decorators: [withDashboardPageStory],
   parameters: {
     layout: "fullscreen",
   },

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { WebhookAutomationListView } from "./webhook-automation-list-view.js";
 import {
   createDefaultWebhookAutomationListStoryItems,
@@ -12,9 +12,9 @@ const UnavailableSavedEventItem = SampleItems[2];
 const RowLevelIssueItem = createRowLevelIssueWebhookAutomationListItemViewModel();
 
 const meta = {
-  title: "Dashboard/Automations/WebhookAutomationListView",
+  title: "Dashboard/Automations/WebhookAutomation/ListView",
   component: WebhookAutomationListView,
-  decorators: [withDashboardCenteredSurface],
+  decorators: [withDashboardCenteredStory],
   parameters: {
     layout: "fullscreen",
   },

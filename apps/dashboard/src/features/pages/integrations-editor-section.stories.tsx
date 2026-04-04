@@ -3,7 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import type React from "react";
 
-import { withDashboardPageWidth } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import {
   createIntegrationsEditorSectionStoryQueryClient,
   StoryGithubConnection,
@@ -77,8 +77,8 @@ function IntegrationsEditorSectionStory(): React.JSX.Element {
 }
 
 const meta = {
-  title: "Dashboard/Pages/IntegrationsEditorSection",
-  decorators: [withDashboardPageWidth],
+  title: "Dashboard/SandboxProfiles/Integrations/EditorSection",
+  decorators: [withDashboardCenteredStory],
 } satisfies Meta;
 
 export default meta;

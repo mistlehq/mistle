@@ -1,7 +1,7 @@
 import type { Decorator } from "@storybook/react-vite";
 import { MemoryRouter } from "react-router";
 
-export const withDashboardCenteredSurface: Decorator = (Story): React.JSX.Element => {
+export const withDashboardCenteredStory: Decorator = (Story): React.JSX.Element => {
   return (
     <div className="from-background to-muted/20 min-h-screen bg-linear-to-b px-6 py-8">
       <div className="mx-auto max-w-5xl">
@@ -11,9 +11,17 @@ export const withDashboardCenteredSurface: Decorator = (Story): React.JSX.Elemen
   );
 };
 
-export const withDashboardPageWidth: Decorator = (Story): React.JSX.Element => {
+export const withDashboardPageStory: Decorator = (Story): React.JSX.Element => {
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6">
+    <div className="min-h-screen bg-background">
+      <Story />
+    </div>
+  );
+};
+
+export const withDashboardWorkspaceStory: Decorator = (Story): React.JSX.Element => {
+  return (
+    <div className="h-screen overflow-hidden bg-background">
       <Story />
     </div>
   );

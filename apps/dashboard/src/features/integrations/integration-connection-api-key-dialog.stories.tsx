@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { IntegrationConnectionApiKeyDialog } from "./integration-connection-api-key-dialog.js";
 
 const meta = {
-  title: "Dashboard/Integrations/IntegrationConnectionApiKeyDialog",
+  title: "Dashboard/Integrations/Connection/ApiKeyDialog",
   component: IntegrationConnectionApiKeyDialog,
-  decorators: [withDashboardCenteredSurface],
+  decorators: [withDashboardCenteredStory],
   parameters: {
     layout: "fullscreen",
   },

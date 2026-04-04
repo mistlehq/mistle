@@ -3,7 +3,7 @@ import { useState } from "react";
 import type React from "react";
 import { expect, userEvent, within } from "storybook/test";
 
-import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { IntegrationConnectionDetailView } from "./integration-connection-detail-view.js";
 import {
   createDetailViewStoryProps,
@@ -12,9 +12,9 @@ import {
 } from "./integration-story-harness.js";
 
 const meta = {
-  title: "Dashboard/Integrations/IntegrationConnectionDetailView",
+  title: "Dashboard/Integrations/Connection/DetailView",
   component: IntegrationConnectionDetailView,
-  decorators: [withDashboardCenteredSurface],
+  decorators: [withDashboardCenteredStory],
   args: {
     ...createDetailViewStoryProps(),
     onEditApiKey: () => {},

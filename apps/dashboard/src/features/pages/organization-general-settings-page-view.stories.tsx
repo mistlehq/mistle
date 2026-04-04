@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardPageWidth } from "../../storybook/decorators.js";
+import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { OrganizationGeneralSettingsPageView } from "./organization-general-settings-page-view.js";
 
 const meta = {
-  title: "Dashboard/Pages/OrganizationGeneralSettingsPageView",
+  title: "Dashboard/Settings/OrganizationGeneral/PageView",
   component: OrganizationGeneralSettingsPageView,
-  decorators: [withDashboardPageWidth],
+  decorators: [withDashboardPageStory],
   args: {
     isLoading: false,
     isSaving: false,

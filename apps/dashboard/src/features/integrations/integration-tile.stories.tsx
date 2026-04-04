@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { IntegrationTile } from "./integration-tile.js";
 
 const meta = {
-  title: "Dashboard/Integrations/IntegrationTile",
+  title: "Dashboard/Integrations/Tile",
   component: IntegrationTile,
   tags: ["autodocs"],
   parameters: {

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 
-import { withDashboardCenteredSurface } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import {
   ListSearchFilterToolbar,
   type ListSearchFilterToolbarOption,
@@ -45,7 +45,7 @@ function InteractiveToolbar(args: InteractiveToolbarProps): React.JSX.Element {
 const meta = {
   title: "Dashboard/Shared/ListSearchFilterToolbar",
   component: InteractiveToolbar,
-  decorators: [withDashboardCenteredSurface],
+  decorators: [withDashboardCenteredStory],
   parameters: {
     layout: "fullscreen",
   },

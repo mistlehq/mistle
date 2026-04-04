@@ -11,7 +11,7 @@ import {
 import { ChatSemanticGroup } from "./chat-semantic-group.js";
 
 const meta = {
-  title: "Dashboard/Chat/ChatSemanticGroup",
+  title: "Dashboard/Chat/SemanticGroup",
   component: ChatSemanticGroup,
   tags: ["autodocs"],
   args: {

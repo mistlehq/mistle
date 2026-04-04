@@ -11,7 +11,7 @@ import {
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 
-import { withDashboardPageWidth } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
 import {
   AgentInstructionsNoTriggerHelpText,
@@ -180,7 +180,7 @@ function PlaygroundHarness(): React.JSX.Element {
 const meta = {
   title: "Dashboard/Automations/AgentInstructionsEditor",
   component: StoryHarness,
-  decorators: [withDashboardPageWidth],
+  decorators: [withDashboardCenteredStory],
 } satisfies Meta<typeof StoryHarness>;
 
 export default meta;

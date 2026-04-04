@@ -17,7 +17,7 @@ const BaseArgs = {
 } satisfies Omit<React.ComponentProps<typeof ChatThread>, "entries">;
 
 const meta = {
-  title: "Dashboard/Chat/ChatThread",
+  title: "Dashboard/Chat/Thread",
   component: ChatThread,
   tags: ["autodocs"],
   parameters: {

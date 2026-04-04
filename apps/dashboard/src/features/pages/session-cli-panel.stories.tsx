@@ -2,13 +2,13 @@ import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useMemo, useState } from "react";
 
+import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import type { UseSandboxPtyStateResult } from "../sessions/use-sandbox-pty-state.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
   createStoryLongCliOutput,
   createStoryPtyChunks,
-  renderSessionWorkbenchStory,
-  SessionWorkbenchStoryChrome,
+  renderSessionWorkbenchContentStory,
   StorySandboxInstanceId,
 } from "./session-story-support.js";
 
@@ -87,25 +87,22 @@ function StoryCliWorkbench(input: CliStoryScenario): React.JSX.Element {
     };
   }, [errorMessage, lifecycleState, outputChunks]);
 
-  return (
-    <SessionWorkbenchStoryChrome>
-      {renderSessionWorkbenchStory({
-        mainContentLayout: { scroll: "contained", width: "full" },
-        mainContent: <SessionCliPanel ptyState={ptyState} />,
-        primaryBottomPanel: null,
-        sandboxInstanceId: StorySandboxInstanceId,
-      })}
-    </SessionWorkbenchStoryChrome>
-  );
+  return renderSessionWorkbenchContentStory({
+    mainContentLayout: { scroll: "contained", width: "full" },
+    mainContent: <SessionCliPanel ptyState={ptyState} />,
+    primaryBottomPanel: null,
+    sandboxInstanceId: StorySandboxInstanceId,
+  });
 }
 
 const meta = {
-  title: "Dashboard/Pages/SessionCliPanel",
+  title: "Dashboard/Sessions/SessionWorkbench/CliPanel",
   component: StoryCliWorkbench,
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",
   },
+  decorators: [withDashboardWorkspaceStory],
   args: {
     initialErrorMessage: null,
     initialOutput: "",

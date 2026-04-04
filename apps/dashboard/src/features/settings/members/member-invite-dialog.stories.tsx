@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardCenteredSurface } from "../../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../../storybook/decorators.js";
 import { MemberInviteDialog } from "./member-invite-dialog.js";
 
 const meta = {
-  title: "Dashboard/Settings/MemberInviteDialog",
+  title: "Dashboard/Settings/OrganizationMembers/InviteDialog",
   component: MemberInviteDialog,
-  decorators: [withDashboardCenteredSurface],
+  decorators: [withDashboardCenteredStory],
   parameters: {
     layout: "fullscreen",
   },

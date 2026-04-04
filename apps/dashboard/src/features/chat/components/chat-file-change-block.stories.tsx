@@ -8,7 +8,7 @@ import { ChatFileChangeBlock } from "./chat-file-change-block.js";
 import { noopRespondToServerRequest } from "./chat-story-support.js";
 
 const meta = {
-  title: "Dashboard/Chat/ChatFileChangeBlock",
+  title: "Dashboard/Chat/FileChangeBlock",
   component: ChatFileChangeBlock,
   tags: ["autodocs"],
   parameters: {

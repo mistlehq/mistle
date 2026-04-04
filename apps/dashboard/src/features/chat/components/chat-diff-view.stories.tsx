@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ChatDiffView } from "./chat-diff-view.js";
 
 const meta = {
-  title: "Dashboard/Chat/ChatDiffView",
+  title: "Dashboard/Chat/DiffView",
   component: ChatDiffView,
   tags: ["autodocs"],
   parameters: {
