@@ -23,6 +23,7 @@
             pkgs.cargo
             pkgs.rustfmt
             pkgs.clippy
+            pkgs.rust-analyzer
             pkgs.cloudflared
             pkgs.docker
             pkgs.git
@@ -32,6 +33,7 @@
 
           shellHook = ''
             export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+            export RUST_SRC_PATH=${pkgs.rustPlatform.rustLibSrc}
           '';
         };
       });
