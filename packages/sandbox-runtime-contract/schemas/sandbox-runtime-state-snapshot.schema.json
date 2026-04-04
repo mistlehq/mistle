@@ -40,13 +40,7 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "sandboxInstanceId",
-            "ownerLeaseId",
-            "nodeId",
-            "sessionId",
-            "attachedAtMs"
-          ],
+          "required": ["sandboxInstanceId", "ownerLeaseId", "nodeId", "sessionId", "attachedAtMs"],
           "additionalProperties": false
         },
         {
@@ -55,9 +49,6 @@
       ]
     }
   },
-  "required": [
-    "ownerLeaseId",
-    "attachment"
-  ],
+  "required": ["ownerLeaseId", "attachment"],
   "additionalProperties": false
 }

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 
 import { SandboxKeepaliveStateSchema } from "../src/keepalive.js";
@@ -40,4 +41,10 @@ await Promise.all(
   SchemaOutputs.map(({ outputPath, schema }) =>
     writeFile(outputPath, `${JSON.stringify(schema, null, 2)}\n`),
   ),
+);
+
+execFileSync(
+  "oxfmt",
+  SchemaOutputs.map(({ outputPath }) => outputPath.pathname),
+  { stdio: "inherit" },
 );
