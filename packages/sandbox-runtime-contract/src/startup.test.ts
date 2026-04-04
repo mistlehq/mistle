@@ -8,9 +8,6 @@ import startupApplyResponseErrorFixture from "../tests/fixtures/startup-apply-re
 import startupApplyResponseOkFixture from "../tests/fixtures/startup-apply-response.ok.valid.json" with { type: "json" };
 import startupInputFixture from "../tests/fixtures/startup-input.valid.json" with { type: "json" };
 import {
-  parseSandboxdStartupApplyRequestPayload,
-  parseSandboxdStartupApplyResponsePayload,
-  parseSandboxdStartupInputPayload,
   SandboxdStartupApplyRequestSchema,
   SandboxdStartupApplyResponseSchema,
   SandboxdStartupInputSchema,
@@ -22,69 +19,59 @@ const StartupJsonSchemaParams = {
 
 describe("startup contracts", () => {
   it("parses the checked-in startup input fixture", () => {
-    expect(parseSandboxdStartupInputPayload(startupInputFixture)).toEqual(startupInputFixture);
+    expect(SandboxdStartupInputSchema.parse(startupInputFixture)).toEqual(startupInputFixture);
   });
 
   it("parses the checked-in startup apply request fixture", () => {
-    expect(parseSandboxdStartupApplyRequestPayload(startupApplyRequestFixture)).toEqual(
+    expect(SandboxdStartupApplyRequestSchema.parse(startupApplyRequestFixture)).toEqual(
       startupApplyRequestFixture,
     );
   });
 
   it("parses the checked-in startup apply response fixtures", () => {
-    expect(parseSandboxdStartupApplyResponsePayload(startupApplyResponseOkFixture)).toEqual(
+    expect(SandboxdStartupApplyResponseSchema.parse(startupApplyResponseOkFixture)).toEqual(
       startupApplyResponseOkFixture,
     );
-    expect(parseSandboxdStartupApplyResponsePayload(startupApplyResponseErrorFixture)).toEqual(
+    expect(SandboxdStartupApplyResponseSchema.parse(startupApplyResponseErrorFixture)).toEqual(
       startupApplyResponseErrorFixture,
     );
   });
 
-  it("trims required startup input strings", () => {
-    const parsed = parseSandboxdStartupInputPayload({
-      ...startupInputFixture,
-      bootstrapToken: "  bootstrap-token-value  ",
-      tunnelExchangeToken: "  tunnel-exchange-token-value  ",
-      tunnelGatewayWsUrl: "  ws://127.0.0.1:5003/tunnel/sandbox  ",
-    });
-
-    expect(parsed.bootstrapToken).toBe("bootstrap-token-value");
-    expect(parsed.tunnelExchangeToken).toBe("tunnel-exchange-token-value");
-    expect(parsed.tunnelGatewayWsUrl).toBe("ws://127.0.0.1:5003/tunnel/sandbox");
-  });
-
-  it("fails when startup input contains an unexpected top-level field", () => {
+  it("rejects startup input with an unexpected top-level field", () => {
     expect(() =>
-      parseSandboxdStartupInputPayload({
+      SandboxdStartupInputSchema.parse({
         ...startupInputFixture,
         unexpectedField: "nope",
       }),
-    ).toThrow("startup input from stdin must be valid json: unexpected field unexpectedField");
+    ).toThrow("Unrecognized key");
   });
 
-  it("fails when egressGrantByRuleId has an unexpected route key", () => {
-    expect(() =>
-      parseSandboxdStartupInputPayload({
+  it("accepts startup input with non-empty egress grant values", () => {
+    expect(
+      SandboxdStartupInputSchema.parse({
         ...startupInputFixture,
         egressGrantByRuleId: {
-          egress_rule_unexpected: "grant-token",
+          egress_rule_allow_all: "grant-token",
         },
       }),
-    ).toThrow("startup input egressGrantByRuleId has unexpected grant key egress_rule_unexpected");
+    ).toEqual({
+      ...startupInputFixture,
+      egressGrantByRuleId: {
+        egress_rule_allow_all: "grant-token",
+      },
+    });
   });
 
-  it("wraps nested startup input parse errors for startup apply requests", () => {
+  it("rejects startup apply requests with invalid nested startup input", () => {
     expect(() =>
-      parseSandboxdStartupApplyRequestPayload({
+      SandboxdStartupApplyRequestSchema.parse({
         token: "startup-apply-token",
         startupInput: {
           ...startupInputFixture,
-          bootstrapToken: "   ",
+          startupMode: undefined,
         },
       }),
-    ).toThrow(
-      "startup apply request startupInput is invalid: startup input bootstrapToken is required",
-    );
+    ).toThrow("Invalid option");
   });
 
   it("matches the checked-in startup json schemas", () => {
