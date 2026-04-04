@@ -2,7 +2,6 @@ import {
   insertCompletionText,
   type Completion,
   type CompletionContext,
-  type CompletionResult,
 } from "@codemirror/autocomplete";
 import type { EditorView } from "@codemirror/view";
 
@@ -119,7 +118,7 @@ export function completeAgentInstructionToken(
   input: {
     tokens: readonly AgentInstructionsEditorToken[];
   },
-): CompletionResult | null {
+) {
   const resolvedContext = resolveTemplateTokenContext({
     documentText: context.state.doc.toString(),
     cursorOffset: context.pos,
