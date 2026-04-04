@@ -40,4 +40,9 @@ export interface SandboxPresenceStore {
    * Returns whether at least one live presence lease exists for the sandbox.
    */
   hasAnyActiveLease(input: { sandboxInstanceId: string; nowMs: number }): Promise<boolean>;
+
+  /**
+   * Returns the number of live presence leases for the sandbox.
+   */
+  countActiveLeases(input: { sandboxInstanceId: string; nowMs: number }): Promise<number>;
 }

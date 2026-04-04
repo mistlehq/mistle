@@ -13,7 +13,8 @@ const DataPlaneInternalAuthHeader = "x-mistle-service-token";
  *
  * This adapter always authenticates with the shared internal service token. The
  * gateway owns the runtime-state backend choice, so worker callers never branch
- * on `memory` versus `valkey`.
+ * on `memory` versus `valkey`. Snapshots include owner/attachment and
+ * presence/keepalive summaries.
  */
 export class GatewayHttpSandboxRuntimeStateReader implements SandboxRuntimeStateReader {
   public constructor(

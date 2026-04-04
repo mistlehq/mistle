@@ -1,5 +1,7 @@
 import type { Clock } from "@mistle/time";
 
+import type { SandboxActivityStore } from "../../runtime-state/sandbox-activity-store.js";
+import type { SandboxPresenceStore } from "../../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../../runtime-state/sandbox-runtime-attachment-store.js";
 import type { SandboxOwnerStore } from "../../tunnel/ownership/sandbox-owner-store.js";
 import type { DataPlaneGatewayApp } from "../../types.js";
@@ -11,6 +13,8 @@ type RegisterSandboxRuntimeStateRouteInput = {
   app: DataPlaneGatewayApp;
   clock: Clock;
   internalAuthServiceToken: string;
+  sandboxActivityStore: SandboxActivityStore;
+  sandboxPresenceStore: SandboxPresenceStore;
   sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
   sandboxOwnerStore: SandboxOwnerStore;
 };
@@ -20,7 +24,8 @@ type RegisterSandboxRuntimeStateRouteInput = {
  *
  * This route is authenticated with the shared internal service token and
  * The gateway remains the sole owner of runtime-state backend selection, so
- * workers read owner and attachment state through this route regardless of
+ * workers read owner, attachment, presence, and keepalive summaries through
+ * this route regardless of
  * whether the gateway is running in `memory` or `valkey` mode.
  */
 export function registerSandboxRuntimeStateRoute(
@@ -52,18 +57,35 @@ export function registerSandboxRuntimeStateRoute(
       );
     }
 
-    const owner = await input.sandboxOwnerStore.getOwner({
-      sandboxInstanceId,
-    });
-    const attachment = await input.sandboxRuntimeAttachmentStore.getAttachment({
-      sandboxInstanceId,
-      nowMs: input.clock.nowMs(),
-    });
+    const nowMs = input.clock.nowMs();
+    const [owner, attachment, activePresenceCount, hasActiveKeepalive] = await Promise.all([
+      input.sandboxOwnerStore.getOwner({
+        sandboxInstanceId,
+      }),
+      input.sandboxRuntimeAttachmentStore.getAttachment({
+        sandboxInstanceId,
+        nowMs,
+      }),
+      input.sandboxPresenceStore.countActiveLeases({
+        sandboxInstanceId,
+        nowMs,
+      }),
+      input.sandboxActivityStore.hasAnyActiveLease({
+        sandboxInstanceId,
+        nowMs,
+      }),
+    ]);
 
     return ctx.json(
       {
         ownerLeaseId: owner?.leaseId ?? null,
         attachment,
+        presence: {
+          activeCount: activePresenceCount,
+        },
+        keepalive: {
+          active: hasActiveKeepalive,
+        },
       },
       200,
     );

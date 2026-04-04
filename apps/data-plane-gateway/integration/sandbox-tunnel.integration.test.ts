@@ -237,6 +237,12 @@ describe("sandbox tunnel connect endpoint integration", () => {
       expect(sandboxRuntimeState).toEqual({
         ownerLeaseId: null,
         attachment: null,
+        presence: {
+          activeCount: 0,
+        },
+        keepalive: {
+          active: false,
+        },
       });
     },
     IntegrationTestTimeoutMs,

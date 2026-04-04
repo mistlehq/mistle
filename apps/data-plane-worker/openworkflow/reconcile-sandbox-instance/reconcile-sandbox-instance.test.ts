@@ -10,6 +10,12 @@ describe("shouldExecuteSandboxDisconnectReconciliation", () => {
         snapshot: {
           ownerLeaseId: "sol_disconnect",
           attachment: null,
+          presence: {
+            activeCount: 0,
+          },
+          keepalive: {
+            active: false,
+          },
         },
       }),
     ).toBe(true);
@@ -20,6 +26,12 @@ describe("shouldExecuteSandboxDisconnectReconciliation", () => {
         snapshot: {
           ownerLeaseId: null,
           attachment: null,
+          presence: {
+            activeCount: 0,
+          },
+          keepalive: {
+            active: false,
+          },
         },
       }),
     ).toBe(true);
@@ -38,6 +50,12 @@ describe("shouldExecuteSandboxDisconnectReconciliation", () => {
             sessionId: "dts_disconnect",
             attachedAtMs: 1_000,
           },
+          presence: {
+            activeCount: 0,
+          },
+          keepalive: {
+            active: false,
+          },
         },
       }),
     ).toBe(false);
@@ -50,6 +68,12 @@ describe("shouldExecuteSandboxDisconnectReconciliation", () => {
         snapshot: {
           ownerLeaseId: "sol_new",
           attachment: null,
+          presence: {
+            activeCount: 0,
+          },
+          keepalive: {
+            active: false,
+          },
         },
       }),
     ).toBe(false);

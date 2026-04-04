@@ -32,6 +32,12 @@ describe("InMemorySandboxPresenceStore", () => {
       }),
     ).resolves.toBe(true);
     await expect(
+      store.countActiveLeases({
+        sandboxInstanceId: "sbi_abc",
+        nowMs: clock.nowMs(),
+      }),
+    ).resolves.toBe(2);
+    await expect(
       store.releaseLease({
         sandboxInstanceId: "sbi_abc",
         leaseId: "spl_first",
@@ -43,6 +49,12 @@ describe("InMemorySandboxPresenceStore", () => {
         nowMs: clock.nowMs(),
       }),
     ).resolves.toBe(true);
+    await expect(
+      store.countActiveLeases({
+        sandboxInstanceId: "sbi_abc",
+        nowMs: clock.nowMs(),
+      }),
+    ).resolves.toBe(1);
   });
 
   it("returns false after the final lease is released", async () => {
@@ -70,6 +82,12 @@ describe("InMemorySandboxPresenceStore", () => {
         nowMs: clock.nowMs(),
       }),
     ).resolves.toBe(false);
+    await expect(
+      store.countActiveLeases({
+        sandboxInstanceId: "sbi_abc",
+        nowMs: clock.nowMs(),
+      }),
+    ).resolves.toBe(0);
   });
 
   it("expires leases based on TTL", async () => {
@@ -93,5 +111,11 @@ describe("InMemorySandboxPresenceStore", () => {
         nowMs: clock.nowMs(),
       }),
     ).resolves.toBe(false);
+    await expect(
+      store.countActiveLeases({
+        sandboxInstanceId: "sbi_abc",
+        nowMs: clock.nowMs(),
+      }),
+    ).resolves.toBe(0);
   });
 });

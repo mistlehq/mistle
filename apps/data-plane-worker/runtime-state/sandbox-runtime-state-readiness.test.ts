@@ -14,6 +14,12 @@ describe("isSandboxRuntimeReady", () => {
           sessionId: "dts_ready",
           attachedAtMs: 1_000,
         },
+        presence: {
+          activeCount: 0,
+        },
+        keepalive: {
+          active: false,
+        },
       }),
     ).toBe(true);
   });
@@ -23,6 +29,12 @@ describe("isSandboxRuntimeReady", () => {
       isSandboxRuntimeReady({
         ownerLeaseId: null,
         attachment: null,
+        presence: {
+          activeCount: 0,
+        },
+        keepalive: {
+          active: false,
+        },
       }),
     ).toBe(false);
   });
@@ -32,6 +44,12 @@ describe("isSandboxRuntimeReady", () => {
       isSandboxRuntimeReady({
         ownerLeaseId: "dtl_missing_attachment",
         attachment: null,
+        presence: {
+          activeCount: 0,
+        },
+        keepalive: {
+          active: false,
+        },
       }),
     ).toBe(false);
   });
@@ -46,6 +64,12 @@ describe("isSandboxRuntimeReady", () => {
           nodeId: "dpg_fenced",
           sessionId: "dts_fenced",
           attachedAtMs: 1_000,
+        },
+        presence: {
+          activeCount: 0,
+        },
+        keepalive: {
+          active: false,
         },
       }),
     ).toBe(false);

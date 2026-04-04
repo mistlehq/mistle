@@ -227,6 +227,12 @@ describe("runtime-state store integrations", () => {
         }),
       ).resolves.toBe(true);
       await expect(
+        store.countActiveLeases({
+          sandboxInstanceId,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toBe(2);
+      await expect(
         store.releaseLease({
           sandboxInstanceId,
           leaseId: "spl_first",
@@ -238,6 +244,12 @@ describe("runtime-state store integrations", () => {
           nowMs: Date.now(),
         }),
       ).resolves.toBe(true);
+      await expect(
+        store.countActiveLeases({
+          sandboxInstanceId,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toBe(1);
 
       await systemSleeper.sleep(100);
 
@@ -247,6 +259,12 @@ describe("runtime-state store integrations", () => {
           nowMs: Date.now(),
         }),
       ).resolves.toBe(false);
+      await expect(
+        store.countActiveLeases({
+          sandboxInstanceId,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toBe(0);
     } finally {
       await deleteKeysByPrefix({
         client,

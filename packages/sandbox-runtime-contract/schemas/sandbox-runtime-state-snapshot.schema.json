@@ -47,8 +47,30 @@
           "type": "null"
         }
       ]
+    },
+    "presence": {
+      "type": "object",
+      "properties": {
+        "activeCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["activeCount"],
+      "additionalProperties": false
+    },
+    "keepalive": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "boolean"
+        }
+      },
+      "required": ["active"],
+      "additionalProperties": false
     }
   },
-  "required": ["ownerLeaseId", "attachment"],
+  "required": ["ownerLeaseId", "attachment", "presence", "keepalive"],
   "additionalProperties": false
 }

@@ -2,33 +2,21 @@ import { randomUUID } from "node:crypto";
 
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
+import {
+  SandboxRuntimeStateSnapshotSchema,
+  type SandboxRuntimeStateSnapshot,
+} from "@mistle/sandbox-runtime-contract";
 import { systemSleeper } from "@mistle/time";
 import { expect } from "vitest";
 import WebSocket from "ws";
-import { z } from "zod";
 
 import type { DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import { connectSandboxTunnelWebSocket } from "./websocket-test-helpers.js";
 
 export const RuntimeStateRouteTestTimeoutMs = 40_000;
 
-export const RuntimeStateSnapshotSchema = z
-  .object({
-    ownerLeaseId: z.string().min(1).nullable(),
-    attachment: z
-      .object({
-        sandboxInstanceId: z.string().min(1),
-        ownerLeaseId: z.string().min(1),
-        nodeId: z.string().min(1),
-        sessionId: z.string().min(1),
-        attachedAtMs: z.number().int().nonnegative(),
-      })
-      .strict()
-      .nullable(),
-  })
-  .strict();
-
-export type RuntimeStateSnapshot = z.infer<typeof RuntimeStateSnapshotSchema>;
+export const RuntimeStateSnapshotSchema = SandboxRuntimeStateSnapshotSchema;
+export type RuntimeStateSnapshot = SandboxRuntimeStateSnapshot;
 
 const RuntimeStateReadTimeoutMs = 5_000;
 const RuntimeStateReadPollIntervalMs = 50;

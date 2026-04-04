@@ -17,6 +17,12 @@ describe("shouldExecuteSandboxStop", () => {
             sessionId: "dts_idle",
             attachedAtMs: 1_000,
           },
+          presence: {
+            activeCount: 0,
+          },
+          keepalive: {
+            active: false,
+          },
         },
       }),
     ).toBe(true);
@@ -30,6 +36,12 @@ describe("shouldExecuteSandboxStop", () => {
         snapshot: {
           ownerLeaseId: "dtl_idle",
           attachment: null,
+          presence: {
+            activeCount: 0,
+          },
+          keepalive: {
+            active: false,
+          },
         },
       }),
     ).toBe(false);

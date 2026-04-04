@@ -132,6 +132,10 @@ export class ValkeySandboxPresenceStore implements SandboxPresenceStore {
   }
 
   async hasAnyActiveLease(input: { sandboxInstanceId: string; nowMs: number }): Promise<boolean> {
+    return (await this.countActiveLeases(input)) > 0;
+  }
+
+  async countActiveLeases(input: { sandboxInstanceId: string; nowMs: number }): Promise<number> {
     const indexKey = buildSandboxPresenceIndexKey({
       keyPrefix: this.keyPrefix,
       sandboxInstanceId: input.sandboxInstanceId,
@@ -139,7 +143,6 @@ export class ValkeySandboxPresenceStore implements SandboxPresenceStore {
 
     await this.client.zRemRangeByScore(indexKey, "-inf", input.nowMs);
 
-    const activeLeaseCount = await this.client.zCard(indexKey);
-    return activeLeaseCount > 0;
+    return await this.client.zCard(indexKey);
   }
 }

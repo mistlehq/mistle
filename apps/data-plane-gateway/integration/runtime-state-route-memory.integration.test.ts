@@ -58,6 +58,12 @@ describe("runtime state route integration (memory backend)", () => {
       expect(clearedSnapshot).toEqual({
         ownerLeaseId: null,
         attachment: null,
+        presence: {
+          activeCount: 0,
+        },
+        keepalive: {
+          active: false,
+        },
       });
     },
     RuntimeStateRouteTestTimeoutMs,

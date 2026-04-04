@@ -164,6 +164,8 @@ export function createDataPlaneGatewayRuntime(
     app,
     clock: systemClock,
     internalAuthServiceToken: config.internalAuth.serviceToken,
+    sandboxActivityStore,
+    sandboxPresenceStore,
     sandboxRuntimeAttachmentStore,
     sandboxOwnerStore,
   });

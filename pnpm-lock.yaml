@@ -456,6 +456,9 @@ importers:
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@mistle/sandbox-runtime-contract':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-runtime-contract
       '@mistle/sandbox-session-protocol':
         specifier: workspace:*
         version: link:../../packages/sandbox-session-protocol

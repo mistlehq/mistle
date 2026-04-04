@@ -62,6 +62,12 @@ describe("runtime state route integration", () => {
       expect(clearedSnapshot).toEqual({
         ownerLeaseId: null,
         attachment: null,
+        presence: {
+          activeCount: 0,
+        },
+        keepalive: {
+          active: false,
+        },
       });
     },
     RuntimeStateRouteTestTimeoutMs,
@@ -226,6 +232,12 @@ describe("runtime state route integration", () => {
       expect(clearedSnapshot).toEqual({
         ownerLeaseId: null,
         attachment: null,
+        presence: {
+          activeCount: 0,
+        },
+        keepalive: {
+          active: false,
+        },
       });
     },
     RuntimeStateRouteTestTimeoutMs,

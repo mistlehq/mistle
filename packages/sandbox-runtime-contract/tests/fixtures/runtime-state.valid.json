@@ -6,5 +6,11 @@
     "nodeId": "node_123",
     "sessionId": "session_123",
     "attachedAtMs": 1730910000
+  },
+  "presence": {
+    "activeCount": 1
+  },
+  "keepalive": {
+    "active": true
   }
 }

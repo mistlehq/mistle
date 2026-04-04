@@ -9,11 +9,12 @@ export type { SandboxRuntimeAttachment, SandboxRuntimeStateSnapshot };
  * Reads the latest gateway-owned runtime-state snapshot for one sandbox.
  *
  * Data-plane API uses this to compose user-facing sandbox status from durable
- * lifecycle state plus live gateway attachment state.
+ * lifecycle state plus live gateway owner/attachment and presence/keepalive
+ * summaries.
  */
 export interface SandboxRuntimeStateReader {
   /**
-   * Returns the current owner/attachment snapshot for one sandbox.
+   * Returns the current runtime-state snapshot for one sandbox.
    */
   readSnapshot(input: {
     sandboxInstanceId: string;

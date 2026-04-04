@@ -11,7 +11,8 @@ export type { SandboxRuntimeAttachment, SandboxRuntimeStateSnapshot };
  * Worker callers should not branch on the gateway's runtime-state storage
  * backend. The current implementation reads through an internal gateway HTTP
  * route, and later gateway-side backends may change without affecting worker
- * call sites.
+ * call sites. Snapshots include owner/attachment state plus presence and
+ * keepalive summaries.
  */
 export interface SandboxRuntimeStateReader {
   /**
