@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ownerLeaseId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "attachment": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "sandboxInstanceId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ownerLeaseId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "nodeId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sessionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "attachedAtMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": ["sandboxInstanceId", "ownerLeaseId", "nodeId", "sessionId", "attachedAtMs"],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": ["ownerLeaseId", "attachment"],
+  "additionalProperties": false
+}

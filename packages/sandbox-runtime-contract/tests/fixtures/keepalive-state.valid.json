@@ -1,0 +1,5 @@
+{
+  "type": "keepalive.state",
+  "ttlMs": 30000,
+  "active": true
+}

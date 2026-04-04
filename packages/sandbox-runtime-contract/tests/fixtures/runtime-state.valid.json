@@ -1,0 +1,10 @@
+{
+  "ownerLeaseId": "owner_123",
+  "attachment": {
+    "sandboxInstanceId": "sbi_123",
+    "ownerLeaseId": "owner_123",
+    "nodeId": "node_123",
+    "sessionId": "session_123",
+    "attachedAtMs": 1730910000
+  }
+}

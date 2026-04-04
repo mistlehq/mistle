@@ -871,6 +871,15 @@ importers:
         specifier: ^3.6.0
         version: 3.6.0(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@25.5.0)(node-addon-api@7.1.1)
 
+  packages/sandbox-runtime-contract:
+    dependencies:
+      '@mistle/integrations-core':
+        specifier: workspace:*
+        version: link:../integrations-core
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
+
   packages/sandbox-session-client:
     dependencies:
       '@mistle/sandbox-session-protocol':
