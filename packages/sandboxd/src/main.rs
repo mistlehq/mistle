@@ -1,6 +1,3 @@
 fn main() {
-    if let Err(error) = sandboxd::run(std::env::args().skip(1)) {
-        eprintln!("{error}");
-        std::process::exit(1);
-    }
+    std::process::exit(sandboxd::run_cli(std::env::args().skip(1)));
 }
