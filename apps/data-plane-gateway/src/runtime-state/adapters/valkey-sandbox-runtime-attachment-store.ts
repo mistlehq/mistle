@@ -69,54 +69,57 @@ export class ValkeySandboxRuntimeAttachmentStore implements SandboxRuntimeAttach
     private readonly keyPrefix: string,
   ) {}
 
-  async upsertAttachment(
-    input: SandboxRuntimeAttachment & {
-      ttlMs: number;
-      nowMs: number;
-    },
-  ): Promise<void> {
-    void input.nowMs;
-
+  async upsertAttachment({
+    sandboxInstanceId,
+    ownerLeaseId,
+    nodeId,
+    sessionId,
+    attachedAtMs,
+    ttlMs,
+  }: SandboxRuntimeAttachment & {
+    ttlMs: number;
+    nowMs: number;
+  }): Promise<void> {
     await this.client.set(
       buildSandboxAttachmentKey({
         keyPrefix: this.keyPrefix,
-        sandboxInstanceId: input.sandboxInstanceId,
+        sandboxInstanceId,
       }),
       JSON.stringify({
-        sandboxInstanceId: input.sandboxInstanceId,
-        ownerLeaseId: input.ownerLeaseId,
-        nodeId: input.nodeId,
-        sessionId: input.sessionId,
-        attachedAtMs: input.attachedAtMs,
+        sandboxInstanceId,
+        ownerLeaseId,
+        nodeId,
+        sessionId,
+        attachedAtMs,
       }),
       {
-        PX: input.ttlMs,
+        PX: ttlMs,
       },
     );
     logger.debug(
       {
         event: "sandbox_runtime_attachment_upserted",
-        sandboxInstanceId: input.sandboxInstanceId,
-        ownerLeaseId: input.ownerLeaseId,
-        nodeId: input.nodeId,
-        sessionId: input.sessionId,
-        attachedAtMs: input.attachedAtMs,
-        ttlMs: input.ttlMs,
+        sandboxInstanceId,
+        ownerLeaseId,
+        nodeId,
+        sessionId,
+        attachedAtMs,
+        ttlMs,
       },
       "Upserted sandbox runtime attachment",
     );
   }
 
-  async getAttachment(input: {
+  async getAttachment({
+    sandboxInstanceId,
+  }: {
     sandboxInstanceId: string;
     nowMs: number;
   }): Promise<SandboxRuntimeAttachment | null> {
-    void input.nowMs;
-
     const attachmentJson = await this.client.get(
       buildSandboxAttachmentKey({
         keyPrefix: this.keyPrefix,
-        sandboxInstanceId: input.sandboxInstanceId,
+        sandboxInstanceId,
       }),
     );
     if (attachmentJson === null) {

@@ -28,8 +28,6 @@ export class InMemorySandboxRuntimeAttachmentStore implements SandboxRuntimeAtta
       nowMs: number;
     },
   ): Promise<void> {
-    void input.nowMs;
-
     this.#attachmentsBySandboxInstanceId.set(input.sandboxInstanceId, {
       attachment: {
         sandboxInstanceId: input.sandboxInstanceId,
@@ -38,7 +36,7 @@ export class InMemorySandboxRuntimeAttachmentStore implements SandboxRuntimeAtta
         sessionId: input.sessionId,
         attachedAtMs: input.attachedAtMs,
       },
-      expiresAtMs: this.clock.nowMs() + input.ttlMs,
+      expiresAtMs: input.nowMs + input.ttlMs,
     });
     logger.debug(
       {
@@ -58,14 +56,12 @@ export class InMemorySandboxRuntimeAttachmentStore implements SandboxRuntimeAtta
     sandboxInstanceId: string;
     nowMs: number;
   }): Promise<SandboxRuntimeAttachment | null> {
-    void input.nowMs;
-
     const currentRecord = this.#attachmentsBySandboxInstanceId.get(input.sandboxInstanceId);
     if (currentRecord === undefined) {
       return null;
     }
 
-    if (currentRecord.expiresAtMs > this.clock.nowMs()) {
+    if (currentRecord.expiresAtMs > input.nowMs) {
       return currentRecord.attachment;
     }
 

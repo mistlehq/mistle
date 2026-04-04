@@ -28,14 +28,14 @@ export class GatewayHttpSandboxRuntimeStateReader implements SandboxRuntimeState
   /**
    * Reads the latest runtime-state snapshot for one sandbox instance.
    */
-  public async readSnapshot(input: {
+  public async readSnapshot({
+    sandboxInstanceId,
+  }: {
     sandboxInstanceId: string;
     nowMs: number;
   }): Promise<SandboxRuntimeStateSnapshot> {
-    void input.nowMs;
-
     const url = new URL(
-      `/internal/sandbox-instances/${encodeURIComponent(input.sandboxInstanceId)}/runtime-state`,
+      `/internal/sandbox-instances/${encodeURIComponent(sandboxInstanceId)}/runtime-state`,
       this.input.baseUrl,
     );
     const response = await fetch(url, {
@@ -47,7 +47,7 @@ export class GatewayHttpSandboxRuntimeStateReader implements SandboxRuntimeState
 
     if (!response.ok) {
       throw new Error(
-        `Gateway runtime-state read failed with status ${String(response.status)} for sandbox '${input.sandboxInstanceId}'.`,
+        `Gateway runtime-state read failed with status ${String(response.status)} for sandbox '${sandboxInstanceId}'.`,
       );
     }
 

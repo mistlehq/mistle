@@ -148,21 +148,19 @@ export class InMemorySandboxActivityStore implements SandboxActivityStore {
   }
 
   async hasAnyActiveLease(input: { sandboxInstanceId: string; nowMs: number }): Promise<boolean> {
-    void input.nowMs;
-
-    this.pruneExpiredLeases(input.sandboxInstanceId);
+    this.pruneExpiredLeases(input.sandboxInstanceId, input.nowMs);
     const currentLeases = this.#leasesBySandboxInstanceId.get(input.sandboxInstanceId);
     return currentLeases !== undefined && currentLeases.size > 0;
   }
 
-  private pruneExpiredLeases(sandboxInstanceId: string): void {
+  private pruneExpiredLeases(sandboxInstanceId: string, nowMs: number = this.clock.nowMs()): void {
     const currentLeases = this.#leasesBySandboxInstanceId.get(sandboxInstanceId);
     if (currentLeases === undefined) {
       return;
     }
 
     for (const [leaseId, lease] of currentLeases.entries()) {
-      if (lease.expiresAtMs <= this.clock.nowMs()) {
+      if (lease.expiresAtMs <= nowMs) {
         currentLeases.delete(leaseId);
       }
     }
