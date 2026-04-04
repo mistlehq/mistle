@@ -52,12 +52,14 @@ jobs:
               - 'tsconfig.base.json'
               - '!apps/sandbox-runtime/**'
               - '!packages/sandbox-rs-napi/**'
+              - '!packages/sandboxd/**'
             rust:
               - '.github/workflows/ci.yml'
               - '.github/workflows/ci-daily-integration.yml'
               - '.envrc'
               - 'apps/sandbox-runtime/**'
               - 'packages/sandbox-rs-napi/**'
+              - 'packages/sandboxd/**'
               - 'packages/integrations-core/**'
               - 'packages/integrations-definitions/**'
               - 'packages/sandbox-session-protocol/**'
@@ -142,7 +144,7 @@ jobs:
 
       - name: Build workspace in Nix shell
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=!@mistle/sandbox-runtime --filter=!@mistle/sandbox-rs-napi"
+        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=!@mistle/sandbox-runtime --filter=!@mistle/sandbox-rs-napi --filter=!@mistle/sandboxd"
 
       - name: Run TS static checks in Nix shell
         run: nix develop --command bash -lc "pnpm format:check && pnpm lint:ts && pnpm lint:sql && pnpm typecheck:ts"
@@ -177,9 +179,10 @@ jobs:
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: sandbox-rs-napi
+          shared-key: sandbox-rust
           workspaces: |
             packages/sandbox-rs-napi -> target
+            packages/sandboxd -> target
           env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
           cmd-format: nix develop --command {0}
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -218,7 +221,7 @@ jobs:
 
       - name: Build workspace in Nix shell
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=@mistle/sandbox-runtime --filter=@mistle/sandbox-rs-napi"
+        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=@mistle/sandbox-runtime --filter=@mistle/sandbox-rs-napi --filter=@mistle/sandboxd"
 
       - name: Run Rust static checks in Nix shell
         run: nix develop --command bash -lc "pnpm lint:rust && pnpm typecheck:rust"
@@ -350,9 +353,10 @@ jobs:
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: sandbox-rs-napi
+          shared-key: sandbox-rust
           workspaces: |
             packages/sandbox-rs-napi -> target
+            packages/sandboxd -> target
           env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
           cmd-format: nix develop --command {0}
           save-if: ${{ github.ref == 'refs/heads/main' }}
