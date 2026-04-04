@@ -2,8 +2,6 @@ import { z } from "zod";
 
 import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "./runtime-plan.js";
 
-const NonEmptyStringSchema = z.string().min(1);
-
 export const SandboxdStartupModes = {
   NEW: "new",
   EXISTING: "existing",
@@ -19,11 +17,11 @@ export type SandboxdStartupMode = z.infer<typeof SandboxdStartupModeSchema>;
 export const SandboxdStartupInputSchema = z
   .object({
     startupMode: SandboxdStartupModeSchema,
-    bootstrapToken: NonEmptyStringSchema,
-    tunnelExchangeToken: NonEmptyStringSchema,
-    tunnelGatewayWsUrl: NonEmptyStringSchema,
+    bootstrapToken: z.string().min(1),
+    tunnelExchangeToken: z.string().min(1),
+    tunnelGatewayWsUrl: z.string().min(1),
     runtimePlan: CompiledRuntimePlanSchema,
-    egressGrantByRuleId: z.record(z.string(), NonEmptyStringSchema),
+    egressGrantByRuleId: z.record(z.string(), z.string().min(1)),
   })
   .strict();
 
@@ -31,7 +29,7 @@ export type SandboxdStartupInput = z.infer<typeof SandboxdStartupInputSchema>;
 
 export const SandboxdStartupApplyRequestSchema = z
   .object({
-    token: NonEmptyStringSchema,
+    token: z.string().min(1),
     startupInput: SandboxdStartupInputSchema,
   })
   .strict();
@@ -47,7 +45,7 @@ export const SandboxdStartupApplyResponseSchema = z.discriminatedUnion("ok", [
   z
     .object({
       ok: z.literal(false),
-      error: NonEmptyStringSchema,
+      error: z.string().min(1),
     })
     .strict(),
 ]);
