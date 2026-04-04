@@ -172,14 +172,7 @@
                 "additionalProperties": false
               }
             },
-            "required": [
-              "egressRuleId",
-              "bindingId",
-              "match",
-              "upstream",
-              "authInjection",
-              "credentialResolver"
-            ],
+            "required": ["egressRuleId", "bindingId", "match", "upstream", "authInjection", "credentialResolver"],
             "additionalProperties": false
           }
         },
@@ -721,28 +714,12 @@
                 "additionalProperties": false
               }
             },
-            "required": [
-              "bindingId",
-              "runtimeId",
-              "runtimeKey",
-              "clientId",
-              "endpointKey",
-              "ptyLaunch"
-            ],
+            "required": ["bindingId", "runtimeId", "runtimeKey", "clientId", "endpointKey", "ptyLaunch"],
             "additionalProperties": false
           }
         }
       },
-      "required": [
-        "sandboxProfileId",
-        "version",
-        "image",
-        "egressRoutes",
-        "artifacts",
-        "workspaceSources",
-        "runtimeClients",
-        "agentRuntimes"
-      ],
+      "required": ["sandboxProfileId", "version", "image", "egressRoutes", "artifacts", "workspaceSources", "runtimeClients", "agentRuntimes"],
       "additionalProperties": false
     },
     "egressGrantByRuleId": {
@@ -756,13 +733,6 @@
       }
     }
   },
-  "required": [
-    "startupMode",
-    "bootstrapToken",
-    "tunnelExchangeToken",
-    "tunnelGatewayWsUrl",
-    "runtimePlan",
-    "egressGrantByRuleId"
-  ],
+  "required": ["startupMode", "bootstrapToken", "tunnelExchangeToken", "tunnelGatewayWsUrl", "runtimePlan", "egressGrantByRuleId"],
   "additionalProperties": false
 }
