@@ -2,11 +2,11 @@ import type { ExecutionLease } from "@mistle/sandbox-session-protocol";
 import type { Clock } from "@mistle/time";
 
 import { ACTIVITY_LEASE_TTL_MS } from "../runtime-state/durations.js";
-import type { SandboxActivityStore } from "../runtime-state/sandbox-activity-store.js";
+import type { SandboxKeepaliveStore } from "../runtime-state/sandbox-keepalive-store.js";
 
-function toSandboxActivityLeaseKind(kind: string): "agent_execution" {
+function assertSupportedExecutionLeaseKind(kind: string): void {
   if (kind === "agent_execution") {
-    return kind;
+    return;
   }
 
   throw new Error(`Unsupported execution lease kind '${kind}'.`);
@@ -22,20 +22,21 @@ export class SandboxExecutionLeaseNotFoundError extends Error {
 }
 
 export async function createSandboxExecutionLease(input: {
-  activityStore: SandboxActivityStore;
+  keepaliveStore: SandboxKeepaliveStore;
   clock: Clock;
   gatewayNodeId: string;
   lease: ExecutionLease;
   sandboxInstanceId: string;
 }): Promise<void> {
-  await input.activityStore.touchLease({
+  assertSupportedExecutionLeaseKind(input.lease.kind);
+
+  await input.keepaliveStore.touchKeepalive({
     sandboxInstanceId: input.sandboxInstanceId,
-    leaseId: input.lease.id,
-    kind: toSandboxActivityLeaseKind(input.lease.kind),
+    keepaliveId: input.lease.id,
     source: input.lease.source,
     ...(input.lease.externalExecutionId === undefined
       ? {}
-      : { externalExecutionId: input.lease.externalExecutionId }),
+      : { externalSubjectId: input.lease.externalExecutionId }),
     ...(input.lease.metadata === undefined ? {} : { metadata: input.lease.metadata }),
     nodeId: input.gatewayNodeId,
     ttlMs: ACTIVITY_LEASE_TTL_MS,
@@ -44,14 +45,14 @@ export async function createSandboxExecutionLease(input: {
 }
 
 export async function renewSandboxExecutionLease(input: {
-  activityStore: SandboxActivityStore;
+  keepaliveStore: SandboxKeepaliveStore;
   clock: Clock;
   leaseId: string;
   sandboxInstanceId: string;
 }): Promise<void> {
-  const didRenew = await input.activityStore.renewLease({
+  const didRenew = await input.keepaliveStore.renewKeepalive({
     sandboxInstanceId: input.sandboxInstanceId,
-    leaseId: input.leaseId,
+    keepaliveId: input.leaseId,
     ttlMs: ACTIVITY_LEASE_TTL_MS,
     nowMs: input.clock.nowMs(),
   });

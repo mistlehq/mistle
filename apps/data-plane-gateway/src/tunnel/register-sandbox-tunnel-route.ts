@@ -7,7 +7,7 @@ import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 import type { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { logger } from "../logger.js";
 import { OWNER_LEASE_TTL_MS } from "../runtime-state/durations.js";
-import type { SandboxActivityStore } from "../runtime-state/sandbox-activity-store.js";
+import type { SandboxKeepaliveStore } from "../runtime-state/sandbox-keepalive-store.js";
 import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
 import type { DataPlaneGatewayApp } from "../types.js";
@@ -45,7 +45,7 @@ type RegisterSandboxTunnelRouteInput = {
   sandboxOwnerStore: SandboxOwnerStore;
   sandboxOwnerResolver: SandboxOwnerResolver;
   sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat;
-  sandboxActivityStore: SandboxActivityStore;
+  sandboxKeepaliveStore: SandboxKeepaliveStore;
   sandboxPresenceStore: SandboxPresenceStore;
   sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
   sandboxIdleControllerRegistry: SandboxIdleControllerRegistry;
@@ -79,7 +79,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
   });
   const tunnelProtocolTranslator = new TunnelProtocolTranslator(input.interactiveStreamRouter);
   const executionLeaseRepository = new ExecutionLeaseRepository(
-    input.sandboxActivityStore,
+    input.sandboxKeepaliveStore,
     input.sandboxIdleControllerRegistry,
     input.clock,
     input.gatewayNodeId,

@@ -2,7 +2,7 @@ import type { LeaseControlMessage } from "@mistle/sandbox-session-protocol";
 import type { Clock } from "@mistle/time";
 
 import type { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
-import type { SandboxActivityStore } from "../runtime-state/sandbox-activity-store.js";
+import type { SandboxKeepaliveStore } from "../runtime-state/sandbox-keepalive-store.js";
 import {
   createSandboxExecutionLease,
   renewSandboxExecutionLease,
@@ -10,7 +10,7 @@ import {
 
 export class ExecutionLeaseRepository {
   public constructor(
-    private readonly activityStore: SandboxActivityStore,
+    private readonly keepaliveStore: SandboxKeepaliveStore,
     private readonly sandboxIdleControllerRegistry: SandboxIdleControllerRegistry,
     private readonly clock: Clock,
     private readonly gatewayNodeId: string,
@@ -23,7 +23,7 @@ export class ExecutionLeaseRepository {
     switch (input.message.type) {
       case "lease.create":
         await createSandboxExecutionLease({
-          activityStore: this.activityStore,
+          keepaliveStore: this.keepaliveStore,
           clock: this.clock,
           gatewayNodeId: this.gatewayNodeId,
           lease: input.message.lease,
@@ -36,7 +36,7 @@ export class ExecutionLeaseRepository {
         return;
       case "lease.renew":
         await renewSandboxExecutionLease({
-          activityStore: this.activityStore,
+          keepaliveStore: this.keepaliveStore,
           clock: this.clock,
           leaseId: input.message.leaseId,
           sandboxInstanceId: input.sandboxInstanceId,

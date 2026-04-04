@@ -1,19 +1,18 @@
 import { createMutableClock } from "@mistle/time/testing";
 import { describe, expect, it } from "vitest";
 
-import { InMemorySandboxActivityStore } from "./in-memory-sandbox-activity-store.js";
+import { InMemorySandboxKeepaliveStore } from "./in-memory-sandbox-keepalive-store.js";
 
-describe("InMemorySandboxActivityStore", () => {
-  it("returns true while at least one active lease exists", async () => {
+describe("InMemorySandboxKeepaliveStore", () => {
+  it("returns an active summary while at least one keepalive exists", async () => {
     const clock = createMutableClock(1_000);
-    const store = new InMemorySandboxActivityStore(clock);
+    const store = new InMemorySandboxKeepaliveStore(clock);
 
-    await store.touchLease({
+    await store.touchKeepalive({
       sandboxInstanceId: "sbi_abc",
-      leaseId: "sal_first",
-      kind: "agent_execution",
+      keepaliveId: "skp_first",
       source: "codex",
-      externalExecutionId: "turn_123",
+      externalSubjectId: "turn_123",
       metadata: {
         threadId: "thr_123",
       },
@@ -23,33 +22,32 @@ describe("InMemorySandboxActivityStore", () => {
     });
 
     await expect(
-      store.hasAnyActiveLease({
+      store.summarize({
         sandboxInstanceId: "sbi_abc",
         nowMs: clock.nowMs(),
       }),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ active: true });
     await expect(
-      store.releaseLease({
+      store.releaseKeepalive({
         sandboxInstanceId: "sbi_abc",
-        leaseId: "sal_first",
+        keepaliveId: "skp_first",
       }),
     ).resolves.toBe(true);
     await expect(
-      store.hasAnyActiveLease({
+      store.summarize({
         sandboxInstanceId: "sbi_abc",
         nowMs: clock.nowMs(),
       }),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ active: false });
   });
 
-  it("renews existing leases and rejects renewing unknown leases", async () => {
+  it("renews existing keepalives and rejects renewing unknown keepalives", async () => {
     const clock = createMutableClock(1_000);
-    const store = new InMemorySandboxActivityStore(clock);
+    const store = new InMemorySandboxKeepaliveStore(clock);
 
-    await store.touchLease({
+    await store.touchKeepalive({
       sandboxInstanceId: "sbi_abc",
-      leaseId: "sal_known",
-      kind: "agent_execution",
+      keepaliveId: "skp_known",
       source: "codex",
       nodeId: "dpg_123",
       ttlMs: 5_000,
@@ -59,9 +57,9 @@ describe("InMemorySandboxActivityStore", () => {
     clock.advanceMs(4_000);
 
     await expect(
-      store.renewLease({
+      store.renewKeepalive({
         sandboxInstanceId: "sbi_abc",
-        leaseId: "sal_known",
+        keepaliveId: "skp_known",
         ttlMs: 5_000,
         nowMs: clock.nowMs(),
       }),
@@ -70,29 +68,28 @@ describe("InMemorySandboxActivityStore", () => {
     clock.advanceMs(2_000);
 
     await expect(
-      store.hasAnyActiveLease({
+      store.summarize({
         sandboxInstanceId: "sbi_abc",
         nowMs: clock.nowMs(),
       }),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ active: true });
     await expect(
-      store.renewLease({
+      store.renewKeepalive({
         sandboxInstanceId: "sbi_abc",
-        leaseId: "sal_missing",
+        keepaliveId: "skp_missing",
         ttlMs: 5_000,
         nowMs: clock.nowMs(),
       }),
     ).resolves.toBe(false);
   });
 
-  it("expires leases based on TTL", async () => {
+  it("expires keepalives based on TTL", async () => {
     const clock = createMutableClock(1_000);
-    const store = new InMemorySandboxActivityStore(clock);
+    const store = new InMemorySandboxKeepaliveStore(clock);
 
-    await store.touchLease({
+    await store.touchKeepalive({
       sandboxInstanceId: "sbi_abc",
-      leaseId: "sal_expiring",
-      kind: "agent_execution",
+      keepaliveId: "skp_expiring",
       source: "codex",
       nodeId: "dpg_123",
       ttlMs: 5_000,
@@ -102,10 +99,10 @@ describe("InMemorySandboxActivityStore", () => {
     clock.advanceMs(5_001);
 
     await expect(
-      store.hasAnyActiveLease({
+      store.summarize({
         sandboxInstanceId: "sbi_abc",
         nowMs: clock.nowMs(),
       }),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ active: false });
   });
 });

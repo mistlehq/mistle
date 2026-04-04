@@ -5,7 +5,7 @@ import { systemSleeper } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { ValkeySandboxActivityStore } from "../src/runtime-state/adapters/valkey-sandbox-activity-store.js";
+import { ValkeySandboxKeepaliveStore } from "../src/runtime-state/adapters/valkey-sandbox-keepalive-store.js";
 import { ValkeySandboxPresenceStore } from "../src/runtime-state/adapters/valkey-sandbox-presence-store.js";
 import { ValkeySandboxRuntimeAttachmentStore } from "../src/runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import { createValkeyClient, closeValkeyClient } from "../src/runtime-state/valkey-client.js";
@@ -274,8 +274,8 @@ describe("runtime-state store integrations", () => {
     }
   });
 
-  it("renews activity leases without losing their stored metadata", async () => {
-    const keyPrefix = `mistle:runtime-state:activity-it:${randomUUID()}`;
+  it("renews keepalives without losing their stored metadata", async () => {
+    const keyPrefix = `mistle:runtime-state:keepalive-it:${randomUUID()}`;
     const valkeyUrl = await readValkeyUrl();
     const client = createValkeyClient({
       url: valkeyUrl,
@@ -283,17 +283,16 @@ describe("runtime-state store integrations", () => {
     await client.connect();
 
     try {
-      const store = new ValkeySandboxActivityStore(client, keyPrefix);
-      const sandboxInstanceId = "sbi_activity_it";
-      const leaseId = "sal_first";
-      const detailKey = `${keyPrefix}:sandbox-activity:${sandboxInstanceId}:lease:${leaseId}`;
+      const store = new ValkeySandboxKeepaliveStore(client, keyPrefix);
+      const sandboxInstanceId = "sbi_keepalive_it";
+      const keepaliveId = "skp_first";
+      const detailKey = `${keyPrefix}:sandbox-keepalive:${sandboxInstanceId}:record:${keepaliveId}`;
 
-      await store.touchLease({
+      await store.touchKeepalive({
         sandboxInstanceId,
-        leaseId,
-        kind: "agent_execution",
+        keepaliveId,
         source: "codex",
-        externalExecutionId: "turn_123",
+        externalSubjectId: "turn_123",
         metadata: {
           threadId: "thr_123",
         },
@@ -302,9 +301,9 @@ describe("runtime-state store integrations", () => {
         nowMs: Date.now(),
       });
       await expect(
-        store.renewLease({
+        store.renewKeepalive({
           sandboxInstanceId,
-          leaseId,
+          keepaliveId,
           ttlMs: 30_000,
           nowMs: Date.now(),
         }),
@@ -314,10 +313,9 @@ describe("runtime-state store integrations", () => {
       expect(serializedLease).not.toBeNull();
       expect(JSON.parse(serializedLease ?? "null")).toMatchObject({
         sandboxInstanceId,
-        leaseId,
-        kind: "agent_execution",
+        keepaliveId,
         source: "codex",
-        externalExecutionId: "turn_123",
+        externalSubjectId: "turn_123",
         metadata: {
           threadId: "thr_123",
         },
@@ -325,9 +323,9 @@ describe("runtime-state store integrations", () => {
       });
 
       await expect(
-        store.renewLease({
+        store.renewKeepalive({
           sandboxInstanceId,
-          leaseId: "sal_missing",
+          keepaliveId: "skp_missing",
           ttlMs: 30_000,
           nowMs: Date.now(),
         }),

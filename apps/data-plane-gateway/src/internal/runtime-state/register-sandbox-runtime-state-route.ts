@@ -1,6 +1,6 @@
 import type { Clock } from "@mistle/time";
 
-import type { SandboxActivityStore } from "../../runtime-state/sandbox-activity-store.js";
+import type { SandboxKeepaliveStore } from "../../runtime-state/sandbox-keepalive-store.js";
 import type { SandboxPresenceStore } from "../../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../../runtime-state/sandbox-runtime-attachment-store.js";
 import type { SandboxOwnerStore } from "../../tunnel/ownership/sandbox-owner-store.js";
@@ -13,7 +13,7 @@ type RegisterSandboxRuntimeStateRouteInput = {
   app: DataPlaneGatewayApp;
   clock: Clock;
   internalAuthServiceToken: string;
-  sandboxActivityStore: SandboxActivityStore;
+  sandboxKeepaliveStore: SandboxKeepaliveStore;
   sandboxPresenceStore: SandboxPresenceStore;
   sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
   sandboxOwnerStore: SandboxOwnerStore;
@@ -58,7 +58,7 @@ export function registerSandboxRuntimeStateRoute(
     }
 
     const nowMs = input.clock.nowMs();
-    const [owner, attachment, activePresenceCount, hasActiveKeepalive] = await Promise.all([
+    const [owner, attachment, activePresenceCount, keepaliveSummary] = await Promise.all([
       input.sandboxOwnerStore.getOwner({
         sandboxInstanceId,
       }),
@@ -70,7 +70,7 @@ export function registerSandboxRuntimeStateRoute(
         sandboxInstanceId,
         nowMs,
       }),
-      input.sandboxActivityStore.hasAnyActiveLease({
+      input.sandboxKeepaliveStore.summarize({
         sandboxInstanceId,
         nowMs,
       }),
@@ -84,7 +84,7 @@ export function registerSandboxRuntimeStateRoute(
           activeCount: activePresenceCount,
         },
         keepalive: {
-          active: hasActiveKeepalive,
+          active: keepaliveSummary.active,
         },
       },
       200,

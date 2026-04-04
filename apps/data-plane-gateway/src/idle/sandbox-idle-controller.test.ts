@@ -5,7 +5,7 @@ import { systemSleeper } from "@mistle/time";
 import { createMutableClock, createManualScheduler } from "@mistle/time/testing";
 import { describe, expect, it } from "vitest";
 
-import { InMemorySandboxActivityStore } from "../runtime-state/adapters/in-memory-sandbox-activity-store.js";
+import { InMemorySandboxKeepaliveStore } from "../runtime-state/adapters/in-memory-sandbox-keepalive-store.js";
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
 import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
@@ -184,7 +184,7 @@ describe("LocalSandboxIdleController", () => {
       const clock = createMutableClock(1_000);
       const scheduler = createManualScheduler(clock);
       const ownerStore = new InMemorySandboxOwnerStore(clock);
-      const activityStore = new InMemorySandboxActivityStore(clock);
+      const keepaliveStore = new InMemorySandboxKeepaliveStore(clock);
       const presenceStore = new InMemorySandboxPresenceStore(clock);
       const runtimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
       const dataPlaneClient = createDataPlaneSandboxInstancesClient({
@@ -208,7 +208,7 @@ describe("LocalSandboxIdleController", () => {
           clock,
           scheduler,
           ownerStore,
-          activityStore,
+          keepaliveStore,
           presenceStore,
           runtimeAttachmentStore,
           dataPlaneClient,
@@ -262,7 +262,7 @@ describe("LocalSandboxIdleController", () => {
       const clock = createMutableClock(1_000);
       const scheduler = createManualScheduler(clock);
       const ownerStore = new InMemorySandboxOwnerStore(clock);
-      const activityStore = new InMemorySandboxActivityStore(clock);
+      const keepaliveStore = new InMemorySandboxKeepaliveStore(clock);
       const presenceStore = new InMemorySandboxPresenceStore(clock);
       const runtimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
       const dataPlaneClient = createDataPlaneSandboxInstancesClient({
@@ -286,7 +286,7 @@ describe("LocalSandboxIdleController", () => {
           clock,
           scheduler,
           ownerStore,
-          activityStore,
+          keepaliveStore,
           presenceStore,
           runtimeAttachmentStore,
           dataPlaneClient,
@@ -358,7 +358,7 @@ describe("LocalSandboxIdleController", () => {
       const clock = createMutableClock(1_000);
       const scheduler = createManualScheduler(clock);
       const ownerStore = new InMemorySandboxOwnerStore(clock);
-      const activityStore = new InMemorySandboxActivityStore(clock);
+      const keepaliveStore = new InMemorySandboxKeepaliveStore(clock);
       const presenceStore = new InMemorySandboxPresenceStore(clock);
       const runtimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
       const dataPlaneClient = createDataPlaneSandboxInstancesClient({
@@ -382,7 +382,7 @@ describe("LocalSandboxIdleController", () => {
           clock,
           scheduler,
           ownerStore,
-          activityStore,
+          keepaliveStore,
           presenceStore,
           runtimeAttachmentStore,
           dataPlaneClient,
@@ -401,10 +401,9 @@ describe("LocalSandboxIdleController", () => {
         leaseId: "sal_reschedule",
         nowMs: clock.nowMs(),
       });
-      await activityStore.touchLease({
+      await keepaliveStore.touchKeepalive({
         sandboxInstanceId: "sbi_activity",
-        leaseId: "sal_reschedule",
-        kind: "agent_execution",
+        keepaliveId: "sal_reschedule",
         source: "webhook",
         nodeId: "dpg_activity",
         ttlMs: 10_000,
@@ -437,7 +436,7 @@ describe("LocalSandboxIdleController", () => {
       const clock = createMutableClock(1_000);
       const scheduler = createManualScheduler(clock);
       const ownerStore = new InMemorySandboxOwnerStore(clock);
-      const activityStore = new InMemorySandboxActivityStore(clock);
+      const keepaliveStore = new InMemorySandboxKeepaliveStore(clock);
       const presenceStore = new InMemorySandboxPresenceStore(clock);
       const runtimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
       const dataPlaneClient = createDataPlaneSandboxInstancesClient({
@@ -461,7 +460,7 @@ describe("LocalSandboxIdleController", () => {
           clock,
           scheduler,
           ownerStore,
-          activityStore,
+          keepaliveStore,
           presenceStore,
           runtimeAttachmentStore,
           dataPlaneClient,

@@ -2,7 +2,7 @@ import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-interna
 import type { Clock, Scheduler, TimerHandle } from "@mistle/time";
 
 import { logger } from "../logger.js";
-import type { SandboxActivityStore } from "../runtime-state/sandbox-activity-store.js";
+import type { SandboxKeepaliveStore } from "../runtime-state/sandbox-keepalive-store.js";
 import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
 import type { SandboxOwnerStore } from "../tunnel/ownership/sandbox-owner-store.js";
@@ -27,7 +27,7 @@ export type SandboxIdleControllerDependencies = {
   clock: Clock;
   scheduler: Scheduler;
   ownerStore: SandboxOwnerStore;
-  activityStore: SandboxActivityStore;
+  keepaliveStore: SandboxKeepaliveStore;
   presenceStore: SandboxPresenceStore;
   runtimeAttachmentStore: SandboxRuntimeAttachmentStore;
   dataPlaneClient: SandboxIdleControllerDataPlaneClient;
@@ -62,7 +62,7 @@ export interface SandboxIdleController {
   handlePresenceLeaseTouch(input: { leaseId: string; nowMs: number }): void;
 
   /**
-   * Handles an activity lease creation or renewal for the same sandbox.
+   * Handles a keepalive refresh for the same sandbox.
    */
   handleActivityLeaseTouch(input: { leaseId: string; nowMs: number }): void;
 
@@ -79,7 +79,7 @@ export interface SandboxIdleController {
   /**
    * Cancels controller-local timers and makes later handler calls no-ops.
    *
-   * Implementations must not release owner leases, clear presence or activity
+   * Implementations must not release owner leases, clear presence or keepalive
    * leases, clear runtime attachment, or mutate durable sandbox state here.
    */
   dispose(): void;
@@ -240,7 +240,7 @@ export class LocalSandboxIdleController implements SandboxIdleController {
 
   private async handleIdleDeadlineElapsed(): Promise<void> {
     const nowMs = this.dependencies.clock.nowMs();
-    const [currentOwner, hasActivePresence, hasActiveActivity] = await Promise.all([
+    const [currentOwner, hasActivePresence, keepaliveSummary] = await Promise.all([
       this.dependencies.ownerStore.getOwner({
         sandboxInstanceId: this.sandboxInstanceId,
       }),
@@ -248,7 +248,7 @@ export class LocalSandboxIdleController implements SandboxIdleController {
         sandboxInstanceId: this.sandboxInstanceId,
         nowMs,
       }),
-      this.dependencies.activityStore.hasAnyActiveLease({
+      this.dependencies.keepaliveStore.summarize({
         sandboxInstanceId: this.sandboxInstanceId,
         nowMs,
       }),
@@ -262,7 +262,7 @@ export class LocalSandboxIdleController implements SandboxIdleController {
         nowMs,
         currentOwnerLeaseId: currentOwner?.leaseId,
         hasActivePresence,
-        hasActiveActivity,
+        hasActiveKeepalive: keepaliveSummary.active,
       },
       "Sandbox idle timer fired",
     );
@@ -287,7 +287,7 @@ export class LocalSandboxIdleController implements SandboxIdleController {
       return;
     }
 
-    if (hasActivePresence || hasActiveActivity) {
+    if (hasActivePresence || keepaliveSummary.active) {
       this.scheduleIdleDeadline(nowMs + this.dependencies.timeoutMs, "active_leases");
       return;
     }

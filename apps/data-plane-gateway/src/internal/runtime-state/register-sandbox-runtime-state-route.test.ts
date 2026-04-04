@@ -2,7 +2,7 @@ import { systemClock } from "@mistle/time";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { InMemorySandboxActivityStore } from "../../runtime-state/adapters/in-memory-sandbox-activity-store.js";
+import { InMemorySandboxKeepaliveStore } from "../../runtime-state/adapters/in-memory-sandbox-keepalive-store.js";
 import { InMemorySandboxPresenceStore } from "../../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
 import { InMemorySandboxOwnerStore } from "../../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
@@ -13,13 +13,13 @@ const InternalServiceToken = "test-internal-service-token";
 
 function createTestApp(): {
   app: DataPlaneGatewayApp;
-  sandboxActivityStore: InMemorySandboxActivityStore;
+  sandboxKeepaliveStore: InMemorySandboxKeepaliveStore;
   sandboxPresenceStore: InMemorySandboxPresenceStore;
   sandboxRuntimeAttachmentStore: InMemorySandboxRuntimeAttachmentStore;
   sandboxOwnerStore: InMemorySandboxOwnerStore;
 } {
   const app = new Hono<AppContextBindings>();
-  const sandboxActivityStore = new InMemorySandboxActivityStore(systemClock);
+  const sandboxKeepaliveStore = new InMemorySandboxKeepaliveStore(systemClock);
   const sandboxPresenceStore = new InMemorySandboxPresenceStore(systemClock);
   const sandboxRuntimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
   const sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
@@ -28,7 +28,7 @@ function createTestApp(): {
     app,
     clock: systemClock,
     internalAuthServiceToken: InternalServiceToken,
-    sandboxActivityStore,
+    sandboxKeepaliveStore,
     sandboxPresenceStore,
     sandboxRuntimeAttachmentStore,
     sandboxOwnerStore,
@@ -36,7 +36,7 @@ function createTestApp(): {
 
   return {
     app,
-    sandboxActivityStore,
+    sandboxKeepaliveStore,
     sandboxPresenceStore,
     sandboxRuntimeAttachmentStore,
     sandboxOwnerStore,
@@ -123,7 +123,7 @@ describe("registerSandboxRuntimeStateRoute", () => {
   });
 
   it("returns presence and keepalive summaries from the current stores", async () => {
-    const { app, sandboxActivityStore, sandboxPresenceStore } = createTestApp();
+    const { app, sandboxKeepaliveStore, sandboxPresenceStore } = createTestApp();
 
     await sandboxPresenceStore.touchLease({
       sandboxInstanceId: "sbi_test",
@@ -141,10 +141,9 @@ describe("registerSandboxRuntimeStateRoute", () => {
       ttlMs: 30_000,
       nowMs: systemClock.nowMs(),
     });
-    await sandboxActivityStore.touchLease({
+    await sandboxKeepaliveStore.touchKeepalive({
       sandboxInstanceId: "sbi_test",
-      leaseId: "sal_1",
-      kind: "agent_execution",
+      keepaliveId: "sal_1",
       source: "codex",
       nodeId: "dpg_test",
       ttlMs: 30_000,

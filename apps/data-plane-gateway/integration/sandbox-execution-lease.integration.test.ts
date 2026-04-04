@@ -11,7 +11,7 @@ import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 import WebSocket from "ws";
 
-import { ValkeySandboxActivityStore } from "../src/runtime-state/adapters/valkey-sandbox-activity-store.js";
+import { ValkeySandboxKeepaliveStore } from "../src/runtime-state/adapters/valkey-sandbox-keepalive-store.js";
 import { closeValkeyClient, createValkeyClient } from "../src/runtime-state/valkey-client.js";
 import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import {
@@ -43,17 +43,17 @@ async function insertSandboxInstanceRow(input: {
 }
 
 async function waitForActiveActivityLease(input: {
-  store: ValkeySandboxActivityStore;
+  store: ValkeySandboxKeepaliveStore;
   sandboxInstanceId: string;
 }): Promise<void> {
   const deadline = Date.now() + 5_000;
 
   while (Date.now() < deadline) {
-    const hasAnyActiveLease = await input.store.hasAnyActiveLease({
+    const keepaliveSummary = await input.store.summarize({
       sandboxInstanceId: input.sandboxInstanceId,
       nowMs: Date.now(),
     });
-    if (hasAnyActiveLease) {
+    if (keepaliveSummary.active) {
       return;
     }
 
@@ -65,7 +65,7 @@ async function waitForActiveActivityLease(input: {
 
 async function createActivityStore(fixture: DataPlaneGatewayIntegrationFixture): Promise<{
   client: ReturnType<typeof createValkeyClient>;
-  store: ValkeySandboxActivityStore;
+  store: ValkeySandboxKeepaliveStore;
 }> {
   if (fixture.config.app.runtimeState.backend !== "valkey") {
     throw new Error("Expected Valkey runtime-state backend for sandbox activity integration test.");
@@ -82,7 +82,7 @@ async function createActivityStore(fixture: DataPlaneGatewayIntegrationFixture):
 
   return {
     client,
-    store: new ValkeySandboxActivityStore(client, valkeyConfig.keyPrefix),
+    store: new ValkeySandboxKeepaliveStore(client, valkeyConfig.keyPrefix),
   };
 }
 
@@ -208,11 +208,11 @@ describe("sandbox execution lease integration", () => {
         await sendWebSocketPingAndExpectPong(bootstrapSocket, Buffer.from("lease-renew-miss"));
 
         await expect(
-          store.hasAnyActiveLease({
+          store.summarize({
             sandboxInstanceId,
             nowMs: Date.now(),
           }),
-        ).resolves.toBe(false);
+        ).resolves.toEqual({ active: false });
       } finally {
         await closeValkeyClient(client);
         if (bootstrapSocket.readyState === WebSocket.OPEN) {
