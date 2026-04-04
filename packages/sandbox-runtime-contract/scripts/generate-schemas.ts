@@ -10,7 +10,6 @@ import {
 
 const StartupJsonSchemaParams = {
   io: "input",
-  unrepresentable: "any",
 } as const;
 
 const SchemaOutputs = [

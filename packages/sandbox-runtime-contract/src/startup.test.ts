@@ -18,7 +18,6 @@ import {
 
 const StartupJsonSchemaParams = {
   io: "input",
-  unrepresentable: "any",
 } as const;
 
 describe("startup contracts", () => {
