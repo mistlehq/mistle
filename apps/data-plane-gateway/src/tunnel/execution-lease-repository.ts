@@ -29,8 +29,7 @@ export class ExecutionLeaseRepository {
           lease: input.message.lease,
           sandboxInstanceId: input.sandboxInstanceId,
         });
-        this.requireController(input.sandboxInstanceId).handleActivityLeaseTouch({
-          leaseId: input.message.lease.id,
+        this.requireController(input.sandboxInstanceId).handleActivityTouch({
           nowMs: this.clock.nowMs(),
         });
         return;
@@ -41,8 +40,7 @@ export class ExecutionLeaseRepository {
           leaseId: input.message.leaseId,
           sandboxInstanceId: input.sandboxInstanceId,
         });
-        this.requireController(input.sandboxInstanceId).handleActivityLeaseTouch({
-          leaseId: input.message.leaseId,
+        this.requireController(input.sandboxInstanceId).handleActivityTouch({
           nowMs: this.clock.nowMs(),
         });
     }

@@ -12,6 +12,14 @@ type SandboxKeepaliveRecord = {
   expiresAtMs: number;
 };
 
+type SandboxKeepaliveStateRecord = {
+  sandboxInstanceId: string;
+  ownerLeaseId: string;
+  nodeId: string;
+  active: boolean;
+  expiresAtMs: number;
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -29,6 +37,13 @@ function buildSandboxKeepaliveDetailKey(input: {
   keepaliveId: string;
 }): string {
   return `${input.keyPrefix}:sandbox-keepalive:${input.sandboxInstanceId}:record:${input.keepaliveId}`;
+}
+
+function buildSandboxKeepaliveStateKey(input: {
+  keyPrefix: string;
+  sandboxInstanceId: string;
+}): string {
+  return `${input.keyPrefix}:sandbox-keepalive:${input.sandboxInstanceId}:state`;
 }
 
 function parseSandboxKeepaliveRecord(serializedKeepalive: string): SandboxKeepaliveRecord {
@@ -62,6 +77,39 @@ function parseSandboxKeepaliveRecord(serializedKeepalive: string): SandboxKeepal
     ...(typeof externalSubjectId === "string" ? { externalSubjectId } : {}),
     ...(isRecord(metadata) ? { metadata } : {}),
     nodeId,
+    expiresAtMs,
+  };
+}
+
+function parseSandboxKeepaliveStateRecord(
+  serializedKeepaliveState: string,
+): SandboxKeepaliveStateRecord {
+  const parsedKeepaliveState = JSON.parse(serializedKeepaliveState);
+  if (!isRecord(parsedKeepaliveState)) {
+    throw new Error("Expected sandbox keepalive state record to be an object.");
+  }
+
+  const sandboxInstanceId = parsedKeepaliveState.sandboxInstanceId;
+  const ownerLeaseId = parsedKeepaliveState.ownerLeaseId;
+  const nodeId = parsedKeepaliveState.nodeId;
+  const active = parsedKeepaliveState.active;
+  const expiresAtMs = parsedKeepaliveState.expiresAtMs;
+
+  if (
+    typeof sandboxInstanceId !== "string" ||
+    typeof ownerLeaseId !== "string" ||
+    typeof nodeId !== "string" ||
+    typeof active !== "boolean" ||
+    typeof expiresAtMs !== "number"
+  ) {
+    throw new Error("Unexpected sandbox keepalive state record.");
+  }
+
+  return {
+    sandboxInstanceId,
+    ownerLeaseId,
+    nodeId,
+    active,
     expiresAtMs,
   };
 }
@@ -142,6 +190,46 @@ export class ValkeySandboxKeepaliveStore implements SandboxKeepaliveStore {
           : { externalSubjectId: input.externalSubjectId }),
       },
       "Touched sandbox keepalive",
+    );
+  }
+
+  async replaceStateForOwner(input: {
+    sandboxInstanceId: string;
+    ownerLeaseId: string;
+    nodeId: string;
+    ttlMs: number;
+    nowMs: number;
+    active: boolean;
+  }): Promise<void> {
+    const expiresAtMs = input.nowMs + input.ttlMs;
+    await this.client.set(
+      buildSandboxKeepaliveStateKey({
+        keyPrefix: this.keyPrefix,
+        sandboxInstanceId: input.sandboxInstanceId,
+      }),
+      JSON.stringify({
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: input.ownerLeaseId,
+        nodeId: input.nodeId,
+        active: input.active,
+        expiresAtMs,
+      } satisfies SandboxKeepaliveStateRecord),
+      {
+        PX: input.ttlMs,
+      },
+    );
+
+    logger.debug(
+      {
+        event: "sandbox_keepalive_state_replaced",
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: input.ownerLeaseId,
+        nodeId: input.nodeId,
+        ttlMs: input.ttlMs,
+        expiresAtMs,
+        active: input.active,
+      },
+      "Replaced sandbox keepalive state",
     );
   }
 
@@ -269,8 +357,27 @@ export class ValkeySandboxKeepaliveStore implements SandboxKeepaliveStore {
     await this.client.zRemRangeByScore(indexKey, "-inf", input.nowMs);
 
     const activeKeepaliveCount = await this.client.zCard(indexKey);
+    if (activeKeepaliveCount > 0) {
+      return {
+        active: true,
+      };
+    }
+
+    const serializedState = await this.client.get(
+      buildSandboxKeepaliveStateKey({
+        keyPrefix: this.keyPrefix,
+        sandboxInstanceId: input.sandboxInstanceId,
+      }),
+    );
+    if (serializedState === null) {
+      return {
+        active: false,
+      };
+    }
+
+    const parsedState = parseSandboxKeepaliveStateRecord(serializedState);
     return {
-      active: activeKeepaliveCount > 0,
+      active: parsedState.active,
     };
   }
 }

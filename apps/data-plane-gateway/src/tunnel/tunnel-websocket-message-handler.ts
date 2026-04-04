@@ -9,6 +9,7 @@ import {
   type TunnelProtocolDelivery,
 } from "./protocol/tunnel-protocol-translator.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
+import { SandboxKeepaliveRepository } from "./sandbox-keepalive-repository.js";
 import { notifyBootstrapPeerOfReleasedInteractiveStreams } from "./tunnel-peer-notifier.js";
 import type { RelayPeerSide } from "./types.js";
 
@@ -44,9 +45,11 @@ export function toTunnelForwardPayload(data: WSMessageReceive): string | ArrayBu
  * message.
  */
 export async function handleTunnelWebSocketMessage(input: {
+  bootstrapOwnerLeaseId?: string;
   clientSessionId: string;
   currentSocket: Pick<WSContext, "send">;
   executionLeaseRepository: ExecutionLeaseRepository;
+  sandboxKeepaliveRepository: SandboxKeepaliveRepository;
   handleTelemetryDelivery?: ((delivery: TelemetryDelivery) => Promise<void>) | undefined;
   interactiveStreamRouter: InteractiveStreamRouter;
   payload: string | ArrayBuffer;
@@ -75,6 +78,20 @@ export async function handleTunnelWebSocketMessage(input: {
 
       throw error;
     }
+  }
+
+  if (translation.keepaliveControlMessage !== undefined) {
+    if (input.bootstrapOwnerLeaseId === undefined) {
+      throw new Error(
+        "Bootstrap owner lease id is required when applying keepalive control messages.",
+      );
+    }
+
+    await input.sandboxKeepaliveRepository.applyControlMessage({
+      message: translation.keepaliveControlMessage,
+      sandboxInstanceId: input.sandboxInstanceId,
+      ownerLeaseId: input.bootstrapOwnerLeaseId,
+    });
   }
 
   if (translation.delivery.kind === "drop") {

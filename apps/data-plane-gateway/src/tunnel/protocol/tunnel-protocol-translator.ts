@@ -6,6 +6,7 @@ import {
   parseStreamControlMessage,
   parseTelemetryControlMessage,
   type BootstrapControlMessage,
+  type KeepaliveControlMessage,
   type LeaseControlMessage,
   type StreamControlMessage,
   type TelemetryClose,
@@ -62,6 +63,7 @@ export type TunnelProtocolDelivery =
 export type TunnelProtocolTranslation = {
   delivery: TunnelProtocolDelivery;
   executionLeaseControlMessage?: LeaseControlMessage;
+  keepaliveControlMessage?: KeepaliveControlMessage;
   notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding;
   releaseInteractiveStream?: ReleaseInteractiveStream;
 };
@@ -357,6 +359,7 @@ function createRespondDelivery(payload: RelayPayload): TunnelProtocolDelivery {
 function createTranslation(input: {
   delivery: TunnelProtocolDelivery;
   executionLeaseControlMessage?: LeaseControlMessage | undefined;
+  keepaliveControlMessage?: KeepaliveControlMessage | undefined;
   notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding | undefined;
   releaseInteractiveStream?: ReleaseInteractiveStream | undefined;
 }): TunnelProtocolTranslation {
@@ -366,6 +369,11 @@ function createTranslation(input: {
       ? {}
       : {
           executionLeaseControlMessage: input.executionLeaseControlMessage,
+        }),
+    ...(input.keepaliveControlMessage === undefined
+      ? {}
+      : {
+          keepaliveControlMessage: input.keepaliveControlMessage,
         }),
     ...(input.notifyBootstrapPeerOfReleasedStream === undefined
       ? {}
@@ -576,7 +584,7 @@ export class TunnelProtocolTranslator {
           kind: "drop",
         },
         ...(controlMessage.type === "keepalive.state"
-          ? {}
+          ? { keepaliveControlMessage: controlMessage }
           : { executionLeaseControlMessage: controlMessage }),
       });
     }

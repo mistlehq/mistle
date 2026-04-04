@@ -13,6 +13,14 @@ type InMemoryKeepaliveRecord = {
   expiresAtMs: number;
 };
 
+type InMemoryKeepaliveState = {
+  sandboxInstanceId: string;
+  ownerLeaseId: string;
+  nodeId: string;
+  active: boolean;
+  expiresAtMs: number;
+};
+
 /**
  * Gateway-local keepalive store used in single-node `memory` mode.
  *
@@ -21,6 +29,7 @@ type InMemoryKeepaliveRecord = {
  */
 export class InMemorySandboxKeepaliveStore implements SandboxKeepaliveStore {
   readonly #keepalivesBySandboxInstanceId = new Map<string, Map<string, InMemoryKeepaliveRecord>>();
+  readonly #stateBySandboxInstanceId = new Map<string, InMemoryKeepaliveState>();
 
   constructor(private readonly clock: Clock) {}
 
@@ -66,6 +75,37 @@ export class InMemorySandboxKeepaliveStore implements SandboxKeepaliveStore {
           : { externalSubjectId: input.externalSubjectId }),
       },
       "Touched sandbox keepalive",
+    );
+  }
+
+  async replaceStateForOwner(input: {
+    sandboxInstanceId: string;
+    ownerLeaseId: string;
+    nodeId: string;
+    ttlMs: number;
+    nowMs: number;
+    active: boolean;
+  }): Promise<void> {
+    const expiresAtMs = input.nowMs + input.ttlMs;
+    this.#stateBySandboxInstanceId.set(input.sandboxInstanceId, {
+      sandboxInstanceId: input.sandboxInstanceId,
+      ownerLeaseId: input.ownerLeaseId,
+      nodeId: input.nodeId,
+      active: input.active,
+      expiresAtMs,
+    });
+
+    logger.debug(
+      {
+        event: "sandbox_keepalive_state_replaced",
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: input.ownerLeaseId,
+        nodeId: input.nodeId,
+        ttlMs: input.ttlMs,
+        expiresAtMs,
+        active: input.active,
+      },
+      "Replaced sandbox keepalive state",
     );
   }
 
@@ -144,9 +184,13 @@ export class InMemorySandboxKeepaliveStore implements SandboxKeepaliveStore {
     nowMs: number;
   }): Promise<{ active: boolean }> {
     this.pruneExpiredKeepalives(input.sandboxInstanceId, input.nowMs);
+    this.pruneExpiredState(input.sandboxInstanceId, input.nowMs);
     const currentKeepalives = this.#keepalivesBySandboxInstanceId.get(input.sandboxInstanceId);
+    const currentState = this.#stateBySandboxInstanceId.get(input.sandboxInstanceId);
     return {
-      active: currentKeepalives !== undefined && currentKeepalives.size > 0,
+      active:
+        (currentKeepalives !== undefined && currentKeepalives.size > 0) ||
+        currentState?.active === true,
     };
   }
 
@@ -167,6 +211,17 @@ export class InMemorySandboxKeepaliveStore implements SandboxKeepaliveStore {
 
     if (currentKeepalives.size === 0) {
       this.#keepalivesBySandboxInstanceId.delete(sandboxInstanceId);
+    }
+  }
+
+  private pruneExpiredState(sandboxInstanceId: string, nowMs: number = this.clock.nowMs()): void {
+    const currentState = this.#stateBySandboxInstanceId.get(sandboxInstanceId);
+    if (currentState === undefined) {
+      return;
+    }
+
+    if (currentState.expiresAtMs <= nowMs) {
+      this.#stateBySandboxInstanceId.delete(sandboxInstanceId);
     }
   }
 }

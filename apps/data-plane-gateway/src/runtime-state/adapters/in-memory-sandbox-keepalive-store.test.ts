@@ -105,4 +105,41 @@ describe("InMemorySandboxKeepaliveStore", () => {
       }),
     ).resolves.toEqual({ active: false });
   });
+
+  it("summarizes owner-fenced keepalive state independently of legacy keepalive records", async () => {
+    const clock = createMutableClock(1_000);
+    const store = new InMemorySandboxKeepaliveStore(clock);
+
+    await store.replaceStateForOwner({
+      sandboxInstanceId: "sbi_abc",
+      ownerLeaseId: "dtl_owner",
+      nodeId: "dpg_123",
+      ttlMs: 5_000,
+      nowMs: clock.nowMs(),
+      active: true,
+    });
+
+    await expect(
+      store.summarize({
+        sandboxInstanceId: "sbi_abc",
+        nowMs: clock.nowMs(),
+      }),
+    ).resolves.toEqual({ active: true });
+
+    await store.replaceStateForOwner({
+      sandboxInstanceId: "sbi_abc",
+      ownerLeaseId: "dtl_owner_next",
+      nodeId: "dpg_123",
+      ttlMs: 5_000,
+      nowMs: clock.nowMs(),
+      active: false,
+    });
+
+    await expect(
+      store.summarize({
+        sandboxInstanceId: "sbi_abc",
+        nowMs: clock.nowMs(),
+      }),
+    ).resolves.toEqual({ active: false });
+  });
 });

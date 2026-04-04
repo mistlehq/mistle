@@ -30,6 +30,18 @@ export interface SandboxKeepaliveStore {
   }): Promise<void>;
 
   /**
+   * Replaces the coarse owner-fenced keepalive projection for one sandbox.
+   */
+  replaceStateForOwner(input: {
+    sandboxInstanceId: string;
+    ownerLeaseId: string;
+    nodeId: string;
+    ttlMs: number;
+    nowMs: number;
+    active: boolean;
+  }): Promise<void>;
+
+  /**
    * Renews an existing keepalive record until `nowMs + ttlMs`.
    *
    * Returns `false` when the keepalive record does not exist.

@@ -64,7 +64,7 @@ export interface SandboxIdleController {
   /**
    * Handles a keepalive refresh for the same sandbox.
    */
-  handleActivityLeaseTouch(input: { leaseId: string; nowMs: number }): void;
+  handleActivityTouch(input: { nowMs: number }): void;
 
   /**
    * Transitions the controller into its disconnect-grace path.
@@ -129,7 +129,7 @@ export class LocalSandboxIdleController implements SandboxIdleController {
     this.scheduleIdleDeadline(input.nowMs + this.dependencies.timeoutMs, "presence_touch");
   }
 
-  handleActivityLeaseTouch(input: { leaseId: string; nowMs: number }): void {
+  handleActivityTouch(input: { nowMs: number }): void {
     if (this.#disposed || this.#inDisconnectGracePath) {
       return;
     }

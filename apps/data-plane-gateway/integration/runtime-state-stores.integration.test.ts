@@ -338,4 +338,56 @@ describe("runtime-state store integrations", () => {
       await closeValkeyClient(client);
     }
   });
+
+  it("summarizes owner-fenced keepalive state from valkey", async () => {
+    const keyPrefix = `mistle:runtime-state:keepalive-state-it:${randomUUID()}`;
+    const valkeyUrl = await readValkeyUrl();
+    const client = createValkeyClient({
+      url: valkeyUrl,
+    });
+    await client.connect();
+
+    try {
+      const store = new ValkeySandboxKeepaliveStore(client, keyPrefix);
+      const sandboxInstanceId = "sbi_keepalive_state_it";
+
+      await store.replaceStateForOwner({
+        sandboxInstanceId,
+        ownerLeaseId: "dtl_owner",
+        nodeId: "dpg_it",
+        ttlMs: 30_000,
+        nowMs: Date.now(),
+        active: true,
+      });
+
+      await expect(
+        store.summarize({
+          sandboxInstanceId,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toEqual({ active: true });
+
+      await store.replaceStateForOwner({
+        sandboxInstanceId,
+        ownerLeaseId: "dtl_owner_next",
+        nodeId: "dpg_it",
+        ttlMs: 30_000,
+        nowMs: Date.now(),
+        active: false,
+      });
+
+      await expect(
+        store.summarize({
+          sandboxInstanceId,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toEqual({ active: false });
+    } finally {
+      await deleteKeysByPrefix({
+        client,
+        keyPrefix,
+      });
+      await closeValkeyClient(client);
+    }
+  });
 });

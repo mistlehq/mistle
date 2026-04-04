@@ -423,6 +423,8 @@ export type ExecutionLease = z.infer<typeof ExecutionLeaseSchema>;
 export type LeaseCreate = z.infer<typeof LeaseCreateSchema>;
 export type LeaseRenew = z.infer<typeof LeaseRenewSchema>;
 export type LeaseControlMessage = z.infer<typeof LeaseControlMessageSchema>;
+export type SandboxKeepaliveState = z.infer<typeof SandboxKeepaliveStateSchema>;
+export type KeepaliveControlMessage = SandboxKeepaliveState;
 export type BootstrapControlMessage = z.infer<typeof BootstrapControlMessageSchema>;
 export type LiveListenerOwner = z.infer<typeof LiveListenerOwnerSchema>;
 export type LiveListener = z.infer<typeof LiveListenerSchema>;
@@ -506,4 +508,5 @@ export type PublishControlMessage = z.infer<typeof PublishControlMessageSchema>;
 export type SandboxSessionControlMessage =
   | StreamControlMessage
   | TelemetryControlMessage
-  | LeaseControlMessage;
+  | LeaseControlMessage
+  | KeepaliveControlMessage;

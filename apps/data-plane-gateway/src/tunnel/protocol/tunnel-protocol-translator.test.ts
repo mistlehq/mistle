@@ -565,6 +565,11 @@ describe("TunnelProtocolTranslator", () => {
       delivery: {
         kind: "drop",
       },
+      keepaliveControlMessage: {
+        type: "keepalive.state",
+        ttlMs: 30_000,
+        active: true,
+      },
     });
   });
 

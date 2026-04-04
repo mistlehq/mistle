@@ -397,8 +397,7 @@ describe("LocalSandboxIdleController", () => {
       });
 
       clock.advanceMs(3_000);
-      controller.handleActivityLeaseTouch({
-        leaseId: "sal_reschedule",
+      controller.handleActivityTouch({
         nowMs: clock.nowMs(),
       });
       await keepaliveStore.touchKeepalive({

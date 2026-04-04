@@ -19,6 +19,7 @@ import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js
 import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
 import { TunnelProtocolTranslator } from "./protocol/tunnel-protocol-translator.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
+import { SandboxKeepaliveRepository } from "./sandbox-keepalive-repository.js";
 import { type AttachedTunnelPeer, TunnelSessionService } from "./session/tunnel-session-service.js";
 import type { SandboxTelemetryIngressService } from "./telemetry-ingress/index.js";
 import { getSandboxTunnelSessionAttributes, getSandboxTunnelSessionSpanName } from "./telemetry.js";
@@ -79,6 +80,12 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
   });
   const tunnelProtocolTranslator = new TunnelProtocolTranslator(input.interactiveStreamRouter);
   const executionLeaseRepository = new ExecutionLeaseRepository(
+    input.sandboxKeepaliveStore,
+    input.sandboxIdleControllerRegistry,
+    input.clock,
+    input.gatewayNodeId,
+  );
+  const sandboxKeepaliveRepository = new SandboxKeepaliveRepository(
     input.sandboxKeepaliveStore,
     input.sandboxIdleControllerRegistry,
     input.clock,
@@ -266,9 +273,13 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             }
 
             void handleTunnelWebSocketMessage({
+              ...(admittedRequest.kind === "bootstrap"
+                ? { bootstrapOwnerLeaseId: admittedRequest.ownerLeaseId }
+                : {}),
               clientSessionId: relaySessionId,
               currentSocket: ws,
               executionLeaseRepository,
+              sandboxKeepaliveRepository,
               handleTelemetryDelivery: async (delivery) => {
                 await input.telemetryIngressService.handleDelivery({
                   delivery,
