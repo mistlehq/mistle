@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { SandboxRuntimeStateSnapshotSchema } from "@mistle/sandbox-runtime-contract";
 
 import type {
   SandboxRuntimeStateReader,
@@ -7,23 +7,6 @@ import type {
 
 const DefaultRequestTimeoutMs = 3_000;
 const DataPlaneInternalAuthHeader = "x-mistle-service-token";
-
-const SandboxRuntimeAttachmentSchema = z
-  .object({
-    sandboxInstanceId: z.string().min(1),
-    ownerLeaseId: z.string().min(1),
-    nodeId: z.string().min(1),
-    sessionId: z.string().min(1),
-    attachedAtMs: z.number().int().nonnegative(),
-  })
-  .strict();
-
-const SandboxRuntimeStateSnapshotSchema = z
-  .object({
-    ownerLeaseId: z.string().min(1).nullable(),
-    attachment: SandboxRuntimeAttachmentSchema.nullable(),
-  })
-  .strict();
 
 /**
  * Reads worker runtime-state snapshots through the gateway's internal HTTP API.

@@ -380,6 +380,9 @@ importers:
       '@mistle/sandbox':
         specifier: workspace:*
         version: link:../../packages/sandbox
+      '@mistle/sandbox-runtime-contract':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-runtime-contract
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
@@ -520,6 +523,9 @@ importers:
       '@mistle/sandbox-egress-auth':
         specifier: workspace:*
         version: link:../../packages/sandbox-egress-auth
+      '@mistle/sandbox-runtime-contract':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-runtime-contract
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
@@ -566,6 +572,9 @@ importers:
       '@mistle/sandbox-rs-napi':
         specifier: workspace:*
         version: link:../../packages/sandbox-rs-napi
+      '@mistle/sandbox-runtime-contract':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-runtime-contract
       '@mistle/sandbox-session-protocol':
         specifier: workspace:*
         version: link:../../packages/sandbox-session-protocol

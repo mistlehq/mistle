@@ -1,22 +1,16 @@
-import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "@mistle/integrations-core";
+import {
+  CompiledRuntimePlanSchema,
+  SandboxdStartupModes,
+  type CompiledRuntimePlan,
+  type SandboxdStartupInput,
+  type SandboxdStartupMode,
+} from "@mistle/sandbox-runtime-contract";
 
-export const RuntimeStartupModes = {
-  NEW: "new",
-  EXISTING: "existing",
-} as const;
+export const RuntimeStartupModes = SandboxdStartupModes;
 
-export type RuntimeStartupMode = (typeof RuntimeStartupModes)[keyof typeof RuntimeStartupModes];
+export type RuntimeStartupMode = SandboxdStartupMode;
 
-export type StartupInput = {
-  // `new` performs initial provisioning from the runtime plan. `existing`
-  // reuses the sandbox filesystem as-is and only restarts processes/tunnel.
-  startupMode: RuntimeStartupMode;
-  bootstrapToken: string;
-  tunnelExchangeToken: string;
-  tunnelGatewayWsUrl: string;
-  runtimePlan: CompiledRuntimePlan;
-  egressGrantByRuleId: Record<string, string>;
-};
+export type StartupInput = SandboxdStartupInput;
 
 function normalizeRequiredString(value: string, fieldLabel: string): string {
   const trimmedValue = value.trim();

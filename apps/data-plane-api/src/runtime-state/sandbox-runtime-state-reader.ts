@@ -1,15 +1,9 @@
-export type SandboxRuntimeAttachment = {
-  sandboxInstanceId: string;
-  ownerLeaseId: string;
-  nodeId: string;
-  sessionId: string;
-  attachedAtMs: number;
-};
+import type {
+  SandboxRuntimeAttachment,
+  SandboxRuntimeStateSnapshot,
+} from "@mistle/sandbox-runtime-contract";
 
-export type SandboxRuntimeStateSnapshot = {
-  ownerLeaseId: string | null;
-  attachment: SandboxRuntimeAttachment | null;
-};
+export type { SandboxRuntimeAttachment, SandboxRuntimeStateSnapshot };
 
 /**
  * Reads the latest gateway-owned runtime-state snapshot for one sandbox.

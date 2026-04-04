@@ -24,6 +24,7 @@
     "@mistle/integrations-core": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
     "@mistle/sandbox-rs-napi": "workspace:*",
+    "@mistle/sandbox-runtime-contract": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/time": "workspace:*",
     "undici": "7.24.6",

@@ -1,25 +1,9 @@
-/**
- * A worker-readable record of the current bootstrap attachment for a sandbox.
- *
- * The worker uses this attachment together with the current owner lease to make
- * readiness and stop-fencing decisions without depending on Postgres liveliness
- * columns.
- */
-export type SandboxRuntimeAttachment = {
-  sandboxInstanceId: string;
-  ownerLeaseId: string;
-  nodeId: string;
-  sessionId: string;
-  attachedAtMs: number;
-};
+import type {
+  SandboxRuntimeAttachment,
+  SandboxRuntimeStateSnapshot,
+} from "@mistle/sandbox-runtime-contract";
 
-/**
- * A snapshot of the worker-visible runtime state for one sandbox instance.
- */
-export type SandboxRuntimeStateSnapshot = {
-  ownerLeaseId: string | null;
-  attachment: SandboxRuntimeAttachment | null;
-};
+export type { SandboxRuntimeAttachment, SandboxRuntimeStateSnapshot };
 
 /**
  * Reads worker-visible runtime state regardless of the backing implementation.

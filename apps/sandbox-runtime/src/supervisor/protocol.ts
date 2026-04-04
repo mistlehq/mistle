@@ -1,20 +1,15 @@
-import { type StartupInput, parseStartupInputPayload } from "../runtime/startup-input.js";
+import type {
+  SandboxdStartupApplyRequest,
+  SandboxdStartupApplyResponse,
+} from "@mistle/sandbox-runtime-contract";
+
+import { parseStartupInputPayload } from "../runtime/startup-input.js";
 
 export const DefaultSupervisorMessageMaxBytes = 1024 * 1024;
 
-export type StartupApplyRequest = {
-  token: string;
-  startupInput: StartupInput;
-};
+export type StartupApplyRequest = SandboxdStartupApplyRequest;
 
-export type StartupApplyResponse =
-  | {
-      ok: true;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
+export type StartupApplyResponse = SandboxdStartupApplyResponse;
 
 function normalizeRequiredString(value: string, fieldLabel: string): string {
   const trimmedValue = value.trim();
