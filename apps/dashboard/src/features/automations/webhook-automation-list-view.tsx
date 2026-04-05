@@ -7,7 +7,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@mistle/ui";
+import { WarningCircleIcon } from "@phosphor-icons/react";
 
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
@@ -137,14 +141,27 @@ function AutomationStatusDot(input: { enabled: boolean }): React.JSX.Element {
   );
 }
 
-function AutomationIssueMessage(input: {
+function AutomationIssueIndicator(input: {
   issue: WebhookAutomationListItemViewModel["issue"];
-}): React.JSX.Element | null {
+  enabled: boolean;
+}): React.JSX.Element {
   if (input.issue === undefined) {
-    return null;
+    return <AutomationStatusDot enabled={input.enabled} />;
   }
 
-  return <p className="text-destructive text-xs leading-5">{input.issue.message}</p>;
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        aria-label="View automation issue details"
+        className="inline-flex shrink-0 items-center justify-center rounded-full text-destructive outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        <WarningCircleIcon aria-hidden className="size-4 fill-current" weight="fill" />
+      </TooltipTrigger>
+      <TooltipContent className="max-w-80 whitespace-pre-wrap text-left" side="top">
+        {input.issue.message}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 function AutomationIdentityCell(input: {
@@ -154,7 +171,7 @@ function AutomationIdentityCell(input: {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
-        <AutomationStatusDot enabled={input.item.enabled} />
+        <AutomationIssueIndicator enabled={input.item.enabled} issue={input.item.issue} />
         <button
           className="text-left font-medium underline-offset-4 hover:underline"
           onClick={() => {
@@ -165,7 +182,6 @@ function AutomationIdentityCell(input: {
           {input.item.name}
         </button>
       </div>
-      <AutomationIssueMessage issue={input.item.issue} />
     </div>
   );
 }

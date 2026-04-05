@@ -65,7 +65,7 @@ describe("resolveEventSummary", () => {
 });
 
 describe("WebhookAutomationListView", () => {
-  it("shows row-level issue messages for affected automations", () => {
+  it("renders a compact row-level issue indicator with tooltip details", () => {
     render(
       createElement(WebhookAutomationListView, {
         errorMessage: null,
@@ -88,11 +88,12 @@ describe("WebhookAutomationListView", () => {
       }),
     );
 
+    expect(screen.getByLabelText("View automation issue details")).toBeDefined();
     expect(
-      screen.getByText(
+      screen.queryByText(
         "This automation references an integration target definition that is no longer available. Event metadata may be incomplete.",
       ),
-    ).toBeDefined();
+    ).toBeNull();
   });
 
   it("renders load errors without a retry action", () => {
