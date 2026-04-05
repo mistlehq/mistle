@@ -7,10 +7,24 @@ use crate::protocol::startup::StartupInput;
 
 use super::ApplyStartupError;
 
-pub fn persist_manifest(path: &Path, startup_input: &StartupInput) -> Result<(), ApplyStartupError> {
-    let parent_dir = path.parent().ok_or_else(|| ApplyStartupError::MissingManifestParent {
+pub fn load_manifest(path: &Path) -> Result<StartupInput, ApplyStartupError> {
+    let manifest_bytes = fs::read(path).map_err(|error| ApplyStartupError::ReadManifest {
         path: path.to_path_buf(),
+        error,
     })?;
+
+    serde_json::from_slice(&manifest_bytes).map_err(ApplyStartupError::InvalidManifest)
+}
+
+pub fn persist_manifest(
+    path: &Path,
+    startup_input: &StartupInput,
+) -> Result<(), ApplyStartupError> {
+    let parent_dir = path
+        .parent()
+        .ok_or_else(|| ApplyStartupError::MissingManifestParent {
+            path: path.to_path_buf(),
+        })?;
 
     fs::create_dir_all(parent_dir).map_err(|error| ApplyStartupError::CreateManifestDirectory {
         path: parent_dir.to_path_buf(),

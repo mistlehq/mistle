@@ -1,9 +1,10 @@
-mod manifest;
+pub(crate) mod manifest;
 
 use std::fmt;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
+use crate::control;
 use crate::protocol::startup::{
     StartupApplyErrorResponse, StartupApplyOkResponse, StartupApplyRequest,
 };
@@ -41,6 +42,12 @@ pub enum ApplyStartupError {
         error: std::io::Error,
     },
     SerializeManifest(serde_json::Error),
+    ReadManifest {
+        path: PathBuf,
+        error: std::io::Error,
+    },
+    InvalidManifest(serde_json::Error),
+    NotifyReload(String),
 }
 
 impl fmt::Display for ApplyStartupError {
@@ -50,12 +57,18 @@ impl fmt::Display for ApplyStartupError {
             Self::InvalidRequest(error) => {
                 write!(f, "startup apply request must be valid json: {error}")
             }
-            Self::WriteResponse(error) => write!(f, "failed to write startup apply response: {error}"),
+            Self::WriteResponse(error) => {
+                write!(f, "failed to write startup apply response: {error}")
+            }
             Self::SerializeResponse(error) => {
                 write!(f, "failed to serialize startup apply response: {error}")
             }
             Self::MissingManifestParent { path } => {
-                write!(f, "manifest path {} has no parent directory", path.display())
+                write!(
+                    f,
+                    "manifest path {} has no parent directory",
+                    path.display()
+                )
             }
             Self::CreateManifestDirectory { path, error } => write!(
                 f,
@@ -63,13 +76,25 @@ impl fmt::Display for ApplyStartupError {
                 path.display()
             ),
             Self::CreateTempManifest { path, error } => {
-                write!(f, "failed to create temp manifest {}: {error}", path.display())
+                write!(
+                    f,
+                    "failed to create temp manifest {}: {error}",
+                    path.display()
+                )
             }
             Self::WriteTempManifest { path, error } => {
-                write!(f, "failed to write temp manifest {}: {error}", path.display())
+                write!(
+                    f,
+                    "failed to write temp manifest {}: {error}",
+                    path.display()
+                )
             }
             Self::FlushTempManifest { path, error } => {
-                write!(f, "failed to flush temp manifest {}: {error}", path.display())
+                write!(
+                    f,
+                    "failed to flush temp manifest {}: {error}",
+                    path.display()
+                )
             }
             Self::ReplaceManifest { from, to, error } => write!(
                 f,
@@ -79,6 +104,16 @@ impl fmt::Display for ApplyStartupError {
             ),
             Self::SerializeManifest(error) => {
                 write!(f, "failed to serialize startup manifest: {error}")
+            }
+            Self::ReadManifest { path, error } => {
+                write!(f, "failed to read manifest {}: {error}", path.display())
+            }
+            Self::InvalidManifest(error) => write!(f, "manifest is invalid: {error}"),
+            Self::NotifyReload(error) => {
+                write!(
+                    f,
+                    "failed to notify running sandboxd serve process: {error}"
+                )
             }
         }
     }
@@ -90,6 +125,7 @@ pub fn run_apply_startup<R, W>(
     reader: &mut R,
     writer: &mut W,
     manifest_path: &Path,
+    control_socket_path: &Path,
 ) -> Result<(), ApplyStartupError>
 where
     R: Read,
@@ -128,6 +164,8 @@ where
     // control-plane data and should not become part of durable sandbox state.
     match manifest::persist_manifest(manifest_path, &request.startup_input) {
         Ok(()) => {
+            control::notify_reload(control_socket_path)
+                .map_err(|error| ApplyStartupError::NotifyReload(error.to_string()))?;
             write_response(writer, &StartupApplyOkResponse { ok: true })?;
             Ok(())
         }
@@ -166,20 +204,28 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    use crate::control;
     use crate::protocol::startup::{StartupApplyResponse, StartupInput, StartupMode};
 
     use super::run_apply_startup;
 
     #[test]
     fn persists_manifest_and_writes_ok_response() {
-        let request =
-            include_str!("../../../sandbox-runtime-contract/tests/fixtures/startup-apply-request.valid.json");
+        let request = include_str!(
+            "../../../sandbox-runtime-contract/tests/fixtures/startup-apply-request.valid.json"
+        );
         let test_dir = create_temp_test_dir("apply_startup_ok");
         let manifest_path = test_dir.join("manifest.json");
+        let control_socket_path = test_dir.join("control.sock");
         let mut stdout = Vec::new();
 
-        run_apply_startup(&mut request.as_bytes(), &mut stdout, &manifest_path)
-            .expect("apply-startup should persist a valid manifest");
+        run_apply_startup(
+            &mut request.as_bytes(),
+            &mut stdout,
+            &manifest_path,
+            &control_socket_path,
+        )
+        .expect("apply-startup should persist a valid manifest");
 
         let response: StartupApplyResponse =
             serde_json::from_slice(&stdout).expect("apply-startup should write a valid response");
@@ -205,9 +251,15 @@ mod tests {
         let mut invalid_request = br#"{"token":""}"#.as_slice();
         let test_dir = create_temp_test_dir("apply_startup_invalid");
         let manifest_path = test_dir.join("manifest.json");
+        let control_socket_path = test_dir.join("control.sock");
 
-        let error = run_apply_startup(&mut invalid_request, &mut stdout, &manifest_path)
-            .expect_err("invalid request should fail");
+        let error = run_apply_startup(
+            &mut invalid_request,
+            &mut stdout,
+            &manifest_path,
+            &control_socket_path,
+        )
+        .expect_err("invalid request should fail");
         let response: StartupApplyResponse =
             serde_json::from_slice(&stdout).expect("failed apply-startup should write a response");
 
@@ -226,13 +278,44 @@ mod tests {
         fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
+    #[test]
+    fn notifies_running_control_server_after_persisting_manifest() {
+        let request = include_str!(
+            "../../../sandbox-runtime-contract/tests/fixtures/startup-apply-request.valid.json"
+        );
+        let test_dir = create_temp_test_dir("apply_startup_control_reload");
+        let manifest_path = test_dir.join("manifest.json");
+        let control_socket_path = test_dir.join("control.sock");
+        let mut stdout = Vec::new();
+        let server = control::start_control_server(&control_socket_path, &manifest_path)
+            .expect("control server should start");
+
+        run_apply_startup(
+            &mut request.as_bytes(),
+            &mut stdout,
+            &manifest_path,
+            &control_socket_path,
+        )
+        .expect("apply-startup should notify the running control server");
+
+        assert_eq!(server.reload_count(), 1);
+        let latest_manifest = server
+            .latest_manifest()
+            .expect("control server should load the persisted manifest");
+        assert_eq!(latest_manifest.bootstrap_token, "bootstrap-token-value");
+
+        server.close().expect("control server should stop cleanly");
+        fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
     fn create_temp_test_dir(prefix: &str) -> PathBuf {
         let unique_suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system time should be after unix epoch")
             .as_nanos();
-        let path = std::env::temp_dir().join(format!(
-            "sandboxd_{prefix}_{}_{}",
+        let short_prefix = &prefix[..prefix.len().min(8)];
+        let path = PathBuf::from("/tmp").join(format!(
+            "sbd_{short_prefix}_{}_{}",
             std::process::id(),
             unique_suffix
         ));

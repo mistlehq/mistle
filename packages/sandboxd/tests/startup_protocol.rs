@@ -4,7 +4,8 @@ use sandboxd::protocol::startup::{
 
 #[test]
 fn decodes_startup_input_fixture() {
-    let fixture = include_str!("../../sandbox-runtime-contract/tests/fixtures/startup-input.valid.json");
+    let fixture =
+        include_str!("../../sandbox-runtime-contract/tests/fixtures/startup-input.valid.json");
 
     let startup_input: StartupInput =
         serde_json::from_str(fixture).expect("startup-input fixture should decode");
@@ -49,7 +50,10 @@ fn decodes_startup_apply_ok_response_fixture() {
     let response: StartupApplyResponse =
         serde_json::from_str(fixture).expect("startup apply ok fixture should decode");
 
-    assert_eq!(response, StartupApplyResponse::Ok(sandboxd::protocol::startup::StartupApplyOkResponse { ok: true }));
+    assert_eq!(
+        response,
+        StartupApplyResponse::Ok(sandboxd::protocol::startup::StartupApplyOkResponse { ok: true })
+    );
 }
 
 #[test]

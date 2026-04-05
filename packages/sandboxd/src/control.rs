@@ -1,0 +1,467 @@
+use std::fmt;
+use std::fs;
+use std::io::{Read, Write};
+use std::os::unix::fs::FileTypeExt;
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::path::{Path, PathBuf};
+use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
+use std::thread::{self, JoinHandle};
+use std::time::Duration;
+
+use serde::{Deserialize, Serialize};
+
+use crate::apply_startup::manifest;
+use crate::protocol::startup::StartupInput;
+
+pub const DEFAULT_CONTROL_SOCKET_PATH: &str = "/run/mistle/sandboxd/control.sock";
+
+#[derive(Debug)]
+pub enum ControlError {
+    MissingSocketParent {
+        path: PathBuf,
+    },
+    CreateSocketDirectory {
+        path: PathBuf,
+        error: std::io::Error,
+    },
+    ReadSocketMetadata {
+        path: PathBuf,
+        error: std::io::Error,
+    },
+    ExistingSocketPathIsNotSocket {
+        path: PathBuf,
+    },
+    RemoveStaleSocket {
+        path: PathBuf,
+        error: std::io::Error,
+    },
+    BindSocket {
+        path: PathBuf,
+        error: std::io::Error,
+    },
+    AcceptConnection(std::io::Error),
+    ReadRequest(std::io::Error),
+    InvalidRequest(serde_json::Error),
+    InvalidResponse(serde_json::Error),
+    LoadManifest(String),
+    ResponseError(String),
+    SerializeResponse(serde_json::Error),
+    WriteResponse(std::io::Error),
+    ConnectSocket {
+        path: PathBuf,
+        error: std::io::Error,
+    },
+    ShutdownSend,
+    ServerPanicked,
+}
+
+impl fmt::Display for ControlError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingSocketParent { path } => {
+                write!(
+                    f,
+                    "control socket path {} has no parent directory",
+                    path.display()
+                )
+            }
+            Self::CreateSocketDirectory { path, error } => write!(
+                f,
+                "failed to create control socket directory {}: {error}",
+                path.display()
+            ),
+            Self::ReadSocketMetadata { path, error } => write!(
+                f,
+                "failed to inspect control socket path {}: {error}",
+                path.display()
+            ),
+            Self::ExistingSocketPathIsNotSocket { path } => write!(
+                f,
+                "control socket path {} already exists and is not a unix socket",
+                path.display()
+            ),
+            Self::RemoveStaleSocket { path, error } => {
+                write!(
+                    f,
+                    "failed to remove stale control socket {}: {error}",
+                    path.display()
+                )
+            }
+            Self::BindSocket { path, error } => {
+                write!(
+                    f,
+                    "failed to bind control socket {}: {error}",
+                    path.display()
+                )
+            }
+            Self::AcceptConnection(error) => {
+                write!(f, "failed to accept control socket connection: {error}")
+            }
+            Self::ReadRequest(error) => write!(f, "failed to read control socket request: {error}"),
+            Self::InvalidRequest(error) => {
+                write!(f, "control socket request must be valid json: {error}")
+            }
+            Self::InvalidResponse(error) => {
+                write!(f, "control socket response must be valid json: {error}")
+            }
+            Self::LoadManifest(error) => write!(f, "failed to reload startup manifest: {error}"),
+            Self::ResponseError(error) => write!(f, "control socket returned an error: {error}"),
+            Self::SerializeResponse(error) => {
+                write!(f, "failed to serialize control socket response: {error}")
+            }
+            Self::WriteResponse(error) => {
+                write!(f, "failed to write control socket response: {error}")
+            }
+            Self::ConnectSocket { path, error } => {
+                write!(
+                    f,
+                    "failed to connect to control socket {}: {error}",
+                    path.display()
+                )
+            }
+            Self::ShutdownSend => write!(f, "failed to signal control socket shutdown"),
+            Self::ServerPanicked => write!(f, "control socket server panicked"),
+        }
+    }
+}
+
+impl std::error::Error for ControlError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+enum ControlRequest {
+    #[serde(rename = "reload.startup")]
+    ReloadStartup,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ControlResponse {
+    ok: bool,
+    error: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct ControlServerState {
+    reload_count: usize,
+    latest_manifest: Option<StartupInput>,
+}
+
+pub struct StartedControlServer {
+    state: Arc<Mutex<ControlServerState>>,
+    shutdown_sender: mpsc::Sender<()>,
+    thread: Option<JoinHandle<Result<(), ControlError>>>,
+}
+
+impl StartedControlServer {
+    pub fn reload_count(&self) -> usize {
+        self.state
+            .lock()
+            .expect("control server state lock should not be poisoned")
+            .reload_count
+    }
+
+    pub fn latest_manifest(&self) -> Option<StartupInput> {
+        self.state
+            .lock()
+            .expect("control server state lock should not be poisoned")
+            .latest_manifest
+            .clone()
+    }
+
+    pub fn close(mut self) -> Result<(), ControlError> {
+        self.shutdown_sender
+            .send(())
+            .map_err(|_| ControlError::ShutdownSend)?;
+
+        let thread = self
+            .thread
+            .take()
+            .expect("control server thread should exist");
+        match thread.join() {
+            Ok(result) => result,
+            Err(_) => Err(ControlError::ServerPanicked),
+        }
+    }
+
+    pub fn wait(mut self) -> Result<(), ControlError> {
+        let thread = self
+            .thread
+            .take()
+            .expect("control server thread should exist");
+        match thread.join() {
+            Ok(result) => result,
+            Err(_) => Err(ControlError::ServerPanicked),
+        }
+    }
+}
+
+pub fn start_control_server(
+    socket_path: &Path,
+    manifest_path: &Path,
+) -> Result<StartedControlServer, ControlError> {
+    let parent_dir = socket_path
+        .parent()
+        .ok_or_else(|| ControlError::MissingSocketParent {
+            path: socket_path.to_path_buf(),
+        })?;
+    fs::create_dir_all(parent_dir).map_err(|error| ControlError::CreateSocketDirectory {
+        path: parent_dir.to_path_buf(),
+        error,
+    })?;
+    remove_stale_socket(socket_path)?;
+
+    let listener = UnixListener::bind(socket_path).map_err(|error| ControlError::BindSocket {
+        path: socket_path.to_path_buf(),
+        error,
+    })?;
+    listener
+        .set_nonblocking(true)
+        .map_err(|error| ControlError::BindSocket {
+            path: socket_path.to_path_buf(),
+            error,
+        })?;
+
+    let state = Arc::new(Mutex::new(ControlServerState {
+        reload_count: 0,
+        latest_manifest: None,
+    }));
+    let (shutdown_sender, shutdown_receiver) = mpsc::channel::<()>();
+    let state_for_thread = state.clone();
+    let socket_path_for_thread = socket_path.to_path_buf();
+    let manifest_path_for_thread = manifest_path.to_path_buf();
+
+    let thread = thread::spawn(move || {
+        let result = run_control_server_loop(
+            listener,
+            &manifest_path_for_thread,
+            &state_for_thread,
+            &shutdown_receiver,
+        );
+        let _ = fs::remove_file(&socket_path_for_thread);
+        result
+    });
+
+    Ok(StartedControlServer {
+        state,
+        shutdown_sender,
+        thread: Some(thread),
+    })
+}
+
+pub fn notify_reload(socket_path: &Path) -> Result<(), ControlError> {
+    let mut stream = match UnixStream::connect(socket_path) {
+        Ok(stream) => stream,
+        Err(error)
+            if matches!(
+                error.kind(),
+                std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused
+            ) =>
+        {
+            return Ok(());
+        }
+        Err(error) => {
+            return Err(ControlError::ConnectSocket {
+                path: socket_path.to_path_buf(),
+                error,
+            });
+        }
+    };
+
+    let request = serde_json::to_vec(&ControlRequest::ReloadStartup)
+        .map_err(ControlError::SerializeResponse)?;
+    stream
+        .write_all(&request)
+        .map_err(ControlError::WriteResponse)?;
+    stream
+        .shutdown(std::net::Shutdown::Write)
+        .map_err(ControlError::WriteResponse)?;
+
+    let mut raw_response = Vec::new();
+    stream
+        .read_to_end(&mut raw_response)
+        .map_err(ControlError::ReadRequest)?;
+    let response: ControlResponse =
+        serde_json::from_slice(&raw_response).map_err(ControlError::InvalidResponse)?;
+
+    if response.ok {
+        return Ok(());
+    }
+
+    Err(ControlError::ResponseError(response.error.unwrap_or_else(
+        || "control socket returned ok=false without an error".to_string(),
+    )))
+}
+
+fn run_control_server_loop(
+    listener: UnixListener,
+    manifest_path: &Path,
+    state: &Arc<Mutex<ControlServerState>>,
+    shutdown_receiver: &mpsc::Receiver<()>,
+) -> Result<(), ControlError> {
+    loop {
+        if shutdown_receiver.try_recv().is_ok() {
+            return Ok(());
+        }
+
+        match listener.accept() {
+            Ok((mut stream, _)) => {
+                let response = match handle_connection(&mut stream, manifest_path, state) {
+                    Ok(()) => ControlResponse {
+                        ok: true,
+                        error: None,
+                    },
+                    Err(error) => ControlResponse {
+                        ok: false,
+                        error: Some(error.to_string()),
+                    },
+                };
+                write_control_response(&mut stream, &response)?;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) => {
+                return Err(ControlError::AcceptConnection(error));
+            }
+        }
+    }
+}
+
+fn handle_connection(
+    stream: &mut UnixStream,
+    manifest_path: &Path,
+    state: &Arc<Mutex<ControlServerState>>,
+) -> Result<(), ControlError> {
+    let mut raw_request = Vec::new();
+    stream
+        .read_to_end(&mut raw_request)
+        .map_err(ControlError::ReadRequest)?;
+    let request: ControlRequest =
+        serde_json::from_slice(&raw_request).map_err(ControlError::InvalidRequest)?;
+
+    match request {
+        ControlRequest::ReloadStartup => {
+            let manifest = manifest::load_manifest(manifest_path)
+                .map_err(|error| ControlError::LoadManifest(error.to_string()))?;
+            let mut state = state
+                .lock()
+                .expect("control server state lock should not be poisoned");
+            state.reload_count += 1;
+            state.latest_manifest = Some(manifest);
+            Ok(())
+        }
+    }
+}
+
+fn write_control_response(
+    stream: &mut UnixStream,
+    response: &ControlResponse,
+) -> Result<(), ControlError> {
+    let response_bytes = serde_json::to_vec(response).map_err(ControlError::SerializeResponse)?;
+    stream
+        .write_all(&response_bytes)
+        .map_err(ControlError::WriteResponse)
+}
+
+fn remove_stale_socket(socket_path: &Path) -> Result<(), ControlError> {
+    match fs::symlink_metadata(socket_path) {
+        Ok(metadata) => {
+            if !metadata.file_type().is_socket() {
+                return Err(ControlError::ExistingSocketPathIsNotSocket {
+                    path: socket_path.to_path_buf(),
+                });
+            }
+            fs::remove_file(socket_path).map_err(|error| ControlError::RemoveStaleSocket {
+                path: socket_path.to_path_buf(),
+                error,
+            })
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(ControlError::ReadSocketMetadata {
+            path: socket_path.to_path_buf(),
+            error,
+        }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::{notify_reload, start_control_server};
+    use crate::apply_startup::manifest::persist_manifest;
+    use crate::protocol::startup::{StartupInput, StartupMode};
+
+    #[test]
+    fn reloads_manifest_from_control_socket() {
+        let test_dir = create_temp_test_dir("control_reload");
+        let socket_path = test_dir.join("control.sock");
+        let manifest_path = test_dir.join("manifest.json");
+        let startup_input = valid_startup_input("bootstrap-token-value");
+
+        persist_manifest(&manifest_path, &startup_input)
+            .expect("manifest should persist before reload");
+        let server = start_control_server(&socket_path, &manifest_path)
+            .expect("control server should start");
+
+        notify_reload(&socket_path).expect("reload notification should succeed");
+
+        assert_eq!(server.reload_count(), 1);
+        assert_eq!(server.latest_manifest(), Some(startup_input));
+
+        server.close().expect("control server should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn ignores_missing_control_socket() {
+        let test_dir = create_temp_test_dir("control_missing_socket");
+        let socket_path = test_dir.join("missing.sock");
+
+        notify_reload(&socket_path).expect("missing control socket should be ignored");
+
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    fn valid_startup_input(bootstrap_token: &str) -> StartupInput {
+        StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: bootstrap_token.to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: "wss://gateway.example.test".to_string(),
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "registry.example.test/base:latest"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: std::collections::BTreeMap::new(),
+        }
+    }
+
+    fn create_temp_test_dir(prefix: &str) -> std::path::PathBuf {
+        let unique_suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        let short_prefix = &prefix[..prefix.len().min(8)];
+        let path = std::path::Path::new("/tmp").join(format!(
+            "sbd_{short_prefix}_{}_{}",
+            std::process::id(),
+            unique_suffix
+        ));
+
+        std::fs::create_dir_all(&path).expect("temp test dir should be creatable");
+
+        path
+    }
+}

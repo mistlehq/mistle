@@ -3,6 +3,7 @@ use std::io;
 use std::path::Path;
 
 pub mod apply_startup;
+pub mod control;
 pub mod protocol;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -82,11 +83,31 @@ where
     };
 
     match command {
-        SandboxdCommand::Serve => 0,
+        SandboxdCommand::Serve => {
+            let server = match control::start_control_server(
+                Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
+                Path::new(apply_startup::DEFAULT_MANIFEST_PATH),
+            ) {
+                Ok(server) => server,
+                Err(error) => {
+                    let _ = writeln!(stderr, "{error}");
+                    return 1;
+                }
+            };
+
+            match server.wait() {
+                Ok(()) => 0,
+                Err(error) => {
+                    let _ = writeln!(stderr, "{error}");
+                    1
+                }
+            }
+        }
         SandboxdCommand::ApplyStartup => match apply_startup::run_apply_startup(
             stdin,
             stdout,
             Path::new(apply_startup::DEFAULT_MANIFEST_PATH),
+            Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
         ) {
             Ok(()) => 0,
             Err(_) => 1,
