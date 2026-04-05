@@ -6,8 +6,11 @@ use std::fmt;
 
 use crate::command::{CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL, run_command};
 use crate::time::{SystemClock, ThreadSleeper};
-
-pub use plan::CompiledRuntimePlan;
+pub use plan::{
+    CompiledRuntimePlan, RuntimeArtifactCommand, RuntimeClientProcessReadiness,
+    RuntimeClientProcessStopPolicy, RuntimeClientProcessStopSignal,
+};
+pub(crate) use plan::RuntimeClient;
 
 #[derive(Debug)]
 pub enum RuntimePlanApplyError {

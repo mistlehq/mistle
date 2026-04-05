@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::apply_startup::ApplyStartupError;
 use crate::apply_startup::manifest;
+use crate::process;
 use crate::protocol::startup::StartupInput;
 use crate::runtime;
 use crate::time::Sleeper;
@@ -60,6 +61,8 @@ pub enum ControlError {
     InvalidResponse(serde_json::Error),
     LoadManifest(String),
     ApplyRuntimePlan(String),
+    StartProcessManager(String),
+    StopProcessManager(String),
     ResponseError(String),
     SerializeResponse(serde_json::Error),
     WriteResponse(std::io::Error),
@@ -127,6 +130,12 @@ impl fmt::Display for ControlError {
             Self::ApplyRuntimePlan(error) => {
                 write!(f, "failed to apply startup manifest runtime plan: {error}")
             }
+            Self::StartProcessManager(error) => {
+                write!(f, "failed to start runtime client processes: {error}")
+            }
+            Self::StopProcessManager(error) => {
+                write!(f, "failed to stop runtime client processes: {error}")
+            }
             Self::ResponseError(error) => write!(f, "control socket returned an error: {error}"),
             Self::SerializeResponse(error) => {
                 write!(f, "failed to serialize control socket response: {error}")
@@ -166,10 +175,11 @@ struct ControlResponse {
 }
 
 /// Tracks observable control-server state for tests and later supervisor wiring.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ControlServerState {
     reload_count: usize,
     latest_manifest: Option<StartupInput>,
+    process_manager: Option<process::RuntimeClientProcessManager>,
 }
 
 /// Owns one running control socket server thread and its observable state.
@@ -207,10 +217,14 @@ impl ControlServer {
             .thread
             .take()
             .expect("control server thread should exist");
-        match thread.join() {
+        let thread_result = match thread.join() {
             Ok(result) => result,
             Err(_) => Err(ControlError::ServerPanicked),
-        }
+        };
+        let stop_result = stop_managed_processes(&self.state);
+
+        thread_result?;
+        stop_result
     }
 
     /// Waits for the control server thread to exit without sending a shutdown signal first.
@@ -219,10 +233,14 @@ impl ControlServer {
             .thread
             .take()
             .expect("control server thread should exist");
-        match thread.join() {
+        let thread_result = match thread.join() {
             Ok(result) => result,
             Err(_) => Err(ControlError::ServerPanicked),
-        }
+        };
+        let stop_result = stop_managed_processes(&self.state);
+
+        thread_result?;
+        stop_result
     }
 }
 
@@ -261,6 +279,7 @@ where
     let state = Arc::new(Mutex::new(ControlServerState {
         reload_count: 0,
         latest_manifest: None,
+        process_manager: None,
     }));
     load_persisted_manifest_if_present(manifest_path, &state)?;
     let (shutdown_sender, shutdown_receiver) = mpsc::channel::<()>();
@@ -428,8 +447,21 @@ fn apply_loaded_manifest(
     let runtime_plan: runtime::CompiledRuntimePlan =
         serde_json::from_value(manifest.runtime_plan.clone())
             .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
+    take_process_manager(state)
+        .map(|process_manager| process_manager.stop())
+        .transpose()
+        .map_err(|error| ControlError::StopProcessManager(error.to_string()))?;
     runtime::apply_runtime_plan(&runtime_plan)
         .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
+    let process_specs = process::flatten_runtime_client_processes(&runtime_plan.runtime_clients);
+    let process_manager = if process_specs.is_empty() {
+        None
+    } else {
+        Some(
+            process::start_runtime_client_process_manager(&process_specs)
+                .map_err(|error| ControlError::StartProcessManager(error.to_string()))?,
+        )
+    };
 
     let mut state = state
         .lock()
@@ -438,6 +470,24 @@ fn apply_loaded_manifest(
         state.reload_count += 1;
     }
     state.latest_manifest = Some(manifest);
+    state.process_manager = process_manager;
+    Ok(())
+}
+
+fn take_process_manager(
+    state: &Arc<Mutex<ControlServerState>>,
+) -> Option<process::RuntimeClientProcessManager> {
+    state.lock()
+        .expect("control server state lock should not be poisoned")
+        .process_manager
+        .take()
+}
+
+fn stop_managed_processes(state: &Arc<Mutex<ControlServerState>>) -> Result<(), ControlError> {
+    take_process_manager(state)
+        .map(|process_manager| process_manager.stop())
+        .transpose()
+        .map_err(|error| ControlError::StopProcessManager(error.to_string()))?;
     Ok(())
 }
 

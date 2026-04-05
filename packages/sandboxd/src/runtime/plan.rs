@@ -66,8 +66,61 @@ pub struct RuntimeClientSetup {
 pub struct RuntimeClient {
     pub client_id: String,
     pub setup: RuntimeClientSetup,
-    pub processes: Vec<serde_json::Value>,
+    pub processes: Vec<RuntimeClientProcess>,
     pub endpoints: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeClientProcess {
+    pub process_key: String,
+    pub command: RuntimeArtifactCommand,
+    pub readiness: RuntimeClientProcessReadiness,
+    pub stop: RuntimeClientProcessStopPolicy,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(tag = "type")]
+pub enum RuntimeClientProcessReadiness {
+    #[serde(rename = "none")]
+    None,
+    #[serde(rename = "tcp")]
+    Tcp {
+        host: String,
+        port: u16,
+        #[serde(rename = "timeoutMs")]
+        timeout_ms: u64,
+    },
+    #[serde(rename = "http")]
+    Http {
+        url: String,
+        #[serde(rename = "expectedStatus")]
+        expected_status: u16,
+        #[serde(rename = "timeoutMs")]
+        timeout_ms: u64,
+    },
+    #[serde(rename = "ws")]
+    Ws {
+        url: String,
+        #[serde(rename = "timeoutMs")]
+        timeout_ms: u64,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeClientProcessStopPolicy {
+    pub signal: RuntimeClientProcessStopSignal,
+    pub timeout_ms: u64,
+    pub grace_period_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum RuntimeClientProcessStopSignal {
+    #[serde(rename = "sigterm")]
+    Sigterm,
+    #[serde(rename = "sigkill")]
+    Sigkill,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
