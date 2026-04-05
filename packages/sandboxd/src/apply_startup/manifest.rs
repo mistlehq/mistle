@@ -86,16 +86,42 @@ fn cleanup_temp_manifest(path: &Path) {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::persist_manifest;
     use crate::protocol::startup::{StartupInput, StartupMode};
 
     #[test]
+    fn persists_manifest_happy_path() {
+        let test_dir = create_temp_test_dir("manifest_persist_ok");
+        let manifest_path = test_dir.join("manifest.json");
+        let startup_input = valid_startup_input();
+
+        persist_manifest(&manifest_path, &startup_input)
+            .expect("persist_manifest should write the manifest");
+
+        let manifest: StartupInput = serde_json::from_slice(
+            &fs::read(&manifest_path).expect("manifest should be readable after persist"),
+        )
+        .expect("persisted manifest should decode");
+
+        assert_eq!(manifest, startup_input);
+
+        let temp_path = test_dir.join(format!(".{}.tmp.{}", "manifest.json", std::process::id()));
+        assert!(
+            !temp_path.exists(),
+            "temp manifest should not remain after a successful rename"
+        );
+
+        fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
     fn removes_temp_manifest_when_rename_fails() {
         let test_dir = create_temp_test_dir("manifest_rename_failure");
         let manifest_path = test_dir.join("manifest.json");
-        std::fs::create_dir(&manifest_path).expect("test should create conflicting manifest dir");
+        fs::create_dir(&manifest_path).expect("test should create conflicting manifest dir");
         let startup_input = valid_startup_input();
 
         let error = persist_manifest(&manifest_path, &startup_input)
@@ -112,7 +138,7 @@ mod tests {
             "temp manifest should be removed after a failed rename"
         );
 
-        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+        fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
     fn valid_startup_input() -> StartupInput {
@@ -150,7 +176,7 @@ mod tests {
             unique_suffix
         ));
 
-        std::fs::create_dir_all(&path).expect("temp test dir should be creatable");
+        fs::create_dir_all(&path).expect("temp test dir should be creatable");
 
         path
     }

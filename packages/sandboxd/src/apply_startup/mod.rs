@@ -41,11 +41,6 @@ pub enum ApplyStartupError {
         error: std::io::Error,
     },
     SerializeManifest(serde_json::Error),
-    ReadManifest {
-        path: PathBuf,
-        error: std::io::Error,
-    },
-    InvalidManifest(serde_json::Error),
 }
 
 impl fmt::Display for ApplyStartupError {
@@ -85,10 +80,6 @@ impl fmt::Display for ApplyStartupError {
             Self::SerializeManifest(error) => {
                 write!(f, "failed to serialize startup manifest: {error}")
             }
-            Self::ReadManifest { path, error } => {
-                write!(f, "failed to read manifest {}: {error}", path.display())
-            }
-            Self::InvalidManifest(error) => write!(f, "manifest is invalid: {error}"),
         }
     }
 }
