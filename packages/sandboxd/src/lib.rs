@@ -8,9 +8,11 @@ use std::path::Path;
 
 pub mod apply_startup;
 pub mod command;
+pub mod bootstrap;
 pub mod control;
 pub mod process;
 pub mod protocol;
+pub mod proxy_ca;
 pub mod runtime;
 pub mod time;
 pub mod security;
