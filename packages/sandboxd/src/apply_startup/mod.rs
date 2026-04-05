@@ -104,9 +104,24 @@ where
     R: Read,
     W: Write,
 {
-    let request = match read_startup_apply_request(reader) {
-        Ok(request) => request,
+    let mut raw_request = Vec::new();
+    let request = match reader.read_to_end(&mut raw_request) {
+        Ok(_) => match serde_json::from_slice::<StartupApplyRequest>(&raw_request) {
+            Ok(request) => request,
+            Err(error) => {
+                let error = ApplyStartupError::InvalidRequest(error);
+                write_response(
+                    writer,
+                    &StartupApplyErrorResponse {
+                        ok: false,
+                        error: error.to_string(),
+                    },
+                )?;
+                return Err(error);
+            }
+        },
         Err(error) => {
+            let error = ApplyStartupError::ReadRequest(error);
             write_response(
                 writer,
                 &StartupApplyErrorResponse {
@@ -136,18 +151,6 @@ where
             Err(error)
         }
     }
-}
-
-fn read_startup_apply_request<R>(reader: &mut R) -> Result<StartupApplyRequest, ApplyStartupError>
-where
-    R: Read,
-{
-    let mut raw_request = Vec::new();
-    reader
-        .read_to_end(&mut raw_request)
-        .map_err(ApplyStartupError::ReadRequest)?;
-
-    serde_json::from_slice(&raw_request).map_err(ApplyStartupError::InvalidRequest)
 }
 
 fn write_response<W, T>(writer: &mut W, response: &T) -> Result<(), ApplyStartupError>
