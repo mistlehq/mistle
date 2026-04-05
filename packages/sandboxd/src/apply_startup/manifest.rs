@@ -6,15 +6,6 @@ use crate::protocol::startup::StartupInput;
 
 use super::ApplyStartupError;
 
-pub fn load_manifest(path: &Path) -> Result<StartupInput, ApplyStartupError> {
-    let bytes = fs::read(path).map_err(|error| ApplyStartupError::ReadManifest {
-        path: path.to_path_buf(),
-        error,
-    })?;
-
-    serde_json::from_slice(&bytes).map_err(ApplyStartupError::InvalidManifest)
-}
-
 pub fn persist_manifest(path: &Path, startup_input: &StartupInput) -> Result<(), ApplyStartupError> {
     let parent_dir = path.parent().ok_or_else(|| ApplyStartupError::MissingManifestParent {
         path: path.to_path_buf(),

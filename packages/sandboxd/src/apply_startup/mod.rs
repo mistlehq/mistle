@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use crate::protocol::startup::{
-    StartupApplyErrorResponse, StartupApplyOkResponse, StartupApplyRequest, StartupInput,
+    StartupApplyErrorResponse, StartupApplyOkResponse, StartupApplyRequest,
 };
 
 pub const DEFAULT_MANIFEST_PATH: &str = "/var/lib/mistle/sandboxd/manifest.json";
@@ -95,14 +95,6 @@ impl fmt::Display for ApplyStartupError {
 
 impl std::error::Error for ApplyStartupError {}
 
-pub fn load_manifest(path: &Path) -> Result<StartupInput, ApplyStartupError> {
-    manifest::load_manifest(path)
-}
-
-pub fn persist_manifest(path: &Path, startup_input: &StartupInput) -> Result<(), ApplyStartupError> {
-    manifest::persist_manifest(path, startup_input)
-}
-
 pub fn run_apply_startup<R, W>(
     reader: &mut R,
     writer: &mut W,
@@ -128,7 +120,7 @@ where
 
     // Persist only the applied runtime manifest. The token is request-scoped
     // control-plane data and should not become part of durable sandbox state.
-    match persist_manifest(manifest_path, &request.startup_input) {
+    match manifest::persist_manifest(manifest_path, &request.startup_input) {
         Ok(()) => {
             write_response(writer, &StartupApplyOkResponse { ok: true })?;
             Ok(())
@@ -180,9 +172,9 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use crate::protocol::startup::{StartupApplyResponse, StartupMode};
+    use crate::protocol::startup::{StartupApplyResponse, StartupInput, StartupMode};
 
-    use super::{load_manifest, run_apply_startup};
+    use super::run_apply_startup;
 
     #[test]
     fn persists_manifest_and_writes_ok_response() {
@@ -197,7 +189,10 @@ mod tests {
 
         let response: StartupApplyResponse =
             serde_json::from_slice(&stdout).expect("apply-startup should write a valid response");
-        let manifest = load_manifest(&manifest_path).expect("manifest should decode after apply");
+        let manifest: StartupInput = serde_json::from_slice(
+            &fs::read(&manifest_path).expect("manifest should be readable after apply"),
+        )
+        .expect("manifest should decode after apply");
 
         assert_eq!(
             response,
