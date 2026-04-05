@@ -84,7 +84,6 @@ describe("WebhookAutomationListView", () => {
         onNextPage: () => {},
         onOpenAutomation: () => {},
         onPreviousPage: () => {},
-        onRetry: () => {},
         totalResults: 1,
       }),
     );
@@ -94,5 +93,24 @@ describe("WebhookAutomationListView", () => {
         "This automation references an integration target definition that is no longer available. Event metadata may be incomplete.",
       ),
     ).toBeDefined();
+  });
+
+  it("renders load errors without a retry action", () => {
+    render(
+      createElement(WebhookAutomationListView, {
+        errorMessage: "Could not load automations.",
+        hasNextPage: false,
+        hasPreviousPage: false,
+        isLoading: false,
+        items: [],
+        onNextPage: () => {},
+        onOpenAutomation: () => {},
+        onPreviousPage: () => {},
+        totalResults: 0,
+      }),
+    );
+
+    expect(screen.getByText("Could not load automations.")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
 });

@@ -30,7 +30,6 @@ const meta = {
     onNextPage: function onNextPage() {},
     onPreviousPage: function onPreviousPage() {},
     onOpenAutomation: function onOpenAutomation() {},
-    onRetry: function onRetry() {},
   },
 } satisfies Meta<typeof WebhookAutomationListView>;
 

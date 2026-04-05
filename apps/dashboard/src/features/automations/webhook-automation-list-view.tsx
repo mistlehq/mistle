@@ -1,5 +1,4 @@
 import {
-  Button,
   Notice,
   Skeleton,
   Table,
@@ -58,7 +57,6 @@ type WebhookAutomationListViewProps = {
   onNextPage: () => void;
   onPreviousPage: () => void;
   onOpenAutomation: (automationId: string) => void;
-  onRetry: () => void;
 };
 
 function LoadingState(): React.JSX.Element {
@@ -185,15 +183,7 @@ export function WebhookAutomationListView(
       {input.isLoading ? (
         <LoadingState />
       ) : input.errorMessage !== null ? (
-        <Notice
-          action={
-            <Button onClick={input.onRetry} type="button" variant="outline">
-              Retry
-            </Button>
-          }
-          title="Could not load automations"
-          variant="alert"
-        >
+        <Notice title="Could not load automations" variant="alert">
           {input.errorMessage}
         </Notice>
       ) : (

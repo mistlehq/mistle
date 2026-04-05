@@ -118,9 +118,6 @@ export function AutomationsPage(): React.JSX.Element {
             nextBefore: previousPage.before,
           });
         }}
-        onRetry={() => {
-          void automationsQuery.refetch();
-        }}
         previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
         totalResults={canShowSummary ? automationsQuery.data.totalResults : null}
       />
