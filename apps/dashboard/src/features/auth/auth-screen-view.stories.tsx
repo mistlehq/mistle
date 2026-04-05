@@ -112,6 +112,13 @@ export const OtpEntry: Story = {
   },
 };
 
+export const OtpPartialEntry: Story = {
+  args: {
+    authStep: "otp",
+    otp: "12",
+  },
+};
+
 export const VerifyingOtp: Story = {
   args: {
     authStep: "otp",
