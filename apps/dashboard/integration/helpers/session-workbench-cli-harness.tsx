@@ -6,7 +6,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { expect } from "vitest";
 import { type RawData, type WebSocket, WebSocket as NodeWebSocket, WebSocketServer } from "ws";
 
-import { OpenAiCodexAppServerListenUrl } from "../../../../packages/integrations-definitions/src/openai/index.ts";
+import { CodexAppServerListenUrl } from "../../../../packages/integrations-definitions/src/agent-runtimes/codex/app-server.ts";
 import {
   decodeDataFrame,
   parseStreamControlMessage,
@@ -691,6 +691,7 @@ function createWorkbenchRequestHandler(
           status: "running",
           failureCode: null,
           failureMessage: null,
+          runtimePlan: null,
           automationConversation:
             options.providerConversationId === null || options.providerConversationId === undefined
               ? null
@@ -825,12 +826,11 @@ async function withSessionWorkbenchCliHarness(
 }
 
 async function waitForEnabledButton(name: string): Promise<HTMLButtonElement> {
-  const button = await screen.findByRole("button", { name });
   await waitFor(() => {
-    expect(button).toHaveProperty("disabled", false);
+    expect(screen.getByRole("button", { name })).toHaveProperty("disabled", false);
   });
 
-  return button as HTMLButtonElement;
+  return screen.getByRole("button", { name }) as HTMLButtonElement;
 }
 
 async function waitForChatReady(): Promise<void> {
@@ -855,7 +855,7 @@ function expectCliPty(record: PtyOpenRecord): void {
   expect(record.channel.session).toBe("create");
   expect(record.channel.ptySessionId).toBe("cli");
   expect(record.channel.command).toBe("codex");
-  expect(record.channel.args).toEqual(["--remote", OpenAiCodexAppServerListenUrl]);
+  expect(record.channel.args).toEqual(["--remote", CodexAppServerListenUrl]);
 }
 
 function expectTerminalPty(record: PtyOpenRecord): void {

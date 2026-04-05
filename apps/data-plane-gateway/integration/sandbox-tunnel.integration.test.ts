@@ -7,11 +7,10 @@ import { randomUUID } from "node:crypto";
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
-import { systemSleeper } from "@mistle/time";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
-import { z } from "zod";
 
+import { waitForRuntimeState } from "./runtime-state-test-helpers.js";
 import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import {
   closeWebSocket,
@@ -21,34 +20,6 @@ import {
 } from "./websocket-test-helpers.js";
 
 const IntegrationTestTimeoutMs = 30_000;
-const InternalServiceTokenHeader = "x-mistle-service-token";
-
-type RuntimeStateSnapshot = {
-  ownerLeaseId: string | null;
-  attachment: {
-    sandboxInstanceId: string;
-    ownerLeaseId: string;
-    nodeId: string;
-    sessionId: string;
-    attachedAtMs: number;
-  } | null;
-};
-
-const RuntimeStateSnapshotSchema = z
-  .object({
-    ownerLeaseId: z.string().min(1).nullable(),
-    attachment: z
-      .object({
-        sandboxInstanceId: z.string().min(1),
-        ownerLeaseId: z.string().min(1),
-        nodeId: z.string().min(1),
-        sessionId: z.string().min(1),
-        attachedAtMs: z.number().int().nonnegative(),
-      })
-      .strict()
-      .nullable(),
-  })
-  .strict();
 
 async function insertSandboxInstanceRow(input: {
   fixture: DataPlaneGatewayIntegrationFixture;
@@ -66,48 +37,6 @@ async function insertSandboxInstanceRow(input: {
     startedById: "workflow_data_plane_gateway_integration",
     source: "webhook",
   });
-}
-
-async function readRuntimeState(input: {
-  fixture: DataPlaneGatewayIntegrationFixture;
-  sandboxInstanceId: string;
-}): Promise<RuntimeStateSnapshot> {
-  const response = await fetch(
-    `${input.fixture.baseUrl}/internal/sandbox-instances/${encodeURIComponent(input.sandboxInstanceId)}/runtime-state`,
-    {
-      headers: {
-        [InternalServiceTokenHeader]: input.fixture.config.internalAuth.serviceToken,
-      },
-    },
-  );
-
-  expect(response.status).toBe(200);
-  return RuntimeStateSnapshotSchema.parse(await response.json());
-}
-
-async function waitForRuntimeState(
-  input: DataPlaneGatewayIntegrationFixture & {
-    sandboxInstanceId: string;
-    predicate: (snapshot: RuntimeStateSnapshot) => boolean;
-  },
-): Promise<RuntimeStateSnapshot> {
-  const deadline = Date.now() + 5_000;
-
-  while (Date.now() < deadline) {
-    const snapshot = await readRuntimeState({
-      fixture: input,
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
-    if (input.predicate(snapshot)) {
-      return snapshot;
-    }
-
-    await systemSleeper.sleep(50);
-  }
-
-  throw new Error(
-    `Timed out waiting for runtime-state snapshot for sandbox '${input.sandboxInstanceId}'.`,
-  );
 }
 
 describe("sandbox tunnel connect endpoint integration", () => {
@@ -138,7 +67,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
         where: (table, { eq }) => eq(table.tokenJti, jti),
       });
       const sandboxRuntimeState = await waitForRuntimeState({
-        ...fixture,
+        fixture,
         sandboxInstanceId,
         predicate: (currentSnapshot) =>
           currentSnapshot.ownerLeaseId !== null && currentSnapshot.attachment !== null,
@@ -228,7 +157,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
       await closeWebSocket(socket);
 
       const sandboxRuntimeState = await waitForRuntimeState({
-        ...fixture,
+        fixture,
         sandboxInstanceId,
         predicate: (currentSnapshot) =>
           currentSnapshot.ownerLeaseId === null && currentSnapshot.attachment === null,
@@ -281,7 +210,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
         `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(firstToken)}`,
       );
       const firstConnectedSnapshot = await waitForRuntimeState({
-        ...fixture,
+        fixture,
         sandboxInstanceId,
         predicate: (currentSnapshot) =>
           currentSnapshot.ownerLeaseId !== null && currentSnapshot.attachment !== null,
@@ -296,7 +225,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
         `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(secondToken)}`,
       );
       const secondConnectedSnapshot = await waitForRuntimeState({
-        ...fixture,
+        fixture,
         sandboxInstanceId,
         predicate: (currentSnapshot) =>
           currentSnapshot.ownerLeaseId !== null &&
@@ -313,7 +242,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
       expect(firstSocketClose.code).toBe(1012);
 
       const snapshotAfterStaleClose = await waitForRuntimeState({
-        ...fixture,
+        fixture,
         sandboxInstanceId,
         predicate: (currentSnapshot) =>
           currentSnapshot.ownerLeaseId === secondConnectedSnapshot.ownerLeaseId &&
