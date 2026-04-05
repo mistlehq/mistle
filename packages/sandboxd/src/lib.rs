@@ -65,28 +65,7 @@ where
     Ok(command)
 }
 
-pub fn run<I, S>(args: I) -> Result<(), ParseSandboxdCommandError>
-where
-    I: IntoIterator<Item = S>,
-    S: Into<String>,
-{
-    let _command = parse_sandboxd_command(args)?;
-    Ok(())
-}
-
-pub fn run_cli<I, S>(args: I) -> i32
-where
-    I: IntoIterator<Item = S>,
-    S: Into<String>,
-{
-    let mut stdin = io::stdin().lock();
-    let mut stdout = io::stdout().lock();
-    let mut stderr = io::stderr().lock();
-
-    run_with_io(args, &mut stdin, &mut stdout, &mut stderr)
-}
-
-pub fn run_with_io<I, S, R, W, E>(args: I, stdin: &mut R, stdout: &mut W, stderr: &mut E) -> i32
+pub fn run<I, S, R, W, E>(args: I, stdin: &mut R, stdout: &mut W, stderr: &mut E) -> i32
 where
     I: IntoIterator<Item = S>,
     S: Into<String>,
