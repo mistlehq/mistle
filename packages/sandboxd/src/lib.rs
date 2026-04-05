@@ -16,6 +16,7 @@ pub mod proxy_ca;
 pub mod runtime;
 pub mod time;
 pub mod security;
+pub mod tunnel;
 
 use crate::time::ThreadSleeper;
 
