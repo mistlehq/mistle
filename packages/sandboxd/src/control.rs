@@ -23,6 +23,7 @@ use crate::process;
 use crate::protocol::startup::StartupInput;
 use crate::runtime;
 use crate::time::{Sleeper, SystemClock, ThreadSleeper};
+use crate::security;
 
 /// Default Unix socket path for the local `sandboxd` control channel.
 pub const DEFAULT_CONTROL_SOCKET_PATH: &str = "/run/mistle/sandboxd/control.sock";
@@ -59,6 +60,7 @@ pub enum ControlError {
     ReadRequest(std::io::Error),
     InvalidRequest(serde_json::Error),
     InvalidResponse(serde_json::Error),
+    VerifyPeer(String),
     LoadManifest(String),
     ApplyRuntimePlan(String),
     StartProcessManager(String),
@@ -125,6 +127,9 @@ impl fmt::Display for ControlError {
             }
             Self::InvalidResponse(error) => {
                 write!(f, "control socket response must be valid json: {error}")
+            }
+            Self::VerifyPeer(error) => {
+                write!(f, "control socket peer verification failed: {error}")
             }
             Self::LoadManifest(error) => write!(f, "failed to reload startup manifest: {error}"),
             Self::ApplyRuntimePlan(error) => {
@@ -406,6 +411,9 @@ fn handle_connection(
     manifest_path: &Path,
     state: &Arc<Mutex<ControlServerState>>,
 ) -> Result<(), ControlError> {
+    security::ensure_unix_socket_peer_matches_current_process_uid(stream)
+        .map_err(|error| ControlError::VerifyPeer(error.to_string()))?;
+
     let mut raw_request = Vec::new();
     stream
         .read_to_end(&mut raw_request)
@@ -444,9 +452,8 @@ fn apply_loaded_manifest(
 ) -> Result<(), ControlError> {
     // Use the same apply path for initial startup and later reloads so setup work
     // stays driven by the persisted manifest rather than ad hoc in-memory state.
-    let runtime_plan: runtime::CompiledRuntimePlan =
-        serde_json::from_value(manifest.runtime_plan.clone())
-            .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
+    let runtime_plan = runtime::parse_runtime_plan(&manifest)
+        .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
     take_process_manager(state)
         .map(|process_manager| process_manager.stop(&SystemClock, &ThreadSleeper))
         .transpose()

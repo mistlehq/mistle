@@ -13,6 +13,7 @@ pub mod process;
 pub mod protocol;
 pub mod runtime;
 pub mod time;
+pub mod security;
 
 use crate::time::ThreadSleeper;
 
@@ -98,6 +99,11 @@ where
 
     match command {
         SandboxdCommand::Serve => {
+            if let Err(error) = security::apply_current_process_security() {
+                let _ = writeln!(stderr, "{error}");
+                return 1;
+            }
+
             let server = match control::start_control_server(
                 Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
                 Path::new(apply_startup::DEFAULT_MANIFEST_PATH),
