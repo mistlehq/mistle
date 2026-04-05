@@ -17,9 +17,11 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+use crate::apply_startup::ApplyStartupError;
 use crate::apply_startup::manifest;
 use crate::protocol::startup::StartupInput;
 use crate::time::Sleeper;
+use crate::runtime;
 
 /// Default Unix socket path for the local `sandboxd` control channel.
 pub const DEFAULT_CONTROL_SOCKET_PATH: &str = "/run/mistle/sandboxd/control.sock";
@@ -52,10 +54,12 @@ pub enum ControlError {
         error: std::io::Error,
     },
     AcceptConnection(std::io::Error),
+    ConfigureConnection(std::io::Error),
     ReadRequest(std::io::Error),
     InvalidRequest(serde_json::Error),
     InvalidResponse(serde_json::Error),
     LoadManifest(String),
+    ApplyRuntimePlan(String),
     ResponseError(String),
     SerializeResponse(serde_json::Error),
     WriteResponse(std::io::Error),
@@ -109,6 +113,9 @@ impl fmt::Display for ControlError {
             Self::AcceptConnection(error) => {
                 write!(f, "failed to accept control socket connection: {error}")
             }
+            Self::ConfigureConnection(error) => {
+                write!(f, "failed to configure control socket connection: {error}")
+            }
             Self::ReadRequest(error) => write!(f, "failed to read control socket request: {error}"),
             Self::InvalidRequest(error) => {
                 write!(f, "control socket request must be valid json: {error}")
@@ -117,6 +124,9 @@ impl fmt::Display for ControlError {
                 write!(f, "control socket response must be valid json: {error}")
             }
             Self::LoadManifest(error) => write!(f, "failed to reload startup manifest: {error}"),
+            Self::ApplyRuntimePlan(error) => {
+                write!(f, "failed to apply startup manifest runtime plan: {error}")
+            }
             Self::ResponseError(error) => write!(f, "control socket returned an error: {error}"),
             Self::SerializeResponse(error) => {
                 write!(f, "failed to serialize control socket response: {error}")
@@ -252,6 +262,7 @@ where
         reload_count: 0,
         latest_manifest: None,
     }));
+    load_persisted_manifest_if_present(manifest_path, &state)?;
     let (shutdown_sender, shutdown_receiver) = mpsc::channel::<()>();
     let state_for_thread = state.clone();
     let socket_path_for_thread = socket_path.to_path_buf();
@@ -343,7 +354,7 @@ fn run_control_server_loop(
                 // request/response reads wait for the peer to finish writing.
                 stream
                     .set_nonblocking(false)
-                    .map_err(ControlError::AcceptConnection)?;
+                    .map_err(ControlError::ConfigureConnection)?;
                 let response = match handle_connection(&mut stream, manifest_path, state) {
                     Ok(()) => ControlResponse {
                         ok: true,
@@ -387,14 +398,44 @@ fn handle_connection(
         ControlRequest::ReloadStartup => {
             let manifest = manifest::load_manifest(manifest_path)
                 .map_err(|error| ControlError::LoadManifest(error.to_string()))?;
-            let mut state = state
-                .lock()
-                .expect("control server state lock should not be poisoned");
-            state.reload_count += 1;
-            state.latest_manifest = Some(manifest);
-            Ok(())
+            apply_loaded_manifest(manifest, state, true)
         }
     }
+}
+
+fn load_persisted_manifest_if_present(
+    manifest_path: &Path,
+    state: &Arc<Mutex<ControlServerState>>,
+) -> Result<(), ControlError> {
+    match manifest::load_manifest(manifest_path) {
+        Ok(manifest) => apply_loaded_manifest(manifest, state, false),
+        Err(ApplyStartupError::ReadManifest { error, .. })
+            if error.kind() == std::io::ErrorKind::NotFound =>
+        {
+            Ok(())
+        }
+        Err(error) => Err(ControlError::LoadManifest(error.to_string())),
+    }
+}
+
+fn apply_loaded_manifest(
+    manifest: StartupInput,
+    state: &Arc<Mutex<ControlServerState>>,
+    increment_reload_count: bool,
+) -> Result<(), ControlError> {
+    // Use the same apply path for initial startup and later reloads so setup work
+    // stays driven by the persisted manifest rather than ad hoc in-memory state.
+    runtime::apply_startup_input(&manifest)
+        .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
+
+    let mut state = state
+        .lock()
+        .expect("control server state lock should not be poisoned");
+    if increment_reload_count {
+        state.reload_count += 1;
+    }
+    state.latest_manifest = Some(manifest);
+    Ok(())
 }
 
 /// Removes an existing socket file only when it is actually a stale Unix socket.

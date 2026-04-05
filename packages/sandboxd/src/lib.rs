@@ -10,6 +10,7 @@ pub mod apply_startup;
 pub mod control;
 pub mod protocol;
 pub mod time;
+pub mod runtime;
 
 use crate::time::ThreadSleeper;
 
