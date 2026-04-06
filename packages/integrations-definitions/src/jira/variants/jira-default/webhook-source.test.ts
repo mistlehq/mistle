@@ -51,17 +51,6 @@ describe("jira webhook source helpers", () => {
     ).toThrow("only supports personal API token connections");
   });
 
-  it("builds the Jira admin webhook request body", () => {
-    expect({
-      name: "Mistle webhook source iws_jira_123",
-      description: "Managed by Mistle for webhook source iws_jira_123",
-      url: "https://control-plane.mistle.test/v1/integration/webhooks/jira-default/ep_jira_123",
-      events: ["jira:issue_created", "jira:issue_updated", "comment_created", "comment_updated"],
-      excludeBody: false,
-      secret: "whsec_jira",
-    });
-  });
-
   it("extracts the remote webhook id from the Jira self URL", () => {
     expect(
       resolveJiraAdminWebhookIdFromSelf({
