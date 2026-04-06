@@ -20,7 +20,7 @@ describe("webhook automations types", () => {
       id: "aut_123",
       idempotencyKeyTemplate: null,
       inputTemplate: '{"ref": "{{event.ref}}"}',
-      integrationConnectionId: "conn_123",
+      integrationWebhookSourceId: "iws_123",
       kind: "webhook",
       name: "GitHub pushes",
       payloadFilter: {
@@ -48,7 +48,7 @@ describe("webhook automations types", () => {
         id: "aut_123",
         idempotencyKeyTemplate: null,
         inputTemplate: '{"ref": "{{event.ref}}"}',
-        integrationConnectionId: "conn_123",
+        integrationWebhookSourceId: "iws_123",
         kind: "not-webhook",
         name: "GitHub pushes",
         payloadFilter: null,

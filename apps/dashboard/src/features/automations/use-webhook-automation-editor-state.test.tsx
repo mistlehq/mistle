@@ -16,6 +16,9 @@ import {
 import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 
+const LinearConnectionId = "conn_linear";
+const LinearWebhookSourceId = "iws_linear";
+
 function createDirectoryData(input?: {
   supportedWebhookEvents?: {
     eventType: string;
@@ -36,10 +39,27 @@ function createDirectoryData(input?: {
   return {
     connections: [
       {
-        id: "conn_linear",
+        id: LinearConnectionId,
         targetKey: "linear-cloud",
         displayName: "Linear Workspace",
         status: "active" as const,
+        createdAt: "2026-03-24T00:00:00.000Z",
+        updatedAt: "2026-03-24T00:00:00.000Z",
+      },
+    ],
+    webhookSources: [
+      {
+        id: LinearWebhookSourceId,
+        targetKey: "linear-cloud",
+        ownerScope: "connection" as const,
+        integrationConnectionId: LinearConnectionId,
+        displayName: "Linear Workspace webhook",
+        endpointKey: "ep_linear",
+        callbackUrl:
+          "https://control-plane.example.com/v1/integration/webhooks/linear-cloud/ep_linear",
+        remoteRegistrationId: "whk_linear",
+        status: "active" as const,
+        providerMetadata: {},
         createdAt: "2026-03-24T00:00:00.000Z",
         updatedAt: "2026-03-24T00:00:00.000Z",
       },
@@ -67,7 +87,7 @@ function createBinding() {
     id: "bnd_linear",
     sandboxProfileId: "sbp_123",
     sandboxProfileVersion: 1,
-    connectionId: "conn_linear",
+    connectionId: LinearConnectionId,
     kind: "connector" as const,
     config: {},
     createdAt: "2026-03-24T00:00:00.000Z",
@@ -98,6 +118,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           sandboxProfileOptions: [],
           directoryData: {
             connections: [],
+            webhookSources: [],
             targets: [],
           },
         }),
@@ -159,7 +180,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   it("preserves selected triggers when the sandbox profile changes", () => {
     const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     const triggerId = createWebhookAutomationTriggerId({
-      connectionId: "conn_linear",
+      webhookSourceId: LinearWebhookSourceId,
       eventType: "linear.issue.created",
     });
 
@@ -229,7 +250,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   it("applies explicit invocation defaults when a trigger is selected", () => {
     const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     const triggerId = createWebhookAutomationTriggerId({
-      connectionId: "conn_linear",
+      webhookSourceId: LinearWebhookSourceId,
       eventType: "linear.issue_comment.created",
     });
     queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_123"), {
@@ -305,11 +326,11 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   it("preserves explicit invocation opt-out when trigger selections change", () => {
     const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     const firstTriggerId = createWebhookAutomationTriggerId({
-      connectionId: "conn_linear",
+      webhookSourceId: LinearWebhookSourceId,
       eventType: "linear.issue_comment.created",
     });
     const secondTriggerId = createWebhookAutomationTriggerId({
-      connectionId: "conn_linear",
+      webhookSourceId: LinearWebhookSourceId,
       eventType: "linear.issue.opened",
     });
     queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_123"), {
@@ -404,11 +425,11 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   it("does not auto-enable explicit invocation when editing an existing automation", () => {
     const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     const firstTriggerId = createWebhookAutomationTriggerId({
-      connectionId: "conn_linear",
+      webhookSourceId: LinearWebhookSourceId,
       eventType: "linear.issue_comment.created",
     });
     const secondTriggerId = createWebhookAutomationTriggerId({
-      connectionId: "conn_linear",
+      webhookSourceId: LinearWebhookSourceId,
       eventType: "linear.issue.opened",
     });
     queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_123"), {
@@ -521,6 +542,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           sandboxProfileOptions: [],
           directoryData: {
             connections: [],
+            webhookSources: [],
             targets: [],
           },
         }),
@@ -569,6 +591,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           sandboxProfileOptions: [],
           directoryData: {
             connections: [],
+            webhookSources: [],
             targets: [],
           },
         }),
@@ -592,7 +615,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
   it("clears stale trigger validation errors when the sandbox profile changes", () => {
     const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     const triggerId = createWebhookAutomationTriggerId({
-      connectionId: "conn_linear",
+      webhookSourceId: LinearWebhookSourceId,
       eventType: "linear.issue.created",
     });
 

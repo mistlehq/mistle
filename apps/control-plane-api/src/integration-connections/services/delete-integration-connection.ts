@@ -2,6 +2,7 @@ import {
   integrationConnectionCredentials,
   integrationConnections,
   integrationCredentials,
+  integrationWebhookSources,
   sandboxProfileVersionIntegrationBindings,
   type ControlPlaneDatabase,
   webhookAutomations,
@@ -64,7 +65,11 @@ export async function deleteIntegrationConnection(
         automationCount: sql<number>`count(*)::int`,
       })
       .from(webhookAutomations)
-      .where(eq(webhookAutomations.integrationConnectionId, lockedConnection.id));
+      .innerJoin(
+        integrationWebhookSources,
+        eq(integrationWebhookSources.id, webhookAutomations.integrationWebhookSourceId),
+      )
+      .where(eq(integrationWebhookSources.integrationConnectionId, lockedConnection.id));
 
     if ((automationUsage?.automationCount ?? 0) > 0) {
       throw new ConflictError(

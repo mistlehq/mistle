@@ -233,6 +233,27 @@ export const RefreshedIntegrationConnectionResourcesSchema = z
   })
   .strict();
 
+export const IntegrationWebhookSourceSchema = z
+  .object({
+    id: z.string().min(1),
+    targetKey: z.string().min(1),
+    ownerScope: z.enum(["target", "connection"]),
+    integrationConnectionId: z.string().min(1).optional(),
+    displayName: z.string().min(1),
+    endpointKey: z.string().min(1).optional(),
+    callbackUrl: z.string().min(1).optional(),
+    remoteRegistrationId: z.string().min(1).optional(),
+    status: z.enum(["active", "error", "disabled"]),
+    providerMetadata: z.record(z.string(), z.unknown()),
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
+export const CreatedIntegrationWebhookSourceSchema = IntegrationWebhookSourceSchema.extend({
+  webhookSecret: z.string().min(1).optional(),
+}).strict();
+
 export const IntegrationTargetsPageSchema = z
   .object({
     items: z.array(IntegrationTargetSchema),
@@ -284,6 +305,8 @@ export type IntegrationConnectionResourceSummary = NonNullable<
   IntegrationConnection["resources"]
 >[number];
 export type IntegrationConnectionResource = z.infer<typeof IntegrationConnectionResourceSchema>;
+export type IntegrationWebhookSource = z.infer<typeof IntegrationWebhookSourceSchema>;
+export type CreatedIntegrationWebhookSource = z.infer<typeof CreatedIntegrationWebhookSourceSchema>;
 export type CreatedIntegrationConnection = z.infer<typeof IntegrationConnectionSchema>;
 export type DeletedIntegrationConnection = z.infer<typeof DeletedIntegrationConnectionSchema>;
 export type StartedRedirectConnection = z.infer<typeof StartedRedirectConnectionSchema>;

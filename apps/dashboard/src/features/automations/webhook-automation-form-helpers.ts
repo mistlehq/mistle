@@ -21,7 +21,8 @@ import type {
 type ResolvedSelectedTriggers = {
   connectionIds: string[];
   eventTypes: string[];
-  connectionId: string | null;
+  webhookSourceIds: string[];
+  webhookSourceId: string | null;
 };
 
 function resolveSelectedTriggers(input: {
@@ -35,19 +36,26 @@ function resolveSelectedTriggers(input: {
   const fallbackSelections = input.triggerIds
     .filter((triggerId) => !selectedOptions.some((option) => option.id === triggerId))
     .map((triggerId) => {
-      const [connectionId = "", ...eventTypeParts] = triggerId.split("::");
+      const [webhookSourceId = "", ...eventTypeParts] = triggerId.split("::");
       return {
-        connectionId,
+        webhookSourceId,
         eventType: eventTypeParts.join("::"),
       };
     });
 
   const connectionIds = [
     ...new Set(
+      selectedOptions
+        .map((option) => option.connectionId)
+        .filter((connectionId) => connectionId.trim().length > 0),
+    ),
+  ];
+  const webhookSourceIds = [
+    ...new Set(
       [
-        ...selectedOptions.map((option) => option.connectionId),
-        ...fallbackSelections.map((s) => s.connectionId),
-      ].filter((connectionId) => connectionId.trim().length > 0),
+        ...selectedOptions.map((option) => option.integrationWebhookSourceId),
+        ...fallbackSelections.map((selection) => selection.webhookSourceId),
+      ].filter((webhookSourceId) => webhookSourceId.trim().length > 0),
     ),
   ];
   const eventTypes = [
@@ -59,8 +67,9 @@ function resolveSelectedTriggers(input: {
 
   return {
     connectionIds,
+    webhookSourceIds,
     eventTypes,
-    connectionId: connectionIds.length === 1 ? (connectionIds[0] ?? null) : null,
+    webhookSourceId: webhookSourceIds.length === 1 ? (webhookSourceIds[0] ?? null) : null,
   };
 }
 
@@ -88,7 +97,7 @@ export function toWebhookAutomationFormValues(
 
   const selectedTriggerIds = (automation.eventTypes ?? []).map((eventType) =>
     createWebhookAutomationTriggerId({
-      connectionId: automation.integrationConnectionId,
+      webhookSourceId: automation.integrationWebhookSourceId,
       eventType,
     }),
   );
@@ -142,8 +151,10 @@ export function validateWebhookAutomationFormValues(
     if (errors.triggerIds === undefined && resolvedTriggers.connectionIds.length > 1) {
       errors.triggerIds =
         "All triggers in one automation must come from the same integration connection.";
-    } else if (errors.triggerIds === undefined && resolvedTriggers.connectionId === null) {
-      errors.triggerIds = "Select triggers from an available integration connection.";
+    } else if (errors.triggerIds === undefined && resolvedTriggers.webhookSourceIds.length > 1) {
+      errors.triggerIds = "All triggers in one automation must come from the same webhook source.";
+    } else if (errors.triggerIds === undefined && resolvedTriggers.webhookSourceId === null) {
+      errors.triggerIds = "Select triggers from an available webhook source.";
     }
   }
 
@@ -193,7 +204,7 @@ function resolveAutomationSubmissionShape(input: {
   values: WebhookAutomationFormValues;
   eventOptions: readonly WebhookAutomationEventOption[];
 }): {
-  integrationConnectionId: string;
+  integrationWebhookSourceId: string;
   eventTypes: string[] | null;
 } {
   const resolvedTriggers = resolveSelectedTriggers({
@@ -207,14 +218,18 @@ function resolveAutomationSubmissionShape(input: {
     );
   }
 
-  if (resolvedTriggers.connectionId === null) {
+  if (resolvedTriggers.webhookSourceIds.length > 1) {
+    throw new Error("All triggers in one automation must come from the same webhook source.");
+  }
+
+  if (resolvedTriggers.webhookSourceId === null) {
     throw new Error(
-      "A valid integration connection could not be derived from the selected triggers.",
+      "A valid integration webhook source could not be derived from the selected triggers.",
     );
   }
 
   return {
-    integrationConnectionId: resolvedTriggers.connectionId,
+    integrationWebhookSourceId: resolvedTriggers.webhookSourceId,
     eventTypes: parseOptionalEventTypes(resolvedTriggers.eventTypes),
   };
 }
@@ -231,7 +246,7 @@ export function toCreateWebhookAutomationPayload(
   return {
     name: values.name.trim(),
     enabled: values.enabled,
-    integrationConnectionId: resolvedSubmissionShape.integrationConnectionId,
+    integrationWebhookSourceId: resolvedSubmissionShape.integrationWebhookSourceId,
     inputTemplate: values.inputTemplate.trim(),
     conversationKeyTemplate: values.conversationKeyTemplate,
     idempotencyKeyTemplate: null,
@@ -255,7 +270,7 @@ export function toUpdateWebhookAutomationPayload(
   return {
     name: values.name.trim(),
     enabled: values.enabled,
-    integrationConnectionId: resolvedSubmissionShape.integrationConnectionId,
+    integrationWebhookSourceId: resolvedSubmissionShape.integrationWebhookSourceId,
     inputTemplate: values.inputTemplate.trim(),
     conversationKeyTemplate: values.conversationKeyTemplate,
     idempotencyKeyTemplate: null,

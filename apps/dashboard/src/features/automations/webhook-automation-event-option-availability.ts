@@ -3,8 +3,8 @@ import type {
   WebhookAutomationEventOptionAvailability,
 } from "./webhook-automation-trigger-types.js";
 
-function formatFallbackConnectionLabel(connectionId: string): string {
-  return connectionId.trim().length > 0 ? connectionId : "Unknown connection";
+function formatFallbackConnectionLabel(webhookSourceId: string): string {
+  return webhookSourceId.trim().length > 0 ? webhookSourceId : "Unknown webhook source";
 }
 
 export function isWebhookAutomationEventOptionUnavailable(
@@ -38,15 +38,17 @@ export function createSyntheticWebhookAutomationEventOption(input: {
   connectionLabel?: string;
   label?: string;
 }): WebhookAutomationEventOption {
-  const [connectionId = "", ...eventTypeParts] = input.triggerId.split("::");
+  const [integrationWebhookSourceId = "", ...eventTypeParts] = input.triggerId.split("::");
   const eventType = eventTypeParts.join("::");
   const availabilityCopy = resolveWebhookAutomationEventOptionAvailabilityCopy(input.availability);
 
   return {
     id: input.triggerId,
     eventType,
-    connectionId,
-    connectionLabel: input.connectionLabel ?? formatFallbackConnectionLabel(connectionId),
+    integrationWebhookSourceId,
+    connectionId: "",
+    connectionLabel:
+      input.connectionLabel ?? formatFallbackConnectionLabel(integrationWebhookSourceId),
     label: input.label ?? (eventType.length > 0 ? eventType : input.triggerId),
     description: availabilityCopy.description,
     category: "Unavailable",

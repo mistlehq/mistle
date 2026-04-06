@@ -20,7 +20,7 @@ export const GitHubWebhookSourceCapability: IntegrationWebhookSourceCapability<
   async describeSource(input) {
     return {
       displayName: input.source.displayName ?? "GitHub App webhook",
-      callbackUrl: `/v1/integration/webhooks/${input.targetKey}`,
+      callbackUrl: `${input.controlPlaneBaseUrl}/v1/integration/webhooks/${input.targetKey}`,
       providerMetadata: input.source.providerMetadata,
     };
   },

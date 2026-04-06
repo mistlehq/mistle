@@ -4,6 +4,7 @@ import {
   AutomationKinds,
   integrationConnections,
   integrationTargets,
+  integrationWebhookSources,
   sandboxProfiles,
   webhookAutomations,
 } from "@mistle/db/control-plane";
@@ -62,7 +63,11 @@ export type AutomationWebhookListItem = {
   enabled: boolean;
   targetName: string;
   issue?: {
-    code: "MISSING_TARGET_METADATA" | "MISSING_INTEGRATION_CONNECTION" | "MISSING_SANDBOX_PROFILE";
+    code:
+      | "MISSING_TARGET_METADATA"
+      | "MISSING_WEBHOOK_SOURCE"
+      | "MISSING_INTEGRATION_CONNECTION"
+      | "MISSING_SANDBOX_PROFILE";
     message: string;
   };
   events: {
@@ -77,13 +82,8 @@ type AutomationWebhookListPageItem = AutomationWebhookListItem & {
   createdAt: string;
 };
 
-function createTriggerId(input: { connectionId: string; eventType: string }): string {
-  return `${input.connectionId}::${input.eventType}`;
-}
-
 function resolveAutomationListEvents(input: {
   eventTypes: string[] | null;
-  integrationConnectionId: string;
   supportedWebhookEvents?: {
     eventType: string;
     displayName: string;
@@ -92,10 +92,7 @@ function resolveAutomationListEvents(input: {
 }): AutomationWebhookListItem["events"] {
   const supportedEventMap = new Map(
     (input.supportedWebhookEvents ?? []).map((eventDefinition) => [
-      createTriggerId({
-        connectionId: input.integrationConnectionId,
-        eventType: eventDefinition.eventType,
-      }),
+      eventDefinition.eventType,
       eventDefinition,
     ]),
   );
@@ -110,12 +107,7 @@ function resolveAutomationListEvents(input: {
   }
 
   return input.eventTypes.map((eventType) => {
-    const eventDefinition = supportedEventMap.get(
-      createTriggerId({
-        connectionId: input.integrationConnectionId,
-        eventType,
-      }),
-    );
+    const eventDefinition = supportedEventMap.get(eventType);
 
     if (eventDefinition === undefined) {
       return {
@@ -156,7 +148,8 @@ type AutomationListPageRow = {
   createdAt: string;
   updatedAt: string;
   eventTypes: string[] | null;
-  integrationConnectionId: string;
+  integrationWebhookSourceId: string;
+  resolvedIntegrationWebhookSourceId: string | null;
   resolvedIntegrationConnectionId: string | null;
   sandboxProfileId: string;
   sandboxProfileDisplayName: string | null;
@@ -178,6 +171,25 @@ function createAutomationListPageItem(row: AutomationListPageRow): AutomationWeb
         code: "MISSING_SANDBOX_PROFILE",
         message:
           "This automation references a sandbox profile that is no longer available. The target name may be incomplete.",
+      },
+      events: resolveUnavailableAutomationListEvents({
+        eventTypes: row.eventTypes,
+      }),
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  if (row.resolvedIntegrationWebhookSourceId === null) {
+    return {
+      id: row.automationId,
+      name: row.automationName,
+      enabled: row.enabled,
+      createdAt: row.createdAt,
+      targetName: row.sandboxProfileDisplayName,
+      issue: {
+        code: "MISSING_WEBHOOK_SOURCE",
+        message:
+          "This automation references a webhook source that is no longer available. Event metadata may be incomplete.",
       },
       events: resolveUnavailableAutomationListEvents({
         eventTypes: row.eventTypes,
@@ -263,7 +275,6 @@ function createAutomationListPageItem(row: AutomationListPageRow): AutomationWeb
     targetName: row.sandboxProfileDisplayName,
     events: resolveAutomationListEvents({
       eventTypes: row.eventTypes,
-      integrationConnectionId: row.integrationConnectionId,
       ...(targetMetadata.supportedWebhookEvents === undefined
         ? {}
         : {
@@ -297,7 +308,8 @@ async function loadAutomationListPageRows(input: {
       createdAt: automations.createdAt,
       updatedAt: automations.updatedAt,
       eventTypes: webhookAutomations.eventTypes,
-      integrationConnectionId: webhookAutomations.integrationConnectionId,
+      integrationWebhookSourceId: webhookAutomations.integrationWebhookSourceId,
+      resolvedIntegrationWebhookSourceId: integrationWebhookSources.id,
       resolvedIntegrationConnectionId: integrationConnections.id,
       sandboxProfileId: automationTargets.sandboxProfileId,
       sandboxProfileDisplayName: sandboxProfiles.displayName,
@@ -309,12 +321,16 @@ async function loadAutomationListPageRows(input: {
     .from(automations)
     .innerJoin(webhookAutomations, eq(webhookAutomations.automationId, automations.id))
     .leftJoin(
+      integrationWebhookSources,
+      eq(integrationWebhookSources.id, webhookAutomations.integrationWebhookSourceId),
+    )
+    .leftJoin(
       integrationConnections,
-      eq(integrationConnections.id, webhookAutomations.integrationConnectionId),
+      eq(integrationConnections.id, integrationWebhookSources.integrationConnectionId),
     )
     .leftJoin(
       integrationTargets,
-      eq(integrationTargets.targetKey, integrationConnections.targetKey),
+      eq(integrationTargets.targetKey, integrationWebhookSources.targetKey),
     )
     .innerJoin(automationTargets, eq(automationTargets.automationId, automations.id))
     .leftJoin(sandboxProfiles, eq(sandboxProfiles.id, automationTargets.sandboxProfileId))
