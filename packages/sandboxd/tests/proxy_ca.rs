@@ -6,7 +6,9 @@ use sandboxd::time::SystemClock;
 
 fn read_all_from_prepared_fd(
     prepared: &sandboxd::proxy_ca::PreparedProxyCaRuntime,
-    getter: fn(&sandboxd::proxy_ca::PreparedProxyCaRuntime) -> Result<i32, sandboxd::proxy_ca::ProxyCaError>,
+    getter: fn(
+        &sandboxd::proxy_ca::PreparedProxyCaRuntime,
+    ) -> Result<i32, sandboxd::proxy_ca::ProxyCaError>,
 ) -> String {
     let fd = getter(prepared).expect("expected prepared fd to be available");
     let duplicated_fd =
@@ -31,8 +33,16 @@ fn generates_a_ca_and_issues_leaf_certificates() {
     let generated_proxy_ca = sandboxd::proxy_ca::generate_proxy_ca(&SystemClock)
         .expect("expected proxy ca generation to succeed");
 
-    assert!(generated_proxy_ca.certificate_pem.contains("BEGIN CERTIFICATE"));
-    assert!(generated_proxy_ca.private_key_pem.contains("BEGIN PRIVATE KEY"));
+    assert!(
+        generated_proxy_ca
+            .certificate_pem
+            .contains("BEGIN CERTIFICATE")
+    );
+    assert!(
+        generated_proxy_ca
+            .private_key_pem
+            .contains("BEGIN PRIVATE KEY")
+    );
 
     let leaf_certificate = sandboxd::proxy_ca::issue_proxy_leaf_certificate(
         generated_proxy_ca.certificate_pem.clone(),
@@ -42,8 +52,16 @@ fn generates_a_ca_and_issues_leaf_certificates() {
     )
     .expect("expected leaf certificate issuance to succeed");
 
-    assert!(leaf_certificate.certificate_chain_pem.contains("BEGIN CERTIFICATE"));
-    assert!(leaf_certificate.private_key_pem.contains("BEGIN PRIVATE KEY"));
+    assert!(
+        leaf_certificate
+            .certificate_chain_pem
+            .contains("BEGIN CERTIFICATE")
+    );
+    assert!(
+        leaf_certificate
+            .private_key_pem
+            .contains("BEGIN PRIVATE KEY")
+    );
     assert_eq!(
         leaf_certificate
             .certificate_chain_pem
@@ -67,10 +85,14 @@ fn prepares_proxy_ca_runtime_with_pipe_backed_fds() {
     assert!(env.contains_key(sandboxd::proxy_ca::PROXY_CA_CERT_FD_ENV));
     assert!(env.contains_key(sandboxd::proxy_ca::PROXY_CA_KEY_FD_ENV));
 
-    let certificate_payload =
-        read_all_from_prepared_fd(&prepared, sandboxd::proxy_ca::PreparedProxyCaRuntime::certificate_fd);
-    let private_key_payload =
-        read_all_from_prepared_fd(&prepared, sandboxd::proxy_ca::PreparedProxyCaRuntime::private_key_fd);
+    let certificate_payload = read_all_from_prepared_fd(
+        &prepared,
+        sandboxd::proxy_ca::PreparedProxyCaRuntime::certificate_fd,
+    );
+    let private_key_payload = read_all_from_prepared_fd(
+        &prepared,
+        sandboxd::proxy_ca::PreparedProxyCaRuntime::private_key_fd,
+    );
 
     assert_eq!(certificate_payload, generated_proxy_ca.certificate_pem);
     assert_eq!(private_key_payload, generated_proxy_ca.private_key_pem);

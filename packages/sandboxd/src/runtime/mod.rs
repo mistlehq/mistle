@@ -11,8 +11,8 @@ mod workspace_source;
 use std::fmt;
 
 use crate::command::{CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL, run_command};
-use crate::time::{SystemClock, ThreadSleeper};
 use crate::protocol::startup::StartupInput;
+use crate::time::{SystemClock, ThreadSleeper};
 
 pub(crate) use plan::RuntimeClient;
 pub use plan::{
@@ -90,8 +90,9 @@ impl std::error::Error for RuntimePlanApplyError {}
 /// Applies the artifact, workspace-source, and setup-file portions of one startup input's runtime
 /// plan.
 pub fn apply_runtime_plan(startup_input: &StartupInput) -> Result<(), RuntimePlanApplyError> {
-    let runtime_plan: CompiledRuntimePlan = serde_json::from_value(startup_input.runtime_plan.clone())
-        .map_err(RuntimePlanApplyError::InvalidRuntimePlan)?;
+    let runtime_plan: CompiledRuntimePlan =
+        serde_json::from_value(startup_input.runtime_plan.clone())
+            .map_err(RuntimePlanApplyError::InvalidRuntimePlan)?;
     apply_compiled_runtime_plan(&runtime_plan)
 }
 

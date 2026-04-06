@@ -157,9 +157,7 @@ mod tests {
     use std::time::Duration;
 
     use crate::time::testing::{ManualSleeper, MutableClock};
-    use crate::time::{
-        Clock, Sleeper, SystemClock, ThreadSleeper, add_millis, subtract_millis,
-    };
+    use crate::time::{Clock, Sleeper, SystemClock, ThreadSleeper, add_millis, subtract_millis};
     use std::time::UNIX_EPOCH;
 
     #[test]

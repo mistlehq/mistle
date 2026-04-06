@@ -74,7 +74,9 @@ pub fn clear_close_on_exec(fd: i32) -> Result<(), BootstrapError> {
 
     let updated_flags = FdFlag::from_bits_truncate(current_flags) & !FdFlag::FD_CLOEXEC;
     fcntl(borrowed_fd, FcntlArg::F_SETFD(updated_flags)).map_err(|error| {
-        BootstrapError::new(format!("failed to clear close-on-exec for fd {fd}: {error}"))
+        BootstrapError::new(format!(
+            "failed to clear close-on-exec for fd {fd}: {error}"
+        ))
     })?;
 
     Ok(())
@@ -180,10 +182,12 @@ pub fn exec_runtime(input: ExecRuntimeInput) -> Result<(), BootstrapError> {
     // Keep the privilege drop and exec ordering in one place: explicit groups
     // first, then gid, then uid, then clear stdio CLOEXEC before execve.
     set_supplementary_groups(input.gid)?;
-    nix::unistd::setgid(nix::unistd::Gid::from_raw(input.gid))
-        .map_err(|error| BootstrapError::new(format!("failed to switch to runtime gid: {error}")))?;
-    nix::unistd::setuid(nix::unistd::Uid::from_raw(input.uid))
-        .map_err(|error| BootstrapError::new(format!("failed to switch to runtime uid: {error}")))?;
+    nix::unistd::setgid(nix::unistd::Gid::from_raw(input.gid)).map_err(|error| {
+        BootstrapError::new(format!("failed to switch to runtime gid: {error}"))
+    })?;
+    nix::unistd::setuid(nix::unistd::Uid::from_raw(input.uid)).map_err(|error| {
+        BootstrapError::new(format!("failed to switch to runtime uid: {error}"))
+    })?;
     clear_close_on_exec(0)?;
     clear_close_on_exec(1)?;
     clear_close_on_exec(2)?;

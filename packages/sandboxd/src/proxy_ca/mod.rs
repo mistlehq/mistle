@@ -220,7 +220,9 @@ pub fn issue_proxy_leaf_certificate(
     params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth];
 
     if let Ok(ip_address) = IpAddr::from_str(&normalized_server_name) {
-        params.subject_alt_names.push(SanType::IpAddress(ip_address));
+        params
+            .subject_alt_names
+            .push(SanType::IpAddress(ip_address));
     } else {
         params.subject_alt_names.push(SanType::DnsName(
             normalized_server_name.clone().try_into().map_err(|error| {
@@ -277,13 +279,14 @@ fn prepare_proxy_ca_fd_payload(name: &str, payload: &str) -> Result<OwnedFd, Pro
 
     drop(write_fd);
 
-    let flags_bits = fcntl(&read_fd, FcntlArg::F_GETFD).map_err(|error| {
-        ProxyCaError::new(format!("failed to read {name} fd flags: {error}"))
-    })?;
+    let flags_bits = fcntl(&read_fd, FcntlArg::F_GETFD)
+        .map_err(|error| ProxyCaError::new(format!("failed to read {name} fd flags: {error}")))?;
     let flags = FdFlag::from_bits_truncate(flags_bits);
     let updated_flags = flags & !FdFlag::FD_CLOEXEC;
     fcntl(&read_fd, FcntlArg::F_SETFD(updated_flags)).map_err(|error| {
-        ProxyCaError::new(format!("failed to clear close-on-exec for {name} fd: {error}"))
+        ProxyCaError::new(format!(
+            "failed to clear close-on-exec for {name} fd: {error}"
+        ))
     })?;
 
     Ok(read_fd)

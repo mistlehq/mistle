@@ -2,9 +2,9 @@ use std::net::TcpListener;
 use std::sync::mpsc;
 use std::thread;
 
+use tungstenite::Message;
 use tungstenite::accept_hdr;
 use tungstenite::handshake::server::{Request, Response};
-use tungstenite::Message;
 
 #[test]
 fn connects_to_bootstrap_tunnel_with_bootstrap_token_query() {
@@ -60,7 +60,7 @@ fn connects_to_bootstrap_tunnel_with_bootstrap_token_query() {
 
 #[test]
 fn rejects_non_websocket_gateway_urls() {
-    let error = sandboxd::tunnel::build_bootstrap_tunnel_url(
+    let error = sandboxd::tunnel::connect_bootstrap_tunnel(
         "https://gateway.example.test/bootstrap",
         "bootstrap-token",
     )

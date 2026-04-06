@@ -1,3 +1,9 @@
+//! Bootstrap websocket helpers for the gateway-facing sandbox tunnel.
+//!
+//! This module owns the minimal synchronous tunnel flow in PR 15: validate the
+//! configured gateway URL, append the bootstrap token query parameter, open the
+//! websocket, and close it cleanly during shutdown.
+
 use std::fmt::{self, Display};
 use std::net::TcpStream;
 
@@ -5,6 +11,7 @@ use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket, connect};
 use url::Url;
 
+/// Describes why bootstrap tunnel setup or shutdown failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TunnelError {
     message: String,
@@ -26,33 +33,41 @@ impl Display for TunnelError {
 
 impl std::error::Error for TunnelError {}
 
+#[derive(Debug)]
+/// Owns one established bootstrap websocket connection.
 pub struct StartedBootstrapTunnel {
     connected_url: String,
     socket: Option<WebSocket<MaybeTlsStream<TcpStream>>>,
 }
 
 impl StartedBootstrapTunnel {
+    /// Returns the final websocket URL used to connect to the gateway.
     pub fn connected_url(&self) -> &str {
         &self.connected_url
     }
 
+    /// Sends a websocket close frame and closes the underlying socket.
     pub fn close(mut self) -> Result<(), TunnelError> {
         let Some(mut socket) = self.socket.take() else {
             return Ok(());
         };
 
-        socket
-            .send(Message::Close(None))
-            .map_err(|error| TunnelError::new(format!("failed to close bootstrap tunnel: {error}")))?;
-        socket
-            .close(None)
-            .map_err(|error| TunnelError::new(format!("failed to close bootstrap tunnel: {error}")))?;
+        socket.send(Message::Close(None)).map_err(|error| {
+            TunnelError::new(format!("failed to close bootstrap tunnel: {error}"))
+        })?;
+        socket.close(None).map_err(|error| {
+            TunnelError::new(format!("failed to close bootstrap tunnel: {error}"))
+        })?;
 
         Ok(())
     }
 }
 
-pub fn normalize_bootstrap_token(bootstrap_token: &str) -> Result<String, TunnelError> {
+/// Connects `sandboxd` to the gateway bootstrap tunnel using the provided token.
+pub fn connect_bootstrap_tunnel(
+    gateway_ws_url: &str,
+    bootstrap_token: &str,
+) -> Result<StartedBootstrapTunnel, TunnelError> {
     let normalized_token = bootstrap_token.trim();
     if normalized_token.is_empty() {
         return Err(TunnelError::new(
@@ -60,43 +75,30 @@ pub fn normalize_bootstrap_token(bootstrap_token: &str) -> Result<String, Tunnel
         ));
     }
 
-    Ok(normalized_token.to_string())
-}
-
-pub fn parse_gateway_ws_url(gateway_ws_url: &str) -> Result<Url, TunnelError> {
-    let parsed_url = Url::parse(gateway_ws_url).map_err(|error| {
+    let mut parsed_url = Url::parse(gateway_ws_url).map_err(|error| {
         TunnelError::new(format!(
             "failed to parse sandbox tunnel gateway ws url: {error}"
         ))
     })?;
-
     match parsed_url.scheme() {
-        "ws" | "wss" => Ok(parsed_url),
-        _ => Err(TunnelError::new(
-            "sandbox tunnel gateway ws url must use ws or wss scheme",
-        )),
+        "ws" | "wss" => {}
+        _ => {
+            return Err(TunnelError::new(
+                "sandbox tunnel gateway ws url must use ws or wss scheme",
+            ));
+        }
     }
-}
 
-pub fn build_bootstrap_tunnel_url(
-    gateway_ws_url: &str,
-    bootstrap_token: &str,
-) -> Result<String, TunnelError> {
-    let mut parsed_url = parse_gateway_ws_url(gateway_ws_url)?;
+    // The bootstrap token rides on the initial websocket request because this
+    // first PR only needs a minimal connect/close handshake.
     parsed_url
         .query_pairs_mut()
-        .append_pair("bootstrap_token", &normalize_bootstrap_token(bootstrap_token)?);
+        .append_pair("bootstrap_token", normalized_token);
+    let connected_url = parsed_url.to_string();
 
-    Ok(parsed_url.to_string())
-}
-
-pub fn connect_bootstrap_tunnel(
-    gateway_ws_url: &str,
-    bootstrap_token: &str,
-) -> Result<StartedBootstrapTunnel, TunnelError> {
-    let connected_url = build_bootstrap_tunnel_url(gateway_ws_url, bootstrap_token)?;
-    let (socket, _) = connect(&connected_url)
-        .map_err(|error| TunnelError::new(format!("failed to connect bootstrap tunnel: {error}")))?;
+    let (socket, _) = connect(&connected_url).map_err(|error| {
+        TunnelError::new(format!("failed to connect bootstrap tunnel: {error}"))
+    })?;
 
     Ok(StartedBootstrapTunnel {
         connected_url,

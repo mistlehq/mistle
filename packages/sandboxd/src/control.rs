@@ -22,8 +22,8 @@ use crate::apply_startup::manifest;
 use crate::process;
 use crate::protocol::startup::StartupInput;
 use crate::runtime;
-use crate::time::{Sleeper, SystemClock, ThreadSleeper};
 use crate::security;
+use crate::time::{Sleeper, SystemClock, ThreadSleeper};
 
 /// Default Unix socket path for the local `sandboxd` control channel.
 pub const DEFAULT_CONTROL_SOCKET_PATH: &str = "/run/mistle/sandboxd/control.sock";

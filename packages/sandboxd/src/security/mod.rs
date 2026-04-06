@@ -78,8 +78,8 @@ pub fn ensure_unix_socket_peer_matches_current_process_uid(
     {
         // The control socket is a local root/sandboxd coordination channel. Reject
         // peers from any uid other than the current sandboxd process uid.
-        let credentials =
-            getsockopt(stream, sockopt::PeerCredentials).map_err(SecurityError::ReadPeerCredentials)?;
+        let credentials = getsockopt(stream, sockopt::PeerCredentials)
+            .map_err(SecurityError::ReadPeerCredentials)?;
         let current_uid = geteuid().as_raw();
         if credentials.uid() != current_uid {
             return Err(SecurityError::UnexpectedPeerUid {
