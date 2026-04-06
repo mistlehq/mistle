@@ -1,6 +1,8 @@
 import { BadRequestError } from "@mistle/http/errors.js";
 import sharp from "sharp";
 
+import { ProfileImageRequirements } from "./profile-image-requirements.js";
+
 export type NormalizeOrganizationLogoImageInput = {
   imageBytes: Uint8Array;
 };
@@ -12,10 +14,6 @@ export type NormalizedOrganizationLogoImage = {
   height: number;
 };
 
-const MaxOrganizationLogoUploadBytes = 5 * 1024 * 1024;
-const MaxOrganizationLogoEdgePixels = 512;
-const OrganizationLogoWebpQuality = 85;
-
 export async function normalizeOrganizationLogoImage(
   input: NormalizeOrganizationLogoImageInput,
 ): Promise<NormalizedOrganizationLogoImage> {
@@ -23,10 +21,10 @@ export async function normalizeOrganizationLogoImage(
     throw new BadRequestError("INVALID_IMAGE", "Organization logo upload must not be empty.");
   }
 
-  if (input.imageBytes.byteLength > MaxOrganizationLogoUploadBytes) {
+  if (input.imageBytes.byteLength > ProfileImageRequirements.MAX_UPLOAD_BYTES) {
     throw new BadRequestError(
       "INVALID_IMAGE",
-      `Organization logo upload must be ${String(MaxOrganizationLogoUploadBytes)} bytes or smaller.`,
+      `Organization logo upload must be ${String(ProfileImageRequirements.MAX_UPLOAD_BYTES)} bytes or smaller.`,
     );
   }
 
@@ -58,7 +56,11 @@ export async function normalizeOrganizationLogoImage(
     );
   }
 
-  const outputEdgePixels = Math.min(metadata.width, metadata.height, MaxOrganizationLogoEdgePixels);
+  const outputEdgePixels = Math.min(
+    metadata.width,
+    metadata.height,
+    ProfileImageRequirements.MAX_EDGE_PIXELS,
+  );
 
   const normalizedImageBuffer = await sharp(input.imageBytes, {
     animated: false,
@@ -73,7 +75,7 @@ export async function normalizeOrganizationLogoImage(
       withoutEnlargement: true,
     })
     .webp({
-      quality: OrganizationLogoWebpQuality,
+      quality: ProfileImageRequirements.WEBP_QUALITY,
     })
     .toBuffer();
 
