@@ -10,7 +10,7 @@ import { initializeSandboxRuntime } from "../start-sandbox-instance/initialize-s
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "../start-sandbox-instance/mark-sandbox-instance-running.js";
 import { SandboxStartupModes } from "../start-sandbox-instance/sandbox-startup-input.js";
-import { waitForSandboxTunnelReadiness } from "../start-sandbox-instance/wait-for-sandbox-tunnel-readiness.js";
+import { waitForSandboxRuntimeReadiness } from "../start-sandbox-instance/wait-for-sandbox-runtime-readiness.js";
 import { markSandboxInstanceStarting } from "./mark-sandbox-instance-starting.js";
 import { resolveResumableSandboxInstanceState } from "./resolve-resumable-sandbox-instance-state.js";
 import { resumeSandbox } from "./resume-sandbox.js";
@@ -174,11 +174,11 @@ export async function resumeSandboxInstance(
     throw error;
   }
 
-  let tunnelReady: boolean;
+  let sandboxRuntimeReady: boolean;
   try {
-    // Tunnel readiness is only meaningful after the resumed daemon has accepted init
-    // and had a chance to relaunch its bootstrap process.
-    tunnelReady = await waitForSandboxTunnelReadiness(
+    // Runtime readiness is only meaningful after the resumed daemon has accepted
+    // init and had a chance to relaunch its bootstrap and adapter processes.
+    sandboxRuntimeReady = await waitForSandboxRuntimeReadiness(
       {
         runtimeStateReader: ctx.runtimeStateReader,
         policy: ctx.tunnelReadinessPolicy,
@@ -195,20 +195,20 @@ export async function resumeSandboxInstance(
       runtimeProvider: resumedRuntime.runtimeProvider,
       providerSandboxId: resumedRuntime.providerSandboxId,
       failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
-      failureMessage: "Failed while waiting for resumed sandbox tunnel readiness.",
+      failureMessage: "Failed while waiting for resumed sandbox runtime readiness.",
     });
     throw error;
   }
 
-  if (!tunnelReady) {
+  if (!sandboxRuntimeReady) {
     await handleFailedResume({
       sandboxInstanceId: input.sandboxInstanceId,
       runtimeProvider: resumedRuntime.runtimeProvider,
       providerSandboxId: resumedRuntime.providerSandboxId,
       failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_TIMEOUT,
-      failureMessage: "Timed out waiting for resumed sandbox tunnel readiness.",
+      failureMessage: "Timed out waiting for resumed sandbox runtime readiness.",
     });
-    throw new Error("Timed out waiting for resumed sandbox tunnel readiness.");
+    throw new Error("Timed out waiting for resumed sandbox runtime readiness.");
   }
 
   try {

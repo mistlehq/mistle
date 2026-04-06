@@ -3,7 +3,7 @@ import type { Clock, Sleeper } from "@mistle/time";
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import { isSandboxRuntimeReady } from "../../runtime-state/sandbox-runtime-state-readiness.js";
 
-export async function waitForSandboxTunnelReadiness(
+export async function waitForSandboxRuntimeReadiness(
   ctx: {
     runtimeStateReader: SandboxRuntimeStateReader;
     policy: {
@@ -16,10 +16,10 @@ export async function waitForSandboxTunnelReadiness(
   input: { sandboxInstanceId: string },
 ): Promise<boolean> {
   if (ctx.policy.timeoutMs <= 0) {
-    throw new Error("Expected sandbox tunnel readiness timeout to be positive.");
+    throw new Error("Expected sandbox runtime readiness timeout to be positive.");
   }
   if (ctx.policy.pollIntervalMs <= 0) {
-    throw new Error("Expected sandbox tunnel readiness poll interval to be positive.");
+    throw new Error("Expected sandbox runtime readiness poll interval to be positive.");
   }
   if (input.sandboxInstanceId.trim().length === 0) {
     throw new Error("Expected sandbox instance id to be non-empty when waiting for readiness.");

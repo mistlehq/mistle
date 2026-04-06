@@ -14,7 +14,7 @@ import { markSandboxInstanceRunning } from "./mark-sandbox-instance-running.js";
 import { persistSandboxInstanceProvisioning } from "./persist-sandbox-instance-provisioning.js";
 import { SandboxStartupModes } from "./sandbox-startup-input.js";
 import { startSandbox } from "./start-sandbox.js";
-import { waitForSandboxTunnelReadiness } from "./wait-for-sandbox-tunnel-readiness.js";
+import { waitForSandboxRuntimeReadiness } from "./wait-for-sandbox-runtime-readiness.js";
 
 const StartSandboxFailureCodes = {
   SANDBOX_START_FAILED: "sandbox_start_failed",
@@ -348,10 +348,10 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
       );
     }
 
-    let didSandboxConnectToTunnel: boolean;
+    let didSandboxBecomeReady: boolean;
     try {
-      didSandboxConnectToTunnel = await step.run(
-        { name: "wait-for-sandbox-tunnel-readiness" },
+      didSandboxBecomeReady = await step.run(
+        { name: "wait-for-sandbox-runtime-readiness" },
         async () => {
           logger.info(
             {
@@ -359,9 +359,9 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
               timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
               pollIntervalMs: ctx.tunnelReadinessPolicy.pollIntervalMs,
             },
-            "Waiting for sandbox tunnel readiness.",
+            "Waiting for sandbox runtime readiness.",
           );
-          return waitForSandboxTunnelReadiness(
+          return waitForSandboxRuntimeReadiness(
             {
               runtimeStateReader: ctx.runtimeStateReader,
               policy: ctx.tunnelReadinessPolicy,
@@ -377,9 +377,9 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
       logger.info(
         {
           providerSandboxId: startedSandbox.providerSandboxId,
-          didSandboxConnectToTunnel,
+          didSandboxBecomeReady,
         },
-        "Finished waiting for sandbox tunnel readiness.",
+        "Finished waiting for sandbox runtime readiness.",
       );
     } catch (error) {
       logger.error(
@@ -387,7 +387,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           err: error,
           providerSandboxId: startedSandbox.providerSandboxId,
         },
-        "Failed while waiting for sandbox tunnel readiness.",
+        "Failed while waiting for sandbox runtime readiness.",
       );
       try {
         await handleFailedStartup({
@@ -395,11 +395,11 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           runtimeProvider: startedSandbox.runtimeProvider,
           providerSandboxId: startedSandbox.providerSandboxId,
           failureCode: StartSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
-          failureMessage: "Failed to wait for sandbox tunnel readiness.",
+          failureMessage: "Failed to wait for sandbox runtime readiness.",
         });
       } catch (cleanupError) {
         throw new Error(
-          "Failed to wait for sandbox tunnel readiness and failed cleanup after startup failure.",
+          "Failed to wait for sandbox runtime readiness and failed cleanup after startup failure.",
           {
             cause: {
               waitForAckError: error,
@@ -410,20 +410,20 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
       }
 
       throw new Error(
-        "Failed to wait for sandbox tunnel readiness. Sandbox was stopped and sandbox instance was marked as failed.",
+        "Failed to wait for sandbox runtime readiness. Sandbox was stopped and sandbox instance was marked as failed.",
         {
           cause: error,
         },
       );
     }
 
-    if (!didSandboxConnectToTunnel) {
+    if (!didSandboxBecomeReady) {
       logger.error(
         {
           providerSandboxId: startedSandbox.providerSandboxId,
           timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
         },
-        "Sandbox tunnel readiness timed out.",
+        "Sandbox runtime readiness timed out.",
       );
       try {
         await handleFailedStartup({
@@ -431,11 +431,11 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           runtimeProvider: startedSandbox.runtimeProvider,
           providerSandboxId: startedSandbox.providerSandboxId,
           failureCode: StartSandboxFailureCodes.TUNNEL_CONNECT_ACK_TIMEOUT,
-          failureMessage: "Sandbox tunnel readiness timed out.",
+          failureMessage: "Sandbox runtime readiness timed out.",
         });
       } catch (cleanupError) {
         throw new Error(
-          "Sandbox tunnel readiness timed out and failed cleanup after startup failure.",
+          "Sandbox runtime readiness timed out and failed cleanup after startup failure.",
           {
             cause: cleanupError,
           },
@@ -443,7 +443,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
       }
 
       throw new Error(
-        "Sandbox tunnel readiness timed out. Sandbox was stopped and sandbox instance was marked as failed.",
+        "Sandbox runtime readiness timed out. Sandbox was stopped and sandbox instance was marked as failed.",
       );
     }
 
