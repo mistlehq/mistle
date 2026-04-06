@@ -5,8 +5,7 @@ import { putOrganizationLogo } from "../../auth/services/put-organization-logo.j
 import { PROFILE_IMAGE_READ_URL_TTL_SECONDS } from "../../me/constants.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { assertActiveOrganizationAccess } from "../services/assert-active-organization-access.js";
-import { assertCanManageOrganizationLogo } from "../services/assert-can-manage-organization-logo.js";
+import { assertCanManageActiveOrganization } from "../services/assert-can-manage-active-organization.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -19,13 +18,10 @@ const routeHandler = async (
   const { file } = ctx.req.valid("form");
   const imageBytes = new Uint8Array(await file.arrayBuffer());
 
-  assertActiveOrganizationAccess({
-    activeOrganizationId: session.session.activeOrganizationId,
-    organizationId,
-  });
-  await assertCanManageOrganizationLogo({
+  await assertCanManageActiveOrganization({
     db,
     actorUserId: session.user.id,
+    activeOrganizationId: session.session.activeOrganizationId,
     organizationId,
   });
 
