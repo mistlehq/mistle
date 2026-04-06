@@ -50,15 +50,11 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'turbo.json'
               - 'tsconfig.base.json'
-              - '!apps/sandbox-runtime/**'
-              - '!packages/sandbox-rs-napi/**'
               - '!packages/sandboxd/**'
             rust:
               - '.github/workflows/ci.yml'
               - '.github/workflows/ci-daily-integration.yml'
               - '.envrc'
-              - 'apps/sandbox-runtime/**'
-              - 'packages/sandbox-rs-napi/**'
               - 'packages/sandboxd/**'
               - 'packages/sandbox-runtime-contract/**'
               - 'packages/integrations-core/**'
@@ -79,7 +75,7 @@ jobs:
               - '.dockerignore'
               - 'packages/sandboxd/**'
               - 'packages/sandboxd/Dockerfile'
-              - 'apps/sandbox-runtime/scripts/cmddir/**'
+              - 'packages/sandboxd/scripts/cmddir'
 
   static-ts:
     name: TS Static
@@ -136,7 +132,7 @@ jobs:
 
       - name: Build workspace in Nix shell
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=!@mistle/sandbox-runtime --filter=!@mistle/sandbox-rs-napi --filter=!@mistle/sandboxd"
+        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=!@mistle/sandboxd"
 
       - name: Run TS static checks in Nix shell
         run: nix develop --command bash -lc "pnpm format:check && pnpm exec oxlint --type-aware --deny-warnings --threads=1 apps packages tests && pnpm lint:openapi && pnpm lint:docs && pnpm lint:sql && pnpm typecheck:ts"
@@ -174,7 +170,6 @@ jobs:
         with:
           shared-key: sandbox-rust
           workspaces: |
-            packages/sandbox-rs-napi -> target
             packages/sandboxd -> target
           env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
           cmd-format: nix develop --command {0}
@@ -214,7 +209,7 @@ jobs:
 
       - name: Build workspace in Nix shell
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=@mistle/sandbox-runtime --filter=@mistle/sandbox-rs-napi --filter=@mistle/sandboxd"
+        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=@mistle/sandboxd"
 
       - name: Run Rust static checks in Nix shell
         run: nix develop --command bash -lc "pnpm lint:rust && pnpm typecheck:rust"
@@ -351,7 +346,6 @@ jobs:
         with:
           shared-key: sandbox-rust
           workspaces: |
-            packages/sandbox-rs-napi -> target
             packages/sandboxd -> target
           env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
           cmd-format: nix develop --command {0}
