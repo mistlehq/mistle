@@ -1,4 +1,4 @@
-use std::fs::{DirBuilder, OpenOptions, metadata};
+use std::fs::{DirBuilder, OpenOptions};
 use std::io::Write;
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::Path;
@@ -11,22 +11,27 @@ pub enum RuntimeFileApplyOutcome {
     SkippedIfAbsent,
 }
 
-pub fn apply_runtime_file(file: &RuntimeClientSetupFile) -> Result<RuntimeFileApplyOutcome, String> {
+pub fn apply_runtime_file(
+    file: &RuntimeClientSetupFile,
+) -> Result<RuntimeFileApplyOutcome, String> {
     let parent_directory = Path::new(&file.path)
         .parent()
         .ok_or_else(|| format!("runtime file path {} has no parent directory", file.path))?;
 
-    let mut dir_builder = DirBuilder::new();
-    dir_builder.recursive(true);
-    dir_builder.mode(0o755);
-    dir_builder.create(parent_directory).map_err(|error| {
-        format!(
-            "failed to create parent directory {}: {error}",
-            parent_directory.display()
-        )
-    })?;
+    DirBuilder::new()
+        .recursive(true)
+        .mode(0o755)
+        .create(parent_directory)
+        .map_err(|error| {
+            format!(
+                "failed to create parent directory {}: {error}",
+                parent_directory.display()
+            )
+        })?;
 
-    if matches!(file.write_mode, Some(RuntimeFileWriteMode::IfAbsent)) && path_exists(&file.path) {
+    if matches!(file.write_mode, Some(RuntimeFileWriteMode::IfAbsent))
+        && Path::new(&file.path).exists()
+    {
         return Ok(RuntimeFileApplyOutcome::SkippedIfAbsent);
     }
 
@@ -42,8 +47,4 @@ pub fn apply_runtime_file(file: &RuntimeClientSetupFile) -> Result<RuntimeFileAp
         .map_err(|error| format!("failed to write file {}: {error}", file.path))?;
 
     Ok(RuntimeFileApplyOutcome::Written)
-}
-
-fn path_exists(path: &str) -> bool {
-    metadata(path).is_ok()
 }

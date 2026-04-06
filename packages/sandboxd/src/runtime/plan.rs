@@ -76,9 +76,15 @@ pub enum CompiledWorkspaceSource {
     #[serde(rename = "git-clone")]
     GitClone {
         #[serde(rename = "resourceKind")]
-        _resource_kind: String,
+        resource_kind: WorkspaceSourceResourceKind,
         path: String,
         #[serde(rename = "originUrl")]
         origin_url: String,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum WorkspaceSourceResourceKind {
+    #[serde(rename = "repository")]
+    Repository,
 }

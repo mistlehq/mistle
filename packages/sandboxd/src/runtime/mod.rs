@@ -1,9 +1,11 @@
-mod artifact_command;
 mod plan;
 mod runtime_file;
 mod workspace_source;
 
 use std::fmt;
+
+use crate::command::{CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL, run_command};
+use crate::time::{SystemClock, ThreadSleeper};
 
 pub use plan::CompiledRuntimePlan;
 
@@ -78,13 +80,22 @@ pub fn apply_runtime_plan(runtime_plan: &CompiledRuntimePlan) -> Result<(), Runt
     // long-lived process supervision on top of this state.
     for (artifact_index, artifact) in runtime_plan.artifacts.iter().enumerate() {
         for (command_index, command) in artifact.lifecycle.install.iter().enumerate() {
-            artifact_command::run_runtime_artifact_command(command).map_err(|error| {
-                RuntimePlanApplyError::ArtifactCommand {
-                    artifact_index,
-                    command_index,
-                    artifact_key: artifact.artifact_key.clone(),
-                    error,
-                }
+            run_command(
+                CommandSpec {
+                    args: &command.args,
+                    env: command.env.as_ref(),
+                    cwd: command.cwd.as_deref(),
+                    timeout_ms: command.timeout_ms,
+                },
+                &SystemClock,
+                &ThreadSleeper,
+                DEFAULT_COMMAND_POLL_INTERVAL,
+            )
+            .map_err(|error| RuntimePlanApplyError::ArtifactCommand {
+                artifact_index,
+                command_index,
+                artifact_key: artifact.artifact_key.clone(),
+                error,
             })?;
         }
     }

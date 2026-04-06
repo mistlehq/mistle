@@ -1,10 +1,14 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use sandboxd::control;
 use sandboxd::protocol::startup::{StartupInput, StartupMode};
+use sandboxd::time::ThreadSleeper;
+
+static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
 fn serve_applies_persisted_manifest_on_startup() {
@@ -50,8 +54,13 @@ fn serve_applies_persisted_manifest_on_startup() {
     manifest_bytes.push(b'\n');
     fs::write(&manifest_path, manifest_bytes).expect("manifest file should be writable");
 
-    let server = control::start_control_server(&control_socket_path, &manifest_path)
-        .expect("serve should start when persisted manifest is valid");
+    let server = control::start_control_server(
+        &control_socket_path,
+        &manifest_path,
+        ThreadSleeper,
+        control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
+    )
+    .expect("serve should start when persisted manifest is valid");
 
     assert_eq!(
         fs::read_to_string(&startup_output_path).expect("startup runtime state should be applied"),
@@ -70,14 +79,15 @@ fn serve_applies_persisted_manifest_on_startup() {
 }
 
 fn create_temp_test_dir(prefix: &str) -> PathBuf {
+    let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
     let unique_suffix = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time should be after unix epoch")
         .as_nanos();
-    let short_prefix = &prefix[..prefix.len().min(8)];
     let path = PathBuf::from("/tmp").join(format!(
-        "sbd_{short_prefix}_{}_{}",
+        "sbd_{prefix}_{}_{}_{}",
         std::process::id(),
+        counter,
         unique_suffix
     ));
 
