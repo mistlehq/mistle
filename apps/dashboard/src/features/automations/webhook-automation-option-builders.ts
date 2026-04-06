@@ -2,6 +2,7 @@ import type { IntegrationWebhookEventDefinition } from "@mistle/integrations-cor
 
 import type {
   IntegrationConnection,
+  IntegrationWebhookSource,
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -40,15 +41,33 @@ function formatWebhookAutomationTriggerGroupLabel(input: {
   return `${integrationDisplayName} - ${connectionDisplayName}`;
 }
 
+function formatWebhookAutomationSourceLabel(input: {
+  connectionDisplayName: string;
+  sourceDisplayName: string;
+  sourceCount: number;
+}): string {
+  if (input.sourceCount <= 1) {
+    return input.connectionDisplayName;
+  }
+
+  const sourceDisplayName = input.sourceDisplayName.trim();
+  if (sourceDisplayName.length === 0 || sourceDisplayName === input.connectionDisplayName) {
+    return input.connectionDisplayName;
+  }
+
+  return `${input.connectionDisplayName} - ${sourceDisplayName}`;
+}
+
 export function createWebhookAutomationTriggerId(input: {
-  connectionId: string;
+  webhookSourceId: string;
   eventType: string;
 }): string {
-  return `${input.connectionId}::${input.eventType}`;
+  return `${input.webhookSourceId}::${input.eventType}`;
 }
 
 export function createWebhookAutomationEventOption(input: {
   eventDefinition: IntegrationWebhookEventDefinition;
+  webhookSourceId: string;
   connectionId: string;
   connectionLabel: string;
   availability?: WebhookAutomationEventOptionAvailability;
@@ -64,10 +83,11 @@ export function createWebhookAutomationEventOption(input: {
 
   return {
     id: createWebhookAutomationTriggerId({
-      connectionId: input.connectionId,
+      webhookSourceId: input.webhookSourceId,
       eventType: input.eventDefinition.eventType,
     }),
     eventType: input.eventDefinition.eventType,
+    integrationWebhookSourceId: input.webhookSourceId,
     connectionId: input.connectionId,
     connectionLabel: input.connectionLabel,
     label: input.eventDefinition.displayName,
@@ -213,6 +233,7 @@ export function resolveEligibleProfileAutomationConnectionIds(input: {
 export function buildWebhookAutomationEventOptions(input: {
   connections: readonly IntegrationConnection[];
   targets: readonly IntegrationTarget[];
+  webhookSources: readonly IntegrationWebhookSource[];
   preservedConnectionId?: string;
   selectableConnectionIds?: readonly string[];
   selectedTriggerIds: readonly string[];
@@ -227,6 +248,7 @@ export function buildWebhookAutomationEventOptions(input: {
   const supportedEventOptions = buildSelectableWebhookAutomationEventOptions({
     connections: selectableConnections,
     targets: input.targets,
+    webhookSources: input.webhookSources,
     selectableConnectionIds,
   });
 
@@ -240,6 +262,7 @@ export function buildWebhookAutomationEventOptions(input: {
         selectedTriggerId,
         connections: selectableConnections,
         targets: input.targets,
+        webhookSources: input.webhookSources,
         selectableConnectionIds,
       }),
     );
@@ -265,6 +288,7 @@ export function buildWebhookAutomationEventOptions(input: {
 function buildSelectableWebhookAutomationEventOptions(input: {
   connections: readonly IntegrationConnection[];
   targets: readonly IntegrationTarget[];
+  webhookSources: readonly IntegrationWebhookSource[];
   selectableConnectionIds: ReadonlySet<string> | null;
 }): WebhookAutomationEventOption[] {
   const supportedEventOptions: WebhookAutomationEventOption[] = [];
@@ -282,20 +306,38 @@ function buildSelectableWebhookAutomationEventOptions(input: {
       continue;
     }
 
-    for (const eventDefinition of target.supportedWebhookEvents ?? []) {
-      supportedEventOptions.push(
-        createWebhookAutomationEventOption({
-          eventDefinition,
-          connectionId: connection.id,
-          connectionLabel: formatWebhookAutomationTriggerGroupLabel({
-            integrationDisplayName: target.displayName,
-            connectionDisplayName: connection.displayName,
+    const connectionWebhookSources = input.webhookSources.filter(
+      (candidate) =>
+        candidate.integrationConnectionId === connection.id && candidate.status === "active",
+    );
+    if (connectionWebhookSources.length === 0) {
+      continue;
+    }
+
+    for (const source of connectionWebhookSources) {
+      for (const eventDefinition of target.supportedWebhookEvents ?? []) {
+        supportedEventOptions.push(
+          createWebhookAutomationEventOption({
+            eventDefinition,
+            webhookSourceId: source.id,
+            connectionId: connection.id,
+            connectionLabel: formatWebhookAutomationTriggerGroupLabel({
+              integrationDisplayName: target.displayName,
+              connectionDisplayName: formatWebhookAutomationSourceLabel({
+                connectionDisplayName: connection.displayName,
+                sourceDisplayName: source.displayName,
+                sourceCount: connectionWebhookSources.length,
+              }),
+            }),
+            availability: "available",
+            ...(target.logoKey === undefined ? {} : { logoKey: target.logoKey }),
+            categoryPrefix:
+              connectionWebhookSources.length > 1
+                ? `${connection.displayName} / ${source.displayName}`
+                : connection.displayName,
           }),
-          availability: "available",
-          ...(target.logoKey === undefined ? {} : { logoKey: target.logoKey }),
-          categoryPrefix: connection.displayName,
-        }),
-      );
+        );
+      }
     }
   }
 
@@ -306,15 +348,22 @@ function buildUnavailableSelectedWebhookAutomationEventOption(input: {
   selectedTriggerId: string;
   connections: readonly IntegrationConnection[];
   targets: readonly IntegrationTarget[];
+  webhookSources: readonly IntegrationWebhookSource[];
   selectableConnectionIds: ReadonlySet<string> | null;
 }): WebhookAutomationEventOption {
-  const [connectionId = "", ...eventTypeParts] = input.selectedTriggerId.split("::");
+  const [integrationWebhookSourceId = "", ...eventTypeParts] = input.selectedTriggerId.split("::");
   const eventType = eventTypeParts.join("::");
-  const connection = input.connections.find((candidate) => candidate.id === connectionId);
-  const target =
-    connection === undefined
+  const source = input.webhookSources.find(
+    (candidate) => candidate.id === integrationWebhookSourceId,
+  );
+  const connection =
+    source?.integrationConnectionId === undefined
       ? undefined
-      : input.targets.find((candidate) => candidate.targetKey === connection.targetKey);
+      : input.connections.find((candidate) => candidate.id === source.integrationConnectionId);
+  const target =
+    source === undefined
+      ? undefined
+      : input.targets.find((candidate) => candidate.targetKey === source.targetKey);
   const eventDefinition = target?.supportedWebhookEvents?.find(
     (candidate) => candidate.eventType === eventType,
   );

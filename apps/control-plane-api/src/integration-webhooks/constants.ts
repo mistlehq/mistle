@@ -7,4 +7,5 @@ export const IntegrationWebhooksBadRequestCodes = {
 export const IntegrationWebhooksNotFoundCodes = {
   TARGET_NOT_FOUND: "TARGET_NOT_FOUND",
   CONNECTION_NOT_FOUND: "CONNECTION_NOT_FOUND",
+  WEBHOOK_SOURCE_NOT_FOUND: "WEBHOOK_SOURCE_NOT_FOUND",
 } as const;

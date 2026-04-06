@@ -58,6 +58,7 @@ export type WebhookAutomationPayloadReference = {
 export type WebhookAutomationEventOption = {
   id: string;
   eventType: string;
+  integrationWebhookSourceId: string;
   connectionId: string;
   connectionLabel: string;
   label: string;

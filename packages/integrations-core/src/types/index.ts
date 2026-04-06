@@ -1279,6 +1279,7 @@ export type IntegrationWebhookSourceDescribeInput<
 > = {
   organizationId: string;
   targetKey: string;
+  controlPlaneBaseUrl: string;
   target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
   connection?:
     | (IntegrationConnection & {
@@ -1302,12 +1303,14 @@ export type IntegrationWebhookSourceRegistrationInput<
 > = {
   organizationId: string;
   targetKey: string;
+  controlPlaneBaseUrl: string;
   target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
   connection?:
     | (IntegrationConnection & {
         config: TConnectionConfig;
       })
     | undefined;
+  connectionSecrets?: Record<string, string> | undefined;
   source: IntegrationWebhookSource;
   /** Decrypted webhook secret to register with the provider when required. */
   webhookSecret?: string | undefined;

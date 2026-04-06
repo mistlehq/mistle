@@ -67,6 +67,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@mistle/http": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/sandbox-session-client": "workspace:*",
     "@mistle/time": "workspace:*",

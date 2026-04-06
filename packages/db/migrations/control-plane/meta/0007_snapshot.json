@@ -1,6 +1,6 @@
 {
-  "id": "ee150cfd-86ea-4f19-bc36-f0713208533e",
-  "prevId": "2286e65a-a2d3-44a2-8cb6-05f70bdf9074",
+  "id": "e647dd96-2ca8-4aaa-8a88-ead9c4ea63e6",
+  "prevId": "ee150cfd-86ea-4f19-bc36-f0713208533e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2449,11 +2449,11 @@
         }
       },
       "indexes": {
-        "integration_webhook_events_target_key_external_event_id_uidx": {
-          "name": "integration_webhook_events_target_key_external_event_id_uidx",
+        "integration_webhook_events_source_id_external_event_id_uidx": {
+          "name": "integration_webhook_events_source_id_external_event_id_uidx",
           "columns": [
             {
-              "expression": "target_key",
+              "expression": "integration_webhook_source_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4142,8 +4142,8 @@
           "primaryKey": true,
           "notNull": true
         },
-        "integration_connection_id": {
-          "name": "integration_connection_id",
+        "integration_webhook_source_id": {
+          "name": "integration_webhook_source_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -4194,11 +4194,11 @@
         }
       },
       "indexes": {
-        "webhook_automations_integration_connection_id_idx": {
-          "name": "webhook_automations_integration_connection_id_idx",
+        "webhook_automations_integration_webhook_source_id_idx": {
+          "name": "webhook_automations_integration_webhook_source_id_idx",
           "columns": [
             {
-              "expression": "integration_connection_id",
+              "expression": "integration_webhook_source_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4236,12 +4236,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "webhook_automations_integration_connection_id_integration_connections_id_fk": {
-          "name": "webhook_automations_integration_connection_id_integration_connections_id_fk",
+        "webhook_automations_integration_webhook_source_id_integration_webhook_sources_id_fk": {
+          "name": "webhook_automations_integration_webhook_source_id_integration_webhook_sources_id_fk",
           "tableFrom": "webhook_automations",
-          "tableTo": "integration_connections",
+          "tableTo": "integration_webhook_sources",
           "schemaTo": "control_plane",
-          "columnsFrom": ["integration_connection_id"],
+          "columnsFrom": ["integration_webhook_source_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"

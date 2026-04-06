@@ -1994,8 +1994,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "integration_connection_id": {
-          "name": "integration_connection_id",
+        "integration_webhook_source_id": {
+          "name": "integration_webhook_source_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -3535,11 +3535,11 @@
         }
       },
       "indexes": {
-        "webhook_automations_integration_connection_id_idx": {
-          "name": "webhook_automations_integration_connection_id_idx",
+        "webhook_automations_integration_webhook_source_id_idx": {
+          "name": "webhook_automations_integration_webhook_source_id_idx",
           "columns": [
             {
-              "expression": "integration_connection_id",
+              "expression": "integration_webhook_source_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -3573,16 +3573,6 @@
           "tableTo": "automations",
           "schemaTo": "control_plane",
           "columnsFrom": ["automation_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "webhook_automations_integration_connection_id_integration_connections_id_fk": {
-          "name": "webhook_automations_integration_connection_id_integration_connections_id_fk",
-          "tableFrom": "webhook_automations",
-          "tableTo": "integration_connections",
-          "schemaTo": "control_plane",
-          "columnsFrom": ["integration_connection_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"

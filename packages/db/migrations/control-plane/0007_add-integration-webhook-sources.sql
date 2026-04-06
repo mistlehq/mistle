@@ -29,3 +29,7 @@ CREATE INDEX "integration_webhook_sources_status_idx" ON "control_plane"."integr
 CREATE INDEX "integration_webhook_sources_webhook_secret_credential_id_idx" ON "control_plane"."integration_webhook_sources" USING btree ("webhook_secret_credential_id");--> statement-breakpoint
 ALTER TABLE "control_plane"."integration_webhook_events" ADD CONSTRAINT "integration_webhook_events_integration_webhook_source_id_integration_webhook_sources_id_fk" FOREIGN KEY ("integration_webhook_source_id") REFERENCES "control_plane"."integration_webhook_sources"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "integration_webhook_events_integration_webhook_source_id_idx" ON "control_plane"."integration_webhook_events" USING btree ("integration_webhook_source_id");
+--> statement-breakpoint
+CREATE UNIQUE INDEX "integration_webhook_events_source_id_external_event_id_uidx" ON "control_plane"."integration_webhook_events" USING btree ("integration_webhook_source_id","external_event_id");
+--> statement-breakpoint
+ALTER TABLE "control_plane"."webhook_automations" ADD CONSTRAINT "webhook_automations_integration_webhook_source_id_integration_webhook_sources_id_fk" FOREIGN KEY ("integration_webhook_source_id") REFERENCES "control_plane"."integration_webhook_sources"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

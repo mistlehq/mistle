@@ -3,6 +3,9 @@ import {
   IntegrationConnectionMethodIds,
   IntegrationKinds,
   IntegrationRegistry,
+  IntegrationWebhookSourceLifecycles,
+  IntegrationWebhookSourceOwnerScopes,
+  IntegrationWebhookSourceRoutingStrategies,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 import { describe, expect } from "vitest";
@@ -43,6 +46,18 @@ const ImmediateResponseWebhookDefinition: IntegrationDefinition<
       ],
     },
   ],
+  webhookSource: {
+    ownerScope: IntegrationWebhookSourceOwnerScopes.TARGET,
+    routingStrategy: IntegrationWebhookSourceRoutingStrategies.PAYLOAD,
+    lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
+    async describeSource(input) {
+      return {
+        displayName: input.source.displayName ?? "Immediate response webhook",
+        callbackUrl: `/v1/integration/webhooks/${input.targetKey}`,
+        providerMetadata: input.source.providerMetadata,
+      };
+    },
+  },
   webhookHandler: {
     resolveWebhookRequest(input) {
       return {
@@ -93,6 +108,7 @@ describe("receive integration webhook immediate response integration", () => {
       },
       {
         targetKey,
+        endpointKey: undefined,
         headers: {
           "content-type": "text/plain",
         },

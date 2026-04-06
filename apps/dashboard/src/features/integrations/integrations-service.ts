@@ -3,6 +3,11 @@ export {
   refreshIntegrationConnectionResources,
 } from "./integration-connection-resources-service.js";
 export {
+  createIntegrationWebhookSource,
+  deleteIntegrationWebhookSource,
+  listIntegrationWebhookSources,
+} from "./integration-webhook-sources-service.js";
+export {
   createFormIntegrationConnection,
   createApiKeyIntegrationConnection,
   deleteIntegrationConnection,
@@ -20,7 +25,9 @@ export {
   type IntegrationConnectionResource,
   type IntegrationConnectionResources,
   type IntegrationConnectionResourceSummary,
+  type IntegrationWebhookSource,
   type IntegrationTarget,
   type RefreshedIntegrationConnectionResources,
   type StartedRedirectConnection,
+  type CreatedIntegrationWebhookSource,
 } from "./integrations-service-shared.js";
