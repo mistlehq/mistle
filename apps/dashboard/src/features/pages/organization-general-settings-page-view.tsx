@@ -51,7 +51,6 @@ export function OrganizationGeneralSettingsPageView(
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
           <AutoSaveTextField
-            description="Used across the workspace and organization settings."
             disabled={props.isSaving}
             id="organization-name"
             label="Organization name"
