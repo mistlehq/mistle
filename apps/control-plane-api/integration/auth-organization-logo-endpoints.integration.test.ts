@@ -1,5 +1,4 @@
 import { organizations } from "@mistle/db/control-plane";
-import { S3CompatibleObjectStore } from "@mistle/object-store";
 import { startSeaweedfsS3 } from "@mistle/test-harness";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
@@ -7,6 +6,7 @@ import { describe, expect } from "vitest";
 
 import { createControlPlaneApiRuntime } from "../src/main.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
+import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test-object-store.js";
 import { it } from "./test-context.js";
 
 const IntegrationConnectionTokenConfig = {
@@ -198,26 +198,12 @@ describe("organization logo endpoints integration", () => {
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
-    const objectStore = createObjectStore(seaweedfs);
+    const objectStore = createTestObjectStore(seaweedfs);
     const previousObjectKey = `logos/organizations/${authenticatedSession.organizationId}/img_previous.webp`;
 
     try {
       await objectStore.putObject({
-        Body: await sharp({
-          create: {
-            width: 64,
-            height: 64,
-            channels: 4,
-            background: {
-              r: 240,
-              g: 140,
-              b: 40,
-              alpha: 1,
-            },
-          },
-        })
-          .webp()
-          .toBuffer(),
+        Body: await getStoredWebpFixtureBytes(),
         ContentType: "image/webp",
         objectKey: previousObjectKey,
       });
@@ -276,26 +262,12 @@ describe("organization logo endpoints integration", () => {
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
-    const objectStore = createObjectStore(seaweedfs);
+    const objectStore = createTestObjectStore(seaweedfs);
     const objectKey = `logos/organizations/${authenticatedSession.organizationId}/img_existing.webp`;
 
     try {
       await objectStore.putObject({
-        Body: await sharp({
-          create: {
-            width: 128,
-            height: 128,
-            channels: 4,
-            background: {
-              r: 80,
-              g: 140,
-              b: 220,
-              alpha: 1,
-            },
-          },
-        })
-          .webp()
-          .toBuffer(),
+        Body: await getStoredWebpFixtureBytes(),
         ContentType: "image/webp",
         objectKey,
       });
@@ -399,19 +371,6 @@ async function createRuntimeWithObjectStore(input: {
     internalAuthServiceToken: input.internalAuthServiceToken,
     connectionToken: IntegrationConnectionTokenConfig,
     sandbox: IntegrationSandboxRuntimeConfig,
-  });
-}
-
-function createObjectStore(seaweedfs: Awaited<ReturnType<typeof startSeaweedfsS3>>) {
-  return new S3CompatibleObjectStore({
-    bucketName: seaweedfs.bucketName,
-    credentials: {
-      accessKeyId: seaweedfs.accessKeyId,
-      secretAccessKey: seaweedfs.secretAccessKey,
-    },
-    endpoint: seaweedfs.endpoint,
-    forcePathStyle: true,
-    region: seaweedfs.region,
   });
 }
 

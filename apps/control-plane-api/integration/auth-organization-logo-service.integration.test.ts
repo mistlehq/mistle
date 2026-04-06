@@ -5,7 +5,7 @@ import sharp from "sharp";
 import { describe, expect } from "vitest";
 
 import { putOrganizationLogo } from "../src/auth/services/put-organization-logo.js";
-import { createTestObjectStore } from "./helpers/test-object-store.js";
+import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test-object-store.js";
 import { it } from "./test-context.js";
 
 describe("organization logo service integration", () => {
@@ -113,21 +113,7 @@ describe("organization logo service integration", () => {
 
     try {
       await objectStore.putObject({
-        Body: await sharp({
-          create: {
-            width: 64,
-            height: 64,
-            channels: 4,
-            background: {
-              r: 240,
-              g: 180,
-              b: 20,
-              alpha: 1,
-            },
-          },
-        })
-          .webp()
-          .toBuffer(),
+        Body: await getStoredWebpFixtureBytes(),
         ContentType: "image/webp",
         objectKey: previousObjectKey,
       });
