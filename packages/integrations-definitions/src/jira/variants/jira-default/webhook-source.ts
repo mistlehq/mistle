@@ -1,3 +1,4 @@
+import { buildBasicAuthorizationHeader } from "@mistle/http";
 import type { IntegrationWebhookSourceCapability } from "@mistle/integrations-core";
 import {
   IntegrationWebhookSourceLifecycles,
@@ -60,28 +61,6 @@ export function resolveJiraAdminWebhookRegistrationOrThrow(input: {
   };
 }
 
-export function createJiraBasicAuthorizationHeader(input: {
-  email: string;
-  apiKey: string;
-}): string {
-  return `Basic ${Buffer.from(`${input.email}:${input.apiKey}`, "utf8").toString("base64")}`;
-}
-
-export function buildJiraAdminWebhookRequestBody(input: {
-  sourceId: string;
-  callbackUrl: string;
-  webhookSecret: string;
-}): Record<string, unknown> {
-  return {
-    name: `Mistle webhook source ${input.sourceId}`,
-    description: `Managed by Mistle for webhook source ${input.sourceId}`,
-    url: input.callbackUrl,
-    events: [...JiraManagedWebhookEvents],
-    excludeBody: false,
-    secret: input.webhookSecret,
-  };
-}
-
 export function parseJiraAdminWebhookResponse(
   input: unknown,
 ): z.output<typeof JiraAdminWebhookResponseSchema> {
@@ -112,9 +91,9 @@ async function createJiraAdminWebhook(input: {
     method: "POST",
     headers: {
       accept: "application/json",
-      authorization: createJiraBasicAuthorizationHeader({
-        email: input.email,
-        apiKey: input.apiKey,
+      authorization: buildBasicAuthorizationHeader({
+        username: input.email,
+        password: input.apiKey,
       }),
       "content-type": "application/json",
     },
@@ -138,9 +117,9 @@ async function deleteJiraAdminWebhook(input: {
   const response = await fetch(`${input.siteUrl}${JiraAdminWebhookPath}/${input.webhookId}`, {
     method: "DELETE",
     headers: {
-      authorization: createJiraBasicAuthorizationHeader({
-        email: input.email,
-        apiKey: input.apiKey,
+      authorization: buildBasicAuthorizationHeader({
+        username: input.email,
+        password: input.apiKey,
       }),
     },
   });
@@ -207,11 +186,14 @@ export const JiraWebhookSourceCapability: IntegrationWebhookSourceCapability<
     });
     const createdWebhook = await createJiraAdminWebhook({
       ...registration,
-      requestBody: buildJiraAdminWebhookRequestBody({
-        sourceId: input.source.id,
-        callbackUrl,
-        webhookSecret,
-      }),
+      requestBody: {
+        name: `Mistle webhook source ${input.source.id}`,
+        description: `Managed by Mistle for webhook source ${input.source.id}`,
+        url: callbackUrl,
+        events: [...JiraManagedWebhookEvents],
+        excludeBody: false,
+        secret: webhookSecret,
+      },
     });
     const remoteRegistrationId = resolveJiraAdminWebhookIdFromSelf({
       self: createdWebhook.self,

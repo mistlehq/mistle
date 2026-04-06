@@ -26,13 +26,7 @@ const JiraActorParameter = {
 } as const;
 
 function createJiraWebhookEventDefinition(input: {
-  eventType:
-    | "jira:issue_created"
-    | "jira:issue_updated"
-    | "comment_created"
-    | "comment_updated"
-    | "worklog_created"
-    | "worklog_updated";
+  eventType: "jira:issue_created" | "jira:issue_updated" | "comment_created" | "comment_updated";
   displayName: string;
   category: string;
 }): IntegrationWebhookEventDefinition {
@@ -51,8 +45,6 @@ export const JiraManagedWebhookEvents = [
   "jira:issue_updated",
   "comment_created",
   "comment_updated",
-  "worklog_created",
-  "worklog_updated",
 ] as const;
 
 export const JiraSupportedWebhookEvents: readonly IntegrationWebhookEventDefinition[] = [
@@ -75,15 +67,5 @@ export const JiraSupportedWebhookEvents: readonly IntegrationWebhookEventDefinit
     eventType: "comment_updated",
     displayName: "Comment updated",
     category: "Comments",
-  }),
-  createJiraWebhookEventDefinition({
-    eventType: "worklog_created",
-    displayName: "Worklog created",
-    category: "Worklogs",
-  }),
-  createJiraWebhookEventDefinition({
-    eventType: "worklog_updated",
-    displayName: "Worklog updated",
-    category: "Worklogs",
   }),
 ] as const;

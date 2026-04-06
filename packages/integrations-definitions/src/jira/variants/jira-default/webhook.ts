@@ -18,16 +18,8 @@ import type { JiraTargetSecrets } from "./target-secret-schema.js";
 const JiraWebhookIdentifierHeaderName = "x-atlassian-webhook-identifier";
 const JiraWebhookSignatureHeaderName = "x-hub-signature";
 
-function isRecord(input: unknown): input is Record<string, unknown> {
-  return typeof input === "object" && input !== null;
-}
-
-function decodeRawBody(input: Uint8Array): string {
-  return new TextDecoder().decode(input);
-}
-
 function parseJsonPayload(input: Uint8Array): Record<string, unknown> {
-  const decodedBody = decodeRawBody(input);
+  const decodedBody = new TextDecoder().decode(input);
   let parsedPayload: unknown;
 
   try {
@@ -36,25 +28,15 @@ function parseJsonPayload(input: Uint8Array): Record<string, unknown> {
     throw new Error("Jira webhook payload must be valid JSON.");
   }
 
-  if (!isRecord(parsedPayload)) {
+  if (typeof parsedPayload !== "object" || parsedPayload === null) {
     throw new Error("Jira webhook payload must be a JSON object.");
   }
 
-  return parsedPayload;
-}
-
-function resolveHeaderValue(input: {
-  headers: Readonly<Record<string, string>>;
-  name: string;
-}): string | undefined {
-  return input.headers[input.name];
+  return Object.fromEntries(Object.entries(parsedPayload));
 }
 
 function resolveWebhookIdentifier(input: Readonly<Record<string, string>>): string {
-  const identifier = resolveHeaderValue({
-    headers: input,
-    name: JiraWebhookIdentifierHeaderName,
-  });
+  const identifier = input[JiraWebhookIdentifierHeaderName];
 
   if (identifier === undefined || identifier.trim().length === 0) {
     throw new Error("Jira webhook is missing x-atlassian-webhook-identifier header.");
@@ -74,11 +56,11 @@ function resolveProviderEventType(input: Record<string, unknown>): string {
 
 function resolveIssuePayload(input: Record<string, unknown>): Record<string, unknown> {
   const issue = input.issue;
-  if (!isRecord(issue)) {
+  if (typeof issue !== "object" || issue === null) {
     throw new Error("Jira webhook payload is missing issue.");
   }
 
-  return issue;
+  return Object.fromEntries(Object.entries(issue));
 }
 
 function resolveSiteUrlFromPayload(input: Record<string, unknown>): string | null {
@@ -110,14 +92,13 @@ function resolveOrderingIdentifier(input: {
 }): string | undefined {
   const providerSpecificObject = input.providerEventType.startsWith("comment_")
     ? input.payload.comment
-    : input.providerEventType.startsWith("worklog_")
-      ? input.payload.worklog
-      : input.payload.changelog;
-  if (!isRecord(providerSpecificObject)) {
+    : input.payload.changelog;
+  if (typeof providerSpecificObject !== "object" || providerSpecificObject === null) {
     return undefined;
   }
 
-  const identifier = providerSpecificObject.id;
+  const providerSpecificRecord = Object.fromEntries(Object.entries(providerSpecificObject));
+  const identifier = providerSpecificRecord.id;
   if (typeof identifier === "number" && Number.isInteger(identifier)) {
     return identifier.toString().padStart(20, "0");
   }
@@ -180,14 +161,16 @@ function resolvePayloadSiteUrlConnection(input: {
 
   const matchingCandidates = input.candidates.filter((candidateConnection) => {
     const parsedConfig = candidateConnection.config;
-    if (
-      !isRecord(parsedConfig) ||
-      parsedConfig.connection_method !== JiraConnectionMethodIds.PERSONAL_API_TOKEN
-    ) {
+    if (typeof parsedConfig !== "object" || parsedConfig === null) {
       return false;
     }
 
-    const siteUrl = parsedConfig.site_url;
+    const normalizedConfig = Object.fromEntries(Object.entries(parsedConfig));
+    if (normalizedConfig.connection_method !== JiraConnectionMethodIds.PERSONAL_API_TOKEN) {
+      return false;
+    }
+
+    const siteUrl = normalizedConfig.site_url;
     return typeof siteUrl === "string" && normalizeJiraBaseUrl(siteUrl) === payloadSiteUrl;
   });
 
@@ -219,10 +202,7 @@ function resolvePayloadSiteUrlConnection(input: {
 }
 
 function resolveWebhookSignatureHeader(input: Readonly<Record<string, string>>): string {
-  const signature = resolveHeaderValue({
-    headers: input,
-    name: JiraWebhookSignatureHeaderName,
-  });
+  const signature = input[JiraWebhookSignatureHeaderName];
 
   if (signature === undefined || signature.trim().length === 0) {
     throw new Error("Jira webhook is missing x-hub-signature header.");

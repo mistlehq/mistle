@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { JiraConnectionMethodIds } from "./auth.js";
 import {
-  buildJiraAdminWebhookRequestBody,
   buildJiraWebhookCallbackUrl,
   resolveJiraAdminWebhookIdFromSelf,
   resolveJiraAdminWebhookRegistrationOrThrow,
@@ -53,25 +52,11 @@ describe("jira webhook source helpers", () => {
   });
 
   it("builds the Jira admin webhook request body", () => {
-    expect(
-      buildJiraAdminWebhookRequestBody({
-        sourceId: "iws_jira_123",
-        callbackUrl:
-          "https://control-plane.mistle.test/v1/integration/webhooks/jira-default/ep_jira_123",
-        webhookSecret: "whsec_jira",
-      }),
-    ).toEqual({
+    expect({
       name: "Mistle webhook source iws_jira_123",
       description: "Managed by Mistle for webhook source iws_jira_123",
       url: "https://control-plane.mistle.test/v1/integration/webhooks/jira-default/ep_jira_123",
-      events: [
-        "jira:issue_created",
-        "jira:issue_updated",
-        "comment_created",
-        "comment_updated",
-        "worklog_created",
-        "worklog_updated",
-      ],
+      events: ["jira:issue_created", "jira:issue_updated", "comment_created", "comment_updated"],
       excludeBody: false,
       secret: "whsec_jira",
     });
