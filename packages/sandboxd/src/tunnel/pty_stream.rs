@@ -9,7 +9,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Display};
 use std::io;
 use std::net::TcpStream;
-use std::time::Duration;
 
 use tungstenite::{Error as WebSocketError, Message, WebSocket};
 
@@ -17,7 +16,7 @@ use crate::pty::{
     DEFAULT_PTY_TERMINATE_POLL_INTERVAL, DEFAULT_PTY_TERMINATE_TIMEOUT_MS, PtyEvent,
     PtySpawnRequest, start_pty_session,
 };
-use crate::time::{Clock, Sleeper};
+use crate::time::{Clock, Duration, Sleeper};
 use crate::tunnel::protocol::{
     CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST, CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED,
     CONNECT_ERROR_CODE_PTY_SESSION_EXISTS, CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,

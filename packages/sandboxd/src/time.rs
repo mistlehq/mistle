@@ -3,7 +3,8 @@
 //! Keep time-dependent behavior injectable so subsystems can swap real waiting
 //! for deterministic test implementations without touching global timer APIs.
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+pub use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Provides access to the current time as epoch milliseconds.
 pub trait Clock: Send + Sync {

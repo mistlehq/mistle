@@ -11,11 +11,10 @@ use std::io::{ErrorKind, Read, Write};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
 
 use portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
 
-use crate::time::{Clock, Sleeper};
+use crate::time::{Clock, Duration, Sleeper};
 
 /// Default PTY column count when the caller does not specify one.
 pub const DEFAULT_PTY_COLS: u16 = 80;
@@ -346,14 +345,11 @@ fn resolve_pty_environment() -> Vec<PtyEnvironmentEntry> {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use crate::pty::{
         DEFAULT_PTY_TERMINATE_POLL_INTERVAL, DEFAULT_PTY_TERMINATE_TIMEOUT_MS, PtyEvent,
         PtySpawnRequest, start_pty_session,
     };
-    use crate::time::SystemClock;
-    use crate::time::ThreadSleeper;
+    use crate::time::{Duration, SystemClock, ThreadSleeper};
 
     #[test]
     fn starts_pty_process_and_emits_output_and_exit() {
