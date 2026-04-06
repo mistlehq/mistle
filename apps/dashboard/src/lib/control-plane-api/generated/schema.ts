@@ -1586,13 +1586,11 @@ export interface paths {
       requestBody?: never;
       responses: {
         /** @description Delete an integration webhook source. */
-        200: {
+        204: {
           headers: {
             [name: string]: unknown;
           };
-          content: {
-            "application/json": Record<string, never>;
-          };
+          content?: never;
         };
         /** @description Invalid request. */
         400: {
