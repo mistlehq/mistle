@@ -163,13 +163,13 @@ struct ControlServerState {
 }
 
 /// Owns one running control socket server thread and its observable state.
-pub struct StartedControlServer {
+pub struct ControlServer {
     state: Arc<Mutex<ControlServerState>>,
     shutdown_sender: mpsc::Sender<()>,
     thread: Option<JoinHandle<Result<(), ControlError>>>,
 }
 
-impl StartedControlServer {
+impl ControlServer {
     /// Returns how many successful reload requests this server has processed.
     pub fn reload_count(&self) -> usize {
         self.state
@@ -220,8 +220,8 @@ impl StartedControlServer {
 pub fn start_control_server(
     socket_path: &Path,
     manifest_path: &Path,
-) -> Result<StartedControlServer, ControlError> {
-    start_control_server_with_sleeper(
+) -> Result<ControlServer, ControlError> {
+    start_control_server_inner(
         socket_path,
         manifest_path,
         ThreadSleeper,
@@ -230,12 +230,25 @@ pub fn start_control_server(
 }
 
 /// Starts the local control socket server with explicit time dependencies for polling behavior.
+#[cfg(test)]
 fn start_control_server_with_sleeper<S>(
     socket_path: &Path,
     manifest_path: &Path,
     sleeper: S,
     accept_poll_interval: Duration,
-) -> Result<StartedControlServer, ControlError>
+) -> Result<ControlServer, ControlError>
+where
+    S: Sleeper + 'static,
+{
+    start_control_server_inner(socket_path, manifest_path, sleeper, accept_poll_interval)
+}
+
+fn start_control_server_inner<S>(
+    socket_path: &Path,
+    manifest_path: &Path,
+    sleeper: S,
+    accept_poll_interval: Duration,
+) -> Result<ControlServer, ControlError>
 where
     S: Sleeper + 'static,
 {
@@ -283,7 +296,7 @@ where
         result
     });
 
-    Ok(StartedControlServer {
+    Ok(ControlServer {
         state,
         shutdown_sender,
         thread: Some(thread),
