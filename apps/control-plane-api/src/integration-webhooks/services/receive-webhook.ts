@@ -18,7 +18,7 @@ import type {
   IntegrationWebhookImmediateResponse,
 } from "@mistle/integrations-core";
 
-import { ensureImplicitTargetWebhookSource } from "../../integration-connections/services/webhook-sources.js";
+import { ensureImplicitTargetWebhookSource } from "../../integration-webhook-sources/services/ensure-implicit-target-webhook-source.js";
 import {
   decryptCredentialUtf8,
   decryptIntegrationConnectionSecrets,
