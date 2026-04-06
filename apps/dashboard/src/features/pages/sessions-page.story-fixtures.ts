@@ -39,6 +39,7 @@ export function buildStorySandboxInstanceListItem(
 
   return {
     id,
+    conversationTitle: null,
     sandboxProfileId: "sbp_profile_alpha",
     sandboxProfileDisplayName: "Alpha Profile",
     sandboxProfileVersion: 3,

@@ -21,6 +21,7 @@ import {
 
 type SessionListItem = {
   id: string;
+  conversationTitle: string | null;
   sandboxProfileId: string;
   sandboxProfileDisplayName?: string;
   sandboxProfileVersion: number;
@@ -54,6 +55,7 @@ function buildListedSession(
 
   return {
     id,
+    conversationTitle: null,
     sandboxProfileId: "sbp_123",
     sandboxProfileDisplayName: "Profile 123",
     sandboxProfileVersion: 2,
@@ -158,6 +160,7 @@ describe("SessionsPage", () => {
     expect(optimisticSessions).toStrictEqual([
       {
         id: "sbi_optimistic",
+        conversationTitle: null,
         sandboxProfileId: "sbp_profile_alpha",
         sandboxProfileDisplayName: "Alpha Profile",
         sandboxProfileVersion: 3,
