@@ -13,7 +13,10 @@ type ChatMarkdownMessageProps = {
 export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Element {
   return (
     <div
-      className={["chat-markdown-message min-w-0 text-[15px] leading-7", props.className]
+      className={[
+        "chat-markdown-message min-w-0 text-[15px] leading-6 md:leading-7",
+        props.className,
+      ]
         .filter(Boolean)
         .join(" ")}
     >
