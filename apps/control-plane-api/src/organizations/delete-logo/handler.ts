@@ -1,8 +1,8 @@
 import type { RouteHandler } from "@hono/zod-openapi";
-import { withHttpErrorHandler } from "@mistle/http/errors.js";
-import { ForbiddenError } from "@mistle/http/errors.js";
+import { ForbiddenError, withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { deleteOrganizationLogo } from "../../auth/services/delete-organization-logo.js";
+import { canManageOrganization } from "../../auth/services/organization-policy.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { getActiveOrganizationRole } from "../services/get-active-organization-role.js";
@@ -21,7 +21,7 @@ const routeHandler = async (
     activeOrganizationId: session.session.activeOrganizationId,
     organizationId,
   });
-  if (actorRole !== "owner" && actorRole !== "admin") {
+  if (!canManageOrganization(actorRole)) {
     throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
   }
 
