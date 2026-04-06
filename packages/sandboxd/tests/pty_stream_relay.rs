@@ -1,5 +1,7 @@
 use std::net::TcpListener;
+use std::path::{Path, PathBuf};
 use std::thread;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 use tungstenite::accept;
@@ -14,10 +16,12 @@ use sandboxd::tunnel::pty_stream::{DEFAULT_PTY_STREAM_POLL_INTERVAL, relay_pty_s
 
 #[test]
 fn relays_pty_output_and_exit_over_websocket() {
+    let cgroup_root = create_temp_test_dir("pty_stream_scope_output");
     let listener = TcpListener::bind("127.0.0.1:0").expect("listener should bind");
     let address = listener
         .local_addr()
         .expect("listener should expose its address");
+    let server_cgroup_root = cgroup_root.clone();
 
     let server_thread = thread::spawn(move || {
         let (stream, _) = listener.accept().expect("server should accept a client");
@@ -32,6 +36,8 @@ fn relays_pty_output_and_exit_over_websocket() {
         relay_pty_stream(
             &mut websocket,
             open_payload.as_str(),
+            &server_cgroup_root,
+            "sbi_123",
             &SystemClock,
             &ThreadSleeper,
             DEFAULT_PTY_STREAM_POLL_INTERVAL,
@@ -66,18 +72,22 @@ fn relays_pty_output_and_exit_over_websocket() {
     assert_eq!(event["streamId"], 1);
     assert_eq!(event["event"]["type"], "pty.exit");
     assert_eq!(event["event"]["exitCode"], 4);
+    assert_eq!(read_scope_procs_files(&cgroup_root).len(), 1);
 
     server_thread
         .join()
         .expect("server thread should exit cleanly");
+    std::fs::remove_dir_all(cgroup_root).expect("temp root should be removable");
 }
 
 #[test]
 fn supports_attach_streams_and_detaches_secondary_close() {
+    let cgroup_root = create_temp_test_dir("pty_stream_scope_attach");
     let listener = TcpListener::bind("127.0.0.1:0").expect("listener should bind");
     let address = listener
         .local_addr()
         .expect("listener should expose its address");
+    let server_cgroup_root = cgroup_root.clone();
 
     let server_thread = thread::spawn(move || {
         let (stream, _) = listener.accept().expect("server should accept a client");
@@ -92,6 +102,8 @@ fn supports_attach_streams_and_detaches_secondary_close() {
         relay_pty_stream(
             &mut websocket,
             open_payload.as_str(),
+            &server_cgroup_root,
+            "sbi_123",
             &SystemClock,
             &ThreadSleeper,
             DEFAULT_PTY_STREAM_POLL_INTERVAL,
@@ -193,10 +205,12 @@ fn supports_attach_streams_and_detaches_secondary_close() {
     assert_eq!(exit_event["type"], "stream.event");
     assert_eq!(exit_event["streamId"], 1);
     assert_eq!(exit_event["event"]["type"], "pty.exit");
+    assert_eq!(read_scope_procs_files(&cgroup_root).len(), 1);
 
     server_thread
         .join()
         .expect("server thread should exit cleanly");
+    std::fs::remove_dir_all(cgroup_root).expect("temp root should be removable");
 }
 
 fn read_text_message<S>(socket: &mut WebSocket<S>) -> String
@@ -233,6 +247,33 @@ where
     };
 
     decode_stream_data_frame(payload.as_ref()).expect("binary frame should decode")
+}
+
+fn read_scope_procs_files(cgroup_root: &Path) -> Vec<String> {
+    let user_root = cgroup_root.join("sbi_123").join("user");
+    let entries = std::fs::read_dir(&user_root).expect("user scope root should exist");
+    let mut contents = Vec::new();
+    for entry in entries {
+        let entry = entry.expect("user scope entry should be readable");
+        let procs_file = entry.path().join("cgroup.procs");
+        contents
+            .push(std::fs::read_to_string(procs_file).expect("cgroup.procs should be readable"));
+    }
+    contents
+}
+
+fn create_temp_test_dir(prefix: &str) -> PathBuf {
+    let unique_suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after unix epoch")
+        .as_nanos();
+    let path = std::path::Path::new("/tmp").join(format!(
+        "sbd_{prefix}_{}_{}",
+        std::process::id(),
+        unique_suffix
+    ));
+    std::fs::create_dir_all(&path).expect("temp root should be creatable");
+    path
 }
 
 #[test]

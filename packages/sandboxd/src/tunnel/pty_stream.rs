@@ -9,12 +9,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Display};
 use std::io;
 use std::net::TcpStream;
+use std::path::Path;
 
 use tungstenite::{Error as WebSocketError, Message, WebSocket};
 
 use crate::pty::{
     DEFAULT_PTY_TERMINATE_POLL_INTERVAL, DEFAULT_PTY_TERMINATE_TIMEOUT_MS, PtyEvent,
-    PtySpawnRequest, start_pty_session,
+    PtySpawnRequest, start_scoped_pty_session,
 };
 use crate::time::{Clock, Duration, Sleeper};
 use crate::tunnel::protocol::{
@@ -92,6 +93,8 @@ impl PtyStreamRelay {
 pub fn relay_pty_stream(
     socket: &mut WebSocket<TcpStream>,
     open_payload: &str,
+    cgroup_root: &Path,
+    sandbox_instance_id: &str,
     clock: &dyn Clock,
     sleeper: &dyn Sleeper,
     poll_interval: Duration,
@@ -123,13 +126,19 @@ pub fn relay_pty_stream(
         )?;
         return Ok(());
     } else {
-        match start_pty_session(PtySpawnRequest {
-            cwd: open_message.channel.cwd.clone(),
-            cols: open_message.channel.cols,
-            rows: open_message.channel.rows,
-            command: open_message.channel.command.clone(),
-            args: open_message.channel.args.clone(),
-        }) {
+        match start_scoped_pty_session(
+            PtySpawnRequest {
+                cwd: open_message.channel.cwd.clone(),
+                cols: open_message.channel.cols,
+                rows: open_message.channel.rows,
+                command: open_message.channel.command.clone(),
+                args: open_message.channel.args.clone(),
+            },
+            cgroup_root,
+            sandbox_instance_id,
+            clock,
+            sleeper,
+        ) {
             Ok(session) => session,
             Err(error) => {
                 write_text_frame(

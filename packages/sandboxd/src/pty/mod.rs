@@ -8,12 +8,17 @@
 use std::collections::BTreeMap;
 use std::fmt::{self, Display};
 use std::io::{ErrorKind, Read, Write};
+use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 use portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
 
+use crate::cgroups::{
+    UserScopePaths, attach_pid_to_scope, create_user_scope, is_scope_populated,
+};
 use crate::time::{Clock, Duration, Sleeper};
 
 /// Default PTY column count when the caller does not specify one.
@@ -28,6 +33,8 @@ pub const DEFAULT_PTY_TERM: &str = "xterm-256color";
 pub const DEFAULT_PTY_TERMINATE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 /// Maximum time `sandboxd` waits after sending a PTY termination signal.
 pub const DEFAULT_PTY_TERMINATE_TIMEOUT_MS: u64 = 2_000;
+
+static PTY_SCOPE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Carries one environment entry into the PTY child process.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,6 +100,8 @@ struct PtySessionInner {
 /// Owns one live PTY session plus the event stream produced by its child.
 pub struct PtySession {
     process_id: Option<u32>,
+    scope_id: Option<String>,
+    scope_paths: Option<UserScopePaths>,
     inner: Arc<PtySessionInner>,
     events: Receiver<PtyEvent>,
 }
@@ -101,6 +110,25 @@ impl PtySession {
     /// Returns the child process identifier when the PTY backend exposes one.
     pub fn process_id(&self) -> Option<u32> {
         self.process_id
+    }
+
+    /// Returns the cgroup scope id allocated for this PTY session, if any.
+    pub fn scope_id(&self) -> Option<&str> {
+        self.scope_id.as_deref()
+    }
+
+    /// Returns the cgroup scope paths attached to this PTY session, if any.
+    pub fn scope_paths(&self) -> Option<&UserScopePaths> {
+        self.scope_paths.as_ref()
+    }
+
+    /// Returns whether the PTY session's user scope still reports live processes.
+    pub fn scope_is_populated(&self) -> Result<bool, PtyError> {
+        let scope_paths = self
+            .scope_paths()
+            .ok_or_else(|| PtyError::new("pty session does not have a user scope"))?;
+
+        is_scope_populated(scope_paths).map_err(|error| PtyError::new(error.to_string()))
     }
 
     /// Resizes the PTY window for the running child process.
@@ -280,9 +308,50 @@ pub fn start_pty_session(request: PtySpawnRequest) -> Result<PtySession, PtyErro
 
     Ok(PtySession {
         process_id,
+        scope_id: None,
+        scope_paths: None,
         inner,
         events: event_receiver,
     })
+}
+
+/// Spawns one PTY child and attaches it to a dedicated user scope cgroup.
+pub fn start_scoped_pty_session(
+    request: PtySpawnRequest,
+    cgroup_root: &Path,
+    sandbox_instance_id: &str,
+    clock: &dyn Clock,
+    sleeper: &dyn Sleeper,
+) -> Result<PtySession, PtyError> {
+    let scope_id = allocate_scope_id(clock);
+    let scope_paths = create_user_scope(cgroup_root, sandbox_instance_id, &scope_id)
+        .map_err(|error| PtyError::new(error.to_string()))?;
+    let mut session = start_pty_session(request)?;
+    let Some(process_id) = session.process_id() else {
+        let _ = session.terminate(
+            clock,
+            sleeper,
+            DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
+            DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
+        );
+        return Err(PtyError::new(
+            "pty backend did not expose a child process id for cgroup attachment",
+        ));
+    };
+
+    if let Err(error) = attach_pid_to_scope(&scope_paths, process_id) {
+        let _ = session.terminate(
+            clock,
+            sleeper,
+            DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
+            DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
+        );
+        return Err(PtyError::new(error.to_string()));
+    }
+
+    session.scope_id = Some(scope_id);
+    session.scope_paths = Some(scope_paths);
+    Ok(session)
 }
 
 fn spawn_pty_output_thread(event_sender: Sender<PtyEvent>, mut reader: Box<dyn Read + Send>) {
@@ -343,11 +412,16 @@ fn resolve_pty_environment() -> Vec<PtyEnvironmentEntry> {
         .collect()
 }
 
+fn allocate_scope_id(clock: &dyn Clock) -> String {
+    let counter = PTY_SCOPE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("scope_{}_{}", clock.now_ms(), counter)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::pty::{
         DEFAULT_PTY_TERMINATE_POLL_INTERVAL, DEFAULT_PTY_TERMINATE_TIMEOUT_MS, PtyEvent,
-        PtySpawnRequest, start_pty_session,
+        PtySpawnRequest, start_pty_session, start_scoped_pty_session,
     };
     use crate::time::{Duration, SystemClock, ThreadSleeper};
 
@@ -365,16 +439,20 @@ mod tests {
 
         let mut output = Vec::new();
         let mut exit_code = None;
-        while exit_code.is_none() {
+        for _ in 0..40 {
             let event = session
-                .next_event_timeout(Duration::from_secs(5))
+                .next_event_timeout(Duration::from_millis(250))
                 .expect("pty event read should succeed")
-                .expect("pty should emit one event");
+                .expect("pty should emit an output or exit event");
             match event {
                 PtyEvent::Output(chunk) => output.extend(chunk),
                 PtyEvent::Exit(code) => exit_code = Some(code),
                 PtyEvent::Closed => {}
                 PtyEvent::Error(message) => panic!("unexpected pty error: {message}"),
+            }
+
+            if exit_code.is_some() && !output.is_empty() {
+                break;
             }
         }
 
@@ -404,5 +482,53 @@ mod tests {
             .expect("termination should succeed");
 
         assert_ne!(exit_code, 0);
+    }
+
+    #[test]
+    fn attaches_scoped_pty_process_to_user_scope() {
+        let temp_root = std::path::Path::new("/tmp").join(format!(
+            "sbd_scoped_pty_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&temp_root).expect("temp root should be creatable");
+
+        let session = start_scoped_pty_session(
+            PtySpawnRequest {
+                command: Some("/bin/sh".to_string()),
+                args: Some(vec![
+                    "-lc".to_string(),
+                    "printf 'scoped'; exit 0".to_string(),
+                ]),
+                ..PtySpawnRequest::default()
+            },
+            &temp_root,
+            "sbi_123",
+            &SystemClock,
+            &ThreadSleeper,
+        )
+        .expect("scoped pty session should start");
+
+        let scope_paths = session
+            .scope_paths()
+            .expect("scoped pty session should expose scope paths");
+        assert!(
+            session.scope_id().is_some(),
+            "scoped pty session should expose a scope id"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&scope_paths.procs_file).expect("cgroup.procs should exist"),
+            format!(
+                "{}\n",
+                session
+                    .process_id()
+                    .expect("scoped session should expose a process id")
+            )
+        );
+
+        std::fs::remove_dir_all(temp_root).expect("temp root should be removable");
     }
 }
