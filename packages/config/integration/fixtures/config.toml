@@ -59,7 +59,7 @@ url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 migration_url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 
 [apps.control_plane_api.object_store]
-bucket_name = "mistle-media"
+bucket_name = "mistle-assets"
 region = "us-east-1"
 endpoint = "http://127.0.0.1:8333"
 force_path_style = true
