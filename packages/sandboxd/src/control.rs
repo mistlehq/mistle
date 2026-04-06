@@ -1,3 +1,9 @@
+//! Local Unix-socket control plane for a running `sandboxd` process.
+//!
+//! This module starts the `/run/.../control.sock` listener used by
+//! `apply-startup` to trigger manifest reloads, and it owns the small request /
+//! response protocol that flows across that socket.
+
 use std::fmt;
 use std::fs;
 use std::io::{Read, Write};
@@ -13,9 +19,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::apply_startup::manifest;
 use crate::protocol::startup::StartupInput;
+use crate::time::{Sleeper, ThreadSleeper};
 
 /// Default Unix socket path for the local `sandboxd` control channel.
 pub const DEFAULT_CONTROL_SOCKET_PATH: &str = "/run/mistle/sandboxd/control.sock";
+/// Poll interval for checking shutdown while the nonblocking listener is idle.
+const CONTROL_ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 /// Describes why the local control socket server or client path failed.
 #[derive(Debug)]
@@ -212,6 +221,24 @@ pub fn start_control_server(
     socket_path: &Path,
     manifest_path: &Path,
 ) -> Result<StartedControlServer, ControlError> {
+    start_control_server_with_sleeper(
+        socket_path,
+        manifest_path,
+        ThreadSleeper,
+        CONTROL_ACCEPT_POLL_INTERVAL,
+    )
+}
+
+/// Starts the local control socket server with explicit time dependencies for polling behavior.
+fn start_control_server_with_sleeper<S>(
+    socket_path: &Path,
+    manifest_path: &Path,
+    sleeper: S,
+    accept_poll_interval: Duration,
+) -> Result<StartedControlServer, ControlError>
+where
+    S: Sleeper + 'static,
+{
     let parent_dir = socket_path
         .parent()
         .ok_or_else(|| ControlError::MissingSocketParent {
@@ -249,6 +276,8 @@ pub fn start_control_server(
             &manifest_path_for_thread,
             &state_for_thread,
             &shutdown_receiver,
+            &sleeper,
+            accept_poll_interval,
         );
         let _ = fs::remove_file(&socket_path_for_thread);
         result
@@ -312,6 +341,8 @@ fn run_control_server_loop(
     manifest_path: &Path,
     state: &Arc<Mutex<ControlServerState>>,
     shutdown_receiver: &mpsc::Receiver<()>,
+    sleeper: &impl Sleeper,
+    accept_poll_interval: Duration,
 ) -> Result<(), ControlError> {
     loop {
         if shutdown_receiver.try_recv().is_ok() {
@@ -339,7 +370,7 @@ fn run_control_server_loop(
                 write_control_response(&mut stream, &response)?;
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                thread::sleep(Duration::from_millis(10));
+                sleeper.sleep(accept_poll_interval);
             }
             Err(error) => {
                 return Err(ControlError::AcceptConnection(error));
@@ -411,11 +442,12 @@ fn remove_stale_socket(socket_path: &Path) -> Result<(), ControlError> {
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use crate::apply_startup::manifest::persist_manifest;
-    use crate::control::{notify_reload, start_control_server};
+    use crate::control::{notify_reload, start_control_server, start_control_server_with_sleeper};
     use crate::protocol::startup::{StartupInput, StartupMode};
+    use crate::time::testing::ManualSleeper;
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -446,6 +478,39 @@ mod tests {
         let socket_path = test_dir.join("missing.sock");
 
         notify_reload(&socket_path).expect("missing control socket should be ignored");
+
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn records_control_loop_sleep_requests_with_manual_sleeper() {
+        let test_dir = create_temp_test_dir("control_manual_sleeper");
+        let socket_path = test_dir.join("control.sock");
+        let manifest_path = test_dir.join("manifest.json");
+        let sleeper = ManualSleeper::default();
+        let server = start_control_server_with_sleeper(
+            &socket_path,
+            &manifest_path,
+            sleeper.clone(),
+            Duration::from_millis(7),
+        )
+        .expect("control server should start");
+
+        for _ in 0..100 {
+            if !sleeper.requested_durations().is_empty() {
+                break;
+            }
+            std::thread::yield_now();
+        }
+        server.close().expect("control server should stop cleanly");
+
+        assert!(
+            sleeper
+                .requested_durations()
+                .iter()
+                .any(|duration| *duration == Duration::from_millis(7)),
+            "control loop should sleep using the injected duration"
+        );
 
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }

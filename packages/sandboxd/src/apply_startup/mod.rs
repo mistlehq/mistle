@@ -1,3 +1,9 @@
+//! `sandboxd apply-startup` command handling.
+//!
+//! This module owns the stdin/stdout JSON protocol for apply-startup, validates
+//! one request, persists the durable manifest, and asks the running control
+//! server to reload that manifest when present.
+
 pub(crate) mod manifest;
 
 use std::fmt;

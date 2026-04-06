@@ -1,3 +1,7 @@
+//! `sandboxd` is the Rust sandbox supervisor binary that is gradually absorbing
+//! startup application, local control, process supervision, and tunnel logic
+//! from the legacy JavaScript runtime.
+
 use std::fmt;
 use std::io;
 use std::path::Path;
@@ -5,6 +9,7 @@ use std::path::Path;
 pub mod apply_startup;
 pub mod control;
 pub mod protocol;
+pub mod time;
 
 /// Enumerates the top-level `sandboxd` subcommands the CLI currently supports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

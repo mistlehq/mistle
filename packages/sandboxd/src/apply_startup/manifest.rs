@@ -1,3 +1,9 @@
+//! Durable startup-manifest persistence helpers for `sandboxd apply-startup`.
+//!
+//! This module keeps disk-format concerns separate from command handling so
+//! later supervisor code can load and persist the same manifest through one
+//! shared path.
+
 use std::fs::{self, OpenOptions};
 use std::io;
 use std::io::Write;
