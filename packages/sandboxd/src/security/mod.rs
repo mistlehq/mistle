@@ -55,7 +55,7 @@ pub fn apply_current_process_security() -> Result<(), SecurityError> {
     {
         // Prevent same-uid debuggers and procfs readers from inspecting this
         // supervisor or its managed child processes through dumpable state.
-        return prctl::set_dumpable(false).map_err(SecurityError::SetNonDumpable);
+        prctl::set_dumpable(false).map_err(SecurityError::SetNonDumpable)
     }
 
     #[cfg(all(not(target_os = "linux"), test))]
