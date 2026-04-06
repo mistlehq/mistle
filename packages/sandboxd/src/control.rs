@@ -19,12 +19,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::apply_startup::manifest;
 use crate::protocol::startup::StartupInput;
-use crate::time::{Sleeper, ThreadSleeper};
+use crate::time::Sleeper;
 
 /// Default Unix socket path for the local `sandboxd` control channel.
 pub const DEFAULT_CONTROL_SOCKET_PATH: &str = "/run/mistle/sandboxd/control.sock";
 /// Poll interval for checking shutdown while the nonblocking listener is idle.
-const CONTROL_ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
+pub const DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 /// Describes why the local control socket server or client path failed.
 #[derive(Debug)]
@@ -217,33 +217,7 @@ impl ControlServer {
 }
 
 /// Starts the local control socket server that accepts startup-manifest reload requests.
-pub fn start_control_server(
-    socket_path: &Path,
-    manifest_path: &Path,
-) -> Result<ControlServer, ControlError> {
-    start_control_server_inner(
-        socket_path,
-        manifest_path,
-        ThreadSleeper,
-        CONTROL_ACCEPT_POLL_INTERVAL,
-    )
-}
-
-/// Starts the local control socket server with explicit time dependencies for polling behavior.
-#[cfg(test)]
-fn start_control_server_with_sleeper<S>(
-    socket_path: &Path,
-    manifest_path: &Path,
-    sleeper: S,
-    accept_poll_interval: Duration,
-) -> Result<ControlServer, ControlError>
-where
-    S: Sleeper + 'static,
-{
-    start_control_server_inner(socket_path, manifest_path, sleeper, accept_poll_interval)
-}
-
-fn start_control_server_inner<S>(
+pub fn start_control_server<S>(
     socket_path: &Path,
     manifest_path: &Path,
     sleeper: S,
@@ -380,7 +354,11 @@ fn run_control_server_loop(
                         error: Some(error.to_string()),
                     },
                 };
-                write_control_response(&mut stream, &response)?;
+                let response_bytes =
+                    serde_json::to_vec(&response).map_err(ControlError::SerializeResponse)?;
+                stream
+                    .write_all(&response_bytes)
+                    .map_err(ControlError::WriteResponse)?;
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                 sleeper.sleep(accept_poll_interval);
@@ -419,17 +397,6 @@ fn handle_connection(
     }
 }
 
-/// Serializes one control socket response to the connected peer.
-fn write_control_response(
-    stream: &mut UnixStream,
-    response: &ControlResponse,
-) -> Result<(), ControlError> {
-    let response_bytes = serde_json::to_vec(response).map_err(ControlError::SerializeResponse)?;
-    stream
-        .write_all(&response_bytes)
-        .map_err(ControlError::WriteResponse)
-}
-
 /// Removes an existing socket file only when it is actually a stale Unix socket.
 fn remove_stale_socket(socket_path: &Path) -> Result<(), ControlError> {
     match fs::symlink_metadata(socket_path) {
@@ -458,8 +425,11 @@ mod tests {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use crate::apply_startup::manifest::persist_manifest;
-    use crate::control::{notify_reload, start_control_server, start_control_server_with_sleeper};
+    use crate::control::{
+        DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, notify_reload, start_control_server,
+    };
     use crate::protocol::startup::{StartupInput, StartupMode};
+    use crate::time::ThreadSleeper;
     use crate::time::testing::ManualSleeper;
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -473,8 +443,13 @@ mod tests {
 
         persist_manifest(&manifest_path, &startup_input)
             .expect("manifest should persist before reload");
-        let server = start_control_server(&socket_path, &manifest_path)
-            .expect("control server should start");
+        let server = start_control_server(
+            &socket_path,
+            &manifest_path,
+            ThreadSleeper,
+            DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
+        )
+        .expect("control server should start");
 
         notify_reload(&socket_path).expect("reload notification should succeed");
 
@@ -501,7 +476,7 @@ mod tests {
         let socket_path = test_dir.join("control.sock");
         let manifest_path = test_dir.join("manifest.json");
         let sleeper = ManualSleeper::default();
-        let server = start_control_server_with_sleeper(
+        let server = start_control_server(
             &socket_path,
             &manifest_path,
             sleeper.clone(),
@@ -509,12 +484,10 @@ mod tests {
         )
         .expect("control server should start");
 
-        for _ in 0..100 {
-            if !sleeper.requested_durations().is_empty() {
-                break;
-            }
-            std::thread::yield_now();
-        }
+        assert!(
+            sleeper.wait_for_sleep_requests(1, Duration::from_millis(100)),
+            "control loop should request at least one sleep"
+        );
         server.close().expect("control server should stop cleanly");
 
         assert!(

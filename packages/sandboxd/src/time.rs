@@ -24,7 +24,7 @@ impl Sleeper for ThreadSleeper {
 pub mod testing {
     //! Deterministic test implementations for `sandboxd::time`.
 
-    use std::sync::{Arc, Mutex};
+    use std::sync::{Arc, Condvar, Mutex};
     use std::time::Duration;
 
     use crate::time::Sleeper;
@@ -32,25 +32,52 @@ pub mod testing {
     /// Test sleeper that records requested durations without blocking on real time.
     #[derive(Debug, Clone, Default)]
     pub struct ManualSleeper {
-        requested_durations: Arc<Mutex<Vec<Duration>>>,
+        state: Arc<ManualSleeperState>,
+    }
+
+    #[derive(Debug, Default)]
+    struct ManualSleeperState {
+        requested_durations: Mutex<Vec<Duration>>,
+        requested_durations_changed: Condvar,
     }
 
     impl ManualSleeper {
         /// Returns the durations this sleeper has been asked to wait for.
         pub fn requested_durations(&self) -> Vec<Duration> {
-            self.requested_durations
+            self.state
+                .requested_durations
                 .lock()
                 .expect("manual sleeper lock should not be poisoned")
                 .clone()
+        }
+
+        /// Waits until at least `count` sleep requests have been recorded or the timeout expires.
+        pub fn wait_for_sleep_requests(&self, count: usize, timeout: Duration) -> bool {
+            let requested_durations = self
+                .state
+                .requested_durations
+                .lock()
+                .expect("manual sleeper lock should not be poisoned");
+            let wait_result = self
+                .state
+                .requested_durations_changed
+                .wait_timeout_while(requested_durations, timeout, |requested_durations| {
+                    requested_durations.len() < count
+                })
+                .expect("manual sleeper condvar should not be poisoned");
+
+            wait_result.0.len() >= count
         }
     }
 
     impl Sleeper for ManualSleeper {
         fn sleep(&self, duration: Duration) {
-            self.requested_durations
+            self.state
+                .requested_durations
                 .lock()
                 .expect("manual sleeper lock should not be poisoned")
                 .push(duration);
+            self.state.requested_durations_changed.notify_all();
         }
     }
 }

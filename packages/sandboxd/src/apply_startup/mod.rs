@@ -212,12 +212,16 @@ where
 mod tests {
     use std::fs;
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::control;
     use crate::protocol::startup::{StartupApplyResponse, StartupInput, StartupMode};
+    use crate::time::ThreadSleeper;
 
     use crate::apply_startup::run_apply_startup;
+
+    static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[test]
     fn persists_manifest_and_writes_ok_response() {
@@ -297,8 +301,13 @@ mod tests {
         let manifest_path = test_dir.join("manifest.json");
         let control_socket_path = test_dir.join("control.sock");
         let mut stdout = Vec::new();
-        let server = control::start_control_server(&control_socket_path, &manifest_path)
-            .expect("control server should start");
+        let server = control::start_control_server(
+            &control_socket_path,
+            &manifest_path,
+            ThreadSleeper,
+            control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
+        )
+        .expect("control server should start");
 
         run_apply_startup(
             &mut request.as_bytes(),
@@ -319,14 +328,15 @@ mod tests {
     }
 
     fn create_temp_test_dir(prefix: &str) -> PathBuf {
+        let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
         let unique_suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system time should be after unix epoch")
             .as_nanos();
-        let short_prefix = &prefix[..prefix.len().min(8)];
         let path = PathBuf::from("/tmp").join(format!(
-            "sbd_{short_prefix}_{}_{}",
+            "sbd_{prefix}_{}_{}_{}",
             std::process::id(),
+            counter,
             unique_suffix
         ));
 

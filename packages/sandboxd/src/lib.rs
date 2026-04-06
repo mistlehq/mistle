@@ -11,6 +11,8 @@ pub mod control;
 pub mod protocol;
 pub mod time;
 
+use crate::time::ThreadSleeper;
+
 /// Enumerates the top-level `sandboxd` subcommands the CLI currently supports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SandboxdCommand {
@@ -96,6 +98,8 @@ where
             let server = match control::start_control_server(
                 Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
                 Path::new(apply_startup::DEFAULT_MANIFEST_PATH),
+                ThreadSleeper,
+                control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
             ) {
                 Ok(server) => server,
                 Err(error) => {
