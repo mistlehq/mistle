@@ -50,7 +50,6 @@ describe("user avatar service integration", () => {
         },
         {
           userId: authenticatedSession.userId,
-          contentType: "image/jpeg",
           imageBytes: new Uint8Array(sourceImage),
         },
       );
@@ -156,7 +155,6 @@ describe("user avatar service integration", () => {
         },
         {
           userId: authenticatedSession.userId,
-          contentType: "image/png",
           imageBytes: new Uint8Array(replacementSource),
         },
       );

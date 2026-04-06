@@ -2,7 +2,6 @@ import { BadRequestError } from "@mistle/http/errors.js";
 import sharp from "sharp";
 
 export type NormalizeUserAvatarImageInput = {
-  contentType: string;
   imageBytes: Uint8Array;
 };
 
@@ -17,17 +16,9 @@ const MaxUserAvatarUploadBytes = 5 * 1024 * 1024;
 const MaxUserAvatarEdgePixels = 512;
 const UserAvatarWebpQuality = 85;
 
-type SupportedUserAvatarContentType = "image/jpeg" | "image/png" | "image/webp";
-
 export async function normalizeUserAvatarImage(
   input: NormalizeUserAvatarImageInput,
 ): Promise<NormalizedUserAvatarImage> {
-  const declaredContentType = parseSupportedUserAvatarContentType(input.contentType);
-
-  if (declaredContentType === null) {
-    throw new BadRequestError("INVALID_IMAGE", "Avatar uploads must be JPEG, PNG, or WebP images.");
-  }
-
   if (input.imageBytes.byteLength === 0) {
     throw new BadRequestError("INVALID_IMAGE", "Avatar upload must not be empty.");
   }
@@ -46,13 +37,6 @@ export async function normalizeUserAvatarImage(
     throw new BadRequestError(
       "INVALID_IMAGE",
       "Avatar uploads must decode to a JPEG, PNG, or WebP image.",
-    );
-  }
-
-  if (detectedContentType !== declaredContentType) {
-    throw new BadRequestError(
-      "INVALID_IMAGE",
-      "Avatar upload content type must match the uploaded image bytes.",
     );
   }
 
@@ -110,36 +94,7 @@ async function readUserAvatarMetadata(imageBytes: Uint8Array) {
   }
 }
 
-function parseSupportedUserAvatarContentType(value: string): SupportedUserAvatarContentType | null {
-  const [mediaType, ...parameterTokens] = value.split(";");
-
-  if (mediaType === undefined || mediaType.length === 0) {
-    return null;
-  }
-
-  if (mediaType !== mediaType.trim()) {
-    return null;
-  }
-
-  if (value.startsWith(";") || parameterTokens.some((token) => token.length === 0)) {
-    return null;
-  }
-
-  switch (mediaType) {
-    case "image/jpeg":
-      return "image/jpeg";
-    case "image/png":
-      return "image/png";
-    case "image/webp":
-      return "image/webp";
-    default:
-      return null;
-  }
-}
-
-function mapDetectedImageFormatToContentType(
-  format: string | undefined,
-): SupportedUserAvatarContentType | null {
+function mapDetectedImageFormatToContentType(format: string | undefined): string | null {
   switch (format) {
     case "jpeg":
       return "image/jpeg";

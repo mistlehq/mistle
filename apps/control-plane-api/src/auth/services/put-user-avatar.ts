@@ -14,7 +14,6 @@ export type PutUserAvatarContext = {
 
 export type PutUserAvatarInput = {
   userId: string;
-  contentType: string;
   imageBytes: Uint8Array;
 };
 
@@ -40,7 +39,6 @@ export async function putUserAvatar(
   }
 
   const normalizedAvatar = await normalizeUserAvatarImage({
-    contentType: input.contentType,
     imageBytes: input.imageBytes,
   });
   const imageObjectKey = createUserAvatarObjectKey(input.userId);
