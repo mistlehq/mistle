@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
+import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import {
   buildOptimisticSessions,
@@ -18,25 +19,7 @@ import {
   shouldClearSelectedProfile,
   shouldUseResumeActionLabel,
 } from "./sessions-page.js";
-
-type SessionListItem = {
-  id: string;
-  conversationTitle: string | null;
-  sandboxProfileId: string;
-  sandboxProfileDisplayName?: string;
-  sandboxProfileVersion: number;
-  status: "starting" | "running" | "stopped" | "failed";
-  startedBy: {
-    kind: "user" | "system";
-    id: string;
-    name: string | null;
-  };
-  source: "dashboard" | "webhook";
-  createdAt: string;
-  updatedAt: string;
-  failureCode: string | null;
-  failureMessage: string | null;
-};
+import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtures.js";
 
 type SelectableProfile = {
   id: string;
@@ -47,32 +30,6 @@ type SelectableProfile = {
   updatedAt: string;
   organizationId: string;
 };
-
-function buildListedSession(
-  overrides: Partial<SessionListItem> & Pick<SessionListItem, "id">,
-): SessionListItem {
-  const { id, ...restOverrides } = overrides;
-
-  return {
-    id,
-    conversationTitle: null,
-    sandboxProfileId: "sbp_123",
-    sandboxProfileDisplayName: "Profile 123",
-    sandboxProfileVersion: 2,
-    status: "running",
-    startedBy: {
-      kind: "user",
-      id: "user-id",
-      name: "Mistle User",
-    },
-    source: "dashboard",
-    createdAt: "2026-03-10T00:00:00.000Z",
-    updatedAt: "2026-03-10T00:00:00.000Z",
-    failureCode: null,
-    failureMessage: null,
-    ...restOverrides,
-  };
-}
 
 function buildSelectableProfile(
   overrides: Partial<SelectableProfile> & Pick<SelectableProfile, "id">,
@@ -101,7 +58,7 @@ function createSessionsPageQueryClient(
 
 function seedSessionsList(input: {
   queryClient: ReturnType<typeof createTestQueryClient>;
-  items: SessionListItem[];
+  items: SandboxInstanceListItem[];
   totalResults?: number;
 }): void {
   input.queryClient.setQueryData(
@@ -221,7 +178,7 @@ describe("SessionsPage", () => {
     seedSessionsList({
       queryClient,
       items: [
-        buildListedSession({
+        buildSandboxInstanceListItemFixture({
           id: "sbi_mobile",
           sandboxProfileDisplayName: "Finance Investigator",
           status: "failed",
@@ -255,7 +212,12 @@ describe("SessionsPage", () => {
     });
     seedSessionsList({
       queryClient,
-      items: [buildListedSession({ id: "sbi_123", sandboxProfileDisplayName: "Single session" })],
+      items: [
+        buildSandboxInstanceListItemFixture({
+          id: "sbi_123",
+          sandboxProfileDisplayName: "Single session",
+        }),
+      ],
       totalResults: 1,
     });
 
@@ -326,7 +288,7 @@ describe("SessionsPage", () => {
     });
     seedSessionsList({
       queryClient,
-      items: [buildListedSession({ id: "sbi_stopped", status: "stopped" })],
+      items: [buildSandboxInstanceListItemFixture({ id: "sbi_stopped", status: "stopped" })],
     });
 
     function SessionRouteProbe(): React.JSX.Element {
@@ -361,7 +323,7 @@ describe("SessionsPage", () => {
     });
     seedSessionsList({
       queryClient,
-      items: [buildListedSession({ id: "sbi_running", status: "running" })],
+      items: [buildSandboxInstanceListItemFixture({ id: "sbi_running", status: "running" })],
     });
 
     const rendered = renderSessionsPage({
@@ -386,7 +348,7 @@ describe("SessionsPage", () => {
     seedSessionsList({
       queryClient,
       items: [
-        buildListedSession({
+        buildSandboxInstanceListItemFixture({
           id: "sbi_automation",
           startedBy: {
             kind: "system",

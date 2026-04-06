@@ -32,7 +32,7 @@ export function buildStoryLaunchableSandboxProfile(
   };
 }
 
-export function buildStorySandboxInstanceListItem(
+export function buildSandboxInstanceListItemFixture(
   overrides: Partial<SandboxInstanceListItem> & Pick<SandboxInstanceListItem, "id">,
 ): SandboxInstanceListItem {
   const { id, ...restOverrides } = overrides;
