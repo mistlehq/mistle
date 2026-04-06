@@ -1,8 +1,5 @@
 import {
   encodeDataFrame,
-  type ExecutionLease,
-  type LeaseCreate,
-  type LeaseRenew,
   type TelemetryClose,
   type TelemetryOpen,
   type StreamClose,
@@ -84,24 +81,6 @@ export function writeStreamReset(socket: WebSocket, streamReset: StreamReset): P
 
 export function writeStreamWindow(socket: WebSocket, streamWindow: StreamWindow): Promise<void> {
   return writeTextJsonMessage(socket, streamWindow);
-}
-
-export function writeLeaseCreate(socket: WebSocket, lease: ExecutionLease): Promise<void> {
-  const message: LeaseCreate = {
-    type: "lease.create",
-    lease,
-  };
-
-  return writeTextJsonMessage(socket, message);
-}
-
-export function writeLeaseRenew(socket: WebSocket, leaseId: string): Promise<void> {
-  const message: LeaseRenew = {
-    type: "lease.renew",
-    leaseId,
-  };
-
-  return writeTextJsonMessage(socket, message);
 }
 
 export function writeTelemetryOpen(socket: WebSocket, telemetryOpen: TelemetryOpen): Promise<void> {

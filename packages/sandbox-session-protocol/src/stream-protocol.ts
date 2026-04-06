@@ -172,26 +172,6 @@ const TelemetryResetSchema = z.object({
   message: NonEmptyStringSchema,
 });
 
-const LeaseMetadataSchema = z.record(z.string(), z.unknown());
-
-const ExecutionLeaseSchema = z.object({
-  id: NonEmptyStringSchema,
-  kind: NonEmptyStringSchema,
-  source: NonEmptyStringSchema,
-  externalExecutionId: NonEmptyStringSchema.optional(),
-  metadata: LeaseMetadataSchema.optional(),
-});
-
-const LeaseCreateSchema = z.object({
-  type: z.literal("lease.create"),
-  lease: ExecutionLeaseSchema,
-});
-
-const LeaseRenewSchema = z.object({
-  type: z.literal("lease.renew"),
-  leaseId: NonEmptyStringSchema,
-});
-
 const SandboxKeepaliveStateSchema = z.object({
   type: z.literal("keepalive.state"),
   ttlMs: PositiveIntegerSchema,
@@ -343,11 +323,6 @@ const StreamControlMessageSchema = z.discriminatedUnion("type", [
   StreamWindowSchema,
 ]);
 
-const LeaseControlMessageSchema = z.discriminatedUnion("type", [
-  LeaseCreateSchema,
-  LeaseRenewSchema,
-]);
-
 const TelemetryControlMessageSchema = z.discriminatedUnion("type", [
   TelemetryOpenSchema,
   TelemetryOpenOKSchema,
@@ -367,8 +342,6 @@ const BootstrapControlMessageSchema = z.discriminatedUnion("type", [
   TelemetryOpenSchema,
   TelemetryCloseSchema,
   SandboxKeepaliveStateSchema,
-  LeaseCreateSchema,
-  LeaseRenewSchema,
 ]);
 
 const PublishControlMessageSchema = z.discriminatedUnion("type", [
@@ -419,10 +392,6 @@ export type TelemetryWindow = z.infer<typeof TelemetryWindowSchema>;
 export type TelemetryClose = z.infer<typeof TelemetryCloseSchema>;
 export type TelemetryReset = z.infer<typeof TelemetryResetSchema>;
 export type TelemetryControlMessage = z.infer<typeof TelemetryControlMessageSchema>;
-export type ExecutionLease = z.infer<typeof ExecutionLeaseSchema>;
-export type LeaseCreate = z.infer<typeof LeaseCreateSchema>;
-export type LeaseRenew = z.infer<typeof LeaseRenewSchema>;
-export type LeaseControlMessage = z.infer<typeof LeaseControlMessageSchema>;
 export type SandboxKeepaliveState = z.infer<typeof SandboxKeepaliveStateSchema>;
 export type KeepaliveControlMessage = SandboxKeepaliveState;
 export type BootstrapControlMessage = z.infer<typeof BootstrapControlMessageSchema>;
@@ -464,16 +433,6 @@ export function parseStreamControlMessage(payload: string): StreamControlMessage
   return result.success ? result.data : undefined;
 }
 
-export function parseLeaseControlMessage(payload: string): LeaseControlMessage | undefined {
-  const parsedPayload = parseJSON(payload);
-  if (parsedPayload === undefined) {
-    return undefined;
-  }
-
-  const result = LeaseControlMessageSchema.safeParse(parsedPayload);
-  return result.success ? result.data : undefined;
-}
-
 export function parseTelemetryControlMessage(payload: string): TelemetryControlMessage | undefined {
   const parsedPayload = parseJSON(payload);
   if (parsedPayload === undefined) {
@@ -508,5 +467,4 @@ export type PublishControlMessage = z.infer<typeof PublishControlMessageSchema>;
 export type SandboxSessionControlMessage =
   | StreamControlMessage
   | TelemetryControlMessage
-  | LeaseControlMessage
   | KeepaliveControlMessage;

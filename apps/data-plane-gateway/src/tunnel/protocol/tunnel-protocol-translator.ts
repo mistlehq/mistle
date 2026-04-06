@@ -7,7 +7,6 @@ import {
   parseTelemetryControlMessage,
   type BootstrapControlMessage,
   type KeepaliveControlMessage,
-  type LeaseControlMessage,
   type StreamControlMessage,
   type TelemetryClose,
   type TelemetryOpen,
@@ -62,7 +61,6 @@ export type TunnelProtocolDelivery =
 
 export type TunnelProtocolTranslation = {
   delivery: TunnelProtocolDelivery;
-  executionLeaseControlMessage?: LeaseControlMessage;
   keepaliveControlMessage?: KeepaliveControlMessage;
   notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding;
   releaseInteractiveStream?: ReleaseInteractiveStream;
@@ -292,10 +290,6 @@ function assertConnectionControlMessageAllowed(message: StreamControlMessage): v
 function assertBootstrapControlMessageAllowed(message: BootstrapControlMessage): void {
   const controlMessageType = message.type;
 
-  if (message.type === "lease.create" || message.type === "lease.renew") {
-    return;
-  }
-
   if (message.type === "keepalive.state") {
     return;
   }
@@ -358,18 +352,12 @@ function createRespondDelivery(payload: RelayPayload): TunnelProtocolDelivery {
 
 function createTranslation(input: {
   delivery: TunnelProtocolDelivery;
-  executionLeaseControlMessage?: LeaseControlMessage | undefined;
   keepaliveControlMessage?: KeepaliveControlMessage | undefined;
   notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding | undefined;
   releaseInteractiveStream?: ReleaseInteractiveStream | undefined;
 }): TunnelProtocolTranslation {
   return {
     delivery: input.delivery,
-    ...(input.executionLeaseControlMessage === undefined
-      ? {}
-      : {
-          executionLeaseControlMessage: input.executionLeaseControlMessage,
-        }),
     ...(input.keepaliveControlMessage === undefined
       ? {}
       : {
@@ -574,18 +562,12 @@ export class TunnelProtocolTranslator {
       throw new TunnelProtocolViolationError(createUnsupportedTextPayloadErrorMessage("bootstrap"));
     }
     assertBootstrapControlMessageAllowed(controlMessage);
-    if (
-      controlMessage.type === "lease.create" ||
-      controlMessage.type === "lease.renew" ||
-      controlMessage.type === "keepalive.state"
-    ) {
+    if (controlMessage.type === "keepalive.state") {
       return createTranslation({
         delivery: {
           kind: "drop",
         },
-        ...(controlMessage.type === "keepalive.state"
-          ? { keepaliveControlMessage: controlMessage }
-          : { executionLeaseControlMessage: controlMessage }),
+        keepaliveControlMessage: controlMessage,
       });
     }
 

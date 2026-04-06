@@ -1,9 +1,4 @@
-import type {
-  AgentExecutionObserverSession,
-  CompiledAgentRuntime,
-  CompiledRuntimeClient,
-} from "@mistle/integrations-core";
-import { resolveAgentExecutionObserver } from "@mistle/integrations-definitions/agent-runtimes/server";
+import type { CompiledAgentRuntime, CompiledRuntimeClient } from "@mistle/integrations-core";
 import {
   decodeDataFrame,
   PayloadKindWebSocketBinary,
@@ -13,11 +8,9 @@ import type WebSocket from "ws";
 
 import { createAbortRace, ignorePromiseRejectionAfterAbort } from "./abortable-race.js";
 import type { ActiveTunnelStreamRelay, ActiveTunnelStreamRelayResult } from "./active-relay.js";
-import { trackObservedExecutions } from "./agent-execution-monitor.js";
 import { AsyncQueue } from "./async-queue.js";
 import type { TunnelSocketMessage } from "./connect-request.js";
 import { parseControlMessageType, parseStreamCloseMessage } from "./connect-request.js";
-import { ExecutionLeaseEngine } from "./execution-lease-engine.js";
 import {
   CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
   CONNECT_ERROR_CODE_AGENT_ENDPOINT_UNAVAILABLE,
@@ -100,7 +93,6 @@ export function resolveAgentEndpoint(
 async function relayAgentFramesDirection(input: {
   signal: AbortSignal;
   agentSocket: WebSocket;
-  observerSession: AgentExecutionObserverSession;
   sendWindow: StreamSendWindow;
   tunnelSocket: WebSocket;
   streamId: number;
@@ -123,9 +115,6 @@ async function relayAgentFramesDirection(input: {
 
     const payloadBytes =
       message.kind === "text" ? new TextEncoder().encode(message.payload) : message.payload;
-    input.observerSession.onInboundMessage(
-      message.kind === "text" ? message.payload : message.payload,
-    );
     if (!input.sendWindow.tryConsume(payloadBytes.length)) {
       await writeStreamReset(input.tunnelSocket, {
         type: "stream.reset",
@@ -148,7 +137,6 @@ async function relayTunnelFrames(input: {
   signal: AbortSignal;
   tunnelSocket: WebSocket;
   agentSocket: WebSocket;
-  observerSession: AgentExecutionObserverSession;
   streamId: number;
   messages: AsyncQueue<TunnelSocketMessage>;
 }): Promise<void> {
@@ -156,7 +144,6 @@ async function relayTunnelFrames(input: {
   const outboundRelay = relayAgentFramesDirection({
     signal: input.signal,
     agentSocket: input.agentSocket,
-    observerSession: input.observerSession,
     sendWindow,
     tunnelSocket: input.tunnelSocket,
     streamId: input.streamId,
@@ -293,9 +280,6 @@ async function relayTunnelFrames(input: {
     }
 
     try {
-      input.observerSession.onOutboundMessage(
-        outboundMessage.kind === "text" ? outboundMessage.payload : outboundMessage.payload,
-      );
       await connectAndSendAgentMessage(input.agentSocket, outboundMessage);
     } catch (error) {
       if (isExpectedWebSocketClose(error)) {
@@ -340,8 +324,6 @@ export async function handleAgentConnectRequest(input: {
   streamId: number;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
-  executionLeases: ExecutionLeaseEngine;
-  executionLeasePollIntervalMs?: number;
   relayResultQueue: AsyncQueue<ActiveTunnelStreamRelayResult>;
 }): Promise<ActiveTunnelStreamRelay | undefined> {
   let agentEndpoint: ResolvedAgentEndpoint | undefined;
@@ -376,21 +358,6 @@ export async function handleAgentConnectRequest(input: {
     return undefined;
   }
 
-  let observerSession: AgentExecutionObserverSession;
-  try {
-    observerSession = resolveAgentExecutionObserver(agentEndpoint.runtimeId).createSession({
-      transportUrl: agentEndpoint.transportUrl,
-    });
-  } catch (error) {
-    await writeStreamOpenError(input.tunnelSocket, {
-      type: "stream.open.error",
-      streamId: input.streamId,
-      code: CONNECT_ERROR_CODE_AGENT_ENDPOINT_UNAVAILABLE,
-      message: error instanceof Error ? error.message : String(error),
-    });
-    return undefined;
-  }
-
   let agentSocket: WebSocket;
   try {
     agentSocket = await connectWebSocket(agentEndpoint.transportUrl, input.signal);
@@ -419,11 +386,6 @@ export async function handleAgentConnectRequest(input: {
     signal: input.signal,
     tunnelSocket: input.tunnelSocket,
     agentSocket,
-    observerSession,
-    executionLeases: input.executionLeases,
-    ...(input.executionLeasePollIntervalMs === undefined
-      ? {}
-      : { executionLeasePollIntervalMs: input.executionLeasePollIntervalMs }),
     streamId: input.streamId,
     messages: relay.messages,
   })
@@ -448,9 +410,6 @@ async function relayAgentSession(input: {
   signal: AbortSignal;
   tunnelSocket: WebSocket;
   agentSocket: WebSocket;
-  observerSession: AgentExecutionObserverSession;
-  executionLeases: ExecutionLeaseEngine;
-  executionLeasePollIntervalMs?: number;
   streamId: number;
   messages: AsyncQueue<TunnelSocketMessage>;
 }): Promise<void> {
@@ -458,15 +417,5 @@ async function relayAgentSession(input: {
     await relayTunnelFrames(input);
   } finally {
     await closeWebSocket(input.agentSocket).catch(() => undefined);
-    if (!input.signal.aborted) {
-      trackObservedExecutions({
-        signal: input.signal,
-        executionLeases: input.executionLeases,
-        observations: input.observerSession.drainObservations(),
-        ...(input.executionLeasePollIntervalMs === undefined
-          ? {}
-          : { pollIntervalMs: input.executionLeasePollIntervalMs }),
-      });
-    }
   }
 }

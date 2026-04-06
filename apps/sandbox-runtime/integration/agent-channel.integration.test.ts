@@ -8,7 +8,6 @@ import {
   parseBootstrapControlMessage,
   type BootstrapControlMessage,
 } from "@mistle/sandbox-session-protocol";
-import { systemSleeper } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 import WebSocket, { WebSocketServer, type RawData } from "ws";
 
@@ -16,14 +15,12 @@ import type { ActiveTunnelStreamRelayResult } from "../src/tunnel/active-relay.j
 import { handleAgentConnectRequest } from "../src/tunnel/agent-channel.js";
 import { AsyncQueue } from "../src/tunnel/async-queue.js";
 import type { TunnelSocketMessage } from "../src/tunnel/connect-request.js";
-import { ExecutionLeaseEngine } from "../src/tunnel/execution-lease-engine.js";
 
 type WebSocketPair = {
   server: WebSocketServer;
   serverSocket: WebSocket;
   clientSocket: WebSocket;
   clientMessages: AsyncQueue<TunnelSocketMessage>;
-  serverMessages: AsyncQueue<TunnelSocketMessage>;
 };
 
 type CodexConnectionScript = (socket: WebSocket) => Promise<void>;
@@ -213,32 +210,10 @@ async function createTunnelWebSocketPair(): Promise<WebSocketPair> {
   await once(server, "listening");
 
   const clientMessages = new AsyncQueue<TunnelSocketMessage>();
-  const serverMessages = new AsyncQueue<TunnelSocketMessage>();
   const connectionPromise = once(server, "connection").then(([socket]) => {
     if (!(socket instanceof WebSocket)) {
       throw new Error("server websocket connection is required");
     }
-
-    socket.on("message", (payload, isBinary) => {
-      if (isBinary) {
-        serverMessages.push({
-          kind: "binary",
-          payload: rawDataToUint8Array(payload),
-        });
-        return;
-      }
-
-      serverMessages.push({
-        kind: "text",
-        payload: rawDataToText(payload),
-      });
-    });
-    socket.on("error", (error) => {
-      serverMessages.fail(error);
-    });
-    socket.on("close", () => {
-      serverMessages.fail(new Error("tunnel server websocket closed"));
-    });
 
     return socket;
   });
@@ -273,7 +248,6 @@ async function createTunnelWebSocketPair(): Promise<WebSocketPair> {
     serverSocket,
     clientSocket,
     clientMessages,
-    serverMessages,
   };
 }
 
@@ -339,23 +313,6 @@ async function writeJsonMessage(socket: WebSocket, payload: object): Promise<voi
   });
 }
 
-async function completeInitializeHandshake(
-  messages: JsonMessageQueue,
-  socket: WebSocket,
-): Promise<void> {
-  const initializeRequest = await messages.next();
-  expect(initializeRequest.method).toBe("initialize");
-  await writeJsonMessage(socket, {
-    id: initializeRequest.id,
-    result: {
-      userAgent: "codex-app-server",
-    },
-  });
-
-  const initializedNotification = await messages.next();
-  expect(initializedNotification.method).toBe("initialized");
-}
-
 async function nextBootstrapControlMessage(
   queue: AsyncQueue<TunnelSocketMessage>,
   signal: AbortSignal,
@@ -390,196 +347,11 @@ async function nextBinaryTunnelMessage(
 }
 
 describe("handleAgentConnectRequest", () => {
-  it("creates and renews execution leases after the agent stream disconnects", async () => {
-    const signal = new AbortController();
-    const relayResultQueue = new AsyncQueue<ActiveTunnelStreamRelayResult>();
-    const { server, serverSocket, clientSocket, clientMessages, serverMessages } =
-      await createTunnelWebSocketPair();
-    const executionLeases = new ExecutionLeaseEngine();
-    executionLeases.attachTunnelConnection(clientSocket);
-    const codexServer = await createCodexServer([
-      async (socket) => {
-        const messages = new JsonMessageQueue(socket);
-        const request = await messages.next();
-        expect(request.method).toBe("turn/start");
-        await writeJsonMessage(socket, {
-          id: request.id,
-          result: {
-            turn: {
-              id: "turn_123",
-              status: "inProgress",
-            },
-          },
-        });
-        socket.close(1000, "completed");
-      },
-      async (socket) => {
-        const messages = new JsonMessageQueue(socket);
-        await completeInitializeHandshake(messages, socket);
-
-        const threadReadRequest = await messages.next();
-        expect(threadReadRequest.method).toBe("thread/read");
-        await writeJsonMessage(socket, {
-          id: threadReadRequest.id,
-          result: {
-            thread: {
-              id: "thr_123",
-              turns: [
-                {
-                  id: "turn_123",
-                  status: "inProgress",
-                },
-              ],
-            },
-          },
-        });
-      },
-      async (socket) => {
-        const messages = new JsonMessageQueue(socket);
-        await completeInitializeHandshake(messages, socket);
-
-        const threadReadRequest = await messages.next();
-        expect(threadReadRequest.method).toBe("thread/read");
-        await writeJsonMessage(socket, {
-          id: threadReadRequest.id,
-          result: {
-            thread: {
-              id: "thr_123",
-              turns: [
-                {
-                  id: "turn_123",
-                  status: "inProgress",
-                },
-              ],
-            },
-          },
-        });
-      },
-      async (socket) => {
-        const messages = new JsonMessageQueue(socket);
-        await completeInitializeHandshake(messages, socket);
-
-        const threadReadRequest = await messages.next();
-        expect(threadReadRequest.method).toBe("thread/read");
-        await writeJsonMessage(socket, {
-          id: threadReadRequest.id,
-          result: {
-            thread: {
-              id: "thr_123",
-              turns: [
-                {
-                  id: "turn_123",
-                  status: "completed",
-                },
-              ],
-            },
-          },
-        });
-      },
-    ]);
-
-    try {
-      const runtimeClient = createRuntimeClient();
-      runtimeClient.endpoints = [
-        {
-          endpointKey: "app-server",
-          transport: {
-            type: "ws",
-            url: codexServer.url,
-          },
-          connectionMode: "dedicated",
-        },
-      ];
-
-      const relay = await handleAgentConnectRequest({
-        signal: signal.signal,
-        tunnelSocket: serverSocket,
-        streamId: 1,
-        agentRuntimes: [createAgentRuntime()],
-        runtimeClients: [runtimeClient],
-        executionLeases,
-        executionLeasePollIntervalMs: 25,
-        relayResultQueue,
-      });
-
-      expect(relay).toBeDefined();
-      if (relay === undefined) {
-        throw new Error("agent relay is required");
-      }
-
-      await expect(nextBootstrapControlMessage(clientMessages, signal.signal)).resolves.toEqual({
-        type: "stream.open.ok",
-        streamId: 1,
-      });
-
-      relay.messages.push({
-        kind: "binary",
-        payload: encodeDataFrame({
-          streamId: 1,
-          payloadKind: PayloadKindWebSocketText,
-          payload: new TextEncoder().encode(
-            JSON.stringify({
-              id: "request_1",
-              method: "turn/start",
-              params: {
-                threadId: "thr_123",
-                input: [],
-              },
-            }),
-          ),
-        }),
-      });
-
-      const responseFrame = decodeDataFrame(
-        await nextBinaryTunnelMessage(clientMessages, signal.signal),
-      );
-      expect(responseFrame.streamId).toBe(1);
-
-      const relayResult = await nextQueueItem(
-        relayResultQueue,
-        signal.signal,
-        "failed waiting for agent relay completion",
-      );
-      expect(relayResult.error).toBeUndefined();
-
-      const leaseCreate = await nextBootstrapControlMessage(serverMessages, signal.signal);
-      expect(leaseCreate).toEqual({
-        type: "lease.create",
-        lease: {
-          id: "sxl_codex_1ce34b9b1d075061",
-          kind: "agent_execution",
-          source: "codex",
-          externalExecutionId: "turn_123",
-          metadata: {
-            threadId: "thr_123",
-          },
-        },
-      });
-
-      const leaseRenew = await nextBootstrapControlMessage(serverMessages, signal.signal);
-      expect(leaseRenew).toEqual({
-        type: "lease.renew",
-        leaseId: "sxl_codex_1ce34b9b1d075061",
-      });
-
-      await systemSleeper.sleep(80);
-      expect(executionLeases.has("sxl_codex_1ce34b9b1d075061")).toBe(false);
-    } finally {
-      signal.abort();
-      await closeWebSocket(clientSocket).catch(() => undefined);
-      await closeWebSocket(serverSocket).catch(() => undefined);
-      await closeWebSocketServer(server).catch(() => undefined);
-      await closeWebSocketServer(codexServer.server).catch(() => undefined);
-    }
-  });
-
   it("forwards localImage turn input to the agent endpoint unchanged", async () => {
     const signal = new AbortController();
     const relayResultQueue = new AsyncQueue<ActiveTunnelStreamRelayResult>();
     const { server, serverSocket, clientSocket, clientMessages } =
       await createTunnelWebSocketPair();
-    const executionLeases = new ExecutionLeaseEngine();
-    executionLeases.attachTunnelConnection(clientSocket);
     const codexServer = await createCodexServer([
       async (socket) => {
         const messages = new JsonMessageQueue(socket);
@@ -635,8 +407,6 @@ describe("handleAgentConnectRequest", () => {
         streamId: 1,
         agentRuntimes: [createAgentRuntime()],
         runtimeClients: [runtimeClient],
-        executionLeases,
-        executionLeasePollIntervalMs: 25,
         relayResultQueue,
       });
 

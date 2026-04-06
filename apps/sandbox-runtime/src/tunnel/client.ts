@@ -16,7 +16,6 @@ import {
   parsePtyConnectRequest,
   type TunnelSocketMessage,
 } from "./connect-request.js";
-import { ExecutionLeaseEngine } from "./execution-lease-engine.js";
 import { handleFileUploadConnectRequest } from "./file-upload-channel.js";
 import {
   CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
@@ -140,7 +139,6 @@ async function handleTunnelConnection(input: {
   signal: AbortSignal;
   tunnelSocket: WebSocket;
   tunnelMessages: AsyncQueue<TunnelSocketMessage>;
-  executionLeases: ExecutionLeaseEngine;
   telemetryLogRelay: TelemetryLogRelay;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
@@ -276,7 +274,6 @@ async function handleTunnelConnection(input: {
               streamId: connectRequest.streamId,
               agentRuntimes: input.agentRuntimes,
               runtimeClients: input.runtimeClients,
-              executionLeases: input.executionLeases,
               relayResultQueue,
             });
             if (relay !== undefined) {
@@ -363,7 +360,6 @@ async function runTunnelClientLoop(input: {
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
   logger: Logger;
 }): Promise<void> {
-  const executionLeases = new ExecutionLeaseEngine();
   const telemetryLogRelay = new TelemetryLogRelay(input.logger);
 
   void runTunnelTokenExchangeLoop({
@@ -431,15 +427,12 @@ async function runTunnelClientLoop(input: {
       continue;
     }
 
-    executionLeases.attachTunnelConnection(tunnelSocket);
-
     let connectionError: unknown;
     try {
       await handleTunnelConnection({
         signal: input.signal,
         tunnelSocket,
         tunnelMessages,
-        executionLeases,
         telemetryLogRelay,
         agentRuntimes: input.agentRuntimes,
         runtimeClients: input.runtimeClients,
@@ -448,7 +441,6 @@ async function runTunnelClientLoop(input: {
     } catch (error) {
       connectionError = error;
     } finally {
-      executionLeases.detachTunnelConnection(tunnelSocket);
       telemetryLogRelay.detachTunnelConnection(tunnelSocket);
       await closeWebSocket(tunnelSocket).catch(() => undefined);
     }
