@@ -23,7 +23,7 @@ function formatReasoningEffortLabel(value: string): string {
 export type ChatComposerStatusMessage = {
   message: string;
   variant: "alert" | "default";
-  presentation?: "loading";
+  presentation?: "loading" | "notice";
 };
 
 export type ChatComposerViewModel = {

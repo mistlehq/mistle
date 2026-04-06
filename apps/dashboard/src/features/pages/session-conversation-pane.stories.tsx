@@ -101,6 +101,7 @@ export const DisconnectedWithError: Story = {
     statusMessage: {
       message: "The session disconnected before the turn could be submitted.",
       variant: "alert",
+      presentation: "notice",
     },
   },
 };
