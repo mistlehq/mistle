@@ -148,7 +148,7 @@ jobs:
         run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=!@mistle/sandbox-runtime --filter=!@mistle/sandbox-rs-napi --filter=!@mistle/sandboxd"
 
       - name: Run TS static checks in Nix shell
-        run: nix develop --command bash -lc "pnpm format:check && pnpm lint:ts && pnpm lint:sql && pnpm typecheck:ts"
+        run: nix develop --command bash -lc "pnpm format:check && pnpm exec oxlint --type-aware --deny-warnings --threads=1 apps packages tests && pnpm lint:openapi && pnpm lint:docs && pnpm lint:sql && pnpm typecheck:ts"
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-ts-turbo-cache.outputs.cache-hit != 'true' }}
