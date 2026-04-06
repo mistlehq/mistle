@@ -22,4 +22,19 @@ describe("OtpStepForm", () => {
     expect(markup).toContain('name="otp"');
     expect(markup).toContain('autoComplete="one-time-code"');
   });
+
+  it("keeps the OTP input visible to pointer interaction", () => {
+    const markup = renderToStaticMarkup(
+      <OtpStepForm
+        email="user@example.com"
+        isVerifyingOtp={false}
+        onOtpChange={() => {}}
+        onSubmit={async () => {}}
+        onUseDifferentEmail={() => {}}
+        otp=""
+      />,
+    );
+
+    expect(markup).not.toContain('data-slot="input-otp" class="sr-only');
+  });
 });

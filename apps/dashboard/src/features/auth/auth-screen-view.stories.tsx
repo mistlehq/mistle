@@ -1,5 +1,6 @@
 import { Separator } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 
 import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybook/decorators.js";
 import { AuthScreenView } from "./auth-screen-view.js";
@@ -31,6 +32,12 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+function InteractiveOtpStory(args: Story["args"]): React.JSX.Element {
+  const [otp, setOtp] = useState(args?.otp ?? "");
+
+  return <AuthScreenView {...args} onOtpChange={setOtp} otp={otp} />;
+}
 
 export const EmailEntry: Story = {
   args: {
@@ -110,6 +117,7 @@ export const OtpEntry: Story = {
   args: {
     authStep: "otp",
   },
+  render: InteractiveOtpStory,
 };
 
 export const OtpPartialEntry: Story = {
@@ -117,6 +125,7 @@ export const OtpPartialEntry: Story = {
     authStep: "otp",
     otp: "12",
   },
+  render: InteractiveOtpStory,
 };
 
 export const VerifyingOtp: Story = {
@@ -133,4 +142,5 @@ export const OtpError: Story = {
     authError: "The one-time code is invalid or expired.",
     otp: "123456",
   },
+  render: InteractiveOtpStory,
 };
