@@ -410,11 +410,14 @@ fn remove_stale_socket(socket_path: &Path) -> Result<(), ControlError> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::apply_startup::manifest::persist_manifest;
     use crate::control::{notify_reload, start_control_server};
     use crate::protocol::startup::{StartupInput, StartupMode};
+
+    static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[test]
     fn reloads_manifest_from_control_socket() {
@@ -471,14 +474,15 @@ mod tests {
     }
 
     fn create_temp_test_dir(prefix: &str) -> std::path::PathBuf {
+        let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
         let unique_suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system time should be after unix epoch")
             .as_nanos();
-        let short_prefix = &prefix[..prefix.len().min(8)];
         let path = std::path::Path::new("/tmp").join(format!(
-            "sbd_{short_prefix}_{}_{}",
+            "sbd_{prefix}_{}_{}_{}",
             std::process::id(),
+            counter,
             unique_suffix
         ));
 
