@@ -1,13 +1,17 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { ForbiddenError, NotFoundError } from "@mistle/http/errors.js";
+import { ForbiddenError } from "@mistle/http/errors.js";
 
 import { parseOrganizationRole } from "../../auth/services/organization-policy.js";
+import { assertCanAccessActiveOrganization } from "./assert-can-access-active-organization.js";
 
-export async function assertCanManageOrganizationLogo(input: {
+export async function assertCanManageActiveOrganization(input: {
   db: ControlPlaneDatabase;
   actorUserId: string;
+  activeOrganizationId: string;
   organizationId: string;
 }): Promise<void> {
+  await assertCanAccessActiveOrganization(input);
+
   const membership = await input.db.query.members.findFirst({
     columns: {
       role: true,
@@ -17,18 +21,7 @@ export async function assertCanManageOrganizationLogo(input: {
   });
 
   if (membership === undefined) {
-    const organization = await input.db.query.organizations.findFirst({
-      columns: {
-        id: true,
-      },
-      where: (organizations, { eq }) => eq(organizations.id, input.organizationId),
-    });
-
-    if (organization === undefined) {
-      throw new NotFoundError("NOT_FOUND", "Organization was not found.");
-    }
-
-    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
+    throw new Error("Expected organization membership to exist after access check.");
   }
 
   const actorRole = parseOrganizationRole(membership.role);

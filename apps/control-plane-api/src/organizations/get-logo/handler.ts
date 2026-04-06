@@ -5,23 +5,26 @@ import { getOrganizationLogo } from "../../auth/services/get-organization-logo.j
 import { PROFILE_IMAGE_READ_URL_TTL_SECONDS } from "../../me/constants.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { assertActiveOrganizationAccess } from "../services/assert-active-organization-access.js";
+import { assertCanAccessActiveOrganization } from "../services/assert-can-access-active-organization.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
   session: AppSession,
 ) => {
+  const db = ctx.get("db");
   const objectStore = ctx.get("objectStore");
   const { organizationId } = ctx.req.valid("param");
 
-  assertActiveOrganizationAccess({
+  await assertCanAccessActiveOrganization({
+    db,
+    actorUserId: session.user.id,
     activeOrganizationId: session.session.activeOrganizationId,
     organizationId,
   });
 
   const organizationLogo = await getOrganizationLogo({
-    db: ctx.get("db"),
+    db,
     organizationId,
   });
 
