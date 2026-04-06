@@ -10,7 +10,7 @@ use tungstenite::{Message, WebSocket};
 
 use sandboxd::time::{SystemClock, ThreadSleeper};
 use sandboxd::tunnel::protocol::{
-    PtyControlMessage, decode_stream_data_frame, parse_pty_control_message,
+    PAYLOAD_KIND_RAW_BYTES, PtyControlMessage, decode_stream_data_frame, parse_pty_control_message,
 };
 use sandboxd::tunnel::pty_stream::{DEFAULT_PTY_STREAM_POLL_INTERVAL, relay_pty_stream};
 
@@ -145,7 +145,11 @@ fn supports_attach_streams_and_detaches_secondary_close() {
         ))
         .expect("client should send resize signal");
 
-    let encoded_input = sandboxd::tunnel::protocol::encode_stream_data_frame(2, b"hello\n")
+    let encoded_input = sandboxd::tunnel::protocol::encode_stream_data_frame(
+        2,
+        PAYLOAD_KIND_RAW_BYTES,
+        b"hello\n",
+    )
         .expect("input frame should encode");
     client_socket
         .send(Message::Binary(encoded_input.into()))
@@ -177,7 +181,11 @@ fn supports_attach_streams_and_detaches_secondary_close() {
         ))
         .expect("client should close the attached stream");
 
-    let encoded_primary_input = sandboxd::tunnel::protocol::encode_stream_data_frame(1, b"bye\n")
+    let encoded_primary_input = sandboxd::tunnel::protocol::encode_stream_data_frame(
+        1,
+        PAYLOAD_KIND_RAW_BYTES,
+        b"bye\n",
+    )
         .expect("primary input frame should encode");
     client_socket
         .send(Message::Binary(encoded_primary_input.into()))

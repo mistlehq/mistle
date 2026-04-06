@@ -21,12 +21,13 @@ use crate::time::{Clock, Duration, Sleeper};
 use crate::tunnel::protocol::{
     CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST, CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED,
     CONNECT_ERROR_CODE_PTY_SESSION_EXISTS, CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,
-    PtyControlMessage, PtySessionMode, STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
-    STREAM_RESET_CODE_INVALID_STREAM_DATA, STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
-    STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_STREAM_CLOSE_FAILED,
-    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED, STREAM_RESET_CODE_TARGET_CLOSED, StreamSendWindow,
-    decode_stream_data_frame, encode_stream_data_frame, parse_pty_control_message, pty_exit_event,
-    stream_open_error, stream_open_ok, stream_reset, stream_window,
+    PAYLOAD_KIND_RAW_BYTES, PtyControlMessage, PtySessionMode,
+    STREAM_RESET_CODE_INVALID_STREAM_CLOSE, STREAM_RESET_CODE_INVALID_STREAM_DATA,
+    STREAM_RESET_CODE_INVALID_STREAM_SIGNAL, STREAM_RESET_CODE_INVALID_STREAM_WINDOW,
+    STREAM_RESET_CODE_STREAM_CLOSE_FAILED, STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+    STREAM_RESET_CODE_TARGET_CLOSED, StreamSendWindow, decode_stream_data_frame,
+    encode_stream_data_frame, parse_pty_control_message, pty_exit_event, stream_open_error,
+    stream_open_ok, stream_reset, stream_window,
 };
 
 /// Default idle poll interval for interleaving nonblocking tunnel reads and PTY output.
@@ -196,7 +197,8 @@ pub fn relay_pty_stream(
                             continue;
                         }
 
-                        let encoded = encode_stream_data_frame(stream_id, &chunk)
+                        let encoded =
+                            encode_stream_data_frame(stream_id, PAYLOAD_KIND_RAW_BYTES, &chunk)
                             .map_err(|error| PtyStreamError::new(error.to_string()))?;
                         socket
                             .send(Message::Binary(encoded.into()))
@@ -386,6 +388,17 @@ pub fn relay_pty_stream(
                                 "stream data frame streamId {} is not attached to the active PTY session",
                                 frame.stream_id
                             ),
+                        ),
+                    )?;
+                    return Ok(());
+                }
+                if frame.payload_kind != PAYLOAD_KIND_RAW_BYTES {
+                    write_text_frame(
+                        socket,
+                        stream_reset(
+                            frame.stream_id,
+                            STREAM_RESET_CODE_INVALID_STREAM_DATA,
+                            "pty stream only accepts raw byte data frames",
                         ),
                     )?;
                     return Ok(());

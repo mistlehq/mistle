@@ -1,8 +1,9 @@
-//! Bootstrap websocket helpers for the gateway-facing sandbox tunnel.
+//! Gateway-facing bootstrap tunnel helpers for `sandboxd`.
 //!
-//! This module owns the minimal synchronous tunnel flow in PR 15: validate the
-//! configured gateway URL, append the bootstrap token query parameter, open the
-//! websocket, and close it cleanly during shutdown.
+//! The tunnel has two layers of responsibility:
+//! - establish and close the outer websocket connection to the gateway
+//! - host the stream-level channel implementations that run over that socket
+//!   for PTY, agent runtime, file upload, and telemetry traffic
 
 use std::fmt::{self, Display};
 use std::net::TcpStream;
@@ -11,8 +12,11 @@ use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket, connect};
 use url::Url;
 
+pub mod agent_stream;
+pub mod file_upload;
 pub mod protocol;
 pub mod pty_stream;
+pub mod telemetry;
 
 /// Describes why bootstrap tunnel setup or shutdown failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
