@@ -439,16 +439,20 @@ mod tests {
 
         let mut output = Vec::new();
         let mut exit_code = None;
-        while exit_code.is_none() {
+        for _ in 0..40 {
             let event = session
-                .next_event_timeout(Duration::from_secs(5))
+                .next_event_timeout(Duration::from_millis(250))
                 .expect("pty event read should succeed")
-                .expect("pty should emit one event");
+                .expect("pty should emit an output or exit event");
             match event {
                 PtyEvent::Output(chunk) => output.extend(chunk),
                 PtyEvent::Exit(code) => exit_code = Some(code),
                 PtyEvent::Closed => {}
                 PtyEvent::Error(message) => panic!("unexpected pty error: {message}"),
+            }
+
+            if exit_code.is_some() && !output.is_empty() {
+                break;
             }
         }
 
