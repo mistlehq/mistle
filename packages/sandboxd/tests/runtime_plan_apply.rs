@@ -16,8 +16,12 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
     let clone_source_path = test_dir.join("source-repo");
     let clone_target_path = test_dir.join("workspace").join("repo");
 
-    fs::create_dir_all(if_absent_path.parent().expect("if-absent file should have a parent"))
-        .expect("runtime client dir should be creatable");
+    fs::create_dir_all(
+        if_absent_path
+            .parent()
+            .expect("if-absent file should have a parent"),
+    )
+    .expect("runtime client dir should be creatable");
     fs::write(&if_absent_path, "keep-me").expect("if-absent fixture file should be writable");
     create_git_repository(&clone_source_path);
 
@@ -87,7 +91,11 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
         egress_grant_by_rule_id: BTreeMap::new(),
     };
 
-    runtime::apply_startup_input(&startup_input)
+    let runtime_plan: runtime::CompiledRuntimePlan =
+        serde_json::from_value(startup_input.runtime_plan.clone())
+            .expect("runtime plan fixture should decode");
+
+    runtime::apply_runtime_plan(&runtime_plan)
         .expect("runtime plan apply should materialize files and workspace state");
 
     assert_eq!(
@@ -114,15 +122,15 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
 fn create_git_repository(path: &Path) {
     fs::create_dir_all(path).expect("git repository dir should be creatable");
     run_command(&["git", "init", "--quiet"], path);
-    run_command(&["git", "config", "user.email", "sandboxd@example.test"], path);
+    run_command(
+        &["git", "config", "user.email", "sandboxd@example.test"],
+        path,
+    );
     run_command(&["git", "config", "user.name", "sandboxd"], path);
     fs::write(path.join("README.md"), "hello from source repo\n")
         .expect("git repository file should be writable");
     run_command(&["git", "add", "README.md"], path);
-    run_command(
-        &["git", "commit", "--quiet", "-m", "initial commit"],
-        path,
-    );
+    run_command(&["git", "commit", "--quiet", "-m", "initial commit"], path);
 }
 
 fn run_command(args: &[&str], cwd: &Path) {

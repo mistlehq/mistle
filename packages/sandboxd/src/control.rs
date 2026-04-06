@@ -20,8 +20,8 @@ use serde::{Deserialize, Serialize};
 use crate::apply_startup::ApplyStartupError;
 use crate::apply_startup::manifest;
 use crate::protocol::startup::StartupInput;
-use crate::time::Sleeper;
 use crate::runtime;
+use crate::time::Sleeper;
 
 /// Default Unix socket path for the local `sandboxd` control channel.
 pub const DEFAULT_CONTROL_SOCKET_PATH: &str = "/run/mistle/sandboxd/control.sock";
@@ -425,7 +425,10 @@ fn apply_loaded_manifest(
 ) -> Result<(), ControlError> {
     // Use the same apply path for initial startup and later reloads so setup work
     // stays driven by the persisted manifest rather than ad hoc in-memory state.
-    runtime::apply_startup_input(&manifest)
+    let runtime_plan: runtime::CompiledRuntimePlan =
+        serde_json::from_value(manifest.runtime_plan.clone())
+            .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
+    runtime::apply_runtime_plan(&runtime_plan)
         .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
 
     let mut state = state

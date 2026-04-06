@@ -7,8 +7,6 @@ use std::fmt;
 
 pub use plan::CompiledRuntimePlan;
 
-use crate::protocol::startup::StartupInput;
-
 #[derive(Debug)]
 pub enum RuntimePlanApplyError {
     InvalidRuntimePlan(serde_json::Error),
@@ -74,12 +72,6 @@ impl fmt::Display for RuntimePlanApplyError {
 }
 
 impl std::error::Error for RuntimePlanApplyError {}
-
-pub fn apply_startup_input(startup_input: &StartupInput) -> Result<(), RuntimePlanApplyError> {
-    let runtime_plan: CompiledRuntimePlan = serde_json::from_value(startup_input.runtime_plan.clone())
-        .map_err(RuntimePlanApplyError::InvalidRuntimePlan)?;
-    apply_runtime_plan(&runtime_plan)
-}
 
 pub fn apply_runtime_plan(runtime_plan: &CompiledRuntimePlan) -> Result<(), RuntimePlanApplyError> {
     // Materialize artifacts, workspace sources, and setup files before later PRs add
