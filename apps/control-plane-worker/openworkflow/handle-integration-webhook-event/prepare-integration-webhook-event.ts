@@ -63,10 +63,7 @@ export async function prepareIntegrationWebhookEvent(
       finalized: false,
     });
 
-    if (
-      webhookEvent.integrationWebhookSourceId === null ||
-      webhookEvent.integrationWebhookSourceId === undefined
-    ) {
+    if (webhookEvent.integrationWebhookSourceId == null) {
       throw new Error(`Webhook event '${webhookEvent.id}' is missing integrationWebhookSourceId.`);
     }
 
