@@ -920,6 +920,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "conversationTitle": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
                           "sandboxProfileVersion": {
                             "type": "integer",
                             "minimum": 1
@@ -967,6 +971,7 @@
                         "required": [
                           "id",
                           "sandboxProfileId",
+                          "conversationTitle",
                           "sandboxProfileVersion",
                           "status",
                           "startedBy",
@@ -1128,6 +1133,10 @@
                   "properties": {
                     "id": {
                       "type": "string",
+                      "minLength": 1
+                    },
+                    "conversationTitle": {
+                      "type": ["string", "null"],
                       "minLength": 1
                     },
                     "status": {
@@ -1837,7 +1846,14 @@
                       "additionalProperties": false
                     }
                   },
-                  "required": ["id", "status", "failureCode", "failureMessage", "runtimePlan"],
+                  "required": [
+                    "id",
+                    "conversationTitle",
+                    "status",
+                    "failureCode",
+                    "failureMessage",
+                    "runtimePlan"
+                  ],
                   "additionalProperties": false
                 }
               }

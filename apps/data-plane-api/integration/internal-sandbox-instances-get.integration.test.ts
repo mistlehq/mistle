@@ -112,6 +112,7 @@ describe("internal sandbox instances get integration", () => {
       id: "sbi_conventional_get_pending",
       organizationId: "org_dp_api_conventional_get",
       sandboxProfileId: "sbp_conventional_get",
+      title: null,
       sandboxProfileVersion: 0,
       runtimeProvider: "docker",
       providerSandboxId: null,
@@ -136,6 +137,7 @@ describe("internal sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       id: "sbi_conventional_get_pending",
+      conversationTitle: null,
       status: "pending",
       failureCode: null,
       failureMessage: null,
@@ -168,6 +170,7 @@ describe("internal sandbox instances get integration", () => {
         id: "sbi_conventional_get_running",
         organizationId: "org_dp_api_conventional_get",
         sandboxProfileId: "sbp_conventional_get",
+        title: "Investigate runtime attach",
         sandboxProfileVersion: 1,
         runtimeProvider: "docker",
         providerSandboxId: sandbox.id,
@@ -192,6 +195,7 @@ describe("internal sandbox instances get integration", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         id: "sbi_conventional_get_running",
+        conversationTitle: "Investigate runtime attach",
         status: "starting",
         failureCode: null,
         failureMessage: null,
@@ -224,6 +228,7 @@ describe("internal sandbox instances get integration", () => {
       id: "sbi_conventional_get_starting_missing",
       organizationId: "org_dp_api_conventional_get",
       sandboxProfileId: "sbp_conventional_get",
+      title: null,
       sandboxProfileVersion: 4,
       runtimeProvider: "docker",
       providerSandboxId: sandbox.id,
@@ -250,6 +255,7 @@ describe("internal sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       id: "sbi_conventional_get_starting_missing",
+      conversationTitle: null,
       status: "failed",
       failureCode: "provider_runtime_missing",
       failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
@@ -298,6 +304,7 @@ describe("internal sandbox instances get integration", () => {
         id: "sbi_conventional_get_starting",
         organizationId: "org_dp_api_conventional_get",
         sandboxProfileId: "sbp_conventional_get",
+        title: null,
         sandboxProfileVersion: 2,
         runtimeProvider: "docker",
         providerSandboxId: sandbox.id,
@@ -322,6 +329,7 @@ describe("internal sandbox instances get integration", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         id: "sbi_conventional_get_starting",
+        conversationTitle: null,
         status: "starting",
         failureCode: null,
         failureMessage: null,
@@ -367,6 +375,7 @@ describe("internal sandbox instances get integration", () => {
         id: "sbi_conventional_get_running_attached",
         organizationId: "org_dp_api_conventional_get",
         sandboxProfileId: "sbp_conventional_get",
+        title: null,
         sandboxProfileVersion: 5,
         runtimeProvider: "docker",
         providerSandboxId: sandbox.id,
@@ -405,6 +414,7 @@ describe("internal sandbox instances get integration", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         id: "sbi_conventional_get_running_attached",
+        conversationTitle: null,
         status: "running",
         failureCode: null,
         failureMessage: null,
@@ -440,6 +450,7 @@ describe("internal sandbox instances get integration", () => {
       id: "sbi_conventional_get_missing",
       organizationId: "org_dp_api_conventional_get",
       sandboxProfileId: "sbp_conventional_get",
+      title: null,
       sandboxProfileVersion: 3,
       runtimeProvider: "docker",
       providerSandboxId: sandbox.id,
@@ -466,6 +477,7 @@ describe("internal sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       id: "sbi_conventional_get_missing",
+      conversationTitle: null,
       status: "failed",
       failureCode: "provider_runtime_missing",
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",

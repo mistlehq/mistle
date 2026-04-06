@@ -30,6 +30,7 @@ export const SandboxInstanceSourceSchema = z.enum(["dashboard", "webhook"]);
 export const GetSandboxInstanceResponseSchema = z
   .object({
     id: z.string().min(1),
+    conversationTitle: z.string().min(1).nullable(),
     status: DataPlaneSandboxInstanceStatusSchema,
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
@@ -42,6 +43,7 @@ export const SandboxInstanceListItemSchema = z
   .object({
     id: z.string().min(1),
     sandboxProfileId: z.string().min(1),
+    conversationTitle: z.string().min(1).nullable(),
     sandboxProfileVersion: z.number().int().min(1),
     status: DataPlaneSandboxInstanceStatusSchema,
     startedBy: SandboxInstanceStartedBySchema,

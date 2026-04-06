@@ -2850,6 +2850,7 @@ export interface paths {
                 providerConversationId: string | null;
                 routeId: string | null;
               } | null;
+              conversationTitle: string | null;
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
@@ -3276,6 +3277,7 @@ export interface paths {
                 providerConversationId: string | null;
                 routeId: string | null;
               } | null;
+              conversationTitle: string | null;
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
