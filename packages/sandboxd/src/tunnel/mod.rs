@@ -92,8 +92,8 @@ pub fn connect_bootstrap_tunnel(
         }
     }
 
-    // The bootstrap token rides on the initial websocket request because this
-    // first PR only needs a minimal connect/close handshake.
+    // The bootstrap token travels on the initial websocket request so the
+    // gateway can authenticate tunnel setup before exchanging tunnel frames.
     parsed_url
         .query_pairs_mut()
         .append_pair("bootstrap_token", normalized_token);
