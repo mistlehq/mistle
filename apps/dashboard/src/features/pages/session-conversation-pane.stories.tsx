@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import {
   CodexFixtureChatThreadEntriesWithStructuredPlan,
   CodexFixtureChatThreadEntriesWithThinkingGroup,
@@ -41,7 +40,6 @@ const meta = {
   },
   args: baseArgs,
   decorators: [
-    withDashboardWorkspaceStory,
     function StoryDecorator(Story, context): React.JSX.Element {
       return renderSessionWorkbenchContentStory({
         mainContent: <Story />,

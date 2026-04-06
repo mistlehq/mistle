@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import { noop } from "../chat/components/chat-story-support.js";
 import {
   SessionComposerFixturePropsForLoadingModel,
@@ -50,7 +49,6 @@ const meta = {
     },
   },
   decorators: [
-    withDashboardWorkspaceStory,
     function StoryDecorator(Story, context): React.JSX.Element {
       return (
         <SessionWorkbenchStoryChrome headerStatusUi={context.args.headerStatusUi}>
