@@ -6,7 +6,7 @@ import { loadControlPlaneApiFromToml } from "./load-toml.js";
 describe("control-plane api object store config", () => {
   it("loads object-store config from env when fully configured", () => {
     const loaded = loadControlPlaneApiFromEnv({
-      MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_BUCKET_NAME: "mistle-media",
+      MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_BUCKET_NAME: "mistle-assets",
       MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_REGION: "us-east-1",
       MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_ENDPOINT: "http://127.0.0.1:8333",
       MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_FORCE_PATH_STYLE: "true",
@@ -15,7 +15,7 @@ describe("control-plane api object store config", () => {
     });
 
     expect(loaded.objectStore).toEqual({
-      bucketName: "mistle-media",
+      bucketName: "mistle-assets",
       region: "us-east-1",
       endpoint: "http://127.0.0.1:8333",
       forcePathStyle: true,
@@ -29,7 +29,7 @@ describe("control-plane api object store config", () => {
       apps: {
         control_plane_api: {
           object_store: {
-            bucket_name: "mistle-media",
+            bucket_name: "mistle-assets",
             region: "us-east-1",
             endpoint: "http://127.0.0.1:8333",
             force_path_style: true,
@@ -48,7 +48,7 @@ describe("control-plane api object store config", () => {
     });
 
     expect(loaded.objectStore).toEqual({
-      bucketName: "mistle-media",
+      bucketName: "mistle-assets",
       region: "us-east-1",
       endpoint: "http://127.0.0.1:8333",
       forcePathStyle: true,

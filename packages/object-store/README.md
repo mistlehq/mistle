@@ -21,7 +21,7 @@ Exported from [`src/index.ts`](./src/index.ts):
 import { S3CompatibleObjectStore } from "@mistle/object-store";
 
 const objectStore = new S3CompatibleObjectStore({
-  bucketName: "mistle-media",
+  bucketName: "mistle-assets",
   region: "us-east-1",
   endpoint: "http://127.0.0.1:8333",
   forcePathStyle: true,

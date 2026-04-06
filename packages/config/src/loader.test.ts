@@ -69,7 +69,7 @@ describe("parseConfigRecord", () => {
             migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
           },
           objectStore: {
-            bucketName: "mistle-media",
+            bucketName: "mistle-assets",
             region: "us-east-1",
             endpoint: "http://127.0.0.1:8333",
             forcePathStyle: true,
@@ -271,7 +271,7 @@ describe("parseConfigRecord", () => {
             migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
           },
           objectStore: {
-            bucketName: "mistle-media",
+            bucketName: "mistle-assets",
             region: "us-east-1",
             endpoint: "http://127.0.0.1:8333",
             forcePathStyle: true,
@@ -473,7 +473,7 @@ describe("parseConfigRecord", () => {
             migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
           },
           objectStore: {
-            bucketName: "mistle-media",
+            bucketName: "mistle-assets",
             region: "us-east-1",
             endpoint: "http://127.0.0.1:8333",
             forcePathStyle: true,
