@@ -569,9 +569,6 @@ importers:
       '@mistle/integrations-core':
         specifier: workspace:*
         version: link:../../packages/integrations-core
-      '@mistle/integrations-definitions':
-        specifier: workspace:*
-        version: link:../../packages/integrations-definitions
       '@mistle/sandbox-rs-napi':
         specifier: workspace:*
         version: link:../../packages/sandbox-rs-napi
