@@ -38,12 +38,12 @@ impl std::error::Error for TunnelError {}
 
 #[derive(Debug)]
 /// Owns one established bootstrap websocket connection.
-pub struct StartedBootstrapTunnel {
+pub struct BootstrapTunnel {
     connected_url: String,
     socket: Option<WebSocket<MaybeTlsStream<TcpStream>>>,
 }
 
-impl StartedBootstrapTunnel {
+impl BootstrapTunnel {
     /// Returns the final websocket URL used to connect to the gateway.
     pub fn connected_url(&self) -> &str {
         &self.connected_url
@@ -70,7 +70,7 @@ impl StartedBootstrapTunnel {
 pub fn connect_bootstrap_tunnel(
     gateway_ws_url: &str,
     bootstrap_token: &str,
-) -> Result<StartedBootstrapTunnel, TunnelError> {
+) -> Result<BootstrapTunnel, TunnelError> {
     let normalized_token = bootstrap_token.trim();
     if normalized_token.is_empty() {
         return Err(TunnelError::new(
@@ -103,7 +103,7 @@ pub fn connect_bootstrap_tunnel(
         TunnelError::new(format!("failed to connect bootstrap tunnel: {error}"))
     })?;
 
-    Ok(StartedBootstrapTunnel {
+    Ok(BootstrapTunnel {
         connected_url,
         socket: Some(socket),
     })
