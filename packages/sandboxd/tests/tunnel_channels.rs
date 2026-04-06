@@ -78,9 +78,8 @@ fn relays_agent_channel_frames_between_tunnel_and_runtime_endpoint() {
         .expect("agent relay should finish cleanly");
     });
 
-    let (mut client_socket, _) =
-        connect(format!("ws://127.0.0.1:{}/agent", tunnel_address.port()))
-            .expect("client should connect to tunnel relay");
+    let (mut client_socket, _) = connect(format!("ws://127.0.0.1:{}/agent", tunnel_address.port()))
+        .expect("client should connect to tunnel relay");
     client_socket
         .send(Message::Text(
             r#"{"type":"stream.open","streamId":7,"channel":{"kind":"agent"}}"#
@@ -94,9 +93,8 @@ fn relays_agent_channel_frames_between_tunnel_and_runtime_endpoint() {
         r#"{"type":"stream.open.ok","streamId":7}"#
     );
 
-    let encoded_input =
-        encode_stream_data_frame(7, PAYLOAD_KIND_WEBSOCKET_TEXT, b"hello runtime")
-            .expect("agent input frame should encode");
+    let encoded_input = encode_stream_data_frame(7, PAYLOAD_KIND_WEBSOCKET_TEXT, b"hello runtime")
+        .expect("agent input frame should encode");
     client_socket
         .send(Message::Binary(encoded_input.into()))
         .expect("client should send agent input");
@@ -170,8 +168,8 @@ fn persists_supported_image_uploads_and_emits_completion() {
     );
 
     let png_bytes = vec![0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-    let encoded_upload =
-        encode_stream_data_frame(9, PAYLOAD_KIND_RAW_BYTES, &png_bytes).expect("upload frame should encode");
+    let encoded_upload = encode_stream_data_frame(9, PAYLOAD_KIND_RAW_BYTES, &png_bytes)
+        .expect("upload frame should encode");
     client_socket
         .send(Message::Binary(encoded_upload.into()))
         .expect("client should send upload bytes");
@@ -339,9 +337,11 @@ fn negotiates_telemetry_stream_and_flushes_buffered_logs() {
             .expect("telemetry relay should send telemetry.close");
     });
 
-    let (mut client_socket, _) =
-        connect(format!("ws://127.0.0.1:{}/telemetry", tunnel_address.port()))
-            .expect("client should connect to telemetry relay");
+    let (mut client_socket, _) = connect(format!(
+        "ws://127.0.0.1:{}/telemetry",
+        tunnel_address.port()
+    ))
+    .expect("client should connect to telemetry relay");
     let open_message = parse_json_text_message(&mut client_socket);
     assert_eq!(open_message["type"], "telemetry.open");
     assert_eq!(open_message["streamId"], SANDBOX_TELEMETRY_LOG_STREAM_ID);
@@ -351,8 +351,7 @@ fn negotiates_telemetry_stream_and_flushes_buffered_logs() {
     client_socket
         .send(Message::Text(
             format!(
-                r#"{{"type":"telemetry.open.ok","streamId":{},"initialWindowBytes":1024}}"#,
-                SANDBOX_TELEMETRY_LOG_STREAM_ID
+                r#"{{"type":"telemetry.open.ok","streamId":{SANDBOX_TELEMETRY_LOG_STREAM_ID},"initialWindowBytes":1024}}"#
             )
             .into(),
         ))
