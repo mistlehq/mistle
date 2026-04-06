@@ -10,6 +10,7 @@ import { OWNER_LEASE_TTL_MS } from "../runtime-state/durations.js";
 import type { SandboxKeepaliveStore } from "../runtime-state/sandbox-keepalive-store.js";
 import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
+import type { SandboxRuntimeReadinessStore } from "../runtime-state/sandbox-runtime-readiness-store.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
@@ -19,6 +20,7 @@ import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
 import { TunnelProtocolTranslator } from "./protocol/tunnel-protocol-translator.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
 import { SandboxKeepaliveRepository } from "./sandbox-keepalive-repository.js";
+import { SandboxRuntimeReadinessRepository } from "./sandbox-runtime-readiness-repository.js";
 import { type AttachedTunnelPeer, TunnelSessionService } from "./session/tunnel-session-service.js";
 import type { SandboxTelemetryIngressService } from "./telemetry-ingress/index.js";
 import { getSandboxTunnelSessionAttributes, getSandboxTunnelSessionSpanName } from "./telemetry.js";
@@ -46,6 +48,7 @@ type RegisterSandboxTunnelRouteInput = {
   sandboxOwnerResolver: SandboxOwnerResolver;
   sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat;
   sandboxKeepaliveStore: SandboxKeepaliveStore;
+  sandboxRuntimeReadinessStore: SandboxRuntimeReadinessStore;
   sandboxPresenceStore: SandboxPresenceStore;
   sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
   sandboxIdleControllerRegistry: SandboxIdleControllerRegistry;
@@ -82,6 +85,10 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     input.sandboxKeepaliveStore,
     input.sandboxIdleControllerRegistry,
     input.clock,
+    input.gatewayNodeId,
+  );
+  const sandboxRuntimeReadinessRepository = new SandboxRuntimeReadinessRepository(
+    input.sandboxRuntimeReadinessStore,
     input.gatewayNodeId,
   );
   const tunnelSessionService = new TunnelSessionService(
@@ -272,6 +279,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               clientSessionId: relaySessionId,
               currentSocket: ws,
               sandboxKeepaliveRepository,
+              sandboxRuntimeReadinessRepository,
               handleTelemetryDelivery: async (delivery) => {
                 await input.telemetryIngressService.handleDelivery({
                   delivery,

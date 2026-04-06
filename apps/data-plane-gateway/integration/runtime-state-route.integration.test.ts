@@ -68,6 +68,9 @@ describe("runtime state route integration", () => {
         keepalive: {
           active: false,
         },
+        runtime: {
+          ready: false,
+        },
       });
     },
     RuntimeStateRouteTestTimeoutMs,
@@ -237,6 +240,9 @@ describe("runtime state route integration", () => {
         },
         keepalive: {
           active: false,
+        },
+        runtime: {
+          ready: false,
         },
       });
     },

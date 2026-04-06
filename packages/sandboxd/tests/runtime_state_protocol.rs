@@ -11,6 +11,7 @@ fn decodes_runtime_state_fixture() {
     assert_eq!(snapshot.owner_lease_id.as_deref(), Some("owner_123"));
     assert_eq!(snapshot.presence.active_count, 1);
     assert!(snapshot.keepalive.active);
+    assert!(snapshot.runtime.ready);
 
     let attachment = snapshot
         .attachment

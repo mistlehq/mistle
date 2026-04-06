@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { isSandboxRuntimeReady } from "./sandbox-runtime-state-readiness.js";
 
 describe("isSandboxRuntimeReady", () => {
-  it("returns true when owner and attachment are both present and fenced to the same lease", () => {
+  it("returns true when owner, attachment, and runtime readiness are all present", () => {
     expect(
       isSandboxRuntimeReady({
         ownerLeaseId: "dtl_ready",
@@ -20,6 +20,9 @@ describe("isSandboxRuntimeReady", () => {
         keepalive: {
           active: false,
         },
+        runtime: {
+          ready: true,
+        },
       }),
     ).toBe(true);
   });
@@ -35,6 +38,9 @@ describe("isSandboxRuntimeReady", () => {
         keepalive: {
           active: false,
         },
+        runtime: {
+          ready: false,
+        },
       }),
     ).toBe(false);
   });
@@ -49,6 +55,9 @@ describe("isSandboxRuntimeReady", () => {
         },
         keepalive: {
           active: false,
+        },
+        runtime: {
+          ready: true,
         },
       }),
     ).toBe(false);
@@ -70,6 +79,33 @@ describe("isSandboxRuntimeReady", () => {
         },
         keepalive: {
           active: false,
+        },
+        runtime: {
+          ready: true,
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false when the runtime is not ready yet", () => {
+    expect(
+      isSandboxRuntimeReady({
+        ownerLeaseId: "dtl_ready",
+        attachment: {
+          sandboxInstanceId: "sbi_ready",
+          ownerLeaseId: "dtl_ready",
+          nodeId: "dpg_ready",
+          sessionId: "dts_ready",
+          attachedAtMs: 1_000,
+        },
+        presence: {
+          activeCount: 0,
+        },
+        keepalive: {
+          active: false,
+        },
+        runtime: {
+          ready: false,
         },
       }),
     ).toBe(false);

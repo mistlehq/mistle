@@ -533,6 +533,30 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
+  it("keeps bootstrap runtime readiness messages local to the gateway", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: JSON.stringify({
+          type: "runtime.ready",
+          ready: true,
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "drop",
+      },
+      runtimeReadyControlMessage: {
+        type: "runtime.ready",
+        ready: true,
+      },
+    });
+  });
+
   it("responds with a reset and releases the binding when connection binary data is invalid for the channel", async () => {
     const { router, translator } = await createTranslatorHarness();
 

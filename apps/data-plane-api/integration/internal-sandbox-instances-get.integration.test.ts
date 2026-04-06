@@ -26,6 +26,9 @@ type RuntimeStateSnapshot = {
     sandboxInstanceId: string;
     ownerLeaseId: string;
   } | null;
+  runtime: {
+    ready: boolean;
+  };
 };
 
 function isRuntimeStateSnapshot(value: unknown): value is RuntimeStateSnapshot {
@@ -35,7 +38,15 @@ function isRuntimeStateSnapshot(value: unknown): value is RuntimeStateSnapshot {
 
   const ownerLeaseId = Object.getOwnPropertyDescriptor(value, "ownerLeaseId")?.value;
   const attachment = Object.getOwnPropertyDescriptor(value, "attachment")?.value;
+  const runtime = Object.getOwnPropertyDescriptor(value, "runtime")?.value;
   if (ownerLeaseId !== null && typeof ownerLeaseId !== "string") {
+    return false;
+  }
+  if (typeof runtime !== "object" || runtime === null) {
+    return false;
+  }
+  const runtimeReady = Object.getOwnPropertyDescriptor(runtime, "ready")?.value;
+  if (typeof runtimeReady !== "boolean") {
     return false;
   }
   if (attachment === null) {
@@ -60,7 +71,7 @@ async function startGatewayForFixture(input: { fixture: DataPlaneApiIntegrationF
   });
 }
 
-async function waitForRuntimeAttachment(input: {
+async function waitForRuntimeReadiness(input: {
   fixture: DataPlaneApiIntegrationFixture;
   gatewayBaseUrl: string;
   sandboxInstanceId: string;
@@ -93,7 +104,8 @@ async function waitForRuntimeAttachment(input: {
     if (
       payload.ownerLeaseId !== null &&
       payload.attachment?.sandboxInstanceId === input.sandboxInstanceId &&
-      payload.attachment.ownerLeaseId === payload.ownerLeaseId
+      payload.attachment.ownerLeaseId === payload.ownerLeaseId &&
+      payload.runtime.ready
     ) {
       return;
     }
@@ -102,7 +114,7 @@ async function waitForRuntimeAttachment(input: {
   }
 
   throw new Error(
-    `Timed out waiting for runtime attachment for sandbox '${input.sandboxInstanceId}'.`,
+    `Timed out waiting for runtime readiness for sandbox '${input.sandboxInstanceId}'.`,
   );
 }
 
@@ -393,7 +405,13 @@ describe("internal sandbox instances get integration", () => {
         sandboxInstanceId: "sbi_conventional_get_running_attached",
         token: bootstrapToken,
       });
-      await waitForRuntimeAttachment({
+      bootstrapSocket.send(
+        JSON.stringify({
+          type: "runtime.ready",
+          ready: true,
+        }),
+      );
+      await waitForRuntimeReadiness({
         fixture,
         gatewayBaseUrl: gateway.baseUrl,
         sandboxInstanceId: "sbi_conventional_get_running_attached",

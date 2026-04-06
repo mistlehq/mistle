@@ -7,6 +7,7 @@ import {
   parseTelemetryControlMessage,
   type BootstrapControlMessage,
   type KeepaliveControlMessage,
+  type RuntimeReadyControlMessage,
   type StreamControlMessage,
   type TelemetryClose,
   type TelemetryOpen,
@@ -62,6 +63,7 @@ export type TunnelProtocolDelivery =
 export type TunnelProtocolTranslation = {
   delivery: TunnelProtocolDelivery;
   keepaliveControlMessage?: KeepaliveControlMessage;
+  runtimeReadyControlMessage?: RuntimeReadyControlMessage;
   notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding;
   releaseInteractiveStream?: ReleaseInteractiveStream;
 };
@@ -294,6 +296,10 @@ function assertBootstrapControlMessageAllowed(message: BootstrapControlMessage):
     return;
   }
 
+  if (message.type === "runtime.ready") {
+    return;
+  }
+
   if (isBootstrapStreamControlMessageAllowed(message)) {
     return;
   }
@@ -353,6 +359,7 @@ function createRespondDelivery(payload: RelayPayload): TunnelProtocolDelivery {
 function createTranslation(input: {
   delivery: TunnelProtocolDelivery;
   keepaliveControlMessage?: KeepaliveControlMessage | undefined;
+  runtimeReadyControlMessage?: RuntimeReadyControlMessage | undefined;
   notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding | undefined;
   releaseInteractiveStream?: ReleaseInteractiveStream | undefined;
 }): TunnelProtocolTranslation {
@@ -362,6 +369,11 @@ function createTranslation(input: {
       ? {}
       : {
           keepaliveControlMessage: input.keepaliveControlMessage,
+        }),
+    ...(input.runtimeReadyControlMessage === undefined
+      ? {}
+      : {
+          runtimeReadyControlMessage: input.runtimeReadyControlMessage,
         }),
     ...(input.notifyBootstrapPeerOfReleasedStream === undefined
       ? {}
@@ -568,6 +580,15 @@ export class TunnelProtocolTranslator {
           kind: "drop",
         },
         keepaliveControlMessage: controlMessage,
+      });
+    }
+
+    if (controlMessage.type === "runtime.ready") {
+      return createTranslation({
+        delivery: {
+          kind: "drop",
+        },
+        runtimeReadyControlMessage: controlMessage,
       });
     }
 

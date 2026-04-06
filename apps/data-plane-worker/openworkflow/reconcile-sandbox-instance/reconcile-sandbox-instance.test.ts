@@ -16,6 +16,9 @@ describe("shouldExecuteSandboxDisconnectReconciliation", () => {
           keepalive: {
             active: false,
           },
+          runtime: {
+            ready: false,
+          },
         },
       }),
     ).toBe(true);
@@ -31,6 +34,9 @@ describe("shouldExecuteSandboxDisconnectReconciliation", () => {
           },
           keepalive: {
             active: false,
+          },
+          runtime: {
+            ready: false,
           },
         },
       }),
@@ -56,6 +62,9 @@ describe("shouldExecuteSandboxDisconnectReconciliation", () => {
           keepalive: {
             active: false,
           },
+          runtime: {
+            ready: false,
+          },
         },
       }),
     ).toBe(false);
@@ -73,6 +82,9 @@ describe("shouldExecuteSandboxDisconnectReconciliation", () => {
           },
           keepalive: {
             active: false,
+          },
+          runtime: {
+            ready: false,
           },
         },
       }),

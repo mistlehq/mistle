@@ -316,6 +316,20 @@ describe("stream control message parser", () => {
     });
   });
 
+  it("parses bootstrap runtime readiness messages", () => {
+    expect(
+      parseBootstrapControlMessage(
+        JSON.stringify({
+          type: "runtime.ready",
+          ready: true,
+        }),
+      ),
+    ).toEqual({
+      type: "runtime.ready",
+      ready: true,
+    });
+  });
+
   it("keeps stream and bootstrap control parsers scoped correctly", () => {
     expect(
       parseBootstrapControlMessage(
@@ -337,6 +351,27 @@ describe("stream control message parser", () => {
           type: "keepalive.state",
           ttlMs: 30_000,
           active: false,
+        }),
+      ),
+    ).toBeUndefined();
+
+    expect(
+      parseBootstrapControlMessage(
+        JSON.stringify({
+          type: "runtime.ready",
+          ready: false,
+        }),
+      ),
+    ).toEqual({
+      type: "runtime.ready",
+      ready: false,
+    });
+
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
+          type: "runtime.ready",
+          ready: false,
         }),
       ),
     ).toBeUndefined();

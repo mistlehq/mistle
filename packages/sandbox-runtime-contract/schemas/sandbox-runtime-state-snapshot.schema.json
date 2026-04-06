@@ -69,8 +69,18 @@
       },
       "required": ["active"],
       "additionalProperties": false
+    },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "ready": {
+          "type": "boolean"
+        }
+      },
+      "required": ["ready"],
+      "additionalProperties": false
     }
   },
-  "required": ["ownerLeaseId", "attachment", "presence", "keepalive"],
+  "required": ["ownerLeaseId", "attachment", "presence", "keepalive", "runtime"],
   "additionalProperties": false
 }

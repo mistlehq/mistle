@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { InMemorySandboxKeepaliveStore } from "../../runtime-state/adapters/in-memory-sandbox-keepalive-store.js";
 import { InMemorySandboxPresenceStore } from "../../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
+import { InMemorySandboxRuntimeReadinessStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-readiness-store.js";
 import { InMemorySandboxOwnerStore } from "../../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
 import type { AppContextBindings, DataPlaneGatewayApp } from "../../types.js";
 import { registerSandboxRuntimeStateRoute } from "./register-sandbox-runtime-state-route.js";
@@ -15,12 +16,14 @@ function createTestApp(): {
   app: DataPlaneGatewayApp;
   sandboxKeepaliveStore: InMemorySandboxKeepaliveStore;
   sandboxPresenceStore: InMemorySandboxPresenceStore;
+  sandboxRuntimeReadinessStore: InMemorySandboxRuntimeReadinessStore;
   sandboxRuntimeAttachmentStore: InMemorySandboxRuntimeAttachmentStore;
   sandboxOwnerStore: InMemorySandboxOwnerStore;
 } {
   const app = new Hono<AppContextBindings>();
   const sandboxKeepaliveStore = new InMemorySandboxKeepaliveStore(systemClock);
   const sandboxPresenceStore = new InMemorySandboxPresenceStore(systemClock);
+  const sandboxRuntimeReadinessStore = new InMemorySandboxRuntimeReadinessStore();
   const sandboxRuntimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
   const sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
 
@@ -30,6 +33,7 @@ function createTestApp(): {
     internalAuthServiceToken: InternalServiceToken,
     sandboxKeepaliveStore,
     sandboxPresenceStore,
+    sandboxRuntimeReadinessStore,
     sandboxRuntimeAttachmentStore,
     sandboxOwnerStore,
   });
@@ -38,6 +42,7 @@ function createTestApp(): {
     app,
     sandboxKeepaliveStore,
     sandboxPresenceStore,
+    sandboxRuntimeReadinessStore,
     sandboxRuntimeAttachmentStore,
     sandboxOwnerStore,
   };
@@ -74,6 +79,9 @@ describe("registerSandboxRuntimeStateRoute", () => {
       },
       keepalive: {
         active: false,
+      },
+      runtime: {
+        ready: false,
       },
     });
   });
@@ -118,6 +126,9 @@ describe("registerSandboxRuntimeStateRoute", () => {
       },
       keepalive: {
         active: false,
+      },
+      runtime: {
+        ready: false,
       },
     });
   });
@@ -165,6 +176,46 @@ describe("registerSandboxRuntimeStateRoute", () => {
       },
       keepalive: {
         active: true,
+      },
+      runtime: {
+        ready: false,
+      },
+    });
+  });
+
+  it("returns runtime readiness fenced to the current owner lease", async () => {
+    const { app, sandboxOwnerStore, sandboxRuntimeReadinessStore } = createTestApp();
+    const owner = await sandboxOwnerStore.claimOwner({
+      sandboxInstanceId: "sbi_test",
+      nodeId: "dpg_test",
+      sessionId: "relay_test",
+      ttlMs: 30_000,
+    });
+    await sandboxRuntimeReadinessStore.replaceStateForOwner({
+      sandboxInstanceId: "sbi_test",
+      ownerLeaseId: owner.leaseId,
+      nodeId: "dpg_test",
+      ready: true,
+    });
+
+    const response = await app.request("/internal/sandbox-instances/sbi_test/runtime-state", {
+      headers: {
+        "x-mistle-service-token": InternalServiceToken,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ownerLeaseId: owner.leaseId,
+      attachment: null,
+      presence: {
+        activeCount: 0,
+      },
+      keepalive: {
+        active: false,
+      },
+      runtime: {
+        ready: true,
       },
     });
   });

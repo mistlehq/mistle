@@ -26,6 +26,7 @@ use crate::pty::{
     DEFAULT_PTY_TERMINATE_POLL_INTERVAL, DEFAULT_PTY_TERMINATE_TIMEOUT_MS, PtyEvent, PtySession,
     PtySpawnRequest, start_scoped_pty_session,
 };
+use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::time::{Clock, Duration, Sleeper};
 use crate::tunnel::BootstrapTunnel;
 use crate::tunnel::protocol::{
@@ -68,6 +69,7 @@ pub enum TunnelSessionError {
     AttachTelemetry(String),
     HandleTelemetry(String),
     PublishKeepalive(serde_json::Error),
+    PublishRuntimeReady(serde_json::Error),
     WriteTunnelText(String),
     WriteTunnelBinary(String),
     ReadTunnel(String),
@@ -103,6 +105,9 @@ impl Display for TunnelSessionError {
             }
             Self::PublishKeepalive(error) => {
                 write!(f, "failed to serialize keepalive payload: {error}")
+            }
+            Self::PublishRuntimeReady(error) => {
+                write!(f, "failed to serialize runtime readiness payload: {error}")
             }
             Self::WriteTunnelText(error) => {
                 write!(f, "failed to write bootstrap tunnel text frame: {error}")
@@ -146,6 +151,7 @@ impl TunnelSession {
         startup_input: &StartupInput,
         tunnel: BootstrapTunnel,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+        runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
         agent_endpoint_url: Option<String>,
         clock: Arc<dyn Clock>,
         sleeper: Arc<dyn Sleeper>,
@@ -161,6 +167,7 @@ impl TunnelSession {
             let cgroup_root = PathBuf::from(DEFAULT_CGROUP_ROOT);
             let runtime = TunnelSessionRuntime {
                 keepalive_manager,
+                runtime_readiness_manager,
                 agent_endpoint_url,
                 cgroup_root,
                 attachment_root,
@@ -218,6 +225,7 @@ struct FileUploadState {
 
 struct TunnelSessionRuntime {
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     agent_endpoint_url: Option<String>,
     cgroup_root: PathBuf,
     attachment_root: PathBuf,
@@ -255,6 +263,11 @@ fn run_tunnel_session_loop(
         .lock()
         .expect("keepalive manager lock should not be poisoned")
         .on_tunnel_connected(runtime.clock.as_ref());
+    runtime
+        .runtime_readiness_manager
+        .lock()
+        .expect("runtime readiness manager lock should not be poisoned")
+        .on_tunnel_connected();
 
     let mut agent_streams = BTreeMap::<u32, AgentStreamState>::new();
     let mut pty_sessions = BTreeMap::<String, PtySessionState>::new();
@@ -288,6 +301,11 @@ fn run_tunnel_session_loop(
                 .lock()
                 .expect("keepalive manager lock should not be poisoned")
                 .on_tunnel_disconnected();
+            runtime
+                .runtime_readiness_manager
+                .lock()
+                .expect("runtime readiness manager lock should not be poisoned")
+                .on_tunnel_disconnected();
             return tunnel
                 .close()
                 .map_err(|error| TunnelSessionError::WriteTunnelText(error.to_string()));
@@ -302,6 +320,20 @@ fn run_tunnel_session_loop(
             if let Some(state) = publishable_state {
                 let payload =
                     serde_json::to_string(&state).map_err(TunnelSessionError::PublishKeepalive)?;
+                tunnel
+                    .send_text(&payload)
+                    .map_err(|error| TunnelSessionError::WriteTunnelText(error.to_string()))?;
+            }
+        }
+        {
+            let publishable_state = runtime
+                .runtime_readiness_manager
+                .lock()
+                .expect("runtime readiness manager lock should not be poisoned")
+                .take_publishable_state();
+            if let Some(state) = publishable_state {
+                let payload = serde_json::to_string(&state)
+                    .map_err(TunnelSessionError::PublishRuntimeReady)?;
                 tunnel
                     .send_text(&payload)
                     .map_err(|error| TunnelSessionError::WriteTunnelText(error.to_string()))?;
@@ -1359,6 +1391,7 @@ mod tests {
     use crate::keepalive::KeepaliveManager;
     use crate::protocol::startup::{StartupInput, StartupMode};
     use crate::runtime::adapters::RuntimeAdapterRegistry;
+    use crate::runtime::readiness::RuntimeReadinessManager;
     use crate::time::{SystemClock, ThreadSleeper};
     use crate::tunnel::connect_bootstrap_tunnel;
     use crate::tunnel::protocol::{
@@ -1493,9 +1526,23 @@ mod tests {
                 ))
                 .expect("gateway should acknowledge telemetry.open");
 
-            let keepalive = read_json_text_message(&mut websocket);
-            assert_eq!(keepalive["type"], "keepalive.state");
-            assert_eq!(keepalive["active"], Value::Bool(false));
+            let mut saw_keepalive = false;
+            let mut saw_runtime_ready = false;
+            while !saw_keepalive || !saw_runtime_ready {
+                let control_message = read_json_text_message(&mut websocket);
+                match control_message["type"].as_str() {
+                    Some("keepalive.state") => {
+                        assert_eq!(control_message["active"], Value::Bool(false));
+                        saw_keepalive = true;
+                    }
+                    Some("runtime.ready") => {
+                        if control_message["ready"] == Value::Bool(true) {
+                            saw_runtime_ready = true;
+                        }
+                    }
+                    other => panic!("unexpected bootstrap control message before streams: {other:?}"),
+                }
+            }
 
             websocket
                 .send(Message::Text(
@@ -1511,7 +1558,7 @@ mod tests {
                 ))
                 .expect("gateway should open an agent stream");
             assert_eq!(
-                read_json_text_message(&mut websocket),
+                read_stream_text_message(&mut websocket),
                 json!({
                     "type": "stream.open.ok",
                     "streamId": 7
@@ -1578,7 +1625,7 @@ mod tests {
                 ))
                 .expect("gateway should open a file upload stream");
             assert_eq!(
-                read_json_text_message(&mut websocket),
+                read_stream_text_message(&mut websocket),
                 json!({
                     "type": "stream.open.ok",
                     "streamId": 9
@@ -1592,7 +1639,7 @@ mod tests {
                 .send(Message::Binary(encoded_upload.into()))
                 .expect("gateway should send file upload bytes");
 
-            let upload_window = read_json_text_message(&mut websocket);
+            let upload_window = read_stream_text_message(&mut websocket);
             assert_eq!(upload_window["type"], "stream.window");
             assert_eq!(upload_window["streamId"], Value::Number(9.into()));
             assert_eq!(upload_window["bytes"], Value::Number(8.into()));
@@ -1608,7 +1655,7 @@ mod tests {
                 ))
                 .expect("gateway should close the file upload stream");
 
-            let completion_event = read_json_text_message(&mut websocket);
+            let completion_event = read_stream_text_message(&mut websocket);
             assert_eq!(completion_event["type"], "stream.event");
             assert_eq!(completion_event["streamId"], Value::Number(9.into()));
             assert_eq!(completion_event["event"]["type"], "fileUpload.completed");
@@ -1621,7 +1668,7 @@ mod tests {
                 png_bytes
             );
 
-            let complete_message = read_json_text_message(&mut websocket);
+            let complete_message = read_stream_text_message(&mut websocket);
             assert_eq!(complete_message["type"], "stream.complete");
             assert_eq!(complete_message["streamId"], Value::Number(9.into()));
 
@@ -1718,10 +1765,12 @@ mod tests {
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
         let runtime_adapters = RuntimeAdapterRegistry
             .start(
                 &startup_input,
                 keepalive_manager.clone(),
+                runtime_readiness_manager.clone(),
                 Arc::new(ThreadSleeper),
             )
             .expect("runtime adapters should start");
@@ -1734,6 +1783,7 @@ mod tests {
             &startup_input,
             tunnel,
             keepalive_manager,
+            runtime_readiness_manager,
             Some(runtime_adapters.adapters()[0].listen_url().to_string()),
             Arc::new(SystemClock),
             Arc::new(ThreadSleeper),
@@ -1774,6 +1824,19 @@ mod tests {
         };
 
         serde_json::from_str(payload.as_str()).expect("text payload should be valid json")
+    }
+
+    fn read_stream_text_message<S>(socket: &mut WebSocket<S>) -> Value
+    where
+        S: std::io::Read + std::io::Write,
+    {
+        loop {
+            let message = read_json_text_message(socket);
+            match message["type"].as_str() {
+                Some("keepalive.state") | Some("runtime.ready") => continue,
+                _ => return message,
+            }
+        }
     }
 
     fn read_binary_frame<S>(socket: &mut WebSocket<S>) -> crate::tunnel::protocol::StreamDataFrame

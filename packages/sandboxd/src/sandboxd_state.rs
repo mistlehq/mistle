@@ -13,6 +13,7 @@ use crate::process;
 use crate::protocol::startup::StartupInput;
 use crate::runtime;
 use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapters};
+use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::time::{Clock, Sleeper};
 use crate::tunnel::connect_bootstrap_tunnel;
 use crate::tunnel::session::TunnelSession;
@@ -96,11 +97,23 @@ impl SandboxdState {
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
         let runtime_adapters = RuntimeAdapterRegistry
-            .start(startup_input, keepalive_manager.clone(), sleeper.clone())
+            .start(
+                startup_input,
+                keepalive_manager.clone(),
+                runtime_readiness_manager.clone(),
+                sleeper.clone(),
+            )
             .map_err(|error| SandboxdStateError::StartRuntimeAdapters(error.to_string()))?;
         let agent_endpoint_url = match runtime_adapters.adapters() {
-            [] => None,
+            [] => {
+                runtime_readiness_manager
+                    .lock()
+                    .expect("runtime readiness manager lock should not be poisoned")
+                    .set_ready(true);
+                None
+            }
             [adapter] => Some(adapter.listen_url().to_string()),
             _ => {
                 return Err(SandboxdStateError::StartTunnelSession(
@@ -119,6 +132,7 @@ impl SandboxdState {
                 startup_input,
                 tunnel,
                 keepalive_manager,
+                runtime_readiness_manager,
                 agent_endpoint_url,
                 clock,
                 sleeper,

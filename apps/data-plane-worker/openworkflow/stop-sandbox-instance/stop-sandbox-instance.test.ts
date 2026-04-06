@@ -23,6 +23,9 @@ describe("shouldExecuteSandboxStop", () => {
           keepalive: {
             active: false,
           },
+          runtime: {
+            ready: false,
+          },
         },
       }),
     ).toBe(true);
@@ -41,6 +44,9 @@ describe("shouldExecuteSandboxStop", () => {
           },
           keepalive: {
             active: false,
+          },
+          runtime: {
+            ready: false,
           },
         },
       }),

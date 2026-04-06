@@ -10,6 +10,7 @@ use tungstenite::{Message, WebSocket, accept, connect};
 use sandboxd::keepalive::KeepaliveManager;
 use sandboxd::protocol::startup::{StartupInput, StartupMode};
 use sandboxd::runtime::adapters::RuntimeAdapterRegistry;
+use sandboxd::runtime::readiness::RuntimeReadinessManager;
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 
 static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(400);
@@ -227,11 +228,13 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
     };
 
     let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
     let registry = RuntimeAdapterRegistry;
     let adapters = registry
         .start(
             &startup_input,
             keepalive_manager.clone(),
+            runtime_readiness_manager.clone(),
             Arc::new(ThreadSleeper),
         )
         .expect("runtime adapter registry should start the codex adapter");
@@ -240,6 +243,7 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
     assert_eq!(adapters.adapters()[0].runtime_id(), "codex");
 
     wait_for_keepalive_state(&keepalive_manager, true);
+    wait_for_runtime_readiness(&runtime_readiness_manager, true);
 
     let (mut proxy_client, _) = connect(adapters.adapters()[0].listen_url())
         .expect("client should connect through the codex runtime adapter");
@@ -261,6 +265,7 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
     assert_eq!(proxied_response["result"]["data"], json!([]));
 
     wait_for_keepalive_state(&keepalive_manager, false);
+    wait_for_runtime_readiness(&runtime_readiness_manager, false);
 
     proxy_client
         .close(None)
@@ -271,6 +276,26 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
     raw_server_thread
         .join()
         .expect("raw server thread should exit cleanly");
+}
+
+fn wait_for_runtime_readiness(
+    runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
+    expected_ready: bool,
+) {
+    for _ in 0..100 {
+        if runtime_readiness_manager
+            .lock()
+            .expect("runtime readiness manager lock should not be poisoned")
+            .ready()
+            == expected_ready
+        {
+            return;
+        }
+
+        ThreadSleeper.sleep(Duration::from_millis(10));
+    }
+
+    panic!("timed out waiting for runtime.ready == {expected_ready}");
 }
 
 fn wait_for_keepalive_state(

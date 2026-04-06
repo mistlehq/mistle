@@ -5,6 +5,7 @@
 //! supervision module starts and stops for the active sandbox session.
 
 pub mod adapters;
+pub mod readiness;
 mod plan;
 mod runtime_file;
 mod workspace_source;

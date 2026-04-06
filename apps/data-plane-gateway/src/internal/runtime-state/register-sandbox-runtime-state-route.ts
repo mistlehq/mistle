@@ -3,6 +3,7 @@ import type { Clock } from "@mistle/time";
 import type { SandboxKeepaliveStore } from "../../runtime-state/sandbox-keepalive-store.js";
 import type { SandboxPresenceStore } from "../../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../../runtime-state/sandbox-runtime-attachment-store.js";
+import type { SandboxRuntimeReadinessStore } from "../../runtime-state/sandbox-runtime-readiness-store.js";
 import type { SandboxOwnerStore } from "../../tunnel/ownership/sandbox-owner-store.js";
 import type { DataPlaneGatewayApp } from "../../types.js";
 
@@ -15,6 +16,7 @@ type RegisterSandboxRuntimeStateRouteInput = {
   internalAuthServiceToken: string;
   sandboxKeepaliveStore: SandboxKeepaliveStore;
   sandboxPresenceStore: SandboxPresenceStore;
+  sandboxRuntimeReadinessStore: SandboxRuntimeReadinessStore;
   sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
   sandboxOwnerStore: SandboxOwnerStore;
 };
@@ -24,7 +26,7 @@ type RegisterSandboxRuntimeStateRouteInput = {
  *
  * This route is authenticated with the shared internal service token and
  * The gateway remains the sole owner of runtime-state backend selection, so
- * workers read owner, attachment, presence, and keepalive summaries through
+ * workers read owner, attachment, presence, keepalive, and runtime-readiness summaries through
  * this route regardless of
  * whether the gateway is running in `memory` or `valkey` mode.
  */
@@ -58,10 +60,10 @@ export function registerSandboxRuntimeStateRoute(
     }
 
     const nowMs = input.clock.nowMs();
-    const [owner, attachment, activePresenceCount, keepaliveSummary] = await Promise.all([
-      input.sandboxOwnerStore.getOwner({
-        sandboxInstanceId,
-      }),
+    const owner = await input.sandboxOwnerStore.getOwner({
+      sandboxInstanceId,
+    });
+    const [attachment, activePresenceCount, keepaliveSummary, runtimeSummary] = await Promise.all([
       input.sandboxRuntimeAttachmentStore.getAttachment({
         sandboxInstanceId,
         nowMs,
@@ -74,6 +76,10 @@ export function registerSandboxRuntimeStateRoute(
         sandboxInstanceId,
         nowMs,
       }),
+      input.sandboxRuntimeReadinessStore.summarize({
+        sandboxInstanceId,
+        ownerLeaseId: owner?.leaseId ?? null,
+      }),
     ]);
 
     return ctx.json(
@@ -85,6 +91,9 @@ export function registerSandboxRuntimeStateRoute(
         },
         keepalive: {
           active: keepaliveSummary.active,
+        },
+        runtime: {
+          ready: runtimeSummary.ready,
         },
       },
       200,
