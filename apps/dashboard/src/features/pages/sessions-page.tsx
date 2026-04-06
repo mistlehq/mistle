@@ -490,6 +490,9 @@ export function SessionsPage(): React.JSX.Element {
                       <TableCell className="whitespace-normal">
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className="font-medium break-words">
+                            {session.conversationTitle ?? "Untitled"}
+                          </span>
+                          <span className="text-muted-foreground text-xs break-words">
                             {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
                           </span>
                           {optimisticSessionIds.has(session.id) ? (

@@ -215,7 +215,8 @@ describe("SessionsPage", () => {
       items: [
         buildSandboxInstanceListItemFixture({
           id: "sbi_123",
-          sandboxProfileDisplayName: "Single session",
+          conversationTitle: "Single session",
+          sandboxProfileDisplayName: "Profile metadata",
         }),
       ],
       totalResults: 1,
@@ -226,8 +227,27 @@ describe("SessionsPage", () => {
     });
 
     expect(screen.getByText("Single session")).toBeDefined();
+    expect(screen.getByText("Profile metadata")).toBeDefined();
     expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+  });
+
+  it("renders Untitled when the persisted conversation title is missing", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [buildSandboxInstanceListItemFixture({ id: "sbi_untitled", conversationTitle: null })],
+    });
+
+    renderSessionsPage({
+      queryClient,
+    });
+
+    expect(screen.getByText("Untitled")).toBeDefined();
+    expect(screen.getByText("Alpha Profile")).toBeDefined();
   });
 
   it("counts optimistic sessions only in the visible results", () => {
