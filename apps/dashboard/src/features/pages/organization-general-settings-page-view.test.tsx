@@ -27,7 +27,7 @@ describe("OrganizationGeneralSettingsPageView", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Replace logo" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit organization logo" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove logo" }).hasAttribute("disabled")).toBe(
       false,
     );
@@ -90,7 +90,9 @@ describe("OrganizationGeneralSettingsPageView", () => {
 
     render(<Harness />);
 
-    const uploadInput = screen.getByLabelText("Upload organization logo");
+    const uploadInput = screen.getByLabelText("Upload organization logo", {
+      selector: "input",
+    });
     const uploadFile = new File([new Uint8Array([1, 2, 3])], "logo.png", { type: "image/png" });
 
     fireEvent.change(uploadInput, {
@@ -110,7 +112,7 @@ describe("OrganizationGeneralSettingsPageView", () => {
     completeUpload();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Replace logo" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Edit organization logo" })).toBeTruthy();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Remove logo" }));
@@ -119,7 +121,7 @@ describe("OrganizationGeneralSettingsPageView", () => {
       expect(removeCount).toBe(1);
     });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Upload logo" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Upload organization logo" })).toBeTruthy();
     });
   });
 });
