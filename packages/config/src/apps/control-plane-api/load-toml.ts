@@ -12,6 +12,7 @@ export function loadControlPlaneApiFromToml(
   const controlPlaneApi = asObjectRecord(apps.control_plane_api);
   const server = asObjectRecord(controlPlaneApi.server);
   const database = asObjectRecord(controlPlaneApi.database);
+  const objectStore = asObjectRecord(controlPlaneApi.object_store);
   const auth = asObjectRecord(controlPlaneApi.auth);
   const dashboard = asObjectRecord(controlPlaneApi.dashboard);
   const workflow = asObjectRecord(controlPlaneApi.workflow);
@@ -26,6 +27,14 @@ export function loadControlPlaneApiFromToml(
     database: {
       url: database.url,
       migrationUrl: database.migration_url,
+    },
+    objectStore: {
+      bucketName: objectStore.bucket_name,
+      region: objectStore.region,
+      endpoint: objectStore.endpoint,
+      forcePathStyle: objectStore.force_path_style,
+      accessKeyId: objectStore.access_key_id,
+      secretAccessKey: objectStore.secret_access_key,
     },
     auth: {
       baseUrl: auth.base_url,

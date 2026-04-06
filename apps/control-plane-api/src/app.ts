@@ -40,6 +40,7 @@ export type CreateAppInput = {
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
+  objectStore: AppContextVariables["objectStore"];
   integrationRegistry: IntegrationRegistry;
   dataPlaneClient: DataPlaneSandboxInstancesClient;
   connectionTokenConfig: AppContextBindings["Variables"]["connectionTokenConfig"];
@@ -56,6 +57,7 @@ export function createApp(input: CreateAppInput): ControlPlaneApp {
     sandboxConfig: input.sandboxConfig,
     internalAuthServiceToken: input.internalAuthServiceToken,
     db: input.db,
+    objectStore: input.objectStore,
     integrationRegistry: input.integrationRegistry,
     dataPlaneClient: input.dataPlaneClient,
     connectionTokenConfig: input.connectionTokenConfig,
@@ -77,6 +79,7 @@ export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): 
       sandboxConfig: input.sandboxConfig,
       internalAuthServiceToken: input.internalAuthServiceToken,
       db,
+      objectStore: input.objectStore,
       integrationRegistry: input.integrationRegistry,
       dataPlaneClient: input.dataPlaneClient,
       connectionTokenConfig: input.connectionTokenConfig,

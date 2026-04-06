@@ -46,6 +46,7 @@ export async function createControlPlaneApiRuntime(
       sandboxConfig: runtimeConfig.sandbox,
       internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
       db: resources.db,
+      objectStore: resources.objectStore,
       integrationRegistry: resources.integrationRegistry,
       dataPlaneClient,
       connectionTokenConfig: runtimeConfig.connectionToken,
