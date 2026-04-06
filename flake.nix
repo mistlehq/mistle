@@ -24,6 +24,7 @@
             pkgs.rustfmt
             pkgs.clippy
             pkgs.rust-analyzer
+            pkgs.ripgrep
             pkgs.cloudflared
             pkgs.docker
             pkgs.git
