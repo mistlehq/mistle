@@ -7,10 +7,11 @@ type ChatDiffViewProps = {
   path: string;
 };
 
-const ChatDiffOptions = {
+export const ChatDiffOptions = {
   diffStyle: "unified",
   disableFileHeader: true,
   overflow: "scroll",
+  themeType: "light",
 } as const;
 
 export function ChatDiffView({ diff, path }: ChatDiffViewProps): React.JSX.Element {
