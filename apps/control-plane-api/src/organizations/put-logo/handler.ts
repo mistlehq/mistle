@@ -1,11 +1,11 @@
 import type { RouteHandler } from "@hono/zod-openapi";
-import { withHttpErrorHandler } from "@mistle/http/errors.js";
+import { ForbiddenError, withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { putOrganizationLogo } from "../../auth/services/put-organization-logo.js";
 import { PROFILE_IMAGE_READ_URL_TTL_SECONDS } from "../../me/constants.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { assertCanManageActiveOrganization } from "../services/assert-can-manage-active-organization.js";
+import { getActiveOrganizationRole } from "../services/get-active-organization-role.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -18,12 +18,15 @@ const routeHandler = async (
   const { file } = ctx.req.valid("form");
   const imageBytes = new Uint8Array(await file.arrayBuffer());
 
-  await assertCanManageActiveOrganization({
+  const actorRole = await getActiveOrganizationRole({
     db,
     actorUserId: session.user.id,
     activeOrganizationId: session.session.activeOrganizationId,
     organizationId,
   });
+  if (actorRole !== "owner" && actorRole !== "admin") {
+    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
+  }
 
   const organizationLogo = await putOrganizationLogo(
     {
