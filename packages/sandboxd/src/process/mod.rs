@@ -11,6 +11,10 @@ use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
+use nix::errno::Errno;
+use nix::sys::signal::{Signal, kill as send_signal};
+use nix::unistd::Pid;
+
 use crate::runtime::{
     RuntimeArtifactCommand, RuntimeClient, RuntimeClientProcessReadiness,
     RuntimeClientProcessStopPolicy, RuntimeClientProcessStopSignal,
@@ -363,25 +367,18 @@ fn signal_runtime_client_process(
 ) -> Result<(), String> {
     let pid = i32::try_from(process.child.id())
         .map_err(|_| "process pid exceeded i32 range".to_string())?;
-    let signal_number = match signal {
-        RuntimeClientProcessStopSignal::Sigterm => 15,
-        RuntimeClientProcessStopSignal::Sigkill => 9,
+    let unix_signal = match signal {
+        RuntimeClientProcessStopSignal::Sigterm => Signal::SIGTERM,
+        RuntimeClientProcessStopSignal::Sigkill => Signal::SIGKILL,
     };
 
-    let result = unsafe { kill(pid, signal_number) };
-    if result == 0 {
-        return Ok(());
+    match send_signal(Pid::from_raw(pid), unix_signal) {
+        Ok(()) => Ok(()),
+        Err(Errno::ESRCH) => Ok(()),
+        Err(error) => Err(format!(
+            "failed to signal process pid={pid} signal={unix_signal}: {error}"
+        )),
     }
-
-    let error = std::io::Error::last_os_error();
-    if error.raw_os_error() == Some(3) {
-        return Ok(());
-    }
-
-    Err(format!(
-        "failed to signal process pid={pid} signal={signal_number}: {}",
-        error
-    ))
 }
 
 /// Formats an exited child status for readiness or shutdown error reporting.
@@ -540,9 +537,4 @@ impl ParsedReadinessUrl {
             path,
         })
     }
-}
-
-// Declares the libc `kill(2)` entrypoint used for Unix signal delivery.
-unsafe extern "C" {
-    fn kill(pid: i32, sig: i32) -> i32;
 }
