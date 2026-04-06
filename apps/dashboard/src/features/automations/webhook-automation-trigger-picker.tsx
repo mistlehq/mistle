@@ -210,20 +210,38 @@ export function WebhookAutomationTriggerPicker(input: {
               }
               key={option.id}
             >
-              <div className="min-w-0 self-start md:col-start-1 md:row-start-1 md:self-center">
-                <div className="flex min-w-0 items-start gap-2.5 md:items-center">
-                  {option.logoKey === undefined ? null : (
-                    <img
-                      alt=""
-                      aria-hidden
-                      className="mt-0.5 size-4 shrink-0 md:mt-0"
-                      src={resolveIntegrationLogoPath({ logoKey: option.logoKey })}
-                    />
-                  )}
-                  <p className="text-sm leading-5 font-medium text-balance md:leading-none">
-                    {option.label}
-                  </p>
+              <div className="flex items-start justify-between gap-3 md:contents">
+                <div className="min-w-0 self-start my-auto md:col-start-1 md:row-start-1 md:self-center">
+                  <div className="flex min-w-0 items-start gap-2.5 md:items-center">
+                    {option.logoKey === undefined ? null : (
+                      <img
+                        alt=""
+                        aria-hidden
+                        className="mt-0.5 size-4 shrink-0 md:mt-0"
+                        src={resolveIntegrationLogoPath({ logoKey: option.logoKey })}
+                      />
+                    )}
+                    <p className="text-sm leading-5 font-medium text-balance md:leading-none">
+                      {option.label}
+                    </p>
+                  </div>
                 </div>
+                <Button
+                  aria-label={`Remove ${option.label} trigger`}
+                  className="size-7 shrink-0 self-start md:col-start-3 md:row-start-1 md:self-center"
+                  onClick={() => {
+                    input.onValueChange(
+                      input.selectedTriggerIds.filter(
+                        (selectedTriggerId) => selectedTriggerId !== option.id,
+                      ),
+                    );
+                  }}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <TrashIcon aria-hidden className="size-3.5" />
+                </Button>
               </div>
               {option.parameters?.map((parameter, index) => (
                 <div
@@ -255,22 +273,6 @@ export function WebhookAutomationTriggerPicker(input: {
                   {option.description}
                 </p>
               ) : null}
-              <Button
-                aria-label={`Remove ${option.label} trigger`}
-                className="size-7 shrink-0 self-end md:col-start-3 md:row-start-1 md:self-center"
-                onClick={() => {
-                  input.onValueChange(
-                    input.selectedTriggerIds.filter(
-                      (selectedTriggerId) => selectedTriggerId !== option.id,
-                    ),
-                  );
-                }}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-              >
-                <TrashIcon aria-hidden className="size-3.5" />
-              </Button>
             </div>
           ))}
         </div>
