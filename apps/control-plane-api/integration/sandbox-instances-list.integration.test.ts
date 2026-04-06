@@ -1,4 +1,9 @@
-import { sandboxProfiles, SandboxProfileStatuses } from "@mistle/db/control-plane";
+import {
+  automationRuns,
+  automations,
+  sandboxProfiles,
+  SandboxProfileStatuses,
+} from "@mistle/db/control-plane";
 import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { afterEach, describe, expect } from "vitest";
 
@@ -58,6 +63,25 @@ describe("sandbox instances list integration", () => {
         updatedAt: "2026-03-01T00:00:00.000Z",
       },
     ]);
+
+    await fixture.db.insert(automations).values({
+      id: "atm_cp_list",
+      organizationId: firstOrgSession.organizationId,
+      kind: "webhook",
+      name: "GitHub Repo Triage",
+      enabled: true,
+      createdAt: "2026-03-02T00:00:00.000Z",
+      updatedAt: "2026-03-02T00:00:00.000Z",
+    });
+
+    await fixture.db.insert(automationRuns).values({
+      id: "aru_cp_list",
+      automationId: "atm_cp_list",
+      status: "running",
+      createdAt: "2026-03-11T00:00:00.000Z",
+      startedAt: "2026-03-11T00:00:00.000Z",
+      updatedAt: "2026-03-11T00:00:00.000Z",
+    });
 
     await dataPlaneFixture.db.insert(sandboxInstances).values([
       {
@@ -141,7 +165,7 @@ describe("sandbox instances list integration", () => {
       startedBy: {
         kind: "system",
         id: "aru_cp_list",
-        name: null,
+        name: "GitHub Repo Triage",
       },
       source: "webhook",
       failureCode: "SANDBOX_START_FAILED",

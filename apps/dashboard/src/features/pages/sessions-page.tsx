@@ -132,7 +132,7 @@ export function shouldUseResumeActionLabel(status: SandboxLifecycleStatus): bool
 }
 
 function formatStartedByLabel(input: SandboxInstanceListItem["startedBy"]): string {
-  if (input.kind === "user" && input.name !== null) {
+  if (input.name !== null) {
     return input.name;
   }
 
@@ -497,14 +497,9 @@ export function SessionsPage(): React.JSX.Element {
                         </div>
                       </TableCell>
                       <TableCell className="text-sm whitespace-normal">
-                        <div className="flex flex-col gap-1">
-                          <span className="break-words">
-                            {formatStartedByLabel(session.startedBy)}
-                          </span>
-                          <span className="text-muted-foreground text-xs capitalize">
-                            {session.source}
-                          </span>
-                        </div>
+                        <span className="break-words">
+                          {formatStartedByLabel(session.startedBy)}
+                        </span>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                         {formatRelativeOrDate(session.createdAt)}
@@ -528,7 +523,7 @@ export function SessionsPage(): React.JSX.Element {
                           }}
                           type="button"
                         >
-                          {shouldUseResumeActionLabel(session.status) ? "Resume" : "Open session"}
+                          {shouldUseResumeActionLabel(session.status) ? "Resume" : "Open"}
                         </Button>
                       </TableCell>
                     </TableRow>

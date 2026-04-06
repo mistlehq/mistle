@@ -205,6 +205,71 @@ describe("SessionsPage integration", () => {
     }
   });
 
+  it("renders the automation name for automation-started sessions without the source label", async () => {
+    const renderedPage = await renderDashboardPageIntegration({
+      handler: (request, response) => {
+        const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+
+        if (request.method === "GET" && requestUrl.pathname === "/v1/sandbox/profiles/launchable") {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(
+            JSON.stringify({
+              items: [],
+            }),
+          );
+          return;
+        }
+
+        if (request.method === "GET" && requestUrl.pathname === "/v1/sandbox/instances") {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(
+            JSON.stringify({
+              items: [
+                {
+                  id: "sbi_automation",
+                  sandboxProfileId: "sbp_profile_alpha",
+                  sandboxProfileDisplayName: "Automation Profile",
+                  sandboxProfileVersion: 1,
+                  status: "running",
+                  startedBy: {
+                    kind: "system",
+                    id: "aru_automation",
+                    name: "GitHub Repo Triage",
+                  },
+                  source: "webhook",
+                  createdAt: "2026-03-11T12:00:00.000Z",
+                  updatedAt: "2026-03-11T12:10:00.000Z",
+                  failureCode: null,
+                  failureMessage: null,
+                },
+              ],
+              nextPage: null,
+              previousPage: null,
+              totalResults: 1,
+            }),
+          );
+          return;
+        }
+
+        response.writeHead(404, { "content-type": "application/json" });
+        response.end(JSON.stringify({ message: "Not found" }));
+      },
+      ui: (
+        <MemoryRouter>
+          <SessionsPage />
+        </MemoryRouter>
+      ),
+    });
+
+    try {
+      expect(await screen.findByText("GitHub Repo Triage")).toBeDefined();
+      expect(screen.queryByText("Webhook")).toBeNull();
+      expect(screen.queryByText("System")).toBeNull();
+    } finally {
+      await renderedPage.close();
+    }
+  });
+
   it("loads launchable profiles for the session picker from the dedicated endpoint", async () => {
     let launchableRequestCount = 0;
 

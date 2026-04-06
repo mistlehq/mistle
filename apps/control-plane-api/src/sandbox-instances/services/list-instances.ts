@@ -11,38 +11,86 @@ import type { ListSandboxInstancesResult } from "./types.js";
 
 async function resolveStartedByNames(
   db: ControlPlaneDatabase,
-  input: ListSandboxInstancesResponse["items"],
+  input: {
+    organizationId: string;
+    items: ListSandboxInstancesResponse["items"];
+  },
 ): Promise<Map<string, string>> {
   const startedByUserIds = [
     ...new Set(
-      input
+      input.items
         .map((item) => item.startedBy)
         .filter((starter) => starter.kind === "user")
         .map((starter) => starter.id),
     ),
   ];
-  if (startedByUserIds.length === 0) {
-    return new Map();
+  const startedByAutomationRunIds = [
+    ...new Set(
+      input.items
+        .map((item) => item.startedBy)
+        .filter((starter) => starter.kind === "system")
+        .map((starter) => starter.id),
+    ),
+  ];
+
+  const startedByNames = new Map<string, string>();
+
+  if (startedByUserIds.length > 0) {
+    const users = await db.query.users.findMany({
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+      },
+      where: (table, { inArray }) => inArray(table.id, startedByUserIds),
+    });
+
+    for (const user of users) {
+      startedByNames.set(
+        user.id,
+        resolveUserDisplayName({
+          name: user.name,
+          email: user.email,
+        }),
+      );
+    }
   }
 
-  const users = await db.query.users.findMany({
-    columns: {
-      id: true,
-      name: true,
-      email: true,
-    },
-    where: (table, { inArray }) => inArray(table.id, startedByUserIds),
-  });
+  if (startedByAutomationRunIds.length > 0) {
+    const automationRuns = await db.query.automationRuns.findMany({
+      columns: {
+        id: true,
+        automationId: true,
+      },
+      where: (table, { inArray }) => inArray(table.id, startedByAutomationRunIds),
+    });
+    const automationIds = [
+      ...new Set(automationRuns.map((automationRun) => automationRun.automationId)),
+    ];
 
-  return new Map(
-    users.map((user) => [
-      user.id,
-      resolveUserDisplayName({
-        name: user.name,
-        email: user.email,
-      }),
-    ]),
-  );
+    if (automationIds.length > 0) {
+      const automations = await db.query.automations.findMany({
+        columns: {
+          id: true,
+          name: true,
+        },
+        where: (table, { and, eq, inArray }) =>
+          and(eq(table.organizationId, input.organizationId), inArray(table.id, automationIds)),
+      });
+      const automationNamesById = new Map(
+        automations.map((automation) => [automation.id, automation.name]),
+      );
+
+      for (const automationRun of automationRuns) {
+        const automationName = automationNamesById.get(automationRun.automationId);
+        if (automationName !== undefined) {
+          startedByNames.set(automationRun.id, automationName);
+        }
+      }
+    }
+  }
+
+  return startedByNames;
 }
 
 async function resolveSandboxProfileDisplayNames(
@@ -94,7 +142,10 @@ export async function listInstances(
       ...(input.before === undefined ? {} : { before: input.before }),
     });
 
-    const startedByNames = await resolveStartedByNames(db, sandboxInstances.items);
+    const startedByNames = await resolveStartedByNames(db, {
+      organizationId: input.organizationId,
+      items: sandboxInstances.items,
+    });
     const sandboxProfileDisplayNames = await resolveSandboxProfileDisplayNames(db, {
       organizationId: input.organizationId,
       items: sandboxInstances.items,
@@ -107,8 +158,7 @@ export async function listInstances(
         sandboxProfileDisplayName: sandboxProfileDisplayNames.get(item.sandboxProfileId) ?? null,
         startedBy: {
           ...item.startedBy,
-          name:
-            item.startedBy.kind === "user" ? (startedByNames.get(item.startedBy.id) ?? null) : null,
+          name: startedByNames.get(item.startedBy.id) ?? null,
         },
       })),
     };
