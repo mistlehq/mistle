@@ -19,13 +19,6 @@ export async function normalizeOrganizationLogoImage(
 ): Promise<NormalizedOrganizationLogoImage> {
   const validatedImage = await validateProfileImage({
     imageBytes: input.imageBytes,
-    emptyMessage: "Organization logo upload must not be empty.",
-    tooLargeMessage: `Organization logo upload must be ${String(ProfileImageRequirements.MAX_UPLOAD_BYTES)} bytes or smaller.`,
-    invalidImageMessage: "Organization logo upload must be a valid image.",
-    unsupportedFormatMessage:
-      "Organization logo uploads must decode to a JPEG, PNG, or WebP image.",
-    animatedMessage: "Animated organization logo uploads are not supported.",
-    invalidDimensionsMessage: "Organization logo upload must include valid image dimensions.",
   });
 
   const normalizedImageBuffer = await sharp(input.imageBytes, {
