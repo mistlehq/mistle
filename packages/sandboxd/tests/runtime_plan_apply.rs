@@ -91,11 +91,7 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
         egress_grant_by_rule_id: BTreeMap::new(),
     };
 
-    let runtime_plan: runtime::CompiledRuntimePlan =
-        serde_json::from_value(startup_input.runtime_plan.clone())
-            .expect("runtime plan fixture should decode");
-
-    runtime::apply_runtime_plan(&runtime_plan)
+    runtime::apply_runtime_plan(&startup_input)
         .expect("runtime plan apply should materialize files and workspace state");
 
     assert_eq!(

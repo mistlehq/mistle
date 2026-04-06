@@ -452,14 +452,15 @@ fn apply_loaded_manifest(
 ) -> Result<(), ControlError> {
     // Use the same apply path for initial startup and later reloads so setup work
     // stays driven by the persisted manifest rather than ad hoc in-memory state.
-    let runtime_plan = runtime::parse_runtime_plan(&manifest)
-        .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
     take_process_manager(state)
         .map(|process_manager| process_manager.stop(&SystemClock, &ThreadSleeper))
         .transpose()
         .map_err(|error| ControlError::StopProcessManager(error.to_string()))?;
-    runtime::apply_runtime_plan(&runtime_plan)
+    runtime::apply_runtime_plan(&manifest)
         .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
+    let runtime_plan: runtime::CompiledRuntimePlan =
+        serde_json::from_value(manifest.runtime_plan.clone())
+            .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
     let process_specs = process::flatten_runtime_client_processes(&runtime_plan.runtime_clients);
     let process_manager = if process_specs.is_empty() {
         None
