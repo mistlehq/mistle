@@ -28,7 +28,7 @@
   "dependencies": {
     "@mistle/time": "workspace:*",
     "dockerode": "^4.0.9",
-    "e2b": "^2.18.0",
+    "e2b": "^2.19.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
