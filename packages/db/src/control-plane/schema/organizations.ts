@@ -12,6 +12,7 @@ export const organizations = controlPlaneSchema.table(
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     logo: text("logo"),
+    logoObjectKey: text("logo_object_key"),
     metadata: text("metadata"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
