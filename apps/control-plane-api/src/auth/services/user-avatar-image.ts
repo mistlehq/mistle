@@ -31,9 +31,8 @@ export async function normalizeUserAvatarImage(
   }
 
   const metadata = await readUserAvatarMetadata(input.imageBytes);
-  const detectedContentType = mapDetectedImageFormatToContentType(metadata.format);
 
-  if (detectedContentType === null) {
+  if (metadata.format !== "jpeg" && metadata.format !== "png" && metadata.format !== "webp") {
     throw new BadRequestError(
       "INVALID_IMAGE",
       "Avatar uploads must decode to a JPEG, PNG, or WebP image.",
@@ -91,18 +90,5 @@ async function readUserAvatarMetadata(imageBytes: Uint8Array) {
     }).metadata();
   } catch {
     throw new BadRequestError("INVALID_IMAGE", "Avatar upload must be a valid image.");
-  }
-}
-
-function mapDetectedImageFormatToContentType(format: string | undefined): string | null {
-  switch (format) {
-    case "jpeg":
-      return "image/jpeg";
-    case "png":
-      return "image/png";
-    case "webp":
-      return "image/webp";
-    default:
-      return null;
   }
 }
