@@ -104,8 +104,13 @@ export function createOrganizationGeneralSettingsFixtureContent(): React.JSX.Ele
       isLoading={false}
       isSaving={false}
       loadErrorMessage={null}
+      logoBusy={false}
+      logoErrorMessage={null}
+      logoUrl={null}
       name="Mistle Labs"
+      onDeleteLogo={async () => {}}
       onSaveChanges={async () => {}}
+      onUploadLogo={async () => {}}
     />
   );
 }
