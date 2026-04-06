@@ -5,7 +5,6 @@ import sharp from "sharp";
 import { describe, expect } from "vitest";
 
 import { putOrganizationLogo } from "../src/auth/services/put-organization-logo.js";
-import { createTestImageBuffer } from "./helpers/test-image.js";
 import { createTestObjectStore } from "./helpers/test-object-store.js";
 import { it } from "./test-context.js";
 
@@ -29,17 +28,20 @@ describe("organization logo service integration", () => {
       .where(eq(organizations.id, authenticatedSession.organizationId));
 
     try {
-      const sourceImage = await createTestImageBuffer({
-        width: 1024,
-        height: 640,
-        channels: 3,
-        background: {
-          r: 16,
-          g: 72,
-          b: 220,
+      const sourceImage = await sharp({
+        create: {
+          width: 1024,
+          height: 640,
+          channels: 3,
+          background: {
+            r: 16,
+            g: 72,
+            b: 220,
+          },
         },
-        format: "jpeg",
-      });
+      })
+        .jpeg()
+        .toBuffer();
 
       const result = await putOrganizationLogo(
         {
@@ -111,18 +113,21 @@ describe("organization logo service integration", () => {
 
     try {
       await objectStore.putObject({
-        Body: await createTestImageBuffer({
-          width: 64,
-          height: 64,
-          channels: 4,
-          background: {
-            r: 240,
-            g: 180,
-            b: 20,
-            alpha: 1,
+        Body: await sharp({
+          create: {
+            width: 64,
+            height: 64,
+            channels: 4,
+            background: {
+              r: 240,
+              g: 180,
+              b: 20,
+              alpha: 1,
+            },
           },
-          format: "webp",
-        }),
+        })
+          .webp()
+          .toBuffer(),
         ContentType: "image/webp",
         objectKey: previousObjectKey,
       });
@@ -134,18 +139,21 @@ describe("organization logo service integration", () => {
         })
         .where(eq(organizations.id, authenticatedSession.organizationId));
 
-      const replacementSource = await createTestImageBuffer({
-        width: 300,
-        height: 600,
-        channels: 4,
-        background: {
-          r: 120,
-          g: 40,
-          b: 180,
-          alpha: 1,
+      const replacementSource = await sharp({
+        create: {
+          width: 300,
+          height: 600,
+          channels: 4,
+          background: {
+            r: 120,
+            g: 40,
+            b: 180,
+            alpha: 1,
+          },
         },
-        format: "png",
-      });
+      })
+        .png()
+        .toBuffer();
 
       const result = await putOrganizationLogo(
         {
