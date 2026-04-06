@@ -1,4 +1,4 @@
-import { organizations } from "@mistle/db/control-plane";
+import { MemberRoles, members, organizations, sessions } from "@mistle/db/control-plane";
 import { startSeaweedfsS3 } from "@mistle/test-harness";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
@@ -7,6 +7,7 @@ import { describe, expect } from "vitest";
 import { createControlPlaneApiRuntime } from "../src/main.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
 import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test-object-store.js";
+import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
 
 const IntegrationConnectionTokenConfig = {
@@ -349,6 +350,145 @@ describe("organization logo endpoints integration", () => {
       await seaweedfs.stop();
     }
   });
+
+  it("returns forbidden when a same-organization member tries to upload a logo", async ({
+    fixture,
+  }) => {
+    const ownerSession = await fixture.authSession({
+      email: "integration-organization-logo-endpoint-member-upload-owner@example.com",
+    });
+    const memberSession = await fixture.authSession({
+      email: "integration-organization-logo-endpoint-member-upload-member@example.com",
+    });
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "mistle-assets",
+    });
+    const runtime = await createRuntimeWithObjectStore({
+      config: fixture.config,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      seaweedfs,
+    });
+
+    try {
+      await addMemberToActiveOrganization({
+        fixture,
+        organizationId: ownerSession.organizationId,
+        userId: memberSession.userId,
+      });
+
+      const sourceImage = await sharp({
+        create: {
+          width: 960,
+          height: 640,
+          channels: 3,
+          background: {
+            r: 24,
+            g: 96,
+            b: 220,
+          },
+        },
+      })
+        .jpeg()
+        .toBuffer();
+      const formData = new FormData();
+
+      formData.set(
+        "file",
+        new File([new Uint8Array(sourceImage)], "logo.jpg", { type: "image/jpeg" }),
+      );
+
+      const response = await runtime.request(
+        `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/logo`,
+        {
+          method: "PUT",
+          headers: {
+            cookie: memberSession.cookie,
+          },
+          body: formData,
+        },
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        code: "FORBIDDEN",
+        message: "Forbidden API request.",
+      });
+    } finally {
+      await runtime.stop();
+      await seaweedfs.stop();
+    }
+  });
+
+  it("returns forbidden when a same-organization member tries to delete a logo", async ({
+    fixture,
+  }) => {
+    const ownerSession = await fixture.authSession({
+      email: "integration-organization-logo-endpoint-member-delete-owner@example.com",
+    });
+    const memberSession = await fixture.authSession({
+      email: "integration-organization-logo-endpoint-member-delete-member@example.com",
+    });
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "mistle-assets",
+    });
+    const runtime = await createRuntimeWithObjectStore({
+      config: fixture.config,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      seaweedfs,
+    });
+    const objectStore = createTestObjectStore(seaweedfs);
+    const objectKey = `logos/organizations/${ownerSession.organizationId}/img_existing.webp`;
+
+    try {
+      await addMemberToActiveOrganization({
+        fixture,
+        organizationId: ownerSession.organizationId,
+        userId: memberSession.userId,
+      });
+      await objectStore.putObject({
+        Body: await getStoredWebpFixtureBytes(),
+        ContentType: "image/webp",
+        objectKey,
+      });
+      await runtime.db
+        .update(organizations)
+        .set({
+          logoObjectKey: objectKey,
+        })
+        .where(eq(organizations.id, ownerSession.organizationId));
+
+      const response = await runtime.request(
+        `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/logo`,
+        {
+          method: "DELETE",
+          headers: {
+            cookie: memberSession.cookie,
+          },
+        },
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        code: "FORBIDDEN",
+        message: "Forbidden API request.",
+      });
+
+      const persistedOrganization = await runtime.db.query.organizations.findFirst({
+        columns: {
+          logoObjectKey: true,
+        },
+        where: (table, { eq }) => eq(table.id, ownerSession.organizationId),
+      });
+
+      expect(persistedOrganization).toEqual({
+        logoObjectKey: objectKey,
+      });
+    } finally {
+      objectStore.destroy();
+      await runtime.stop();
+      await seaweedfs.stop();
+    }
+  });
 });
 
 async function createRuntimeWithObjectStore(input: {
@@ -384,4 +524,23 @@ function readImageUrl(payload: unknown): string | null {
   }
 
   return payload.imageUrl;
+}
+
+async function addMemberToActiveOrganization(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  organizationId: string;
+  userId: string;
+}): Promise<void> {
+  await input.fixture.db.insert(members).values({
+    organizationId: input.organizationId,
+    userId: input.userId,
+    role: MemberRoles.MEMBER,
+  });
+
+  await input.fixture.db
+    .update(sessions)
+    .set({
+      activeOrganizationId: input.organizationId,
+    })
+    .where(eq(sessions.userId, input.userId));
 }

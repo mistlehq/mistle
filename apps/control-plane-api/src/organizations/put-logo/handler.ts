@@ -6,6 +6,7 @@ import { PROFILE_IMAGE_READ_URL_TTL_SECONDS } from "../../me/constants.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { assertActiveOrganizationAccess } from "../services/assert-active-organization-access.js";
+import { assertCanManageOrganizationLogo } from "../services/assert-can-manage-organization-logo.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -20,6 +21,11 @@ const routeHandler = async (
 
   assertActiveOrganizationAccess({
     activeOrganizationId: session.session.activeOrganizationId,
+    organizationId,
+  });
+  await assertCanManageOrganizationLogo({
+    db,
+    actorUserId: session.user.id,
     organizationId,
   });
 
