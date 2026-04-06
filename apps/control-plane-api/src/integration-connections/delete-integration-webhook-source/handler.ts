@@ -25,7 +25,7 @@ const routeHandler = async (
     },
   );
 
-  return ctx.json({}, 200);
+  return ctx.body(null, 204);
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(

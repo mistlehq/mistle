@@ -1,5 +1,4 @@
 import { createRoute } from "@hono/zod-openapi";
-import { z } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
 import {
@@ -16,13 +15,8 @@ export const route = createRoute({
     params: DeleteIntegrationWebhookSourceParamsSchema,
   },
   responses: {
-    200: {
+    204: {
       description: "Delete an integration webhook source.",
-      content: {
-        "application/json": {
-          schema: z.object({}),
-        },
-      },
     },
     400: {
       description: "Invalid request.",

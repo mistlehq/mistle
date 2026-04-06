@@ -2362,16 +2362,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Delete an integration webhook source.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {}
-                }
-              }
-            }
+          "204": {
+            "description": "Delete an integration webhook source."
           },
           "400": {
             "description": "Invalid request.",
