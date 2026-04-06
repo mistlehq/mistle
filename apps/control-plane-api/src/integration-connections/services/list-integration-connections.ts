@@ -1,5 +1,6 @@
 import {
   integrationConnections,
+  integrationWebhookSources,
   sandboxProfileVersionIntegrationBindings,
   webhookAutomations,
   type ControlPlaneDatabase,
@@ -249,15 +250,23 @@ async function listAutomationCountsByConnectionId(input: {
 
   const automationCounts = await input.db
     .select({
-      connectionId: webhookAutomations.integrationConnectionId,
+      resolvedConnectionId: integrationConnections.id,
       automationCount: sql<number>`count(*)::int`,
     })
     .from(webhookAutomations)
-    .where(inArray(webhookAutomations.integrationConnectionId, [...input.connectionIds]))
-    .groupBy(webhookAutomations.integrationConnectionId);
+    .innerJoin(
+      integrationWebhookSources,
+      eq(integrationWebhookSources.id, webhookAutomations.integrationWebhookSourceId),
+    )
+    .innerJoin(
+      integrationConnections,
+      eq(integrationConnections.id, integrationWebhookSources.integrationConnectionId),
+    )
+    .where(inArray(integrationConnections.id, [...input.connectionIds]))
+    .groupBy(integrationConnections.id);
 
   return new Map(
-    automationCounts.map((entry) => [entry.connectionId, entry.automationCount] as const),
+    automationCounts.map((entry) => [entry.resolvedConnectionId, entry.automationCount] as const),
   );
 }
 

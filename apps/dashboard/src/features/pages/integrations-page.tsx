@@ -9,6 +9,7 @@ import { buildIntegrationConnectionDetailItems } from "./integrations-page-view-
 import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
 import { useIntegrationConnectionDialogState } from "./use-integration-connection-dialog-state.js";
 import { useIntegrationConnectionEditors } from "./use-integration-connection-editors.js";
+import { useIntegrationWebhookSourceState } from "./use-integration-webhook-source-state.js";
 import {
   SETTINGS_INTEGRATIONS_QUERY_KEY,
   useIntegrationsDirectoryState,
@@ -33,6 +34,9 @@ export function IntegrationsPage() {
     connections: directoryState.selectedDetailConnections,
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
   });
+  const webhookSourceState = useIntegrationWebhookSourceState({
+    detailConnections: directoryState.selectedDetailConnections,
+  });
 
   if (
     detailTargetKey !== null &&
@@ -54,6 +58,19 @@ export function IntegrationsPage() {
         onEditApiKey={connectionEditors.onEditApiKey}
         onRefreshResource={directoryState.onRefreshResource}
         resourceItemsByKey={directoryState.resourceItemsByKey}
+        webhookSourceStateByConnectionId={webhookSourceState.webhookSourceStateByConnectionId}
+        onCreateWebhookSource={({ connectionId }) => {
+          webhookSourceState.createWebhookSource({ connectionId });
+        }}
+        onDeleteWebhookSource={({ connectionId, webhookSourceId }) => {
+          webhookSourceState.deleteWebhookSource({
+            connectionId,
+            webhookSourceId,
+          });
+        }}
+        showWebhookSources={
+          (directoryState.selectedDetailCard.target.supportedWebhookEvents?.length ?? 0) > 0
+        }
         titleEditor={connectionEditors.titleEditor}
       />
     );

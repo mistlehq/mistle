@@ -2,8 +2,14 @@ import { createHmac } from "node:crypto";
 
 import {
   integrationConnections,
+  integrationCredentials,
   IntegrationConnectionStatuses,
+  IntegrationCredentialSecretKinds,
   integrationTargets,
+  integrationWebhookSources,
+  IntegrationWebhookSourceOwnerScopes,
+  IntegrationWebhookSourceRoutingStrategies,
+  IntegrationWebhookSourceStatuses,
 } from "@mistle/db/control-plane";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
@@ -14,11 +20,14 @@ import {
   IntegrationWebhooksNotFoundResponseSchema,
 } from "../src/integration-webhooks/index.js";
 import {
+  encryptCredentialUtf8,
   encryptIntegrationTargetSecrets,
   resolveMasterEncryptionKeyMaterial,
+  unwrapOrganizationCredentialKey,
 } from "../src/lib/crypto.js";
 import { ControlPlaneOpenWorkflowSchema } from "../src/openworkflow.js";
 import { it } from "./test-context.js";
+import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
 const GitHubEventTypeHeader = "issue_comment";
 const InstallationId = "123456";
@@ -50,6 +59,81 @@ function createGitHubWebhookPayload(): Record<string, unknown> {
 function signGitHubWebhookPayload(input: { secret: string; payload: string }): string {
   const digest = createHmac("sha256", input.secret).update(input.payload, "utf8").digest("hex");
   return `sha256=${digest}`;
+}
+
+function createJiraWebhookPayload(input: { siteUrl: string }): Record<string, unknown> {
+  return {
+    timestamp: 1_775_151_763_000,
+    webhookEvent: "jira:issue_created",
+    issue_event_type_name: "issue_created",
+    issue: {
+      id: "10001",
+      self: `${input.siteUrl}/rest/api/2/issue/10001`,
+      key: "MST-101",
+    },
+    user: {
+      accountId: "jira-user-123",
+    },
+  };
+}
+
+function signJiraWebhookPayload(input: { secret: string; payload: string }): string {
+  const digest = createHmac("sha256", input.secret).update(input.payload, "utf8").digest("hex");
+  return `sha256=${digest}`;
+}
+
+async function createWebhookSecretCredential(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  organizationId: string;
+  familyId: string;
+  secret: string;
+}): Promise<string> {
+  const organizationCredentialKey =
+    await input.fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, input.organizationId),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+
+  if (organizationCredentialKey === undefined) {
+    throw new Error("Expected organization credential key.");
+  }
+
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+    masterEncryptionKeys: input.fixture.config.integrations.masterEncryptionKeys,
+  });
+  const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: organizationCredentialKey.ciphertext,
+    masterEncryptionKeyMaterial,
+  });
+
+  try {
+    const encryptedSecret = encryptCredentialUtf8({
+      plaintext: input.secret,
+      organizationCredentialKey: unwrappedOrganizationCredentialKey,
+    });
+    const [createdCredential] = await input.fixture.db
+      .insert(integrationCredentials)
+      .values({
+        organizationId: input.organizationId,
+        secretKind: IntegrationCredentialSecretKinds.WEBHOOK_SECRET,
+        ciphertext: encryptedSecret.ciphertext,
+        nonce: encryptedSecret.nonce,
+        organizationCredentialKeyVersion: organizationCredentialKey.version,
+        intendedFamilyId: input.familyId,
+      })
+      .returning({
+        id: integrationCredentials.id,
+      });
+
+    if (createdCredential === undefined) {
+      throw new Error("Expected webhook secret credential.");
+    }
+
+    return createdCredential.id;
+  } finally {
+    unwrappedOrganizationCredentialKey.fill(0);
+  }
 }
 
 type PersistedWebhookWorkflowRun = {
@@ -180,11 +264,27 @@ describe("integration webhooks ingest integration", () => {
     expect(persistedEvent.status).toBe("received");
     expect(persistedEvent.organizationId).toBe(authenticatedSession.organizationId);
     expect(persistedEvent.integrationConnectionId).toBe(connectionId);
+    expect(persistedEvent.integrationWebhookSourceId).toBeDefined();
     expect(persistedEvent.payload).toEqual(payloadObject);
     expect(new Date(String(persistedEvent.sourceOccurredAt)).toISOString()).toBe(
       "2026-03-10T00:00:00.000Z",
     );
     expect(persistedEvent.sourceOrderKey).toBe("2026-03-10T00:00:00Z#00000000000000001001");
+
+    const persistedSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.targetKey, targetKey),
+          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.TARGET),
+        ),
+    });
+
+    expect(persistedSource).toBeDefined();
+    if (persistedSource === undefined) {
+      throw new Error("Expected implicit target webhook source to be created.");
+    }
+
+    expect(persistedEvent.integrationWebhookSourceId).toBe(persistedSource.id);
 
     const workflowRuns = await listWebhookWorkflowRuns({
       databaseUrl: fixture.databaseStack.directUrl,
@@ -400,6 +500,20 @@ describe("integration webhooks ingest integration", () => {
       throw new Error("Expected persisted webhook event.");
     }
 
+    const persistedSources = await fixture.db.query.integrationWebhookSources.findMany({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.targetKey, targetKey),
+          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.TARGET),
+        ),
+    });
+    expect(persistedSources).toHaveLength(1);
+    const [persistedSource] = persistedSources;
+    if (persistedSource === undefined) {
+      throw new Error("Expected persisted webhook source.");
+    }
+    expect(persistedEvent.integrationWebhookSourceId).toBe(persistedSource.id);
+
     const workflowRuns = await listWebhookWorkflowRuns({
       databaseUrl: fixture.databaseStack.directUrl,
       webhookEventId: persistedEvent.id,
@@ -410,5 +524,116 @@ describe("integration webhooks ingest integration", () => {
       throw new Error("Expected exactly one webhook workflow run.");
     }
     expect(workflowRun.idempotencyKey).toBe(persistedEvent.id);
+  });
+
+  it("accepts a valid Jira path-routed webhook and stores the event against the source", async ({
+    fixture,
+  }) => {
+    const targetKey = "jira-default";
+    const connectionId = "icn_jira_webhook_ingest_success";
+    const endpointKey = "ep_jira_ingest_success";
+    const webhookSecret = "whsec_jira_ingest";
+    const externalEventId = "jira-webhook-evt-1";
+    const siteUrl = "https://mistle-test.atlassian.net";
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-webhooks-ingest-jira@example.com",
+    });
+
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey,
+        familyId: "jira",
+        variantId: "jira-default",
+        enabled: true,
+        config: {},
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "jira",
+          variantId: "jira-default",
+          enabled: true,
+          config: {},
+        },
+      });
+
+    await fixture.db.insert(integrationConnections).values({
+      id: connectionId,
+      organizationId: authenticatedSession.organizationId,
+      targetKey,
+      displayName: "Jira webhook connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: "jira-personal-api-token",
+        site_url: siteUrl,
+        email: "jira@example.com",
+      },
+    });
+
+    const webhookSecretCredentialId = await createWebhookSecretCredential({
+      fixture,
+      organizationId: authenticatedSession.organizationId,
+      familyId: "jira",
+      secret: webhookSecret,
+    });
+
+    const [createdSource] = await fixture.db
+      .insert(integrationWebhookSources)
+      .values({
+        ownerScope: "connection",
+        organizationId: authenticatedSession.organizationId,
+        integrationConnectionId: connectionId,
+        targetKey,
+        displayName: "Jira admin webhook",
+        routingStrategy: IntegrationWebhookSourceRoutingStrategies.PATH,
+        endpointKey,
+        webhookSecretCredentialId,
+        status: IntegrationWebhookSourceStatuses.ACTIVE,
+      })
+      .returning();
+
+    if (createdSource === undefined) {
+      throw new Error("Expected Jira webhook source.");
+    }
+
+    const payloadObject = createJiraWebhookPayload({
+      siteUrl,
+    });
+    const payload = JSON.stringify(payloadObject);
+    const response = await fixture.request(`/v1/integration/webhooks/${targetKey}/${endpointKey}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-atlassian-webhook-identifier": externalEventId,
+        "x-hub-signature": signJiraWebhookPayload({
+          secret: webhookSecret,
+          payload,
+        }),
+      },
+      body: payload,
+    });
+
+    expect(response.status).toBe(202);
+    const responseBody = IngestIntegrationWebhookResponseSchema.parse(await response.json());
+    expect(responseBody).toEqual({
+      status: "received",
+    });
+
+    const persistedEvent = await fixture.db.query.integrationWebhookEvents.findFirst({
+      where: (table, { eq }) => eq(table.externalEventId, externalEventId),
+    });
+
+    expect(persistedEvent).toBeDefined();
+    if (persistedEvent === undefined) {
+      throw new Error("Expected Jira webhook event to be stored.");
+    }
+
+    expect(persistedEvent.integrationConnectionId).toBe(connectionId);
+    expect(persistedEvent.integrationWebhookSourceId).toBe(createdSource.id);
+    expect(persistedEvent.eventType).toBe("jira:issue_created");
+    expect(persistedEvent.providerEventType).toBe("jira:issue_created");
+    expect(persistedEvent.payload).toEqual(payloadObject);
+    expect(persistedEvent.sourceOccurredAt).toBe("2026-04-02T17:42:43.000Z");
   });
 });

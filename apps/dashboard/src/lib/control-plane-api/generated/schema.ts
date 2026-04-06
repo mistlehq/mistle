@@ -43,6 +43,7 @@ export interface paths {
                   /** @enum {string} */
                   code:
                     | "MISSING_TARGET_METADATA"
+                    | "MISSING_WEBHOOK_SOURCE"
                     | "MISSING_INTEGRATION_CONNECTION"
                     | "MISSING_SANDBOX_PROFILE";
                   message: string;
@@ -126,7 +127,7 @@ export interface paths {
             eventTypes?: string[] | null;
             idempotencyKeyTemplate?: string | null;
             inputTemplate: string;
-            integrationConnectionId: string;
+            integrationWebhookSourceId: string;
             name: string;
             payloadFilter?: {
               [key: string]: unknown;
@@ -153,7 +154,7 @@ export interface paths {
               id: string;
               idempotencyKeyTemplate: string | null;
               inputTemplate: string;
-              integrationConnectionId: string;
+              integrationWebhookSourceId: string;
               /** @enum {string} */
               kind: "webhook";
               name: string;
@@ -179,8 +180,8 @@ export interface paths {
               | {
                   /** @enum {string} */
                   code:
-                    | "INVALID_CONNECTION_REFERENCE"
-                    | "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE"
+                    | "INVALID_WEBHOOK_SOURCE_REFERENCE"
+                    | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
                     | "INVALID_SANDBOX_PROFILE_REFERENCE"
                     | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE";
                   message: string;
@@ -258,7 +259,7 @@ export interface paths {
               id: string;
               idempotencyKeyTemplate: string | null;
               inputTemplate: string;
-              integrationConnectionId: string;
+              integrationWebhookSourceId: string;
               /** @enum {string} */
               kind: "webhook";
               name: string;
@@ -425,7 +426,7 @@ export interface paths {
             eventTypes?: string[] | null;
             idempotencyKeyTemplate?: string | null;
             inputTemplate?: string;
-            integrationConnectionId?: string;
+            integrationWebhookSourceId?: string;
             name?: string;
             payloadFilter?: {
               [key: string]: unknown;
@@ -452,7 +453,7 @@ export interface paths {
               id: string;
               idempotencyKeyTemplate: string | null;
               inputTemplate: string;
-              integrationConnectionId: string;
+              integrationWebhookSourceId: string;
               /** @enum {string} */
               kind: "webhook";
               name: string;
@@ -478,8 +479,8 @@ export interface paths {
               | {
                   /** @enum {string} */
                   code:
-                    | "INVALID_CONNECTION_REFERENCE"
-                    | "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE"
+                    | "INVALID_WEBHOOK_SOURCE_REFERENCE"
+                    | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
                     | "INVALID_SANDBOX_PROFILE_REFERENCE"
                     | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE";
                   message: string;
@@ -1654,6 +1655,19 @@ export interface paths {
             };
           };
         };
+        /** @description Webhook source is still referenced locally. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "WEBHOOK_SOURCE_HAS_AUTOMATIONS";
+              message: string;
+            };
+          };
+        };
       };
     };
     options?: never;
@@ -2457,7 +2471,109 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND";
+              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND" | "WEBHOOK_SOURCE_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integration/webhooks/:targetKey/:endpointKey": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          endpointKey: string;
+          targetKey: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Immediate integration-defined webhook response. Status code, headers, content type, and body are integration-specific and may include empty responses. */
+        "2XX": {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "*/*":
+              | string
+              | {
+                  [key: string]: unknown;
+                };
+          };
+        };
+        /** @description Webhook event accepted for processing. */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              status: "received" | "duplicate";
+            };
+          };
+        };
+        /** @description Immediate integration-defined webhook response with no body. */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Invalid webhook request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_WEBHOOK_REQUEST";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Integration target, source, or connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND" | "WEBHOOK_SOURCE_NOT_FOUND";
               message: string;
             };
           };

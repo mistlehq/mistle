@@ -10,14 +10,14 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 
 import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-reference-or-throw.js";
 import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
-import { assertWebhookConnectionReferenceOrThrow } from "./assert-webhook-connection-reference-or-throw.js";
+import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-reference-or-throw.js";
 import { loadWebhookAutomationAggregateOrThrow } from "./load-webhook-automation-aggregate-or-throw.js";
 
 export type CreateWebhookAutomationInput = {
   organizationId: string;
   name: string;
   enabled?: boolean | undefined;
-  integrationConnectionId: string;
+  integrationWebhookSourceId: string;
   eventTypes?: string[] | null | undefined;
   payloadFilter?: Record<string, unknown> | null | undefined;
   inputTemplate: string;
@@ -43,11 +43,11 @@ export async function createAutomationWebhook(
   },
   input: CreateWebhookAutomationInput,
 ) {
-  await assertWebhookConnectionReferenceOrThrow(
+  const resolvedWebhookSource = await assertWebhookSourceReferenceOrThrow(
     { db: ctx.db, integrationRegistry: ctx.integrationRegistry },
     {
       organizationId: input.organizationId,
-      integrationConnectionId: input.integrationConnectionId,
+      integrationWebhookSourceId: input.integrationWebhookSourceId,
     },
   );
   await assertSandboxProfileReferenceOrThrow(
@@ -62,7 +62,7 @@ export async function createAutomationWebhook(
     {
       sandboxProfileId: input.target.sandboxProfileId,
       sandboxProfileVersion: input.target.sandboxProfileVersion,
-      integrationConnectionId: input.integrationConnectionId,
+      integrationConnectionId: resolvedWebhookSource.integrationConnectionId,
     },
   );
 
@@ -108,7 +108,7 @@ async function createAutomationAggregate(
 
   await tx.insert(webhookAutomations).values({
     automationId: insertedAutomation.id,
-    integrationConnectionId: input.integrationConnectionId,
+    integrationWebhookSourceId: input.integrationWebhookSourceId,
     eventTypes: input.eventTypes ?? null,
     payloadFilter: input.payloadFilter ?? null,
     inputTemplate: input.inputTemplate,

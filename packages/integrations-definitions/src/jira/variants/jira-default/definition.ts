@@ -1,5 +1,4 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
-import { z } from "zod";
 
 import {
   JiraConnectionMethodIds,
@@ -18,7 +17,11 @@ import {
   JiraServiceAccountOauthClientCredentialsConnectionConfigForm,
 } from "./connection-config-form.js";
 import { exchangeJiraClientCredentials } from "./oauth2-client-credentials.js";
+import { JiraSupportedWebhookEvents } from "./supported-webhook-events.js";
 import { JiraTargetConfigSchema } from "./target-config-schema.js";
+import { JiraTargetSecretSchema } from "./target-secret-schema.js";
+import { JiraWebhookSourceCapability } from "./webhook-source.js";
+import { JiraWebhookHandler } from "./webhook.js";
 
 type JiraIntegrationDefinition = IntegrationDefinition<
   typeof JiraTargetConfigSchema,
@@ -26,8 +29,6 @@ type JiraIntegrationDefinition = IntegrationDefinition<
   typeof JiraBindingConfigSchema,
   JiraConnectionConfig
 >;
-
-const JiraTargetSecretSchema = z.object({}).strict();
 
 export const JiraDefinition: JiraIntegrationDefinition = {
   familyId: "jira",
@@ -94,5 +95,8 @@ export const JiraDefinition: JiraIntegrationDefinition = {
   oauth2ClientCredentials: {
     exchangeClientCredentials: exchangeJiraClientCredentials,
   },
+  supportedWebhookEvents: JiraSupportedWebhookEvents,
+  webhookHandler: JiraWebhookHandler,
+  webhookSource: JiraWebhookSourceCapability,
   compileBinding: compileJiraBinding,
 };

@@ -1,7 +1,12 @@
 import {
   IntegrationConnectionStatuses,
+  integrationCredentials,
   integrationWebhookEvents,
   IntegrationWebhookEventStatuses,
+  IntegrationWebhookSourceOwnerScopes,
+  IntegrationWebhookSourceStatuses,
+  organizationCredentialKeys,
+  type IntegrationWebhookSource,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
@@ -14,11 +19,16 @@ import type {
   IntegrationConnection,
   IntegrationWebhookImmediateResponse,
 } from "@mistle/integrations-core";
+import { and, eq, isNull } from "drizzle-orm";
 
+import { ensureImplicitConnectionWebhookSource } from "../../integration-connections/services/webhook-sources.js";
+import { ensureImplicitTargetWebhookSource } from "../../integration-webhook-sources/services/ensure-implicit-target-webhook-source.js";
 import {
+  decryptCredentialUtf8,
   decryptIntegrationConnectionSecrets,
   resolveMasterEncryptionKeyMaterial,
   type IntegrationConnectionSecrets,
+  unwrapOrganizationCredentialKey,
 } from "../../lib/crypto.js";
 import { resolveIntegrationTargetSecrets } from "../../lib/integration-target-secrets.js";
 import type { AppContext } from "../../types.js";
@@ -29,6 +39,7 @@ import {
 
 export type ReceiveIntegrationWebhookInput = {
   targetKey: string;
+  endpointKey: string | undefined;
   headers: Readonly<Record<string, string | string[] | undefined>>;
   rawBody: Uint8Array;
 };
@@ -109,6 +120,140 @@ async function resolveConnectionSecretsOrThrow(input: {
   };
 }
 
+async function resolveWebhookSourceSecretOrThrow(input: {
+  db: AppContext["var"]["db"];
+  source: IntegrationWebhookSource;
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+}): Promise<IntegrationConnectionSecrets> {
+  const webhookSecretCredentialId = input.source.webhookSecretCredentialId;
+  if (webhookSecretCredentialId == null) {
+    return {};
+  }
+
+  const organizationId = input.source.organizationId;
+  if (organizationId == null) {
+    throw new Error(
+      `Webhook source '${input.source.id}' is missing organizationId for credential resolution.`,
+    );
+  }
+
+  const [credential] = await input.db
+    .select({
+      credentialCiphertext: integrationCredentials.ciphertext,
+      credentialNonce: integrationCredentials.nonce,
+      organizationCredentialKeyCiphertext: organizationCredentialKeys.ciphertext,
+      organizationCredentialKeyMasterKeyVersion: organizationCredentialKeys.masterKeyVersion,
+    })
+    .from(integrationCredentials)
+    .innerJoin(
+      organizationCredentialKeys,
+      and(
+        eq(organizationCredentialKeys.organizationId, integrationCredentials.organizationId),
+        eq(
+          organizationCredentialKeys.version,
+          integrationCredentials.organizationCredentialKeyVersion,
+        ),
+      ),
+    )
+    .where(
+      and(
+        eq(integrationCredentials.id, webhookSecretCredentialId),
+        eq(integrationCredentials.organizationId, organizationId),
+        isNull(integrationCredentials.revokedAt),
+      ),
+    )
+    .limit(1);
+
+  if (credential === undefined) {
+    throw new Error(
+      `Webhook secret credential '${webhookSecretCredentialId}' for source '${input.source.id}' was not found.`,
+    );
+  }
+
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: credential.organizationCredentialKeyMasterKeyVersion,
+    masterEncryptionKeys: input.integrationsConfig.masterEncryptionKeys,
+  });
+  const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: credential.organizationCredentialKeyCiphertext,
+    masterEncryptionKeyMaterial,
+  });
+
+  try {
+    return {
+      webhookSecret: decryptCredentialUtf8({
+        nonce: credential.credentialNonce,
+        ciphertext: credential.credentialCiphertext,
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      }),
+    };
+  } finally {
+    unwrappedOrganizationCredentialKey.fill(0);
+  }
+}
+
+async function resolveWebhookSourceForPreVerificationOrThrow(input: {
+  db: AppContext["var"]["db"];
+  targetKey: string;
+  endpointKey: string | undefined;
+  definition: NonNullable<ReturnType<AppContext["var"]["integrationRegistry"]["getDefinition"]>>;
+}): Promise<IntegrationWebhookSource | undefined> {
+  const webhookSourceCapability = input.definition.webhookSource;
+  if (webhookSourceCapability === undefined) {
+    throw new Error(
+      `Integration '${input.definition.familyId}/${input.definition.variantId}' does not define webhookSource capability.`,
+    );
+  }
+
+  const endpointKey = input.endpointKey;
+  if (endpointKey !== undefined) {
+    const source = await input.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.targetKey, input.targetKey),
+          eq(table.endpointKey, endpointKey),
+          eq(table.status, IntegrationWebhookSourceStatuses.ACTIVE),
+        ),
+    });
+
+    if (source === undefined) {
+      throw new NotFoundError(
+        IntegrationWebhooksNotFoundCodes.WEBHOOK_SOURCE_NOT_FOUND,
+        `Active webhook source '${endpointKey}' was not found for target '${input.targetKey}'.`,
+      );
+    }
+
+    return source;
+  }
+
+  if (webhookSourceCapability.routingStrategy !== "payload") {
+    throw new NotFoundError(
+      IntegrationWebhooksNotFoundCodes.WEBHOOK_SOURCE_NOT_FOUND,
+      `Integration target '${input.targetKey}' does not expose a shared payload-routed webhook ingress.`,
+    );
+  }
+
+  if (webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.TARGET) {
+    return ensureImplicitTargetWebhookSource({
+      db: input.db,
+      targetKey: input.targetKey,
+      routingStrategy: webhookSourceCapability.routingStrategy,
+    });
+  }
+
+  return undefined;
+}
+
+function resolveSourceConnectionIdOrThrow(input: { source: IntegrationWebhookSource }): string {
+  if (input.source.integrationConnectionId == null) {
+    throw new Error(
+      `Connection-owned webhook source '${input.source.id}' is missing integrationConnectionId.`,
+    );
+  }
+
+  return input.source.integrationConnectionId;
+}
+
 export async function receiveIntegrationWebhook(
   {
     db,
@@ -150,10 +295,34 @@ export async function receiveIntegrationWebhook(
     target,
   });
   const parsedTargetSecrets = definition.targetSecretSchema.parse(resolvedTargetSecrets);
+  const webhookSourceCapability = definition.webhookSource;
+  if (webhookSourceCapability === undefined) {
+    throw new Error(
+      `Integration '${target.familyId}/${target.variantId}' does not define webhookSource capability.`,
+    );
+  }
+
+  let webhookSource = await resolveWebhookSourceForPreVerificationOrThrow({
+    db,
+    targetKey: input.targetKey,
+    endpointKey: input.endpointKey,
+    definition,
+  });
+  const webhookSourceSecrets =
+    webhookSource === undefined
+      ? {}
+      : await resolveWebhookSourceSecretOrThrow({
+          db,
+          source: webhookSource,
+          integrationsConfig,
+        });
   const activeConnections = await db.query.integrationConnections.findMany({
     where: (table, { and, eq }) =>
       and(
         eq(table.targetKey, input.targetKey),
+        ...(webhookSource?.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION
+          ? [eq(table.id, resolveSourceConnectionIdOrThrow({ source: webhookSource }))]
+          : []),
         eq(table.status, IntegrationConnectionStatuses.ACTIVE),
       ),
     columns: {
@@ -197,7 +366,10 @@ export async function receiveIntegrationWebhook(
           connectionId,
           connectionsById: activeConnectionsById,
           integrationsConfig,
-        }),
+        }).then((connectionSecrets) => ({
+          ...connectionSecrets,
+          ...webhookSourceSecrets,
+        })),
       headers: normalizeWebhookHeaders(input.headers),
       rawBody: input.rawBody,
     });
@@ -234,11 +406,28 @@ export async function receiveIntegrationWebhook(
     );
   }
 
+  if (webhookSource === undefined) {
+    if (webhookSourceCapability.ownerScope !== IntegrationWebhookSourceOwnerScopes.CONNECTION) {
+      throw new Error(
+        `Payload-routed webhook source for '${input.targetKey}' could not be resolved before persistence.`,
+      );
+    }
+
+    webhookSource = await ensureImplicitConnectionWebhookSource({
+      db,
+      organizationId: resolvedConnection.organizationId,
+      connectionId: resolvedConnection.id,
+      targetKey: input.targetKey,
+      routingStrategy: webhookSourceCapability.routingStrategy,
+    });
+  }
+
   const insertedRows = await db
     .insert(integrationWebhookEvents)
     .values({
       organizationId: resolvedConnection.organizationId,
       integrationConnectionId: resolvedConnection.id,
+      integrationWebhookSourceId: webhookSource.id,
       targetKey: input.targetKey,
       externalEventId: resolvedWebhookRequest.event.externalEventId,
       externalDeliveryId: resolvedWebhookRequest.event.externalDeliveryId,
@@ -250,7 +439,10 @@ export async function receiveIntegrationWebhook(
       status: IntegrationWebhookEventStatuses.RECEIVED,
     })
     .onConflictDoNothing({
-      target: [integrationWebhookEvents.targetKey, integrationWebhookEvents.externalEventId],
+      target: [
+        integrationWebhookEvents.integrationWebhookSourceId,
+        integrationWebhookEvents.externalEventId,
+      ],
     })
     .returning({
       id: integrationWebhookEvents.id,

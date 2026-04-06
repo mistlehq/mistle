@@ -3,6 +3,7 @@ import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/htt
 
 import {
   DeleteIntegrationWebhookSourceBadRequestResponseSchema,
+  DeleteIntegrationWebhookSourceConflictResponseSchema,
   DeleteIntegrationWebhookSourceNotFoundResponseSchema,
   DeleteIntegrationWebhookSourceParamsSchema,
 } from "./schema.js";
@@ -47,6 +48,14 @@ export const route = createRoute({
       content: {
         "application/json": {
           schema: DeleteIntegrationWebhookSourceNotFoundResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: "Webhook source is still referenced locally.",
+      content: {
+        "application/json": {
+          schema: DeleteIntegrationWebhookSourceConflictResponseSchema,
         },
       },
     },
