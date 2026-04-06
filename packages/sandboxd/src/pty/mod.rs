@@ -16,7 +16,9 @@ use std::thread;
 
 use portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
 
-use crate::cgroups::{UserScopePaths, attach_pid_to_scope, create_user_scope};
+use crate::cgroups::{
+    UserScopePaths, attach_pid_to_scope, create_user_scope, is_scope_populated,
+};
 use crate::time::{Clock, Duration, Sleeper};
 
 /// Default PTY column count when the caller does not specify one.
@@ -118,6 +120,15 @@ impl PtySession {
     /// Returns the cgroup scope paths attached to this PTY session, if any.
     pub fn scope_paths(&self) -> Option<&UserScopePaths> {
         self.scope_paths.as_ref()
+    }
+
+    /// Returns whether the PTY session's user scope still reports live processes.
+    pub fn scope_is_populated(&self) -> Result<bool, PtyError> {
+        let scope_paths = self
+            .scope_paths()
+            .ok_or_else(|| PtyError::new("pty session does not have a user scope"))?;
+
+        is_scope_populated(scope_paths).map_err(|error| PtyError::new(error.to_string()))
     }
 
     /// Resizes the PTY window for the running child process.
