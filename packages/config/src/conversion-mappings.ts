@@ -159,6 +159,36 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL",
   },
   {
+    configPath: ["apps", "control_plane_api", "objectStore", "bucketName"],
+    tomlPath: ["apps", "control_plane_api", "object_store", "bucket_name"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_BUCKET_NAME",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "objectStore", "region"],
+    tomlPath: ["apps", "control_plane_api", "object_store", "region"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_REGION",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "objectStore", "endpoint"],
+    tomlPath: ["apps", "control_plane_api", "object_store", "endpoint"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_ENDPOINT",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "objectStore", "forcePathStyle"],
+    tomlPath: ["apps", "control_plane_api", "object_store", "force_path_style"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_FORCE_PATH_STYLE",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "objectStore", "accessKeyId"],
+    tomlPath: ["apps", "control_plane_api", "object_store", "access_key_id"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_ACCESS_KEY_ID",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "objectStore", "secretAccessKey"],
+    tomlPath: ["apps", "control_plane_api", "object_store", "secret_access_key"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_SECRET_ACCESS_KEY",
+  },
+  {
     configPath: ["apps", "control_plane_api", "auth", "baseUrl"],
     tomlPath: ["apps", "control_plane_api", "auth", "base_url"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL",
