@@ -21,6 +21,7 @@ import {
   createGithubPullRequestOpenedEventOption,
   GitHubConnectionId,
   GitHubConnectionLabel,
+  GitHubWebhookSourceId,
   RepoMaintainerSandboxProfileId,
 } from "./webhook-automation-test-fixtures.js";
 import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
@@ -65,7 +66,7 @@ const FormValues: WebhookAutomationFormValues = {
   conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
   triggerIds: [
     createWebhookAutomationTriggerId({
-      connectionId: GitHubConnectionId,
+      webhookSourceId: GitHubWebhookSourceId,
       eventType: "github.issue_comment.created",
     }),
   ],

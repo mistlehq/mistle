@@ -12,23 +12,26 @@ import { createWebhookAutomationTriggerId } from "./webhook-automation-option-bu
 import {
   createGithubIssueCommentCreatedEventOption,
   createGithubPullRequestOpenedEventOption,
+  GitHubWebhookSourceId,
 } from "./webhook-automation-test-fixtures.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 import type { WebhookAutomation } from "./webhook-automations-types.js";
 
 const GitHubConnectionId = "conn_github";
+const StripeWebhookSourceId = "iws_stripe";
 const PullRequestOpenedTriggerId = createWebhookAutomationTriggerId({
-  connectionId: GitHubConnectionId,
+  webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.pull_request.opened",
 });
 const IssueCommentCreatedTriggerId = createWebhookAutomationTriggerId({
-  connectionId: GitHubConnectionId,
+  webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.issue_comment.created",
 });
 
 const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
   createGithubIssueCommentCreatedEventOption({
     id: IssueCommentCreatedTriggerId,
+    integrationWebhookSourceId: GitHubWebhookSourceId,
     connectionId: GitHubConnectionId,
     connectionLabel: "GitHub Engineering",
     conversationKeyOptions: [
@@ -48,6 +51,7 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
   }),
   createGithubPullRequestOpenedEventOption({
     id: PullRequestOpenedTriggerId,
+    integrationWebhookSourceId: GitHubWebhookSourceId,
     connectionId: GitHubConnectionId,
     connectionLabel: "GitHub Engineering",
     conversationKeyOptions: [
@@ -91,7 +95,7 @@ const SampleAutomation: WebhookAutomation = {
   kind: "webhook",
   name: "GitHub pushes to repo triage",
   enabled: true,
-  integrationConnectionId: GitHubConnectionId,
+  integrationWebhookSourceId: GitHubWebhookSourceId,
   inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
   conversationKeyTemplate: "{{event.repository.id}}",
   idempotencyKeyTemplate: null,
@@ -142,11 +146,11 @@ describe("toWebhookAutomationFormValues", () => {
       conversationKeyTemplate: "{{event.repository.id}}",
       triggerIds: [
         createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "push",
         }),
         createWebhookAutomationTriggerId({
-          connectionId: GitHubConnectionId,
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "pull_request",
         }),
       ],
@@ -269,7 +273,7 @@ describe("validateWebhookAutomationFormValues", () => {
           triggerIds: [
             PullRequestOpenedTriggerId,
             createWebhookAutomationTriggerId({
-              connectionId: "conn_stripe",
+              webhookSourceId: StripeWebhookSourceId,
               eventType: "stripe.payout.failed",
             }),
           ],
@@ -278,10 +282,11 @@ describe("validateWebhookAutomationFormValues", () => {
           ...GitHubEventOptions,
           {
             id: createWebhookAutomationTriggerId({
-              connectionId: "conn_stripe",
+              webhookSourceId: StripeWebhookSourceId,
               eventType: "stripe.payout.failed",
             }),
             eventType: "stripe.payout.failed",
+            integrationWebhookSourceId: StripeWebhookSourceId,
             connectionId: "conn_stripe",
             connectionLabel: "Stripe Production",
             label: "Payout failed",
@@ -318,6 +323,7 @@ describe("validateWebhookAutomationFormValues", () => {
         [
           createGithubPullRequestOpenedEventOption({
             id: PullRequestOpenedTriggerId,
+            integrationWebhookSourceId: GitHubWebhookSourceId,
             connectionId: GitHubConnectionId,
             connectionLabel: "GitHub Engineering",
             availability: "wrong_profile",
@@ -332,7 +338,7 @@ describe("validateWebhookAutomationFormValues", () => {
 });
 
 describe("automation payload transforms", () => {
-  it("builds the create payload with a derived connection id", () => {
+  it("builds the create payload with a derived webhook source id", () => {
     expect(
       toCreateWebhookAutomationPayload(
         {
@@ -345,7 +351,7 @@ describe("automation payload transforms", () => {
     ).toEqual({
       name: "GitHub pushes to repo triage",
       enabled: true,
-      integrationConnectionId: GitHubConnectionId,
+      integrationWebhookSourceId: GitHubWebhookSourceId,
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
@@ -371,7 +377,7 @@ describe("automation payload transforms", () => {
     ).toEqual({
       name: "Stripe payouts incident intake",
       enabled: false,
-      integrationConnectionId: GitHubConnectionId,
+      integrationWebhookSourceId: GitHubWebhookSourceId,
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
@@ -400,7 +406,7 @@ describe("automation payload transforms", () => {
     ).toEqual({
       name: "Pull request routing",
       enabled: true,
-      integrationConnectionId: GitHubConnectionId,
+      integrationWebhookSourceId: GitHubWebhookSourceId,
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
@@ -443,7 +449,7 @@ describe("automation payload transforms", () => {
     ).toEqual({
       name: "Pull request routing",
       enabled: true,
-      integrationConnectionId: GitHubConnectionId,
+      integrationWebhookSourceId: GitHubWebhookSourceId,
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
@@ -475,7 +481,7 @@ describe("automation payload transforms", () => {
     ).toEqual({
       name: "Pull request routing",
       enabled: true,
-      integrationConnectionId: GitHubConnectionId,
+      integrationWebhookSourceId: GitHubWebhookSourceId,
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,

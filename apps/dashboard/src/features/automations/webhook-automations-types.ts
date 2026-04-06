@@ -62,7 +62,7 @@ export const WebhookAutomationSchema = z
     id: z.string().min(1),
     idempotencyKeyTemplate: z.string().nullable(),
     inputTemplate: z.string(),
-    integrationConnectionId: z.string().min(1),
+    integrationWebhookSourceId: z.string().min(1),
     kind: z.literal("webhook"),
     name: z.string().min(1),
     payloadFilter: z.record(z.string(), z.unknown()).nullable(),
@@ -94,30 +94,32 @@ export type WebhookAutomationsListResult = z.infer<typeof WebhookAutomationsList
 export type DeleteWebhookAutomationResult = z.infer<typeof DeleteWebhookAutomationResultSchema>;
 
 export type CreateWebhookAutomationInput = {
-  conversationKeyTemplate: string;
-  enabled: boolean;
-  eventTypes: string[] | null;
-  idempotencyKeyTemplate: string | null;
-  inputTemplate: string;
-  integrationConnectionId: string;
   name: string;
-  payloadFilter: Record<string, unknown> | null;
+  enabled?: boolean;
+  integrationWebhookSourceId: string;
+  eventTypes?: string[] | null;
+  payloadFilter?: Record<string, unknown> | null;
+  inputTemplate: string;
+  conversationKeyTemplate: string;
+  idempotencyKeyTemplate?: string | null;
   target: {
     sandboxProfileId: string;
+    sandboxProfileVersion?: number;
   };
 };
 
 export type UpdateWebhookAutomationPatch = {
-  conversationKeyTemplate?: string;
-  enabled?: boolean;
-  eventTypes?: string[] | null;
-  idempotencyKeyTemplate?: string | null;
-  inputTemplate?: string;
-  integrationConnectionId?: string;
   name?: string;
+  enabled?: boolean;
+  integrationWebhookSourceId?: string;
+  eventTypes?: string[] | null;
   payloadFilter?: Record<string, unknown> | null;
+  inputTemplate?: string;
+  conversationKeyTemplate?: string;
+  idempotencyKeyTemplate?: string | null;
   target?: {
-    sandboxProfileId: string;
+    sandboxProfileId?: string;
+    sandboxProfileVersion?: number;
   };
 };
 

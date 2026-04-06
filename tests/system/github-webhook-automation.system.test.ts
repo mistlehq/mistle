@@ -45,6 +45,11 @@ const IntegrationConnectionResponseSchema = z.looseObject({
   id: z.string().min(1),
 });
 
+const IntegrationWebhookSourceResponseSchema = z.looseObject({
+  id: z.string().min(1),
+  integrationConnectionId: z.string().min(1).optional(),
+});
+
 const SandboxProfileResponseSchema = z.looseObject({
   id: z.string().min(1),
 });
@@ -481,6 +486,27 @@ describeIf("system GitHub webhook automation", () => {
           );
         },
       });
+      const githubWebhookSources = await requestJsonOrThrow({
+        request: fixture.request,
+        path: `/v1/integration/connections/${encodeURIComponent(githubConnection.id)}/webhook-sources`,
+        expectedStatus: 200,
+        description: "GitHub webhook source listing",
+        schema: z.array(IntegrationWebhookSourceResponseSchema),
+        init: {
+          method: "GET",
+          headers: {
+            cookie: session.cookie,
+          },
+        },
+      });
+      const githubWebhookSource = githubWebhookSources.find(
+        (source) => source.integrationConnectionId === githubConnection.id,
+      );
+      if (githubWebhookSource === undefined) {
+        throw new Error(
+          `Expected an implicit GitHub webhook source for connection '${githubConnection.id}'.`,
+        );
+      }
 
       const automation = await requestJsonOrThrow({
         request: fixture.request,
@@ -497,7 +523,7 @@ describeIf("system GitHub webhook automation", () => {
           body: JSON.stringify({
             name: `GitHub Webhook Automation ${randomUUID()}`,
             enabled: true,
-            integrationConnectionId: githubConnection.id,
+            integrationWebhookSourceId: githubWebhookSource.id,
             eventTypes: ["github.issue_comment.created"],
             payloadFilter: {
               op: "contains",
@@ -554,7 +580,7 @@ describeIf("system GitHub webhook automation", () => {
               where: (table, { and, eq }) =>
                 and(
                   eq(table.targetKey, GitHubTargetKey),
-                  eq(table.integrationConnectionId, githubConnection.id),
+                  eq(table.integrationWebhookSourceId, githubWebhookSource.id),
                 ),
               orderBy: (table, { desc }) => [desc(table.finalizedAt), desc(table.id)],
             });

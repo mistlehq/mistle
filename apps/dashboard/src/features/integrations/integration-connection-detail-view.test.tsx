@@ -296,4 +296,136 @@ describe("IntegrationConnectionDetailView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete connection Free connection" }));
     expect(deletedConnectionId).toBe("icn_free");
   });
+
+  it("renders webhook sources and create/delete actions", () => {
+    let createdConnectionId: string | null = null;
+    let deletedWebhookSource: { connectionId: string; webhookSourceId: string } | null = null;
+
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_jira_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Jira Production",
+            authMethodId: "jira-personal-api-token",
+            authMethodLabel: "Personal API token",
+            status: "active",
+            resources: [],
+          },
+        ]}
+        onCreateWebhookSource={({ connectionId }) => {
+          createdConnectionId = connectionId;
+        }}
+        onDeleteWebhookSource={({ connectionId, webhookSourceId }) => {
+          deletedWebhookSource = { connectionId, webhookSourceId };
+        }}
+        showWebhookSources={true}
+        webhookSourceStateByConnectionId={
+          new Map([
+            [
+              "icn_jira_primary",
+              {
+                createErrorMessage: null,
+                deleteErrorMessage: null,
+                deletingWebhookSourceId: null,
+                isCreating: false,
+                isLoading: false,
+                items: [
+                  {
+                    id: "iws_jira_123",
+                    targetKey: "jira-default",
+                    ownerScope: "connection",
+                    integrationConnectionId: "icn_jira_primary",
+                    displayName: "Primary Jira webhook",
+                    endpointKey: "ep_jira_123",
+                    callbackUrl:
+                      "https://control-plane.example.com/v1/integration/webhooks/jira-default/ep_jira_123",
+                    remoteRegistrationId: "10001",
+                    status: "active",
+                    providerMetadata: {},
+                    createdAt: "2026-04-03T00:00:00.000Z",
+                    updatedAt: "2026-04-03T00:00:00.000Z",
+                  },
+                ],
+                loadErrorMessage: null,
+                revealedWebhookSecret: "whsec_jira_123",
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    expect(screen.getByText("Webhooks")).toBeTruthy();
+    expect(screen.getByText("Primary Jira webhook")).toBeTruthy();
+    expect(screen.getByText("whsec_jira_123")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create webhook" }));
+    expect(createdConnectionId).toBe("icn_jira_primary");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete webhook source Primary Jira webhook" }),
+    );
+    expect(deletedWebhookSource).toEqual({
+      connectionId: "icn_jira_primary",
+      webhookSourceId: "iws_jira_123",
+    });
+  });
+
+  it("does not show delete for implicit webhook sources", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "GitHub Production",
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [],
+          },
+        ]}
+        showWebhookSources={true}
+        webhookSourceStateByConnectionId={
+          new Map([
+            [
+              "icn_github_primary",
+              {
+                createErrorMessage: null,
+                deleteErrorMessage: null,
+                deletingWebhookSourceId: null,
+                isCreating: false,
+                isLoading: false,
+                items: [
+                  {
+                    id: "iws_github_123",
+                    targetKey: "github-cloud",
+                    ownerScope: "connection",
+                    integrationConnectionId: "icn_github_primary",
+                    displayName: "GitHub App webhook",
+                    callbackUrl:
+                      "https://control-plane.example.com/v1/integration/webhooks/github-cloud",
+                    status: "active",
+                    providerMetadata: {},
+                    createdAt: "2026-04-03T00:00:00.000Z",
+                    updatedAt: "2026-04-03T00:00:00.000Z",
+                  },
+                ],
+                loadErrorMessage: null,
+                revealedWebhookSecret: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Delete webhook source GitHub App webhook" }),
+    ).toBeNull();
+  });
 });
