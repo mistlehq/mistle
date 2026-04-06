@@ -24,7 +24,7 @@ const SANDBOX_BASE_CACHE_KEY_PATH = resolve(SANDBOX_BASE_CACHE_DIR, ".cache-key"
 
 const SANDBOX_BASE_BUILD_INPUT_PATHS: readonly string[] = [
   "packages/sandboxd",
-  "apps/sandbox-runtime/scripts/cmddir",
+  "packages/sandboxd/scripts/cmddir",
   ".dockerignore",
   SANDBOX_BASE_DOCKERFILE_PATH,
 ];

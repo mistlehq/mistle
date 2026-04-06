@@ -110,7 +110,7 @@ export function createSandboxTelemetryIngressSink(input: {
     clock: input.clock,
     gatewayNodeId: input.gatewayNodeId,
     logForwarder: createOtlpLogForwarder({
-      serviceName: "@mistle/sandbox-runtime",
+      serviceName: "@mistle/sandboxd",
       resourceAttributes: joinResourceAttributes(
         input.telemetry.resourceAttributes,
         "mistle.telemetry.ingest=gateway-tunnel",
