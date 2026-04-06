@@ -5,6 +5,7 @@ import type { S3CompatibleObjectStore } from "@mistle/object-store";
 import { eq } from "drizzle-orm";
 import { typeid } from "typeid-js";
 
+import { deleteObjectBestEffort } from "./delete-object-best-effort.js";
 import { normalizeProfileImage } from "./normalize-profile-image.js";
 
 export type PutOrganizationLogoContext = {
@@ -69,9 +70,10 @@ export async function putOrganizationLogo(
       });
     [updatedOrganization] = updatedOrganizations;
   } catch (error) {
-    await deleteObjectIgnoringFailure({
+    await deleteObjectBestEffort({
       objectStore: ctx.objectStore,
       objectKey: logoObjectKey,
+      subject: "organization_logo",
     });
     throw error;
   }
@@ -85,9 +87,10 @@ export async function putOrganizationLogo(
     existingOrganization.logoObjectKey.length > 0 &&
     existingOrganization.logoObjectKey !== updatedOrganization.logoObjectKey
   ) {
-    await deleteObjectIgnoringFailure({
+    await deleteObjectBestEffort({
       objectStore: ctx.objectStore,
       objectKey: existingOrganization.logoObjectKey,
+      subject: "organization_logo",
     });
   }
 
@@ -99,16 +102,4 @@ export async function putOrganizationLogo(
 
 function createOrganizationLogoObjectKey(organizationId: string): string {
   return `logos/organizations/${organizationId}/${typeid("img").toString()}.webp`;
-}
-
-async function deleteObjectIgnoringFailure(input: {
-  objectStore: S3CompatibleObjectStore;
-  objectKey: string;
-}): Promise<void> {
-  try {
-    // Replacement uploads are already durable; cleanup failure must not roll them back.
-    await input.objectStore.deleteObject(input.objectKey);
-  } catch (error) {
-    void error;
-  }
 }
