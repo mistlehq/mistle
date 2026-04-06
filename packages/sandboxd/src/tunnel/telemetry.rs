@@ -213,18 +213,23 @@ impl TelemetryRelay {
                 &line,
             )
             .map_err(|error| TelemetryRelayError::new(error.to_string()))?;
-            socket.send(Message::Binary(encoded.into())).map_err(|error| {
-                TelemetryRelayError::new(format!(
-                    "failed to write telemetry binary frame: {error}"
-                ))
-            })?;
+            socket
+                .send(Message::Binary(encoded.into()))
+                .map_err(|error| {
+                    TelemetryRelayError::new(format!(
+                        "failed to write telemetry binary frame: {error}"
+                    ))
+                })?;
         }
 
         Ok(())
     }
 }
 
-fn write_text_frame<S>(socket: &mut WebSocket<S>, payload: String) -> Result<(), TelemetryRelayError>
+fn write_text_frame<S>(
+    socket: &mut WebSocket<S>,
+    payload: String,
+) -> Result<(), TelemetryRelayError>
 where
     S: io::Read + io::Write,
 {
@@ -234,9 +239,7 @@ where
 }
 
 /// Decodes one telemetry data frame routed back from the tunnel.
-pub fn decode_telemetry_data_frame(
-    payload: &[u8],
-) -> Result<Vec<u8>, TelemetryRelayError> {
+pub fn decode_telemetry_data_frame(payload: &[u8]) -> Result<Vec<u8>, TelemetryRelayError> {
     let frame = decode_stream_data_frame(payload)
         .map_err(|error| TelemetryRelayError::new(error.to_string()))?;
     if frame.stream_id != SANDBOX_TELEMETRY_LOG_STREAM_ID {

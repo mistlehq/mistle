@@ -145,12 +145,9 @@ fn supports_attach_streams_and_detaches_secondary_close() {
         ))
         .expect("client should send resize signal");
 
-    let encoded_input = sandboxd::tunnel::protocol::encode_stream_data_frame(
-        2,
-        PAYLOAD_KIND_RAW_BYTES,
-        b"hello\n",
-    )
-        .expect("input frame should encode");
+    let encoded_input =
+        sandboxd::tunnel::protocol::encode_stream_data_frame(2, PAYLOAD_KIND_RAW_BYTES, b"hello\n")
+            .expect("input frame should encode");
     client_socket
         .send(Message::Binary(encoded_input.into()))
         .expect("client should send PTY stdin bytes");
@@ -181,12 +178,9 @@ fn supports_attach_streams_and_detaches_secondary_close() {
         ))
         .expect("client should close the attached stream");
 
-    let encoded_primary_input = sandboxd::tunnel::protocol::encode_stream_data_frame(
-        1,
-        PAYLOAD_KIND_RAW_BYTES,
-        b"bye\n",
-    )
-        .expect("primary input frame should encode");
+    let encoded_primary_input =
+        sandboxd::tunnel::protocol::encode_stream_data_frame(1, PAYLOAD_KIND_RAW_BYTES, b"bye\n")
+            .expect("primary input frame should encode");
     client_socket
         .send(Message::Binary(encoded_primary_input.into()))
         .expect("client should send bytes through the primary stream");

@@ -60,10 +60,7 @@ impl std::error::Error for FileUploadError {}
 
 enum FileUploadValidationError {
     Internal(FileUploadError),
-    Reset {
-        code: &'static str,
-        message: String,
-    },
+    Reset { code: &'static str, message: String },
 }
 
 /// Starts one file-upload relay from an initial `stream.open` payload.
@@ -115,8 +112,8 @@ pub fn relay_file_upload_stream(
         clock.now_ms(),
         UPLOAD_ID_COUNTER.fetch_add(1, Ordering::Relaxed)
     );
-    let extension = resolve_image_extension(&open_message.channel.mime_type)
-        .map_err(FileUploadError::new)?;
+    let extension =
+        resolve_image_extension(&open_message.channel.mime_type).map_err(FileUploadError::new)?;
     let temp_path = thread_directory_path.join(format!(".{attachment_id}.part"));
     let final_path = thread_directory_path.join(format!("{attachment_id}.{extension}"));
     let mut file = OpenOptions::new()
@@ -287,8 +284,11 @@ fn run_upload_loop(
                         temp_path.display()
                     ))
                 })?;
-                match validate_uploaded_image(&open_message.channel.mime_type, temp_path, final_path)
-                {
+                match validate_uploaded_image(
+                    &open_message.channel.mime_type,
+                    temp_path,
+                    final_path,
+                ) {
                     Ok(()) => {}
                     Err(FileUploadValidationError::Internal(error)) => {
                         return Err(error);
@@ -450,7 +450,8 @@ fn detect_supported_image_mime_type(bytes: &[u8]) -> Option<&'static str> {
     if matches_signature(bytes, 0, JPEG_SIGNATURE) {
         return Some("image/jpeg");
     }
-    if matches_signature(bytes, 0, GIF87A_SIGNATURE) || matches_signature(bytes, 0, GIF89A_SIGNATURE)
+    if matches_signature(bytes, 0, GIF87A_SIGNATURE)
+        || matches_signature(bytes, 0, GIF89A_SIGNATURE)
     {
         return Some("image/gif");
     }
@@ -477,6 +478,8 @@ where
     S: io::Read + io::Write,
 {
     socket.send(Message::Text(payload.into())).map_err(|error| {
-        FileUploadError::new(format!("failed to write file upload control frame: {error}"))
+        FileUploadError::new(format!(
+            "failed to write file upload control frame: {error}"
+        ))
     })
 }

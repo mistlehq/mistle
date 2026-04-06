@@ -17,9 +17,8 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::process;
 use crate::protocol::startup::StartupInput;
-use crate::runtime;
+use crate::sandboxd_state::SandboxdState;
 use crate::security;
 use crate::time::{Sleeper, SystemClock, ThreadSleeper};
 
@@ -69,9 +68,8 @@ pub enum ControlError {
     InvalidResponse(serde_json::Error),
     VerifyPeer(String),
     InitRejected(String),
-    ApplyRuntimePlan(String),
-    StartProcessManager(String),
-    StopProcessManager(String),
+    InitializeSandboxdState(String),
+    CloseSandboxdState(String),
     SerializeResponse(serde_json::Error),
     WriteResponse(std::io::Error),
     ResponseError(String),
@@ -140,12 +138,11 @@ impl fmt::Display for ControlError {
                 write!(f, "control socket peer verification failed: {error}")
             }
             Self::InitRejected(error) => write!(f, "sandbox init request was rejected: {error}"),
-            Self::ApplyRuntimePlan(error) => write!(f, "failed to apply startup input: {error}"),
-            Self::StartProcessManager(error) => {
-                write!(f, "failed to start runtime client processes: {error}")
+            Self::InitializeSandboxdState(error) => {
+                write!(f, "failed to initialize sandboxd state: {error}")
             }
-            Self::StopProcessManager(error) => {
-                write!(f, "failed to stop runtime client processes: {error}")
+            Self::CloseSandboxdState(error) => {
+                write!(f, "failed to close sandboxd state: {error}")
             }
             Self::SerializeResponse(error) => {
                 write!(f, "failed to serialize control socket response: {error}")
@@ -187,11 +184,10 @@ struct ControlResponse {
 }
 
 /// Tracks observable daemon state for tests and daemon lifecycle control.
-#[derive(Debug)]
 struct ControlServerState {
     init_phase: InitPhase,
     startup_input: Option<StartupInput>,
-    process_manager: Option<process::RuntimeClientProcessManager>,
+    sandboxd_state: Option<SandboxdState>,
 }
 
 type InitThread = JoinHandle<Result<(), ControlError>>;
@@ -239,7 +235,7 @@ impl ControlServer {
             Err(_) => Err(ControlError::ServerPanicked),
         };
         let init_result = join_init_thread(&self.init_thread);
-        let stop_result = stop_managed_processes(&self.state);
+        let stop_result = close_sandboxd_state(&self.state);
 
         thread_result?;
         init_result?;
@@ -257,7 +253,7 @@ impl ControlServer {
             Err(_) => Err(ControlError::ServerPanicked),
         };
         let init_result = join_init_thread(&self.init_thread);
-        let stop_result = stop_managed_processes(&self.state);
+        let stop_result = close_sandboxd_state(&self.state);
 
         thread_result?;
         init_result?;
@@ -299,7 +295,7 @@ where
     let state = Arc::new(Mutex::new(ControlServerState {
         init_phase: InitPhase::Uninitialized,
         startup_input: None,
-        process_manager: None,
+        sandboxd_state: None,
     }));
     let init_thread: SharedInitThread = Arc::new(Mutex::new(None));
     let (shutdown_sender, shutdown_receiver) = mpsc::channel::<()>();
@@ -470,49 +466,32 @@ fn begin_init(
 
     let state_for_thread = state.clone();
     *init_thread_guard = Some(thread::spawn(move || {
-        initialize_daemon(startup_input, &state_for_thread)
+        let result = SandboxdState::initialize(
+            &startup_input,
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        );
+
+        match result {
+            Ok(sandboxd_state) => {
+                let mut state_guard = state_for_thread
+                    .lock()
+                    .expect("control server state lock should not be poisoned");
+                state_guard.sandboxd_state = Some(sandboxd_state);
+                state_guard.init_phase = InitPhase::Initialized;
+                Ok(())
+            }
+            Err(error) => {
+                let error_text = error.to_string();
+                state_for_thread
+                    .lock()
+                    .expect("control server state lock should not be poisoned")
+                    .init_phase = InitPhase::Failed(error_text.clone());
+                Err(ControlError::InitializeSandboxdState(error_text))
+            }
+        }
     }));
     Ok(())
-}
-
-fn initialize_daemon(
-    startup_input: StartupInput,
-    state: &Arc<Mutex<ControlServerState>>,
-) -> Result<(), ControlError> {
-    let result = initialize_daemon_inner(&startup_input).map(|process_manager| {
-        let mut state_guard = state
-            .lock()
-            .expect("control server state lock should not be poisoned");
-        state_guard.process_manager = process_manager;
-        state_guard.init_phase = InitPhase::Initialized;
-    });
-
-    if let Err(error) = &result {
-        state
-            .lock()
-            .expect("control server state lock should not be poisoned")
-            .init_phase = InitPhase::Failed(error.to_string());
-    }
-
-    result
-}
-
-fn initialize_daemon_inner(
-    startup_input: &StartupInput,
-) -> Result<Option<process::RuntimeClientProcessManager>, ControlError> {
-    runtime::apply_runtime_plan(startup_input)
-        .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
-    let runtime_plan: runtime::CompiledRuntimePlan =
-        serde_json::from_value(startup_input.runtime_plan.clone())
-            .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
-    let process_specs = process::flatten_runtime_client_processes(&runtime_plan.runtime_clients);
-    if process_specs.is_empty() {
-        return Ok(None);
-    }
-
-    process::start_runtime_client_process_manager(&process_specs, &SystemClock, &ThreadSleeper)
-        .map(Some)
-        .map_err(|error| ControlError::StartProcessManager(error.to_string()))
 }
 
 fn join_init_thread(init_thread: &SharedInitThread) -> Result<(), ControlError> {
@@ -530,21 +509,19 @@ fn join_init_thread(init_thread: &SharedInitThread) -> Result<(), ControlError> 
     }
 }
 
-fn take_process_manager(
-    state: &Arc<Mutex<ControlServerState>>,
-) -> Option<process::RuntimeClientProcessManager> {
+fn take_sandboxd_state(state: &Arc<Mutex<ControlServerState>>) -> Option<SandboxdState> {
     state
         .lock()
         .expect("control server state lock should not be poisoned")
-        .process_manager
+        .sandboxd_state
         .take()
 }
 
-fn stop_managed_processes(state: &Arc<Mutex<ControlServerState>>) -> Result<(), ControlError> {
-    take_process_manager(state)
-        .map(|process_manager| process_manager.stop(&SystemClock, &ThreadSleeper))
+fn close_sandboxd_state(state: &Arc<Mutex<ControlServerState>>) -> Result<(), ControlError> {
+    take_sandboxd_state(state)
+        .map(SandboxdState::close)
         .transpose()
-        .map_err(|error| ControlError::StopProcessManager(error.to_string()))?;
+        .map_err(|error| ControlError::CloseSandboxdState(error.to_string()))?;
     Ok(())
 }
 
@@ -571,8 +548,13 @@ fn remove_stale_socket(socket_path: &Path) -> Result<(), ControlError> {
 
 #[cfg(test)]
 mod tests {
+    use std::net::TcpListener;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::mpsc;
+    use std::thread;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    use tungstenite::{Message, accept};
 
     use crate::control::{
         DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, InitPhase, start_control_server, submit_init,
@@ -587,7 +569,8 @@ mod tests {
     fn accepts_one_init_request_from_the_control_socket() {
         let test_dir = create_temp_test_dir("control_init");
         let socket_path = test_dir.join("control.sock");
-        let startup_input = valid_startup_input("bootstrap-token-value");
+        let gateway = start_bootstrap_gateway();
+        let startup_input = valid_startup_input("bootstrap-token-value", &gateway.ws_url);
         let server = start_control_server(
             &socket_path,
             ThreadSleeper,
@@ -601,6 +584,9 @@ mod tests {
         assert_eq!(server.startup_input(), Some(startup_input));
 
         server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
@@ -608,7 +594,8 @@ mod tests {
     fn rejects_second_init_requests_after_initialization_begins() {
         let test_dir = create_temp_test_dir("control_second_init");
         let socket_path = test_dir.join("control.sock");
-        let startup_input = valid_startup_input("bootstrap-token-value");
+        let gateway = start_bootstrap_gateway();
+        let startup_input = valid_startup_input("bootstrap-token-value", &gateway.ws_url);
         let server = start_control_server(
             &socket_path,
             ThreadSleeper,
@@ -629,6 +616,9 @@ mod tests {
         );
 
         server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
@@ -669,12 +659,12 @@ mod tests {
         panic!("timed out waiting for init phase");
     }
 
-    fn valid_startup_input(bootstrap_token: &str) -> StartupInput {
+    fn valid_startup_input(bootstrap_token: &str, tunnel_gateway_ws_url: &str) -> StartupInput {
         StartupInput {
             startup_mode: StartupMode::New,
             bootstrap_token: bootstrap_token.to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
-            tunnel_gateway_ws_url: "wss://gateway.example.test".to_string(),
+            tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -708,5 +698,80 @@ mod tests {
         std::fs::create_dir_all(&path).expect("temp test dir should be creatable");
 
         path
+    }
+
+    struct BootstrapGateway {
+        ws_url: String,
+        shutdown_sender: mpsc::Sender<()>,
+        thread: Option<thread::JoinHandle<()>>,
+    }
+
+    impl BootstrapGateway {
+        fn close(mut self) -> Result<(), String> {
+            let _ = self.shutdown_sender.send(());
+            let thread = self
+                .thread
+                .take()
+                .expect("bootstrap gateway thread should exist");
+            thread
+                .join()
+                .map_err(|_| "bootstrap gateway thread panicked".to_string())
+        }
+    }
+
+    fn start_bootstrap_gateway() -> BootstrapGateway {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bootstrap gateway should bind");
+        listener
+            .set_nonblocking(true)
+            .expect("bootstrap gateway listener should become nonblocking");
+        let ws_url = format!(
+            "ws://127.0.0.1:{}/bootstrap",
+            listener
+                .local_addr()
+                .expect("bootstrap gateway should expose its address")
+                .port()
+        );
+        let (shutdown_sender, shutdown_receiver) = mpsc::channel();
+
+        let thread = thread::spawn(move || {
+            loop {
+                if shutdown_receiver.try_recv().is_ok() {
+                    return;
+                }
+
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        stream
+                            .set_nonblocking(false)
+                            .expect("bootstrap gateway stream should become blocking");
+                        let mut websocket =
+                            accept(stream).expect("bootstrap gateway handshake should succeed");
+                        loop {
+                            match websocket
+                                .read()
+                                .expect("bootstrap gateway should read frames")
+                            {
+                                Message::Close(_) => return,
+                                Message::Text(_)
+                                | Message::Binary(_)
+                                | Message::Ping(_)
+                                | Message::Pong(_)
+                                | Message::Frame(_) => {}
+                            }
+                        }
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        ThreadSleeper.sleep(Duration::from_millis(10));
+                    }
+                    Err(error) => panic!("bootstrap gateway accept should succeed: {error}"),
+                }
+            }
+        });
+
+        BootstrapGateway {
+            ws_url,
+            shutdown_sender,
+            thread: Some(thread),
+        }
     }
 }

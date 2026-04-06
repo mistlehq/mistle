@@ -21,6 +21,7 @@ pub mod protocol;
 pub mod proxy_ca;
 pub mod pty;
 pub mod runtime;
+pub mod sandboxd_state;
 pub mod security;
 pub mod time;
 pub mod tunnel;

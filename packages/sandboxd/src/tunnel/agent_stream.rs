@@ -114,9 +114,13 @@ pub fn relay_agent_stream(
                         payload.as_bytes(),
                     )
                     .map_err(|error| AgentStreamError::new(error.to_string()))?;
-                    socket.send(Message::Binary(encoded.into())).map_err(|error| {
-                        AgentStreamError::new(format!("failed to write agent binary frame: {error}"))
-                    })?;
+                    socket
+                        .send(Message::Binary(encoded.into()))
+                        .map_err(|error| {
+                            AgentStreamError::new(format!(
+                                "failed to write agent binary frame: {error}"
+                            ))
+                        })?;
                 }
                 Ok(Message::Binary(payload)) => {
                     if !send_window.try_consume(payload.len()) {
@@ -137,9 +141,13 @@ pub fn relay_agent_stream(
                         payload.as_ref(),
                     )
                     .map_err(|error| AgentStreamError::new(error.to_string()))?;
-                    socket.send(Message::Binary(encoded.into())).map_err(|error| {
-                        AgentStreamError::new(format!("failed to write agent binary frame: {error}"))
-                    })?;
+                    socket
+                        .send(Message::Binary(encoded.into()))
+                        .map_err(|error| {
+                            AgentStreamError::new(format!(
+                                "failed to write agent binary frame: {error}"
+                            ))
+                        })?;
                 }
                 Ok(Message::Close(_)) | Err(WebSocketError::ConnectionClosed) => {
                     return Ok(());
@@ -335,7 +343,9 @@ fn set_agent_socket_nonblocking(
 ) -> Result<(), AgentStreamError> {
     match socket.get_mut() {
         MaybeTlsStream::Plain(stream) => stream.set_nonblocking(true).map_err(|error| {
-            AgentStreamError::new(format!("failed to configure agent endpoint socket: {error}"))
+            AgentStreamError::new(format!(
+                "failed to configure agent endpoint socket: {error}"
+            ))
         }),
         _ => Err(AgentStreamError::new(
             "agent relay only supports ws runtime endpoints",

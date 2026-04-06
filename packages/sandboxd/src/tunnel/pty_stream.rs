@@ -199,7 +199,7 @@ pub fn relay_pty_stream(
 
                         let encoded =
                             encode_stream_data_frame(stream_id, PAYLOAD_KIND_RAW_BYTES, &chunk)
-                            .map_err(|error| PtyStreamError::new(error.to_string()))?;
+                                .map_err(|error| PtyStreamError::new(error.to_string()))?;
                         socket
                             .send(Message::Binary(encoded.into()))
                             .map_err(|error| {

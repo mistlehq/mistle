@@ -118,12 +118,17 @@ where
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::net::TcpListener;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::mpsc;
+    use std::thread;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    use tungstenite::{Message, accept};
+
     use crate::control;
-    use crate::protocol::startup::{StartupInitResponse, StartupMode};
-    use crate::time::ThreadSleeper;
+    use crate::protocol::startup::{StartupInitResponse, StartupInput, StartupMode};
+    use crate::time::{Sleeper, ThreadSleeper};
 
     use crate::init::run_init;
 
@@ -131,10 +136,11 @@ mod tests {
 
     #[test]
     fn submits_startup_input_and_writes_ok_response() {
-        let request =
-            include_str!("../../sandbox-runtime-contract/tests/fixtures/startup-input.valid.json");
         let test_dir = create_temp_test_dir("init_ok");
         let control_socket_path = test_dir.join("control.sock");
+        let gateway = start_bootstrap_gateway();
+        let request = serde_json::to_string(&valid_startup_input(&gateway.ws_url))
+            .expect("startup input should serialize");
         let mut stdout = Vec::new();
         let server = control::start_control_server(
             &control_socket_path,
@@ -162,6 +168,9 @@ mod tests {
         );
 
         server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
         fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
@@ -202,5 +211,103 @@ mod tests {
         fs::create_dir_all(&path).expect("temp test dir should be creatable");
 
         path
+    }
+
+    fn valid_startup_input(tunnel_gateway_ws_url: &str) -> StartupInput {
+        StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "registry.example.test/base:latest"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: std::collections::BTreeMap::new(),
+        }
+    }
+
+    struct BootstrapGateway {
+        ws_url: String,
+        shutdown_sender: mpsc::Sender<()>,
+        thread: Option<thread::JoinHandle<()>>,
+    }
+
+    impl BootstrapGateway {
+        fn close(mut self) -> Result<(), String> {
+            let _ = self.shutdown_sender.send(());
+            let thread = self
+                .thread
+                .take()
+                .expect("bootstrap gateway thread should exist");
+            thread
+                .join()
+                .map_err(|_| "bootstrap gateway thread panicked".to_string())
+        }
+    }
+
+    fn start_bootstrap_gateway() -> BootstrapGateway {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bootstrap gateway should bind");
+        listener
+            .set_nonblocking(true)
+            .expect("bootstrap gateway listener should become nonblocking");
+        let ws_url = format!(
+            "ws://127.0.0.1:{}/bootstrap",
+            listener
+                .local_addr()
+                .expect("bootstrap gateway should expose its address")
+                .port()
+        );
+        let (shutdown_sender, shutdown_receiver) = mpsc::channel();
+
+        let thread = thread::spawn(move || {
+            loop {
+                if shutdown_receiver.try_recv().is_ok() {
+                    return;
+                }
+
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        stream
+                            .set_nonblocking(false)
+                            .expect("bootstrap gateway stream should become blocking");
+                        let mut websocket =
+                            accept(stream).expect("bootstrap gateway handshake should succeed");
+                        loop {
+                            match websocket
+                                .read()
+                                .expect("bootstrap gateway should read frames")
+                            {
+                                Message::Close(_) => return,
+                                Message::Text(_)
+                                | Message::Binary(_)
+                                | Message::Ping(_)
+                                | Message::Pong(_)
+                                | Message::Frame(_) => {}
+                            }
+                        }
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        ThreadSleeper.sleep(std::time::Duration::from_millis(10));
+                    }
+                    Err(error) => panic!("bootstrap gateway accept should succeed: {error}"),
+                }
+            }
+        });
+
+        BootstrapGateway {
+            ws_url,
+            shutdown_sender,
+            thread: Some(thread),
+        }
     }
 }

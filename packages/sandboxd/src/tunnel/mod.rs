@@ -16,6 +16,7 @@ pub mod agent_stream;
 pub mod file_upload;
 pub mod protocol;
 pub mod pty_stream;
+pub mod session;
 pub mod telemetry;
 
 /// Describes why bootstrap tunnel setup or shutdown failed.
@@ -53,8 +54,23 @@ impl BootstrapTunnel {
         &self.connected_url
     }
 
+    /// Sends one text control frame over the bootstrap websocket.
+    pub fn send_text(&mut self, payload: &str) -> Result<(), TunnelError> {
+        let Some(socket) = self.socket.as_mut() else {
+            return Err(TunnelError::new("bootstrap tunnel is already closed"));
+        };
+
+        socket
+            .send(Message::Text(payload.to_string().into()))
+            .map_err(|error| {
+                TunnelError::new(format!(
+                    "failed to write bootstrap tunnel text frame: {error}"
+                ))
+            })
+    }
+
     /// Sends a websocket close frame and closes the underlying socket.
-    pub fn close(mut self) -> Result<(), TunnelError> {
+    pub fn close(&mut self) -> Result<(), TunnelError> {
         let Some(mut socket) = self.socket.take() else {
             return Ok(());
         };
