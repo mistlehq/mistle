@@ -17,6 +17,8 @@ type OtpStepFormProps = {
 };
 
 export function OtpStepForm(props: OtpStepFormProps): React.JSX.Element {
+  const otpSlotClassName = "h-12 min-w-0 flex-1 text-base tabular-nums sm:h-14 sm:text-lg";
+
   return (
     <form className="gap-4 flex flex-col" onSubmit={(event) => void props.onSubmit(event)}>
       <div className="gap-2 flex flex-col">
@@ -42,30 +44,9 @@ export function OtpStepForm(props: OtpStepFormProps): React.JSX.Element {
           value={props.otp}
         >
           <InputOTPGroup className="w-full">
-            <InputOTPSlot
-              className="h-12 min-w-0 flex-1 text-base tabular-nums sm:h-14 sm:text-lg"
-              index={0}
-            />
-            <InputOTPSlot
-              className="h-12 min-w-0 flex-1 text-base tabular-nums sm:h-14 sm:text-lg"
-              index={1}
-            />
-            <InputOTPSlot
-              className="h-12 min-w-0 flex-1 text-base tabular-nums sm:h-14 sm:text-lg"
-              index={2}
-            />
-            <InputOTPSlot
-              className="h-12 min-w-0 flex-1 text-base tabular-nums sm:h-14 sm:text-lg"
-              index={3}
-            />
-            <InputOTPSlot
-              className="h-12 min-w-0 flex-1 text-base tabular-nums sm:h-14 sm:text-lg"
-              index={4}
-            />
-            <InputOTPSlot
-              className="h-12 min-w-0 flex-1 text-base tabular-nums sm:h-14 sm:text-lg"
-              index={5}
-            />
+            {Array.from({ length: 6 }, (_, index) => (
+              <InputOTPSlot className={otpSlotClassName} index={index} key={index} />
+            ))}
           </InputOTPGroup>
         </InputOTP>
       </div>
