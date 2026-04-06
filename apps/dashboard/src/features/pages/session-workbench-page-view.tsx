@@ -52,7 +52,9 @@ export function SessionWorkbenchPageView({
   const hasPrimaryBottomPanel =
     primaryBottomPanel !== null && primaryBottomPanel !== undefined && primaryBottomPanel !== false;
   const mainContentContainerClassName =
-    mainContentLayout.width === "full" ? "h-full w-full" : "mx-auto w-full max-w-3xl px-4 pb-4";
+    mainContentLayout.width === "full"
+      ? "h-full w-full"
+      : "mx-auto w-full max-w-3xl pr-2 pb-4 md:px-4";
   const mainContentRegionClassName =
     mainContentLayout.scroll === "contained"
       ? "min-h-0 flex-1 overflow-hidden"
