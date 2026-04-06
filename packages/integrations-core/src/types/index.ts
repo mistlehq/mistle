@@ -1092,11 +1092,21 @@ export type IntegrationWebhookEventParameterOptionDefinition = {
   label: string;
 };
 
+/**
+ * Metadata shown to users when configuring webhook automations.
+ *
+ * `path` is the JSON path within the provider payload that the UI should
+ * surface as useful context for previewing or filtering the event.
+ */
 export type IntegrationWebhookPayloadReference = {
   path: ReadonlyArray<string>;
   description: string;
 };
 
+/**
+ * Provider-defined filter controls that the dashboard can render for a
+ * supported webhook event.
+ */
 export type IntegrationWebhookEventParameterDefinition =
   | {
       id: string;
@@ -1130,10 +1140,25 @@ export type IntegrationWebhookEventParameterDefinition =
       placeholder?: string | undefined;
     };
 
+/**
+ * A normalized webhook event that an integration exposes to the rest of
+ * Mistle. These definitions drive automation event pickers, payload previews,
+ * conversation-key selection, and provider-specific trigger parameter UIs.
+ */
 export type IntegrationWebhookEventDefinition = {
+  /**
+   * Canonical Mistle event type stored on webhook automations and emitted by
+   * webhook handlers, for example `github.issue_comment.created`.
+   */
   eventType: string;
+  /**
+   * Raw provider event discriminator used during ingest or registration, for
+   * example GitHub's `issue_comment` or Jira's `jira:issue_updated`.
+   */
   providerEventType: string;
+  /** Human-readable label shown in automation UIs. */
   displayName: string;
+  /** Optional top-level UI category for grouping related events. */
   category?: string | undefined;
   payloadReferences?: ReadonlyArray<IntegrationWebhookPayloadReference> | undefined;
   conversationKeyOptions?:
@@ -1147,6 +1172,15 @@ export type IntegrationWebhookEventDefinition = {
   parameters?: ReadonlyArray<IntegrationWebhookEventParameterDefinition> | undefined;
 };
 
+/**
+ * Declares which persisted object owns a webhook source row.
+ *
+ * `target` sources are shared across all connections under a target and fit
+ * app-level webhook models such as GitHub or Slack Events API.
+ *
+ * `connection` sources belong to one integration connection and fit
+ * tenant/site/workspace-scoped webhook models such as Jira admin webhooks.
+ */
 export type IntegrationWebhookSourceOwnerScope = "target" | "connection";
 
 export const IntegrationWebhookSourceOwnerScopes: {
@@ -1157,6 +1191,15 @@ export const IntegrationWebhookSourceOwnerScopes: {
   CONNECTION: "connection",
 };
 
+/**
+ * Declares how inbound requests are matched to a webhook source row.
+ *
+ * `payload` means the source is inferred from provider identity inside the
+ * webhook body.
+ *
+ * `path` means the source is resolved from a unique key embedded in the public
+ * webhook URL path.
+ */
 export type IntegrationWebhookSourceRoutingStrategy = "payload" | "path";
 
 export const IntegrationWebhookSourceRoutingStrategies: {
@@ -1167,6 +1210,15 @@ export const IntegrationWebhookSourceRoutingStrategies: {
   PATH: "path",
 };
 
+/**
+ * Describes who creates and tears down the provider-side registration.
+ *
+ * `implicit` means no per-source provider API lifecycle is required at runtime.
+ * The source still exists locally as the canonical source-of-truth record.
+ *
+ * `managed` means control-plane is expected to create/update/delete the remote
+ * provider registration through the integration definition hooks below.
+ */
 export type IntegrationWebhookSourceLifecycle = "implicit" | "managed";
 
 export const IntegrationWebhookSourceLifecycles: {
@@ -1177,24 +1229,49 @@ export const IntegrationWebhookSourceLifecycles: {
   MANAGED: "managed",
 };
 
+/**
+ * Provider-rendered description of a webhook source as it should appear in the
+ * dashboard or APIs. This is the display-facing view of a persisted source row.
+ */
 export type IntegrationWebhookSourceDescriptor = {
+  /** User-facing source name, for example "GitHub App webhook". */
   displayName: string;
+  /** Public callback URL that the provider is expected to call, if applicable. */
   callbackUrl?: string | undefined;
+  /** Provider-specific metadata that higher layers may expose for debugging/UI. */
   providerMetadata: Record<string, unknown>;
 };
 
+/**
+ * Persisted local source-of-truth record for one inbound webhook source.
+ *
+ * This record exists regardless of whether the provider uses implicit
+ * app-managed webhooks or explicit managed registrations.
+ */
 export type IntegrationWebhookSource = {
   id: string;
+  /** Integration target that owns the source. */
   targetKey: string;
+  /** Whether the source belongs to the target or a single connection. */
   ownerScope: IntegrationWebhookSourceOwnerScope;
+  /** Organization that owns the source when it is scoped below the target. */
   organizationId?: string | undefined;
+  /** Connection owner for `connection`-scoped sources. */
   integrationConnectionId?: string | undefined;
+  /** Optional persisted display name override chosen by Mistle or the provider. */
   displayName?: string | undefined;
+  /** Unique public path token used by `path` routing strategies. */
   endpointKey?: string | undefined;
+  /** Remote provider registration identifier when the provider returns one. */
   remoteRegistrationId?: string | undefined;
+  /** Provider-specific persisted reconciliation state. */
   providerMetadata: Record<string, unknown>;
 };
 
+/**
+ * Context supplied to `describeSource`, which converts a persisted source row
+ * into a UI/API descriptor.
+ */
 export type IntegrationWebhookSourceDescribeInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -1211,6 +1288,13 @@ export type IntegrationWebhookSourceDescribeInput<
   source: IntegrationWebhookSource;
 };
 
+/**
+ * Shared input for managed provider registration hooks.
+ *
+ * The control-plane service owns local persistence, secret generation, and
+ * dependency checks. These hooks are only responsible for provider-side
+ * registration lifecycle work.
+ */
 export type IntegrationWebhookSourceRegistrationInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -1225,25 +1309,43 @@ export type IntegrationWebhookSourceRegistrationInput<
       })
     | undefined;
   source: IntegrationWebhookSource;
+  /** Decrypted webhook secret to register with the provider when required. */
   webhookSecret?: string | undefined;
 };
 
+/**
+ * Provider-side reconciliation data returned from create/update registration
+ * hooks. Local persistence is handled by control-plane after the hook returns.
+ */
 export type IntegrationWebhookSourceRegistrationResult = {
   remoteRegistrationId?: string | undefined;
   providerMetadata?: Record<string, unknown> | undefined;
 };
 
+/**
+ * Optional capability for integrations that support inbound webhook sources in
+ * addition to the existing runtime `webhookHandler`.
+ *
+ * `webhookHandler` answers "a request arrived; how do I parse and verify it?"
+ * `webhookSource` answers "what source rows exist, who owns them, and how are
+ * their provider registrations described or reconciled?"
+ */
 export type IntegrationWebhookSourceCapability<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TConnectionConfig = Record<string, unknown>,
 > = {
+  /** Persisted owner boundary for all sources of this definition. */
   ownerScope: IntegrationWebhookSourceOwnerScope;
+  /** How inbound requests should be routed to a source row. */
   routingStrategy: IntegrationWebhookSourceRoutingStrategy;
+  /** Whether provider registration is implicit or managed. */
   lifecycle: IntegrationWebhookSourceLifecycle;
+  /** Returns the UI/API-facing description of a persisted source row. */
   describeSource(
     input: IntegrationWebhookSourceDescribeInput<TTargetConfig, TTargetSecrets, TConnectionConfig>,
   ): MaybePromise<IntegrationWebhookSourceDescriptor>;
+  /** Creates the remote/provider registration for a new source when needed. */
   createRegistration?(
     input: IntegrationWebhookSourceRegistrationInput<
       TTargetConfig,
@@ -1251,6 +1353,7 @@ export type IntegrationWebhookSourceCapability<
       TConnectionConfig
     >,
   ): MaybePromise<IntegrationWebhookSourceRegistrationResult>;
+  /** Reconciles provider-side registration state for an existing source. */
   updateRegistration?(
     input: IntegrationWebhookSourceRegistrationInput<
       TTargetConfig,
@@ -1258,6 +1361,7 @@ export type IntegrationWebhookSourceCapability<
       TConnectionConfig
     >,
   ): MaybePromise<IntegrationWebhookSourceRegistrationResult>;
+  /** Tears down only the remote/provider registration for a source. */
   deleteRegistration?(
     input: IntegrationWebhookSourceRegistrationInput<
       TTargetConfig,
@@ -1330,12 +1434,21 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>
   >;
+  /**
+   * Provider-advertised webhook events that can be selected by webhook
+   * automations and emitted by `webhookHandler`.
+   */
   supportedWebhookEvents?: ReadonlyArray<IntegrationWebhookEventDefinition>;
   webhookHandler?: IntegrationWebhookHandler<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,
     Record<string, string>
   >;
+  /**
+   * Optional inbound webhook-source contract for integrations that need an
+   * explicit source-of-truth record and, optionally, provider registration
+   * lifecycle hooks.
+   */
   webhookSource?: IntegrationWebhookSourceCapability<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,
