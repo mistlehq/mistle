@@ -15,6 +15,15 @@ import { ChatSemanticGroup } from "./chat-semantic-group.js";
 
 afterEach(cleanup);
 
+function openSemanticGroup(): void {
+  const groupSummary = screen.getByText("Toggle group").closest("summary");
+  if (groupSummary === null) {
+    throw new Error("Expected a semantic group summary");
+  }
+
+  fireEvent.click(groupSummary);
+}
+
 describe("ChatSemanticGroup", () => {
   it("renders exploring groups as compact semantic steps with collapsible results", () => {
     const { container } = render(
@@ -28,10 +37,9 @@ describe("ChatSemanticGroup", () => {
 
     expect(screen.getByText("Explored")).toBeTruthy();
     expect(screen.getByText("2 reads, 1 search, 1 list")).toBeTruthy();
-    expect(screen.getByText("Search")).toBeTruthy();
-    expect(screen.getByText("semantic")).toBeTruthy();
-    expect(screen.getAllByText("Toggle results")).toHaveLength(4);
     expect(screen.getByText("Toggle group")).toBeTruthy();
+    const groupDisclosure = container.querySelector("details");
+    expect(groupDisclosure?.hasAttribute("open")).toBe(false);
     expect(container.textContent?.includes("cwd:")).toBe(false);
   });
 
@@ -61,6 +69,7 @@ describe("ChatSemanticGroup", () => {
         pendingServerRequests={[]}
       />,
     );
+    openSemanticGroup();
     const disclosureDetails = container.querySelectorAll("details").item(1);
     if (disclosureDetails === null) {
       throw new Error("Expected a semantic group item disclosure");
@@ -94,13 +103,55 @@ describe("ChatSemanticGroup", () => {
     if (groupDisclosure === null) {
       throw new Error("Expected a semantic group disclosure");
     }
-    expect(groupDisclosure.hasAttribute("open")).toBe(true);
+    expect(groupDisclosure.hasAttribute("open")).toBe(false);
 
     const groupSummary = screen.getByText("Toggle group").closest("summary");
     if (groupSummary === null) {
       throw new Error("Expected a semantic group summary");
     }
     fireEvent.click(groupSummary);
+
+    expect(groupDisclosure.hasAttribute("open")).toBe(true);
+  });
+
+  it("keeps streaming groups open and collapses them after completion", () => {
+    const streamingBlock: ChatSemanticGroupEntry = {
+      ...CodexFixtureExploringGroupEntry,
+      status: "streaming",
+      items: CodexFixtureExploringGroupEntry.items.map((item, index) =>
+        index === 0
+          ? {
+              ...item,
+              status: "streaming",
+            }
+          : item,
+      ),
+    };
+
+    const { container, rerender } = render(
+      <ChatSemanticGroup
+        block={streamingBlock}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
+
+    const groupDisclosure = container.querySelector("details");
+    if (groupDisclosure === null) {
+      throw new Error("Expected a semantic group disclosure");
+    }
+    expect(groupDisclosure.hasAttribute("open")).toBe(true);
+    expect(screen.getByText("Search")).toBeTruthy();
+
+    rerender(
+      <ChatSemanticGroup
+        block={CodexFixtureExploringGroupEntry}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
 
     expect(groupDisclosure.hasAttribute("open")).toBe(false);
   });
@@ -114,6 +165,7 @@ describe("ChatSemanticGroup", () => {
         pendingServerRequests={[]}
       />,
     );
+    openSemanticGroup();
 
     expect(screen.getByText("Updated files")).toBeTruthy();
     expect(screen.getByText("Updated")).toBeTruthy();
@@ -183,6 +235,7 @@ describe("ChatSemanticGroup", () => {
         pendingServerRequests={[]}
       />,
     );
+    openSemanticGroup();
 
     const toggleResultsButtons = screen.getAllByText("Toggle results");
     const firstToggleResultsButton = toggleResultsButtons.at(0);
@@ -214,6 +267,7 @@ describe("ChatSemanticGroup", () => {
         pendingServerRequests={[]}
       />,
     );
+    openSemanticGroup();
 
     const toggleResultsButtons = screen.getAllByText("Toggle results");
     const firstToggleResultsButton = toggleResultsButtons.at(0);

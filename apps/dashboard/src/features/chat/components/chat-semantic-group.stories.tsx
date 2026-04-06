@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { ComponentProps } from "react";
 
 import {
   CodexFixtureExploringGroupEntry,
@@ -10,19 +11,55 @@ import {
 } from "../../session-agents/codex/fixtures/chat-fixtures.js";
 import { ChatSemanticGroup } from "./chat-semantic-group.js";
 
+type ChatSemanticGroupStoryProps = ComponentProps<typeof ChatSemanticGroup> & {
+  previewState: "completed" | "active";
+};
+
+function applyPreviewState(
+  block: ChatSemanticGroupStoryProps["block"],
+  previewState: ChatSemanticGroupStoryProps["previewState"],
+): ChatSemanticGroupStoryProps["block"] {
+  if (previewState === "completed") {
+    return block;
+  }
+
+  return {
+    ...block,
+    status: "streaming",
+    items: block.items.map((item, index) =>
+      index === 0
+        ? {
+            ...item,
+            status: "streaming",
+          }
+        : item,
+    ),
+  };
+}
+
 const meta = {
   title: "Dashboard/Chat/SemanticGroup",
   component: ChatSemanticGroup,
   tags: ["autodocs"],
+  argTypes: {
+    previewState: {
+      control: "inline-radio",
+      options: ["completed", "active"],
+    },
+  },
   args: {
     isRespondingToServerRequest: false,
     onRespondToServerRequest: () => {},
     pendingServerRequests: [],
+    previewState: "completed",
   },
   parameters: {
     layout: "padded",
   },
-} satisfies Meta<typeof ChatSemanticGroup>;
+  render: ({ previewState, ...args }) => (
+    <ChatSemanticGroup {...args} block={applyPreviewState(args.block, previewState)} />
+  ),
+} satisfies Meta<ChatSemanticGroupStoryProps>;
 
 export default meta;
 

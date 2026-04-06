@@ -1,4 +1,6 @@
+import { AnimatedStatusText } from "@mistle/ui";
 import { CaretRightIcon } from "@phosphor-icons/react";
+import { useEffect, useState } from "react";
 
 import type { CodexApprovalRequestEntry } from "../../session-agents/codex/approvals/index.js";
 import type {
@@ -97,12 +99,44 @@ function getSemanticGroupDetailClassName(input: {
   return "text-muted-foreground text-xs leading-5";
 }
 
+function shouldAutoOpenSemanticGroup(input: {
+  block: ChatSemanticGroupEntry;
+  pendingServerRequests: readonly CodexApprovalRequestEntry[];
+}): boolean {
+  if (input.block.status === "streaming") {
+    return true;
+  }
+
+  return input.block.items.some((item) => {
+    if (item.status === "streaming") {
+      return true;
+    }
+
+    return (
+      (item.sourceKind === "command-execution" &&
+        findCommandApprovalRequest(input.pendingServerRequests, item.id) !== null) ||
+      (item.sourceKind === "file-change" &&
+        findFileChangeApprovalRequest(input.pendingServerRequests, item.id) !== null)
+    );
+  });
+}
+
 export function ChatSemanticGroup({
   block,
   isRespondingToServerRequest,
   onRespondToServerRequest,
   pendingServerRequests,
 }: ChatSemanticGroupProps): React.JSX.Element {
+  const autoOpen = shouldAutoOpenSemanticGroup({
+    block,
+    pendingServerRequests,
+  });
+  const [isOpen, setIsOpen] = useState(autoOpen);
+
+  useEffect(() => {
+    setIsOpen(autoOpen);
+  }, [autoOpen]);
+
   const groupSummary = getSemanticGroupSummary({
     semanticKind: block.semanticKind,
     counts: block.counts,
@@ -110,16 +144,25 @@ export function ChatSemanticGroup({
   });
 
   return (
-    <details className="group/semantic space-y-3" open>
+    <details
+      className="group/semantic space-y-3"
+      onToggle={(event) => {
+        setIsOpen(event.currentTarget.open);
+      }}
+      open={isOpen}
+    >
       <summary className="flex cursor-default list-none items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <p className="font-medium text-sm">
+            <AnimatedStatusText
+              active={block.status === "streaming"}
+              className="font-medium text-sm"
+            >
               {getSemanticGroupTitle({
                 displayKeys: block.displayKeys,
                 status: block.status,
               })}
-            </p>
+            </AnimatedStatusText>
             <span className="text-muted-foreground flex size-4 items-center justify-center">
               <span className="sr-only">Toggle group</span>
               <CaretRightIcon

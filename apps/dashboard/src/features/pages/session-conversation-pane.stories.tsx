@@ -90,6 +90,15 @@ export const UploadingImageAttachments: Story = {
   },
 };
 
+export const ExploringStatusBanner: Story = {
+  args: {
+    statusMessage: {
+      message: "Exploring",
+      variant: "default",
+    },
+  },
+};
+
 export const DisconnectedWithError: Story = {
   args: {
     composerViewModel: {

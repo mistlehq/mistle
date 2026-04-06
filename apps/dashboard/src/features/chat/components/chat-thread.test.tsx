@@ -166,11 +166,8 @@ describe("ChatThread", () => {
     );
 
     expect(screen.getByText("Explored")).toBeTruthy();
-    expect(screen.getByText("Read")).toBeTruthy();
-    expect(screen.getByText("app.ts")).toBeTruthy();
-    expect(screen.getByText("Search")).toBeTruthy();
-    expect(screen.queryByText("Show results")).toBeNull();
-    expect(screen.getAllByText("Toggle results")).toHaveLength(2);
+    const groupDisclosure = container.querySelector("details");
+    expect(groupDisclosure?.hasAttribute("open")).toBe(false);
     expect(container.textContent?.includes("cwd: /root")).toBe(false);
   });
 
