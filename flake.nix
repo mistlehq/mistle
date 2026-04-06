@@ -29,6 +29,7 @@
             pkgs.git
             pkgs.git-cliff
             pkgs.jq
+            pkgs.ripgrep
           ];
 
           shellHook = ''
