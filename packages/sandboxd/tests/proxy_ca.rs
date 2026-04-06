@@ -2,6 +2,7 @@ use std::os::fd::BorrowedFd;
 
 use nix::fcntl::{FcntlArg, FdFlag, fcntl};
 use nix::unistd::{dup, read};
+use sandboxd::time::SystemClock;
 
 fn read_all_from_prepared_fd(
     prepared: &sandboxd::proxy_ca::PreparedProxyCaRuntime,
@@ -27,8 +28,8 @@ fn read_all_from_prepared_fd(
 
 #[test]
 fn generates_a_ca_and_issues_leaf_certificates() {
-    let generated_proxy_ca =
-        sandboxd::proxy_ca::generate_proxy_ca().expect("expected proxy ca generation to succeed");
+    let generated_proxy_ca = sandboxd::proxy_ca::generate_proxy_ca(&SystemClock)
+        .expect("expected proxy ca generation to succeed");
 
     assert!(generated_proxy_ca.certificate_pem.contains("BEGIN CERTIFICATE"));
     assert!(generated_proxy_ca.private_key_pem.contains("BEGIN PRIVATE KEY"));
@@ -37,6 +38,7 @@ fn generates_a_ca_and_issues_leaf_certificates() {
         generated_proxy_ca.certificate_pem.clone(),
         generated_proxy_ca.private_key_pem.clone(),
         "api.openai.com:443".to_string(),
+        &SystemClock,
     )
     .expect("expected leaf certificate issuance to succeed");
 
@@ -53,8 +55,8 @@ fn generates_a_ca_and_issues_leaf_certificates() {
 
 #[test]
 fn prepares_proxy_ca_runtime_with_pipe_backed_fds() {
-    let generated_proxy_ca =
-        sandboxd::proxy_ca::generate_proxy_ca().expect("expected proxy ca generation to succeed");
+    let generated_proxy_ca = sandboxd::proxy_ca::generate_proxy_ca(&SystemClock)
+        .expect("expected proxy ca generation to succeed");
 
     let prepared = sandboxd::proxy_ca::prepare_proxy_ca_runtime(&generated_proxy_ca)
         .expect("expected proxy ca runtime preparation to succeed");
@@ -90,8 +92,8 @@ fn prepares_proxy_ca_runtime_with_pipe_backed_fds() {
 
 #[test]
 fn cleanup_closes_proxy_ca_runtime_fds() {
-    let generated_proxy_ca =
-        sandboxd::proxy_ca::generate_proxy_ca().expect("expected proxy ca generation to succeed");
+    let generated_proxy_ca = sandboxd::proxy_ca::generate_proxy_ca(&SystemClock)
+        .expect("expected proxy ca generation to succeed");
     let mut prepared = sandboxd::proxy_ca::prepare_proxy_ca_runtime(&generated_proxy_ca)
         .expect("expected proxy ca runtime preparation to succeed");
     prepared.cleanup();

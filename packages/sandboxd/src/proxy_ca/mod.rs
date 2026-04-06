@@ -17,7 +17,7 @@ use rcgen::{
     SanType,
 };
 
-use crate::time::{Clock, SystemClock, add_millis, subtract_millis};
+use crate::time::{Clock, add_millis, subtract_millis};
 
 const PROXY_CA_COMMON_NAME: &str = "Mistle Sandbox Proxy CA";
 const PROXY_CA_VALIDITY_MS: u64 = 24 * 60 * 60 * 1000;
@@ -155,12 +155,7 @@ fn base_proxy_ca_params(clock: &dyn Clock) -> CertificateParams {
 }
 
 /// Generates a short-lived proxy CA for one runtime supervisor instance.
-pub fn generate_proxy_ca() -> Result<GeneratedProxyCa, ProxyCaError> {
-    generate_proxy_ca_with_clock(&SystemClock)
-}
-
-/// Generates a short-lived proxy CA using the provided clock.
-fn generate_proxy_ca_with_clock(clock: &dyn Clock) -> Result<GeneratedProxyCa, ProxyCaError> {
+pub fn generate_proxy_ca(clock: &dyn Clock) -> Result<GeneratedProxyCa, ProxyCaError> {
     let key_pair = KeyPair::generate().map_err(|error| {
         ProxyCaError::new(format!("failed to generate proxy ca private key: {error}"))
     })?;
@@ -177,20 +172,6 @@ fn generate_proxy_ca_with_clock(clock: &dyn Clock) -> Result<GeneratedProxyCa, P
 
 /// Issues one proxy leaf certificate signed by the provided CA material.
 pub fn issue_proxy_leaf_certificate(
-    ca_certificate_pem: String,
-    ca_private_key_pem: String,
-    server_name: String,
-) -> Result<IssuedProxyLeafCertificate, ProxyCaError> {
-    issue_proxy_leaf_certificate_with_clock(
-        ca_certificate_pem,
-        ca_private_key_pem,
-        server_name,
-        &SystemClock,
-    )
-}
-
-/// Issues one proxy leaf certificate signed by the provided CA material and clock.
-fn issue_proxy_leaf_certificate_with_clock(
     ca_certificate_pem: String,
     ca_private_key_pem: String,
     server_name: String,

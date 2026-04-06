@@ -17,6 +17,7 @@ use nix::unistd::geteuid;
 /// Describes why one Linux-specific hardening step failed.
 #[derive(Debug)]
 pub enum SecurityError {
+    UnsupportedPlatform,
     SetNonDumpable(nix::errno::Errno),
     ReadPeerCredentials(nix::errno::Errno),
     UnexpectedPeerUid { expected_uid: u32, actual_uid: u32 },
@@ -25,6 +26,10 @@ pub enum SecurityError {
 impl fmt::Display for SecurityError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::UnsupportedPlatform => write!(
+                f,
+                "sandboxd security hardening is only supported in linux sandboxes"
+            ),
             Self::SetNonDumpable(error) => {
                 write!(f, "failed to set current process non-dumpable: {error}")
             }
@@ -50,10 +55,18 @@ pub fn apply_current_process_security() -> Result<(), SecurityError> {
     {
         // Prevent same-uid debuggers and procfs readers from inspecting this
         // supervisor or its managed child processes through dumpable state.
-        prctl::set_dumpable(false).map_err(SecurityError::SetNonDumpable)?;
+        return prctl::set_dumpable(false).map_err(SecurityError::SetNonDumpable);
     }
 
-    Ok(())
+    #[cfg(all(not(target_os = "linux"), test))]
+    {
+        Ok(())
+    }
+
+    #[cfg(all(not(target_os = "linux"), not(test)))]
+    {
+        Err(SecurityError::UnsupportedPlatform)
+    }
 }
 
 /// Rejects Unix socket peers whose effective uid does not match the current supervisor process.
@@ -74,7 +87,17 @@ pub fn ensure_unix_socket_peer_matches_current_process_uid(
                 actual_uid: credentials.uid(),
             });
         }
+
+        Ok(())
     }
 
-    Ok(())
+    #[cfg(all(not(target_os = "linux"), test))]
+    {
+        Ok(())
+    }
+
+    #[cfg(all(not(target_os = "linux"), not(test)))]
+    {
+        Err(SecurityError::UnsupportedPlatform)
+    }
 }
