@@ -13,7 +13,6 @@ import {
   resolveSelectedProfileTriggerState,
   useLoadedWebhookAutomationEditorState,
 } from "./use-webhook-automation-editor-state.js";
-import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 
 const LinearConnectionId = "conn_linear";
@@ -109,7 +108,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
             name: "Your automation",
             sandboxProfileId: "",
             enabled: true,
-            inputTemplate: DefaultWebhookAutomationInputTemplate,
+            inputTemplate: "",
             conversationKeyTemplate: "",
             triggerIds: [],
             triggerParameterValues: {},
@@ -133,7 +132,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       name: "Your automation",
       sandboxProfileId: "",
       enabled: true,
-      inputTemplate: DefaultWebhookAutomationInputTemplate,
+      inputTemplate: "",
       conversationKeyTemplate: "",
       triggerIds: [],
       triggerParameterValues: {},
@@ -276,7 +275,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
             name: "Linear automation",
             sandboxProfileId: "sbp_123",
             enabled: true,
-            inputTemplate: DefaultWebhookAutomationInputTemplate,
+            inputTemplate: "",
             conversationKeyTemplate: "",
             triggerIds: [],
             triggerParameterValues: {},
@@ -356,7 +355,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
             name: "Linear automation",
             sandboxProfileId: "sbp_123",
             enabled: true,
-            inputTemplate: DefaultWebhookAutomationInputTemplate,
+            inputTemplate: "",
             conversationKeyTemplate: "",
             triggerIds: [],
             triggerParameterValues: {},
@@ -455,7 +454,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
             name: "Existing automation",
             sandboxProfileId: "sbp_123",
             enabled: true,
-            inputTemplate: DefaultWebhookAutomationInputTemplate,
+            inputTemplate: "",
             conversationKeyTemplate: "",
             triggerIds: [firstTriggerId],
             triggerParameterValues: {
@@ -582,7 +581,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
             name: "GitHub triage",
             sandboxProfileId: "sbp_123",
             enabled: true,
-            inputTemplate: DefaultWebhookAutomationInputTemplate,
+            inputTemplate: "",
             conversationKeyTemplate: "",
             triggerIds: [],
             triggerParameterValues: {},
@@ -654,7 +653,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
             name: "Linear automation",
             sandboxProfileId: "sbp_invalid",
             enabled: true,
-            inputTemplate: DefaultWebhookAutomationInputTemplate,
+            inputTemplate: "",
             conversationKeyTemplate: "",
             triggerIds: [triggerId],
             triggerParameterValues: {},

@@ -4,3 +4,10 @@ export const DefaultWebhookAutomationInputTemplate = [
   "Event type: {{webhookEvent.eventType}}",
   "Payload: {{payload}}",
 ].join("\n");
+
+export const DefaultWebhookAutomationInputTemplatePlaceholder = [
+  "Review the webhook event.",
+  "",
+  "Event type: {{webhookEvent.eventType}}",
+  "Payload: {{payload}}",
+].join("\n");

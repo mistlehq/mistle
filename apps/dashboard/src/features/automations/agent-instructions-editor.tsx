@@ -16,6 +16,7 @@ import {
   drawSelection,
   EditorView,
   keymap,
+  placeholder,
   tooltips,
   ViewPlugin,
   type ViewUpdate as CodeMirrorViewUpdate,
@@ -38,6 +39,7 @@ type AgentInstructionsEditorProps = {
   tokens: readonly AgentInstructionsEditorToken[];
   ariaLabelledBy: string;
   onChange: (value: string) => void;
+  placeholderText?: string;
 };
 
 const TemplateTokenPattern = /\{\{([A-Za-z0-9_.]+)\}\}/g;
@@ -67,6 +69,18 @@ function supportsDrawSelection(): boolean {
   }
 
   return typeof Range.prototype.getClientRects === "function";
+}
+
+function createAgentInstructionsPlaceholder(
+  view: EditorView,
+  placeholderText: string,
+): HTMLElement {
+  const element = view.dom.ownerDocument.createElement("div");
+  element.className =
+    "m-0 whitespace-pre-wrap text-muted-foreground font-sans text-sm leading-[var(--text-sm--line-height)]";
+  element.textContent = placeholderText;
+
+  return element;
 }
 
 function createAgentInstructionsEditorTheme(): ReturnType<typeof EditorView.theme> {
@@ -251,11 +265,15 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
     () => rankAgentInstructionTokensForMatching(input.tokens),
     [input.tokens],
   );
+  const placeholderText = input.placeholderText;
 
   const extensions = useMemo(
     () => [
       history(),
       ...(supportsDrawSelection() ? [drawSelection()] : []),
+      ...(placeholderText === undefined
+        ? []
+        : [placeholder((view) => createAgentInstructionsPlaceholder(view, placeholderText))]),
       EditorState.languageData.of(() => [
         {
           closeBrackets: {
@@ -332,15 +350,20 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
         "aria-labelledby": input.ariaLabelledBy,
         "aria-invalid": input.invalid ? "true" : "false",
         "aria-multiline": "true",
+        ...(placeholderText === undefined ? {} : { "aria-placeholder": placeholderText }),
         role: "textbox",
       }),
       createAgentInstructionsEditorTheme(),
     ],
-    [input.ariaLabelledBy, input.disabled, input.invalid, rankedTokens],
+    [input.ariaLabelledBy, input.disabled, input.invalid, placeholderText, rankedTokens],
   );
 
   return (
-    <div className="relative" data-slot="agent-instructions-editor">
+    <div
+      className="relative"
+      data-editor-state={input.value.length === 0 ? "empty" : "filled"}
+      data-slot="agent-instructions-editor"
+    >
       <div
         aria-disabled={input.disabled ? "true" : "false"}
         aria-invalid={input.invalid ? "true" : "false"}

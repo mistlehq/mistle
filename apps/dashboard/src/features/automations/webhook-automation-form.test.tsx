@@ -14,7 +14,6 @@ import {
   type WebhookAutomationFormOption,
   type WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
-import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
@@ -83,19 +82,21 @@ describe("WebhookAutomationForm", () => {
     };
   }
 
-  function getResetButton(): HTMLElement {
-    const resetButton = screen.getAllByRole("button", { name: "Reset to default" }).at(-1);
-
-    if (resetButton === undefined) {
-      throw new Error("Expected reset button to be rendered.");
-    }
-
-    return resetButton;
-  }
-
   function renderForm(mode: "create" | "edit" = "create"): ReturnType<typeof render> {
     return renderFormWithOptions({
       mode,
+      values:
+        mode === "create"
+          ? {
+              ...FormValues,
+              name: "",
+              sandboxProfileId: "",
+              inputTemplate: "",
+              conversationKeyTemplate: "",
+              triggerIds: [],
+              triggerParameterValues: {},
+            }
+          : FormValues,
     });
   }
 
@@ -132,7 +133,10 @@ describe("WebhookAutomationForm", () => {
   }
 
   it("shows selected option labels in the select triggers instead of raw ids", () => {
-    renderForm();
+    renderFormWithOptions({
+      mode: "create",
+      values: buildFormValues(),
+    });
 
     expect(screen.getByText("Repo Maintainer")).toBeDefined();
     expect(screen.queryByText(GitHubConnectionId)).toBeNull();
@@ -140,7 +144,10 @@ describe("WebhookAutomationForm", () => {
   });
 
   it("shows selected trigger event labels instead of raw event types", () => {
-    renderForm();
+    renderFormWithOptions({
+      mode: "create",
+      values: buildFormValues(),
+    });
 
     expect(screen.getAllByText("Issue comment created").length).toBeGreaterThan(0);
     expect(screen.queryByText("github.issue_comment.created")).toBeNull();
@@ -159,7 +166,10 @@ describe("WebhookAutomationForm", () => {
   });
 
   it("shows connector-defined conversation grouping choices", () => {
-    const { container } = renderForm("create");
+    const { container } = renderFormWithOptions({
+      mode: "create",
+      values: buildFormValues(),
+    });
 
     const groupingFieldCandidate = within(container)
       .getAllByText("Group events by")[0]
@@ -204,11 +214,13 @@ describe("WebhookAutomationForm", () => {
     const currentForm = within(container);
 
     expect(currentForm.getByRole("textbox", { name: "Agent Instructions" })).toBeDefined();
-    expect(
-      currentForm.getAllByText((content) => content.includes("Use Liquid syntax with")).length,
-    ).toBeGreaterThan(0);
-    expect(currentForm.getAllByText("{{webhookEvent.eventType}}").length).toBeGreaterThan(0);
-    expect(currentForm.getAllByText("{{payload}}").length).toBeGreaterThan(0);
+    const editor = container.querySelector('[data-slot="agent-instructions-editor"]');
+
+    if (editor === null) {
+      throw new Error("Expected the agent instructions editor to be rendered.");
+    }
+
+    expect(editor.getAttribute("data-editor-state")).toBe("empty");
     expect(currentForm.queryByRole("heading", { name: "Agent Instructions" })).toBeNull();
   });
 
@@ -234,39 +246,6 @@ describe("WebhookAutomationForm", () => {
     expect(container.textContent?.indexOf("Triggers")).toBeLessThan(
       container.textContent?.indexOf("Agent Instructions") ?? Number.POSITIVE_INFINITY,
     );
-  });
-
-  it("disables reset when the default template is already shown", () => {
-    renderFormWithOptions({
-      mode: "create",
-      values: buildFormValues({
-        inputTemplate: DefaultWebhookAutomationInputTemplate,
-      }),
-    });
-
-    expect(getResetButton().hasAttribute("disabled")).toBe(true);
-  });
-
-  it("resets the template field to the default", () => {
-    let nextInputTemplate: string | null = null;
-
-    renderFormWithOptions({
-      mode: "create",
-      onValueChange(key, value) {
-        if (key !== "inputTemplate") {
-          return;
-        }
-
-        if (typeof value !== "string") {
-          throw new Error("Expected input template reset value to be a string.");
-        }
-
-        nextInputTemplate = value;
-      },
-    });
-
-    fireEvent.click(getResetButton());
-    expect(nextInputTemplate).toBe(DefaultWebhookAutomationInputTemplate);
   });
 
   it("renders the automation name field without an inline edit-name control on create", () => {
@@ -426,7 +405,7 @@ describe("WebhookAutomationForm", () => {
       }),
     });
 
-    expect(screen.getByText(AgentInstructionsNoTriggerHelpText)).toBeDefined();
+    expect(screen.getAllByText(AgentInstructionsNoTriggerHelpText).length).toBeGreaterThan(0);
   });
 
   it("builds agent instruction tokens from the selected trigger payload paths", () => {

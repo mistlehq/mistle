@@ -19,13 +19,10 @@ import { TrashIcon } from "@phosphor-icons/react";
 
 import { FormPageFooter, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
-import {
-  AgentInstructionsNoTriggerHelpText,
-  buildAgentInstructionTokenCatalog,
-} from "./agent-instructions-token-catalog.js";
+import { buildAgentInstructionTokenCatalog } from "./agent-instructions-token-catalog.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
-import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
+import { DefaultWebhookAutomationInputTemplatePlaceholder } from "./webhook-automation-input-template.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
@@ -179,8 +176,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
     input.fieldErrors.triggerIds !== "Trigger is unavailable for the selected sandbox profile."
       ? input.fieldErrors.triggerIds
       : undefined;
-  const isInputTemplateDefault =
-    input.values.inputTemplate === DefaultWebhookAutomationInputTemplate;
+  const hasSelectedTrigger = input.values.triggerIds.length > 0;
   const agentInstructionTokens = buildAgentInstructionTokenCatalog({
     selectedEventOptions: selectedTriggerOptions,
   });
@@ -228,25 +224,25 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         </Notice>
       )}
 
-      {input.mode === "edit" ? (
-        <FormPageSection>
-          <div className="flex min-h-10 items-center justify-between gap-3 p-4">
-            <div className="space-y-1">
-              <FieldLabel htmlFor="automation-enabled">Automation enabled</FieldLabel>
-            </div>
-            <Switch
-              aria-label="Automation enabled"
-              checked={input.values.enabled}
-              id="automation-enabled"
-              onCheckedChange={(checked) => {
-                input.onValueChange("enabled", checked);
-              }}
-            />
-          </div>
-        </FormPageSection>
-      ) : null}
-
       <FormPageSection>
+        {input.mode === "edit" ? (
+          <div className="border-b px-4 py-4">
+            <div className="flex min-h-10 items-center justify-between gap-3">
+              <div className="space-y-1">
+                <FieldLabel htmlFor="automation-enabled">Automation enabled</FieldLabel>
+              </div>
+              <Switch
+                aria-label="Automation enabled"
+                checked={input.values.enabled}
+                id="automation-enabled"
+                onCheckedChange={(checked) => {
+                  input.onValueChange("enabled", checked);
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
+
         {input.mode === "create" ? (
           <div className="p-4">
             <Field orientation="horizontal">
@@ -393,30 +389,17 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         <div className="p-4">
           <Field>
             <FieldHeader>
-              <div className="flex items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <FieldLabel id={inputTemplateLabelId}>Agent Instructions</FieldLabel>
+              <div className="space-y-1">
+                <FieldLabel id={inputTemplateLabelId}>Agent Instructions</FieldLabel>
+                {hasSelectedTrigger ? (
                   <FieldDescription>
-                    <span className="block">
-                      These are the instructions the agent will receive.
-                    </span>
-                    <span className="block">
-                      Use Liquid syntax with{" "}
-                      <InlineCode variant="muted">{"{{webhookEvent.eventType}}"}</InlineCode> and{" "}
-                      <InlineCode variant="muted">{"{{payload}}"}</InlineCode>.
-                    </span>
+                    Type <InlineCode variant="muted">{"{{"}</InlineCode> to insert available fields.
                   </FieldDescription>
-                </div>
-                <Button
-                  disabled={input.isDeleting || input.isSaving || isInputTemplateDefault}
-                  onClick={() => {
-                    input.onValueChange("inputTemplate", DefaultWebhookAutomationInputTemplate);
-                  }}
-                  type="button"
-                  variant="outline"
-                >
-                  Reset to default
-                </Button>
+                ) : (
+                  <FieldDescription>
+                    Select a trigger to unlock event-specific payload fields.
+                  </FieldDescription>
+                )}
               </div>
             </FieldHeader>
             <FieldContent>
@@ -427,14 +410,10 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                 onChange={(nextValue) => {
                   input.onValueChange("inputTemplate", nextValue);
                 }}
+                placeholderText={DefaultWebhookAutomationInputTemplatePlaceholder}
                 tokens={agentInstructionTokens}
                 value={input.values.inputTemplate}
               />
-              {input.values.triggerIds.length === 0 ? (
-                <p className="text-muted-foreground mt-2 text-sm">
-                  {AgentInstructionsNoTriggerHelpText}
-                </p>
-              ) : null}
               <FieldError
                 message={
                   shouldRenderInlineFieldError({

@@ -12,7 +12,6 @@ import {
   type WebhookAutomationFormValues,
   type WebhookAutomationFormValueKey,
 } from "./webhook-automation-form.js";
-import { DefaultWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
 
@@ -392,7 +391,7 @@ const EmptyCreateValues: WebhookAutomationFormValues = {
   name: "",
   sandboxProfileId: "",
   enabled: true,
-  inputTemplate: DefaultWebhookAutomationInputTemplate,
+  inputTemplate: "",
   conversationKeyTemplate: "",
   triggerIds: [],
   triggerParameterValues: {},
@@ -436,30 +435,33 @@ function StoryHarness(input: {
 }): React.JSX.Element {
   const [queryClient] = useState(() => createWebhookAutomationStoryQueryClient());
   const [values, setValues] = useState(input.values);
+  const pageTitle = input.mode === "create" ? "Create automation" : "Edit automation";
 
   return (
     <QueryClientProvider client={queryClient}>
-      <WebhookAutomationForm
-        connectionOptions={input.connectionOptions ?? ConnectionOptions}
-        fieldErrors={input.fieldErrors ?? {}}
-        formError={input.formError ?? null}
-        validationSummaryError={input.validationSummaryError ?? null}
-        isDeleting={input.isDeleting ?? false}
-        isSaving={input.isSaving ?? false}
-        mode={input.mode}
-        onDelete={input.onDelete ?? null}
-        onSubmit={function onSubmit() {}}
-        onValueChange={(key, value) => {
-          setValues((currentValues) => ({
-            ...currentValues,
-            [key]: value,
-          }));
-        }}
-        sandboxProfileOptions={input.sandboxProfileOptions ?? SandboxProfileOptions}
-        triggerPickerDisabledState={input.triggerPickerDisabledState ?? null}
-        webhookEventOptions={input.webhookEventOptions ?? GitHubWebhookEventOptions}
-        values={values}
-      />
+      <FormPageFrame title={pageTitle}>
+        <WebhookAutomationForm
+          connectionOptions={input.connectionOptions ?? ConnectionOptions}
+          fieldErrors={input.fieldErrors ?? {}}
+          formError={input.formError ?? null}
+          validationSummaryError={input.validationSummaryError ?? null}
+          isDeleting={input.isDeleting ?? false}
+          isSaving={input.isSaving ?? false}
+          mode={input.mode}
+          onDelete={input.onDelete ?? null}
+          onSubmit={function onSubmit() {}}
+          onValueChange={(key, value) => {
+            setValues((currentValues) => ({
+              ...currentValues,
+              [key]: value,
+            }));
+          }}
+          sandboxProfileOptions={input.sandboxProfileOptions ?? SandboxProfileOptions}
+          triggerPickerDisabledState={input.triggerPickerDisabledState ?? null}
+          webhookEventOptions={input.webhookEventOptions ?? GitHubWebhookEventOptions}
+          values={values}
+        />
+      </FormPageFrame>
     </QueryClientProvider>
   );
 }
@@ -486,13 +488,6 @@ export const CreatePageLayout: Story = {
     },
     values: EmptyCreateValues,
   },
-  render: function RenderStory(args): React.JSX.Element {
-    return (
-      <FormPageFrame title="Create automation">
-        <StoryHarness {...args} />
-      </FormPageFrame>
-    );
-  },
 };
 
 export const EditPageLayout: Story = {
@@ -500,13 +495,6 @@ export const EditPageLayout: Story = {
     mode: "edit",
     onDelete: function onDelete() {},
     values: ExistingAutomationValues,
-  },
-  render: function RenderStory(args): React.JSX.Element {
-    return (
-      <FormPageFrame title="">
-        <StoryHarness {...args} />
-      </FormPageFrame>
-    );
   },
 };
 
