@@ -8,6 +8,7 @@ use std::path::Path;
 
 pub mod apply_startup;
 pub mod bootstrap;
+pub mod cgroups;
 pub mod command;
 pub mod control;
 pub mod process;
