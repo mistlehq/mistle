@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 FROM debian:bookworm-slim AS sandbox-base-common
 
 ARG MISE_VERSION=2026.2.20
@@ -21,11 +23,9 @@ RUN apt-get update \
     unzip \
   && rm -rf /var/lib/apt/lists/*
 
-COPY apps/sandbox-runtime/scripts/cmddir /usr/local/bin/cmddir
+COPY packages/sandboxd/scripts/cmddir /usr/local/bin/cmddir
 RUN chmod +x /usr/local/bin/cmddir
 
-# Keep only generic runtime-owned paths in the base image. Agent-specific config
-# trees such as /etc/codex are created on demand by runtime-plan file application.
 RUN mkdir -p \
     /run/mistle \
     /var/lib/mistle/artifacts \
@@ -35,12 +35,30 @@ RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PA
 
 RUN chmod +x /usr/local/bin/mise
 
-# The sandbox session is intentionally a conventional root-owned environment: home,
-# default cwd, and the integration workspace all resolve to /root.
 WORKDIR /root
 USER root
 
+FROM rust:1.93-bookworm AS sandboxd-build
+
+# Build only the standalone sandboxd Rust crate. The sandbox base image copies
+# this binary directly and does not need the rest of the workspace build.
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    libssl-dev \
+    pkg-config \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app/packages/sandboxd
+
+COPY packages/sandboxd /app/packages/sandboxd
+
+RUN cargo build --locked --bin sandboxd
+
 FROM sandbox-base-common AS sandbox-base
+
+# The final sandbox image only carries the compiled supervisor binary and the
+# shared Linux tooling the sandbox session expects at runtime.
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -50,9 +68,8 @@ RUN apt-get update \
     vim \
   && rm -rf /var/lib/apt/lists/*
 
-COPY apps/sandbox-runtime/dist-sea/ /usr/local/bin/
+COPY --from=sandboxd-build /app/packages/sandboxd/target/debug/sandboxd /usr/local/bin/sandboxd
 
-RUN chmod +x \
-  /usr/local/bin/sandboxd
+RUN chmod +x /usr/local/bin/sandboxd
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandboxd", "serve"]

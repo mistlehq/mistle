@@ -1,7 +1,6 @@
 import type { z } from "zod";
 
 import type { AgentConversationProvider } from "../agent/conversation-provider.js";
-import type { AgentExecutionObserver } from "../agent/execution-observer.js";
 import type { AgentProviderAccess } from "../capabilities/index.js";
 import type {
   CompileBindingEgressRoute,
@@ -80,7 +79,6 @@ export type AgentRuntimeDefinition<
     input: CompileAgentRuntimeInput<z.output<TRuntimeConfigSchema>>,
   ): CompileAgentRuntimeResult;
   createConversationProvider?(): AgentConversationProvider;
-  createExecutionObserver?(): AgentExecutionObserver;
   materializeMcpConfig?(): ReadonlyArray<IntegrationMcpConfig>;
 };
 

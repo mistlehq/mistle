@@ -1,18 +1,10 @@
 /**
  * The source that originated a keepalive record.
- *
- * The current legacy execution-lease protocol treats this as an open string
- * field, so the store preserves the source value rather than restricting it to
- * a closed union too early.
  */
 export type SandboxKeepaliveSource = string;
 
 /**
  * Stores background keepalive records for sandbox instances.
- *
- * During the migration stack, legacy execution leases are translated into
- * generic keepalive records keyed by `keepaliveId`. Callers that only need the
- * idle-control projection should consume `summarize(...)`.
  */
 export interface SandboxKeepaliveStore {
   /**

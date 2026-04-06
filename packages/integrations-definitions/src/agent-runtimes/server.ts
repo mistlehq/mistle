@@ -1,4 +1,4 @@
-import type { AgentConversationProvider, AgentExecutionObserver } from "@mistle/integrations-core";
+import type { AgentConversationProvider } from "@mistle/integrations-core";
 
 import { createAgentRuntimeServerRegistry } from "../registry/agent-runtimes.server.js";
 
@@ -14,16 +14,4 @@ export function resolveAgentConversationProvider(runtimeId: string): AgentConver
   }
 
   return runtimeDefinition.createConversationProvider();
-}
-
-export function resolveAgentExecutionObserver(runtimeId: string): AgentExecutionObserver {
-  const runtimeDefinition = AgentRuntimeRegistry.getRuntimeOrThrow({
-    runtimeId,
-  });
-
-  if (runtimeDefinition.createExecutionObserver === undefined) {
-    throw new Error(`Agent runtime '${runtimeId}' does not define createExecutionObserver().`);
-  }
-
-  return runtimeDefinition.createExecutionObserver();
 }

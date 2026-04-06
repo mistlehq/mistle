@@ -507,46 +507,6 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
-  it("keeps bootstrap lease control messages local to the gateway", async () => {
-    const { translator } = await createTranslatorHarness();
-
-    await expect(
-      translator.translateInboundMessage({
-        clientSessionId: BootstrapSessionId,
-        payload: JSON.stringify({
-          type: "lease.create",
-          lease: {
-            id: "sxl_test",
-            kind: "agent_execution",
-            source: "codex",
-            externalExecutionId: "turn_123",
-            metadata: {
-              threadId: "thr_123",
-            },
-          },
-        }),
-        sandboxInstanceId: SandboxInstanceId,
-        sourcePeerSide: "bootstrap",
-      }),
-    ).resolves.toEqual({
-      delivery: {
-        kind: "drop",
-      },
-      executionLeaseControlMessage: {
-        type: "lease.create",
-        lease: {
-          id: "sxl_test",
-          kind: "agent_execution",
-          source: "codex",
-          externalExecutionId: "turn_123",
-          metadata: {
-            threadId: "thr_123",
-          },
-        },
-      },
-    });
-  });
-
   it("keeps bootstrap keepalive state messages local to the gateway", async () => {
     const { translator } = await createTranslatorHarness();
 
