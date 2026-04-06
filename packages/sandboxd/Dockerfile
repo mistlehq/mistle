@@ -23,7 +23,7 @@ RUN apt-get update \
     unzip \
   && rm -rf /var/lib/apt/lists/*
 
-COPY apps/sandbox-runtime/scripts/cmddir /usr/local/bin/cmddir
+COPY packages/sandboxd/scripts/cmddir /usr/local/bin/cmddir
 RUN chmod +x /usr/local/bin/cmddir
 
 RUN mkdir -p \

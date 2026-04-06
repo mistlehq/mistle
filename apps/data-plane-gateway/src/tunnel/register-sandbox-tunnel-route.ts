@@ -12,7 +12,6 @@ import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-sto
 import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
-import { ExecutionLeaseRepository } from "./execution-lease-repository.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import type { SandboxOwnerLeaseHeartbeat } from "./ownership/sandbox-owner-lease-heartbeat.js";
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
@@ -79,12 +78,6 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     sandboxOwnerStore: input.sandboxOwnerStore,
   });
   const tunnelProtocolTranslator = new TunnelProtocolTranslator(input.interactiveStreamRouter);
-  const executionLeaseRepository = new ExecutionLeaseRepository(
-    input.sandboxKeepaliveStore,
-    input.sandboxIdleControllerRegistry,
-    input.clock,
-    input.gatewayNodeId,
-  );
   const sandboxKeepaliveRepository = new SandboxKeepaliveRepository(
     input.sandboxKeepaliveStore,
     input.sandboxIdleControllerRegistry,
@@ -278,7 +271,6 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 : {}),
               clientSessionId: relaySessionId,
               currentSocket: ws,
-              executionLeaseRepository,
               sandboxKeepaliveRepository,
               handleTelemetryDelivery: async (delivery) => {
                 await input.telemetryIngressService.handleDelivery({

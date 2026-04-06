@@ -71,14 +71,6 @@ const NoopConversationProvider = {
   interruptExecution: async () => {},
 };
 
-const NoopExecutionObserver = {
-  createSession: () => ({
-    onOutboundMessage: () => {},
-    onInboundMessage: () => {},
-    drainObservations: () => [],
-  }),
-};
-
 function createDefinitionsBundle(registry: IntegrationRegistry) {
   const agentRuntimeRegistry = new AgentRuntimeRegistry();
   agentRuntimeRegistry.register({
@@ -86,7 +78,6 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
     displayName: "Codex",
     configSchema: z.object({}).strict(),
     createConversationProvider: () => NoopConversationProvider,
-    createExecutionObserver: () => NoopExecutionObserver,
     materializeMcpConfig: () => [
       {
         clientId: "codex-cli",
@@ -243,7 +234,6 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
     displayName: "Claude Code",
     configSchema: z.object({}).strict(),
     createConversationProvider: () => NoopConversationProvider,
-    createExecutionObserver: () => NoopExecutionObserver,
     materializeMcpConfig: () => [
       {
         clientId: "claude-code",
@@ -1773,7 +1763,6 @@ describe("compileRuntimePlan", () => {
         approvalPolicy: z.literal("never"),
       }),
       createConversationProvider: () => NoopConversationProvider,
-      createExecutionObserver: () => NoopExecutionObserver,
       compileRuntime: () => ({
         runtimeClients: [],
         agentRuntimes: [],
@@ -1920,7 +1909,6 @@ describe("compileRuntimePlan", () => {
       displayName: "Codex",
       configSchema: z.object({}).strict(),
       createConversationProvider: () => NoopConversationProvider,
-      createExecutionObserver: () => NoopExecutionObserver,
       materializeMcpConfig: () => [
         {
           clientId: "missing-client",

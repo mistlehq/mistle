@@ -88,13 +88,6 @@ function registerRuntime(
       }),
       interruptExecution: async () => {},
     }),
-    createExecutionObserver: () => ({
-      createSession: () => ({
-        onInboundMessage: () => {},
-        onOutboundMessage: () => {},
-        drainObservations: () => [],
-      }),
-    }),
   });
 }
 
