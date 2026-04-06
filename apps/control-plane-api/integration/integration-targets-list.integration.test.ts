@@ -175,6 +175,10 @@ describe("integration targets discovery integration", () => {
           },
         },
       ],
+      webhookSource: {
+        ownerScope: "target",
+        requiresSourceSelection: true,
+      },
       supportedWebhookEvents: expect.arrayContaining([
         expect.objectContaining({
           eventType: "github.issue_comment.created",

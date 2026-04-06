@@ -4362,6 +4362,20 @@
                             },
                             "minItems": 1
                           },
+                          "webhookSource": {
+                            "type": "object",
+                            "properties": {
+                              "ownerScope": {
+                                "type": "string",
+                                "enum": ["target", "connection"]
+                              },
+                              "requiresSourceSelection": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["ownerScope", "requiresSourceSelection"],
+                            "additionalProperties": false
+                          },
                           "supportedWebhookEvents": {
                             "type": "array",
                             "items": {

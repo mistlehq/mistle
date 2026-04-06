@@ -2315,6 +2315,11 @@ export interface paths {
                 };
                 targetKey: string;
                 variantId: string;
+                webhookSource?: {
+                  /** @enum {string} */
+                  ownerScope: "target" | "connection";
+                  requiresSourceSelection: boolean;
+                };
               }[];
               nextPage: {
                 after: string;
