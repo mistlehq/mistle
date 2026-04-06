@@ -119,14 +119,14 @@ impl fmt::Display for RuntimeAdapterRegistryError {
 impl std::error::Error for RuntimeAdapterRegistryError {}
 
 /// Owns one running runtime-specific adapter instance.
-pub enum StartedRuntimeAdapter {
+pub enum RuntimeAdapter {
     Codex {
         runtime_id: String,
         proxy: CodexProxy,
     },
 }
 
-impl StartedRuntimeAdapter {
+impl RuntimeAdapter {
     /// Returns the runtime id this adapter instance belongs to.
     pub fn runtime_id(&self) -> &str {
         match self {
@@ -155,13 +155,13 @@ impl StartedRuntimeAdapter {
 
 /// Groups the runtime adapters started for one manifest application.
 #[derive(Default)]
-pub struct StartedRuntimeAdapters {
-    adapters: Vec<StartedRuntimeAdapter>,
+pub struct RuntimeAdapters {
+    adapters: Vec<RuntimeAdapter>,
 }
 
-impl StartedRuntimeAdapters {
+impl RuntimeAdapters {
     /// Returns the started adapters in manifest order.
-    pub fn adapters(&self) -> &[StartedRuntimeAdapter] {
+    pub fn adapters(&self) -> &[RuntimeAdapter] {
         &self.adapters
     }
 
@@ -182,7 +182,7 @@ impl RuntimeAdapterRegistry {
         startup_input: &StartupInput,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
         sleeper: Arc<dyn Sleeper>,
-    ) -> Result<StartedRuntimeAdapters, RuntimeAdapterRegistryError> {
+    ) -> Result<RuntimeAdapters, RuntimeAdapterRegistryError> {
         let runtime_plan: CompiledRuntimePlan =
             serde_json::from_value(startup_input.runtime_plan.clone())
                 .map_err(RuntimeAdapterRegistryError::InvalidRuntimePlan)?;
@@ -211,7 +211,7 @@ impl RuntimeAdapterRegistry {
             }
         }
 
-        Ok(StartedRuntimeAdapters {
+        Ok(RuntimeAdapters {
             adapters: started_adapters,
         })
     }
@@ -222,7 +222,7 @@ fn start_codex_runtime_adapter(
     runtime_plan: &CompiledRuntimePlan,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     sleeper: Arc<dyn Sleeper>,
-) -> Result<StartedRuntimeAdapter, RuntimeAdapterRegistryError> {
+) -> Result<RuntimeAdapter, RuntimeAdapterRegistryError> {
     let runtime_client = runtime_plan
         .runtime_clients
         .iter()
@@ -275,7 +275,7 @@ fn start_codex_runtime_adapter(
     let proxy = start_codex_proxy(listen_url, raw_app_server_url, keepalive_manager, sleeper)
         .map_err(RuntimeAdapterRegistryError::StartCodexProxy)?;
 
-    Ok(StartedRuntimeAdapter::Codex {
+    Ok(RuntimeAdapter::Codex {
         runtime_id: agent_runtime.runtime_id.clone(),
         proxy,
     })
