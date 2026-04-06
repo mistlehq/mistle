@@ -177,8 +177,8 @@ export function ChatComposer({
         rows={2}
         value={composerText}
       />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2">
+        <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] items-center gap-1.5 md:flex md:flex-wrap md:items-center md:gap-2">
           <Button
             aria-label="Add images"
             className="text-muted-foreground h-8 min-w-0 rounded-md px-1.5 hover:bg-muted/60"
@@ -204,7 +204,8 @@ export function ChatComposer({
           >
             <SelectTrigger
               aria-label="Model switcher"
-              className="text-muted-foreground h-8 border-0 bg-transparent shadow-none hover:bg-muted/60 data-[state=open]:bg-muted/70"
+              className="text-muted-foreground h-8 w-full min-w-0 border-0 bg-transparent px-2 shadow-none hover:bg-muted/60 md:w-fit md:px-2.5 data-[state=open]:bg-muted/70"
+              size="sm"
             >
               <SelectValue className="text-muted-foreground" placeholder="Model">
                 {selectedModelLabel ?? "Model"}
@@ -231,7 +232,8 @@ export function ChatComposer({
           >
             <SelectTrigger
               aria-label="Reasoning switcher"
-              className="text-muted-foreground h-8 border-0 bg-transparent shadow-none hover:bg-muted/60 data-[state=open]:bg-muted/70"
+              className="text-muted-foreground h-8 w-full min-w-0 border-0 bg-transparent px-2 shadow-none hover:bg-muted/60 md:w-fit md:px-2.5 data-[state=open]:bg-muted/70"
+              size="sm"
             >
               <SelectValue className="text-muted-foreground" placeholder="Reasoning">
                 {selectedReasoningEffortValue === null
@@ -251,7 +253,7 @@ export function ChatComposer({
 
         <Button
           aria-label={submitLabel}
-          className="rounded-full bg-transparent text-primary hover:bg-transparent"
+          className="shrink-0 rounded-full bg-transparent text-primary hover:bg-transparent"
           disabled={submitDisabled}
           onClick={onSubmit}
           size="icon-fill"
