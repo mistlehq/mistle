@@ -7,6 +7,7 @@ use crate::protocol::startup::StartupInput;
 
 use crate::apply_startup::ApplyStartupError;
 
+/// Loads the persisted startup manifest from disk and decodes it into the shared protocol type.
 pub fn load_manifest(path: &Path) -> Result<StartupInput, ApplyStartupError> {
     let manifest_bytes = fs::read(path).map_err(|error| ApplyStartupError::ReadManifest {
         path: path.to_path_buf(),
@@ -16,6 +17,7 @@ pub fn load_manifest(path: &Path) -> Result<StartupInput, ApplyStartupError> {
     serde_json::from_slice(&manifest_bytes).map_err(ApplyStartupError::InvalidManifest)
 }
 
+/// Persists the startup manifest with an atomic temp-file write followed by rename.
 pub fn persist_manifest(
     path: &Path,
     startup_input: &StartupInput,
@@ -90,6 +92,7 @@ pub fn persist_manifest(
     Ok(())
 }
 
+/// Best-effort cleanup for abandoned temp manifests after a failed write or rename.
 fn cleanup_temp_manifest(path: &Path) {
     match fs::remove_file(path) {
         Ok(()) => {}

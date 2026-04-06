@@ -9,8 +9,10 @@ use crate::protocol::startup::{
     StartupApplyErrorResponse, StartupApplyOkResponse, StartupApplyRequest,
 };
 
+/// Default on-disk location for the persisted startup manifest.
 pub const DEFAULT_MANIFEST_PATH: &str = "/var/lib/mistle/sandboxd/manifest.json";
 
+/// Describes why `sandboxd apply-startup` failed to read, persist, or acknowledge a request.
 #[derive(Debug)]
 pub enum ApplyStartupError {
     ReadRequest(std::io::Error),
@@ -121,6 +123,7 @@ impl fmt::Display for ApplyStartupError {
 
 impl std::error::Error for ApplyStartupError {}
 
+/// Applies one startup request from stdin, persists the durable manifest, and writes a JSON response.
 pub fn run_apply_startup<R, W>(
     reader: &mut R,
     writer: &mut W,
@@ -182,6 +185,7 @@ where
     }
 }
 
+/// Serializes one JSON response object to the command's stdout stream.
 fn write_response<W, T>(writer: &mut W, response: &T) -> Result<(), ApplyStartupError>
 where
     W: Write,

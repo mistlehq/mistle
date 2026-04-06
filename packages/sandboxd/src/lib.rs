@@ -6,12 +6,14 @@ pub mod apply_startup;
 pub mod control;
 pub mod protocol;
 
+/// Enumerates the top-level `sandboxd` subcommands the CLI currently supports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SandboxdCommand {
     Serve,
     ApplyStartup,
 }
 
+/// Describes why CLI argument parsing failed before any command-specific work ran.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseSandboxdCommandError {
     MissingCommand,
@@ -39,6 +41,7 @@ impl fmt::Display for ParseSandboxdCommandError {
 
 impl std::error::Error for ParseSandboxdCommandError {}
 
+/// Parses `sandboxd` CLI arguments into one supported subcommand.
 pub fn parse_sandboxd_command<I, S>(args: I) -> Result<SandboxdCommand, ParseSandboxdCommandError>
 where
     I: IntoIterator<Item = S>,
@@ -66,6 +69,7 @@ where
     Ok(command)
 }
 
+/// Runs one `sandboxd` CLI invocation against the provided process I/O streams.
 pub fn run<I, S, R, W, E>(args: I, stdin: &mut R, stdout: &mut W, stderr: &mut E) -> i32
 where
     I: IntoIterator<Item = S>,

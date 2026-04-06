@@ -14,8 +14,10 @@ use serde::{Deserialize, Serialize};
 use crate::apply_startup::manifest;
 use crate::protocol::startup::StartupInput;
 
+/// Default Unix socket path for the local `sandboxd` control channel.
 pub const DEFAULT_CONTROL_SOCKET_PATH: &str = "/run/mistle/sandboxd/control.sock";
 
+/// Describes why the local control socket server or client path failed.
 #[derive(Debug)]
 pub enum ControlError {
     MissingSocketParent {
@@ -128,6 +130,7 @@ impl fmt::Display for ControlError {
 
 impl std::error::Error for ControlError {}
 
+/// Enumerates JSON requests accepted by the local control socket.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 enum ControlRequest {
@@ -135,6 +138,7 @@ enum ControlRequest {
     ReloadStartup,
 }
 
+/// Carries one JSON response back to a local control socket client.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ControlResponse {
@@ -142,12 +146,14 @@ struct ControlResponse {
     error: Option<String>,
 }
 
+/// Tracks observable control-server state for tests and later supervisor wiring.
 #[derive(Debug, Clone)]
 struct ControlServerState {
     reload_count: usize,
     latest_manifest: Option<StartupInput>,
 }
 
+/// Owns one running control socket server thread and its observable state.
 pub struct StartedControlServer {
     state: Arc<Mutex<ControlServerState>>,
     shutdown_sender: mpsc::Sender<()>,
@@ -155,6 +161,7 @@ pub struct StartedControlServer {
 }
 
 impl StartedControlServer {
+    /// Returns how many successful reload requests this server has processed.
     pub fn reload_count(&self) -> usize {
         self.state
             .lock()
@@ -162,6 +169,7 @@ impl StartedControlServer {
             .reload_count
     }
 
+    /// Returns the most recently loaded manifest after a successful reload request.
     pub fn latest_manifest(&self) -> Option<StartupInput> {
         self.state
             .lock()
@@ -170,6 +178,7 @@ impl StartedControlServer {
             .clone()
     }
 
+    /// Signals the control server thread to stop and waits for it to exit.
     pub fn close(mut self) -> Result<(), ControlError> {
         self.shutdown_sender
             .send(())
@@ -185,6 +194,7 @@ impl StartedControlServer {
         }
     }
 
+    /// Waits for the control server thread to exit without sending a shutdown signal first.
     pub fn wait(mut self) -> Result<(), ControlError> {
         let thread = self
             .thread
@@ -197,6 +207,7 @@ impl StartedControlServer {
     }
 }
 
+/// Starts the local control socket server that accepts startup-manifest reload requests.
 pub fn start_control_server(
     socket_path: &Path,
     manifest_path: &Path,
@@ -250,6 +261,7 @@ pub fn start_control_server(
     })
 }
 
+/// Notifies a running `sandboxd serve` process that it should reload the persisted manifest.
 pub fn notify_reload(socket_path: &Path) -> Result<(), ControlError> {
     let mut stream = match UnixStream::connect(socket_path) {
         Ok(stream) => stream,
@@ -294,6 +306,7 @@ pub fn notify_reload(socket_path: &Path) -> Result<(), ControlError> {
     )))
 }
 
+/// Runs the blocking accept loop for the local control socket server.
 fn run_control_server_loop(
     listener: UnixListener,
     manifest_path: &Path,
@@ -335,6 +348,7 @@ fn run_control_server_loop(
     }
 }
 
+/// Handles one accepted control socket connection from request read through response state update.
 fn handle_connection(
     stream: &mut UnixStream,
     manifest_path: &Path,
@@ -361,6 +375,7 @@ fn handle_connection(
     }
 }
 
+/// Serializes one control socket response to the connected peer.
 fn write_control_response(
     stream: &mut UnixStream,
     response: &ControlResponse,
@@ -371,6 +386,7 @@ fn write_control_response(
         .map_err(ControlError::WriteResponse)
 }
 
+/// Removes an existing socket file only when it is actually a stale Unix socket.
 fn remove_stale_socket(socket_path: &Path) -> Result<(), ControlError> {
     match fs::symlink_metadata(socket_path) {
         Ok(metadata) => {
