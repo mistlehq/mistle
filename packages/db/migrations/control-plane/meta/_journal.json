@@ -57,6 +57,13 @@
       "when": 1775150160132,
       "tag": "0007_add-integration-webhook-sources",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1775469414828,
+      "tag": "0008_add-avatar-object-key-columns",
+      "breakpoints": true
     }
   ]
 }
