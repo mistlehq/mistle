@@ -8,8 +8,10 @@ use std::path::Path;
 
 pub mod apply_startup;
 pub mod bootstrap;
+pub mod cgroups;
 pub mod command;
 pub mod control;
+pub mod keepalive;
 pub mod process;
 pub mod protocol;
 pub mod proxy_ca;
