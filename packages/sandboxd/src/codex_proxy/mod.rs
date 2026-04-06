@@ -80,8 +80,12 @@ pub enum CodexProxyError {
 impl fmt::Display for CodexProxyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ParseListenUrl(error) => write!(f, "failed to parse Codex proxy listen URL: {error}"),
-            Self::ParseRawUrl(error) => write!(f, "failed to parse raw Codex app-server URL: {error}"),
+            Self::ParseListenUrl(error) => {
+                write!(f, "failed to parse Codex proxy listen URL: {error}")
+            }
+            Self::ParseRawUrl(error) => {
+                write!(f, "failed to parse raw Codex app-server URL: {error}")
+            }
             Self::ListenUrlMustUseWebSocket { url } => {
                 write!(f, "Codex proxy listen URL must use ws scheme: {url}")
             }
@@ -107,23 +111,36 @@ impl fmt::Display for CodexProxyError {
                 write!(f, "failed to accept Codex proxy client: {error}")
             }
             Self::AcceptHandshake(error) => {
-                write!(f, "failed to accept Codex proxy websocket handshake: {error}")
+                write!(
+                    f,
+                    "failed to accept Codex proxy websocket handshake: {error}"
+                )
             }
             Self::ConnectRaw(error) => {
                 write!(f, "failed to connect to raw Codex app-server: {error}")
             }
-            Self::InvalidJson(error) => write!(f, "Codex proxy received invalid JSON-RPC payload: {error}"),
+            Self::InvalidJson(error) => {
+                write!(f, "Codex proxy received invalid JSON-RPC payload: {error}")
+            }
             Self::MissingResponseId { expected_id } => {
                 write!(f, "Codex monitor did not receive response id {expected_id}")
             }
             Self::InvalidThreadLoadedList(message) => {
-                write!(f, "Codex monitor received invalid thread/loaded/list response: {message}")
+                write!(
+                    f,
+                    "Codex monitor received invalid thread/loaded/list response: {message}"
+                )
             }
             Self::InvalidThreadRead(message) => {
-                write!(f, "Codex monitor received invalid thread/read response: {message}")
+                write!(
+                    f,
+                    "Codex monitor received invalid thread/read response: {message}"
+                )
             }
             Self::ReadSocket(error) => write!(f, "failed to read Codex websocket message: {error}"),
-            Self::WriteSocket(error) => write!(f, "failed to write Codex websocket message: {error}"),
+            Self::WriteSocket(error) => {
+                write!(f, "failed to write Codex websocket message: {error}")
+            }
             Self::ListenerPanicked => write!(f, "Codex proxy listener thread panicked"),
             Self::MonitorPanicked => write!(f, "Codex proxy monitor thread panicked"),
             Self::SessionPanicked => write!(f, "Codex proxy session thread panicked"),
@@ -250,26 +267,27 @@ pub fn start_codex_proxy(
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     sleeper: Arc<dyn Sleeper>,
 ) -> Result<CodexProxy, CodexProxyError> {
-    let listen_url =
-        Url::parse(proxy_listen_url).map_err(|error| CodexProxyError::ParseListenUrl(error.to_string()))?;
+    let listen_url = Url::parse(proxy_listen_url)
+        .map_err(|error| CodexProxyError::ParseListenUrl(error.to_string()))?;
     if listen_url.scheme() != "ws" {
         return Err(CodexProxyError::ListenUrlMustUseWebSocket {
             url: proxy_listen_url.to_string(),
         });
     }
-    let listen_host = listen_url
-        .host_str()
-        .ok_or_else(|| CodexProxyError::ListenUrlMissingHost {
-            url: proxy_listen_url.to_string(),
-        })?;
+    let listen_host =
+        listen_url
+            .host_str()
+            .ok_or_else(|| CodexProxyError::ListenUrlMissingHost {
+                url: proxy_listen_url.to_string(),
+            })?;
     let listen_port = listen_url
         .port()
         .ok_or_else(|| CodexProxyError::ListenUrlMissingPort {
             url: proxy_listen_url.to_string(),
         })?;
 
-    let raw_url =
-        Url::parse(raw_app_server_url).map_err(|error| CodexProxyError::ParseRawUrl(error.to_string()))?;
+    let raw_url = Url::parse(raw_app_server_url)
+        .map_err(|error| CodexProxyError::ParseRawUrl(error.to_string()))?;
     if raw_url.scheme() != "ws" {
         return Err(CodexProxyError::RawUrlMustUseWebSocket {
             url: raw_app_server_url.to_string(),
@@ -460,12 +478,15 @@ pub fn run_codex_monitor_session(
                 }
             }),
         )?;
-        let thread_response = wait_for_response(&mut socket, next_request_id, &mut pending_updates)?;
+        let thread_response =
+            wait_for_response(&mut socket, next_request_id, &mut pending_updates)?;
         let status = parse_thread_read_response(&thread_response)?;
         let thread_id = thread_response["result"]["thread"]["id"]
             .as_str()
             .ok_or_else(|| {
-                CodexProxyError::InvalidThreadRead("thread/read response is missing thread.id".to_string())
+                CodexProxyError::InvalidThreadRead(
+                    "thread/read response is missing thread.id".to_string(),
+                )
             })?
             .to_string();
         threads.push((thread_id, status));
@@ -602,13 +623,11 @@ fn wait_for_response(
 }
 
 fn parse_thread_loaded_list_response(response: &Value) -> Result<Vec<String>, CodexProxyError> {
-    let loaded_list = response["result"]["data"]
-        .as_array()
-        .ok_or_else(|| {
-            CodexProxyError::InvalidThreadLoadedList(
-                "thread/loaded/list response is missing result.data array".to_string(),
-            )
-        })?;
+    let loaded_list = response["result"]["data"].as_array().ok_or_else(|| {
+        CodexProxyError::InvalidThreadLoadedList(
+            "thread/loaded/list response is missing result.data array".to_string(),
+        )
+    })?;
 
     let mut thread_ids = Vec::with_capacity(loaded_list.len());
     for thread_id in loaded_list {
@@ -626,7 +645,9 @@ fn parse_thread_loaded_list_response(response: &Value) -> Result<Vec<String>, Co
 fn parse_thread_read_response(response: &Value) -> Result<CodexThreadStatus, CodexProxyError> {
     let status = response["result"]["thread"]["status"].clone();
     serde_json::from_value(status).map_err(|error| {
-        CodexProxyError::InvalidThreadRead(format!("thread/read response has invalid status: {error}"))
+        CodexProxyError::InvalidThreadRead(format!(
+            "thread/read response has invalid status: {error}"
+        ))
     })
 }
 
@@ -645,15 +666,14 @@ fn parse_thread_status_changed_message(
         return Ok(None);
     }
 
-    let params: ThreadStatusChangedParams = serde_json::from_value(
-        value.get("params")
-            .cloned()
-            .ok_or_else(|| CodexProxyError::InvalidJson(serde_json::Error::io(std::io::Error::new(
+    let params: ThreadStatusChangedParams =
+        serde_json::from_value(value.get("params").cloned().ok_or_else(|| {
+            CodexProxyError::InvalidJson(serde_json::Error::io(std::io::Error::new(
                 ErrorKind::InvalidData,
                 "thread/status/changed notification is missing params",
-            ))))?,
-    )
-    .map_err(CodexProxyError::InvalidJson)?;
+            )))
+        })?)
+        .map_err(CodexProxyError::InvalidJson)?;
 
     Ok(Some((params.thread_id, params.status)))
 }
@@ -731,7 +751,9 @@ struct ThreadStatusChangedParams {
 mod tests {
     use serde_json::json;
 
-    use crate::codex_proxy::{CodexMonitor, CodexThreadStatus, parse_thread_status_changed_message};
+    use crate::codex_proxy::{
+        CodexMonitor, CodexThreadStatus, parse_thread_status_changed_message,
+    };
     use crate::keepalive::KeepaliveManager;
     use tungstenite::Message;
 
@@ -742,7 +764,12 @@ mod tests {
 
         monitor.rebuild_from_threads(
             [
-                ("thr_active".to_string(), CodexThreadStatus::Active { active_flags: Vec::new() }),
+                (
+                    "thr_active".to_string(),
+                    CodexThreadStatus::Active {
+                        active_flags: Vec::new(),
+                    },
+                ),
                 ("thr_idle".to_string(), CodexThreadStatus::Idle),
             ],
             &mut keepalive_manager,

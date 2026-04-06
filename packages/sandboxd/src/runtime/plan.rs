@@ -15,6 +15,7 @@ pub struct CompiledRuntimePlan {
     pub artifacts: Vec<CompiledRuntimeArtifact>,
     pub workspace_sources: Vec<CompiledWorkspaceSource>,
     pub runtime_clients: Vec<RuntimeClient>,
+    pub agent_runtimes: Vec<CompiledAgentRuntime>,
 }
 
 /// One artifact lifecycle command or runtime client process command.
@@ -81,7 +82,7 @@ pub struct RuntimeClient {
     pub client_id: String,
     pub setup: RuntimeClientSetup,
     pub processes: Vec<RuntimeClientProcess>,
-    pub endpoints: Vec<serde_json::Value>,
+    pub endpoints: Vec<RuntimeClientEndpoint>,
 }
 
 /// One child process that belongs to a runtime client.
@@ -92,6 +93,33 @@ pub struct RuntimeClientProcess {
     pub command: RuntimeArtifactCommand,
     pub readiness: RuntimeClientProcessReadiness,
     pub stop: RuntimeClientProcessStopPolicy,
+}
+
+/// One client-visible endpoint exposed by a runtime client process.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeClientEndpoint {
+    pub endpoint_key: String,
+    pub process_key: Option<String>,
+    pub transport: RuntimeClientEndpointTransport,
+    pub connection_mode: RuntimeClientConnectionMode,
+}
+
+/// The transports `sandboxd` currently understands for runtime client endpoints.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(tag = "type")]
+pub enum RuntimeClientEndpointTransport {
+    #[serde(rename = "ws")]
+    Ws { url: String },
+}
+
+/// The connection sharing modes supported by the runtime endpoint contract.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum RuntimeClientConnectionMode {
+    #[serde(rename = "dedicated")]
+    Dedicated,
+    #[serde(rename = "shared")]
+    Shared,
 }
 
 /// The readiness strategies supported for runtime client processes.
@@ -139,6 +167,18 @@ pub enum RuntimeClientProcessStopSignal {
     Sigterm,
     #[serde(rename = "sigkill")]
     Sigkill,
+}
+
+/// One compiled first-class agent runtime attached to the runtime plan.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompiledAgentRuntime {
+    pub binding_id: String,
+    pub runtime_id: String,
+    pub runtime_key: String,
+    pub client_id: String,
+    pub endpoint_key: String,
+    pub pty_launch: serde_json::Value,
 }
 
 /// The workspace sources `sandboxd` knows how to materialize today.

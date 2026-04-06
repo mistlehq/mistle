@@ -4,6 +4,7 @@
 //! directly, while exposing the parsed process definitions that the process
 //! supervision module starts and stops around manifest reloads.
 
+pub mod adapters;
 mod plan;
 mod runtime_file;
 mod workspace_source;
@@ -14,10 +15,11 @@ use crate::command::{CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL, run_command};
 use crate::protocol::startup::StartupInput;
 use crate::time::{SystemClock, ThreadSleeper};
 
-pub(crate) use plan::RuntimeClient;
 pub use plan::{
-    CompiledRuntimePlan, RuntimeArtifactCommand, RuntimeClientProcessReadiness,
-    RuntimeClientProcessStopPolicy, RuntimeClientProcessStopSignal,
+    CompiledAgentRuntime, CompiledRuntimePlan, RuntimeArtifactCommand, RuntimeClient,
+    RuntimeClientConnectionMode, RuntimeClientEndpoint, RuntimeClientEndpointTransport,
+    RuntimeClientProcess, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
+    RuntimeClientProcessStopSignal,
 };
 
 /// Describes why one runtime-plan setup step failed while applying the manifest.

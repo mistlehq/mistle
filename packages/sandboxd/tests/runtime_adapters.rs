@@ -1,19 +1,21 @@
+use std::collections::BTreeMap;
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 
 use serde_json::{Value, json};
 use tungstenite::{Message, WebSocket, accept, connect};
 
-use sandboxd::codex_proxy::start_codex_proxy;
 use sandboxd::keepalive::KeepaliveManager;
+use sandboxd::protocol::startup::{StartupInput, StartupMode};
+use sandboxd::runtime::adapters::RuntimeAdapterRegistry;
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 
-static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(100);
+static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(400);
 
 #[test]
-fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
+fn runtime_adapter_registry_starts_codex_proxy_adapter() {
     let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
     let raw_port = raw_listener
         .local_addr()
@@ -140,19 +142,107 @@ fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
         .recv()
         .expect("raw server should report readiness");
 
-    let keepalive_manager = Arc::new(std::sync::Mutex::new(KeepaliveManager::default()));
-    let proxy = start_codex_proxy(
-        "ws://127.0.0.1:0/codex",
-        &raw_url,
-        keepalive_manager.clone(),
-        Arc::new(ThreadSleeper),
-    )
-    .expect("Codex proxy should start");
+    let startup_input = StartupInput {
+        startup_mode: StartupMode::New,
+        bootstrap_token: "bootstrap-token-value".to_string(),
+        tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+        tunnel_gateway_ws_url: "ws://127.0.0.1:5000/tunnel/sandbox".to_string(),
+        runtime_plan: serde_json::json!({
+            "sandboxProfileId": "sbp_123",
+            "version": 1,
+            "image": {
+                "source": "base",
+                "imageRef": "mistle/sandbox-base:dev"
+            },
+            "egressRoutes": [],
+            "artifacts": [],
+            "runtimeClients": [
+                {
+                    "clientId": "codex-cli",
+                    "setup": {
+                        "env": {},
+                        "files": []
+                    },
+                    "processes": [
+                        {
+                            "processKey": "codex-app-server",
+                            "command": {
+                                "args": ["codex", "app-server"]
+                            },
+                            "readiness": {
+                                "type": "ws",
+                                "url": raw_url,
+                                "timeoutMs": 5000
+                            },
+                            "stop": {
+                                "signal": "sigterm",
+                                "timeoutMs": 10000,
+                                "gracePeriodMs": 2000
+                            }
+                        }
+                    ],
+                    "endpoints": [
+                        {
+                            "endpointKey": "app-server",
+                            "processKey": "codex-app-server",
+                            "transport": {
+                                "type": "ws",
+                                "url": "ws://127.0.0.1:0/codex"
+                            },
+                            "connectionMode": "dedicated"
+                        }
+                    ]
+                }
+            ],
+            "workspaceSources": [],
+            "agentRuntimes": [
+                {
+                    "bindingId": "arb_123",
+                    "runtimeId": "codex",
+                    "runtimeKey": "codex-app-server",
+                    "clientId": "codex-cli",
+                    "endpointKey": "app-server",
+                    "ptyLaunch": {
+                        "runtimeId": "codex",
+                        "displayName": "Codex",
+                        "newLaunch": {
+                            "ptySessionId": "pty_new",
+                            "cols": 80,
+                            "rows": 24,
+                            "command": "codex",
+                            "args": []
+                        },
+                        "resumeLaunch": {
+                            "ptySessionId": "pty_resume",
+                            "cols": 80,
+                            "rows": 24,
+                            "command": "codex",
+                            "args": []
+                        }
+                    }
+                }
+            ]
+        }),
+        egress_grant_by_rule_id: BTreeMap::new(),
+    };
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let registry = RuntimeAdapterRegistry;
+    let adapters = registry
+        .start(
+            &startup_input,
+            keepalive_manager.clone(),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("runtime adapter registry should start the codex adapter");
+
+    assert_eq!(adapters.adapters().len(), 1);
+    assert_eq!(adapters.adapters()[0].runtime_id(), "codex");
 
     wait_for_keepalive_state(&keepalive_manager, true);
 
-    let (mut proxy_client, _) =
-        connect(proxy.listen_url()).expect("client should connect through the Codex proxy");
+    let (mut proxy_client, _) = connect(adapters.adapters()[0].listen_url())
+        .expect("client should connect through the codex runtime adapter");
     let request_id = REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
     proxy_client
         .send(Message::Text(
@@ -175,14 +265,16 @@ fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
     proxy_client
         .close(None)
         .expect("proxy client should close cleanly");
-    proxy.close().expect("Codex proxy should close cleanly");
+    adapters
+        .close()
+        .expect("runtime adapter registry should close the codex adapter");
     raw_server_thread
         .join()
         .expect("raw server thread should exit cleanly");
 }
 
 fn wait_for_keepalive_state(
-    keepalive_manager: &Arc<std::sync::Mutex<KeepaliveManager>>,
+    keepalive_manager: &Arc<Mutex<KeepaliveManager>>,
     expected_active: bool,
 ) {
     for _ in 0..100 {

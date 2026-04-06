@@ -16,9 +16,7 @@ use std::thread;
 
 use portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
 
-use crate::cgroups::{
-    UserScopePaths, attach_pid_to_scope, create_user_scope, is_scope_populated,
-};
+use crate::cgroups::{UserScopePaths, attach_pid_to_scope, create_user_scope, is_scope_populated};
 use crate::time::{Clock, Duration, Sleeper};
 
 /// Default PTY column count when the caller does not specify one.
