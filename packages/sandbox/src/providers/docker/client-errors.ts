@@ -28,7 +28,7 @@ export const DockerClientOperationIds = {
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L422-L452
    */
   STOP_CONTAINER: "stop_container",
-  APPLY_STARTUP: "apply_startup",
+  INIT: "init",
   /**
    * `container.inspect(...)`.
    * Source:

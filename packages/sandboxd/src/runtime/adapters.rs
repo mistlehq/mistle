@@ -19,7 +19,7 @@ use crate::runtime::plan::{
 };
 use crate::time::Sleeper;
 
-/// Starts the runtime-specific platform-activity adapters declared by one startup manifest.
+/// Starts the runtime-specific platform-activity adapters declared by one startup input.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RuntimeAdapterRegistry;
 
@@ -153,14 +153,14 @@ impl RuntimeAdapter {
     }
 }
 
-/// Groups the runtime adapters started for one manifest application.
+/// Groups the runtime adapters started for one accepted startup input.
 #[derive(Default)]
 pub struct RuntimeAdapters {
     adapters: Vec<RuntimeAdapter>,
 }
 
 impl RuntimeAdapters {
-    /// Returns the started adapters in manifest order.
+    /// Returns the started adapters in runtime-plan order.
     pub fn adapters(&self) -> &[RuntimeAdapter] {
         &self.adapters
     }
@@ -176,7 +176,7 @@ impl RuntimeAdapters {
 }
 
 impl RuntimeAdapterRegistry {
-    /// Starts all runtime-specific adapters declared by one startup manifest.
+    /// Starts all runtime-specific adapters declared by one startup input.
     pub fn start(
         &self,
         startup_input: &StartupInput,

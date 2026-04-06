@@ -8,7 +8,7 @@ Current scope:
 - resume a sandbox against existing provider-managed state
 - stop a running sandbox
 - destroy a sandbox runtime
-- apply runtime startup payloads through provider-scoped runtime control
+- initialize a running sandbox daemon through provider-scoped runtime control
 
 Currently implemented providers:
 
@@ -93,7 +93,7 @@ const inspection = await adapter.inspect({
   id: sandbox.id,
 });
 
-await runtimeControl.applyStartup({
+await runtimeControl.init({
   id: sandbox.id,
   payload: Buffer.from("bootstrap payload\n", "utf8"),
 });
@@ -112,7 +112,7 @@ await runtimeControl.close();
 - `SandboxAdapter.inspect({ id })` returns normalized top-level lifecycle fields plus `raw`, the actual provider inspect payload, without attaching to the runtime.
 - For E2B sandboxes created by this package, the stable template alias is available in `inspection.raw.metadata.mistle_template_alias`.
 - `SandboxResumeRequestV1` resumes provider compute against existing sandbox state using a previous sandbox `id`.
-- `SandboxRuntimeControl.applyStartup({ id, payload })` delivers runtime startup bytes to an already-running sandbox using provider-native control paths.
+- `SandboxRuntimeControl.init({ id, payload })` delivers one sandbox startup payload to an already-running sandbox daemon using provider-native control paths.
 - `SandboxRuntimeControl.close()` releases provider client resources held by runtime control.
 - Official providers inject the required runtime env through `withRequiredSandboxRuntimeEnv(...)` instead of relying on image-level runtime env defaults.
 - E2B uses the same shared OCI base image reference but resolves provider-native templates internally.
@@ -128,7 +128,7 @@ await runtimeControl.close();
 - resume a sandbox runtime
 - stop a sandbox runtime
 - destroy a sandbox runtime
-- apply runtime startup payloads through a separate runtime-control interface
+- initialize a running sandbox daemon through a separate runtime-control interface
 
 It is not responsible for provisioning or managing provider infrastructure/resources. For current and future adapters (for example Docker, E2B, Kubernetes), platform concerns such as autoscaling, cluster/node lifecycle, scheduling policy, capacity management, and other underlying resource orchestration are out of scope for this package.
 

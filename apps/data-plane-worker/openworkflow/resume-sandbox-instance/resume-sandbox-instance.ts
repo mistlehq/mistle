@@ -6,7 +6,7 @@ import type { Clock, Sleeper } from "@mistle/time";
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
-import { applySandboxStartupConfiguration } from "../start-sandbox-instance/apply-sandbox-startup-configuration.js";
+import { initializeSandboxRuntime } from "../start-sandbox-instance/initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "../start-sandbox-instance/mark-sandbox-instance-running.js";
 import { SandboxStartupModes } from "../start-sandbox-instance/sandbox-startup-input.js";
@@ -17,7 +17,7 @@ import { resumeSandbox } from "./resume-sandbox.js";
 
 const ResumeSandboxFailureCodes = {
   RESUME_SANDBOX_FAILED: "resume_sandbox_failed",
-  STARTUP_CONFIGURATION_FAILED: "startup_configuration_failed",
+  SANDBOX_INIT_FAILED: "sandbox_init_failed",
   TUNNEL_CONNECT_ACK_TIMEOUT: "tunnel_connect_ack_timeout",
   TUNNEL_CONNECT_ACK_WAIT_FAILED: "tunnel_connect_ack_wait_failed",
   STATUS_TRANSITION_TO_RUNNING_FAILED: "status_transition_to_running_failed",
@@ -149,10 +149,9 @@ export async function resumeSandboxInstance(
 
   try {
     // Resuming the provider runtime is not enough to make the sandbox connectable again.
-    // The runtime process tree is restarted as part of resume, so we must resend startup
-    // metadata with `startupMode=existing` to relaunch processes/tunnel without mutating
-    // the persisted sandbox filesystem again.
-    await applySandboxStartupConfiguration(
+    // The resumed daemon still needs one `startupMode=existing` init payload so it can
+    // restore its in-memory runtime state and reconnect its tunnel/process tree.
+    await initializeSandboxRuntime(
       {
         config: ctx.config,
         sandboxRuntimeControl: ctx.sandboxRuntimeControl,
@@ -169,16 +168,16 @@ export async function resumeSandboxInstance(
       sandboxInstanceId: input.sandboxInstanceId,
       runtimeProvider: resumedRuntime.runtimeProvider,
       providerSandboxId: resumedRuntime.providerSandboxId,
-      failureCode: ResumeSandboxFailureCodes.STARTUP_CONFIGURATION_FAILED,
-      failureMessage: "Failed to apply resumed sandbox startup configuration.",
+      failureCode: ResumeSandboxFailureCodes.SANDBOX_INIT_FAILED,
+      failureMessage: "Failed to initialize resumed sandbox runtime.",
     });
     throw error;
   }
 
   let tunnelReady: boolean;
   try {
-    // Tunnel readiness is only meaningful after startup has been reapplied and the resumed
-    // runtime has had a chance to relaunch its bootstrap process.
+    // Tunnel readiness is only meaningful after the resumed daemon has accepted init
+    // and had a chance to relaunch its bootstrap process.
     tunnelReady = await waitForSandboxTunnelReadiness(
       {
         runtimeStateReader: ctx.runtimeStateReader,

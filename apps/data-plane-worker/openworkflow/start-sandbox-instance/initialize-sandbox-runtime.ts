@@ -65,7 +65,7 @@ async function createSandboxStartupInput(input: {
   };
 }
 
-export async function applySandboxStartupConfiguration(
+export async function initializeSandboxRuntime(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     sandboxRuntimeControl: SandboxRuntimeControl;
@@ -84,7 +84,7 @@ export async function applySandboxStartupConfiguration(
     runtimePlan: input.runtimePlan,
   });
 
-  await ctx.sandboxRuntimeControl.applyStartup({
+  await ctx.sandboxRuntimeControl.init({
     id: input.providerSandboxId,
     payload: encodeSandboxStartupInput(startupInput),
   });

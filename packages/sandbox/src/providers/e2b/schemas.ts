@@ -64,7 +64,7 @@ export const E2BDestroySandboxRequestSchema = z
   .strict();
 export type E2BDestroySandboxRequest = z.output<typeof E2BDestroySandboxRequestSchema>;
 
-export const E2BApplyStartupRequestSchema = z
+export const E2BInitRequestSchema = z
   .object({
     sandboxId: z.string().trim().min(1, {
       message: "E2B request field `sandboxId` is required.",
@@ -74,4 +74,4 @@ export const E2BApplyStartupRequestSchema = z
     }),
   })
   .strict();
-export type E2BApplyStartupRequest = z.output<typeof E2BApplyStartupRequestSchema>;
+export type E2BInitRequest = z.output<typeof E2BInitRequestSchema>;

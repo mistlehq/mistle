@@ -7,8 +7,8 @@ import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "../core/context.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
-import { applySandboxStartupConfiguration } from "./apply-sandbox-startup-configuration.js";
 import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
+import { initializeSandboxRuntime } from "./initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "./mark-sandbox-instance-running.js";
 import { persistSandboxInstanceProvisioning } from "./persist-sandbox-instance-provisioning.js";
@@ -19,7 +19,7 @@ import { waitForSandboxTunnelReadiness } from "./wait-for-sandbox-tunnel-readine
 const StartSandboxFailureCodes = {
   SANDBOX_START_FAILED: "sandbox_start_failed",
   PERSIST_PROVISIONING_METADATA_FAILED: "persist_provisioning_metadata_failed",
-  STARTUP_CONFIGURATION_FAILED: "startup_configuration_failed",
+  SANDBOX_INIT_FAILED: "sandbox_init_failed",
   TUNNEL_CONNECT_ACK_TIMEOUT: "tunnel_connect_ack_timeout",
   TUNNEL_CONNECT_ACK_WAIT_FAILED: "tunnel_connect_ack_wait_failed",
   STATUS_TRANSITION_TO_RUNNING_FAILED: "status_transition_to_running_failed",
@@ -286,14 +286,14 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
     }
 
     try {
-      await step.run({ name: "apply-sandbox-startup-configuration" }, async () => {
+      await step.run({ name: "initialize-sandbox-runtime" }, async () => {
         logger.info(
           {
             providerSandboxId: startedSandbox.providerSandboxId,
           },
-          "Applying sandbox startup configuration.",
+          "Initializing sandbox runtime.",
         );
-        await applySandboxStartupConfiguration(
+        await initializeSandboxRuntime(
           {
             config: ctx.config,
             sandboxRuntimeControl: ctx.sandboxRuntimeControl,
@@ -310,7 +310,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
         {
           providerSandboxId: startedSandbox.providerSandboxId,
         },
-        "Applied sandbox startup configuration.",
+        "Initialized sandbox runtime.",
       );
     } catch (error) {
       logger.error(
@@ -318,22 +318,22 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           err: error,
           providerSandboxId: startedSandbox.providerSandboxId,
         },
-        "Failed to apply sandbox startup configuration.",
+        "Failed to initialize sandbox runtime.",
       );
       try {
         await handleFailedStartup({
           sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
           runtimeProvider: startedSandbox.runtimeProvider,
           providerSandboxId: startedSandbox.providerSandboxId,
-          failureCode: StartSandboxFailureCodes.STARTUP_CONFIGURATION_FAILED,
-          failureMessage: "Failed to apply sandbox startup configuration.",
+          failureCode: StartSandboxFailureCodes.SANDBOX_INIT_FAILED,
+          failureMessage: "Failed to initialize sandbox runtime.",
         });
       } catch (cleanupError) {
         throw new Error(
-          "Failed to apply sandbox startup configuration and failed cleanup after startup failure.",
+          "Failed to initialize sandbox runtime and failed cleanup after startup failure.",
           {
             cause: {
-              applyStartupConfigurationError: error,
+              startupConfigurationError: error,
               cleanupError,
             },
           },
@@ -341,7 +341,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
       }
 
       throw new Error(
-        "Failed to apply sandbox startup configuration. Sandbox was stopped and sandbox instance was marked as failed.",
+        "Failed to initialize sandbox runtime. Sandbox was stopped and sandbox instance was marked as failed.",
         {
           cause: error,
         },

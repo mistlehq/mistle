@@ -1,6 +1,4 @@
-use sandboxd::protocol::startup::{
-    StartupApplyRequest, StartupApplyResponse, StartupInput, StartupMode,
-};
+use sandboxd::protocol::startup::{StartupInitResponse, StartupInput, StartupMode};
 
 #[test]
 fn decodes_startup_input_fixture() {
@@ -25,51 +23,34 @@ fn decodes_startup_input_fixture() {
 }
 
 #[test]
-fn decodes_startup_apply_request_fixture() {
+fn decodes_startup_init_ok_response_fixture() {
     let fixture = include_str!(
-        "../../sandbox-runtime-contract/tests/fixtures/startup-apply-request.valid.json"
+        "../../sandbox-runtime-contract/tests/fixtures/startup-init-response.ok.valid.json"
     );
 
-    let request: StartupApplyRequest =
-        serde_json::from_str(fixture).expect("startup-apply-request fixture should decode");
+    let response: StartupInitResponse =
+        serde_json::from_str(fixture).expect("startup init ok fixture should decode");
 
-    assert_eq!(request.token, "startup-apply-token");
-    assert_eq!(request.startup_input.startup_mode, StartupMode::New);
     assert_eq!(
-        request.startup_input.runtime_plan["image"]["imageRef"],
-        "mistle/sandbox-base:dev"
+        response,
+        StartupInitResponse::Ok(sandboxd::protocol::startup::StartupInitOkResponse { ok: true })
     );
 }
 
 #[test]
-fn decodes_startup_apply_ok_response_fixture() {
+fn decodes_startup_init_error_response_fixture() {
     let fixture = include_str!(
-        "../../sandbox-runtime-contract/tests/fixtures/startup-apply-response.ok.valid.json"
+        "../../sandbox-runtime-contract/tests/fixtures/startup-init-response.error.valid.json"
     );
 
-    let response: StartupApplyResponse =
-        serde_json::from_str(fixture).expect("startup apply ok fixture should decode");
+    let response: StartupInitResponse =
+        serde_json::from_str(fixture).expect("startup init error fixture should decode");
 
     assert_eq!(
         response,
-        StartupApplyResponse::Ok(sandboxd::protocol::startup::StartupApplyOkResponse { ok: true })
-    );
-}
-
-#[test]
-fn decodes_startup_apply_error_response_fixture() {
-    let fixture = include_str!(
-        "../../sandbox-runtime-contract/tests/fixtures/startup-apply-response.error.valid.json"
-    );
-
-    let response: StartupApplyResponse =
-        serde_json::from_str(fixture).expect("startup apply error fixture should decode");
-
-    assert_eq!(
-        response,
-        StartupApplyResponse::Error(sandboxd::protocol::startup::StartupApplyErrorResponse {
+        StartupInitResponse::Error(sandboxd::protocol::startup::StartupInitErrorResponse {
             ok: false,
-            error: "startup apply failed".to_string(),
+            error: "sandbox init failed".to_string(),
         })
     );
 }

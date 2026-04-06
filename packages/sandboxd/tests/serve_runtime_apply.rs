@@ -1,3 +1,5 @@
+#![cfg(target_os = "linux")]
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
@@ -6,14 +8,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use sandboxd::control;
 use sandboxd::protocol::startup::{StartupInput, StartupMode};
-use sandboxd::time::ThreadSleeper;
+use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
-fn serve_applies_persisted_manifest_on_startup() {
+fn daemon_applies_startup_input_after_init_submission() {
     let test_dir = create_temp_test_dir("serve_runtime_apply");
-    let manifest_path = test_dir.join("manifest.json");
     let control_socket_path = test_dir.join("control.sock");
     let startup_output_path = test_dir.join("startup-output.txt");
 
@@ -49,33 +50,44 @@ fn serve_applies_persisted_manifest_on_startup() {
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
     };
-    let mut manifest_bytes =
-        serde_json::to_vec_pretty(&startup_input).expect("manifest json should serialize");
-    manifest_bytes.push(b'\n');
-    fs::write(&manifest_path, manifest_bytes).expect("manifest file should be writable");
 
     let server = control::start_control_server(
         &control_socket_path,
-        &manifest_path,
         ThreadSleeper,
         control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
     )
-    .expect("serve should start when persisted manifest is valid");
+    .expect("daemon should start");
+    control::submit_init(&control_socket_path, &startup_input)
+        .expect("init submission should succeed");
 
-    assert_eq!(
-        fs::read_to_string(&startup_output_path).expect("startup runtime state should be applied"),
-        "startup"
-    );
+    wait_for_file_contents(&startup_output_path, "startup");
     assert_eq!(
         server
-            .latest_manifest()
-            .expect("serve should retain the applied manifest")
+            .startup_input()
+            .expect("daemon should retain the accepted startup input")
             .bootstrap_token,
         "bootstrap-token-value"
     );
 
-    server.close().expect("serve should shut down cleanly");
+    server.close().expect("daemon should shut down cleanly");
     fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+}
+
+fn wait_for_file_contents(path: &PathBuf, expected: &str) {
+    for _ in 0..100 {
+        if let Ok(contents) = fs::read_to_string(path)
+            && contents == expected
+        {
+            return;
+        }
+
+        ThreadSleeper.sleep(Duration::from_millis(10));
+    }
+
+    panic!(
+        "timed out waiting for startup output file {} to contain '{expected}'",
+        path.display()
+    );
 }
 
 fn create_temp_test_dir(prefix: &str) -> PathBuf {

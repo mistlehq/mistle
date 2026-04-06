@@ -2,7 +2,7 @@
 //!
 //! This module turns compiled runtime-plan process entries into child
 //! processes, waits for their declared readiness checks, and applies the stop
-//! policies used during manifest reloads and shutdown.
+//! policies used during daemon shutdown.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -35,7 +35,7 @@ pub struct RuntimeClientProcessSpec {
     pub stop: RuntimeClientProcessStopPolicy,
 }
 
-/// Owns the set of runtime client processes started for the current manifest.
+/// Owns the set of runtime client processes started for the current startup input.
 #[derive(Debug)]
 pub struct RuntimeClientProcessManager {
     processes: Vec<RunningRuntimeClientProcess>,

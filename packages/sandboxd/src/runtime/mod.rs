@@ -2,7 +2,7 @@
 //!
 //! This module materializes the non-supervised parts of the runtime plan
 //! directly, while exposing the parsed process definitions that the process
-//! supervision module starts and stops around manifest reloads.
+//! supervision module starts and stops for the active sandbox session.
 
 pub mod adapters;
 mod plan;
@@ -22,7 +22,7 @@ pub use plan::{
     RuntimeClientProcessStopSignal,
 };
 
-/// Describes why one runtime-plan setup step failed while applying the manifest.
+/// Describes why one runtime-plan setup step failed while applying startup input.
 #[derive(Debug)]
 pub enum RuntimePlanApplyError {
     InvalidRuntimePlan(serde_json::Error),

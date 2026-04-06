@@ -27,16 +27,7 @@ export const SandboxdStartupInputSchema = z
 
 export type SandboxdStartupInput = z.infer<typeof SandboxdStartupInputSchema>;
 
-export const SandboxdStartupApplyRequestSchema = z
-  .object({
-    token: z.string().min(1),
-    startupInput: SandboxdStartupInputSchema,
-  })
-  .strict();
-
-export type SandboxdStartupApplyRequest = z.infer<typeof SandboxdStartupApplyRequestSchema>;
-
-export const SandboxdStartupApplyResponseSchema = z.discriminatedUnion("ok", [
+export const SandboxdInitResponseSchema = z.discriminatedUnion("ok", [
   z
     .object({
       ok: z.literal(true),
@@ -50,4 +41,4 @@ export const SandboxdStartupApplyResponseSchema = z.discriminatedUnion("ok", [
     .strict(),
 ]);
 
-export type SandboxdStartupApplyResponse = z.infer<typeof SandboxdStartupApplyResponseSchema>;
+export type SandboxdInitResponse = z.infer<typeof SandboxdInitResponseSchema>;

@@ -1,17 +1,18 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
-import startupApplyRequestSchemaJson from "../schemas/sandboxd-startup-apply-request.schema.json" with { type: "json" };
-import startupApplyResponseSchemaJson from "../schemas/sandboxd-startup-apply-response.schema.json" with { type: "json" };
-import startupInputSchemaJson from "../schemas/sandboxd-startup-input.schema.json" with { type: "json" };
-import startupApplyRequestFixture from "../tests/fixtures/startup-apply-request.valid.json" with { type: "json" };
-import startupApplyResponseErrorFixture from "../tests/fixtures/startup-apply-response.error.valid.json" with { type: "json" };
-import startupApplyResponseOkFixture from "../tests/fixtures/startup-apply-response.ok.valid.json" with { type: "json" };
+import startupInitResponseErrorFixture from "../tests/fixtures/startup-init-response.error.valid.json" with { type: "json" };
+import startupInitResponseOkFixture from "../tests/fixtures/startup-init-response.ok.valid.json" with { type: "json" };
 import startupInputFixture from "../tests/fixtures/startup-input.valid.json" with { type: "json" };
-import {
-  SandboxdStartupApplyRequestSchema,
-  SandboxdStartupApplyResponseSchema,
-  SandboxdStartupInputSchema,
-} from "./startup.js";
+import { SandboxdInitResponseSchema, SandboxdStartupInputSchema } from "./startup.js";
+
+const startupInitResponseSchemaJson: unknown = JSON.parse(
+  readFileSync(new URL("../schemas/sandboxd-init-response.schema.json", import.meta.url), "utf8"),
+);
+const startupInputSchemaJson: unknown = JSON.parse(
+  readFileSync(new URL("../schemas/sandboxd-startup-input.schema.json", import.meta.url), "utf8"),
+);
 
 const StartupJsonSchemaParams = {
   io: "input",
@@ -22,18 +23,12 @@ describe("startup contracts", () => {
     expect(SandboxdStartupInputSchema.parse(startupInputFixture)).toEqual(startupInputFixture);
   });
 
-  it("parses the checked-in startup apply request fixture", () => {
-    expect(SandboxdStartupApplyRequestSchema.parse(startupApplyRequestFixture)).toEqual(
-      startupApplyRequestFixture,
+  it("parses the checked-in startup init response fixtures", () => {
+    expect(SandboxdInitResponseSchema.parse(startupInitResponseOkFixture)).toEqual(
+      startupInitResponseOkFixture,
     );
-  });
-
-  it("parses the checked-in startup apply response fixtures", () => {
-    expect(SandboxdStartupApplyResponseSchema.parse(startupApplyResponseOkFixture)).toEqual(
-      startupApplyResponseOkFixture,
-    );
-    expect(SandboxdStartupApplyResponseSchema.parse(startupApplyResponseErrorFixture)).toEqual(
-      startupApplyResponseErrorFixture,
+    expect(SandboxdInitResponseSchema.parse(startupInitResponseErrorFixture)).toEqual(
+      startupInitResponseErrorFixture,
     );
   });
 
@@ -62,27 +57,21 @@ describe("startup contracts", () => {
     });
   });
 
-  it("rejects startup apply requests with invalid nested startup input", () => {
+  it("rejects init responses with an empty error message", () => {
     expect(() =>
-      SandboxdStartupApplyRequestSchema.parse({
-        token: "startup-apply-token",
-        startupInput: {
-          ...startupInputFixture,
-          startupMode: undefined,
-        },
+      SandboxdInitResponseSchema.parse({
+        ok: false,
+        error: "",
       }),
-    ).toThrow("Invalid option");
+    ).toThrow("Too small");
   });
 
   it("matches the checked-in startup json schemas", () => {
     expect(SandboxdStartupInputSchema.toJSONSchema(StartupJsonSchemaParams)).toEqual(
       startupInputSchemaJson,
     );
-    expect(SandboxdStartupApplyRequestSchema.toJSONSchema(StartupJsonSchemaParams)).toEqual(
-      startupApplyRequestSchemaJson,
-    );
-    expect(SandboxdStartupApplyResponseSchema.toJSONSchema(StartupJsonSchemaParams)).toEqual(
-      startupApplyResponseSchemaJson,
+    expect(SandboxdInitResponseSchema.toJSONSchema(StartupJsonSchemaParams)).toEqual(
+      startupInitResponseSchemaJson,
     );
   });
 });

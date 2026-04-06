@@ -22,27 +22,20 @@ pub struct StartupInput {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct StartupApplyRequest {
-    pub token: String,
-    pub startup_input: StartupInput,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct StartupApplyOkResponse {
+pub struct StartupInitOkResponse {
     pub ok: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct StartupApplyErrorResponse {
+pub struct StartupInitErrorResponse {
     pub ok: bool,
     pub error: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum StartupApplyResponse {
-    Ok(StartupApplyOkResponse),
-    Error(StartupApplyErrorResponse),
+pub enum StartupInitResponse {
+    Ok(StartupInitOkResponse),
+    Error(StartupInitErrorResponse),
 }

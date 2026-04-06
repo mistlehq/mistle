@@ -282,7 +282,7 @@ describe("encodeSandboxStartupInput", () => {
     expect(url).toBe("ws://127.0.0.1:5003/tunnel/sandbox/sbi_example_001");
   });
 
-  it("encodes bootstrap token, tunnel exchange token, tunnel gateway ws url, and runtime plan as newline-delimited json", () => {
+  it("encodes the startup input as newline-delimited json", () => {
     const encoded = encodeSandboxStartupInput({
       startupMode: SandboxStartupModes.NEW,
       bootstrapToken: "bootstrap-token-value",
