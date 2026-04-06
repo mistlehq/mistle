@@ -11,7 +11,7 @@ export type AutomationWebhookAggregate = {
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
-  integrationConnectionId: string;
+  integrationWebhookSourceId: string;
   eventTypes: string[] | null;
   payloadFilter: Record<string, unknown> | null;
   inputTemplate: string;
@@ -73,7 +73,7 @@ export async function loadWebhookAutomationAggregateOrThrow(
     enabled: automation.enabled,
     createdAt: automation.createdAt,
     updatedAt: automation.updatedAt,
-    integrationConnectionId: webhookAutomation.integrationConnectionId,
+    integrationWebhookSourceId: webhookAutomation.integrationWebhookSourceId,
     eventTypes: webhookAutomation.eventTypes,
     payloadFilter: webhookAutomation.payloadFilter,
     inputTemplate: webhookAutomation.inputTemplate,

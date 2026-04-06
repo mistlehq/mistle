@@ -1,7 +1,7 @@
 import { index, jsonb, text, timestamp } from "drizzle-orm/pg-core";
 
 import { automations } from "./automations.js";
-import { integrationConnections } from "./integration-connections.js";
+import { integrationWebhookSources } from "./integration-webhook-sources.js";
 import { controlPlaneSchema } from "./namespace.js";
 
 export const webhookAutomations = controlPlaneSchema.table(
@@ -10,9 +10,9 @@ export const webhookAutomations = controlPlaneSchema.table(
     automationId: text("automation_id")
       .primaryKey()
       .references(() => automations.id, { onDelete: "cascade" }),
-    integrationConnectionId: text("integration_connection_id")
+    integrationWebhookSourceId: text("integration_webhook_source_id")
       .notNull()
-      .references(() => integrationConnections.id, { onDelete: "cascade" }),
+      .references(() => integrationWebhookSources.id, { onDelete: "cascade" }),
     eventTypes: jsonb("event_types").$type<string[]>(),
     payloadFilter: jsonb("payload_filter").$type<Record<string, unknown>>(),
     inputTemplate: text("input_template").notNull(),
@@ -26,7 +26,9 @@ export const webhookAutomations = controlPlaneSchema.table(
       .defaultNow(),
   },
   (table) => [
-    index("webhook_automations_integration_connection_id_idx").on(table.integrationConnectionId),
+    index("webhook_automations_integration_webhook_source_id_idx").on(
+      table.integrationWebhookSourceId,
+    ),
     index("webhook_automations_automation_id_idx").on(table.automationId),
   ],
 );

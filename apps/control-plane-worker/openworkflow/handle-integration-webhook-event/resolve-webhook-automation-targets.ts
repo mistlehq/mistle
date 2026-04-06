@@ -5,7 +5,7 @@ import { parseWebhookPayloadFilter } from "./schema.js";
 
 type ResolveWebhookAutomationTargetsInput = {
   organizationId: string;
-  integrationConnectionId: string;
+  integrationWebhookSourceId: string;
   eventType: string;
   payload: Record<string, unknown>;
 };
@@ -45,7 +45,8 @@ export async function resolveWebhookAutomationTargets(
   input: ResolveWebhookAutomationTargetsInput,
 ): Promise<ReadonlyArray<ResolvedWebhookAutomationTarget>> {
   const candidateWebhookAutomations = await db.query.webhookAutomations.findMany({
-    where: (table, { eq }) => eq(table.integrationConnectionId, input.integrationConnectionId),
+    where: (table, { eq }) =>
+      eq(table.integrationWebhookSourceId, input.integrationWebhookSourceId),
   });
 
   if (candidateWebhookAutomations.length === 0) {

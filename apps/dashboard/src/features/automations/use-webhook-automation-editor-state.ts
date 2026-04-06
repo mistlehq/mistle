@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import type {
   IntegrationConnection,
+  IntegrationWebhookSource,
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
 import { resolveLatestVersion } from "../pages/sandbox-profile-integrations-state.js";
@@ -50,6 +51,7 @@ type NavigateFunction = (to: string) => void | Promise<void>;
 type DirectoryData = {
   connections: readonly IntegrationConnection[];
   targets: readonly IntegrationTarget[];
+  webhookSources: readonly IntegrationWebhookSource[];
 };
 
 type WebhookAutomationOption = {
@@ -307,7 +309,7 @@ type LoadedWebhookAutomationEditorStateInput = {
   connectionOptions: readonly WebhookAutomationOption[];
   sandboxProfileOptions: readonly WebhookAutomationOption[];
   directoryData: DirectoryData;
-  preservedConnectionId?: string;
+  preservedWebhookSourceId?: string;
 };
 
 function resolveNormalizedConversationKeyTemplate(input: {
@@ -347,14 +349,19 @@ export function resolveWebhookAutomationEditInitialValues(input: {
 }): WebhookAutomationFormValues {
   const automationTriggerIds = (input.automation.eventTypes ?? []).map((eventType) =>
     createWebhookAutomationTriggerId({
-      connectionId: input.automation.integrationConnectionId,
+      webhookSourceId: input.automation.integrationWebhookSourceId,
       eventType,
     }),
   );
+  const preservedConnectionId =
+    input.directoryData.webhookSources.find(
+      (source) => source.id === input.automation.integrationWebhookSourceId,
+    )?.integrationConnectionId ?? undefined;
   const hydrationEventOptions = buildWebhookAutomationEventOptions({
     connections: input.directoryData.connections,
     targets: input.directoryData.targets,
-    preservedConnectionId: input.automation.integrationConnectionId,
+    webhookSources: input.directoryData.webhookSources,
+    ...(preservedConnectionId === undefined ? {} : { preservedConnectionId }),
     selectedTriggerIds: automationTriggerIds,
   });
 
@@ -399,22 +406,27 @@ export function useLoadedWebhookAutomationEditorState(
     selectedProfileId,
     directoryData: input.directoryData,
   });
+  const preservedConnectionId =
+    input.preservedWebhookSourceId === undefined
+      ? undefined
+      : input.directoryData.webhookSources.find(
+          (source) => source.id === input.preservedWebhookSourceId,
+        )?.integrationConnectionId;
 
   const webhookEventOptions = useMemo(
     () =>
       buildWebhookAutomationEventOptions({
         connections: input.directoryData.connections,
         targets: input.directoryData.targets,
+        webhookSources: input.directoryData.webhookSources,
         selectableConnectionIds: selectedProfileTriggerState.selectableConnectionIds,
-        ...(input.preservedConnectionId === undefined
-          ? {}
-          : { preservedConnectionId: input.preservedConnectionId }),
+        ...(preservedConnectionId === undefined ? {} : { preservedConnectionId }),
         selectedTriggerIds: formValues.triggerIds,
       }),
     [
       formValues.triggerIds,
       input.directoryData,
-      input.preservedConnectionId,
+      preservedConnectionId,
       selectedProfileTriggerState.selectableConnectionIds,
     ],
   );

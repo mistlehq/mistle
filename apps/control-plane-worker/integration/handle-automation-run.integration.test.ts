@@ -15,6 +15,7 @@ import {
   IntegrationBindingKinds,
   integrationTargets,
   integrationWebhookEvents,
+  integrationWebhookSources,
   IntegrationWebhookEventStatuses,
   organizations,
   sandboxProfiles,
@@ -143,6 +144,24 @@ async function seedOpenAiAgentBinding(input: {
   });
 }
 
+async function seedWebhookSource(input: {
+  db: ReturnType<typeof createControlPlaneDatabase>;
+  sourceId: string;
+  organizationId: string;
+  connectionId: string;
+  targetKey: string;
+}) {
+  await input.db.insert(integrationWebhookSources).values({
+    id: input.sourceId,
+    ownerScope: "connection",
+    organizationId: input.organizationId,
+    integrationConnectionId: input.connectionId,
+    targetKey: input.targetKey,
+    routingStrategy: "payload",
+    status: "active",
+  });
+}
+
 describe("handleAutomationRun integration", () => {
   async function prepareAndHandoffAutomationRun(input: {
     db: ReturnType<typeof createControlPlaneDatabase>;
@@ -208,6 +227,7 @@ describe("handleAutomationRun integration", () => {
         const webhookEventId = "iwe_worker_automation_workflow";
         const automationRunId = "aru_worker_automation_workflow";
         const connectionId = "icn_worker_automation_workflow";
+        const webhookSourceId = "iws_worker_automation_workflow";
         const targetKey = "github-cloud-worker-automation-workflow";
 
         await database.db.insert(organizations).values({
@@ -247,6 +267,13 @@ describe("handleAutomationRun integration", () => {
           externalSubjectId: "654321",
           config: {},
         });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
         await database.db.insert(automations).values({
           id: automationId,
           organizationId,
@@ -256,7 +283,7 @@ describe("handleAutomationRun integration", () => {
         });
         await database.db.insert(webhookAutomations).values({
           automationId,
-          integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: null,
           inputTemplate: "Reply to {{payload.comment.body}}",
@@ -273,6 +300,7 @@ describe("handleAutomationRun integration", () => {
           id: webhookEventId,
           organizationId,
           integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           targetKey,
           eventType: "github.issue_comment.created",
           providerEventType: "issue_comment",
@@ -392,6 +420,7 @@ describe("handleAutomationRun integration", () => {
         const webhookEventId = "iwe_worker_automation_prepare";
         const automationRunId = "aru_worker_automation_prepare";
         const connectionId = "icn_worker_automation_prepare";
+        const webhookSourceId = "iws_worker_automation_prepare";
         const targetKey = "github-cloud-worker-automation-prepare";
 
         await database.db.insert(organizations).values({
@@ -431,6 +460,13 @@ describe("handleAutomationRun integration", () => {
           externalSubjectId: "123456",
           config: {},
         });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
         await database.db.insert(automations).values({
           id: automationId,
           organizationId,
@@ -440,7 +476,7 @@ describe("handleAutomationRun integration", () => {
         });
         await database.db.insert(webhookAutomations).values({
           automationId,
-          integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: null,
           inputTemplate: "Handle {{payload.comment.body}}",
@@ -457,6 +493,7 @@ describe("handleAutomationRun integration", () => {
           id: webhookEventId,
           organizationId,
           integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           targetKey,
           externalEventId: "evt_prepare",
           externalDeliveryId: "delivery_prepare",
@@ -567,6 +604,7 @@ describe("handleAutomationRun integration", () => {
         const webhookEventId = "iwe_worker_automation_replay_snapshot";
         const automationRunId = "aru_worker_automation_replay_snapshot";
         const connectionId = "icn_worker_automation_replay_snapshot";
+        const webhookSourceId = "iws_worker_automation_replay_snapshot";
         const targetKey = "github-cloud-worker-automation-replay-snapshot";
 
         await database.db.insert(organizations).values({
@@ -606,6 +644,13 @@ describe("handleAutomationRun integration", () => {
           externalSubjectId: "123456",
           config: {},
         });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
         await database.db.insert(automations).values({
           id: automationId,
           organizationId,
@@ -615,7 +660,7 @@ describe("handleAutomationRun integration", () => {
         });
         await database.db.insert(webhookAutomations).values({
           automationId,
-          integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: null,
           inputTemplate: "Handle {{payload.comment.body}}",
@@ -632,6 +677,7 @@ describe("handleAutomationRun integration", () => {
           id: webhookEventId,
           organizationId,
           integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           targetKey,
           externalEventId: "evt_replay_snapshot",
           externalDeliveryId: "delivery_replay_snapshot",
@@ -724,6 +770,7 @@ describe("handleAutomationRun integration", () => {
         const webhookEventId = "iwe_worker_automation_run_complete";
         const automationRunId = "aru_worker_automation_run_complete";
         const connectionId = "icn_worker_automation_run_complete";
+        const webhookSourceId = "iws_worker_automation_run_complete";
         const targetKey = "github-cloud-worker-automation-run-complete";
 
         await database.db.insert(organizations).values({
@@ -763,6 +810,13 @@ describe("handleAutomationRun integration", () => {
           externalSubjectId: "123456",
           config: {},
         });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
         await database.db.insert(automations).values({
           id: automationId,
           organizationId,
@@ -772,7 +826,7 @@ describe("handleAutomationRun integration", () => {
         });
         await database.db.insert(webhookAutomations).values({
           automationId,
-          integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: null,
           inputTemplate: "Handle {{payload.comment.body}}",
@@ -789,6 +843,7 @@ describe("handleAutomationRun integration", () => {
           id: webhookEventId,
           organizationId,
           integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           targetKey,
           externalEventId: "evt_complete",
           externalDeliveryId: "delivery_complete",
@@ -876,6 +931,7 @@ describe("handleAutomationRun integration", () => {
         const webhookEventId = "iwe_worker_automation_run_running";
         const automationRunId = "aru_worker_automation_run_running";
         const connectionId = "icn_worker_automation_run_running";
+        const webhookSourceId = "iws_worker_automation_run_running";
         const targetKey = "github-cloud-worker-automation-run-running";
 
         await database.db.insert(organizations).values({
@@ -915,6 +971,13 @@ describe("handleAutomationRun integration", () => {
           externalSubjectId: "123456",
           config: {},
         });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
         await database.db.insert(automations).values({
           id: automationId,
           organizationId,
@@ -924,7 +987,7 @@ describe("handleAutomationRun integration", () => {
         });
         await database.db.insert(webhookAutomations).values({
           automationId,
-          integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: null,
           inputTemplate: "Handle {{payload.comment.body}}",
@@ -941,6 +1004,7 @@ describe("handleAutomationRun integration", () => {
           id: webhookEventId,
           organizationId,
           integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           targetKey,
           externalEventId: "evt_running",
           externalDeliveryId: "delivery_running",
@@ -1029,6 +1093,7 @@ describe("handleAutomationRun integration", () => {
         const newerAutomationRunId = "aru_worker_automation_run_ignore_stale_newer";
         const olderAutomationRunId = "aru_worker_automation_run_ignore_stale_older";
         const connectionId = "icn_worker_automation_run_ignore_stale";
+        const webhookSourceId = "iws_worker_automation_run_ignore_stale";
         const targetKey = "github-cloud-worker-automation-run-ignore-stale";
 
         await database.db.insert(organizations).values({
@@ -1068,6 +1133,13 @@ describe("handleAutomationRun integration", () => {
           externalSubjectId: "123456",
           config: {},
         });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
         await database.db.insert(automations).values({
           id: automationId,
           organizationId,
@@ -1077,7 +1149,7 @@ describe("handleAutomationRun integration", () => {
         });
         await database.db.insert(webhookAutomations).values({
           automationId,
-          integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: null,
           inputTemplate: "Handle {{payload.comment.body}}",
@@ -1094,6 +1166,7 @@ describe("handleAutomationRun integration", () => {
           id: newerWebhookEventId,
           organizationId,
           integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           targetKey,
           externalEventId: "evt_ignore_stale_newer",
           externalDeliveryId: "delivery_ignore_stale_newer",
@@ -1182,6 +1255,7 @@ describe("handleAutomationRun integration", () => {
           id: olderWebhookEventId,
           organizationId,
           integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           targetKey,
           externalEventId: "evt_ignore_stale_older",
           externalDeliveryId: "delivery_ignore_stale_older",
@@ -1321,6 +1395,7 @@ describe("handleAutomationRun integration", () => {
         const webhookEventId = "iwe_worker_automation_run_fail";
         const automationRunId = "aru_worker_automation_run_fail";
         const connectionId = "icn_worker_automation_run_fail";
+        const webhookSourceId = "iws_worker_automation_run_fail";
         const targetKey = "github-cloud-worker-automation-run-fail";
 
         await database.db.insert(organizations).values({
@@ -1360,6 +1435,13 @@ describe("handleAutomationRun integration", () => {
           externalSubjectId: "123456",
           config: {},
         });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
         await database.db.insert(automations).values({
           id: automationId,
           organizationId,
@@ -1369,7 +1451,7 @@ describe("handleAutomationRun integration", () => {
         });
         await database.db.insert(webhookAutomations).values({
           automationId,
-          integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: null,
           inputTemplate: "Handle {{payload.comment.missing_field}}",
@@ -1386,6 +1468,7 @@ describe("handleAutomationRun integration", () => {
           id: webhookEventId,
           organizationId,
           integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           targetKey,
           externalEventId: "evt_fail",
           externalDeliveryId: "delivery_fail",

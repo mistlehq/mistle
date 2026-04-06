@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import type { paths } from "../../lib/control-plane-api/generated/schema.js";
-
 const KeysetPageSchema = z
   .object({
     after: z.string().min(1),
@@ -64,7 +62,7 @@ export const WebhookAutomationSchema = z
     id: z.string().min(1),
     idempotencyKeyTemplate: z.string().nullable(),
     inputTemplate: z.string(),
-    integrationConnectionId: z.string().min(1),
+    integrationWebhookSourceId: z.string().min(1),
     kind: z.literal("webhook"),
     name: z.string().min(1),
     payloadFilter: z.record(z.string(), z.unknown()).nullable(),
@@ -95,11 +93,35 @@ export type WebhookAutomationListItem = z.infer<typeof WebhookAutomationListItem
 export type WebhookAutomationsListResult = z.infer<typeof WebhookAutomationsListResultSchema>;
 export type DeleteWebhookAutomationResult = z.infer<typeof DeleteWebhookAutomationResultSchema>;
 
-export type CreateWebhookAutomationInput =
-  paths["/v1/automations/webhooks"]["post"]["requestBody"]["content"]["application/json"];
+export type CreateWebhookAutomationInput = {
+  name: string;
+  enabled?: boolean;
+  integrationWebhookSourceId: string;
+  eventTypes?: string[] | null;
+  payloadFilter?: Record<string, unknown> | null;
+  inputTemplate: string;
+  conversationKeyTemplate: string;
+  idempotencyKeyTemplate?: string | null;
+  target: {
+    sandboxProfileId: string;
+    sandboxProfileVersion?: number;
+  };
+};
 
-export type UpdateWebhookAutomationPatch =
-  paths["/v1/automations/webhooks/{automationId}"]["patch"]["requestBody"]["content"]["application/json"];
+export type UpdateWebhookAutomationPatch = {
+  name?: string;
+  enabled?: boolean;
+  integrationWebhookSourceId?: string;
+  eventTypes?: string[] | null;
+  payloadFilter?: Record<string, unknown> | null;
+  inputTemplate?: string;
+  conversationKeyTemplate?: string;
+  idempotencyKeyTemplate?: string | null;
+  target?: {
+    sandboxProfileId?: string;
+    sandboxProfileVersion?: number;
+  };
+};
 
 export type UpdateWebhookAutomationInput = {
   automationId: string;

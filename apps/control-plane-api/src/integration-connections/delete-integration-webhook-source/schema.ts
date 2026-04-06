@@ -6,6 +6,7 @@ import {
 
 import {
   IntegrationConnectionsBadRequestCodes,
+  IntegrationConnectionsConflictCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
 
@@ -33,4 +34,8 @@ export const DeleteIntegrationWebhookSourceNotFoundResponseSchema = createCodeMe
     IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,
     IntegrationConnectionsNotFoundCodes.WEBHOOK_SOURCE_NOT_FOUND,
   ]),
+);
+
+export const DeleteIntegrationWebhookSourceConflictResponseSchema = createCodeMessageErrorSchema(
+  z.literal(IntegrationConnectionsConflictCodes.WEBHOOK_SOURCE_HAS_AUTOMATIONS),
 );

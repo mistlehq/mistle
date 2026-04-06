@@ -1,6 +1,7 @@
 import { Badge, Button, Notice } from "@mistle/ui";
 import { ArrowClockwiseIcon, PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 
+import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
 import { AutoSaveEditableHeading } from "../shared/auto-save-editable-heading.js";
 import {
   formatConnectionStatusLabel,
@@ -8,7 +9,10 @@ import {
   formatResourceInlineMetadata,
   formatSyncStateLabel,
 } from "./integration-connection-detail-formatters.js";
-import type { IntegrationConnectionResource } from "./integrations-service.js";
+import type {
+  IntegrationConnectionResource,
+  IntegrationWebhookSource,
+} from "./integrations-service.js";
 
 export type IntegrationConnectionDetailResourceSummary = {
   count: number;
@@ -37,7 +41,9 @@ export type IntegrationConnectionDetailItem = {
 export type IntegrationConnectionDetailViewProps = {
   connections: readonly IntegrationConnectionDetailItem[];
   logoKey?: string;
+  onCreateWebhookSource?: (input: { connectionId: string }) => void;
   onDeleteConnection?: (connectionId: string) => void;
+  onDeleteWebhookSource?: (input: { connectionId: string; webhookSourceId: string }) => void;
   onEditApiKey?: (connectionId: string) => void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: ReadonlyMap<
@@ -57,6 +63,8 @@ export type IntegrationConnectionDetailViewProps = {
         onSave: (connectionId: string, draftValue: string) => Promise<void> | void;
       }
     | undefined;
+  showWebhookSources?: boolean;
+  webhookSourceStateByConnectionId?: ReadonlyMap<string, IntegrationWebhookSourceSectionState>;
 };
 
 export function IntegrationConnectionDetailView(
@@ -75,33 +83,64 @@ export function IntegrationConnectionDetailView(
   return (
     <div className="flex flex-col gap-4">
       {props.connections.map((connection) => (
-        <ConnectionCard
+        <ConnectionCardWithOptionalProps
           connection={connection}
           key={connection.id}
-          {...(props.onDeleteConnection === undefined
-            ? {}
-            : { onDeleteConnection: props.onDeleteConnection })}
-          {...(props.onEditApiKey === undefined ? {} : { onEditApiKey: props.onEditApiKey })}
-          {...(props.onRefreshResource === undefined
-            ? {}
-            : { onRefreshResource: props.onRefreshResource })}
-          {...(props.resourceItemsByKey === undefined
-            ? {}
-            : { resourceItemsByKey: props.resourceItemsByKey })}
-          {...(props.titleEditor === undefined ? {} : { titleEditor: props.titleEditor })}
+          props={props}
         />
       ))}
     </div>
   );
 }
 
+function ConnectionCardWithOptionalProps(input: {
+  connection: IntegrationConnectionDetailItem;
+  props: IntegrationConnectionDetailViewProps;
+}): React.JSX.Element {
+  const webhookSourceState =
+    input.props.webhookSourceStateByConnectionId?.get(input.connection.id) ?? undefined;
+
+  return (
+    <ConnectionCard
+      connection={input.connection}
+      {...(input.props.onDeleteConnection === undefined
+        ? {}
+        : { onDeleteConnection: input.props.onDeleteConnection })}
+      {...(input.props.onEditApiKey === undefined
+        ? {}
+        : { onEditApiKey: input.props.onEditApiKey })}
+      {...(input.props.onRefreshResource === undefined
+        ? {}
+        : { onRefreshResource: input.props.onRefreshResource })}
+      {...(input.props.resourceItemsByKey === undefined
+        ? {}
+        : { resourceItemsByKey: input.props.resourceItemsByKey })}
+      {...(webhookSourceState === undefined ? {} : { webhookSourceState })}
+      {...(input.props.onCreateWebhookSource === undefined
+        ? {}
+        : { onCreateWebhookSource: input.props.onCreateWebhookSource })}
+      {...(input.props.onDeleteWebhookSource === undefined
+        ? {}
+        : { onDeleteWebhookSource: input.props.onDeleteWebhookSource })}
+      {...(input.props.showWebhookSources === undefined
+        ? {}
+        : { showWebhookSources: input.props.showWebhookSources })}
+      {...(input.props.titleEditor === undefined ? {} : { titleEditor: input.props.titleEditor })}
+    />
+  );
+}
+
 function ConnectionCard(input: {
   connection: IntegrationConnectionDetailItem;
+  onCreateWebhookSource?: (input: { connectionId: string }) => void;
   onDeleteConnection?: (connectionId: string) => void;
+  onDeleteWebhookSource?: (input: { connectionId: string; webhookSourceId: string }) => void;
   onEditApiKey?: (connectionId: string) => void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
+  showWebhookSources?: boolean;
   titleEditor?: IntegrationConnectionDetailViewProps["titleEditor"];
+  webhookSourceState?: IntegrationWebhookSourceSectionState;
 }): React.JSX.Element {
   return (
     <section className="gap-4 flex flex-col overflow-hidden rounded-md border bg-card p-4">
@@ -177,6 +216,15 @@ function ConnectionCard(input: {
           </div>
         </div>
       )}
+
+      {input.showWebhookSources === true && input.webhookSourceState !== undefined ? (
+        <WebhookSourcesSection
+          connectionId={input.connection.id}
+          onCreateWebhookSource={input.onCreateWebhookSource}
+          onDeleteWebhookSource={input.onDeleteWebhookSource}
+          state={input.webhookSourceState}
+        />
+      ) : null}
     </section>
   );
 }
@@ -371,6 +419,138 @@ function ResourceItemsPreview(input: {
           {item.displayName}
         </span>
       ))}
+    </div>
+  );
+}
+
+function WebhookSourcesSection(input: {
+  connectionId: string;
+  onCreateWebhookSource: ((input: { connectionId: string }) => void) | undefined;
+  onDeleteWebhookSource:
+    | ((input: { connectionId: string; webhookSourceId: string }) => void)
+    | undefined;
+  state: IntegrationWebhookSourceSectionState;
+}): React.JSX.Element {
+  return (
+    <div className="gap-3 flex flex-col">
+      <div className="flex items-start justify-between gap-3">
+        <div className="gap-1 flex flex-col">
+          <h3 className="font-medium text-sm">Webhooks</h3>
+          <p className="text-muted-foreground text-xs">
+            Manage provider webhook registrations for this connection.
+          </p>
+        </div>
+        {input.onCreateWebhookSource ? (
+          <Button
+            disabled={input.state.isCreating}
+            onClick={() => {
+              input.onCreateWebhookSource?.({
+                connectionId: input.connectionId,
+              });
+            }}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {input.state.isCreating ? "Creating..." : "Create webhook"}
+          </Button>
+        ) : null}
+      </div>
+
+      {input.state.loadErrorMessage === null ? null : (
+        <Notice variant="alert">{input.state.loadErrorMessage}</Notice>
+      )}
+      {input.state.createErrorMessage === null ? null : (
+        <Notice variant="alert">{input.state.createErrorMessage}</Notice>
+      )}
+      {input.state.deleteErrorMessage === null ? null : (
+        <Notice variant="alert">{input.state.deleteErrorMessage}</Notice>
+      )}
+      {input.state.revealedWebhookSecret === null ? null : (
+        <Notice title="Webhook secret">
+          <code className="break-all text-xs">{input.state.revealedWebhookSecret}</code>
+        </Notice>
+      )}
+
+      {input.state.isLoading ? (
+        <p className="text-muted-foreground text-sm">Loading webhook sources...</p>
+      ) : input.state.items.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          No webhook sources are configured for this connection.
+        </p>
+      ) : (
+        <div className="gap-3 flex flex-col">
+          {input.state.items.map((source) => (
+            <WebhookSourceCard
+              connectionId={input.connectionId}
+              deletingWebhookSourceId={input.state.deletingWebhookSourceId}
+              key={source.id}
+              onDeleteWebhookSource={input.onDeleteWebhookSource}
+              source={source}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WebhookSourceCard(input: {
+  connectionId: string;
+  deletingWebhookSourceId: string | null;
+  onDeleteWebhookSource:
+    | ((input: { connectionId: string; webhookSourceId: string }) => void)
+    | undefined;
+  source: IntegrationWebhookSource;
+}): React.JSX.Element {
+  const isDeleting = input.deletingWebhookSourceId === input.source.id;
+  const isDeleteSupported =
+    input.onDeleteWebhookSource !== undefined &&
+    (input.source.endpointKey !== undefined || input.source.remoteRegistrationId !== undefined);
+
+  return (
+    <div className="gap-3 flex flex-col rounded-md border p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="gap-1 flex flex-col">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">{input.source.displayName}</span>
+            {input.source.status === "active" ? null : (
+              <Badge variant="outline">{input.source.status}</Badge>
+            )}
+          </div>
+          <p className="text-muted-foreground text-xs">Webhook source ID: {input.source.id}</p>
+        </div>
+        {isDeleteSupported ? (
+          <Button
+            aria-label={`Delete webhook source ${input.source.displayName}`}
+            disabled={isDeleting}
+            onClick={() => {
+              input.onDeleteWebhookSource?.({
+                connectionId: input.connectionId,
+                webhookSourceId: input.source.id,
+              });
+            }}
+            size="icon-sm"
+            type="button"
+            variant="outline"
+          >
+            <TrashIcon aria-hidden className="size-4" />
+          </Button>
+        ) : null}
+      </div>
+      <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
+        <MetadataField label="Owner scope" value={input.source.ownerScope} />
+        <MetadataField label="Target" value={input.source.targetKey} />
+        {input.source.callbackUrl === undefined ? null : (
+          <MetadataField label="Callback URL" value={input.source.callbackUrl} />
+        )}
+        {input.source.endpointKey === undefined ? null : (
+          <MetadataField label="Endpoint key" value={input.source.endpointKey} />
+        )}
+        {input.source.remoteRegistrationId === undefined ? null : (
+          <MetadataField label="Provider registration" value={input.source.remoteRegistrationId} />
+        )}
+      </div>
     </div>
   );
 }

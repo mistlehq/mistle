@@ -43,6 +43,7 @@ export interface paths {
                   /** @enum {string} */
                   code:
                     | "MISSING_TARGET_METADATA"
+                    | "MISSING_WEBHOOK_SOURCE"
                     | "MISSING_INTEGRATION_CONNECTION"
                     | "MISSING_SANDBOX_PROFILE";
                   message: string;
@@ -126,7 +127,7 @@ export interface paths {
             eventTypes?: string[] | null;
             idempotencyKeyTemplate?: string | null;
             inputTemplate: string;
-            integrationConnectionId: string;
+            integrationWebhookSourceId: string;
             name: string;
             payloadFilter?: {
               [key: string]: unknown;
@@ -153,7 +154,7 @@ export interface paths {
               id: string;
               idempotencyKeyTemplate: string | null;
               inputTemplate: string;
-              integrationConnectionId: string;
+              integrationWebhookSourceId: string;
               /** @enum {string} */
               kind: "webhook";
               name: string;
@@ -179,8 +180,8 @@ export interface paths {
               | {
                   /** @enum {string} */
                   code:
-                    | "INVALID_CONNECTION_REFERENCE"
-                    | "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE"
+                    | "INVALID_WEBHOOK_SOURCE_REFERENCE"
+                    | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
                     | "INVALID_SANDBOX_PROFILE_REFERENCE"
                     | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE";
                   message: string;
@@ -258,7 +259,7 @@ export interface paths {
               id: string;
               idempotencyKeyTemplate: string | null;
               inputTemplate: string;
-              integrationConnectionId: string;
+              integrationWebhookSourceId: string;
               /** @enum {string} */
               kind: "webhook";
               name: string;
@@ -425,7 +426,7 @@ export interface paths {
             eventTypes?: string[] | null;
             idempotencyKeyTemplate?: string | null;
             inputTemplate?: string;
-            integrationConnectionId?: string;
+            integrationWebhookSourceId?: string;
             name?: string;
             payloadFilter?: {
               [key: string]: unknown;
@@ -452,7 +453,7 @@ export interface paths {
               id: string;
               idempotencyKeyTemplate: string | null;
               inputTemplate: string;
-              integrationConnectionId: string;
+              integrationWebhookSourceId: string;
               /** @enum {string} */
               kind: "webhook";
               name: string;
@@ -478,8 +479,8 @@ export interface paths {
               | {
                   /** @enum {string} */
                   code:
-                    | "INVALID_CONNECTION_REFERENCE"
-                    | "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE"
+                    | "INVALID_WEBHOOK_SOURCE_REFERENCE"
+                    | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
                     | "INVALID_SANDBOX_PROFILE_REFERENCE"
                     | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE";
                   message: string;
@@ -1650,6 +1651,19 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               code: "CONNECTION_NOT_FOUND" | "WEBHOOK_SOURCE_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Webhook source is still referenced locally. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "WEBHOOK_SOURCE_HAS_AUTOMATIONS";
               message: string;
             };
           };

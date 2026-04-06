@@ -8,6 +8,7 @@ import {
   IntegrationBindingKinds,
   integrationTargets,
   integrationWebhookEvents,
+  integrationWebhookSources,
   IntegrationWebhookEventStatuses,
   organizations,
   sandboxProfiles,
@@ -131,6 +132,24 @@ async function seedOpenAiAgentBinding(input: {
   });
 }
 
+async function seedWebhookSource(input: {
+  db: ReturnType<typeof createControlPlaneDatabase>;
+  sourceId: string;
+  organizationId: string;
+  connectionId: string;
+  targetKey: string;
+}) {
+  await input.db.insert(integrationWebhookSources).values({
+    id: input.sourceId,
+    ownerScope: "connection",
+    organizationId: input.organizationId,
+    integrationConnectionId: input.connectionId,
+    targetKey: input.targetKey,
+    routingStrategy: "payload",
+    status: "active",
+  });
+}
+
 describe("handleIntegrationWebhookEvent integration", () => {
   async function executeHandleIntegrationWebhookEvent(input: {
     db: ReturnType<typeof createControlPlaneDatabase>;
@@ -232,6 +251,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
         const organizationId = "org_worker_webhook_workflow";
         const targetKey = "github-cloud-worker-webhook-workflow";
         const connectionId = "icn_worker_webhook_workflow";
+        const webhookSourceId = "iws_worker_webhook_workflow";
         const sandboxProfileId = "sbp_worker_webhook_workflow";
         const automationId = "atm_worker_webhook_workflow";
         const automationTargetId = "atg_worker_webhook_workflow";
@@ -261,6 +281,13 @@ describe("handleIntegrationWebhookEvent integration", () => {
           externalSubjectId: "999999",
           config: {},
         });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
         await database.db.insert(sandboxProfiles).values({
           id: sandboxProfileId,
           organizationId,
@@ -283,7 +310,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
         });
         await database.db.insert(webhookAutomations).values({
           automationId,
-          integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: null,
           inputTemplate: "Respond to {{payload.comment.body}}",
@@ -300,6 +327,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
           id: webhookEventId,
           organizationId,
           integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           targetKey,
           eventType: "github.issue_comment.created",
           providerEventType: "issue_comment",
@@ -391,6 +419,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
         const organizationId = "org_worker_webhook_queue";
         const targetKey = "github-cloud-worker-webhook-queue";
         const connectionId = "icn_worker_webhook_queue";
+        const webhookSourceId = "iws_worker_webhook_queue";
         const sandboxProfileId = "sbp_worker_webhook_queue";
         const automationId = "atm_worker_webhook_queue";
         const automationTargetId = "atg_worker_webhook_queue";
@@ -420,6 +449,13 @@ describe("handleIntegrationWebhookEvent integration", () => {
           externalSubjectId: "123456",
           config: {},
         });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
         await database.db.insert(sandboxProfiles).values({
           id: sandboxProfileId,
           organizationId,
@@ -442,7 +478,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
         });
         await database.db.insert(webhookAutomations).values({
           automationId,
-          integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: {
             op: "contains_token",
@@ -463,6 +499,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
           id: webhookEventId,
           organizationId,
           integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           targetKey,
           externalEventId: "evt_queue",
           externalDeliveryId: "delivery_queue",
@@ -543,6 +580,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
         const organizationId = "org_worker_webhook_ignore";
         const targetKey = "github-cloud-worker-webhook-ignore";
         const connectionId = "icn_worker_webhook_ignore";
+        const webhookSourceId = "iws_worker_webhook_ignore";
         const webhookEventId = "iwe_worker_webhook_ignore";
 
         await database.db.insert(organizations).values({
@@ -569,10 +607,18 @@ describe("handleIntegrationWebhookEvent integration", () => {
           externalSubjectId: "123456",
           config: {},
         });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
         await database.db.insert(integrationWebhookEvents).values({
           id: webhookEventId,
           organizationId,
           integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           targetKey,
           externalEventId: "evt_ignore",
           externalDeliveryId: "delivery_ignore",
@@ -630,6 +676,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
         const organizationId = "org_worker_webhook_resource_sync";
         const targetKey = "github-cloud-worker-webhook-resource-sync";
         const connectionId = "icn_worker_webhook_resource_sync";
+        const webhookSourceId = "iws_worker_webhook_resource_sync";
         const webhookEventId = "iwe_worker_webhook_resource_sync";
 
         await database.db.insert(organizations).values({
@@ -656,10 +703,18 @@ describe("handleIntegrationWebhookEvent integration", () => {
           externalSubjectId: "123456",
           config: {},
         });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
         await database.db.insert(integrationWebhookEvents).values({
           id: webhookEventId,
           organizationId,
           integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
           targetKey,
           externalEventId: "evt_resource_sync",
           externalDeliveryId: "delivery_resource_sync",

@@ -9,7 +9,7 @@ import {
   type ControlPlaneDatabase,
   type IntegrationWebhookSource,
 } from "@mistle/db/control-plane";
-import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
+import { BadRequestError, ConflictError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationWebhookSourceLifecycles,
   type AnyIntegrationDefinition,
@@ -28,6 +28,7 @@ import { resolveIntegrationTargetSecrets } from "../../lib/integration-target-se
 import type { AppContext } from "../../types.js";
 import {
   IntegrationConnectionsBadRequestCodes,
+  IntegrationConnectionsConflictCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
 
@@ -191,6 +192,48 @@ function resolveWebhookSourceCapabilityOrThrow(input: {
   };
 }
 
+export async function ensureImplicitConnectionWebhookSource(input: {
+  db: ControlPlaneDatabase;
+  organizationId: string;
+  connectionId: string;
+  targetKey: string;
+  routingStrategy: "payload" | "path";
+}): Promise<IntegrationWebhookSource> {
+  const existingSource = await input.db.query.integrationWebhookSources.findFirst({
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.organizationId, input.organizationId),
+        whereEq(table.integrationConnectionId, input.connectionId),
+        whereEq(table.targetKey, input.targetKey),
+        whereEq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
+        whereEq(table.status, IntegrationWebhookSourceStatuses.ACTIVE),
+      ),
+  });
+
+  if (existingSource !== undefined) {
+    return existingSource;
+  }
+
+  const [createdSource] = await input.db
+    .insert(integrationWebhookSources)
+    .values({
+      ownerScope: IntegrationWebhookSourceOwnerScopes.CONNECTION,
+      organizationId: input.organizationId,
+      integrationConnectionId: input.connectionId,
+      targetKey: input.targetKey,
+      routingStrategy: input.routingStrategy,
+      status: IntegrationWebhookSourceStatuses.ACTIVE,
+    })
+    .returning();
+
+  if (createdSource === undefined) {
+    throw new Error(
+      `Failed to create implicit webhook source for connection '${input.connectionId}'.`,
+    );
+  }
+
+  return createdSource;
+}
 function toWebhookSourceListItem(input: {
   source: IntegrationWebhookSource;
   descriptor: {
@@ -403,9 +446,35 @@ export async function listIntegrationWebhookSources(
       target: connection.target,
     });
 
-  if (webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.TARGET) {
+  if (
+    webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT &&
+    webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.TARGET
+  ) {
     const source = await ensureImplicitTargetWebhookSource({
       db: ctx.db,
+      targetKey: connection.targetKey,
+      routingStrategy: webhookSourceCapability.routingStrategy,
+    });
+    const descriptor = await resolveWebhookSourceDescriptor({
+      controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
+      webhookSourceCapability,
+      parsedTargetConfig,
+      parsedTargetSecrets,
+      connection,
+      source,
+    });
+
+    return [toWebhookSourceListItem({ source, descriptor })];
+  }
+
+  if (
+    webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT &&
+    webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION
+  ) {
+    const source = await ensureImplicitConnectionWebhookSource({
+      db: ctx.db,
+      organizationId: input.organizationId,
+      connectionId: connection.id,
       targetKey: connection.targetKey,
       routingStrategy: webhookSourceCapability.routingStrategy,
     });
@@ -698,6 +767,21 @@ export async function deleteIntegrationWebhookSource(
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.WEBHOOK_SOURCE_MANAGED_LIFECYCLE_REQUIRED,
       `Webhook source '${input.webhookSourceId}' is not provider-managed.`,
+    );
+  }
+
+  const sourceAutomationUsage = await ctx.db.query.webhookAutomations.findFirst({
+    columns: {
+      automationId: true,
+    },
+    where: (table, { eq: whereEq }) =>
+      whereEq(table.integrationWebhookSourceId, input.webhookSourceId),
+  });
+
+  if (sourceAutomationUsage !== undefined) {
+    throw new ConflictError(
+      IntegrationConnectionsConflictCodes.WEBHOOK_SOURCE_HAS_AUTOMATIONS,
+      "This webhook source cannot be deleted while it is still used by one or more webhook automations.",
     );
   }
 
