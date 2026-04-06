@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GitHubAppInstallationRedirectHandler } from "./github-app-installation-handler.js";
+import { GitHubAppInstallationRedirectHandler } from "./github-app-installation-handler.server.js";
 
 describe("GitHubAppInstallationRedirectHandler", () => {
   it("builds github cloud install url with state", async () => {

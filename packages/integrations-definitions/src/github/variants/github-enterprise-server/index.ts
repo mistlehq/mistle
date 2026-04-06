@@ -1,4 +1,5 @@
 export { GitHubEnterpriseServerDefinition } from "./definition.js";
+export { GitHubEnterpriseServerBaseDefinition } from "./base-definition.js";
 export {
   GitHubEnterpriseServerTargetConfigSchema,
   type GitHubEnterpriseServerTargetConfig,
@@ -9,4 +10,4 @@ export {
 } from "./binding-config-schema.js";
 export { compileGitHubEnterpriseServerBinding } from "./compile-binding.js";
 export { GitHubEnterpriseServerCredentialSecretTypes } from "./auth.js";
-export { GitHubEnterpriseServerWebhookHandler } from "./webhook.js";
+export { GitHubEnterpriseServerWebhookHandler } from "./webhook.server.js";

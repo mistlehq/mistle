@@ -1,3 +1,3 @@
-import { GitHubWebhookHandler } from "../../shared/webhook.js";
+import { GitHubWebhookHandler } from "../../shared/webhook.server.js";
 
 export const GitHubEnterpriseServerWebhookHandler = GitHubWebhookHandler;

@@ -5,7 +5,7 @@ import {
   buildJiraWebhookCallbackUrl,
   resolveJiraAdminWebhookIdFromSelf,
   resolveJiraAdminWebhookRegistrationOrThrow,
-} from "./webhook-source.js";
+} from "./webhook-source.server.js";
 
 describe("jira webhook source helpers", () => {
   it("builds a source-keyed control-plane callback URL", () => {

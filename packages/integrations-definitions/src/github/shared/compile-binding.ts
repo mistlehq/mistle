@@ -10,7 +10,7 @@ import {
 import { GitHubConnectionConfigSchema, resolveGitHubCredentialSecretType } from "./auth.js";
 import type { GitHubBindingConfig } from "./binding-config-schema.js";
 import { GitHubApiMethods, GitHubGitHttpMethods } from "./constants.js";
-import { GitHubCredentialResolverKeys } from "./credential-resolver.js";
+import { GitHubCredentialResolverKeys } from "./credential-resolver-keys.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
 import { GitHubToolIds } from "./tool-ids.js";
 

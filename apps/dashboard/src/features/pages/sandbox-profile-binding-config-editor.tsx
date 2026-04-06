@@ -1,5 +1,5 @@
 import { applySchemaDefaultsToFormData, resolveIntegrationForm } from "@mistle/integrations-core";
-import { createDefinitionsBundle } from "@mistle/integrations-definitions";
+import { createBrowserDefinitionsBundle } from "@mistle/integrations-definitions/browser";
 import { createIntegrationFormRegistry } from "@mistle/integrations-definitions/forms";
 import { Button, Notice } from "@mistle/ui";
 import type { IChangeEvent } from "@rjsf/core";
@@ -12,7 +12,7 @@ import type { IntegrationConnectionResourceSummary } from "../integrations/integ
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { isRecord } from "../shared/is-record.js";
 
-const Definitions = createDefinitionsBundle();
+const Definitions = createBrowserDefinitionsBundle();
 const IntegrationRegistry = createIntegrationFormRegistry(Definitions);
 
 type JsonObject = Record<string, unknown>;

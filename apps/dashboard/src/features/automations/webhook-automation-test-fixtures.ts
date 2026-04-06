@@ -1,4 +1,4 @@
-import { GitHubCloudDefinition } from "@mistle/integrations-definitions";
+import { GitHubCloudBrowserDefinition } from "@mistle/integrations-definitions/browser";
 
 import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-types.js";
 import { createWebhookAutomationEventOption } from "./webhook-automation-option-builders.js";
@@ -19,7 +19,7 @@ export function createGitHubEventOption(input: {
   eventType: string;
   overrides?: Partial<WebhookAutomationEventOption>;
 }): WebhookAutomationEventOption {
-  const eventDefinition = GitHubCloudDefinition.supportedWebhookEvents?.find(
+  const eventDefinition = GitHubCloudBrowserDefinition.supportedWebhookEvents?.find(
     (candidate) => candidate.eventType === input.eventType,
   );
 

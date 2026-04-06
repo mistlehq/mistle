@@ -1,6 +1,6 @@
 import { applySchemaDefaultsToFormData, resolveIntegrationForm } from "@mistle/integrations-core";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { createDefinitionsBundle } from "@mistle/integrations-definitions";
+import { createBrowserDefinitionsBundle } from "@mistle/integrations-definitions/browser";
 import { createIntegrationFormRegistry } from "@mistle/integrations-definitions/forms";
 import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 
@@ -12,7 +12,7 @@ import type { IntegrationConnectionMethod } from "../integrations/integrations-s
 import { isRecord } from "../shared/is-record.js";
 import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
 
-const Definitions = createDefinitionsBundle();
+const Definitions = createBrowserDefinitionsBundle();
 const IntegrationRegistry = createIntegrationFormRegistry(Definitions);
 
 type JsonObject = Record<string, unknown>;

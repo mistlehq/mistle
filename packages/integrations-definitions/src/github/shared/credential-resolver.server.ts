@@ -10,12 +10,6 @@ import { z } from "zod";
 import { GitHubConnectionConfigSchema, GitHubCredentialSecretTypes } from "./auth.js";
 import { GitHubBindingConfigSchema } from "./binding-config-schema.js";
 
-export const GitHubCredentialResolverKeys: {
-  GITHUB_APP_INSTALLATION_TOKEN: "github_app_installation_token";
-} = {
-  GITHUB_APP_INSTALLATION_TOKEN: "github_app_installation_token",
-};
-
 type ResolvedGitHubAppCredentialContext = {
   apiBaseUrl: string;
   appId: string;

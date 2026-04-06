@@ -4,7 +4,7 @@ import {
   buildJiraClientCredentialsRequestBody,
   parseJiraClientCredentialsResponse,
   resolveAccessTokenExpiresAt,
-} from "./oauth2-client-credentials.js";
+} from "./oauth2-client-credentials.server.js";
 
 describe("buildJiraClientCredentialsRequestBody", () => {
   it("builds the expected client credentials token exchange request body", () => {

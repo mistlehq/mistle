@@ -7,7 +7,7 @@ import {
 } from "@mistle/integrations-core";
 
 import { GitHubConnectionConfigSchema, GitHubCredentialSecretTypes } from "./auth.js";
-import { GitHubCredentialResolverKeys } from "./credential-resolver.js";
+import { GitHubCredentialResolverKeys } from "./credential-resolver-keys.js";
 
 const GitHubRepositoryAppInstallationResourceCredential: IntegrationResourceCredentialRef = {
   secretType: GitHubCredentialSecretTypes.GITHUB_APP_INSTALLATION_TOKEN,
