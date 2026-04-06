@@ -1,8 +1,8 @@
 import { Badge, Button, Notice } from "@mistle/ui";
 import { ArrowClockwiseIcon, PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 
-import { AutoSaveEditableHeading } from "../shared/auto-save-editable-heading.js";
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
+import { AutoSaveEditableHeading } from "../shared/auto-save-editable-heading.js";
 import {
   formatConnectionStatusLabel,
   formatResourceHeading,
