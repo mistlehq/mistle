@@ -1,6 +1,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+// Prepared runtime manifests record which sandbox base image and app images a
+// local test-harness run should reuse, along with the fingerprints that decide
+// when those images must be rebuilt.
+
 export const PreparedTestHarnessRuntimeFileRelativePath = ".local/test-harness/runtime.json";
 export const SANDBOX_SNAPSHOT_REPOSITORY_PATH = "mistle/snapshots";
 
@@ -14,7 +18,7 @@ export type SandboxBaseImageBuild = {
 export const DefaultSandboxBaseImageBuild: SandboxBaseImageBuild = {
   localReference: "mistle/sandbox-base:dev",
   repositoryPath: "mistle/sandbox-base",
-  dockerfilePath: "apps/sandbox-runtime/Dockerfile",
+  dockerfilePath: "packages/sandboxd/Dockerfile",
   dockerTarget: "sandbox-base",
 };
 
@@ -66,7 +70,7 @@ export const PreparedTestHarnessDockerAppBuilds: readonly PreparedTestHarnessDoc
 ] as const;
 
 export type PreparedTestHarnessRuntime = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   provider: "docker";
   fingerprint: PreparedTestHarnessRuntimeFingerprint;
   sandboxBaseImage: {
@@ -79,7 +83,7 @@ export type PreparedTestHarnessRuntime = {
 export type PreparedTestHarnessRuntimeFingerprint = {
   architecture: NodeJS.Architecture;
   dockerContextFingerprint: string;
-  seaContextFingerprint: string;
+  sandboxdContextFingerprint: string;
   sandboxBaseImageFingerprint: string;
   appImageFingerprints: Record<PreparedTestHarnessDockerAppName, string>;
 };
@@ -176,7 +180,7 @@ function parsePreparedRuntime(rawValue: unknown): PreparedTestHarnessRuntime {
     throw new Error("Prepared test-harness runtime manifest must be an object.");
   }
 
-  if (rawValue.schemaVersion !== 2) {
+  if (rawValue.schemaVersion !== 3) {
     throw new Error("Prepared test-harness runtime manifest has an unsupported schemaVersion.");
   }
   if (rawValue.provider !== "docker") {
@@ -202,11 +206,11 @@ function parsePreparedRuntime(rawValue: unknown): PreparedTestHarnessRuntime {
     );
   }
   if (
-    typeof fingerprint.seaContextFingerprint !== "string" ||
-    fingerprint.seaContextFingerprint.length === 0
+    typeof fingerprint.sandboxdContextFingerprint !== "string" ||
+    fingerprint.sandboxdContextFingerprint.length === 0
   ) {
     throw new Error(
-      "Prepared test-harness runtime manifest is missing fingerprint.seaContextFingerprint.",
+      "Prepared test-harness runtime manifest is missing fingerprint.sandboxdContextFingerprint.",
     );
   }
   if (
@@ -256,12 +260,12 @@ function parsePreparedRuntime(rawValue: unknown): PreparedTestHarnessRuntime {
   });
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     provider: "docker",
     fingerprint: {
       architecture: fingerprint.architecture,
       dockerContextFingerprint: fingerprint.dockerContextFingerprint,
-      seaContextFingerprint: fingerprint.seaContextFingerprint,
+      sandboxdContextFingerprint: fingerprint.sandboxdContextFingerprint,
       sandboxBaseImageFingerprint: fingerprint.sandboxBaseImageFingerprint,
       appImageFingerprints: parsedAppImageFingerprints,
     },
