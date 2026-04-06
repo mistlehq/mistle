@@ -111,9 +111,21 @@ async function readUserAvatarMetadata(imageBytes: Uint8Array) {
 }
 
 function parseSupportedUserAvatarContentType(value: string): SupportedUserAvatarContentType | null {
-  const normalizedValue = value.trim().toLowerCase().split(";")[0]?.trim();
+  const [mediaType, ...parameterTokens] = value.split(";");
 
-  switch (normalizedValue) {
+  if (mediaType === undefined || mediaType.length === 0) {
+    return null;
+  }
+
+  if (mediaType !== mediaType.trim()) {
+    return null;
+  }
+
+  if (value.startsWith(";") || parameterTokens.some((token) => token.length === 0)) {
+    return null;
+  }
+
+  switch (mediaType) {
     case "image/jpeg":
       return "image/jpeg";
     case "image/png":

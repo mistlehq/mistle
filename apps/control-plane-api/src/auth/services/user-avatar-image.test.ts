@@ -115,4 +115,82 @@ describe("normalizeUserAvatarImage", () => {
       code: "INVALID_IMAGE",
     });
   });
+
+  it("accepts supported media types with MIME parameters", async () => {
+    const webpBuffer = await sharp({
+      create: {
+        width: 128,
+        height: 128,
+        channels: 4,
+        background: {
+          r: 12,
+          g: 34,
+          b: 56,
+          alpha: 1,
+        },
+      },
+    })
+      .webp()
+      .toBuffer();
+
+    const normalized = await normalizeUserAvatarImage({
+      contentType: "image/webp;charset=utf-8",
+      imageBytes: new Uint8Array(webpBuffer),
+    });
+
+    expect(normalized.contentType).toBe("image/webp");
+  });
+
+  it("rejects content types with surrounding whitespace", async () => {
+    const jpegBuffer = await sharp({
+      create: {
+        width: 64,
+        height: 64,
+        channels: 3,
+        background: {
+          r: 90,
+          g: 120,
+          b: 150,
+        },
+      },
+    })
+      .jpeg()
+      .toBuffer();
+
+    await expect(
+      normalizeUserAvatarImage({
+        contentType: " image/jpeg ",
+        imageBytes: new Uint8Array(jpegBuffer),
+      }),
+    ).rejects.toMatchObject({
+      code: "INVALID_IMAGE",
+    });
+  });
+
+  it("rejects content types with non-canonical casing", async () => {
+    const pngBuffer = await sharp({
+      create: {
+        width: 96,
+        height: 96,
+        channels: 4,
+        background: {
+          r: 180,
+          g: 80,
+          b: 40,
+          alpha: 1,
+        },
+      },
+    })
+      .png()
+      .toBuffer();
+
+    await expect(
+      normalizeUserAvatarImage({
+        contentType: "IMAGE/PNG",
+        imageBytes: new Uint8Array(pngBuffer),
+      }),
+    ).rejects.toMatchObject({
+      code: "INVALID_IMAGE",
+    });
+  });
 });
