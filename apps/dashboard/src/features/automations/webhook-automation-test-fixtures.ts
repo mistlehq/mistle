@@ -10,6 +10,7 @@ import type {
 } from "./webhook-automations-types.js";
 
 export const GitHubConnectionId = "icn_01kkk1g84mfetvga8a4b853k27";
+export const GitHubWebhookSourceId = "iws_01kkk1g84mfetvga8a4b853k27";
 export const GitHubConnectionLabel = "GitHub Engineering";
 export const GitHubGroupedConnectionLabel = "GitHub - GitHub Engineering";
 export const RepoMaintainerSandboxProfileId = "sbp_01kkk1mbmxfetvga8kcmw612jj";
@@ -29,6 +30,7 @@ export function createGitHubEventOption(input: {
   return {
     ...createWebhookAutomationEventOption({
       eventDefinition,
+      webhookSourceId: GitHubWebhookSourceId,
       connectionId: GitHubConnectionId,
       connectionLabel: GitHubConnectionLabel,
       logoKey: "github",

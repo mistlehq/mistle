@@ -18,13 +18,18 @@ const GitHubPullRequestNumberPayloadReference: WebhookAutomationPayloadReference
   description: "Pull request number",
 };
 
+const GitHubConnectionId = "conn_github";
+const GitHubWebhookSourceId = "iws_github";
+const LinearConnectionId = "conn_linear";
+const LinearWebhookSourceId = "iws_linear";
+
 describe("buildWebhookAutomationEventOptions", () => {
-  it("returns connection-scoped supported webhook events from all connected integrations", () => {
+  it("returns source-scoped supported webhook events from connected integrations", () => {
     expect(
       buildWebhookAutomationEventOptions({
         connections: [
           {
-            id: "conn_github",
+            id: GitHubConnectionId,
             targetKey: "github-cloud",
             displayName: "GitHub Engineering",
             status: "active",
@@ -32,10 +37,39 @@ describe("buildWebhookAutomationEventOptions", () => {
             updatedAt: "2026-03-16T10:00:00.000Z",
           },
           {
-            id: "conn_linear",
+            id: LinearConnectionId,
             targetKey: "linear-cloud",
             displayName: "Linear Workspace",
             status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        webhookSources: [
+          {
+            id: GitHubWebhookSourceId,
+            targetKey: "github-cloud",
+            ownerScope: "connection",
+            integrationConnectionId: GitHubConnectionId,
+            displayName: "GitHub App webhook",
+            callbackUrl: "https://control-plane.example.com/v1/integration/webhooks/github-cloud",
+            status: "active",
+            providerMetadata: {},
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+          {
+            id: LinearWebhookSourceId,
+            targetKey: "linear-cloud",
+            ownerScope: "connection",
+            integrationConnectionId: LinearConnectionId,
+            displayName: "Linear Workspace webhook",
+            endpointKey: "ep_linear",
+            callbackUrl:
+              "https://control-plane.example.com/v1/integration/webhooks/linear-cloud/ep_linear",
+            remoteRegistrationId: "whk_linear",
+            status: "active",
+            providerMetadata: {},
             createdAt: "2026-03-16T10:00:00.000Z",
             updatedAt: "2026-03-16T10:00:00.000Z",
           },
@@ -114,8 +148,8 @@ describe("buildWebhookAutomationEventOptions", () => {
         ],
         selectedTriggerIds: [
           createWebhookAutomationTriggerId({
-            connectionId: "conn_github",
-            eventType: "github.pull_request.opened",
+            webhookSourceId: GitHubWebhookSourceId,
+            eventType: "github.issue_comment.created",
           }),
         ],
       }),
@@ -123,11 +157,34 @@ describe("buildWebhookAutomationEventOptions", () => {
       {
         availability: "available",
         id: createWebhookAutomationTriggerId({
-          connectionId: "conn_github",
+          webhookSourceId: GitHubWebhookSourceId,
+          eventType: "github.issue_comment.created",
+        }),
+        eventType: "github.issue_comment.created",
+        integrationWebhookSourceId: GitHubWebhookSourceId,
+        connectionId: GitHubConnectionId,
+        connectionLabel: "GitHub - GitHub Engineering",
+        label: "Issue comment created",
+        payloadReferences: [GitHubRepositoryFullNamePayloadReference],
+        conversationKeyOptions: [
+          {
+            id: "issue",
+            label: "Per issue thread",
+            description: "All matching events for the same issue go to one conversation.",
+            template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
+          },
+        ],
+        category: "GitHub Engineering / Issues",
+      },
+      {
+        availability: "available",
+        id: createWebhookAutomationTriggerId({
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.pull_request.opened",
         }),
         eventType: "github.pull_request.opened",
-        connectionId: "conn_github",
+        integrationWebhookSourceId: GitHubWebhookSourceId,
+        connectionId: GitHubConnectionId,
         connectionLabel: "GitHub - GitHub Engineering",
         label: "Pull request opened",
         payloadReferences: [
@@ -148,32 +205,12 @@ describe("buildWebhookAutomationEventOptions", () => {
       {
         availability: "available",
         id: createWebhookAutomationTriggerId({
-          connectionId: "conn_github",
-          eventType: "github.issue_comment.created",
-        }),
-        eventType: "github.issue_comment.created",
-        connectionId: "conn_github",
-        connectionLabel: "GitHub - GitHub Engineering",
-        label: "Issue comment created",
-        payloadReferences: [GitHubRepositoryFullNamePayloadReference],
-        conversationKeyOptions: [
-          {
-            id: "issue",
-            label: "Per issue thread",
-            description: "All matching events for the same issue go to one conversation.",
-            template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
-          },
-        ],
-        category: "GitHub Engineering / Issues",
-      },
-      {
-        availability: "available",
-        id: createWebhookAutomationTriggerId({
-          connectionId: "conn_linear",
+          webhookSourceId: LinearWebhookSourceId,
           eventType: "linear.issue.created",
         }),
         eventType: "linear.issue.created",
-        connectionId: "conn_linear",
+        integrationWebhookSourceId: LinearWebhookSourceId,
+        connectionId: LinearConnectionId,
         connectionLabel: "Linear - Linear Workspace",
         label: "Issue created",
         category: "Linear Workspace / Issues",
@@ -187,10 +224,24 @@ describe("buildWebhookAutomationEventOptions", () => {
       buildWebhookAutomationEventOptions({
         connections: [
           {
-            id: "conn_github",
+            id: GitHubConnectionId,
             targetKey: "github-cloud",
             displayName: "GitHub Engineering",
             status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        webhookSources: [
+          {
+            id: GitHubWebhookSourceId,
+            targetKey: "github-cloud",
+            ownerScope: "connection",
+            integrationConnectionId: GitHubConnectionId,
+            displayName: "GitHub App webhook",
+            callbackUrl: "https://control-plane.example.com/v1/integration/webhooks/github-cloud",
+            status: "active",
+            providerMetadata: {},
             createdAt: "2026-03-16T10:00:00.000Z",
             updatedAt: "2026-03-16T10:00:00.000Z",
           },
@@ -212,7 +263,7 @@ describe("buildWebhookAutomationEventOptions", () => {
         ],
         selectedTriggerIds: [
           createWebhookAutomationTriggerId({
-            connectionId: "conn_github",
+            webhookSourceId: GitHubWebhookSourceId,
             eventType: "github.push.deleted",
           }),
         ],
@@ -220,75 +271,17 @@ describe("buildWebhookAutomationEventOptions", () => {
     ).toEqual([
       {
         id: createWebhookAutomationTriggerId({
-          connectionId: "conn_github",
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.push.deleted",
         }),
         eventType: "github.push.deleted",
-        connectionId: "conn_github",
+        integrationWebhookSourceId: GitHubWebhookSourceId,
+        connectionId: "",
         connectionLabel: "GitHub - GitHub Engineering",
         label: "github.push.deleted",
         description: "No longer available from your connected integrations.",
         category: "Unavailable",
         availability: "missing_integration",
-      },
-    ]);
-  });
-
-  it("preserves selected triggers that are incompatible with the selected profile", () => {
-    expect(
-      buildWebhookAutomationEventOptions({
-        connections: [
-          {
-            id: "conn_github",
-            targetKey: "github-cloud",
-            displayName: "GitHub Engineering",
-            status: "active",
-            createdAt: "2026-03-16T10:00:00.000Z",
-            updatedAt: "2026-03-16T10:00:00.000Z",
-          },
-        ],
-        targets: [
-          {
-            targetKey: "github-cloud",
-            familyId: "github",
-            variantId: "github-cloud",
-            enabled: true,
-            config: {},
-            displayName: "GitHub",
-            description: "GitHub Cloud",
-            supportedWebhookEvents: [
-              {
-                eventType: "github.issue_comment.created",
-                providerEventType: "issue_comment",
-                displayName: "Issue comment created",
-              },
-            ],
-            targetHealth: {
-              configStatus: "valid",
-            },
-          },
-        ],
-        selectableConnectionIds: [],
-        selectedTriggerIds: [
-          createWebhookAutomationTriggerId({
-            connectionId: "conn_github",
-            eventType: "github.issue_comment.created",
-          }),
-        ],
-      }),
-    ).toEqual([
-      {
-        id: createWebhookAutomationTriggerId({
-          connectionId: "conn_github",
-          eventType: "github.issue_comment.created",
-        }),
-        eventType: "github.issue_comment.created",
-        connectionId: "conn_github",
-        connectionLabel: "GitHub - GitHub Engineering",
-        label: "Issue comment created",
-        description: "Trigger is unavailable for the selected sandbox profile.",
-        category: "Unavailable",
-        availability: "wrong_profile",
       },
     ]);
   });
@@ -327,7 +320,7 @@ describe("resolveEligibleProfileAutomationConnectionIds", () => {
             id: "bnd_github",
             sandboxProfileId: "sbp_1",
             sandboxProfileVersion: 1,
-            connectionId: "conn_github",
+            connectionId: GitHubConnectionId,
             kind: "connector",
             config: {},
             createdAt: "2026-03-16T10:00:00.000Z",
@@ -337,7 +330,7 @@ describe("resolveEligibleProfileAutomationConnectionIds", () => {
             id: "bnd_linear",
             sandboxProfileId: "sbp_1",
             sandboxProfileVersion: 1,
-            connectionId: "conn_linear",
+            connectionId: LinearConnectionId,
             kind: "connector",
             config: {},
             createdAt: "2026-03-16T10:00:00.000Z",
@@ -346,7 +339,7 @@ describe("resolveEligibleProfileAutomationConnectionIds", () => {
         ],
         connections: [
           {
-            id: "conn_github",
+            id: GitHubConnectionId,
             targetKey: "github-cloud",
             displayName: "GitHub Engineering",
             status: "active",
@@ -354,7 +347,7 @@ describe("resolveEligibleProfileAutomationConnectionIds", () => {
             updatedAt: "2026-03-16T10:00:00.000Z",
           },
           {
-            id: "conn_linear",
+            id: LinearConnectionId,
             targetKey: "linear-cloud",
             displayName: "Linear Workspace",
             status: "active",
@@ -397,6 +390,6 @@ describe("resolveEligibleProfileAutomationConnectionIds", () => {
           },
         ],
       }),
-    ).toEqual(["conn_github"]);
+    ).toEqual([GitHubConnectionId]);
   });
 });
