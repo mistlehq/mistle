@@ -69,8 +69,6 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
   canUploadAttachments: true,
   isUploadingAttachments: false,
   configControlsDisabled: false,
-  statusMessage: null,
-  completedTurnErrorMessage: null,
   onComposerTextChange: function onComposerTextChange() {},
   onSubmit: function onSubmit() {},
   onModelChange: function onModelChange() {},

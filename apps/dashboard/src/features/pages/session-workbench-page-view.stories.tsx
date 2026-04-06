@@ -142,8 +142,8 @@ export const WithNonImageCapableModelWarning: Story = {
     primaryBottomPanel: createStorySessionBottomPanel({
       composerViewModel: {
         ...SessionComposerFixturePropsForNonImageCapableModel,
-        statusMessage: SessionComposerFixtureStatusMessageForNonImageCapableModel,
       },
+      statusMessage: SessionComposerFixtureStatusMessageForNonImageCapableModel,
     }),
   },
 };
@@ -153,8 +153,8 @@ export const WithUnavailableModelNotice: Story = {
     primaryBottomPanel: createStorySessionBottomPanel({
       composerViewModel: {
         ...SessionComposerFixturePropsForUnavailableModel,
-        statusMessage: SessionComposerFixtureStatusMessageForUnavailableModel,
       },
+      statusMessage: SessionComposerFixtureStatusMessageForUnavailableModel,
     }),
   },
 };
@@ -164,8 +164,8 @@ export const WithLoadingSelectedModelNotice: Story = {
     primaryBottomPanel: createStorySessionBottomPanel({
       composerViewModel: {
         ...SessionComposerFixturePropsForLoadingModel,
-        statusMessage: SessionComposerFixtureStatusMessageForLoadingModel,
       },
+      statusMessage: SessionComposerFixtureStatusMessageForLoadingModel,
     }),
   },
 };

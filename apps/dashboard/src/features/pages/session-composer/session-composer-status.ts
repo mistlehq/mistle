@@ -11,6 +11,7 @@ import {
 export type ComposerStatusMessage = {
   message: string;
   variant: "alert" | "default";
+  presentation?: "loading";
 };
 
 export function resolveComposerBootstrapMessage(input: {
@@ -39,7 +40,9 @@ export function resolveComposerStatusMessage(input: {
   activeComposerModel: CodexModelSummary | null;
   bootstrapState: SessionBootstrapPhase;
   composerErrorMessage: string | null;
+  completedTurnErrorMessage: string | null;
   hasPendingAttachments: boolean;
+  isUploadingAttachments: boolean;
   sessionErrorMessage: string | null;
   selectedModel: string | null;
 }): ComposerStatusMessage | null {
@@ -50,10 +53,25 @@ export function resolveComposerStatusMessage(input: {
     };
   }
 
+  if (input.completedTurnErrorMessage !== null) {
+    return {
+      message: input.completedTurnErrorMessage,
+      variant: "alert",
+    };
+  }
+
   if (input.sessionErrorMessage !== null) {
     return {
       message: input.sessionErrorMessage,
       variant: "alert",
+    };
+  }
+
+  if (input.isUploadingAttachments) {
+    return {
+      message: "Uploading attachments...",
+      variant: "default",
+      presentation: "loading",
     };
   }
 

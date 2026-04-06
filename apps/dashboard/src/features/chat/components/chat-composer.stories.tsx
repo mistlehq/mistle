@@ -1,20 +1,51 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 
 import {
   SessionComposerFixtureProps,
-  SessionComposerFixturePropsUploadingImageAttachments,
   SessionComposerFixturePropsWithPendingImageAttachments,
   CodexFixtureSessionModelOptions,
 } from "../../session-agents/codex/fixtures/session-fixtures.js";
 import { ChatComposer } from "./chat-composer.js";
-import {
-  noop,
-  noopComposerTextChange,
-  noopModelChange,
-  noopPendingImageFilesAdded,
-  noopReasoningEffortChange,
-  noopRemovePendingAttachment,
-} from "./chat-story-support.js";
+import { noop } from "./chat-story-support.js";
+
+function InteractiveChatComposerStory(
+  props: React.ComponentProps<typeof ChatComposer>,
+): React.JSX.Element {
+  const [composerText, setComposerText] = useState(props.composerText);
+  const [selectedModel, setSelectedModel] = useState(props.selectedModel);
+  const [selectedReasoningEffort, setSelectedReasoningEffort] = useState(
+    props.selectedReasoningEffort,
+  );
+  const [pendingAttachments, setPendingAttachments] = useState(props.pendingAttachments);
+
+  return (
+    <ChatComposer
+      {...props}
+      composerText={composerText}
+      onComposerTextChange={setComposerText}
+      onModelChange={setSelectedModel}
+      onPendingImageFilesAdded={(files) => {
+        setPendingAttachments((currentAttachments) => [
+          ...currentAttachments,
+          ...files.map((file, index) => ({
+            id: `${file.name}-${currentAttachments.length + index}`,
+            name: file.name,
+          })),
+        ]);
+      }}
+      onReasoningEffortChange={setSelectedReasoningEffort}
+      onRemovePendingAttachment={(attachmentId) => {
+        setPendingAttachments((currentAttachments) =>
+          currentAttachments.filter((attachment) => attachment.id !== attachmentId),
+        );
+      }}
+      pendingAttachments={pendingAttachments}
+      selectedModel={selectedModel}
+      selectedReasoningEffort={selectedReasoningEffort}
+    />
+  );
+}
 
 const meta = {
   title: "Dashboard/Chat/Composer",
@@ -26,13 +57,9 @@ const meta = {
   args: {
     ...SessionComposerFixtureProps,
     modelOptions: CodexFixtureSessionModelOptions,
-    onComposerTextChange: noopComposerTextChange,
-    onModelChange: noopModelChange,
-    onPendingImageFilesAdded: noopPendingImageFilesAdded,
-    onReasoningEffortChange: noopReasoningEffortChange,
-    onRemovePendingAttachment: noopRemovePendingAttachment,
     onSubmit: noop,
   },
+  render: (args) => <InteractiveChatComposerStory {...args} />,
 } satisfies Meta<typeof ChatComposer>;
 
 export default meta;
@@ -61,21 +88,8 @@ export const InterruptOnly: Story = {
   },
 };
 
-export const DisconnectedWithError: Story = {
-  args: {
-    completedTurnErrorMessage: "The session disconnected before the turn could be submitted.",
-    submitDisabled: true,
-  },
-};
-
 export const WithPendingImageAttachments: Story = {
   args: {
     ...SessionComposerFixturePropsWithPendingImageAttachments,
-  },
-};
-
-export const UploadingImageAttachments: Story = {
-  args: {
-    ...SessionComposerFixturePropsUploadingImageAttachments,
   },
 };

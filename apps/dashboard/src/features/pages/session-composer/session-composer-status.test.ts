@@ -9,7 +9,9 @@ describe("session-composer-status", () => {
         activeComposerModel: null,
         bootstrapState: { status: "ready" },
         composerErrorMessage: null,
+        completedTurnErrorMessage: null,
         hasPendingAttachments: false,
+        isUploadingAttachments: false,
         sessionErrorMessage: null,
         selectedModel: "removed-model",
       }),
@@ -34,10 +36,58 @@ describe("session-composer-status", () => {
         },
         bootstrapState: { status: "ready" },
         composerErrorMessage: null,
+        completedTurnErrorMessage: null,
         hasPendingAttachments: false,
+        isUploadingAttachments: false,
         sessionErrorMessage: null,
         selectedModel: "gpt-5.4",
       }),
     ).toBeNull();
+  });
+
+  it("shows a completed turn error as an alert notice", () => {
+    expect(
+      resolveComposerStatusMessage({
+        activeComposerModel: null,
+        bootstrapState: { status: "ready" },
+        composerErrorMessage: null,
+        completedTurnErrorMessage: "The session disconnected before the turn could be submitted.",
+        hasPendingAttachments: false,
+        isUploadingAttachments: false,
+        sessionErrorMessage: null,
+        selectedModel: "gpt-5.4",
+      }),
+    ).toEqual({
+      message: "The session disconnected before the turn could be submitted.",
+      variant: "alert",
+    });
+  });
+
+  it("shows attachment uploads as a loading notice", () => {
+    expect(
+      resolveComposerStatusMessage({
+        activeComposerModel: {
+          id: "model_123",
+          model: "gpt-5.4",
+          displayName: "GPT-5.4",
+          hidden: false,
+          defaultReasoningEffort: null,
+          inputModalities: ["text", "image"],
+          supportsPersonality: false,
+          isDefault: true,
+        },
+        bootstrapState: { status: "ready" },
+        composerErrorMessage: null,
+        completedTurnErrorMessage: null,
+        hasPendingAttachments: true,
+        isUploadingAttachments: true,
+        sessionErrorMessage: null,
+        selectedModel: "gpt-5.4",
+      }),
+    ).toEqual({
+      message: "Uploading attachments...",
+      variant: "default",
+      presentation: "loading",
+    });
   });
 });

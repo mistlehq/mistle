@@ -1,7 +1,9 @@
 export {
   useSessionComposerState,
   type SessionComposerStateInput,
+  type SessionComposerUiState,
 } from "./use-session-composer-state.js";
+export { ComposerStatusBanner } from "./composer-status-banner.js";
 export { resolveComposerSubmitAction } from "./session-composer-capabilities.js";
 export { resolveComposerStatusMessage } from "./session-composer-status.js";
 export { readComposerConfigSnapshot } from "./session-composer-config.js";

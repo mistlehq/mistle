@@ -19,8 +19,6 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
     canUploadAttachments: true,
     isUploadingAttachments: false,
     configControlsDisabled: false,
-    statusMessage: null,
-    completedTurnErrorMessage: null,
     onComposerTextChange: () => {},
     onSubmit: () => {},
     onModelChange: () => {},
@@ -88,6 +86,12 @@ describe("ChatComposer", () => {
     );
   });
 
+  it("renders the image attachment button with icon-only visible copy", () => {
+    render(<ChatComposer {...createBaseComposerProps()} />);
+
+    expect(screen.getByRole("button", { name: "Add images" }).textContent).toBe("");
+  });
+
   it("renders safely when model and reasoning selections are unset", () => {
     render(
       <ChatComposer
@@ -125,6 +129,6 @@ describe("ChatComposer", () => {
     );
 
     expect(screen.getByText("design.png")).toBeTruthy();
-    expect(screen.getByText("Uploading attachments...")).toBeTruthy();
+    expect(screen.queryByText("Uploading attachments...")).toBeNull();
   });
 });

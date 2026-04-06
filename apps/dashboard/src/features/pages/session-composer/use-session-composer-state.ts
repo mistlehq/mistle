@@ -10,7 +10,10 @@ import {
   resolveActiveComposerModel,
   supportsImageInspection,
 } from "./session-composer-model-readiness.js";
-import { resolveComposerStatusMessage } from "./session-composer-status.js";
+import {
+  resolveComposerStatusMessage,
+  type ComposerStatusMessage,
+} from "./session-composer-status.js";
 import type { SessionComposerAttachmentControl } from "./use-session-composer-attachment-control.js";
 import type { SessionComposerConfigControl } from "./use-session-composer-config-control.js";
 
@@ -52,7 +55,12 @@ export type SessionComposerStateInput = {
   turnControl: SessionTurnControl;
 };
 
-export function useSessionComposerState(input: SessionComposerStateInput): ChatComposerViewModel {
+export type SessionComposerUiState = {
+  composerViewModel: ChatComposerViewModel;
+  statusMessage: ComposerStatusMessage | null;
+};
+
+export function useSessionComposerState(input: SessionComposerStateInput): SessionComposerUiState {
   const { clearSessionErrorMessage, sessionErrorMessage } = input;
   const [composerText, setComposerText] = useState("");
   const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null);
@@ -73,7 +81,9 @@ export function useSessionComposerState(input: SessionComposerStateInput): ChatC
     activeComposerModel,
     bootstrapState: input.bootstrap.phase,
     composerErrorMessage,
+    completedTurnErrorMessage: input.turnControl.completedTurnErrorMessage,
     hasPendingAttachments: pendingComposerAttachments.length > 0,
+    isUploadingAttachments: input.attachmentControl.isUploadingAttachments,
     sessionErrorMessage,
     selectedModel: input.configControl.selectedModel,
   });
@@ -294,31 +304,32 @@ export function useSessionComposerState(input: SessionComposerStateInput): ChatC
   ]);
 
   return {
-    composerText,
-    pendingAttachments: pendingComposerAttachments.map((attachment) => ({
-      id: attachment.id,
-      name: attachment.name,
-    })),
-    modelOptions: input.configControl.modelOptions,
-    selectedModel: input.configControl.selectedModel,
-    selectedReasoningEffort: input.configControl.selectedReasoningEffort,
-    submitMode: submitAction.submitMode,
-    submitLabel,
-    submitDisabled,
-    submitDisabledReason: null,
-    canUploadAttachments: input.attachmentControl.canUploadAttachments,
-    isUploadingAttachments: input.attachmentControl.isUploadingAttachments,
-    configControlsDisabled:
-      input.bootstrap.phase.status !== "ready" ||
-      input.configControl.isUpdating ||
-      input.attachmentControl.isUploadingAttachments,
+    composerViewModel: {
+      composerText,
+      pendingAttachments: pendingComposerAttachments.map((attachment) => ({
+        id: attachment.id,
+        name: attachment.name,
+      })),
+      modelOptions: input.configControl.modelOptions,
+      selectedModel: input.configControl.selectedModel,
+      selectedReasoningEffort: input.configControl.selectedReasoningEffort,
+      submitMode: submitAction.submitMode,
+      submitLabel,
+      submitDisabled,
+      submitDisabledReason: null,
+      canUploadAttachments: input.attachmentControl.canUploadAttachments,
+      isUploadingAttachments: input.attachmentControl.isUploadingAttachments,
+      configControlsDisabled:
+        input.bootstrap.phase.status !== "ready" ||
+        input.configControl.isUpdating ||
+        input.attachmentControl.isUploadingAttachments,
+      onComposerTextChange: handleComposerTextChange,
+      onSubmit: submitComposer,
+      onModelChange: handleModelChange,
+      onReasoningEffortChange: handleReasoningEffortChange,
+      onPendingImageFilesAdded: addPendingComposerFiles,
+      onRemovePendingAttachment: removePendingComposerAttachment,
+    },
     statusMessage: composerStatusMessage,
-    completedTurnErrorMessage: input.turnControl.completedTurnErrorMessage,
-    onComposerTextChange: handleComposerTextChange,
-    onSubmit: submitComposer,
-    onModelChange: handleModelChange,
-    onReasoningEffortChange: handleReasoningEffortChange,
-    onPendingImageFilesAdded: addPendingComposerFiles,
-    onRemovePendingAttachment: removePendingComposerAttachment,
   };
 }

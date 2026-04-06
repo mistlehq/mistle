@@ -285,6 +285,7 @@ function SessionWorkbenchPageContent(input: {
             isRespondingToServerRequest={false}
             onRespondToServerRequest={function onRespondToServerRequest() {}}
             serverRequestPanelEntries={[]}
+            statusMessage={null}
           />
         }
         secondaryPanel={<></>}
@@ -441,8 +442,6 @@ function createEmptyComposerViewModel(): ChatComposerViewModel {
     canUploadAttachments: false,
     isUploadingAttachments: false,
     configControlsDisabled: true,
-    statusMessage: null,
-    completedTurnErrorMessage: null,
     onComposerTextChange: function onComposerTextChange() {},
     onSubmit: function onSubmit() {},
     onModelChange: function onModelChange() {},

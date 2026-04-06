@@ -84,6 +84,24 @@ export const WithPendingImageAttachments: Story = {
 export const UploadingImageAttachments: Story = {
   args: {
     composerViewModel: SessionComposerFixturePropsUploadingImageAttachments,
+    statusMessage: {
+      message: "Uploading attachments...",
+      variant: "default",
+      presentation: "loading",
+    },
+  },
+};
+
+export const DisconnectedWithError: Story = {
+  args: {
+    composerViewModel: {
+      ...SessionComposerFixtureProps,
+      submitDisabled: true,
+    },
+    statusMessage: {
+      message: "The session disconnected before the turn could be submitted.",
+      variant: "alert",
+    },
   },
 };
 
@@ -91,8 +109,8 @@ export const NonImageCapableModelWithAttachments: Story = {
   args: {
     composerViewModel: {
       ...SessionComposerFixturePropsForNonImageCapableModel,
-      statusMessage: SessionComposerFixtureStatusMessageForNonImageCapableModel,
     },
+    statusMessage: SessionComposerFixtureStatusMessageForNonImageCapableModel,
   },
 };
 
@@ -100,7 +118,7 @@ export const LoadingSelectedModelWithAttachments: Story = {
   args: {
     composerViewModel: {
       ...SessionComposerFixturePropsForLoadingModel,
-      statusMessage: SessionComposerFixtureStatusMessageForLoadingModel,
     },
+    statusMessage: SessionComposerFixtureStatusMessageForLoadingModel,
   },
 };

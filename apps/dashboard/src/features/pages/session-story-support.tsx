@@ -1,7 +1,10 @@
 import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import { Badge } from "@mistle/ui";
 
-import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
+import type {
+  ChatComposerStatusMessage,
+  ChatComposerViewModel,
+} from "../chat/components/chat-composer.js";
 import { noop, noopRespondToServerRequest } from "../chat/components/chat-story-support.js";
 import {
   SessionComposerFixtureProps,
@@ -25,6 +28,7 @@ const textEncoder = new TextEncoder();
 export type SessionConversationStoryArgs = {
   chatEntries: React.ComponentProps<typeof SessionConversationMainContent>["chatEntries"];
   composerViewModel: ChatComposerViewModel;
+  statusMessage: ChatComposerStatusMessage | null;
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: React.ComponentProps<
     typeof SessionConversationMainContent
@@ -37,6 +41,7 @@ export type SessionConversationStoryArgs = {
 export const StorySessionConversationPaneArgs = {
   chatEntries: CodexFixtureSessionEntriesWithExploringGroup,
   composerViewModel: SessionComposerFixtureProps,
+  statusMessage: null,
   isRespondingToServerRequest: false,
   onRespondToServerRequest: noopRespondToServerRequest,
   serverRequestPanelEntries: CodexFixtureSessionServerRequests,
