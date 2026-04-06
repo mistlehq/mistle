@@ -2384,7 +2384,7 @@
           "name": "integration_webhook_source_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "target_key": {
           "name": "target_key",
