@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 nix = { version = "0.31.2", features = ["fs", "process", "signal", "socket", "user"] }
+portable-pty = "0.9.0"
 rcgen = "0.13.2"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"

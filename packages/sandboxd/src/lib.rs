@@ -13,6 +13,7 @@ pub mod control;
 pub mod process;
 pub mod protocol;
 pub mod proxy_ca;
+pub mod pty;
 pub mod runtime;
 pub mod security;
 pub mod time;

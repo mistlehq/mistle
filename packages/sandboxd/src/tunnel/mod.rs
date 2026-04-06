@@ -11,6 +11,9 @@ use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket, connect};
 use url::Url;
 
+pub mod protocol;
+pub mod pty_stream;
+
 /// Describes why bootstrap tunnel setup or shutdown failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TunnelError {
