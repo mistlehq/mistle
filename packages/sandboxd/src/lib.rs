@@ -9,6 +9,7 @@ use std::path::Path;
 pub mod apply_startup;
 pub mod bootstrap;
 pub mod cgroups;
+pub mod codex_proxy;
 pub mod command;
 pub mod control;
 pub mod keepalive;
