@@ -40,8 +40,8 @@ USER root
 
 FROM rust:1.93-bookworm AS sandboxd-build
 
-# Build only the standalone sandboxd Rust crate. The sandbox base image does
-# not need the legacy SEA packaging path or the rest of the workspace build.
+# Build only the standalone sandboxd Rust crate. The sandbox base image copies
+# this binary directly and does not need the rest of the workspace build.
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
