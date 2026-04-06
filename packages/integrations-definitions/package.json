@@ -51,6 +51,12 @@
       "import": "./src/forms/index.ts",
       "default": "./src/forms/index.ts"
     },
+    "./browser": {
+      "types": "./src/browser.ts",
+      "node": "./dist/browser.js",
+      "import": "./src/browser.ts",
+      "default": "./src/browser.ts"
+    },
     "./*.js": {
       "types": "./src/*.ts",
       "node": "./dist/*.js",

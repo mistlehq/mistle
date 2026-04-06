@@ -1,83 +1,20 @@
-import {
-  IntegrationConnectionMethodIds,
-  IntegrationKinds,
-  type IntegrationDefinition,
-} from "@mistle/integrations-core";
-
-import {
-  type GitHubConnectionConfig,
-  GitHubApiKeyConnectionConfigSchema,
-  GitHubAppInstallationConnectionConfigSchema,
-} from "../../shared/auth.js";
-import { resolveGitHubBindingConfigForm } from "../../shared/binding-config-form.js";
-import { GitHubApiKeyConnectionConfigForm } from "../../shared/connection-config-form.js";
-import { GitHubFamilyId } from "../../shared/constants.js";
-import {
-  GitHubAppInstallationCredentialResolver,
-  GitHubCredentialResolverKeys,
-} from "../../shared/credential-resolver.js";
-import { GitHubAppInstallationRedirectHandler } from "../../shared/github-app-installation-handler.js";
-import { listGitHubConnectionResources } from "../../shared/list-connection-resources.js";
+import { GitHubCredentialResolverKeys } from "../../shared/credential-resolver-keys.js";
+import { GitHubAppInstallationCredentialResolver } from "../../shared/credential-resolver.server.js";
+import { GitHubAppInstallationRedirectHandler } from "../../shared/github-app-installation-handler.server.js";
+import { listGitHubConnectionResources } from "../../shared/list-connection-resources.server.js";
 import {
   GitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
 } from "../../shared/resource-definitions.js";
-import { GitHubSupportedWebhookEvents } from "../../shared/supported-webhook-events.js";
-import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
-import { GitHubWebhookSourceCapability } from "../../shared/webhook-source.js";
-import { GitHubCloudBindingConfigSchema } from "./binding-config-schema.js";
-import { compileGitHubCloudBinding } from "./compile-binding.js";
-import { GitHubCloudTargetConfigSchema } from "./target-config-schema.js";
-import { GitHubCloudWebhookHandler } from "./webhook.js";
+import { GitHubWebhookSourceCapability } from "../../shared/webhook-source.server.js";
+import {
+  GitHubCloudBaseDefinition,
+  type GitHubCloudBaseIntegrationDefinition,
+} from "./base-definition.js";
+import { GitHubCloudWebhookHandler } from "./webhook.server.js";
 
-type GitHubCloudIntegrationDefinition = IntegrationDefinition<
-  typeof GitHubCloudTargetConfigSchema,
-  typeof GitHubTargetSecretSchema,
-  typeof GitHubCloudBindingConfigSchema,
-  GitHubConnectionConfig
->;
-
-export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
-  familyId: GitHubFamilyId,
-  variantId: "github-cloud",
-  kind: IntegrationKinds.GIT,
-  displayName: "GitHub",
-  description: "Enable webhooks, repository access, and optional GitHub CLI in sandbox.",
-  logoKey: "github",
-  targetConfigSchema: GitHubCloudTargetConfigSchema,
-  targetSecretSchema: GitHubTargetSecretSchema,
-  bindingConfigSchema: GitHubCloudBindingConfigSchema,
-  bindingConfigForm: resolveGitHubBindingConfigForm,
-  connectionMethods: [
-    {
-      id: IntegrationConnectionMethodIds.API_KEY,
-      label: "API key",
-      kind: "form",
-      secretFields: [
-        {
-          name: "apiKey",
-          label: "API key",
-          placeholder: "Enter API key",
-          inputType: "password",
-          secretType: "api_key",
-        },
-      ],
-      configSchema: GitHubApiKeyConnectionConfigSchema,
-      configForm: GitHubApiKeyConnectionConfigForm,
-    },
-    {
-      id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-      label: "GitHub App installation",
-      kind: "redirect",
-      ui: {
-        create: {
-          submitLabel: "Install GitHub App",
-          helperText: "Continue to GitHub to install the app and finish connecting this account.",
-        },
-      },
-      configSchema: GitHubAppInstallationConnectionConfigSchema,
-    },
-  ],
+export const GitHubCloudDefinition: GitHubCloudBaseIntegrationDefinition = {
+  ...GitHubCloudBaseDefinition,
   credentialResolvers: {
     custom: {
       [GitHubCredentialResolverKeys.GITHUB_APP_INSTALLATION_TOKEN]:
@@ -85,11 +22,9 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
     },
   },
   redirectHandler: GitHubAppInstallationRedirectHandler,
-  supportedWebhookEvents: GitHubSupportedWebhookEvents,
   webhookHandler: GitHubCloudWebhookHandler,
   webhookSource: GitHubWebhookSourceCapability,
   resourceDefinitions: GitHubResourceDefinitions,
   resourceSyncTriggers: GitHubResourceSyncTriggers,
   listConnectionResources: listGitHubConnectionResources,
-  compileBinding: compileGitHubCloudBinding,
 };

@@ -24,7 +24,7 @@ jobs:
     outputs:
       ts: ${{ steps.filter.outputs.ts }}
       rust: ${{ steps.filter.outputs.rust }}
-      sandbox_runtime_sea: ${{ steps.filter.outputs.sandbox_runtime_sea }}
+      sandbox_base_linux: ${{ steps.filter.outputs.sandbox_base_linux }}
 
     steps:
       - name: Checkout
@@ -50,16 +50,13 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'turbo.json'
               - 'tsconfig.base.json'
-              - '!apps/sandbox-runtime/**'
-              - '!packages/sandbox-rs-napi/**'
               - '!packages/sandboxd/**'
             rust:
               - '.github/workflows/ci.yml'
               - '.github/workflows/ci-daily-integration.yml'
               - '.envrc'
-              - 'apps/sandbox-runtime/**'
-              - 'packages/sandbox-rs-napi/**'
               - 'packages/sandboxd/**'
+              - 'packages/sandbox-runtime-contract/**'
               - 'packages/integrations-core/**'
               - 'packages/integrations-definitions/**'
               - 'packages/sandbox-session-protocol/**'
@@ -72,23 +69,13 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'turbo.json'
               - 'tsconfig.base.json'
-            sandbox_runtime_sea:
+            sandbox_base_linux:
               - '.github/workflows/ci.yml'
               - '.github/workflows/ci-daily-integration.yml'
-              - 'docker/sandbox-runtime-sea-check/**'
-              - 'scripts/test/run-sandbox-runtime-sea-linux.mjs'
-              - 'apps/sandbox-runtime/**'
-              - 'packages/sandbox-rs-napi/**'
-              - 'packages/integrations-core/**'
-              - 'packages/integrations-definitions/**'
-              - 'packages/sandbox-session-client/**'
-              - 'packages/sandbox-session-protocol/**'
-              - 'packages/time/**'
-              - 'apps/sandbox-runtime/Dockerfile'
-              - 'package.json'
-              - 'pnpm-workspace.yaml'
-              - 'pnpm-lock.yaml'
-              - 'tsconfig.base.json'
+              - '.dockerignore'
+              - 'packages/sandboxd/**'
+              - 'packages/sandboxd/Dockerfile'
+              - 'packages/sandboxd/scripts/cmddir'
 
   static-ts:
     name: TS Static
@@ -145,7 +132,7 @@ jobs:
 
       - name: Build workspace in Nix shell
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=!@mistle/sandbox-runtime --filter=!@mistle/sandbox-rs-napi --filter=!@mistle/sandboxd"
+        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=!@mistle/sandboxd"
 
       - name: Run TS static checks in Nix shell
         run: nix develop --command bash -lc "pnpm format:check && pnpm exec oxlint --type-aware --deny-warnings --threads=1 apps packages tests && pnpm lint:openapi && pnpm lint:docs && pnpm lint:sql && pnpm typecheck:ts"
@@ -183,7 +170,6 @@ jobs:
         with:
           shared-key: sandbox-rust
           workspaces: |
-            packages/sandbox-rs-napi -> target
             packages/sandboxd -> target
           env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
           cmd-format: nix develop --command {0}
@@ -223,7 +209,7 @@ jobs:
 
       - name: Build workspace in Nix shell
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=@mistle/sandbox-runtime --filter=@mistle/sandbox-rs-napi --filter=@mistle/sandboxd"
+        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=@mistle/sandboxd"
 
       - name: Run Rust static checks in Nix shell
         run: nix develop --command bash -lc "pnpm lint:rust && pnpm typecheck:rust"
@@ -360,7 +346,6 @@ jobs:
         with:
           shared-key: sandbox-rust
           workspaces: |
-            packages/sandbox-rs-napi -> target
             packages/sandboxd -> target
           env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
           cmd-format: nix develop --command {0}
@@ -408,25 +393,26 @@ jobs:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-rust-${{ github.sha }}
 
-  sandbox-runtime-sea-linux:
-    name: Sandbox Runtime SEA (Linux)
+  sandbox-base-linux:
+    name: Sandbox Base Image (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 90
     needs:
       - changes
-    if: needs.changes.outputs.sandbox_runtime_sea == 'true'
+    if: needs.changes.outputs.sandbox_base_linux == 'true'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 25
-
-      - name: Run Linux SEA packaging check
-        run: node ./scripts/test/run-sandbox-runtime-sea-linux.mjs
+      - name: Run Linux sandbox base packaging check
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --target sandbox-base \
+            --tag mistle-sandbox-base-check:local \
+            --file packages/sandboxd/Dockerfile \
+            .
 
   notify:
     name: Notify Slack
@@ -437,7 +423,7 @@ jobs:
       - static-rust
       - test-ts
       - test-rust
-      - sandbox-runtime-sea-linux
+      - sandbox-base-linux
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     permissions:
       contents: read
@@ -445,12 +431,12 @@ jobs:
       pull-requests: read
     env:
       GITHUB_TOKEN: ${{ github.token }}
-      SEA_CHANGES_RESULT: ${{ needs.changes.result }}
+      CHANGES_RESULT: ${{ needs.changes.result }}
       TS_STATIC_RESULT: ${{ needs.static-ts.result }}
       RUST_STATIC_RESULT: ${{ needs.static-rust.result }}
       TS_TEST_RESULT: ${{ needs.test-ts.result }}
       RUST_TEST_RESULT: ${{ needs.test-rust.result }}
-      SEA_RESULT: ${{ needs.sandbox-runtime-sea-linux.result }}
+      SANDBOX_BASE_RESULT: ${{ needs.sandbox-base-linux.result }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       WORKFLOW_NAME: ${{ github.workflow }}
 
@@ -472,22 +458,22 @@ jobs:
           import urllib.error
           import urllib.request
 
-          sea_changes_result = os.environ["SEA_CHANGES_RESULT"]
+          changes_result = os.environ["CHANGES_RESULT"]
           lane_results = [
               os.environ["TS_STATIC_RESULT"],
               os.environ["RUST_STATIC_RESULT"],
               os.environ["TS_TEST_RESULT"],
               os.environ["RUST_TEST_RESULT"],
           ]
-          sea_result = os.environ["SEA_RESULT"]
+          sandbox_base_result = os.environ["SANDBOX_BASE_RESULT"]
           success_like_results = {"success", "skipped"}
-          if sea_changes_result == "cancelled":
+          if changes_result == "cancelled":
               workflow_result = "cancelled"
-          elif sea_changes_result != "success":
+          elif changes_result != "success":
               workflow_result = "failure"
-          elif all(result in success_like_results for result in lane_results) and sea_result in success_like_results:
+          elif all(result in success_like_results for result in lane_results) and sandbox_base_result in success_like_results:
               workflow_result = "success"
-          elif any(result == "cancelled" for result in [*lane_results, sea_result]):
+          elif any(result == "cancelled" for result in [*lane_results, sandbox_base_result]):
               workflow_result = "cancelled"
           else:
               workflow_result = "failure"

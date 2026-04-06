@@ -10,7 +10,7 @@ import type {
 } from "@octokit/webhooks-types";
 import { describe, expect, it } from "vitest";
 
-import { GitHubWebhookHandler } from "./webhook.js";
+import { GitHubWebhookHandler } from "./webhook.server.js";
 
 const encoder = new TextEncoder();
 

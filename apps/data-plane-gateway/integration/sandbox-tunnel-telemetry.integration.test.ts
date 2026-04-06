@@ -140,7 +140,7 @@ describe("sandbox tunnel telemetry ingress integration", () => {
         body: otlpRequest?.body,
         path: "/v1/logs",
       });
-      expect(otlpRequest?.body).toContain("@mistle/sandbox-runtime");
+      expect(otlpRequest?.body).toContain("@mistle/sandboxd");
       expect(otlpRequest?.body).toContain('"service.name"');
       expect(otlpRequest?.body).toContain('"deployment.environment"');
       expect(otlpRequest?.body).toContain('"integration"');

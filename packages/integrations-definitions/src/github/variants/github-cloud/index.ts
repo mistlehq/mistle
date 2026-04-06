@@ -1,4 +1,5 @@
 export { GitHubCloudDefinition } from "./definition.js";
+export { GitHubCloudBaseDefinition } from "./base-definition.js";
 export {
   GitHubCloudTargetConfigSchema,
   type GitHubCloudTargetConfig,
@@ -9,4 +10,4 @@ export {
 } from "./binding-config-schema.js";
 export { compileGitHubCloudBinding } from "./compile-binding.js";
 export { GitHubCloudCredentialSecretTypes } from "./auth.js";
-export { GitHubCloudWebhookHandler } from "./webhook.js";
+export { GitHubCloudWebhookHandler } from "./webhook.server.js";

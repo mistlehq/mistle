@@ -1,7 +1,5 @@
 import type { WSContext, WSMessageReceive } from "hono/ws";
 
-import { ExecutionLeaseRepository } from "./execution-lease-repository.js";
-import { SandboxExecutionLeaseNotFoundError } from "./execution-lease-store.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import {
   TunnelProtocolTranslator,
@@ -48,7 +46,6 @@ export async function handleTunnelWebSocketMessage(input: {
   bootstrapOwnerLeaseId?: string;
   clientSessionId: string;
   currentSocket: Pick<WSContext, "send">;
-  executionLeaseRepository: ExecutionLeaseRepository;
   sandboxKeepaliveRepository: SandboxKeepaliveRepository;
   handleTelemetryDelivery?: ((delivery: TelemetryDelivery) => Promise<void>) | undefined;
   interactiveStreamRouter: InteractiveStreamRouter;
@@ -64,21 +61,6 @@ export async function handleTunnelWebSocketMessage(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     sourcePeerSide: input.sourcePeerSide,
   });
-
-  if (translation.executionLeaseControlMessage !== undefined) {
-    try {
-      await input.executionLeaseRepository.applyControlMessage({
-        message: translation.executionLeaseControlMessage,
-        sandboxInstanceId: input.sandboxInstanceId,
-      });
-    } catch (error) {
-      if (error instanceof SandboxExecutionLeaseNotFoundError) {
-        return;
-      }
-
-      throw error;
-    }
-  }
 
   if (translation.keepaliveControlMessage !== undefined) {
     if (input.bootstrapOwnerLeaseId === undefined) {

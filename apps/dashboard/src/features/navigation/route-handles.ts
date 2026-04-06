@@ -1,4 +1,4 @@
-import { listIntegrationDefinitions } from "@mistle/integrations-definitions";
+import { listBrowserIntegrationDefinitions } from "@mistle/integrations-definitions/browser";
 import { createElement } from "react";
 import { z } from "zod";
 
@@ -59,8 +59,8 @@ function resolveIntegrationDefinitionMetadata(targetKey: string): {
   logoKey: string;
 } | null {
   const definition =
-    listIntegrationDefinitions().find((candidate) => candidate.variantId === targetKey) ??
-    listIntegrationDefinitions().find((candidate) => candidate.familyId === targetKey) ??
+    listBrowserIntegrationDefinitions().find((candidate) => candidate.variantId === targetKey) ??
+    listBrowserIntegrationDefinitions().find((candidate) => candidate.familyId === targetKey) ??
     null;
 
   if (definition === null) {
