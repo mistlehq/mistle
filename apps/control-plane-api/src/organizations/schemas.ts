@@ -22,3 +22,15 @@ export const MembershipCapabilitiesSchema = z
       .strict(),
   })
   .strict();
+
+export const organizationLogoResponseSchema = z
+  .object({
+    imageUrl: z.url(),
+  })
+  .strict();
+
+export const organizationLogoStateResponseSchema = z
+  .object({
+    imageUrl: z.url().nullable(),
+  })
+  .strict();
