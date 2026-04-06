@@ -18,22 +18,15 @@ const TUNNEL_SERVICE_NAME = "tunnel";
 const LOCAL_REGISTRY_HOST = "127.0.0.1:5001";
 const SANDBOX_BASE_IMAGE_TAG = "mistle/sandbox-base:dev";
 const SANDBOX_BASE_IMAGE_REGISTRY_TAG = `${LOCAL_REGISTRY_HOST}/mistle/sandbox-base:dev`;
+const SANDBOX_BASE_DOCKERFILE_PATH = "packages/sandboxd/Dockerfile";
+const SANDBOX_BASE_CACHE_DIR = resolve(REPO_ROOT, ".local", "sandbox-base");
+const SANDBOX_BASE_CACHE_KEY_PATH = resolve(SANDBOX_BASE_CACHE_DIR, ".cache-key");
 
-const SEA_OUTPUT_DIR = resolve(REPO_ROOT, "apps/sandbox-runtime/dist-sea");
-const SEA_CACHE_KEY_PATH = resolve(SEA_OUTPUT_DIR, ".cache-key");
-
-const SEA_BUILD_INPUT_PATHS: readonly string[] = [
-  "packages/sandbox-rs-napi",
-  "apps/sandbox-runtime",
-  "packages/integrations-core",
-  "packages/integrations-definitions",
-  "packages/sandbox-session-client",
-  "packages/sandbox-session-protocol",
-  "packages/time",
-  "scripts/build/build-sandbox-runtime-sea-linux.mjs",
-  "pnpm-lock.yaml",
-  "pnpm-workspace.yaml",
-  "tsconfig.base.json",
+const SANDBOX_BASE_BUILD_INPUT_PATHS: readonly string[] = [
+  "packages/sandboxd",
+  "packages/sandboxd/scripts/cmddir",
+  ".dockerignore",
+  SANDBOX_BASE_DOCKERFILE_PATH,
 ];
 
 let localInfraStartAttempted = false;
@@ -282,7 +275,7 @@ process.once("SIGTERM", () => {
   forwardSignal("SIGTERM");
 });
 
-function computeSeaBuildCacheKey(): string {
+function computeSandboxBaseBuildCacheKey(): string {
   const result = spawnSync(
     "git",
     [
@@ -292,7 +285,7 @@ function computeSeaBuildCacheKey(): string {
       "--exclude-standard",
       "-z",
       "--",
-      ...SEA_BUILD_INPUT_PATHS,
+      ...SANDBOX_BASE_BUILD_INPUT_PATHS,
     ],
     {
       cwd: REPO_ROOT,
@@ -302,7 +295,9 @@ function computeSeaBuildCacheKey(): string {
   );
 
   if (result.status !== 0) {
-    throw new Error(`Failed to list tracked files for SEA cache key: ${result.stderr ?? ""}`);
+    throw new Error(
+      `Failed to list tracked files for sandbox base cache key: ${result.stderr ?? ""}`,
+    );
   }
 
   const files = result.stdout.split("\0").filter(Boolean).sort();
@@ -326,23 +321,20 @@ function computeSeaBuildCacheKey(): string {
   return hash.digest("hex");
 }
 
-function checkSeaBuildCache(): { hit: boolean; cacheKey: string } {
-  const cacheKey = computeSeaBuildCacheKey();
-
-  if (!existsSync(SEA_OUTPUT_DIR)) {
-    return { hit: false, cacheKey };
-  }
+function checkSandboxBaseBuildCache(): { hit: boolean; cacheKey: string } {
+  const cacheKey = computeSandboxBaseBuildCacheKey();
 
   try {
-    const storedKey = readFileSync(SEA_CACHE_KEY_PATH, "utf8").trim();
+    const storedKey = readFileSync(SANDBOX_BASE_CACHE_KEY_PATH, "utf8").trim();
     return { hit: storedKey === cacheKey, cacheKey };
   } catch {
     return { hit: false, cacheKey };
   }
 }
 
-function writeSeaBuildCacheKey(key: string): void {
-  writeFileSync(SEA_CACHE_KEY_PATH, key + "\n", "utf8");
+function writeSandboxBaseBuildCacheKey(key: string): void {
+  mkdirSync(SANDBOX_BASE_CACHE_DIR, { recursive: true });
+  writeFileSync(SANDBOX_BASE_CACHE_KEY_PATH, key + "\n", "utf8");
 }
 
 function dockerImageExists(imageTag: string): boolean {
@@ -408,23 +400,14 @@ function start(): void {
     env: sharedDevEnv,
   });
 
-  console.log("Checking sandbox runtime base image cache...");
-  const { hit: seaCacheHit, cacheKey: seaCacheKey } = checkSeaBuildCache();
+  console.log("Checking sandbox base image cache...");
+  const { hit: sandboxBaseCacheHit, cacheKey: sandboxBaseCacheKey } = checkSandboxBaseBuildCache();
 
-  if (!seaCacheHit) {
-    console.log("Building sandbox runtime SEA (inputs changed)...");
-    runOrThrow({
-      command: "pnpm",
-      args: ["build:sandbox-runtime:sea:linux"],
-      env: sharedDevEnv,
-    });
-  }
-
-  if (!seaCacheHit || !dockerImageExists(SANDBOX_BASE_IMAGE_TAG)) {
-    if (seaCacheHit) {
-      console.log("SEA build cache valid but Docker image missing, rebuilding image...");
+  if (!sandboxBaseCacheHit || !dockerImageExists(SANDBOX_BASE_IMAGE_TAG)) {
+    if (sandboxBaseCacheHit) {
+      console.log("Sandbox base cache is valid but the Docker image is missing, rebuilding it...");
     }
-    console.log("Building sandbox runtime base image...");
+    console.log("Building sandbox base image...");
     runOrThrow({
       command: "docker",
       args: [
@@ -432,7 +415,7 @@ function start(): void {
         "--target",
         "sandbox-base",
         "-f",
-        "apps/sandbox-runtime/Dockerfile",
+        SANDBOX_BASE_DOCKERFILE_PATH,
         "-t",
         SANDBOX_BASE_IMAGE_TAG,
         ".",
@@ -440,10 +423,10 @@ function start(): void {
       env: sharedDevEnv,
     });
   } else {
-    console.log("Sandbox runtime base image is up to date.");
+    console.log("Sandbox base image is up to date.");
   }
 
-  console.log("Pushing sandbox runtime base image to local registry...");
+  console.log("Pushing sandbox base image to the local registry...");
   runOrThrow({
     command: "docker",
     args: ["tag", SANDBOX_BASE_IMAGE_TAG, SANDBOX_BASE_IMAGE_REGISTRY_TAG],
@@ -455,8 +438,8 @@ function start(): void {
     env: sharedDevEnv,
   });
 
-  if (!seaCacheHit) {
-    writeSeaBuildCacheKey(seaCacheKey);
+  if (!sandboxBaseCacheHit) {
+    writeSandboxBaseBuildCacheKey(sandboxBaseCacheKey);
   }
 
   console.log("Building migration dependencies...");

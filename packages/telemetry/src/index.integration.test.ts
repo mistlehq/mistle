@@ -36,7 +36,7 @@ describe("createOtlpLogForwarder", () => {
     }
 
     const forwarder = createOtlpLogForwarder({
-      serviceName: "@mistle/sandbox-runtime",
+      serviceName: "@mistle/sandboxd",
       resourceAttributes: "deployment.environment=test",
       logs: {
         endpoint: `http://127.0.0.1:${String(address.port)}/v1/logs`,
@@ -55,7 +55,7 @@ describe("createOtlpLogForwarder", () => {
     }
 
     expect(requests).toHaveLength(1);
-    expect(requests[0]?.body).toContain("@mistle/sandbox-runtime");
+    expect(requests[0]?.body).toContain("@mistle/sandboxd");
     expect(requests[0]?.body).toContain("sandbox runtime started");
   });
 });
