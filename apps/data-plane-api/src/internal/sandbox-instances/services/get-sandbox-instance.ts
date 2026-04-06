@@ -22,6 +22,7 @@ export async function getSandboxInstance(
   const [sandboxInstance] = await ctx.db
     .select({
       id: sandboxInstances.id,
+      title: sandboxInstances.title,
       status: sandboxInstances.status,
       failureCode: sandboxInstances.failureCode,
       failureMessage: sandboxInstances.failureMessage,
@@ -49,6 +50,7 @@ export async function getSandboxInstance(
 
   return {
     id: sandboxInstance.id,
+    conversationTitle: sandboxInstance.title,
     status: await readEffectiveSandboxStatus(
       {
         runtimeStateReader: ctx.runtimeStateReader,

@@ -48,6 +48,7 @@ export interface paths {
                 };
                 /** @enum {string} */
                 status: "pending" | "starting" | "running" | "stopped" | "failed";
+                title: string | null;
                 updatedAt: string;
               }[];
               nextPage: {
@@ -600,6 +601,7 @@ export interface paths {
               } | null;
               /** @enum {string} */
               status: "pending" | "starting" | "running" | "stopped" | "failed";
+              title: string | null;
             } | null;
           };
         };

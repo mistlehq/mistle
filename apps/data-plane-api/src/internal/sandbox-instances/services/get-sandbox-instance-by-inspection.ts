@@ -136,6 +136,7 @@ async function inspectStartingSandboxInstance(
   ctx: GetSandboxInstanceByInspectionContext,
   sandboxInstance: {
     id: string;
+    title: string | null;
     providerSandboxId: string | null;
     failureCode: string | null;
     failureMessage: string | null;
@@ -157,6 +158,7 @@ async function inspectStartingSandboxInstance(
     });
     return {
       id: sandboxInstance.id,
+      conversationTitle: sandboxInstance.title,
       status: SandboxInstanceStatuses.FAILED,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
@@ -167,6 +169,7 @@ async function inspectStartingSandboxInstance(
   if (inspection.state === SandboxInspectStates.RUNNING) {
     return {
       id: sandboxInstance.id,
+      conversationTitle: sandboxInstance.title,
       status: await readEffectiveSandboxStatus(
         {
           runtimeStateReader: ctx.runtimeStateReader,
@@ -190,6 +193,7 @@ async function inspectStartingSandboxInstance(
 
   return {
     id: sandboxInstance.id,
+    conversationTitle: sandboxInstance.title,
     status: SandboxInstanceStatuses.FAILED,
     failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_STOPPED_DURING_STARTUP,
     failureMessage: "Sandbox runtime was not running at the provider during startup inspection.",
@@ -199,11 +203,13 @@ async function inspectStartingSandboxInstance(
 
 function readPendingSandboxInstance(sandboxInstance: {
   id: string;
+  title: string | null;
   failureCode: string | null;
   failureMessage: string | null;
 }): NonNullable<GetSandboxInstanceResponse> {
   return {
     id: sandboxInstance.id,
+    conversationTitle: sandboxInstance.title,
     status: SandboxInstanceStatuses.PENDING,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
@@ -215,6 +221,7 @@ async function inspectRunningSandboxInstance(
   ctx: GetSandboxInstanceByInspectionContext,
   sandboxInstance: {
     id: string;
+    title: string | null;
     providerSandboxId: string | null;
     failureCode: string | null;
     failureMessage: string | null;
@@ -235,6 +242,7 @@ async function inspectRunningSandboxInstance(
     });
     return {
       id: sandboxInstance.id,
+      conversationTitle: sandboxInstance.title,
       status: SandboxInstanceStatuses.FAILED,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
@@ -245,6 +253,7 @@ async function inspectRunningSandboxInstance(
   if (inspection.state === SandboxInspectStates.RUNNING) {
     return {
       id: sandboxInstance.id,
+      conversationTitle: sandboxInstance.title,
       status: await readEffectiveSandboxStatus(
         {
           runtimeStateReader: ctx.runtimeStateReader,
@@ -266,6 +275,7 @@ async function inspectRunningSandboxInstance(
 
   return {
     id: sandboxInstance.id,
+    conversationTitle: sandboxInstance.title,
     status: SandboxInstanceStatuses.STOPPED,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
@@ -297,6 +307,7 @@ export async function getSandboxInstanceByInspection(
   const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
     columns: {
       id: true,
+      title: true,
       runtimeProvider: true,
       providerSandboxId: true,
       status: true,
@@ -320,6 +331,7 @@ export async function getSandboxInstanceByInspection(
     case SandboxInstanceStatuses.FAILED:
       return {
         id: sandboxInstance.id,
+        conversationTitle: sandboxInstance.title,
         status: SandboxInstanceStatuses.FAILED,
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,
@@ -328,6 +340,7 @@ export async function getSandboxInstanceByInspection(
     case SandboxInstanceStatuses.STOPPED:
       return {
         id: sandboxInstance.id,
+        conversationTitle: sandboxInstance.title,
         status: SandboxInstanceStatuses.STOPPED,
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,

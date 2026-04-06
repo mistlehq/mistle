@@ -18,6 +18,7 @@ const StartSandboxProfileInstanceResponseSchema = z
 const SandboxInstanceStatusResponseSchema = z
   .object({
     id: z.string().min(1),
+    conversationTitle: z.string().min(1).nullable(),
     status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
@@ -48,6 +49,7 @@ export type StartSandboxInstanceResult = {
 
 export type SandboxInstanceStatusResult = {
   id: string;
+  conversationTitle: string | null;
   status: "pending" | "starting" | "running" | "stopped" | "failed";
   failureCode: string | null;
   failureMessage: string | null;

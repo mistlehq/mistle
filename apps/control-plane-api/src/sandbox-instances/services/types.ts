@@ -27,6 +27,7 @@ export type SandboxInstanceAutomationConversation = {
 
 export type SandboxInstanceStatus = {
   id: string;
+  conversationTitle: string | null;
   status: NonNullable<GetSandboxInstanceResponse>["status"];
   failureCode: string | null;
   failureMessage: string | null;

@@ -558,6 +558,7 @@ describe("useSessionWorkbenchController", () => {
       queryClient,
       sandboxInstanceId: "sbi_resume_001",
       sandboxStatus: {
+        conversationTitle: null,
         id: "sbi_resume_001",
         status: "starting",
         failureCode: null,
@@ -568,6 +569,7 @@ describe("useSessionWorkbenchController", () => {
     });
 
     expect(queryClient.getQueryData(getSandboxInstanceStatusQueryKey("sbi_resume_001"))).toEqual({
+      conversationTitle: null,
       id: "sbi_resume_001",
       status: "starting",
       failureCode: null,
@@ -776,6 +778,7 @@ describe("useSessionWorkbenchController", () => {
       queryClient,
       sandboxInstanceId: "sbi_resume_stable",
       sandboxStatus: {
+        conversationTitle: null,
         failureCode: null,
         failureMessage: null,
         id: "sbi_resume_stable",
@@ -851,6 +854,7 @@ describe("useSessionWorkbenchController", () => {
       queryClient,
       sandboxInstanceId,
       sandboxStatus: {
+        conversationTitle: null,
         id: sandboxInstanceId,
         status: "stopped",
         failureCode: null,

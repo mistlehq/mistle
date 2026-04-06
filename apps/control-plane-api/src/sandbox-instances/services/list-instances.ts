@@ -7,7 +7,6 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 
 import { resolveUserDisplayName } from "../../lib/user-display-name.js";
 import { SandboxInstancesBadRequestCodes, SandboxInstancesBadRequestError } from "../errors.js";
-import { resolveInstanceAutomationConversations } from "./resolve-instance-automation-conversations.js";
 import type { ListSandboxInstancesResult } from "./types.js";
 
 async function resolveStartedByNames(
@@ -151,16 +150,11 @@ export async function listInstances(
       organizationId: input.organizationId,
       items: sandboxInstances.items,
     });
-    const automationConversationsByInstanceId = await resolveInstanceAutomationConversations(db, {
-      organizationId: input.organizationId,
-      instanceIds: sandboxInstances.items.map((item) => item.id),
-    });
-
     return {
       ...sandboxInstances,
       items: sandboxInstances.items.map((item) => ({
         ...item,
-        conversationTitle: automationConversationsByInstanceId.get(item.id)?.title ?? null,
+        conversationTitle: item.conversationTitle,
         sandboxProfileDisplayName: sandboxProfileDisplayNames.get(item.sandboxProfileId) ?? null,
         startedBy: {
           ...item.startedBy,

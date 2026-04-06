@@ -111,6 +111,7 @@ async function insertResumableSandboxInstance(input: {
     id: input.sandboxInstanceId,
     organizationId: input.organizationId,
     sandboxProfileId: "sbp_resume_integration",
+    title: null,
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
     providerSandboxId: input.providerSandboxId,
@@ -232,6 +233,7 @@ describe("sandbox instance resume integration", () => {
       const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
       expect(body).toEqual({
         id: sandboxInstanceId,
+        conversationTitle: null,
         status: "starting",
         failureCode: null,
         failureMessage: null,
@@ -317,6 +319,7 @@ describe("sandbox instance resume integration", () => {
       const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
       expect(body).toEqual({
         id: sandboxInstanceId,
+        conversationTitle: null,
         status: "starting",
         failureCode: null,
         failureMessage: null,
@@ -404,6 +407,7 @@ describe("sandbox instance resume integration", () => {
       const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
       expect(body).toEqual({
         id: sandboxInstanceId,
+        conversationTitle: null,
         status: "running",
         failureCode: null,
         failureMessage: null,
