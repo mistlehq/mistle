@@ -3,20 +3,20 @@ import sharp from "sharp";
 import { ProfileImageRequirements } from "./profile-image-requirements.js";
 import { validateProfileImage } from "./profile-image-validation.js";
 
-export type NormalizeUserAvatarImageInput = {
+export type NormalizeProfileImageInput = {
   imageBytes: Uint8Array;
 };
 
-export type NormalizedUserAvatarImage = {
+export type NormalizedProfileImage = {
   contentType: "image/webp";
   imageBytes: Uint8Array;
   width: number;
   height: number;
 };
 
-export async function normalizeUserAvatarImage(
-  input: NormalizeUserAvatarImageInput,
-): Promise<NormalizedUserAvatarImage> {
+export async function normalizeProfileImage(
+  input: NormalizeProfileImageInput,
+): Promise<NormalizedProfileImage> {
   const validatedImage = await validateProfileImage({
     imageBytes: input.imageBytes,
   });

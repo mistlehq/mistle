@@ -5,7 +5,7 @@ import type { S3CompatibleObjectStore } from "@mistle/object-store";
 import { eq } from "drizzle-orm";
 import { typeid } from "typeid-js";
 
-import { normalizeOrganizationLogoImage } from "./organization-logo-image.js";
+import { normalizeProfileImage } from "./normalize-profile-image.js";
 
 export type PutOrganizationLogoContext = {
   db: ControlPlaneDatabase;
@@ -38,7 +38,7 @@ export async function putOrganizationLogo(
     throw new NotFoundError("NOT_FOUND", "Organization was not found.");
   }
 
-  const normalizedLogo = await normalizeOrganizationLogoImage({
+  const normalizedLogo = await normalizeProfileImage({
     imageBytes: input.imageBytes,
   });
   const logoObjectKey = createOrganizationLogoObjectKey(input.organizationId);

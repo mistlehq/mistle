@@ -5,7 +5,7 @@ import type { S3CompatibleObjectStore } from "@mistle/object-store";
 import { eq } from "drizzle-orm";
 import { typeid } from "typeid-js";
 
-import { normalizeUserAvatarImage } from "./user-avatar-image.js";
+import { normalizeProfileImage } from "./normalize-profile-image.js";
 
 export type PutUserAvatarContext = {
   db: ControlPlaneDatabase;
@@ -38,7 +38,7 @@ export async function putUserAvatar(
     throw new NotFoundError("NOT_FOUND", "User was not found.");
   }
 
-  const normalizedAvatar = await normalizeUserAvatarImage({
+  const normalizedAvatar = await normalizeProfileImage({
     imageBytes: input.imageBytes,
   });
   const imageObjectKey = createUserAvatarObjectKey(input.userId);
