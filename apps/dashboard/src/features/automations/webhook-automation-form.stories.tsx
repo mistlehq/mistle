@@ -16,21 +16,22 @@ import { createWebhookAutomationTriggerId } from "./webhook-automation-option-bu
 import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
 
 const GitHubConnectionId = "conn_github_prod";
+const GitHubWebhookSourceId = "iws_github_prod";
 const StripeConnectionId = "conn_stripe_prod";
 const IssueCommentCreatedTriggerId = createWebhookAutomationTriggerId({
-  connectionId: GitHubConnectionId,
+  webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.issue_comment.created",
 });
 const PullRequestOpenedTriggerId = createWebhookAutomationTriggerId({
-  connectionId: GitHubConnectionId,
+  webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.pull_request.opened",
 });
 const PullRequestReviewSubmittedTriggerId = createWebhookAutomationTriggerId({
-  connectionId: GitHubConnectionId,
+  webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.pull_request_review.submitted",
 });
 const PushDeletedTriggerId = createWebhookAutomationTriggerId({
-  connectionId: GitHubConnectionId,
+  webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.push.deleted",
 });
 
@@ -184,6 +185,7 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
   {
     id: IssueCommentCreatedTriggerId,
     eventType: "github.issue_comment.created",
+    integrationWebhookSourceId: GitHubWebhookSourceId,
     connectionId: GitHubConnectionId,
     connectionLabel: "GitHub Engineering",
     label: "Issue comment created",
@@ -241,10 +243,11 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
   },
   {
     id: createWebhookAutomationTriggerId({
-      connectionId: GitHubConnectionId,
+      webhookSourceId: GitHubWebhookSourceId,
       eventType: "github.issues.opened",
     }),
     eventType: "github.issues.opened",
+    integrationWebhookSourceId: GitHubWebhookSourceId,
     connectionId: GitHubConnectionId,
     connectionLabel: "GitHub Engineering",
     label: "Issue opened",
@@ -267,6 +270,7 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
   {
     id: PullRequestOpenedTriggerId,
     eventType: "github.pull_request.opened",
+    integrationWebhookSourceId: GitHubWebhookSourceId,
     connectionId: GitHubConnectionId,
     connectionLabel: "GitHub Engineering",
     label: "Pull request opened",
@@ -315,6 +319,7 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
   {
     id: PullRequestReviewSubmittedTriggerId,
     eventType: "github.pull_request_review.submitted",
+    integrationWebhookSourceId: GitHubWebhookSourceId,
     connectionId: GitHubConnectionId,
     connectionLabel: "GitHub Engineering",
     label: "Pull request review submitted",
@@ -362,10 +367,11 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
   },
   {
     id: createWebhookAutomationTriggerId({
-      connectionId: GitHubConnectionId,
+      webhookSourceId: GitHubWebhookSourceId,
       eventType: "github.pull_request_review_comment.created",
     }),
     eventType: "github.pull_request_review_comment.created",
+    integrationWebhookSourceId: GitHubWebhookSourceId,
     connectionId: GitHubConnectionId,
     connectionLabel: "GitHub Engineering",
     label: "Pull request review comment created",
@@ -590,6 +596,7 @@ export const UnavailableSavedEvent: Story = {
       {
         id: PushDeletedTriggerId,
         eventType: "github.push.deleted",
+        integrationWebhookSourceId: GitHubWebhookSourceId,
         connectionId: GitHubConnectionId,
         connectionLabel: "GitHub Engineering",
         label: "github.push.deleted",

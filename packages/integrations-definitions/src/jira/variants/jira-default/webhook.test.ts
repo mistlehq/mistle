@@ -4,7 +4,7 @@ import {
   JiraWebhookHandler,
   buildJiraWebhookSignature,
   verifyJiraWebhookSignature,
-} from "./webhook.js";
+} from "./webhook.server.js";
 
 function createJiraIssueCreatedPayload(): Record<string, unknown> {
   return {

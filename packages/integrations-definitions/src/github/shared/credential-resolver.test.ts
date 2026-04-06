@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   createGitHubInstallationAuthInput,
   resolveGitHubInstallationRepositoryNames,
-} from "./credential-resolver.js";
+} from "./credential-resolver.server.js";
 
 function createResolverInput(
   overrides?: Omit<Partial<IntegrationCredentialResolverInput>, "binding"> & {

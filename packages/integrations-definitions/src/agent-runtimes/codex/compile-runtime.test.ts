@@ -75,6 +75,35 @@ describe("compileCodexRuntime", () => {
         },
       },
     });
+    expect(compiled.runtimeClients[0]?.processes).toEqual([
+      {
+        processKey: "codex-app-server",
+        command: {
+          args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4501"],
+        },
+        readiness: {
+          type: "ws",
+          url: "ws://127.0.0.1:4501",
+          timeoutMs: 5_000,
+        },
+        stop: {
+          signal: "sigterm",
+          timeoutMs: 10_000,
+          gracePeriodMs: 2_000,
+        },
+      },
+    ]);
+    expect(compiled.runtimeClients[0]?.endpoints).toEqual([
+      {
+        endpointKey: "app-server",
+        processKey: "codex-app-server",
+        transport: {
+          type: "ws",
+          url: "ws://127.0.0.1:4500",
+        },
+        connectionMode: "dedicated",
+      },
+    ]);
     expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain(
       'developer_instructions = "Mistle-managed sandbox context:',
     );

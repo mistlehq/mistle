@@ -15,9 +15,14 @@ import {
   writePreparedTestHarnessRuntime,
 } from "../../packages/test-harness/src/system/prepared-runtime.ts";
 
+// This script prepares the Docker images used by the local system test harness.
+// It fingerprints the sandbox base image inputs separately from the app image
+// inputs so sandboxd changes only rebuild the sandbox image while preserving
+// cached service images when possible.
+
 const ScriptDirectoryPath = dirname(fileURLToPath(import.meta.url));
 const RepositoryRootPath = resolve(ScriptDirectoryPath, "../..");
-const NodeToolchainImage = "node:25-bookworm-slim";
+const SandboxdBuildToolchainImage = "rust:1.93-bookworm";
 
 type ContextFileEntry =
   | {
@@ -38,7 +43,7 @@ type ContextFileEntry =
 
 type CollectedContextFiles = {
   docker: readonly ContextFileEntry[];
-  sea: readonly ContextFileEntry[];
+  sandboxd: readonly ContextFileEntry[];
 };
 
 function createPreparedImageName(input: {
@@ -54,12 +59,12 @@ function createPreparedImageName(input: {
 
 function createPreparedRuntime(buildContextHostPath: string): PreparedTestHarnessRuntime {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     provider: "docker",
     fingerprint: {
       architecture: process.arch,
       dockerContextFingerprint: "",
-      seaContextFingerprint: "",
+      sandboxdContextFingerprint: "",
       sandboxBaseImageFingerprint: "",
       appImageFingerprints: {
         controlPlaneApi: "",
@@ -131,25 +136,25 @@ function isAllowedDockerDistPath(relativePath: string): boolean {
   return segments.includes("dist");
 }
 
-function shouldTraverseSeaDirectory(relativePath: string): boolean {
+function shouldTraverseSandboxdDirectory(relativePath: string): boolean {
   if (relativePath.length === 0) {
     return true;
   }
-  if (hasAnySegment(relativePath, [".git", ".local", ".turbo", "node_modules"])) {
+  if (hasAnySegment(relativePath, [".git", ".local", ".turbo", "node_modules", "target"])) {
     return false;
   }
-  if (isPathWithin(relativePath, "apps/sandbox-runtime/dist-sea")) {
+  if (isPathWithin(relativePath, "packages/sandboxd/dist")) {
     return false;
   }
 
   return true;
 }
 
-function shouldIncludeSeaFile(relativePath: string): boolean {
-  if (hasAnySegment(relativePath, [".git", ".local", ".turbo", "node_modules"])) {
+function shouldIncludeSandboxdFile(relativePath: string): boolean {
+  if (hasAnySegment(relativePath, [".git", ".local", ".turbo", "node_modules", "target"])) {
     return false;
   }
-  if (isPathWithin(relativePath, "apps/sandbox-runtime/dist-sea")) {
+  if (isPathWithin(relativePath, "packages/sandboxd/dist")) {
     return false;
   }
 
@@ -164,11 +169,11 @@ function shouldTraverseDockerDirectory(relativePath: string): boolean {
     relativePath === ".git" ||
     relativePath === ".local" ||
     relativePath === ".pkgrep" ||
-    hasAnySegment(relativePath, [".turbo", "coverage", "node_modules", "test-results"])
+    hasAnySegment(relativePath, [".turbo", "coverage", "node_modules", "target", "test-results"])
   ) {
     return false;
   }
-  if (isPathWithin(relativePath, "apps/sandbox-runtime/dist-sea")) {
+  if (isPathWithin(relativePath, "packages/sandboxd/dist")) {
     return false;
   }
 
@@ -188,11 +193,11 @@ function shouldIncludeDockerFile(relativePath: string): boolean {
     relativePath === ".git" ||
     relativePath === ".local" ||
     relativePath === ".pkgrep" ||
-    hasAnySegment(relativePath, [".turbo", "coverage", "node_modules", "test-results"])
+    hasAnySegment(relativePath, [".turbo", "coverage", "node_modules", "target", "test-results"])
   ) {
     return false;
   }
-  if (isPathWithin(relativePath, "apps/sandbox-runtime/dist-sea")) {
+  if (isPathWithin(relativePath, "packages/sandboxd/dist")) {
     return false;
   }
 
@@ -237,7 +242,7 @@ async function createContextFileEntry(relativePath: string): Promise<ContextFile
 
 async function collectContextFiles(): Promise<CollectedContextFiles> {
   const dockerFiles: ContextFileEntry[] = [];
-  const seaFiles: ContextFileEntry[] = [];
+  const sandboxdFiles: ContextFileEntry[] = [];
 
   async function walk(relativeDirectoryPath: string): Promise<void> {
     const absoluteDirectoryPath = resolve(RepositoryRootPath, relativeDirectoryPath);
@@ -251,9 +256,9 @@ async function collectContextFiles(): Promise<CollectedContextFiles> {
           : `${relativeDirectoryPath}/${directoryEntry.name}`;
 
       if (directoryEntry.isDirectory()) {
-        const shouldWalkSea = shouldTraverseSeaDirectory(relativePath);
+        const shouldWalkSandboxd = shouldTraverseSandboxdDirectory(relativePath);
         const shouldWalkDocker = shouldTraverseDockerDirectory(relativePath);
-        if (!shouldWalkSea && !shouldWalkDocker) {
+        if (!shouldWalkSandboxd && !shouldWalkDocker) {
           continue;
         }
 
@@ -265,15 +270,15 @@ async function collectContextFiles(): Promise<CollectedContextFiles> {
         continue;
       }
 
-      const includeSea = shouldIncludeSeaFile(relativePath);
+      const includeSandboxd = shouldIncludeSandboxdFile(relativePath);
       const includeDocker = shouldIncludeDockerFile(relativePath);
-      if (!includeSea && !includeDocker) {
+      if (!includeSandboxd && !includeDocker) {
         continue;
       }
 
       const fileEntry = await createContextFileEntry(relativePath);
-      if (includeSea) {
-        seaFiles.push(fileEntry);
+      if (includeSandboxd) {
+        sandboxdFiles.push(fileEntry);
       }
       if (includeDocker) {
         dockerFiles.push(fileEntry);
@@ -283,11 +288,11 @@ async function collectContextFiles(): Promise<CollectedContextFiles> {
 
   await walk("");
   dockerFiles.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
-  seaFiles.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+  sandboxdFiles.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
 
   return {
     docker: dockerFiles,
-    sea: seaFiles,
+    sandboxd: sandboxdFiles,
   };
 }
 
@@ -323,29 +328,29 @@ function hashString(parts: readonly string[]): string {
 
 async function createPreparedRuntimeFingerprint(): Promise<PreparedTestHarnessRuntimeFingerprint> {
   const contextFiles = await collectContextFiles();
-  const seaFileFingerprint = await hashContextFiles(contextFiles.sea);
+  const sandboxdFileFingerprint = await hashContextFiles(contextFiles.sandboxd);
   const dockerFileFingerprint = await hashContextFiles(contextFiles.docker);
   const sandboxDockerfileContents = await readFile(
     resolve(RepositoryRootPath, DefaultSandboxBaseImageBuild.dockerfilePath),
     "utf8",
   );
 
-  const seaContextFingerprint = hashString([
-    "sea-context\n",
+  const sandboxdContextFingerprint = hashString([
+    "sandboxd-context\n",
     `arch:${process.arch}\n`,
     `platform:${process.platform}\n`,
-    `toolchain:${NodeToolchainImage}\n`,
-    seaFileFingerprint,
+    `toolchain:${SandboxdBuildToolchainImage}\n`,
+    sandboxdFileFingerprint,
   ]);
   const dockerContextFingerprint = hashString(["docker-context\n", dockerFileFingerprint]);
 
   return {
     architecture: process.arch,
     dockerContextFingerprint,
-    seaContextFingerprint,
+    sandboxdContextFingerprint,
     sandboxBaseImageFingerprint: hashString([
       "sandbox-base\n",
-      seaContextFingerprint,
+      sandboxdContextFingerprint,
       "\n",
       sandboxDockerfileContents,
     ]),
@@ -370,7 +375,7 @@ function preparedRuntimeFingerprintsEqual(
   return (
     left.architecture === right.architecture &&
     left.dockerContextFingerprint === right.dockerContextFingerprint &&
-    left.seaContextFingerprint === right.seaContextFingerprint &&
+    left.sandboxdContextFingerprint === right.sandboxdContextFingerprint &&
     left.sandboxBaseImageFingerprint === right.sandboxBaseImageFingerprint &&
     left.appImageFingerprints.controlPlaneApi === right.appImageFingerprints.controlPlaneApi &&
     left.appImageFingerprints.controlPlaneWorker ===
@@ -466,7 +471,6 @@ function runCommand(command: string, args: readonly string[]): void {
 }
 
 async function buildSandboxBaseImage(): Promise<void> {
-  runCommand("pnpm", ["build:sandbox-runtime:sea:linux"]);
   runCommand("docker", [
     "build",
     "--target",

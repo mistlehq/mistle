@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   parseBootstrapControlMessage,
-  parseLeaseControlMessage,
   parseStreamControlMessage,
   parseTelemetryControlMessage,
 } from "./stream-protocol.js";
@@ -301,48 +300,6 @@ describe("stream control message parser", () => {
     ).toBeUndefined();
   });
 
-  it("parses execution lease control messages", () => {
-    expect(
-      parseLeaseControlMessage(
-        JSON.stringify({
-          type: "lease.create",
-          lease: {
-            id: "sxl_123",
-            kind: "agent_execution",
-            source: "codex",
-            externalExecutionId: "turn_123",
-            metadata: {
-              threadId: "thr_123",
-            },
-          },
-        }),
-      ),
-    ).toEqual({
-      type: "lease.create",
-      lease: {
-        id: "sxl_123",
-        kind: "agent_execution",
-        source: "codex",
-        externalExecutionId: "turn_123",
-        metadata: {
-          threadId: "thr_123",
-        },
-      },
-    });
-
-    expect(
-      parseLeaseControlMessage(
-        JSON.stringify({
-          type: "lease.renew",
-          leaseId: "sxl_123",
-        }),
-      ),
-    ).toEqual({
-      type: "lease.renew",
-      leaseId: "sxl_123",
-    });
-  });
-
   it("parses bootstrap keepalive state messages", () => {
     expect(
       parseBootstrapControlMessage(
@@ -360,25 +317,6 @@ describe("stream control message parser", () => {
   });
 
   it("keeps stream and bootstrap control parsers scoped correctly", () => {
-    const leaseCreatePayload = JSON.stringify({
-      type: "lease.create",
-      lease: {
-        id: "sxl_123",
-        kind: "agent_execution",
-        source: "codex",
-      },
-    });
-
-    expect(parseStreamControlMessage(leaseCreatePayload)).toBeUndefined();
-    expect(parseBootstrapControlMessage(leaseCreatePayload)).toEqual({
-      type: "lease.create",
-      lease: {
-        id: "sxl_123",
-        kind: "agent_execution",
-        source: "codex",
-      },
-    });
-
     expect(
       parseBootstrapControlMessage(
         JSON.stringify({

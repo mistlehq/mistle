@@ -9,6 +9,7 @@ import {
   CodexAppServerEndpointKey,
   CodexAppServerListenUrl,
   CodexAppServerProcessKey,
+  CodexProxyListenUrl,
 } from "./app-server.js";
 import { CodexPtyLaunchSpec } from "./pty-launch.js";
 
@@ -223,7 +224,7 @@ export function compileCodexRuntime(
             processKey: CodexAppServerProcessKey,
             transport: {
               type: "ws",
-              url: CodexAppServerListenUrl,
+              url: CodexProxyListenUrl,
             },
             connectionMode: "dedicated",
           },

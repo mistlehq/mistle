@@ -6,18 +6,8 @@ on:
       - main
     paths:
       - ".github/workflows/publish-sandbox-base.yml"
-      - "apps/sandbox-runtime/**"
-      - "packages/sandbox-rs-napi/**"
-      - "packages/integrations-core/**"
-      - "packages/integrations-definitions/**"
-      - "packages/sandbox-session-client/**"
-      - "packages/sandbox-session-protocol/**"
-      - "packages/time/**"
-      - "scripts/build/build-sandbox-runtime-sea-linux.mjs"
-      - "package.json"
-      - "pnpm-workspace.yaml"
-      - "pnpm-lock.yaml"
-      - "tsconfig.base.json"
+      - ".dockerignore"
+      - "packages/sandboxd/**"
   workflow_dispatch:
     inputs:
       publish_latest:
@@ -49,14 +39,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 25
-
-      - name: Build Linux SEA artifacts
-        run: node ./scripts/build/build-sandbox-runtime-sea-linux.mjs
-
       - name: Log in to GitHub Container Registry
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -73,7 +55,7 @@ jobs:
           docker build \
             --platform linux/amd64 \
             --target sandbox-base \
-            --file apps/sandbox-runtime/Dockerfile \
+            --file packages/sandboxd/Dockerfile \
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             "${tags[@]}" \
