@@ -1,6 +1,11 @@
 import {
   automationRuns,
   automations,
+  automationConversationRoutes,
+  automationConversations,
+  AutomationConversationCreatedByKinds,
+  AutomationConversationOwnerKinds,
+  AutomationConversationStatuses,
   sandboxProfiles,
   SandboxProfileStatuses,
 } from "@mistle/db/control-plane";
@@ -144,6 +149,59 @@ describe("sandbox instances list integration", () => {
       },
     ]);
 
+    await fixture.db.insert(automationConversations).values([
+      {
+        id: "cnv_cp_list_a_003",
+        organizationId: firstOrgSession.organizationId,
+        ownerKind: AutomationConversationOwnerKinds.AUTOMATION_TARGET,
+        ownerId: "aut_cp_list_a_003",
+        createdByKind: AutomationConversationCreatedByKinds.USER,
+        createdById: firstOrgSession.userId,
+        sandboxProfileId: "sbp_cp_list",
+        integrationFamilyId: "openai",
+        runtimeId: "codex",
+        conversationKey: "conversation-key-a-003",
+        title: "Investigate build failure",
+        preview: "Please inspect the failing workflow.",
+        status: AutomationConversationStatuses.ACTIVE,
+      },
+      {
+        id: "cnv_cp_list_a_002",
+        organizationId: firstOrgSession.organizationId,
+        ownerKind: AutomationConversationOwnerKinds.AUTOMATION_TARGET,
+        ownerId: "aut_cp_list_a_002",
+        createdByKind: AutomationConversationCreatedByKinds.WEBHOOK,
+        createdById: "iwe_cp_list_a_002",
+        sandboxProfileId: "sbp_cp_list",
+        integrationFamilyId: "openai",
+        runtimeId: "codex",
+        conversationKey: "conversation-key-a-002",
+        title: null,
+        preview: "Webhook-triggered session.",
+        status: AutomationConversationStatuses.ACTIVE,
+      },
+    ]);
+    await fixture.db.insert(automationConversationRoutes).values([
+      {
+        id: "cvr_cp_list_a_003",
+        conversationId: "cnv_cp_list_a_003",
+        sandboxInstanceId: "sbi_cp_list_a_003",
+        providerConversationId: "thread_cp_list_a_003",
+        providerExecutionId: null,
+        providerState: null,
+        status: "active",
+      },
+      {
+        id: "cvr_cp_list_a_002",
+        conversationId: "cnv_cp_list_a_002",
+        sandboxInstanceId: "sbi_cp_list_a_002",
+        providerConversationId: "thread_cp_list_a_002",
+        providerExecutionId: null,
+        providerState: null,
+        status: "active",
+      },
+    ]);
+
     const firstPageResponse = await fixture.request("/v1/sandbox/instances?limit=2", {
       headers: {
         cookie: firstOrgSession.cookie,
@@ -157,7 +215,9 @@ describe("sandbox instances list integration", () => {
       "sbi_cp_list_a_003",
       "sbi_cp_list_a_002",
     ]);
+    expect(firstPage.items[0]?.conversationTitle).toBe("Investigate build failure");
     expect(firstPage.items[1]).toMatchObject({
+      conversationTitle: null,
       sandboxProfileId: "sbp_cp_list",
       sandboxProfileDisplayName: "Control Plane Profile",
       sandboxProfileVersion: 2,

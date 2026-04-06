@@ -37,6 +37,7 @@ export type SandboxInstanceStatus = {
 export type ListSandboxInstancesResult = Omit<ListSandboxInstancesResponse, "items"> & {
   items: Array<
     ListSandboxInstancesResponse["items"][number] & {
+      conversationTitle: string | null;
       sandboxProfileDisplayName: string | null;
       startedBy: ListSandboxInstancesResponse["items"][number]["startedBy"] & {
         name: string | null;

@@ -63,6 +63,7 @@ export const sandboxInstanceListItemSchema = z
   .object({
     id: z.string().min(1),
     sandboxProfileId: z.string().min(1),
+    conversationTitle: z.string().min(1).nullable(),
     sandboxProfileDisplayName: z.string().min(1).nullable(),
     sandboxProfileVersion: z.number().int().min(1),
     status: sandboxInstanceStatusSchema,

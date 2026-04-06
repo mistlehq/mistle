@@ -5282,6 +5282,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "conversationTitle": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
                           "sandboxProfileDisplayName": {
                             "type": ["string", "null"],
                             "minLength": 1
@@ -5337,6 +5341,7 @@
                         "required": [
                           "id",
                           "sandboxProfileId",
+                          "conversationTitle",
                           "sandboxProfileDisplayName",
                           "sandboxProfileVersion",
                           "status",
