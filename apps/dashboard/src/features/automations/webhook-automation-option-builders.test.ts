@@ -158,6 +158,28 @@ describe("buildWebhookAutomationEventOptions", () => {
         availability: "available",
         id: createWebhookAutomationTriggerId({
           webhookSourceId: GitHubWebhookSourceId,
+          eventType: "github.issue_comment.created",
+        }),
+        eventType: "github.issue_comment.created",
+        integrationWebhookSourceId: GitHubWebhookSourceId,
+        connectionId: GitHubConnectionId,
+        connectionLabel: "GitHub - GitHub Engineering",
+        label: "Issue comment created",
+        payloadReferences: [GitHubRepositoryFullNamePayloadReference],
+        conversationKeyOptions: [
+          {
+            id: "issue",
+            label: "Per issue thread",
+            description: "All matching events for the same issue go to one conversation.",
+            template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
+          },
+        ],
+        category: "GitHub Engineering / Issues",
+      },
+      {
+        availability: "available",
+        id: createWebhookAutomationTriggerId({
+          webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.pull_request.opened",
         }),
         eventType: "github.pull_request.opened",
@@ -179,28 +201,6 @@ describe("buildWebhookAutomationEventOptions", () => {
           },
         ],
         category: "GitHub Engineering / Pull requests",
-      },
-      {
-        availability: "available",
-        id: createWebhookAutomationTriggerId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        }),
-        eventType: "github.issue_comment.created",
-        integrationWebhookSourceId: GitHubWebhookSourceId,
-        connectionId: GitHubConnectionId,
-        connectionLabel: "GitHub - GitHub Engineering",
-        label: "Issue comment created",
-        payloadReferences: [GitHubRepositoryFullNamePayloadReference],
-        conversationKeyOptions: [
-          {
-            id: "issue",
-            label: "Per issue thread",
-            description: "All matching events for the same issue go to one conversation.",
-            template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
-          },
-        ],
-        category: "GitHub Engineering / Issues",
       },
       {
         availability: "available",
