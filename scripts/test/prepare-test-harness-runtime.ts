@@ -143,9 +143,6 @@ function shouldTraverseSandboxdDirectory(relativePath: string): boolean {
   if (hasAnySegment(relativePath, [".git", ".local", ".turbo", "node_modules", "target"])) {
     return false;
   }
-  if (isPathWithin(relativePath, "apps/sandbox-runtime/dist-sea")) {
-    return false;
-  }
   if (isPathWithin(relativePath, "packages/sandboxd/dist")) {
     return false;
   }
@@ -155,9 +152,6 @@ function shouldTraverseSandboxdDirectory(relativePath: string): boolean {
 
 function shouldIncludeSandboxdFile(relativePath: string): boolean {
   if (hasAnySegment(relativePath, [".git", ".local", ".turbo", "node_modules", "target"])) {
-    return false;
-  }
-  if (isPathWithin(relativePath, "apps/sandbox-runtime/dist-sea")) {
     return false;
   }
   if (isPathWithin(relativePath, "packages/sandboxd/dist")) {
@@ -177,9 +171,6 @@ function shouldTraverseDockerDirectory(relativePath: string): boolean {
     relativePath === ".pkgrep" ||
     hasAnySegment(relativePath, [".turbo", "coverage", "node_modules", "target", "test-results"])
   ) {
-    return false;
-  }
-  if (isPathWithin(relativePath, "apps/sandbox-runtime/dist-sea")) {
     return false;
   }
   if (isPathWithin(relativePath, "packages/sandboxd/dist")) {
@@ -204,9 +195,6 @@ function shouldIncludeDockerFile(relativePath: string): boolean {
     relativePath === ".pkgrep" ||
     hasAnySegment(relativePath, [".turbo", "coverage", "node_modules", "target", "test-results"])
   ) {
-    return false;
-  }
-  if (isPathWithin(relativePath, "apps/sandbox-runtime/dist-sea")) {
     return false;
   }
   if (isPathWithin(relativePath, "packages/sandboxd/dist")) {

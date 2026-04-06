@@ -35,9 +35,6 @@
     "apps/data-plane-worker": {
       "ignoreDependencies": ["@mistle/logging", "typeid-js"],
     },
-    "apps/sandbox-runtime": {
-      "ignoreDependencies": ["postject"],
-    },
     "packages/control-plane-internal-client": {
       "ignoreDependencies": ["openapi-typescript"],
     },

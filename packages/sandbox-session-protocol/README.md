@@ -4,7 +4,7 @@ Shared TypeScript types and binary frame codecs for the sandbox tunnel protocol,
 
 - interactive stream control messages
 - telemetry control messages
-- execution lease messages
+- coarse keepalive state messages
 
 ## Commands
 
