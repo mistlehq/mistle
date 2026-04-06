@@ -152,7 +152,7 @@ function OpenMemberInviteDialog(input: {
         )}
 
         {!input.canExecute ? (
-          <Notice title="Invites are disabled" variant="alert">
+          <Notice variant="alert">
             You do not have permission to invite members in this organization.
           </Notice>
         ) : null}
