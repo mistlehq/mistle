@@ -307,6 +307,12 @@ fn run_control_server_loop(
 
         match listener.accept() {
             Ok((mut stream, _)) => {
+                // The listener is nonblocking so the accept loop can observe shutdowns.
+                // Each accepted control connection should switch back to blocking mode so
+                // request/response reads wait for the peer to finish writing.
+                stream
+                    .set_nonblocking(false)
+                    .map_err(ControlError::AcceptConnection)?;
                 let response = match handle_connection(&mut stream, manifest_path, state) {
                     Ok(()) => ControlResponse {
                         ok: true,
@@ -390,8 +396,8 @@ fn remove_stale_socket(socket_path: &Path) -> Result<(), ControlError> {
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use super::{notify_reload, start_control_server};
     use crate::apply_startup::manifest::persist_manifest;
+    use crate::control::{notify_reload, start_control_server};
     use crate::protocol::startup::{StartupInput, StartupMode};
 
     #[test]

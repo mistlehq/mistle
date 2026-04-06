@@ -117,7 +117,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{ParseSandboxdCommandError, SandboxdCommand, parse_sandboxd_command};
+    use crate::{ParseSandboxdCommandError, SandboxdCommand, parse_sandboxd_command};
 
     #[test]
     fn parses_serve() {

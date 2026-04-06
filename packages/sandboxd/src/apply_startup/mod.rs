@@ -207,7 +207,7 @@ mod tests {
     use crate::control;
     use crate::protocol::startup::{StartupApplyResponse, StartupInput, StartupMode};
 
-    use super::run_apply_startup;
+    use crate::apply_startup::run_apply_startup;
 
     #[test]
     fn persists_manifest_and_writes_ok_response() {

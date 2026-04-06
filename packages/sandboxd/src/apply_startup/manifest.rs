@@ -5,7 +5,7 @@ use std::path::Path;
 
 use crate::protocol::startup::StartupInput;
 
-use super::ApplyStartupError;
+use crate::apply_startup::ApplyStartupError;
 
 pub fn load_manifest(path: &Path) -> Result<StartupInput, ApplyStartupError> {
     let manifest_bytes = fs::read(path).map_err(|error| ApplyStartupError::ReadManifest {
@@ -103,7 +103,7 @@ mod tests {
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use super::persist_manifest;
+    use crate::apply_startup::manifest::persist_manifest;
     use crate::protocol::startup::{StartupInput, StartupMode};
 
     #[test]
