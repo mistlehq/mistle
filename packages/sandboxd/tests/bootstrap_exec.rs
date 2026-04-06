@@ -1,3 +1,7 @@
+use std::os::fd::AsRawFd;
+
+use nix::fcntl::{FcntlArg, FdFlag, fcntl};
+
 #[test]
 fn rejects_invalid_environment_entry_name() {
     let result = sandboxd::bootstrap::exec_runtime(sandboxd::bootstrap::ExecRuntimeInput {
@@ -51,23 +55,18 @@ fn requires_root_for_runtime_exec_handoff() {
 
 #[test]
 fn clears_close_on_exec_for_descriptor() {
-    let duplicated_stdin = unsafe { nix::libc::dup(0) };
-    assert!(duplicated_stdin >= 0, "expected stdin dup to succeed");
+    let dev_null = std::fs::File::open("/dev/null").expect("expected /dev/null to be openable");
+    fcntl(&dev_null, FcntlArg::F_SETFD(FdFlag::FD_CLOEXEC))
+        .expect("expected setting cloexec to succeed");
 
-    let set_result =
-        unsafe { nix::libc::fcntl(duplicated_stdin, nix::libc::F_SETFD, nix::libc::FD_CLOEXEC) };
-    assert_eq!(set_result, 0, "expected setting cloexec to succeed");
-
-    sandboxd::bootstrap::clear_close_on_exec(duplicated_stdin)
+    sandboxd::bootstrap::clear_close_on_exec(dev_null.as_raw_fd())
         .expect("expected cloexec clearing to succeed");
 
-    let flags = unsafe { nix::libc::fcntl(duplicated_stdin, nix::libc::F_GETFD) };
-    assert!(flags >= 0, "expected reading descriptor flags to succeed");
-    assert_eq!(flags & nix::libc::FD_CLOEXEC, 0);
-
-    let close_result = unsafe { nix::libc::close(duplicated_stdin) };
-    assert_eq!(
-        close_result, 0,
-        "expected duplicated stdin close to succeed"
+    let flags_bits =
+        fcntl(&dev_null, FcntlArg::F_GETFD).expect("expected reading descriptor flags to succeed");
+    let flags = FdFlag::from_bits_truncate(flags_bits);
+    assert!(
+        !flags.contains(FdFlag::FD_CLOEXEC),
+        "expected close-on-exec to be cleared"
     );
 }

@@ -1,12 +1,24 @@
+//! Native bootstrap helpers for the future runtime exec handoff.
+//!
+//! This module owns the privileged preparation that must happen just before
+//! `sandboxd` replaces the bootstrap process with the runtime binary: validate
+//! the exec inputs, drop privileges in the right order, and preserve the
+//! inherited stdio descriptors across the final `execve`.
+
 use std::ffi::CString;
 use std::fmt::{self, Display};
+use std::os::fd::BorrowedFd;
 
+use nix::fcntl::{FcntlArg, FdFlag, fcntl};
+
+/// Carries one environment entry destined for the runtime process.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessEnvironmentEntry {
     pub name: String,
     pub value: String,
 }
 
+/// Collects the privilege drop and exec parameters for one runtime handoff.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecRuntimeInput {
     pub uid: u32,
@@ -16,6 +28,7 @@ pub struct ExecRuntimeInput {
     pub env: Vec<ProcessEnvironmentEntry>,
 }
 
+/// Describes why one bootstrap preparation step failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BootstrapError {
     message: String,
@@ -37,6 +50,7 @@ impl Display for BootstrapError {
 
 impl std::error::Error for BootstrapError {}
 
+/// Ensures the bootstrap process still has the privileges required for uid/gid handoff.
 fn ensure_running_as_root() -> Result<(), BootstrapError> {
     if !nix::unistd::geteuid().is_root() {
         return Err(BootstrapError::new(
@@ -47,57 +61,67 @@ fn ensure_running_as_root() -> Result<(), BootstrapError> {
     Ok(())
 }
 
+/// Clears `FD_CLOEXEC` so the final runtime exec inherits the provided descriptor.
 pub fn clear_close_on_exec(fd: i32) -> Result<(), BootstrapError> {
     if fd < 0 {
         return Err(BootstrapError::new("fd must be non-negative"));
     }
 
-    let current_flags = unsafe { nix::libc::fcntl(fd, nix::libc::F_GETFD) };
-    if current_flags < 0 {
-        return Err(BootstrapError::new(format!(
-            "failed to read fd flags for {fd}: {}",
-            std::io::Error::last_os_error()
-        )));
-    }
+    let borrowed_fd = unsafe { BorrowedFd::borrow_raw(fd) };
+    let current_flags = fcntl(borrowed_fd, FcntlArg::F_GETFD).map_err(|error| {
+        BootstrapError::new(format!("failed to read fd flags for {fd}: {error}"))
+    })?;
 
-    let updated_flags = current_flags & !nix::libc::FD_CLOEXEC;
-    let result = unsafe { nix::libc::fcntl(fd, nix::libc::F_SETFD, updated_flags) };
-    if result < 0 {
-        return Err(BootstrapError::new(format!(
-            "failed to clear close-on-exec for fd {fd}: {}",
-            std::io::Error::last_os_error()
-        )));
-    }
+    let updated_flags = FdFlag::from_bits_truncate(current_flags) & !FdFlag::FD_CLOEXEC;
+    fcntl(borrowed_fd, FcntlArg::F_SETFD(updated_flags)).map_err(|error| {
+        BootstrapError::new(format!("failed to clear close-on-exec for fd {fd}: {error}"))
+    })?;
 
     Ok(())
 }
 
+/// Replaces supplementary groups with the target runtime gid.
 fn set_supplementary_groups(gid: u32) -> Result<(), BootstrapError> {
-    let groups = [gid as nix::libc::gid_t];
-    let group_count = setgroups_count(groups.len())?;
-    let result = unsafe { nix::libc::setgroups(group_count, groups.as_ptr()) };
-    if result != 0 {
-        return Err(BootstrapError::new(format!(
-            "failed to set supplementary groups: {}",
-            std::io::Error::last_os_error()
-        )));
+    #[cfg(target_os = "linux")]
+    {
+        nix::unistd::setgroups(&[nix::unistd::Gid::from_raw(gid)]).map_err(|error| {
+            BootstrapError::new(format!("failed to set supplementary groups: {error}"))
+        })
     }
 
-    Ok(())
+    #[cfg(all(not(target_os = "linux"), test))]
+    {
+        // Keep local non-Linux test builds compiling, but do not treat this as
+        // a supported production execution path for `sandboxd`.
+        let groups = [gid as nix::libc::gid_t];
+        let group_count = setgroups_count(groups.len())?;
+        let result = unsafe { nix::libc::setgroups(group_count, groups.as_ptr()) };
+        if result != 0 {
+            return Err(BootstrapError::new(format!(
+                "failed to set supplementary groups: {}",
+                std::io::Error::last_os_error()
+            )));
+        }
+
+        Ok(())
+    }
+
+    #[cfg(all(not(target_os = "linux"), not(test)))]
+    {
+        let _ = gid;
+        Err(BootstrapError::new(
+            "sandbox bootstrap is only supported in linux sandboxes",
+        ))
+    }
 }
 
-#[cfg(target_os = "linux")]
-fn setgroups_count(group_count: usize) -> Result<nix::libc::size_t, BootstrapError> {
-    nix::libc::size_t::try_from(group_count)
-        .map_err(|_| BootstrapError::new("supplementary group count overflow"))
-}
-
-#[cfg(not(target_os = "linux"))]
+#[cfg(all(not(target_os = "linux"), test))]
 fn setgroups_count(group_count: usize) -> Result<nix::libc::c_int, BootstrapError> {
     nix::libc::c_int::try_from(group_count)
         .map_err(|_| BootstrapError::new("supplementary group count overflow"))
 }
 
+/// Builds the argv vector that will be passed to `execve`.
 fn build_exec_argv(command: &str, args: &[String]) -> Result<Vec<CString>, BootstrapError> {
     let mut argv = Vec::with_capacity(args.len() + 1);
     argv.push(
@@ -115,6 +139,7 @@ fn build_exec_argv(command: &str, args: &[String]) -> Result<Vec<CString>, Boots
     Ok(argv)
 }
 
+/// Builds the environment vector that will be passed to `execve`.
 fn build_exec_environment(
     env: Vec<ProcessEnvironmentEntry>,
 ) -> Result<Vec<CString>, BootstrapError> {
@@ -142,6 +167,7 @@ fn build_exec_environment(
     Ok(environment)
 }
 
+/// Drops privileges and replaces the current process with the runtime binary.
 pub fn exec_runtime(input: ExecRuntimeInput) -> Result<(), BootstrapError> {
     if input.command.trim().is_empty() {
         return Err(BootstrapError::new("runtime command is required"));

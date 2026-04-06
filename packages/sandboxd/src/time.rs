@@ -3,11 +3,18 @@
 //! Keep time-dependent behavior injectable so subsystems can swap real waiting
 //! for deterministic test implementations without touching global timer APIs.
 
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Provides access to the current time as epoch milliseconds.
 pub trait Clock: Send + Sync {
     fn now_ms(&self) -> u64;
+
+    /// Returns the current wall-clock time.
+    fn now_system_time(&self) -> SystemTime {
+        UNIX_EPOCH
+            .checked_add(Duration::from_millis(self.now_ms()))
+            .expect("epoch milliseconds should convert to system time")
+    }
 }
 
 /// Production clock that reads the current system wall clock.
@@ -16,12 +23,16 @@ pub struct SystemClock;
 
 impl Clock for SystemClock {
     fn now_ms(&self) -> u64 {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
             .expect("system clock should be after unix epoch")
             .as_millis()
             .try_into()
             .expect("system clock epoch milliseconds should fit in u64")
+    }
+
+    fn now_system_time(&self) -> SystemTime {
+        SystemTime::now()
     }
 }
 
@@ -38,6 +49,18 @@ impl Sleeper for ThreadSleeper {
     fn sleep(&self, duration: Duration) {
         std::thread::sleep(duration);
     }
+}
+
+/// Returns `base - duration_ms` when representable, otherwise `base`.
+pub fn subtract_millis(base: SystemTime, duration_ms: u64) -> SystemTime {
+    base.checked_sub(Duration::from_millis(duration_ms))
+        .unwrap_or(base)
+}
+
+/// Returns `base + duration_ms` when representable, otherwise saturates to the plain add result.
+pub fn add_millis(base: SystemTime, duration_ms: u64) -> SystemTime {
+    base.checked_add(Duration::from_millis(duration_ms))
+        .unwrap_or(base + Duration::from_millis(duration_ms))
 }
 
 #[cfg(test)]
@@ -134,7 +157,10 @@ mod tests {
     use std::time::Duration;
 
     use crate::time::testing::{ManualSleeper, MutableClock};
-    use crate::time::{Clock, Sleeper, SystemClock, ThreadSleeper};
+    use crate::time::{
+        Clock, Sleeper, SystemClock, ThreadSleeper, add_millis, subtract_millis,
+    };
+    use std::time::UNIX_EPOCH;
 
     #[test]
     fn mutable_clock_advances_time() {
@@ -143,6 +169,10 @@ mod tests {
         clock.advance_ms(25);
 
         assert_eq!(clock.now_ms(), 125);
+        assert_eq!(
+            clock.now_system_time(),
+            UNIX_EPOCH + Duration::from_millis(125)
+        );
     }
 
     #[test]
@@ -170,5 +200,20 @@ mod tests {
         let clock = SystemClock;
 
         assert!(clock.now_ms() > 0);
+        assert!(clock.now_system_time() >= UNIX_EPOCH);
+    }
+
+    #[test]
+    fn time_helpers_shift_system_time_by_milliseconds() {
+        let base = UNIX_EPOCH + Duration::from_secs(10);
+
+        assert_eq!(
+            subtract_millis(base, 250),
+            UNIX_EPOCH + Duration::from_millis(9_750)
+        );
+        assert_eq!(
+            add_millis(base, 500),
+            UNIX_EPOCH + Duration::from_millis(10_500)
+        );
     }
 }
