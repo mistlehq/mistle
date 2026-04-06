@@ -320,7 +320,7 @@ function buildSelectableWebhookAutomationEventOptions(input: {
           createWebhookAutomationEventOption({
             eventDefinition,
             webhookSourceId: source.id,
-          connectionId: connection.id,
+            connectionId: connection.id,
             connectionLabel: formatWebhookAutomationTriggerGroupLabel({
               integrationDisplayName: target.displayName,
               connectionDisplayName: formatWebhookAutomationSourceLabel({
