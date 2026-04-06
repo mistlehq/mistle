@@ -211,16 +211,16 @@ export function WebhookAutomationTriggerPicker(input: {
               key={option.id}
             >
               <div className="min-w-0 self-start md:col-start-1 md:row-start-1 md:self-center">
-                <div className="flex min-w-0 items-center gap-2.5">
+                <div className="flex min-w-0 items-start gap-2.5 md:items-center">
                   {option.logoKey === undefined ? null : (
                     <img
                       alt=""
                       aria-hidden
-                      className="size-4 shrink-0"
+                      className="mt-0.5 size-4 shrink-0 md:mt-0"
                       src={resolveIntegrationLogoPath({ logoKey: option.logoKey })}
                     />
                   )}
-                  <p className="text-sm leading-none font-medium whitespace-nowrap">
+                  <p className="text-sm leading-5 font-medium text-balance md:leading-none">
                     {option.label}
                   </p>
                 </div>
