@@ -92,7 +92,8 @@ jobs:
 
   static-ts:
     name: TS Static
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     needs:
       - changes
@@ -158,7 +159,8 @@ jobs:
 
   static-rust:
     name: Rust Static
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     needs:
       - changes
@@ -235,7 +237,8 @@ jobs:
 
   knip:
     name: Knip
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       CI: true
@@ -270,7 +273,8 @@ jobs:
 
   test-ts:
     name: TS Test
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     needs:
       - changes
@@ -332,7 +336,8 @@ jobs:
 
   test-rust:
     name: Rust Test
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     needs:
       - changes
