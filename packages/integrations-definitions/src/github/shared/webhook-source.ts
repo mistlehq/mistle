@@ -14,7 +14,7 @@ export const GitHubWebhookSourceCapability: IntegrationWebhookSourceCapability<
   GitHubTargetSecrets,
   GitHubConnectionConfig
 > = {
-  ownerScope: IntegrationWebhookSourceOwnerScopes.CONNECTION,
+  ownerScope: IntegrationWebhookSourceOwnerScopes.TARGET,
   routingStrategy: IntegrationWebhookSourceRoutingStrategies.PAYLOAD,
   lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
   async describeSource(input) {
