@@ -97,7 +97,7 @@ function CreateWebhookAutomationEditor(input: {
     });
   }
 
-  if (prerequisites.isPending || prerequisites.integrationDirectoryQuery.data === undefined) {
+  if (prerequisites.isPending || prerequisites.directoryData === undefined) {
     return renderWebhookAutomationEditorLoading();
   }
 
@@ -110,7 +110,7 @@ function CreateWebhookAutomationEditor(input: {
       initialValues={toWebhookAutomationFormValues(null)}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
-      directoryData={prerequisites.integrationDirectoryQuery.data}
+      directoryData={prerequisites.directoryData}
     />
   );
 }
@@ -132,7 +132,7 @@ function EditWebhookAutomationEditor(input: {
     automationQuery.data === undefined
       ? undefined
       : {
-          preservedConnectionId: automationQuery.data.integrationConnectionId,
+          preservedWebhookSourceId: automationQuery.data.integrationWebhookSourceId,
         },
   );
 
@@ -153,7 +153,7 @@ function EditWebhookAutomationEditor(input: {
     prerequisites.isPending ||
     automationQuery.isPending ||
     automationQuery.data === undefined ||
-    prerequisites.integrationDirectoryQuery.data === undefined
+    prerequisites.directoryData === undefined
   ) {
     return renderWebhookAutomationEditorLoading();
   }
@@ -162,7 +162,7 @@ function EditWebhookAutomationEditor(input: {
   try {
     initialValues = resolveWebhookAutomationEditInitialValues({
       automation: automationQuery.data,
-      directoryData: prerequisites.integrationDirectoryQuery.data,
+      directoryData: prerequisites.directoryData,
     });
   } catch (error) {
     return renderWebhookAutomationEditorError({
@@ -184,10 +184,10 @@ function EditWebhookAutomationEditor(input: {
       automationId={input.automationId}
       navigate={input.navigate}
       initialValues={initialValues}
-      preservedConnectionId={automationQuery.data.integrationConnectionId}
+      preservedWebhookSourceId={automationQuery.data.integrationWebhookSourceId}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
-      directoryData={prerequisites.integrationDirectoryQuery.data}
+      directoryData={prerequisites.directoryData}
     />
   );
 }
@@ -201,10 +201,8 @@ function LoadedWebhookAutomationEditor(input: {
   sandboxProfileOptions: ReturnType<
     typeof useWebhookAutomationPrerequisites
   >["sandboxProfileOptions"];
-  directoryData: NonNullable<
-    ReturnType<typeof useWebhookAutomationPrerequisites>["integrationDirectoryQuery"]["data"]
-  >;
-  preservedConnectionId?: string;
+  directoryData: NonNullable<ReturnType<typeof useWebhookAutomationPrerequisites>["directoryData"]>;
+  preservedWebhookSourceId?: string;
 }): React.JSX.Element {
   const state = useLoadedWebhookAutomationEditorState(input);
 

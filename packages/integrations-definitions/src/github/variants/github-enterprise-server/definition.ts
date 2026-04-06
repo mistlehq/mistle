@@ -24,6 +24,7 @@ import {
 } from "../../shared/resource-definitions.js";
 import { GitHubSupportedWebhookEvents } from "../../shared/supported-webhook-events.js";
 import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
+import { GitHubWebhookSourceCapability } from "../../shared/webhook-source.js";
 import { GitHubEnterpriseServerBindingConfigSchema } from "./binding-config-schema.js";
 import { compileGitHubEnterpriseServerBinding } from "./compile-binding.js";
 import { GitHubEnterpriseServerTargetConfigSchema } from "./target-config-schema.js";
@@ -86,6 +87,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   redirectHandler: GitHubAppInstallationRedirectHandler,
   supportedWebhookEvents: GitHubSupportedWebhookEvents,
   webhookHandler: GitHubEnterpriseServerWebhookHandler,
+  webhookSource: GitHubWebhookSourceCapability,
   resourceDefinitions: GitHubResourceDefinitions,
   resourceSyncTriggers: GitHubResourceSyncTriggers,
   listConnectionResources: listGitHubConnectionResources,

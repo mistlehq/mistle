@@ -24,6 +24,7 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
     },
     {
       targetKey,
+      endpointKey: undefined,
       headers,
       rawBody,
     },

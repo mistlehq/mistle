@@ -1,7 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { listIntegrationDirectory } from "../integrations/integrations-service.js";
+import {
+  listIntegrationDirectory,
+  listIntegrationWebhookSources,
+} from "../integrations/integrations-service.js";
 import { listSandboxProfiles } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
@@ -18,6 +21,11 @@ export const WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY: readonly [
   "automations",
   "integration-directory",
 ] = ["automations", "integration-directory"];
+
+export const WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX: readonly [
+  "automations",
+  "webhook-sources",
+] = ["automations", "webhook-sources"];
 
 async function listAllSandboxProfiles(input: {
   signal?: AbortSignal;
@@ -43,7 +51,7 @@ async function listAllSandboxProfiles(input: {
   }
 }
 
-export function useWebhookAutomationPrerequisites(input?: { preservedConnectionId?: string }) {
+export function useWebhookAutomationPrerequisites(input?: { preservedWebhookSourceId?: string }) {
   const integrationDirectoryQuery = useQuery({
     queryKey: WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY,
     queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
@@ -56,17 +64,41 @@ export function useWebhookAutomationPrerequisites(input?: { preservedConnectionI
     retry: false,
   });
 
+  const webhookCapableConnections =
+    integrationDirectoryQuery.data?.connections.filter((connection) => {
+      const target = integrationDirectoryQuery.data?.targets.find(
+        (candidate) => candidate.targetKey === connection.targetKey,
+      );
+      return (target?.supportedWebhookEvents?.length ?? 0) > 0;
+    }) ?? [];
+
+  const webhookSourceQueries = useQueries({
+    queries: webhookCapableConnections.map((connection) => ({
+      queryKey: [...WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX, connection.id] as const,
+      queryFn: async ({ signal }: { signal: AbortSignal }) =>
+        listIntegrationWebhookSources({
+          connectionId: connection.id,
+          signal,
+        }),
+      retry: false,
+    })),
+  });
+
+  const webhookSources = webhookSourceQueries.flatMap((query) => query.data ?? []);
+
+  const preservedConnectionId =
+    input?.preservedWebhookSourceId === undefined
+      ? undefined
+      : webhookSources.find((source) => source.id === input.preservedWebhookSourceId)
+          ?.integrationConnectionId;
+
   const connectionOptions =
     integrationDirectoryQuery.data === undefined
       ? []
       : buildWebhookAutomationConnectionOptions({
           connections: integrationDirectoryQuery.data.connections,
           targets: integrationDirectoryQuery.data.targets,
-          ...(input?.preservedConnectionId === undefined
-            ? {}
-            : {
-                preservedConnectionId: input.preservedConnectionId,
-              }),
+          ...(preservedConnectionId === undefined ? {} : { preservedConnectionId }),
         });
 
   const sandboxProfileOptions =
@@ -76,20 +108,37 @@ export function useWebhookAutomationPrerequisites(input?: { preservedConnectionI
           sandboxProfiles: sandboxProfilesQuery.data,
         });
 
+  const webhookSourceError = webhookSourceQueries.find((query) => query.isError)?.error;
+
   const errorMessage =
-    integrationDirectoryQuery.isError || sandboxProfilesQuery.isError
+    integrationDirectoryQuery.isError ||
+    sandboxProfilesQuery.isError ||
+    webhookSourceError !== undefined
       ? resolveApiErrorMessage({
-          error: integrationDirectoryQuery.error ?? sandboxProfilesQuery.error,
+          error:
+            integrationDirectoryQuery.error ?? sandboxProfilesQuery.error ?? webhookSourceError,
           fallbackMessage: "Could not load automation prerequisites.",
         })
       : null;
+
+  const directoryData =
+    integrationDirectoryQuery.data === undefined
+      ? undefined
+      : {
+          ...integrationDirectoryQuery.data,
+          webhookSources,
+        };
 
   return {
     connectionOptions,
     sandboxProfileOptions,
     integrationDirectoryQuery,
     sandboxProfilesQuery,
+    directoryData,
     errorMessage,
-    isPending: integrationDirectoryQuery.isPending || sandboxProfilesQuery.isPending,
+    isPending:
+      integrationDirectoryQuery.isPending ||
+      sandboxProfilesQuery.isPending ||
+      webhookSourceQueries.some((query) => query.isPending),
   };
 }

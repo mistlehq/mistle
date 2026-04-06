@@ -10,7 +10,7 @@ import { eq, sql } from "drizzle-orm";
 
 import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-reference-or-throw.js";
 import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
-import { assertWebhookConnectionReferenceOrThrow } from "./assert-webhook-connection-reference-or-throw.js";
+import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-reference-or-throw.js";
 import { loadWebhookAutomationAggregateOrThrow } from "./load-webhook-automation-aggregate-or-throw.js";
 
 export type UpdateWebhookAutomationInput = {
@@ -18,7 +18,7 @@ export type UpdateWebhookAutomationInput = {
   automationId: string;
   name?: string | undefined;
   enabled?: boolean | undefined;
-  integrationConnectionId?: string | undefined;
+  integrationWebhookSourceId?: string | undefined;
   eventTypes?: string[] | null | undefined;
   payloadFilter?: Record<string, unknown> | null | undefined;
   inputTemplate?: string | undefined;
@@ -47,8 +47,8 @@ export async function updateAutomationWebhook(
     },
   );
 
-  const integrationConnectionId =
-    input.integrationConnectionId ?? existingAutomation.integrationConnectionId;
+  const integrationWebhookSourceId =
+    input.integrationWebhookSourceId ?? existingAutomation.integrationWebhookSourceId;
   const sandboxProfileId =
     input.target?.sandboxProfileId ?? existingAutomation.target.sandboxProfileId;
   const sandboxProfileVersion =
@@ -56,11 +56,11 @@ export async function updateAutomationWebhook(
       ? existingAutomation.target.sandboxProfileVersion
       : input.target.sandboxProfileVersion;
 
-  await assertWebhookConnectionReferenceOrThrow(
+  const resolvedWebhookSource = await assertWebhookSourceReferenceOrThrow(
     { db: ctx.db, integrationRegistry: ctx.integrationRegistry },
     {
       organizationId: input.organizationId,
-      integrationConnectionId,
+      integrationWebhookSourceId,
     },
   );
   await assertSandboxProfileReferenceOrThrow(
@@ -75,7 +75,7 @@ export async function updateAutomationWebhook(
     {
       sandboxProfileId,
       sandboxProfileVersion,
-      integrationConnectionId,
+      integrationConnectionId: resolvedWebhookSource.integrationConnectionId,
     },
   );
 
@@ -132,8 +132,8 @@ async function updateWebhookConfigRow(
 ): Promise<void> {
   const nextValues: Partial<typeof webhookAutomations.$inferInsert> = {};
 
-  if (input.integrationConnectionId !== undefined) {
-    nextValues.integrationConnectionId = input.integrationConnectionId;
+  if (input.integrationWebhookSourceId !== undefined) {
+    nextValues.integrationWebhookSourceId = input.integrationWebhookSourceId;
   }
 
   if (input.eventTypes !== undefined) {

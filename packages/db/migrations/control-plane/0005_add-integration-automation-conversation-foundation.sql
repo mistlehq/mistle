@@ -184,7 +184,7 @@ CREATE TABLE "control_plane"."schedule_automations" (
 --> statement-breakpoint
 CREATE TABLE "control_plane"."webhook_automations" (
 	"automation_id" text PRIMARY KEY NOT NULL,
-	"integration_connection_id" text NOT NULL,
+	"integration_webhook_source_id" text NOT NULL,
 	"event_types" jsonb,
 	"payload_filter" jsonb,
 	"input_template" text NOT NULL,
@@ -222,7 +222,6 @@ ALTER TABLE "control_plane"."sandbox_profile_version_integration_bindings" ADD C
 ALTER TABLE "control_plane"."sandbox_profile_version_integration_bindings" ADD CONSTRAINT "spv_integration_bindings_sandbox_profile_version_fkey" FOREIGN KEY ("sandbox_profile_id","sandbox_profile_version") REFERENCES "control_plane"."sandbox_profile_versions"("sandbox_profile_id","version") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."schedule_automations" ADD CONSTRAINT "schedule_automations_automation_id_automations_id_fk" FOREIGN KEY ("automation_id") REFERENCES "control_plane"."automations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."webhook_automations" ADD CONSTRAINT "webhook_automations_automation_id_automations_id_fk" FOREIGN KEY ("automation_id") REFERENCES "control_plane"."automations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "control_plane"."webhook_automations" ADD CONSTRAINT "webhook_automations_integration_connection_id_integration_connections_id_fk" FOREIGN KEY ("integration_connection_id") REFERENCES "control_plane"."integration_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "automation_runs_automation_target_id_source_webhook_event_id_uidx" ON "control_plane"."automation_runs" USING btree ("automation_target_id","source_webhook_event_id");--> statement-breakpoint
 CREATE INDEX "automation_runs_automation_id_idx" ON "control_plane"."automation_runs" USING btree ("automation_id");--> statement-breakpoint
 CREATE INDEX "automation_runs_automation_target_id_idx" ON "control_plane"."automation_runs" USING btree ("automation_target_id");--> statement-breakpoint
@@ -269,5 +268,5 @@ CREATE INDEX "spv_integration_bindings_profile_id_version_idx" ON "control_plane
 CREATE INDEX "spv_integration_bindings_connection_id_idx" ON "control_plane"."sandbox_profile_version_integration_bindings" USING btree ("connection_id");--> statement-breakpoint
 CREATE INDEX "spv_integration_bindings_profile_id_version_kind_idx" ON "control_plane"."sandbox_profile_version_integration_bindings" USING btree ("sandbox_profile_id","sandbox_profile_version","kind");--> statement-breakpoint
 CREATE INDEX "schedule_automations_automation_id_idx" ON "control_plane"."schedule_automations" USING btree ("automation_id");--> statement-breakpoint
-CREATE INDEX "webhook_automations_integration_connection_id_idx" ON "control_plane"."webhook_automations" USING btree ("integration_connection_id");--> statement-breakpoint
+CREATE INDEX "webhook_automations_integration_webhook_source_id_idx" ON "control_plane"."webhook_automations" USING btree ("integration_webhook_source_id");--> statement-breakpoint
 CREATE INDEX "webhook_automations_automation_id_idx" ON "control_plane"."webhook_automations" USING btree ("automation_id");

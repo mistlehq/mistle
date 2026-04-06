@@ -82,6 +82,7 @@
                                 "type": "string",
                                 "enum": [
                                   "MISSING_TARGET_METADATA",
+                                  "MISSING_WEBHOOK_SOURCE",
                                   "MISSING_INTEGRATION_CONNECTION",
                                   "MISSING_SANDBOX_PROFILE"
                                 ]
@@ -269,7 +270,7 @@
                   "enabled": {
                     "type": "boolean"
                   },
-                  "integrationConnectionId": {
+                  "integrationWebhookSourceId": {
                     "type": "string",
                     "minLength": 1
                   },
@@ -315,7 +316,7 @@
                 },
                 "required": [
                   "name",
-                  "integrationConnectionId",
+                  "integrationWebhookSourceId",
                   "inputTemplate",
                   "conversationKeyTemplate",
                   "target"
@@ -348,7 +349,7 @@
                     "enabled": {
                       "type": "boolean"
                     },
-                    "integrationConnectionId": {
+                    "integrationWebhookSourceId": {
                       "type": "string",
                       "minLength": 1
                     },
@@ -408,7 +409,7 @@
                     "kind",
                     "name",
                     "enabled",
-                    "integrationConnectionId",
+                    "integrationWebhookSourceId",
                     "eventTypes",
                     "payloadFilter",
                     "inputTemplate",
@@ -435,8 +436,8 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "INVALID_CONNECTION_REFERENCE",
-                            "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
+                            "INVALID_WEBHOOK_SOURCE_REFERENCE",
+                            "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE",
                             "INVALID_SANDBOX_PROFILE_REFERENCE",
                             "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
                           ]
@@ -554,7 +555,7 @@
                     "enabled": {
                       "type": "boolean"
                     },
-                    "integrationConnectionId": {
+                    "integrationWebhookSourceId": {
                       "type": "string",
                       "minLength": 1
                     },
@@ -614,7 +615,7 @@
                     "kind",
                     "name",
                     "enabled",
-                    "integrationConnectionId",
+                    "integrationWebhookSourceId",
                     "eventTypes",
                     "payloadFilter",
                     "inputTemplate",
@@ -747,7 +748,7 @@
                   "enabled": {
                     "type": "boolean"
                   },
-                  "integrationConnectionId": {
+                  "integrationWebhookSourceId": {
                     "type": "string",
                     "minLength": 1
                   },
@@ -818,7 +819,7 @@
                     "enabled": {
                       "type": "boolean"
                     },
-                    "integrationConnectionId": {
+                    "integrationWebhookSourceId": {
                       "type": "string",
                       "minLength": 1
                     },
@@ -878,7 +879,7 @@
                     "kind",
                     "name",
                     "enabled",
-                    "integrationConnectionId",
+                    "integrationWebhookSourceId",
                     "eventTypes",
                     "payloadFilter",
                     "inputTemplate",
@@ -905,8 +906,8 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "INVALID_CONNECTION_REFERENCE",
-                            "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
+                            "INVALID_WEBHOOK_SOURCE_REFERENCE",
+                            "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE",
                             "INVALID_SANDBOX_PROFILE_REFERENCE",
                             "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
                           ]
@@ -1703,6 +1704,792 @@
                       "minLength": 1
                     },
                     "lastErrorMessage": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/integration/connections/:connectionId/webhook-sources": {
+      "get": {
+        "tags": ["Integrations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "connectionId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List webhook sources accessible for an integration connection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "targetKey": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "ownerScope": {
+                        "type": "string",
+                        "enum": ["target", "connection"]
+                      },
+                      "integrationConnectionId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "displayName": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "endpointKey": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "callbackUrl": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "remoteRegistrationId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": ["active", "error", "disabled"]
+                      },
+                      "providerMetadata": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "targetKey",
+                      "ownerScope",
+                      "displayName",
+                      "status",
+                      "providerMetadata",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_WEBHOOK_SOURCE_INPUT", "WEBHOOK_SOURCE_NOT_SUPPORTED"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Integration connection was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["CONNECTION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Integrations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "connectionId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Create a managed integration webhook source.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "targetKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "ownerScope": {
+                      "type": "string",
+                      "enum": ["target", "connection"]
+                    },
+                    "integrationConnectionId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "endpointKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "callbackUrl": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "remoteRegistrationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["active", "error", "disabled"]
+                    },
+                    "providerMetadata": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "webhookSecret": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "targetKey",
+                    "ownerScope",
+                    "displayName",
+                    "status",
+                    "providerMetadata",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INVALID_WEBHOOK_SOURCE_INPUT",
+                            "WEBHOOK_SOURCE_NOT_SUPPORTED",
+                            "WEBHOOK_SOURCE_CONNECTION_SCOPE_REQUIRED",
+                            "WEBHOOK_SOURCE_MANAGED_LIFECYCLE_REQUIRED"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Integration connection was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["CONNECTION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/integration/connections/:connectionId/webhook-sources/:webhookSourceId": {
+      "get": {
+        "tags": ["Integrations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "connectionId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "webhookSourceId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fetch one integration webhook source.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "targetKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "ownerScope": {
+                      "type": "string",
+                      "enum": ["target", "connection"]
+                    },
+                    "integrationConnectionId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "endpointKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "callbackUrl": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "remoteRegistrationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["active", "error", "disabled"]
+                    },
+                    "providerMetadata": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "targetKey",
+                    "ownerScope",
+                    "displayName",
+                    "status",
+                    "providerMetadata",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_WEBHOOK_SOURCE_INPUT", "WEBHOOK_SOURCE_NOT_SUPPORTED"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection or webhook source was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["CONNECTION_NOT_FOUND", "WEBHOOK_SOURCE_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Integrations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "connectionId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "webhookSourceId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Delete an integration webhook source."
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INVALID_WEBHOOK_SOURCE_INPUT",
+                            "WEBHOOK_SOURCE_NOT_SUPPORTED",
+                            "WEBHOOK_SOURCE_CONNECTION_SCOPE_REQUIRED",
+                            "WEBHOOK_SOURCE_MANAGED_LIFECYCLE_REQUIRED"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection or webhook source was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["CONNECTION_NOT_FOUND", "WEBHOOK_SOURCE_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Webhook source is still referenced locally.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["WEBHOOK_SOURCE_HAS_AUTOMATIONS"]
+                    },
+                    "message": {
                       "type": "string",
                       "minLength": 1
                     }
@@ -4073,7 +4860,155 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": [
+                        "TARGET_NOT_FOUND",
+                        "CONNECTION_NOT_FOUND",
+                        "WEBHOOK_SOURCE_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Immediate integration-defined webhook response. Status code, headers, content type, and body are integration-specific and may include empty responses.",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/integration/webhooks/:targetKey/:endpointKey": {
+      "post": {
+        "tags": ["Integrations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "targetKey",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "endpointKey",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Webhook event accepted for processing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["received", "duplicate"]
+                    }
+                  },
+                  "required": ["status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Immediate integration-defined webhook response with no body."
+          },
+          "400": {
+            "description": "Invalid webhook request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_WEBHOOK_REQUEST"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Integration target, source, or connection was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "TARGET_NOT_FOUND",
+                        "CONNECTION_NOT_FOUND",
+                        "WEBHOOK_SOURCE_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",

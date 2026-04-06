@@ -6,6 +6,7 @@ import {
   IntegrationConnectionStatuses,
   IntegrationBindingKinds,
   integrationTargets,
+  integrationWebhookSources,
   SandboxProfileStatuses,
   sandboxProfiles,
   sandboxProfileVersions,
@@ -56,6 +57,12 @@ describe("automation webhooks CRUD integration", () => {
       organizationId: authenticatedSession.organizationId,
       targetKey: GitHubTarget.targetKey,
     });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_webhook_create_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_webhook_create_001",
+      targetKey: GitHubTarget.targetKey,
+    });
     await insertSandboxProfile(fixture, {
       id: "sbp_webhook_create_001",
       organizationId: authenticatedSession.organizationId,
@@ -73,7 +80,7 @@ describe("automation webhooks CRUD integration", () => {
     const requestBody = {
       name: "GitHub Issue Comments",
       enabled: true,
-      integrationConnectionId: "icn_webhook_create_001",
+      integrationWebhookSourceId: "iws_webhook_create_001",
       eventTypes: ["issue_comment.created"],
       payloadFilter: {
         action: "created",
@@ -101,7 +108,7 @@ describe("automation webhooks CRUD integration", () => {
     expect(body.kind).toBe("webhook");
     expect(body.name).toBe("GitHub Issue Comments");
     expect(body.enabled).toBe(true);
-    expect(body.integrationConnectionId).toBe("icn_webhook_create_001");
+    expect(body.integrationWebhookSourceId).toBe("iws_webhook_create_001");
     expect(body.eventTypes).toEqual(["issue_comment.created"]);
     expect(body.payloadFilter).toEqual({ action: "created" });
     expect(body.target.sandboxProfileId).toBe("sbp_webhook_create_001");
@@ -125,7 +132,7 @@ describe("automation webhooks CRUD integration", () => {
     if (persistedWebhook === undefined) {
       throw new Error("Expected created webhook automation config to be persisted.");
     }
-    expect(persistedWebhook.integrationConnectionId).toBe("icn_webhook_create_001");
+    expect(persistedWebhook.integrationWebhookSourceId).toBe("iws_webhook_create_001");
     expect(persistedWebhook.eventTypes).toEqual(["issue_comment.created"]);
     expect(persistedWebhook.payloadFilter).toEqual({ action: "created" });
 
@@ -152,6 +159,12 @@ describe("automation webhooks CRUD integration", () => {
     await insertIntegrationConnection(fixture, {
       id: "icn_webhook_create_latest_001",
       organizationId: authenticatedSession.organizationId,
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_webhook_create_latest_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_webhook_create_latest_001",
       targetKey: GitHubTarget.targetKey,
     });
     await insertSandboxProfile(fixture, {
@@ -181,7 +194,7 @@ describe("automation webhooks CRUD integration", () => {
       body: JSON.stringify({
         name: "GitHub Issue Comments Latest",
         enabled: true,
-        integrationConnectionId: "icn_webhook_create_latest_001",
+        integrationWebhookSourceId: "iws_webhook_create_latest_001",
         eventTypes: ["issue_comment.created"],
         inputTemplate: "Handle {{payload.comment.body}}",
         conversationKeyTemplate: "{{payload.issue.node_id}}",
@@ -234,6 +247,30 @@ describe("automation webhooks CRUD integration", () => {
     await insertIntegrationConnection(fixture, {
       id: "icn_list_004",
       organizationId: secondOrgSession.organizationId,
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_list_001",
+      organizationId: firstOrgSession.organizationId,
+      connectionId: "icn_list_001",
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_list_002",
+      organizationId: firstOrgSession.organizationId,
+      connectionId: "icn_list_002",
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_list_003",
+      organizationId: firstOrgSession.organizationId,
+      connectionId: "icn_list_003",
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_list_004",
+      organizationId: secondOrgSession.organizationId,
+      connectionId: "icn_list_004",
       targetKey: GitHubTarget.targetKey,
     });
     await insertSandboxProfile(fixture, {
@@ -295,10 +332,10 @@ describe("automation webhooks CRUD integration", () => {
     await fixture.db
       .insert(webhookAutomations)
       .values([
-        createPersistedWebhookAutomationConfig("atm_webhook_list_001", "icn_list_001"),
-        createPersistedWebhookAutomationConfig("atm_webhook_list_002", "icn_list_002"),
-        createPersistedWebhookAutomationConfig("atm_webhook_list_003", "icn_list_003"),
-        createPersistedWebhookAutomationConfig("atm_webhook_list_other_org", "icn_list_004"),
+        createPersistedWebhookAutomationConfig("atm_webhook_list_001", "iws_list_001"),
+        createPersistedWebhookAutomationConfig("atm_webhook_list_002", "iws_list_002"),
+        createPersistedWebhookAutomationConfig("atm_webhook_list_003", "iws_list_003"),
+        createPersistedWebhookAutomationConfig("atm_webhook_list_other_org", "iws_list_004"),
       ]);
 
     await fixture.db
@@ -372,6 +409,12 @@ describe("automation webhooks CRUD integration", () => {
       organizationId: authenticatedSession.organizationId,
       targetKey: "retired_target",
     });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_list_retired_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_list_retired_001",
+      targetKey: "retired_target",
+    });
     await insertSandboxProfile(fixture, {
       id: "sbp_list_retired_001",
       organizationId: authenticatedSession.organizationId,
@@ -391,7 +434,7 @@ describe("automation webhooks CRUD integration", () => {
       .values(
         createPersistedWebhookAutomationConfig(
           "atm_webhook_list_retired_001",
-          "icn_list_retired_001",
+          "iws_list_retired_001",
         ),
       );
     await fixture.db
@@ -456,6 +499,12 @@ describe("automation webhooks CRUD integration", () => {
       organizationId: authenticatedSession.organizationId,
       targetKey: "retired_target_with_overrides",
     });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_list_retired_overrides_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_list_retired_overrides_001",
+      targetKey: "retired_target_with_overrides",
+    });
     await insertSandboxProfile(fixture, {
       id: "sbp_list_retired_overrides_001",
       organizationId: authenticatedSession.organizationId,
@@ -475,7 +524,7 @@ describe("automation webhooks CRUD integration", () => {
       .values(
         createPersistedWebhookAutomationConfig(
           "atm_webhook_list_retired_overrides_001",
-          "icn_list_retired_overrides_001",
+          "iws_list_retired_overrides_001",
         ),
       );
     await fixture.db
@@ -540,14 +589,28 @@ describe("automation webhooks CRUD integration", () => {
       updatedAt: "2026-02-08T00:00:00.000Z",
     });
 
-    await withDisabledTableTriggers(fixture, ["webhook_automations"], async () => {
-      await fixture.db.insert(webhookAutomations).values({
-        ...createPersistedWebhookAutomationConfig(
-          "atm_webhook_list_missing_connection_001",
-          "icn_missing_connection_001",
-        ),
-      });
-    });
+    await withDisabledTableTriggers(
+      fixture,
+      ["integration_webhook_sources", "webhook_automations"],
+      async () => {
+        await fixture.db.insert(integrationWebhookSources).values({
+          id: "iws_missing_connection_001",
+          ownerScope: "connection",
+          organizationId: authenticatedSession.organizationId,
+          integrationConnectionId: "icn_missing_connection_001",
+          targetKey: GitHubTarget.targetKey,
+          routingStrategy: "payload",
+          status: "active",
+        });
+
+        await fixture.db.insert(webhookAutomations).values({
+          ...createPersistedWebhookAutomationConfig(
+            "atm_webhook_list_missing_connection_001",
+            "iws_missing_connection_001",
+          ),
+        });
+      },
+    );
 
     await fixture.db
       .insert(automationTargets)
@@ -603,6 +666,12 @@ describe("automation webhooks CRUD integration", () => {
       organizationId: authenticatedSession.organizationId,
       targetKey: GitHubTarget.targetKey,
     });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_list_missing_profile_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_list_missing_profile_001",
+      targetKey: GitHubTarget.targetKey,
+    });
 
     await fixture.db.insert(automations).values({
       id: "atm_webhook_list_missing_profile_001",
@@ -619,7 +688,7 @@ describe("automation webhooks CRUD integration", () => {
       .values(
         createPersistedWebhookAutomationConfig(
           "atm_webhook_list_missing_profile_001",
-          "icn_list_missing_profile_001",
+          "iws_list_missing_profile_001",
         ),
       );
 
@@ -684,6 +753,18 @@ describe("automation webhooks CRUD integration", () => {
       organizationId: authenticatedSession.organizationId,
       targetKey: GitHubTarget.targetKey,
     });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_webhook_update_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_webhook_update_001",
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_webhook_update_002",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_webhook_update_002",
+      targetKey: GitHubTarget.targetKey,
+    });
     await insertSandboxProfile(fixture, {
       id: "sbp_webhook_update_001",
       organizationId: authenticatedSession.organizationId,
@@ -715,7 +796,7 @@ describe("automation webhooks CRUD integration", () => {
     await fixture.db
       .insert(webhookAutomations)
       .values(
-        createPersistedWebhookAutomationConfig("atm_webhook_update_001", "icn_webhook_update_001"),
+        createPersistedWebhookAutomationConfig("atm_webhook_update_001", "iws_webhook_update_001"),
       );
     await fixture.db
       .insert(automationTargets)
@@ -736,7 +817,7 @@ describe("automation webhooks CRUD integration", () => {
     expect(getResponse.status).toBe(200);
     const getBody = AutomationWebhookSchema.parse(await getResponse.json());
     expect(getBody.name).toBe("Before");
-    expect(getBody.integrationConnectionId).toBe("icn_webhook_update_001");
+    expect(getBody.integrationWebhookSourceId).toBe("iws_webhook_update_001");
     expect(getBody.target.sandboxProfileVersion).toBe(7);
 
     const patchResponse = await fixture.request("/v1/automations/webhooks/atm_webhook_update_001", {
@@ -748,7 +829,7 @@ describe("automation webhooks CRUD integration", () => {
       body: JSON.stringify({
         name: "After",
         enabled: false,
-        integrationConnectionId: "icn_webhook_update_002",
+        integrationWebhookSourceId: "iws_webhook_update_002",
         target: {
           sandboxProfileId: "sbp_webhook_update_001",
         },
@@ -759,7 +840,7 @@ describe("automation webhooks CRUD integration", () => {
     const patchBody = AutomationWebhookSchema.parse(await patchResponse.json());
     expect(patchBody.name).toBe("After");
     expect(patchBody.enabled).toBe(false);
-    expect(patchBody.integrationConnectionId).toBe("icn_webhook_update_002");
+    expect(patchBody.integrationWebhookSourceId).toBe("iws_webhook_update_002");
     expect(patchBody.idempotencyKeyTemplate).toBeNull();
     expect(patchBody.target.sandboxProfileVersion).toBe(7);
     expect(patchBody.updatedAt).not.toBe("2026-02-05T00:00:00.000Z");
@@ -794,6 +875,12 @@ describe("automation webhooks CRUD integration", () => {
       organizationId: authenticatedSession.organizationId,
       targetKey: GitHubTarget.targetKey,
     });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_delete_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_delete_001",
+      targetKey: GitHubTarget.targetKey,
+    });
     await insertSandboxProfile(fixture, {
       id: "sbp_delete_001",
       organizationId: authenticatedSession.organizationId,
@@ -810,7 +897,7 @@ describe("automation webhooks CRUD integration", () => {
     });
     await fixture.db
       .insert(webhookAutomations)
-      .values(createPersistedWebhookAutomationConfig("atm_webhook_delete_001", "icn_delete_001"));
+      .values(createPersistedWebhookAutomationConfig("atm_webhook_delete_001", "iws_delete_001"));
     await fixture.db
       .insert(automationTargets)
       .values(
@@ -860,6 +947,12 @@ describe("automation webhooks CRUD integration", () => {
       organizationId: authenticatedSession.organizationId,
       targetKey: OpenAiTarget.targetKey,
     });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_webhook_invalid_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_webhook_invalid_001",
+      targetKey: OpenAiTarget.targetKey,
+    });
     await insertSandboxProfile(fixture, {
       id: "sbp_webhook_invalid_001",
       organizationId: authenticatedSession.organizationId,
@@ -873,7 +966,7 @@ describe("automation webhooks CRUD integration", () => {
       },
       body: JSON.stringify({
         name: "Invalid",
-        integrationConnectionId: "icn_webhook_invalid_001",
+        integrationWebhookSourceId: "iws_webhook_invalid_001",
         inputTemplate: "Handle payload",
         conversationKeyTemplate: "{{payload.issue.node_id}}",
         target: {
@@ -883,7 +976,7 @@ describe("automation webhooks CRUD integration", () => {
     });
     expect(response.status).toBe(400);
     const body = CreateAutomationWebhookBadRequestResponseSchema.parse(await response.json());
-    expect(body.code).toBe("CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE");
+    expect(body.code).toBe("WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE");
   });
 
   it("returns 400 when creating a webhook automation for a profile without a binding for the selected trigger connection", async ({
@@ -897,6 +990,12 @@ describe("automation webhooks CRUD integration", () => {
     await insertIntegrationConnection(fixture, {
       id: "icn_webhook_invalid_profile_trigger_001",
       organizationId: authenticatedSession.organizationId,
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_webhook_invalid_profile_trigger_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_webhook_invalid_profile_trigger_001",
       targetKey: GitHubTarget.targetKey,
     });
     await insertSandboxProfile(fixture, {
@@ -916,7 +1015,7 @@ describe("automation webhooks CRUD integration", () => {
       },
       body: JSON.stringify({
         name: "GitHub issue triage",
-        integrationConnectionId: "icn_webhook_invalid_profile_trigger_001",
+        integrationWebhookSourceId: "iws_webhook_invalid_profile_trigger_001",
         eventTypes: ["issue_comment.created"],
         inputTemplate: "Handle payload",
         conversationKeyTemplate: "{{payload.issue.node_id}}",
@@ -948,6 +1047,12 @@ describe("automation webhooks CRUD integration", () => {
       organizationId: secondOrgSession.organizationId,
       targetKey: GitHubTarget.targetKey,
     });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_other_org_001",
+      organizationId: secondOrgSession.organizationId,
+      connectionId: "icn_other_org_001",
+      targetKey: GitHubTarget.targetKey,
+    });
     await insertSandboxProfile(fixture, {
       id: "sbp_other_org_001",
       organizationId: secondOrgSession.organizationId,
@@ -965,7 +1070,7 @@ describe("automation webhooks CRUD integration", () => {
     await fixture.db
       .insert(webhookAutomations)
       .values(
-        createPersistedWebhookAutomationConfig("atm_webhook_other_org_001", "icn_other_org_001"),
+        createPersistedWebhookAutomationConfig("atm_webhook_other_org_001", "iws_other_org_001"),
       );
     await fixture.db
       .insert(automationTargets)
@@ -1026,6 +1131,28 @@ async function insertIntegrationConnection(
     targetKey: input.targetKey,
     displayName: `${input.id} display`,
     status: IntegrationConnectionStatuses.ACTIVE,
+    createdAt: "2026-02-01T00:00:00.000Z",
+    updatedAt: "2026-02-01T00:00:00.000Z",
+  });
+}
+
+async function insertIntegrationWebhookSource(
+  fixture: ControlPlaneApiIntegrationFixture,
+  input: {
+    id: string;
+    organizationId: string;
+    connectionId: string;
+    targetKey: string;
+  },
+) {
+  await fixture.db.insert(integrationWebhookSources).values({
+    id: input.id,
+    ownerScope: "connection",
+    organizationId: input.organizationId,
+    integrationConnectionId: input.connectionId,
+    targetKey: input.targetKey,
+    routingStrategy: "payload",
+    status: "active",
     createdAt: "2026-02-01T00:00:00.000Z",
     updatedAt: "2026-02-01T00:00:00.000Z",
   });
@@ -1103,11 +1230,11 @@ async function withDisabledTableTriggers<T>(
 
 function createPersistedWebhookAutomationConfig(
   automationId: string,
-  integrationConnectionId: string,
+  integrationWebhookSourceId: string,
 ) {
   return {
     automationId,
-    integrationConnectionId,
+    integrationWebhookSourceId,
     eventTypes: ["issue_comment.created"],
     payloadFilter: {
       action: "created",

@@ -780,6 +780,9 @@ importers:
 
   packages/integrations-definitions:
     dependencies:
+      '@mistle/http':
+        specifier: workspace:*
+        version: link:../http
       '@mistle/integrations-core':
         specifier: workspace:*
         version: link:../integrations-core

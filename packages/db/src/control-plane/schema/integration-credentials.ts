@@ -10,6 +10,7 @@ export const IntegrationCredentialSecretKinds = {
   OAUTH2_ACCESS_TOKEN: "oauth2_access_token",
   OAUTH2_CLIENT_SECRET: "oauth2_client_secret",
   OAUTH2_REFRESH_TOKEN: "oauth2_refresh_token",
+  WEBHOOK_SECRET: "webhook_secret",
 } as const;
 
 export type IntegrationCredentialSecretKind =

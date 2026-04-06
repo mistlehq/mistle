@@ -20,6 +20,7 @@ export const AutomationWebhookListIssueSchema = z
   .object({
     code: z.enum([
       "MISSING_TARGET_METADATA",
+      "MISSING_WEBHOOK_SOURCE",
       "MISSING_INTEGRATION_CONNECTION",
       "MISSING_SANDBOX_PROFILE",
     ]),
@@ -45,7 +46,7 @@ export const AutomationWebhookSchema = z
     kind: z.literal("webhook"),
     name: z.string().min(1),
     enabled: z.boolean(),
-    integrationConnectionId: z.string().min(1),
+    integrationWebhookSourceId: z.string().min(1),
     eventTypes: z.array(z.string().min(1)).nullable(),
     payloadFilter: z.record(z.string(), z.unknown()).nullable(),
     inputTemplate: z.string().min(1),

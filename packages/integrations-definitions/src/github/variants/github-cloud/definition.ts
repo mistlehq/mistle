@@ -24,6 +24,7 @@ import {
 } from "../../shared/resource-definitions.js";
 import { GitHubSupportedWebhookEvents } from "../../shared/supported-webhook-events.js";
 import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
+import { GitHubWebhookSourceCapability } from "../../shared/webhook-source.js";
 import { GitHubCloudBindingConfigSchema } from "./binding-config-schema.js";
 import { compileGitHubCloudBinding } from "./compile-binding.js";
 import { GitHubCloudTargetConfigSchema } from "./target-config-schema.js";
@@ -86,6 +87,7 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
   redirectHandler: GitHubAppInstallationRedirectHandler,
   supportedWebhookEvents: GitHubSupportedWebhookEvents,
   webhookHandler: GitHubCloudWebhookHandler,
+  webhookSource: GitHubWebhookSourceCapability,
   resourceDefinitions: GitHubResourceDefinitions,
   resourceSyncTriggers: GitHubResourceSyncTriggers,
   listConnectionResources: listGitHubConnectionResources,

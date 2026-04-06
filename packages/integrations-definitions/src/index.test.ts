@@ -64,6 +64,25 @@ describe("integrations-definitions index", () => {
         },
       ],
     });
+    expect(jiraDefinition?.webhookSource).toMatchObject({
+      ownerScope: "connection",
+      routingStrategy: "path",
+      lifecycle: "managed",
+    });
+    expect(jiraDefinition?.supportedWebhookEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "jira:issue_created",
+          providerEventType: "jira:issue_created",
+          displayName: "Issue created",
+        }),
+        expect.objectContaining({
+          eventType: "comment_created",
+          providerEventType: "comment_created",
+          displayName: "Comment created",
+        }),
+      ]),
+    );
     expect(openAiDefinition?.displayName).toBe("OpenAI");
     expect(openAiDefinition?.kind).toBe("agent");
     expect(githubCloudDefinition).toMatchObject({
@@ -93,6 +112,11 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(githubCloudDefinition?.redirectHandler).toBeDefined();
+    expect(githubCloudDefinition?.webhookSource).toMatchObject({
+      ownerScope: "target",
+      routingStrategy: "payload",
+      lifecycle: "implicit",
+    });
     expect(githubCloudDefinition?.supportedWebhookEvents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -161,6 +185,11 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(githubEnterpriseServerDefinition?.redirectHandler).toBeDefined();
+    expect(githubEnterpriseServerDefinition?.webhookSource).toMatchObject({
+      ownerScope: "target",
+      routingStrategy: "payload",
+      lifecycle: "implicit",
+    });
     expect(githubEnterpriseServerDefinition?.supportedWebhookEvents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
