@@ -41,6 +41,7 @@ export const sandboxInstanceConnectionTokenSchema = z
 export const sandboxInstanceStatusResponseSchema = z
   .object({
     id: z.string().min(1),
+    conversationTitle: z.string().min(1).nullable(),
     status: sandboxInstanceStatusSchema,
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),

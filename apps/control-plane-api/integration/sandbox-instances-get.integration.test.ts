@@ -63,6 +63,7 @@ describe("sandbox instances get integration", () => {
       id: "sbi_cp_get_001",
       organizationId: session.organizationId,
       sandboxProfileId: "sbp_dp_get_001",
+      title: "Webhook investigation",
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
       providerSandboxId,
@@ -121,6 +122,7 @@ describe("sandbox instances get integration", () => {
 
     expect(body).toEqual({
       id: "sbi_cp_get_001",
+      conversationTitle: "Webhook investigation",
       status: "running",
       failureCode: null,
       failureMessage: null,
@@ -155,6 +157,7 @@ describe("sandbox instances get integration", () => {
       id: "sbi_cp_get_pending_001",
       organizationId: session.organizationId,
       sandboxProfileId: "sbp_dp_get_pending_001",
+      title: null,
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
       providerSandboxId,
@@ -213,6 +216,7 @@ describe("sandbox instances get integration", () => {
 
     expect(body).toEqual({
       id: "sbi_cp_get_pending_001",
+      conversationTitle: null,
       status: "running",
       failureCode: null,
       failureMessage: null,
@@ -245,6 +249,7 @@ describe("sandbox instances get integration", () => {
       id: "sbi_cp_get_002",
       organizationId: session.organizationId,
       sandboxProfileId: "sbp_dp_get_002",
+      title: null,
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
       providerSandboxId: "provider-cp-get-002",
@@ -265,6 +270,7 @@ describe("sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
 
+    expect(body.conversationTitle).toBeNull();
     expect(body.automationConversation).toBeNull();
   });
 
@@ -290,6 +296,7 @@ describe("sandbox instances get integration", () => {
       id: "sbi_cp_get_003",
       organizationId: session.organizationId,
       sandboxProfileId: "sbp_dp_get_003",
+      title: null,
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
       providerSandboxId,
@@ -380,6 +387,7 @@ describe("sandbox instances get integration", () => {
 
     expect(body).toEqual({
       id: "sbi_cp_get_003",
+      conversationTitle: null,
       status: "running",
       failureCode: null,
       failureMessage: null,
@@ -414,6 +422,7 @@ describe("sandbox instances get integration", () => {
       id: "sbi_cp_get_004",
       organizationId: session.organizationId,
       sandboxProfileId: "sbp_dp_get_004",
+      title: null,
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
       providerSandboxId,
@@ -502,6 +511,7 @@ describe("sandbox instances get integration", () => {
 
     expect(body).toEqual({
       id: "sbi_cp_get_004",
+      conversationTitle: null,
       status: "running",
       failureCode: null,
       failureMessage: null,

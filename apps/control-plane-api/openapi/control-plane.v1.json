@@ -5520,6 +5520,10 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "conversationTitle": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "status": {
                       "type": "string",
                       "enum": ["pending", "starting", "running", "stopped", "failed"]
@@ -6247,6 +6251,7 @@
                   },
                   "required": [
                     "id",
+                    "conversationTitle",
                     "status",
                     "failureCode",
                     "failureMessage",
@@ -6405,6 +6410,10 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "conversationTitle": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "status": {
                       "type": "string",
                       "enum": ["pending", "starting", "running", "stopped", "failed"]
@@ -7132,6 +7141,7 @@
                   },
                   "required": [
                     "id",
+                    "conversationTitle",
                     "status",
                     "failureCode",
                     "failureMessage",
