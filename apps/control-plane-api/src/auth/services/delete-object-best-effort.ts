@@ -10,7 +10,7 @@ export type DeleteObjectBestEffortInput = {
 
 export async function deleteObjectBestEffort(input: DeleteObjectBestEffortInput): Promise<void> {
   try {
-    // Replacement uploads are already durable; cleanup failure must not roll them back.
+    // Object deletion is cleanup; failure should be observable but must not roll back DB state.
     await input.objectStore.deleteObject(input.objectKey);
   } catch (error) {
     logger.warn(
@@ -19,7 +19,7 @@ export async function deleteObjectBestEffort(input: DeleteObjectBestEffortInput)
         objectKey: input.objectKey,
         subject: input.subject,
       },
-      "Failed to delete superseded profile image object",
+      "Failed to delete profile image object",
     );
   }
 }

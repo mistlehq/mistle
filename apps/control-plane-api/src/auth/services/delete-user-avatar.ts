@@ -4,6 +4,8 @@ import { NotFoundError } from "@mistle/http/errors.js";
 import type { S3CompatibleObjectStore } from "@mistle/object-store";
 import { eq } from "drizzle-orm";
 
+import { deleteObjectBestEffort } from "./delete-object-best-effort.js";
+
 export type DeleteUserAvatarContext = {
   db: ControlPlaneDatabase;
   objectStore: S3CompatibleObjectStore;
@@ -48,19 +50,9 @@ export async function deleteUserAvatar(
     throw new Error("Failed to remove the uploaded user avatar.");
   }
 
-  await deleteObjectIgnoringFailure({
+  await deleteObjectBestEffort({
     objectStore: ctx.objectStore,
     objectKey: existingUser.imageObjectKey,
+    subject: "user_avatar",
   });
-}
-
-async function deleteObjectIgnoringFailure(input: {
-  objectStore: S3CompatibleObjectStore;
-  objectKey: string;
-}): Promise<void> {
-  try {
-    await input.objectStore.deleteObject(input.objectKey);
-  } catch (error) {
-    void error;
-  }
 }
