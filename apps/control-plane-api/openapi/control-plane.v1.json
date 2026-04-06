@@ -2487,19 +2487,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "WEBHOOK_SOURCE_HAS_AUTOMATIONS"
-                      ]
+                      "enum": ["WEBHOOK_SOURCE_HAS_AUTOMATIONS"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }

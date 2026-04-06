@@ -113,7 +113,7 @@ describe("integrations-definitions index", () => {
     });
     expect(githubCloudDefinition?.redirectHandler).toBeDefined();
     expect(githubCloudDefinition?.webhookSource).toMatchObject({
-      ownerScope: "connection",
+      ownerScope: "target",
       routingStrategy: "payload",
       lifecycle: "implicit",
     });
@@ -186,7 +186,7 @@ describe("integrations-definitions index", () => {
     });
     expect(githubEnterpriseServerDefinition?.redirectHandler).toBeDefined();
     expect(githubEnterpriseServerDefinition?.webhookSource).toMatchObject({
-      ownerScope: "connection",
+      ownerScope: "target",
       routingStrategy: "payload",
       lifecycle: "implicit",
     });
