@@ -1,9 +1,11 @@
 import {
   IntegrationConnectionStatuses,
+  integrationCredentials,
   integrationWebhookEvents,
   IntegrationWebhookEventStatuses,
   IntegrationWebhookSourceOwnerScopes,
   IntegrationWebhookSourceStatuses,
+  organizationCredentialKeys,
   type IntegrationWebhookSource,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
@@ -17,6 +19,7 @@ import type {
   IntegrationConnection,
   IntegrationWebhookImmediateResponse,
 } from "@mistle/integrations-core";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { ensureImplicitTargetWebhookSource } from "../../integration-webhook-sources/services/ensure-implicit-target-webhook-source.js";
 import {
@@ -122,30 +125,43 @@ async function resolveWebhookSourceSecretOrThrow(input: {
   integrationsConfig: AppContext["var"]["config"]["integrations"];
 }): Promise<IntegrationConnectionSecrets> {
   const webhookSecretCredentialId = input.source.webhookSecretCredentialId;
-  if (webhookSecretCredentialId === null || webhookSecretCredentialId === undefined) {
+  if (webhookSecretCredentialId == null) {
     return {};
   }
 
   const organizationId = input.source.organizationId;
-  if (organizationId === null || organizationId === undefined) {
+  if (organizationId == null) {
     throw new Error(
       `Webhook source '${input.source.id}' is missing organizationId for credential resolution.`,
     );
   }
 
-  const credential = await input.db.query.integrationCredentials.findFirst({
-    where: (table, { and, eq, isNull }) =>
+  const [credential] = await input.db
+    .select({
+      credentialCiphertext: integrationCredentials.ciphertext,
+      credentialNonce: integrationCredentials.nonce,
+      organizationCredentialKeyCiphertext: organizationCredentialKeys.ciphertext,
+      organizationCredentialKeyMasterKeyVersion: organizationCredentialKeys.masterKeyVersion,
+    })
+    .from(integrationCredentials)
+    .innerJoin(
+      organizationCredentialKeys,
       and(
-        eq(table.id, webhookSecretCredentialId),
-        eq(table.organizationId, organizationId),
-        isNull(table.revokedAt),
+        eq(organizationCredentialKeys.organizationId, integrationCredentials.organizationId),
+        eq(
+          organizationCredentialKeys.version,
+          integrationCredentials.organizationCredentialKeyVersion,
+        ),
       ),
-    columns: {
-      ciphertext: true,
-      nonce: true,
-      organizationCredentialKeyVersion: true,
-    },
-  });
+    )
+    .where(
+      and(
+        eq(integrationCredentials.id, webhookSecretCredentialId),
+        eq(integrationCredentials.organizationId, organizationId),
+        isNull(integrationCredentials.revokedAt),
+      ),
+    )
+    .limit(1);
 
   if (credential === undefined) {
     throw new Error(
@@ -153,34 +169,20 @@ async function resolveWebhookSourceSecretOrThrow(input: {
     );
   }
 
-  const organizationCredentialKey = await input.db.query.organizationCredentialKeys.findFirst({
-    where: (table, { and, eq }) =>
-      and(
-        eq(table.organizationId, organizationId),
-        eq(table.version, credential.organizationCredentialKeyVersion),
-      ),
-  });
-
-  if (organizationCredentialKey === undefined) {
-    throw new Error(
-      `Organization credential key version '${String(credential.organizationCredentialKeyVersion)}' for organization '${organizationId}' was not found.`,
-    );
-  }
-
   const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+    masterKeyVersion: credential.organizationCredentialKeyMasterKeyVersion,
     masterEncryptionKeys: input.integrationsConfig.masterEncryptionKeys,
   });
   const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
-    wrappedCiphertext: organizationCredentialKey.ciphertext,
+    wrappedCiphertext: credential.organizationCredentialKeyCiphertext,
     masterEncryptionKeyMaterial,
   });
 
   try {
     return {
       webhookSecret: decryptCredentialUtf8({
-        nonce: credential.nonce,
-        ciphertext: credential.ciphertext,
+        nonce: credential.credentialNonce,
+        ciphertext: credential.credentialCiphertext,
         organizationCredentialKey: unwrappedOrganizationCredentialKey,
       }),
     };
@@ -238,10 +240,7 @@ async function resolveWebhookSourceOrThrow(input: {
 }
 
 function resolveSourceConnectionIdOrThrow(input: { source: IntegrationWebhookSource }): string {
-  if (
-    input.source.integrationConnectionId === null ||
-    input.source.integrationConnectionId === undefined
-  ) {
+  if (input.source.integrationConnectionId == null) {
     throw new Error(
       `Connection-owned webhook source '${input.source.id}' is missing integrationConnectionId.`,
     );
