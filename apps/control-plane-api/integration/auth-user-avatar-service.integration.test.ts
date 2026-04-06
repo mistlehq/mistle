@@ -5,7 +5,7 @@ import sharp from "sharp";
 import { describe, expect } from "vitest";
 
 import { putUserAvatar } from "../src/auth/services/put-user-avatar.js";
-import { createTestObjectStore } from "./helpers/test-object-store.js";
+import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test-object-store.js";
 import { it } from "./test-context.js";
 
 describe("user avatar service integration", () => {
@@ -106,21 +106,7 @@ describe("user avatar service integration", () => {
 
     try {
       await objectStore.putObject({
-        Body: await sharp({
-          create: {
-            width: 64,
-            height: 64,
-            channels: 4,
-            background: {
-              r: 240,
-              g: 180,
-              b: 20,
-              alpha: 1,
-            },
-          },
-        })
-          .webp()
-          .toBuffer(),
+        Body: await getStoredWebpFixtureBytes(),
         ContentType: "image/webp",
         objectKey: previousObjectKey,
       });
