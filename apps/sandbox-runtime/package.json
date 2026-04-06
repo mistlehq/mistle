@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "@mistle/integrations-core": "workspace:*",
-    "@mistle/integrations-definitions": "workspace:*",
     "@mistle/sandbox-rs-napi": "workspace:*",
     "@mistle/sandbox-runtime-contract": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
