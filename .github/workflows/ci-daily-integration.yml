@@ -93,13 +93,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 25
-
       - name: Run Linux sandbox base packaging check
-        run: node ./scripts/test/run-sandbox-base-linux.mjs
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --target sandbox-base \
+            --tag mistle-sandbox-base-check:local \
+            --file packages/sandboxd/Dockerfile \
+            .
 
   notify:
     name: Notify Slack

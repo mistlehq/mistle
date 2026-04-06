@@ -46,7 +46,7 @@
     "test-harness:prepare-runtime": "tsx ./scripts/test/prepare-test-harness-runtime.ts",
     "test:integration": "tsx ./scripts/test/run-integration-vitest.ts",
     "test:integration:all": "pnpm test:integration",
-    "test:sandbox-base:linux": "node ./scripts/test/run-sandbox-base-linux.mjs",
+    "test:sandbox-base:linux": "docker build --platform ${MISTLE_SANDBOX_BASE_CHECK_PLATFORM:-linux/amd64} --target sandbox-base -t mistle-sandbox-base-check:local -f packages/sandboxd/Dockerfile .",
     "test:system": "pnpm --filter @mistle/tests test:system",
     "test:e2e": "pnpm --filter @mistle/tests test:e2e",
     "release:start": "tsx ./scripts/release/start.ts",
