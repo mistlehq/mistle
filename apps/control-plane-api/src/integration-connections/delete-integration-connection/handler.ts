@@ -10,11 +10,15 @@ const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
   { session }: AppSession,
 ) => {
-  const db = ctx.get("db");
   const { connectionId } = ctx.req.valid("param");
 
   await deleteIntegrationConnection(
-    { db },
+    {
+      db: ctx.get("db"),
+      integrationRegistry: ctx.get("integrationRegistry"),
+      integrationsConfig: ctx.get("config").integrations,
+      controlPlaneBaseUrl: ctx.get("config").auth.baseUrl,
+    },
     {
       organizationId: session.activeOrganizationId,
       connectionId,

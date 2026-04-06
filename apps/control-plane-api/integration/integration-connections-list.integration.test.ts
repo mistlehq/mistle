@@ -365,6 +365,26 @@ describe("integration connections list integration", () => {
       credentialId: "icr_delete_free",
       purpose: "api_key",
     });
+    await fixture.db.insert(integrationCredentials).values({
+      id: "icr_delete_free_webhook_secret",
+      organizationId: session.organizationId,
+      secretKind: IntegrationCredentialSecretKinds.WEBHOOK_SECRET,
+      ciphertext: "ciphertext",
+      nonce: "nonce",
+      organizationCredentialKeyVersion: 1,
+      intendedFamilyId: "github",
+    });
+    await fixture.db.insert(integrationWebhookSources).values({
+      id: "iws_delete_free",
+      ownerScope: "connection",
+      organizationId: session.organizationId,
+      integrationConnectionId: "icn_delete_free",
+      targetKey: "github_cloud",
+      routingStrategy: "path",
+      endpointKey: "ep_delete_free",
+      webhookSecretCredentialId: "icr_delete_free_webhook_secret",
+      status: "active",
+    });
 
     await insertWebhookAutomationUsage(fixture, {
       organizationId: session.organizationId,
@@ -409,6 +429,16 @@ describe("integration connections list integration", () => {
       where: (table, { eq }) => eq(table.id, "icr_delete_free"),
     });
     expect(deletedCredential).toBeUndefined();
+
+    const deletedWebhookSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { eq }) => eq(table.id, "iws_delete_free"),
+    });
+    expect(deletedWebhookSource).toBeUndefined();
+
+    const deletedWebhookSecretCredential = await fixture.db.query.integrationCredentials.findFirst({
+      where: (table, { eq }) => eq(table.id, "icr_delete_free_webhook_secret"),
+    });
+    expect(deletedWebhookSecretCredential).toBeUndefined();
 
     const deleteBoundResponse = await fixture.request(
       "/v1/integration/connections/icn_delete_bound",
