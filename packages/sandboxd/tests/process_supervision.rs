@@ -14,8 +14,7 @@ fn starts_runtime_client_processes_and_waits_for_tcp_readiness() {
     let process_spec = RuntimeClientProcessSpec {
         process_key: "tcp_server".to_string(),
         command: node_process(&format!(
-            "require('node:net').createServer(() => {{}}).listen({}, '127.0.0.1')",
-            tcp_port
+            "require('node:net').createServer(() => {{}}).listen({tcp_port}, '127.0.0.1')"
         )),
         readiness: RuntimeClientProcessReadiness::Tcp {
             host: "127.0.0.1".to_string(),
@@ -54,8 +53,7 @@ fn starts_runtime_client_processes_and_waits_for_http_readiness() {
     let process_spec = RuntimeClientProcessSpec {
         process_key: "http_server".to_string(),
         command: node_process(&format!(
-            "require('node:http').createServer((_, res) => res.end('ok')).listen({}, '127.0.0.1')",
-            http_port
+            "require('node:http').createServer((_, res) => res.end('ok')).listen({http_port}, '127.0.0.1')"
         )),
         readiness: RuntimeClientProcessReadiness::Http {
             url: format!("http://127.0.0.1:{http_port}/"),
@@ -97,8 +95,7 @@ fn starts_runtime_client_processes_and_waits_for_websocket_readiness() {
             "const http = require('node:http'); \
              http.createServer().on('upgrade', (_req, socket) => {{ \
                socket.write('HTTP/1.1 101 Switching Protocols\\r\\nConnection: Upgrade\\r\\nUpgrade: websocket\\r\\n\\r\\n'); \
-             }}).listen({}, '127.0.0.1')",
-            ws_port
+             }}).listen({ws_port}, '127.0.0.1')"
         )),
         readiness: RuntimeClientProcessReadiness::Ws {
             url: format!("ws://127.0.0.1:{ws_port}/"),
