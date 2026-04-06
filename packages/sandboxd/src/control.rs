@@ -22,7 +22,7 @@ use crate::apply_startup::manifest;
 use crate::process;
 use crate::protocol::startup::StartupInput;
 use crate::runtime;
-use crate::time::Sleeper;
+use crate::time::{Sleeper, SystemClock, ThreadSleeper};
 
 /// Default Unix socket path for the local `sandboxd` control channel.
 pub const DEFAULT_CONTROL_SOCKET_PATH: &str = "/run/mistle/sandboxd/control.sock";
@@ -448,7 +448,7 @@ fn apply_loaded_manifest(
         serde_json::from_value(manifest.runtime_plan.clone())
             .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
     take_process_manager(state)
-        .map(|process_manager| process_manager.stop())
+        .map(|process_manager| process_manager.stop(&SystemClock, &ThreadSleeper))
         .transpose()
         .map_err(|error| ControlError::StopProcessManager(error.to_string()))?;
     runtime::apply_runtime_plan(&runtime_plan)
@@ -458,8 +458,12 @@ fn apply_loaded_manifest(
         None
     } else {
         Some(
-            process::start_runtime_client_process_manager(&process_specs)
-                .map_err(|error| ControlError::StartProcessManager(error.to_string()))?,
+            process::start_runtime_client_process_manager(
+                &process_specs,
+                &SystemClock,
+                &ThreadSleeper,
+            )
+            .map_err(|error| ControlError::StartProcessManager(error.to_string()))?,
         )
     };
 
@@ -477,7 +481,8 @@ fn apply_loaded_manifest(
 fn take_process_manager(
     state: &Arc<Mutex<ControlServerState>>,
 ) -> Option<process::RuntimeClientProcessManager> {
-    state.lock()
+    state
+        .lock()
         .expect("control server state lock should not be poisoned")
         .process_manager
         .take()
@@ -485,7 +490,7 @@ fn take_process_manager(
 
 fn stop_managed_processes(state: &Arc<Mutex<ControlServerState>>) -> Result<(), ControlError> {
     take_process_manager(state)
-        .map(|process_manager| process_manager.stop())
+        .map(|process_manager| process_manager.stop(&SystemClock, &ThreadSleeper))
         .transpose()
         .map_err(|error| ControlError::StopProcessManager(error.to_string()))?;
     Ok(())

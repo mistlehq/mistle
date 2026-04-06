@@ -1,3 +1,9 @@
+//! Runtime-plan application for `sandboxd`.
+//!
+//! This module materializes the non-supervised parts of the runtime plan
+//! directly, while exposing the parsed process definitions that the process
+//! supervision module starts and stops around manifest reloads.
+
 mod plan;
 mod runtime_file;
 mod workspace_source;
@@ -6,12 +12,13 @@ use std::fmt;
 
 use crate::command::{CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL, run_command};
 use crate::time::{SystemClock, ThreadSleeper};
+pub(crate) use plan::RuntimeClient;
 pub use plan::{
     CompiledRuntimePlan, RuntimeArtifactCommand, RuntimeClientProcessReadiness,
     RuntimeClientProcessStopPolicy, RuntimeClientProcessStopSignal,
 };
-pub(crate) use plan::RuntimeClient;
 
+/// Describes why one runtime-plan setup step failed while applying the manifest.
 #[derive(Debug)]
 pub enum RuntimePlanApplyError {
     InvalidRuntimePlan(serde_json::Error),
@@ -78,6 +85,7 @@ impl fmt::Display for RuntimePlanApplyError {
 
 impl std::error::Error for RuntimePlanApplyError {}
 
+/// Applies the artifact, workspace-source, and setup-file portions of one runtime plan.
 pub fn apply_runtime_plan(runtime_plan: &CompiledRuntimePlan) -> Result<(), RuntimePlanApplyError> {
     // Materialize artifacts, workspace sources, and setup files before later PRs add
     // long-lived process supervision on top of this state.
