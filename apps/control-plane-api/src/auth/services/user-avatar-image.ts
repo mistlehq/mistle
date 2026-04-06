@@ -1,6 +1,8 @@
 import { BadRequestError } from "@mistle/http/errors.js";
 import sharp from "sharp";
 
+import { ProfileImageRequirements } from "./profile-image-requirements.js";
+
 export type NormalizeUserAvatarImageInput = {
   imageBytes: Uint8Array;
 };
@@ -12,10 +14,6 @@ export type NormalizedUserAvatarImage = {
   height: number;
 };
 
-const MaxUserAvatarUploadBytes = 5 * 1024 * 1024;
-const MaxUserAvatarEdgePixels = 512;
-const UserAvatarWebpQuality = 85;
-
 export async function normalizeUserAvatarImage(
   input: NormalizeUserAvatarImageInput,
 ): Promise<NormalizedUserAvatarImage> {
@@ -23,10 +21,10 @@ export async function normalizeUserAvatarImage(
     throw new BadRequestError("INVALID_IMAGE", "Avatar upload must not be empty.");
   }
 
-  if (input.imageBytes.byteLength > MaxUserAvatarUploadBytes) {
+  if (input.imageBytes.byteLength > ProfileImageRequirements.MAX_UPLOAD_BYTES) {
     throw new BadRequestError(
       "INVALID_IMAGE",
-      `Avatar upload must be ${String(MaxUserAvatarUploadBytes)} bytes or smaller.`,
+      `Avatar upload must be ${String(ProfileImageRequirements.MAX_UPLOAD_BYTES)} bytes or smaller.`,
     );
   }
 
@@ -55,7 +53,11 @@ export async function normalizeUserAvatarImage(
     );
   }
 
-  const outputEdgePixels = Math.min(metadata.width, metadata.height, MaxUserAvatarEdgePixels);
+  const outputEdgePixels = Math.min(
+    metadata.width,
+    metadata.height,
+    ProfileImageRequirements.MAX_EDGE_PIXELS,
+  );
 
   const normalizedImageBuffer = await sharp(input.imageBytes, {
     animated: false,
@@ -70,7 +72,7 @@ export async function normalizeUserAvatarImage(
       withoutEnlargement: true,
     })
     .webp({
-      quality: UserAvatarWebpQuality,
+      quality: ProfileImageRequirements.WEBP_QUALITY,
     })
     .toBuffer();
 
