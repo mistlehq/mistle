@@ -19,12 +19,6 @@ export async function normalizeUserAvatarImage(
 ): Promise<NormalizedUserAvatarImage> {
   const validatedImage = await validateProfileImage({
     imageBytes: input.imageBytes,
-    emptyMessage: "Avatar upload must not be empty.",
-    tooLargeMessage: `Avatar upload must be ${String(ProfileImageRequirements.MAX_UPLOAD_BYTES)} bytes or smaller.`,
-    invalidImageMessage: "Avatar upload must be a valid image.",
-    unsupportedFormatMessage: "Avatar uploads must decode to a JPEG, PNG, or WebP image.",
-    animatedMessage: "Animated avatar uploads are not supported.",
-    invalidDimensionsMessage: "Avatar upload must include valid image dimensions.",
   });
 
   const normalizedImageBuffer = await sharp(input.imageBytes, {
