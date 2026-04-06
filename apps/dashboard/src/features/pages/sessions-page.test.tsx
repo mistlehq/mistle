@@ -202,10 +202,47 @@ describe("SessionsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(markup).toContain('data-slot="table" class="w-full caption-bottom text-sm table-fixed"');
+    expect(markup).toContain(
+      'data-slot="table" class="w-full caption-bottom text-sm min-w-[48rem]"',
+    );
     expect(markup).toContain("bg-muted/60");
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
     expect(markup).toContain('<span class="sr-only">Actions</span>');
+  });
+
+  it("keeps a single horizontally scrollable table layout", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [
+        buildListedSession({
+          id: "sbi_mobile",
+          sandboxProfileDisplayName: "Finance Investigator",
+          status: "failed",
+          failureCode: "sandbox_bootstrap_failed",
+          failureMessage: "Could not start sandbox runtime because image pull failed.",
+        }),
+      ],
+    });
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <SessionsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain('data-slot="table-container" class="relative w-full overflow-x-auto"');
+    expect(markup).toContain(
+      'data-slot="table" class="w-full caption-bottom text-sm min-w-[48rem]"',
+    );
+    expect(markup).toContain("Finance Investigator");
+    expect(markup).not.toContain('class="grid gap-3 md:hidden"');
+    expect(markup).not.toContain('class="hidden md:block"');
   });
 
   it("renders the seeded session without pagination when there is only one page", () => {

@@ -61,14 +61,7 @@ export function MembersDirectoryTable(input: {
         searchValue={searchValue}
       />
 
-      <Table className="min-w-[48rem] table-fixed">
-        <colgroup>
-          <col className="w-[26%]" />
-          <col className="w-[30%]" />
-          <col className="w-[14%]" />
-          <col className="w-[14%]" />
-          <col className="w-36" />
-        </colgroup>
+      <Table className="min-w-[48rem]">
         <TableHeader className="bg-muted/60">
           <TableRow className="h-9 border-b">
             <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
@@ -77,13 +70,13 @@ export function MembersDirectoryTable(input: {
             <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
               Email
             </TableHead>
-            <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+            <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
               Status
             </TableHead>
-            <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+            <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
               Date
             </TableHead>
-            <TableHead className="text-right text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+            <TableHead className="text-right text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
               <span className="sr-only">Actions</span>
             </TableHead>
           </TableRow>

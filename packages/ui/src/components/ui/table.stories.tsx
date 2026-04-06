@@ -29,40 +29,46 @@ export const Default: Story = {
   render: function Render() {
     return (
       <div className="mx-auto max-w-4xl">
-        <Table>
+        <Table className="min-w-[40rem]">
           <TableCaption>Recent sandbox sessions across the active organization.</TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead>Session</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Runtime</TableHead>
-              <TableHead className="text-right">Updated</TableHead>
+              <TableHead className="whitespace-nowrap">Status</TableHead>
+              <TableHead className="whitespace-nowrap">Runtime</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Updated</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <TableRow>
-              <TableCell className="font-medium">codex-review-214</TableCell>
-              <TableCell>
+              <TableCell className="font-medium whitespace-normal break-words">
+                codex-review-214-with-a-longer-name
+              </TableCell>
+              <TableCell className="whitespace-nowrap">
                 <Badge>Running</Badge>
               </TableCell>
-              <TableCell>18m 42s</TableCell>
-              <TableCell className="text-right">2m ago</TableCell>
+              <TableCell className="whitespace-nowrap">18m 42s</TableCell>
+              <TableCell className="text-right whitespace-nowrap">2m ago</TableCell>
             </TableRow>
             <TableRow data-state="selected">
-              <TableCell className="font-medium">sandbox-github-sync</TableCell>
-              <TableCell>
+              <TableCell className="font-medium whitespace-normal break-words">
+                sandbox-github-sync
+              </TableCell>
+              <TableCell className="whitespace-nowrap">
                 <Badge variant="secondary">Idle</Badge>
               </TableCell>
-              <TableCell>1h 06m</TableCell>
-              <TableCell className="text-right">12m ago</TableCell>
+              <TableCell className="whitespace-nowrap">1h 06m</TableCell>
+              <TableCell className="text-right whitespace-nowrap">12m ago</TableCell>
             </TableRow>
             <TableRow>
-              <TableCell className="font-medium">fix-drizzle-plan</TableCell>
-              <TableCell>
+              <TableCell className="font-medium whitespace-normal break-words">
+                fix-drizzle-plan
+              </TableCell>
+              <TableCell className="whitespace-nowrap">
                 <Badge variant="destructive">Failed</Badge>
               </TableCell>
-              <TableCell>6m 11s</TableCell>
-              <TableCell className="text-right">27m ago</TableCell>
+              <TableCell className="whitespace-nowrap">6m 11s</TableCell>
+              <TableCell className="text-right whitespace-nowrap">27m ago</TableCell>
             </TableRow>
           </TableBody>
           <TableFooter>

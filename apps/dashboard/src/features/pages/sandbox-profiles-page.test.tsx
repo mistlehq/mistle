@@ -100,7 +100,10 @@ describe("SandboxProfilesPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(markup).toContain("min-w-[32rem] table-fixed");
+    expect(markup).toContain('data-slot="table-container" class="relative w-full overflow-x-auto"');
+    expect(markup).toContain(
+      'data-slot="table" class="w-full caption-bottom text-sm min-w-[32rem]"',
+    );
     expect(markup).toContain("bg-muted/60");
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
   });

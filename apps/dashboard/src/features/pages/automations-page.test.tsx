@@ -80,7 +80,10 @@ describe("AutomationsPage", () => {
     expect(markup).toContain("Automations");
     expect(markup).toContain("Create automation");
     expect(markup).toContain("justify-between");
-    expect(markup).toContain("min-w-[56rem] table-fixed");
+    expect(markup).toContain('data-slot="table-container" class="relative w-full overflow-x-auto"');
+    expect(markup).toContain(
+      'data-slot="table" class="w-full caption-bottom text-sm min-w-[56rem]"',
+    );
     expect(markup).toContain("bg-muted/60");
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
   });

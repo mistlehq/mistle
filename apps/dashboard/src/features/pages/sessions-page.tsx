@@ -131,6 +131,18 @@ export function shouldUseResumeActionLabel(status: SandboxLifecycleStatus): bool
   return status === "stopped";
 }
 
+function formatStartedByLabel(input: SandboxInstanceListItem["startedBy"]): string {
+  if (input.kind === "user" && input.name !== null) {
+    return input.name;
+  }
+
+  if (input.kind === "system") {
+    return "System";
+  }
+
+  return "User";
+}
+
 export function buildOptimisticSessions(input: {
   launchedSessions: readonly {
     profileId: string;
@@ -333,18 +345,6 @@ export function SessionsPage(): React.JSX.Element {
     });
   }
 
-  function formatStartedByLabel(input: SandboxInstanceListItem["startedBy"]): string {
-    if (input.kind === "user" && input.name !== null) {
-      return input.name;
-    }
-
-    if (input.kind === "system") {
-      return "System";
-    }
-
-    return "User";
-  }
-
   const sortedSessions = displayedSessions;
 
   const hasSessions = sortedSessions.length > 0;
@@ -455,14 +455,7 @@ export function SessionsPage(): React.JSX.Element {
         )}
 
         <div className="flex flex-col gap-3">
-          <Table className="table-fixed">
-            <colgroup>
-              <col className="w-[26%]" />
-              <col className="w-[26%]" />
-              <col className="w-[22%]" />
-              <col className="w-[10%]" />
-              <col className="w-[16%]" />
-            </colgroup>
+          <Table className="min-w-[48rem]">
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
@@ -471,13 +464,13 @@ export function SessionsPage(): React.JSX.Element {
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Started by
                 </TableHead>
-                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
                   Created
                 </TableHead>
-                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
                   Status
                 </TableHead>
-                <TableHead className="text-right text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="text-right text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
                   <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
@@ -493,9 +486,9 @@ export function SessionsPage(): React.JSX.Element {
                 sortedSessions.map((session) => {
                   return (
                     <TableRow key={session.id}>
-                      <TableCell>
+                      <TableCell className="whitespace-normal">
                         <div className="flex min-w-0 flex-col gap-1">
-                          <span className="font-medium">
+                          <span className="font-medium break-words">
                             {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
                           </span>
                           {optimisticSessionIds.has(session.id) ? (
@@ -503,27 +496,29 @@ export function SessionsPage(): React.JSX.Element {
                           ) : null}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm">
+                      <TableCell className="text-sm whitespace-normal">
                         <div className="flex flex-col gap-1">
-                          <span>{formatStartedByLabel(session.startedBy)}</span>
+                          <span className="break-words">
+                            {formatStartedByLabel(session.startedBy)}
+                          </span>
                           <span className="text-muted-foreground text-xs capitalize">
                             {session.source}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
+                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                         {formatRelativeOrDate(session.createdAt)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <SandboxSessionStatusBadge
-                            status={session.status}
                             failureCode={session.failureCode}
                             failureMessage={session.failureMessage}
+                            status={session.status}
                           />
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
                         {/** Stopped sessions resume through the workbench so the
                          existing reconnect and error flow stays centralized. */}
                         <Button

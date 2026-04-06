@@ -87,11 +87,11 @@ export function DirectoryTableRow(input: {
 }): React.JSX.Element {
   return (
     <TableRow>
-      <TableCell className="font-medium">{input.name}</TableCell>
-      <TableCell>{input.email}</TableCell>
-      <TableCell>{input.status}</TableCell>
-      <TableCell>{input.date}</TableCell>
-      <TableCell>
+      <TableCell className="font-medium whitespace-normal break-words">{input.name}</TableCell>
+      <TableCell className="whitespace-normal break-words">{input.email}</TableCell>
+      <TableCell className="whitespace-nowrap">{input.status}</TableCell>
+      <TableCell className="whitespace-nowrap">{input.date}</TableCell>
+      <TableCell className="whitespace-nowrap">
         <MembersTableActions
           actionFeedback={input.actionFeedback}
           actions={input.actions}

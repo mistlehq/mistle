@@ -301,17 +301,13 @@ export function SandboxProfilesPage(): React.JSX.Element {
 
       {!listQuery.isPending && !listQuery.isError ? (
         <>
-          <Table className="min-w-[32rem] table-fixed">
-            <colgroup>
-              <col className="w-[68%]" />
-              <col className="w-[32%]" />
-            </colgroup>
+          <Table className="min-w-[32rem]">
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Name
                 </TableHead>
-                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
                   Updated
                 </TableHead>
               </TableRow>
@@ -319,9 +315,9 @@ export function SandboxProfilesPage(): React.JSX.Element {
             <TableBody>
               {items.map((profile) => (
                 <TableRow key={profile.id}>
-                  <TableCell>
+                  <TableCell className="whitespace-normal">
                     <button
-                      className="text-left font-medium underline-offset-4 hover:underline"
+                      className="text-left font-medium underline-offset-4 break-words hover:underline"
                       onClick={() => {
                         navigateToProfileDetail(profile.id);
                       }}
@@ -330,7 +326,7 @@ export function SandboxProfilesPage(): React.JSX.Element {
                       {profile.displayName}
                     </button>
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
+                  <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                     {formatSandboxProfileUpdatedAt(profile.updatedAt)}
                   </TableCell>
                 </TableRow>

@@ -173,7 +173,7 @@ function AutomationIdentityCell(input: {
       <div className="flex items-center gap-2">
         <AutomationIssueIndicator enabled={input.item.enabled} issue={input.item.issue} />
         <button
-          className="text-left font-medium underline-offset-4 hover:underline"
+          className="text-left font-medium underline-offset-4 break-words hover:underline"
           onClick={() => {
             input.onOpenAutomation(input.item.id);
           }}
@@ -213,13 +213,7 @@ export function WebhookAutomationListView(
             />
           ) : null}
 
-          <Table className="min-w-[56rem] table-fixed">
-            <colgroup>
-              <col className="w-[34%]" />
-              <col className="w-[22%]" />
-              <col className="w-[32%]" />
-              <col className="w-[12%]" />
-            </colgroup>
+          <Table className="min-w-[56rem]">
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
@@ -231,7 +225,7 @@ export function WebhookAutomationListView(
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Events
                 </TableHead>
-                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
                   Updated
                 </TableHead>
               </TableRow>
@@ -248,14 +242,14 @@ export function WebhookAutomationListView(
               ) : null}
               {visibleItems.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell>
+                  <TableCell className="whitespace-normal">
                     <AutomationIdentityCell item={item} onOpenAutomation={input.onOpenAutomation} />
                   </TableCell>
-                  <TableCell>{item.targetName}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
+                  <TableCell className="whitespace-normal break-words">{item.targetName}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm whitespace-normal">
                     <EventSummaryCell events={item.events} />
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
+                  <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                     {item.updatedAtLabel}
                   </TableCell>
                 </TableRow>

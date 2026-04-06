@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { MembersDirectoryTable } from "./members-directory-table.js";
 
 describe("MembersDirectoryTable", () => {
-  it("uses fixed table layout with explicit columns to avoid layout shifts", () => {
+  it("uses a scrollable table with explicit column wrapping choices", () => {
     const markup = renderToStaticMarkup(
       <MembersDirectoryTable
         capabilities={null}
@@ -21,10 +21,11 @@ describe("MembersDirectoryTable", () => {
       />,
     );
 
-    expect(markup).toContain("table-fixed");
-    expect(markup).toContain("min-w-[48rem]");
-    expect(markup).toContain("<colgroup>");
-    expect((markup.match(/<col class="/g) ?? []).length).toBe(5);
+    expect(markup).toContain('data-slot="table-container" class="relative w-full overflow-x-auto"');
+    expect(markup).toContain(
+      'data-slot="table" class="w-full caption-bottom text-sm min-w-[48rem]"',
+    );
+    expect(markup).not.toContain("<colgroup>");
   });
 
   it("hides role and removal actions when capabilities are unavailable", () => {
