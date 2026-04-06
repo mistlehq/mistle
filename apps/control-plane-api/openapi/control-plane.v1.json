@@ -5140,7 +5140,10 @@
                                         "minLength": 1
                                       }
                                     },
-                                    "required": ["path", "description"],
+                                    "required": [
+                                      "path",
+                                      "description"
+                                    ],
                                     "additionalProperties": false
                                   }
                                 },
