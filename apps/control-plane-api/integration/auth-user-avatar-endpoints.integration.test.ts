@@ -21,6 +21,39 @@ const IntegrationSandboxRuntimeConfig = {
 } as const;
 
 describe("user avatar endpoints integration", () => {
+  it("returns null from the authenticated read endpoint when no profile image is stored", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-user-avatar-endpoint-read-empty@example.com",
+    });
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "mistle-assets",
+    });
+    const runtime = await createRuntimeWithObjectStore({
+      config: fixture.config,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      seaweedfs,
+    });
+
+    try {
+      const response = await runtime.request("/v1/me/profile-image", {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        imageUrl: null,
+      });
+    } finally {
+      await runtime.stop();
+      await seaweedfs.stop();
+    }
+  });
+
   it("uploads a profile image through the authenticated endpoint and returns a signed read URL", async ({
     fixture,
   }) => {
@@ -207,6 +240,79 @@ describe("user avatar endpoints integration", () => {
       await expect(objectStore.headObject(previousObjectKey)).rejects.toMatchObject({
         name: "NotFound",
       });
+    } finally {
+      objectStore.destroy();
+      await runtime.stop();
+      await seaweedfs.stop();
+    }
+  });
+
+  it("returns a signed read URL from the authenticated read endpoint when a profile image exists", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-user-avatar-endpoint-read-existing@example.com",
+    });
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "mistle-assets",
+    });
+    const runtime = await createRuntimeWithObjectStore({
+      config: fixture.config,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      seaweedfs,
+    });
+    const objectStore = createObjectStore(seaweedfs);
+    const objectKey = `avatars/users/${authenticatedSession.userId}/img_existing.webp`;
+
+    try {
+      await objectStore.putObject({
+        Body: await sharp({
+          create: {
+            width: 128,
+            height: 128,
+            channels: 4,
+            background: {
+              r: 80,
+              g: 140,
+              b: 220,
+              alpha: 1,
+            },
+          },
+        })
+          .webp()
+          .toBuffer(),
+        ContentType: "image/webp",
+        objectKey,
+      });
+      await runtime.db
+        .update(users)
+        .set({
+          imageObjectKey: objectKey,
+        })
+        .where(eq(users.id, authenticatedSession.userId));
+
+      const response = await runtime.request("/v1/me/profile-image", {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      });
+
+      expect(response.status).toBe(200);
+
+      const payload: unknown = await response.json();
+      const imageUrl = readImageUrl(payload);
+
+      expect(imageUrl).not.toBeNull();
+
+      if (imageUrl === null) {
+        throw new Error("Expected profile image read response to include imageUrl.");
+      }
+
+      const imageResponse = await fetch(imageUrl);
+
+      expect(imageResponse.status).toBe(200);
+      expect(imageResponse.headers.get("content-type")).toBe("image/webp");
     } finally {
       objectStore.destroy();
       await runtime.stop();
