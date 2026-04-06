@@ -5,6 +5,7 @@ import type { S3CompatibleObjectStore } from "@mistle/object-store";
 import { eq } from "drizzle-orm";
 import { typeid } from "typeid-js";
 
+import { deleteObjectBestEffort } from "./delete-object-best-effort.js";
 import { normalizeProfileImage } from "./normalize-profile-image.js";
 
 export type PutUserAvatarContext = {
@@ -69,9 +70,10 @@ export async function putUserAvatar(
       });
     [updatedUser] = updatedUsers;
   } catch (error) {
-    await deleteObjectIgnoringFailure({
+    await deleteObjectBestEffort({
       objectStore: ctx.objectStore,
       objectKey: imageObjectKey,
+      subject: "user_avatar",
     });
     throw error;
   }
@@ -85,9 +87,10 @@ export async function putUserAvatar(
     existingUser.imageObjectKey.length > 0 &&
     existingUser.imageObjectKey !== updatedUser.imageObjectKey
   ) {
-    await deleteObjectIgnoringFailure({
+    await deleteObjectBestEffort({
       objectStore: ctx.objectStore,
       objectKey: existingUser.imageObjectKey,
+      subject: "user_avatar",
     });
   }
 
@@ -99,16 +102,4 @@ export async function putUserAvatar(
 
 function createUserAvatarObjectKey(userId: string): string {
   return `avatars/users/${userId}/${typeid("img").toString()}.webp`;
-}
-
-async function deleteObjectIgnoringFailure(input: {
-  objectStore: S3CompatibleObjectStore;
-  objectKey: string;
-}): Promise<void> {
-  try {
-    // Replacement uploads are already durable; cleanup failure must not roll them back.
-    await input.objectStore.deleteObject(input.objectKey);
-  } catch (error) {
-    void error;
-  }
 }
