@@ -9,6 +9,11 @@ export type ProviderInspectConversationOutput = {
   activeExecutionId: string | null;
 };
 
+export type ProviderConversationMetadata = {
+  name: string | null;
+  preview: string | null;
+};
+
 export type ProviderCreateConversationOutput = {
   providerConversationId: string;
   providerState?: unknown;
@@ -35,6 +40,11 @@ export type ProviderConnection = {
 };
 
 export type ProviderInspectConversationInput = {
+  connection: ProviderConnection;
+  providerConversationId: string;
+};
+
+export type ProviderReadConversationMetadataInput = {
   connection: ProviderConnection;
   providerConversationId: string;
 };
@@ -80,6 +90,9 @@ export type ConversationProviderAdapter = {
   inspectAutomationConversation: (
     input: ProviderInspectConversationInput,
   ) => Promise<ProviderInspectConversationOutput>;
+  readConversationMetadata?: (
+    input: ProviderReadConversationMetadataInput,
+  ) => Promise<ProviderConversationMetadata>;
   createAutomationConversation: (
     input: ProviderCreateConversationInput,
   ) => Promise<ProviderCreateConversationOutput>;
@@ -100,10 +113,16 @@ function adaptConversationProvider(
   provider: AgentConversationProvider,
 ): ConversationProviderAdapter {
   const recoverLateSteer = provider.recoverLateSteer;
+  const readConversationMetadata = provider.readConversationMetadata;
 
   return {
     connect: async (input) => await provider.connect(input),
     inspectAutomationConversation: async (input) => await provider.inspectConversation(input),
+    ...(readConversationMetadata === undefined
+      ? {}
+      : {
+          readConversationMetadata: async (input) => await readConversationMetadata(input),
+        }),
     createAutomationConversation: async (input) => await provider.createConversation(input),
     resumeAutomationConversation: async (input) => await provider.resumeConversation(input),
     startExecution: async (input) => await provider.startExecution(input),
