@@ -3984,6 +3984,19 @@ export interface paths {
             };
           };
         };
+        /** @description Sandbox instance cannot be resumed from its current state. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE";
+              message: string;
+            };
+          };
+        };
         /** @description Internal server error. */
         500: {
           headers: {

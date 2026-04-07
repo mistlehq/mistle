@@ -8046,6 +8046,28 @@
               }
             }
           },
+          "409": {
+            "description": "Sandbox instance cannot be resumed from its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["INSTANCE_FAILED", "INSTANCE_NOT_RESUMABLE"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error.",
             "content": {
