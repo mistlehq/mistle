@@ -39,7 +39,7 @@ export function buildSandboxInstanceListItemFixture(
 
   return {
     id,
-    conversationTitle: null,
+    title: null,
     sandboxProfileId: "sbp_profile_alpha",
     sandboxProfileDisplayName: "Alpha Profile",
     sandboxProfileVersion: 3,

@@ -158,7 +158,7 @@ async function inspectStartingSandboxInstance(
     });
     return {
       id: sandboxInstance.id,
-      conversationTitle: sandboxInstance.title,
+      title: sandboxInstance.title,
       status: SandboxInstanceStatuses.FAILED,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
@@ -169,7 +169,7 @@ async function inspectStartingSandboxInstance(
   if (inspection.state === SandboxInspectStates.RUNNING) {
     return {
       id: sandboxInstance.id,
-      conversationTitle: sandboxInstance.title,
+      title: sandboxInstance.title,
       status: await readEffectiveSandboxStatus(
         {
           runtimeStateReader: ctx.runtimeStateReader,
@@ -193,7 +193,7 @@ async function inspectStartingSandboxInstance(
 
   return {
     id: sandboxInstance.id,
-    conversationTitle: sandboxInstance.title,
+    title: sandboxInstance.title,
     status: SandboxInstanceStatuses.FAILED,
     failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_STOPPED_DURING_STARTUP,
     failureMessage: "Sandbox runtime was not running at the provider during startup inspection.",
@@ -209,7 +209,7 @@ function readPendingSandboxInstance(sandboxInstance: {
 }): NonNullable<GetSandboxInstanceResponse> {
   return {
     id: sandboxInstance.id,
-    conversationTitle: sandboxInstance.title,
+    title: sandboxInstance.title,
     status: SandboxInstanceStatuses.PENDING,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
@@ -242,7 +242,7 @@ async function inspectRunningSandboxInstance(
     });
     return {
       id: sandboxInstance.id,
-      conversationTitle: sandboxInstance.title,
+      title: sandboxInstance.title,
       status: SandboxInstanceStatuses.FAILED,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
@@ -253,7 +253,7 @@ async function inspectRunningSandboxInstance(
   if (inspection.state === SandboxInspectStates.RUNNING) {
     return {
       id: sandboxInstance.id,
-      conversationTitle: sandboxInstance.title,
+      title: sandboxInstance.title,
       status: await readEffectiveSandboxStatus(
         {
           runtimeStateReader: ctx.runtimeStateReader,
@@ -275,7 +275,7 @@ async function inspectRunningSandboxInstance(
 
   return {
     id: sandboxInstance.id,
-    conversationTitle: sandboxInstance.title,
+    title: sandboxInstance.title,
     status: SandboxInstanceStatuses.STOPPED,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
@@ -331,7 +331,7 @@ export async function getSandboxInstanceByInspection(
     case SandboxInstanceStatuses.FAILED:
       return {
         id: sandboxInstance.id,
-        conversationTitle: sandboxInstance.title,
+        title: sandboxInstance.title,
         status: SandboxInstanceStatuses.FAILED,
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,
@@ -340,7 +340,7 @@ export async function getSandboxInstanceByInspection(
     case SandboxInstanceStatuses.STOPPED:
       return {
         id: sandboxInstance.id,
-        conversationTitle: sandboxInstance.title,
+        title: sandboxInstance.title,
         status: SandboxInstanceStatuses.STOPPED,
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,

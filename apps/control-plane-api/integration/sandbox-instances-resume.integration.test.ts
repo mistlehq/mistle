@@ -233,7 +233,7 @@ describe("sandbox instance resume integration", () => {
       const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
       expect(body).toEqual({
         id: sandboxInstanceId,
-        conversationTitle: null,
+        title: null,
         status: "starting",
         failureCode: null,
         failureMessage: null,
@@ -319,7 +319,7 @@ describe("sandbox instance resume integration", () => {
       const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
       expect(body).toEqual({
         id: sandboxInstanceId,
-        conversationTitle: null,
+        title: null,
         status: "starting",
         failureCode: null,
         failureMessage: null,
@@ -407,7 +407,7 @@ describe("sandbox instance resume integration", () => {
       const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
       expect(body).toEqual({
         id: sandboxInstanceId,
-        conversationTitle: null,
+        title: null,
         status: "running",
         failureCode: null,
         failureMessage: null,
