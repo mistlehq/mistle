@@ -58,6 +58,14 @@ port = 5100
 url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 migration_url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 
+[apps.control_plane_api.object_store]
+bucket_name = "mistle-assets"
+region = "us-east-1"
+endpoint = "http://127.0.0.1:8333"
+force_path_style = true
+access_key_id = "mistle-access-key"
+secret_access_key = "mistle-secret-key"
+
 [apps.control_plane_api.auth]
 base_url = "http://127.0.0.1:5000"
 secret = "test-secret"

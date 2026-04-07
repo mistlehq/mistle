@@ -31,7 +31,12 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText("Organization name")).toHaveFocus();
+  },
+};
 
 export const ValidationError: Story = {
   args: {

@@ -16,6 +16,7 @@ import {
   IntegrationConnectionStatuses,
   integrationTargets,
   integrationWebhookEvents,
+  integrationWebhookSources,
   IntegrationWebhookEventStatuses,
   organizations,
   sandboxProfiles,
@@ -73,6 +74,7 @@ async function seedConversationDeliveryScope(input: {
   const automationId = `atm_cdt_${input.suffix}`;
   const automationTargetId = `atg_cdt_${input.suffix}`;
   const integrationConnectionId = `icn_cdt_${input.suffix}`;
+  const integrationWebhookSourceId = `iws_cdt_${input.suffix}`;
   const targetKey = `github-cloud-cdt-${input.suffix}`;
 
   await input.db.insert(organizations).values({
@@ -104,6 +106,15 @@ async function seedConversationDeliveryScope(input: {
     status: IntegrationConnectionStatuses.ACTIVE,
     externalSubjectId: `subject-${input.suffix}`,
     config: {},
+  });
+  await input.db.insert(integrationWebhookSources).values({
+    id: integrationWebhookSourceId,
+    ownerScope: "connection",
+    organizationId,
+    integrationConnectionId,
+    targetKey,
+    routingStrategy: "payload",
+    status: "active",
   });
   await input.db.insert(automations).values({
     id: automationId,
@@ -141,6 +152,7 @@ async function seedConversationDeliveryScope(input: {
     automationId,
     automationTargetId,
     integrationConnectionId,
+    integrationWebhookSourceId,
     targetKey,
     conversationId: conversation.id,
   };
@@ -150,6 +162,7 @@ async function insertWebhookEvent(input: {
   db: ReturnType<typeof createControlPlaneDatabase>;
   organizationId: string;
   integrationConnectionId: string;
+  integrationWebhookSourceId: string;
   targetKey: string;
   suffix: string;
   sourceOrderKey: string;
@@ -160,6 +173,7 @@ async function insertWebhookEvent(input: {
     id: webhookEventId,
     organizationId: input.organizationId,
     integrationConnectionId: input.integrationConnectionId,
+    integrationWebhookSourceId: input.integrationWebhookSourceId,
     targetKey: input.targetKey,
     externalEventId: `evt-${input.suffix}`,
     externalDeliveryId: `delivery-${input.suffix}`,
@@ -222,6 +236,7 @@ describe("conversation delivery persistence integration", () => {
         db: database.db,
         organizationId: scope.organizationId,
         integrationConnectionId: scope.integrationConnectionId,
+        integrationWebhookSourceId: scope.integrationWebhookSourceId,
         targetKey: scope.targetKey,
         suffix: "enqueue-idempotent",
         sourceOrderKey: "2026-03-09T00:00:00Z#0001",
@@ -280,6 +295,7 @@ describe("conversation delivery persistence integration", () => {
         db: database.db,
         organizationId: scope.organizationId,
         integrationConnectionId: scope.integrationConnectionId,
+        integrationWebhookSourceId: scope.integrationWebhookSourceId,
         targetKey: scope.targetKey,
         suffix: "enqueue-mismatch",
         sourceOrderKey: "2026-03-09T00:00:00Z#0001",
@@ -400,6 +416,7 @@ describe("conversation delivery persistence integration", () => {
         db: database.db,
         organizationId: scope.organizationId,
         integrationConnectionId: scope.integrationConnectionId,
+        integrationWebhookSourceId: scope.integrationWebhookSourceId,
         targetKey: scope.targetKey,
         suffix: "claim-next-first",
         sourceOrderKey: "2026-03-09T00:00:00Z#0002",
@@ -408,6 +425,7 @@ describe("conversation delivery persistence integration", () => {
         db: database.db,
         organizationId: scope.organizationId,
         integrationConnectionId: scope.integrationConnectionId,
+        integrationWebhookSourceId: scope.integrationWebhookSourceId,
         targetKey: scope.targetKey,
         suffix: "claim-next-second",
         sourceOrderKey: "2026-03-09T00:00:00Z#0001",
@@ -488,6 +506,7 @@ describe("conversation delivery persistence integration", () => {
         db: database.db,
         organizationId: scope.organizationId,
         integrationConnectionId: scope.integrationConnectionId,
+        integrationWebhookSourceId: scope.integrationWebhookSourceId,
         targetKey: scope.targetKey,
         suffix: "finalize-task",
         sourceOrderKey: "2026-03-09T00:00:00Z#0001",
@@ -579,6 +598,7 @@ describe("conversation delivery persistence integration", () => {
         db: database.db,
         organizationId: scope.organizationId,
         integrationConnectionId: scope.integrationConnectionId,
+        integrationWebhookSourceId: scope.integrationWebhookSourceId,
         targetKey: scope.targetKey,
         suffix: "complete-high-water",
         sourceOrderKey: "2026-03-09T00:00:00Z#0005",
@@ -659,6 +679,7 @@ describe("conversation delivery persistence integration", () => {
         db: database.db,
         organizationId: scope.organizationId,
         integrationConnectionId: scope.integrationConnectionId,
+        integrationWebhookSourceId: scope.integrationWebhookSourceId,
         targetKey: scope.targetKey,
         suffix: "stale-action",
         sourceOrderKey: "2026-03-09T00:00:00Z#0001",
@@ -728,6 +749,7 @@ describe("conversation delivery persistence integration", () => {
         db: database.db,
         organizationId: scope.organizationId,
         integrationConnectionId: scope.integrationConnectionId,
+        integrationWebhookSourceId: scope.integrationWebhookSourceId,
         targetKey: scope.targetKey,
         suffix: "resume-active",
         sourceOrderKey: "2026-03-09T00:00:00Z#0001",
@@ -796,6 +818,7 @@ describe("conversation delivery persistence integration", () => {
         db: database.db,
         organizationId: scope.organizationId,
         integrationConnectionId: scope.integrationConnectionId,
+        integrationWebhookSourceId: scope.integrationWebhookSourceId,
         targetKey: scope.targetKey,
         suffix: "idle-active",
         sourceOrderKey: "2026-03-09T00:00:00Z#0001",

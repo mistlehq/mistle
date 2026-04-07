@@ -68,9 +68,7 @@ export function IntegrationsPage() {
             webhookSourceId,
           });
         }}
-        showWebhookSources={
-          (directoryState.selectedDetailCard.target.supportedWebhookEvents?.length ?? 0) > 0
-        }
+        showWebhookSources={directoryState.selectedDetailCard.target.webhookSource !== undefined}
         titleEditor={connectionEditors.titleEditor}
       />
     );

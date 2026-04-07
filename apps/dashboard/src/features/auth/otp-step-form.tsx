@@ -31,7 +31,7 @@ export function OtpStepForm(props: OtpStepFormProps): React.JSX.Element {
         </Label>
         <InputOTP
           autoComplete="one-time-code"
-          className="sr-only"
+          autoFocus
           containerClassName="w-full justify-center"
           data-1p-ignore="true"
           disabled={props.isVerifyingOtp}

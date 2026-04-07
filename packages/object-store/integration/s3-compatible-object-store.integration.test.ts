@@ -111,4 +111,97 @@ describe("S3-compatible object store integration", () => {
       await seaweedfs.stop();
     }
   }, 60_000);
+
+  test("creates a presigned GET URL that can read object bytes from SeaweedFS", async () => {
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "object-store-presigned-get",
+    });
+
+    const objectStore = new S3CompatibleObjectStore({
+      bucketName: seaweedfs.bucketName,
+      credentials: {
+        accessKeyId: seaweedfs.accessKeyId,
+        secretAccessKey: seaweedfs.secretAccessKey,
+      },
+      endpoint: seaweedfs.endpoint,
+      forcePathStyle: true,
+      region: seaweedfs.region,
+    });
+
+    const objectKey = "avatars/users/usr_test/presigned-avatar.webp";
+    const objectBytes = new TextEncoder().encode("presigned-read-bytes");
+
+    try {
+      await objectStore.putObject({
+        Body: objectBytes,
+        ContentType: "image/webp",
+        objectKey,
+      });
+
+      const presignedGetUrl = await objectStore.createPresignedGetUrl({
+        objectKey,
+        expiresInSeconds: 60,
+      });
+
+      const response = await fetch(presignedGetUrl);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toBe("image/webp");
+      await expect(response.bytes()).resolves.toEqual(objectBytes);
+    } finally {
+      objectStore.destroy();
+      await seaweedfs.stop();
+    }
+  }, 60_000);
+
+  test("rejects a tampered presigned GET URL", async () => {
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "object-store-presigned-get-invalid",
+    });
+
+    const objectStore = new S3CompatibleObjectStore({
+      bucketName: seaweedfs.bucketName,
+      credentials: {
+        accessKeyId: seaweedfs.accessKeyId,
+        secretAccessKey: seaweedfs.secretAccessKey,
+      },
+      endpoint: seaweedfs.endpoint,
+      forcePathStyle: true,
+      region: seaweedfs.region,
+    });
+
+    const objectKey = "avatars/users/usr_test/tampered-avatar.webp";
+
+    try {
+      await objectStore.putObject({
+        Body: new TextEncoder().encode("tampered-presign"),
+        ContentType: "image/webp",
+        objectKey,
+      });
+
+      const presignedGetUrl = await objectStore.createPresignedGetUrl({
+        objectKey,
+        expiresInSeconds: 60,
+      });
+      const tamperedUrl = new URL(presignedGetUrl);
+      const signature = tamperedUrl.searchParams.get("X-Amz-Signature");
+
+      if (signature === null || signature.length === 0) {
+        throw new Error("Expected presigned GET URL to include X-Amz-Signature.");
+      }
+
+      tamperedUrl.searchParams.set(
+        "X-Amz-Signature",
+        `${signature.slice(0, -1)}${signature.endsWith("0") ? "1" : "0"}`,
+      );
+
+      const response = await fetch(tamperedUrl);
+
+      expect(response.ok).toBe(false);
+      expect(response.status).toBeGreaterThanOrEqual(400);
+    } finally {
+      objectStore.destroy();
+      await seaweedfs.stop();
+    }
+  }, 60_000);
 });
