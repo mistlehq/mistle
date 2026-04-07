@@ -9,6 +9,7 @@ import {
 } from "../sessions/session-connect-policy.js";
 import { getSandboxInstanceStatus } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
+import { TopLoadingBarQueryMeta } from "../shell/top-loading-bar-query-meta.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import {
   hasAutomationSessionPreparationTimedOut,
@@ -98,6 +99,9 @@ export function useSessionWorkbenchLifecycleState(input: {
 
   const sandboxStatusQuery = useQuery({
     queryKey: getSandboxInstanceStatusQueryKey(input.sandboxInstanceId),
+    meta: {
+      [TopLoadingBarQueryMeta.SUPPRESS]: true,
+    },
     queryFn: async ({ signal }) => {
       if (input.sandboxInstanceId === null) {
         throw new Error("Session id is required.");

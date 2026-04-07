@@ -3,6 +3,8 @@ import { useIsFetching, useIsMutating } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigation } from "react-router";
 
+import { TopLoadingBarQueryMeta } from "./top-loading-bar-query-meta.js";
+
 const TOP_LOADING_BAR_CONFIG = {
   initialProgressPercent: 6,
   maxInFlightProgressPercent: 92,
@@ -38,7 +40,9 @@ function usePrefersReducedMotion(): boolean {
 
 export function TopLoadingBar(): React.JSX.Element | null {
   const navigation = useNavigation();
-  const activeFetchCount = useIsFetching();
+  const activeFetchCount = useIsFetching({
+    predicate: (query) => query.options.meta?.[TopLoadingBarQueryMeta.SUPPRESS] !== true,
+  });
   const activeMutationCount = useIsMutating();
   const prefersReducedMotion = usePrefersReducedMotion();
   const hasActiveWork =

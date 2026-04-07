@@ -28,6 +28,18 @@ function QueryLoadingHarness(props: { promise: Promise<string> }): React.JSX.Ele
   return <TopLoadingBar />;
 }
 
+function SuppressedQueryLoadingHarness(props: { promise: Promise<string> }): React.JSX.Element {
+  useQuery({
+    queryKey: ["top-loading-bar-test", "suppressed"],
+    meta: {
+      suppressTopLoadingBar: true,
+    },
+    queryFn: async () => props.promise,
+  });
+
+  return <TopLoadingBar />;
+}
+
 function MutationLoadingHarness(props: { promise: Promise<string> }): React.JSX.Element {
   const mutation = useMutation({
     mutationFn: async () => props.promise,
@@ -104,6 +116,38 @@ describe("top-loading-bar", () => {
     await waitFor(() => {
       expect(screen.queryByRole("progressbar", { name: "Loading" })).toBeNull();
     });
+  });
+
+  it("does not render for queries that suppress top loading bar activity", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+    const pendingQuery = createDeferredPromise<string>();
+    const router = createMemoryRouter(
+      createRoutesFromElements(
+        <Route
+          element={<SuppressedQueryLoadingHarness promise={pendingQuery.promise} />}
+          path="/"
+        />,
+      ),
+      { initialEntries: ["/"] },
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("progressbar", { name: "Loading" })).toBeNull();
+    });
+
+    pendingQuery.resolve("ready");
   });
 
   it("renders during mutations and hides after the mutation resolves", async () => {
