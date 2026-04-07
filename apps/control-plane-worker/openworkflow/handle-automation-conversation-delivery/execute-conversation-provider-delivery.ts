@@ -172,10 +172,19 @@ export async function executeConversationProviderDelivery(
         );
     }
 
+    const conversationMetadata =
+      adapter.readConversationMetadata === undefined
+        ? undefined
+        : await adapter.readConversationMetadata({
+            connection,
+            providerConversationId,
+          });
+
     return {
       providerConversationId,
       providerExecutionId: executionUpdate.providerExecutionId,
       providerState: executionUpdate.providerState ?? createdConversationState,
+      ...(conversationMetadata === undefined ? {} : { conversationMetadata }),
     };
   } finally {
     await connection.close();

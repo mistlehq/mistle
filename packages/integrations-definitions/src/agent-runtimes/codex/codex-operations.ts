@@ -286,7 +286,13 @@ export async function steerCodexTurn(input: {
 export async function readCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
   threadId: string;
-}): Promise<{ threadId: string; turns: readonly CodexThreadReadTurn[]; response: unknown }> {
+}): Promise<{
+  threadId: string;
+  name: string | null;
+  preview: string | null;
+  turns: readonly CodexThreadReadTurn[];
+  response: unknown;
+}> {
   const response = await input.rpcClient.call("thread/read", {
     threadId: input.threadId,
     includeTurns: true,
@@ -301,6 +307,8 @@ export async function readCodexThread(input: {
 
   return {
     threadId: parsedResponse.data.thread.id,
+    name: parsedResponse.data.thread.name ?? null,
+    preview: parsedResponse.data.thread.preview ?? null,
     turns: (parsedResponse.data.thread.turns ?? []).map((turn) => ({
       id: turn.id,
       status: turn.status ?? null,
