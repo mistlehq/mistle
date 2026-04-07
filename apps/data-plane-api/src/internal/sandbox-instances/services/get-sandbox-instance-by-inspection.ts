@@ -6,6 +6,7 @@ import {
 } from "@mistle/db/data-plane";
 import {
   isSandboxResourceNotFoundError,
+  SandboxInspectDispositions,
   SandboxInspectStates,
   type SandboxAdapter,
   type SandboxProvider,
@@ -135,6 +136,41 @@ async function markRunningSandboxInstanceFailed(
   throw new Error("Failed to transition sandbox instance status from running to failed.");
 }
 
+async function markStoppedSandboxInstanceFailed(
+  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
+  input: {
+    sandboxInstanceId: string;
+    failureCode: string;
+    failureMessage: string;
+  },
+): Promise<void> {
+  const updatedRows = await ctx.db
+    .update(sandboxInstances)
+    .set({
+      status: SandboxInstanceStatuses.FAILED,
+      stopReason: SandboxStopReasons.FAILED,
+      failedAt: sql`now()`,
+      failureCode: input.failureCode,
+      failureMessage: input.failureMessage,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(sandboxInstances.id, input.sandboxInstanceId),
+        eq(sandboxInstances.status, SandboxInstanceStatuses.STOPPED),
+      ),
+    )
+    .returning({
+      status: sandboxInstances.status,
+    });
+
+  if (updatedRows[0]?.status === SandboxInstanceStatuses.FAILED) {
+    return;
+  }
+
+  throw new Error("Failed to transition sandbox instance status from stopped to failed.");
+}
+
 async function inspectStartingSandboxInstance(
   ctx: GetSandboxInstanceByInspectionContext,
   sandboxInstance: {
@@ -220,6 +256,68 @@ function readPendingSandboxInstance(sandboxInstance: {
     status: SandboxInstanceStatuses.PENDING,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
+    runtimePlan: null,
+  };
+}
+
+async function inspectStoppedSandboxInstance(
+  ctx: GetSandboxInstanceByInspectionContext,
+  sandboxInstance: {
+    id: string;
+    title: string | null;
+    providerSandboxId: string | null;
+    failureCode: string | null;
+    failureMessage: string | null;
+  },
+): Promise<NonNullable<GetSandboxInstanceResponse>> {
+  if (sandboxInstance.providerSandboxId === null) {
+    throw new Error(
+      `Expected stopped sandbox instance '${sandboxInstance.id}' to have a providerSandboxId.`,
+    );
+  }
+
+  const inspection = await inspectSandboxInstanceOrNull(ctx, sandboxInstance.providerSandboxId);
+  if (inspection === null) {
+    await markStoppedSandboxInstanceFailed(ctx, {
+      sandboxInstanceId: sandboxInstance.id,
+      failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
+      failureMessage: "Sandbox runtime was not found at the provider during inspection.",
+    });
+    return {
+      id: sandboxInstance.id,
+      title: sandboxInstance.title,
+      status: SandboxInstanceStatuses.FAILED,
+      failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
+      failureMessage: "Sandbox runtime was not found at the provider during inspection.",
+      runtimePlan: null,
+    };
+  }
+
+  if (
+    inspection.disposition === SandboxInspectDispositions.RESUMABLE_STOPPED ||
+    inspection.disposition === SandboxInspectDispositions.ACTIVE
+  ) {
+    return {
+      id: sandboxInstance.id,
+      title: sandboxInstance.title,
+      status: SandboxInstanceStatuses.STOPPED,
+      failureCode: sandboxInstance.failureCode,
+      failureMessage: sandboxInstance.failureMessage,
+      runtimePlan: null,
+    };
+  }
+
+  await markStoppedSandboxInstanceFailed(ctx, {
+    sandboxInstanceId: sandboxInstance.id,
+    failureCode: "provider_runtime_not_resumable",
+    failureMessage: "Sandbox runtime was not resumable at the provider during inspection.",
+  });
+  return {
+    id: sandboxInstance.id,
+    title: sandboxInstance.title,
+    status: SandboxInstanceStatuses.FAILED,
+    failureCode: "provider_runtime_not_resumable",
+    failureMessage: "Sandbox runtime was not resumable at the provider during inspection.",
     runtimePlan: null,
   };
 }
@@ -345,14 +443,7 @@ export async function getSandboxInstanceByInspection(
         runtimePlan: null,
       };
     case SandboxInstanceStatuses.STOPPED:
-      return {
-        id: sandboxInstance.id,
-        title: sandboxInstance.title,
-        status: SandboxInstanceStatuses.STOPPED,
-        failureCode: sandboxInstance.failureCode,
-        failureMessage: sandboxInstance.failureMessage,
-        runtimePlan: null,
-      };
+      return inspectStoppedSandboxInstance(ctx, sandboxInstance);
     case SandboxInstanceStatuses.PENDING:
       return readPendingSandboxInstance(sandboxInstance);
     case SandboxInstanceStatuses.STARTING: {
