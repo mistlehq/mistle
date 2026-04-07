@@ -1,4 +1,4 @@
-export function resolveSignedImageRefetchInterval(input: {
+function resolveSignedImageRefreshMs(input: {
   refreshAfterSeconds: number | null | undefined;
 }): false | number {
   if (input.refreshAfterSeconds === undefined || input.refreshAfterSeconds === null) {
@@ -10,4 +10,17 @@ export function resolveSignedImageRefetchInterval(input: {
   }
 
   return input.refreshAfterSeconds * 1000;
+}
+
+export function resolveSignedImageRefetchInterval(input: {
+  refreshAfterSeconds: number | null | undefined;
+}): false | number {
+  return resolveSignedImageRefreshMs(input);
+}
+
+export function resolveSignedImageStaleTime(input: {
+  refreshAfterSeconds: number | null | undefined;
+}): number {
+  const refreshMs = resolveSignedImageRefreshMs(input);
+  return refreshMs === false ? Number.POSITIVE_INFINITY : refreshMs;
 }

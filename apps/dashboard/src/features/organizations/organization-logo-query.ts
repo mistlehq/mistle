@@ -1,7 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getOrganizationLogo } from "../settings/organization/organization-logo-service.js";
-import { resolveSignedImageRefetchInterval } from "../shared/signed-image-query-policy.js";
+import {
+  resolveSignedImageRefetchInterval,
+  resolveSignedImageStaleTime,
+} from "../shared/signed-image-query-policy.js";
 
 const ORGANIZATION_LOGO_QUERY_KEY_PREFIX: readonly ["organization", "logo"] = [
   "organization",
@@ -25,7 +28,10 @@ export function useOrganizationLogoQuery(organizationId: string) {
       getOrganizationLogo({
         organizationId,
       }),
-    staleTime: 0,
+    staleTime: (query) =>
+      resolveSignedImageStaleTime({
+        refreshAfterSeconds: query.state.data?.refreshAfterSeconds,
+      }),
     refetchInterval: (query) =>
       resolveSignedImageRefetchInterval({
         refreshAfterSeconds: query.state.data?.refreshAfterSeconds,
