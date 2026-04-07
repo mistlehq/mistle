@@ -37,7 +37,7 @@ jobs:
           filters: |
             ts:
               - '.github/workflows/ci.yml'
-              - '.github/workflows/ci-daily-integration.yml'
+              - '.github/workflows/ci-scheduled-integration.yml'
               - '.envrc'
               - 'apps/**'
               - 'packages/**'
@@ -53,7 +53,7 @@ jobs:
               - '!packages/sandboxd/**'
             rust:
               - '.github/workflows/ci.yml'
-              - '.github/workflows/ci-daily-integration.yml'
+              - '.github/workflows/ci-scheduled-integration.yml'
               - '.envrc'
               - 'packages/sandboxd/**'
               - 'packages/sandbox-runtime-contract/**'
@@ -71,7 +71,7 @@ jobs:
               - 'tsconfig.base.json'
             sandbox_base_linux:
               - '.github/workflows/ci.yml'
-              - '.github/workflows/ci-daily-integration.yml'
+              - '.github/workflows/ci-scheduled-integration.yml'
               - '.dockerignore'
               - 'packages/sandboxd/**'
               - 'packages/sandboxd/Dockerfile'

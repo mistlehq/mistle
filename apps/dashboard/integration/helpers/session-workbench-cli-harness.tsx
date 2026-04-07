@@ -688,7 +688,9 @@ function createWorkbenchRequestHandler(
       response.end(
         JSON.stringify({
           id: statusSandboxInstanceId,
+          title: "CLI Test Session",
           status: "running",
+          connectable: true,
           failureCode: null,
           failureMessage: null,
           runtimePlan: null,

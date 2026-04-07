@@ -1,8 +1,10 @@
-name: CI - Integration (Daily)
+name: CI - Integration (Scheduled)
 
 on:
   schedule:
     - cron: "0 0 * * *"
+    - cron: "0 6 * * *"
+    - cron: "0 10 * * *"
   workflow_dispatch:
 
 permissions:
@@ -10,12 +12,12 @@ permissions:
   id-token: write
 
 concurrency:
-  group: daily-integration-${{ github.ref }}
+  group: scheduled-integration-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   integration:
-    name: Daily Integration
+    name: Scheduled Integration
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -72,7 +74,7 @@ jobs:
       - name: Generate integration config
         run: nix develop --command pnpm run config:init:integration
 
-      - name: Run daily integration suite in Nix shell
+      - name: Run scheduled integration suite in Nix shell
         env:
           MISTLE_CONFIG_PATH: ${{ github.workspace }}/config/config.integration.docker.toml
         run: nix develop --command pnpm test:integration
@@ -158,7 +160,7 @@ jobs:
                       "color": color,
                       "title": os.environ["WORKFLOW_NAME"],
                       "title_link": os.environ["RUN_URL"],
-                      "text": f"{emoji} Daily integration run finished with result: {result}.",
+              "text": f"{emoji} Scheduled integration run finished with result: {result}.",
                       "fields": [
                           {
                               "title": "Repository",
