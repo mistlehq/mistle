@@ -372,8 +372,6 @@ export function SessionsPage(): React.JSX.Element {
           optimisticSessionCount: optimisticSessions.length,
         });
 
-  const optimisticSessionIds = new Set(optimisticSessions.map((session) => session.id));
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-4">
@@ -495,9 +493,6 @@ export function SessionsPage(): React.JSX.Element {
                           <span className="text-muted-foreground text-xs break-words">
                             {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
                           </span>
-                          {optimisticSessionIds.has(session.id) ? (
-                            <span className="text-muted-foreground text-xs">Launching locally</span>
-                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell className="text-sm whitespace-normal">
