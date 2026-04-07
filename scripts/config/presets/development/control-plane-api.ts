@@ -14,6 +14,14 @@ export const controlPlaneApiDevelopmentPreset = {
           url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_dev",
           migration_url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_dev",
         },
+        object_store: {
+          bucket_name: "mistle-assets",
+          region: "us-east-1",
+          endpoint: "http://127.0.0.1:8333",
+          force_path_style: true,
+          access_key_id: "mistle-access-key",
+          secret_access_key: "mistle-secret-key",
+        },
         auth: {
           base_url: "http://localhost:5100",
           trusted_origins: [
