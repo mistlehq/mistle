@@ -59,17 +59,14 @@ export function OrganizationGeneralSettingsPageView(
           <SettingsImageField
             alt={`${props.name} logo`}
             busy={props.logoBusy}
-            busyAnnouncement="Updating organization logo"
-            editLabel="Edit organization logo"
             errorMessage={props.logoErrorMessage}
             fallbackInitial="O"
             imageUrl={props.logoUrl}
+            imageName="organization logo"
             label="Logo"
             name={props.name}
             onDelete={props.onDeleteLogo}
             onUpload={props.onUploadLogo}
-            removeLabel="Remove organization logo"
-            uploadLabel="Upload organization logo"
           />
           <AutoSaveTextField
             disabled={props.isSaving}

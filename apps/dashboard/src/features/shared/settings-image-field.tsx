@@ -18,22 +18,23 @@ import { deriveInitials } from "./derive-initials.js";
 export type SettingsImageFieldProps = {
   alt: string;
   busy: boolean;
-  busyAnnouncement: string;
-  editLabel: string;
   errorMessage: string | null;
   fallbackInitial: string;
   imageUrl: string | null;
+  imageName: string;
   label: string;
   name: string;
   onDelete: () => Promise<void>;
   onUpload: (file: File) => Promise<void>;
-  removeLabel: string;
-  uploadLabel: string;
 };
 
 export function SettingsImageField(props: SettingsImageFieldProps): React.JSX.Element {
   const fileInputId = useId();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadLabel = `Upload ${props.imageName}`;
+  const editLabel = `Edit ${props.imageName}`;
+  const removeLabel = `Remove ${props.imageName}`;
+  const busyAnnouncement = `Updating ${props.imageName}`;
 
   return (
     <Field contentWidth="fill" orientation="horizontal">
@@ -60,7 +61,7 @@ export function SettingsImageField(props: SettingsImageFieldProps): React.JSX.El
         />
         <div className="flex items-center gap-2">
           <button
-            aria-label={props.imageUrl === null ? props.uploadLabel : props.editLabel}
+            aria-label={props.imageUrl === null ? uploadLabel : editLabel}
             className="group relative rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             disabled={props.busy}
             onClick={() => {
@@ -90,7 +91,7 @@ export function SettingsImageField(props: SettingsImageFieldProps): React.JSX.El
               )}
             >
               {props.busy ? (
-                <Spinner aria-label={props.busyAnnouncement} className="size-4 text-white" />
+                <Spinner aria-label={busyAnnouncement} className="size-4 text-white" />
               ) : (
                 <PencilSimpleIcon aria-hidden className="size-4 text-white" weight="fill" />
               )}
@@ -98,7 +99,7 @@ export function SettingsImageField(props: SettingsImageFieldProps): React.JSX.El
           </button>
           {props.imageUrl === null ? null : (
             <Button
-              aria-label={props.removeLabel}
+              aria-label={removeLabel}
               className="h-10 w-10 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
               disabled={props.busy}
               onClick={() => {
@@ -112,7 +113,7 @@ export function SettingsImageField(props: SettingsImageFieldProps): React.JSX.El
           )}
         </div>
         <label className="sr-only" htmlFor={fileInputId}>
-          {props.uploadLabel}
+          {uploadLabel}
         </label>
         {props.errorMessage === null ? null : (
           <p className="text-destructive max-w-44 text-right text-xs leading-normal">
@@ -120,7 +121,7 @@ export function SettingsImageField(props: SettingsImageFieldProps): React.JSX.El
           </p>
         )}
         <div aria-live="polite" className="sr-only" role="status">
-          {props.busy ? props.busyAnnouncement : ""}
+          {props.busy ? busyAnnouncement : ""}
         </div>
       </FieldContent>
     </Field>
