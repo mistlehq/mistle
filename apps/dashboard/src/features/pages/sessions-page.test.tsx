@@ -117,7 +117,7 @@ describe("SessionsPage", () => {
     expect(optimisticSessions).toStrictEqual([
       {
         id: "sbi_optimistic",
-        conversationTitle: null,
+        title: null,
         sandboxProfileId: "sbp_profile_alpha",
         sandboxProfileDisplayName: "Alpha Profile",
         sandboxProfileVersion: 3,
@@ -215,7 +215,7 @@ describe("SessionsPage", () => {
       items: [
         buildSandboxInstanceListItemFixture({
           id: "sbi_123",
-          conversationTitle: "Single session",
+          title: "Single session",
           sandboxProfileDisplayName: "Profile metadata",
         }),
       ],
@@ -239,7 +239,7 @@ describe("SessionsPage", () => {
     });
     seedSessionsList({
       queryClient,
-      items: [buildSandboxInstanceListItemFixture({ id: "sbi_untitled", conversationTitle: null })],
+      items: [buildSandboxInstanceListItemFixture({ id: "sbi_untitled", title: null })],
     });
 
     renderSessionsPage({
