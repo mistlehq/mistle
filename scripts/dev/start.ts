@@ -348,7 +348,7 @@ function dockerImageExists(imageTag: string): boolean {
 
 function start(): void {
   console.log(
-    "Starting local infra dependencies (Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM, tokenizer relay, gateway relay)...",
+    "Starting local infra dependencies (SeaweedFS, Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM, tokenizer relay, gateway relay)...",
   );
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const dataPlaneGatewayLocalPort = readDataPlaneGatewayLocalPort(DEV_CONFIG_PATH);
@@ -388,6 +388,7 @@ function start(): void {
       "up",
       "-d",
       "--wait",
+      "seaweedfs",
       "postgres",
       "pgbouncer",
       "mailpit",
@@ -397,6 +398,13 @@ function start(): void {
       "tokenizer-proxy-relay",
       "data-plane-gateway-relay",
     ],
+    env: sharedDevEnv,
+  });
+
+  console.log("Ensuring control-plane object-store bucket exists...");
+  runOrThrow({
+    command: "docker",
+    args: ["compose", "-f", DEV_COMPOSE_PATH, "run", "--rm", "seaweedfs-init"],
     env: sharedDevEnv,
   });
 
