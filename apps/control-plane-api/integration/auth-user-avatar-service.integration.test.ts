@@ -1,11 +1,11 @@
 import { users } from "@mistle/db/control-plane";
-import { S3CompatibleObjectStore } from "@mistle/object-store";
 import { startSeaweedfsS3 } from "@mistle/test-harness";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { describe, expect } from "vitest";
 
 import { putUserAvatar } from "../src/auth/services/put-user-avatar.js";
+import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test-object-store.js";
 import { it } from "./test-context.js";
 
 describe("user avatar service integration", () => {
@@ -18,7 +18,7 @@ describe("user avatar service integration", () => {
     const seaweedfs = await startSeaweedfsS3({
       bucketName: "mistle-assets",
     });
-    const objectStore = createObjectStore(seaweedfs);
+    const objectStore = createTestObjectStore(seaweedfs);
 
     await fixture.db
       .update(users)
@@ -101,26 +101,12 @@ describe("user avatar service integration", () => {
     const seaweedfs = await startSeaweedfsS3({
       bucketName: "mistle-assets",
     });
-    const objectStore = createObjectStore(seaweedfs);
+    const objectStore = createTestObjectStore(seaweedfs);
     const previousObjectKey = `avatars/users/${authenticatedSession.userId}/img_previous.webp`;
 
     try {
       await objectStore.putObject({
-        Body: await sharp({
-          create: {
-            width: 64,
-            height: 64,
-            channels: 4,
-            background: {
-              r: 240,
-              g: 180,
-              b: 20,
-              alpha: 1,
-            },
-          },
-        })
-          .webp()
-          .toBuffer(),
+        Body: await getStoredWebpFixtureBytes(),
         ContentType: "image/webp",
         objectKey: previousObjectKey,
       });
@@ -174,16 +160,3 @@ describe("user avatar service integration", () => {
     }
   });
 });
-
-function createObjectStore(seaweedfs: Awaited<ReturnType<typeof startSeaweedfsS3>>) {
-  return new S3CompatibleObjectStore({
-    bucketName: seaweedfs.bucketName,
-    credentials: {
-      accessKeyId: seaweedfs.accessKeyId,
-      secretAccessKey: seaweedfs.secretAccessKey,
-    },
-    endpoint: seaweedfs.endpoint,
-    forcePathStyle: true,
-    region: seaweedfs.region,
-  });
-}

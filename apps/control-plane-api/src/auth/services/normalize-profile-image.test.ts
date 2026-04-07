@@ -1,10 +1,10 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
-import { normalizeUserAvatarImage } from "./user-avatar-image.js";
+import { normalizeProfileImage } from "./normalize-profile-image.js";
 
-describe("normalizeUserAvatarImage", () => {
-  it("converts a wide JPEG into a square WebP avatar without upscaling", async () => {
+describe("normalizeProfileImage", () => {
+  it("converts a wide JPEG into a square WebP image without upscaling", async () => {
     const jpegBuffer = await sharp({
       create: {
         width: 900,
@@ -20,7 +20,7 @@ describe("normalizeUserAvatarImage", () => {
       .jpeg()
       .toBuffer();
 
-    const normalized = await normalizeUserAvatarImage({
+    const normalized = await normalizeProfileImage({
       imageBytes: new Uint8Array(jpegBuffer),
     });
 
@@ -52,7 +52,7 @@ describe("normalizeUserAvatarImage", () => {
       .png()
       .toBuffer();
 
-    const normalized = await normalizeUserAvatarImage({
+    const normalized = await normalizeProfileImage({
       imageBytes: new Uint8Array(pngBuffer),
     });
 
@@ -62,7 +62,7 @@ describe("normalizeUserAvatarImage", () => {
 
   it("rejects unsupported image bytes", async () => {
     await expect(
-      normalizeUserAvatarImage({
+      normalizeProfileImage({
         imageBytes: new TextEncoder().encode("not-an-image"),
       }),
     ).rejects.toMatchObject({
