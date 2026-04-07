@@ -24,6 +24,7 @@ use hyper::header::{HOST, HeaderName, HeaderValue};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode, Uri};
+use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::{TokioExecutor, TokioIo};
@@ -65,6 +66,7 @@ const MANAGED_PROXY_ENV_KEYS: [&str; 15] = [
 ];
 
 type HyperBody = Full<Bytes>;
+type EgressConnector = HttpsConnector<HttpConnector>;
 
 #[derive(Debug)]
 pub struct EgressProxy {
@@ -92,10 +94,17 @@ struct EgressProxyRoute {
 struct EgressProxyState {
     tokenizer_proxy_egress_base_url: String,
     routes: Arc<Vec<EgressProxyRoute>>,
-    client: Client<HttpConnector, HyperBody>,
+    client: Client<EgressConnector, HyperBody>,
     proxy_ca_certificate_pem: Arc<String>,
     proxy_ca_private_key_pem: Arc<String>,
     clock: Arc<dyn Clock>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RequestTarget {
+    authority: String,
+    host: String,
+    uri: Uri,
 }
 
 impl EgressProxyError {
@@ -134,37 +143,55 @@ impl EgressProxy {
         prepare_proxy_directory(Path::new(RUNTIME_PROXY_DIRECTORY))?;
         let generated_proxy_ca = generate_proxy_ca(clock.as_ref())
             .map_err(|error| EgressProxyError::new(error.to_string()))?;
-        fs::write(RUNTIME_PROXY_CA_CERT_PATH, generated_proxy_ca.certificate_pem.as_bytes())
-            .map_err(|error| {
-                EgressProxyError::new(format!(
-                    "failed to write local egress proxy certificate '{}': {error}",
-                    RUNTIME_PROXY_CA_CERT_PATH
-                ))
-            })?;
+        fs::write(
+            RUNTIME_PROXY_CA_CERT_PATH,
+            generated_proxy_ca.certificate_pem.as_bytes(),
+        )
+        .map_err(|error| {
+            EgressProxyError::new(format!(
+                "failed to write local egress proxy certificate '{}': {error}",
+                RUNTIME_PROXY_CA_CERT_PATH
+            ))
+        })?;
 
         let std_listener = StdTcpListener::bind((LOOPBACK_PROXY_HOST, 0)).map_err(|error| {
-            EgressProxyError::new(format!("failed to bind local egress proxy listener: {error}"))
+            EgressProxyError::new(format!(
+                "failed to bind local egress proxy listener: {error}"
+            ))
         })?;
-        std_listener
-            .set_nonblocking(true)
-            .map_err(|error| EgressProxyError::new(format!("failed to configure proxy listener: {error}")))?;
+        std_listener.set_nonblocking(true).map_err(|error| {
+            EgressProxyError::new(format!("failed to configure proxy listener: {error}"))
+        })?;
         let listener_address = std_listener.local_addr().map_err(|error| {
-            EgressProxyError::new(format!("failed to inspect local egress proxy address: {error}"))
+            EgressProxyError::new(format!(
+                "failed to inspect local egress proxy address: {error}"
+            ))
         })?;
 
         let mut http_connector = HttpConnector::new();
         http_connector.enforce_http(false);
+        let https_connector = HttpsConnectorBuilder::new()
+            .with_native_roots()
+            .map_err(|error| {
+                EgressProxyError::new(format!(
+                    "failed to load system certificate roots for local egress proxy: {error}"
+                ))
+            })?
+            .https_or_http()
+            .enable_http1()
+            .wrap_connector(http_connector);
         let state = EgressProxyState {
             tokenizer_proxy_egress_base_url: tokenizer_proxy_egress_base_url.to_string(),
             routes: Arc::new(routes),
-            client: Client::builder(TokioExecutor::new()).build(http_connector),
+            client: Client::builder(TokioExecutor::new()).build(https_connector),
             proxy_ca_certificate_pem: Arc::new(generated_proxy_ca.certificate_pem.clone()),
             proxy_ca_private_key_pem: Arc::new(generated_proxy_ca.private_key_pem),
             clock,
         };
 
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        let server_thread = thread::spawn(move || run_proxy_server(std_listener, shutdown_rx, state));
+        let server_thread =
+            thread::spawn(move || run_proxy_server(std_listener, shutdown_rx, state));
 
         let runtime_env = build_managed_proxy_env(
             listener_address,
@@ -197,11 +224,7 @@ impl EgressProxy {
             match server_thread.join() {
                 Ok(Ok(())) => {}
                 Ok(Err(error)) => return Err(error),
-                Err(_) => {
-                    return Err(EgressProxyError::new(
-                        "local egress proxy thread panicked",
-                    ))
-                }
+                Err(_) => return Err(EgressProxyError::new("local egress proxy thread panicked")),
             }
         }
 
@@ -212,7 +235,7 @@ impl EgressProxy {
                 return Err(EgressProxyError::new(format!(
                     "failed to remove local egress proxy certificate '{}': {error}",
                     self.ca_certificate_path.display()
-                )))
+                )));
             }
         }
 
@@ -255,11 +278,12 @@ fn build_proxy_route(
             .path_prefixes
             .clone()
             .unwrap_or_else(|| vec!["/".to_string()]),
-        methods: route
-            .r#match
-            .methods
-            .clone()
-            .map(|methods| methods.into_iter().map(|method| method.to_ascii_uppercase()).collect()),
+        methods: route.r#match.methods.clone().map(|methods| {
+            methods
+                .into_iter()
+                .map(|method| method.to_ascii_uppercase())
+                .collect()
+        }),
         grant,
     })
 }
@@ -303,9 +327,7 @@ fn build_managed_proxy_env(
     ]))
 }
 
-fn build_no_proxy_value(
-    tokenizer_proxy_egress_base_url: &str,
-) -> Result<String, EgressProxyError> {
+fn build_no_proxy_value(tokenizer_proxy_egress_base_url: &str) -> Result<String, EgressProxyError> {
     let tokenizer_proxy_url =
         url::Url::parse(tokenizer_proxy_egress_base_url).map_err(|error| {
             EgressProxyError::new(format!(
@@ -339,7 +361,9 @@ fn run_proxy_server(
         .enable_all()
         .build()
         .map_err(|error| {
-            EgressProxyError::new(format!("failed to start local egress proxy runtime: {error}"))
+            EgressProxyError::new(format!(
+                "failed to start local egress proxy runtime: {error}"
+            ))
         })?;
 
     runtime.block_on(async move {
@@ -370,24 +394,33 @@ fn run_proxy_server(
 async fn handle_proxy_request(
     request: Request<Incoming>,
     state: EgressProxyState,
-    tunneled_host: Option<String>,
+    tunneled_authority: Option<String>,
 ) -> Result<Response<HyperBody>, Infallible> {
     if request.method() == Method::CONNECT {
         return Ok(handle_connect_request(request, state));
     }
 
-    Ok(match forward_request(request, state, tunneled_host).await {
-        Ok(response) => response,
-        Err(error) => text_response(StatusCode::BAD_GATEWAY, error.to_string()),
-    })
+    Ok(
+        match forward_request(request, state, tunneled_authority).await {
+            Ok(response) => response,
+            Err(error) => text_response(StatusCode::BAD_GATEWAY, error.to_string()),
+        },
+    )
 }
 
 fn handle_connect_request(
     request: Request<Incoming>,
     state: EgressProxyState,
 ) -> Response<HyperBody> {
-    let Some(authority) = request.uri().authority().map(|authority| authority.as_str().to_string()) else {
-        return text_response(StatusCode::BAD_REQUEST, "CONNECT requests must include a target authority");
+    let Some(authority) = request
+        .uri()
+        .authority()
+        .map(|authority| authority.as_str().to_string())
+    else {
+        return text_response(
+            StatusCode::BAD_REQUEST,
+            "CONNECT requests must include a target authority",
+        );
     };
 
     tokio::spawn(async move {
@@ -405,9 +438,8 @@ fn handle_connect_request(
         let Ok(tls_stream) = tls_acceptor.accept(TokioIo::new(upgraded)).await else {
             return;
         };
-        let tunneled_host = normalize_authority_host(&authority);
         let service = service_fn(move |request| {
-            handle_proxy_request(request, state.clone(), Some(tunneled_host.clone()))
+            handle_proxy_request(request, state.clone(), Some(authority.clone()))
         });
         let _ = http1::Builder::new()
             .serve_connection(TokioIo::new(tls_stream), service)
@@ -423,58 +455,78 @@ fn handle_connect_request(
 async fn forward_request(
     request: Request<Incoming>,
     state: EgressProxyState,
-    tunneled_host: Option<String>,
+    tunneled_authority: Option<String>,
 ) -> Result<Response<HyperBody>, EgressProxyError> {
     let (parts, body) = request.into_parts();
     let request_method = parts.method.clone();
-    let request_host = resolve_request_host(&parts, tunneled_host.as_deref())?;
-    let request_path_and_query = parts
+    let request_target = resolve_request_target(&parts, tunneled_authority.as_deref())?;
+    let request_path_and_query = request_target
         .uri
         .path_and_query()
         .map_or("/", |path_and_query| path_and_query.as_str());
     let route = match_route(
         &state.routes,
-        &request_host,
+        &request_target.host,
         request_path_and_query,
         request_method.as_str(),
-    )?;
-    let forward_uri = build_tokenizer_proxy_forward_uri(
-        &state.tokenizer_proxy_egress_base_url,
-        request_path_and_query,
     )?;
     let request_body = body
         .collect()
         .await
-        .map_err(|error| EgressProxyError::new(format!("failed to read proxied request body: {error}")))?
+        .map_err(|error| {
+            EgressProxyError::new(format!("failed to read proxied request body: {error}"))
+        })?
         .to_bytes();
 
-    let mut outbound_request = Request::builder()
-        .method(request_method)
-        .uri(forward_uri);
+    let mut outbound_request = Request::builder().method(request_method).uri(match route {
+        Some(_) => build_tokenizer_proxy_forward_uri(
+            &state.tokenizer_proxy_egress_base_url,
+            request_path_and_query,
+        )?,
+        None => request_target.uri.clone(),
+    });
     for (header_name, header_value) in filter_outbound_request_headers(&parts.headers) {
         outbound_request = outbound_request.header(header_name, header_value);
     }
-    let outbound_request = outbound_request
-        .header(TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME, route.grant.as_str())
-        .body(Full::new(request_body))
-        .map_err(|error| EgressProxyError::new(format!("failed to build proxied request: {error}")))?;
+    let outbound_request = match route {
+        Some(route) => outbound_request
+            .header(
+                TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME,
+                route.grant.as_str(),
+            )
+            .body(Full::new(request_body))
+            .map_err(|error| {
+                EgressProxyError::new(format!("failed to build proxied request: {error}"))
+            })?,
+        None => outbound_request
+            .body(Full::new(request_body))
+            .map_err(|error| {
+                EgressProxyError::new(format!("failed to build direct proxied request: {error}"))
+            })?,
+    };
 
     let upstream_response = state
         .client
         .request(outbound_request)
         .await
-        .map_err(|error| {
-            EgressProxyError::new(format!(
+        .map_err(|error| match route {
+            Some(route) => EgressProxyError::new(format!(
                 "failed to forward request for '{}' through tokenizer-proxy route '{}': {error}",
                 route.host, route.upstream_base_url
-            ))
+            )),
+            None => EgressProxyError::new(format!(
+                "failed to forward proxied request directly to '{}': {error}",
+                request_target.authority
+            )),
         })?;
 
     let (parts, body) = upstream_response.into_parts();
     let response_body = body
         .collect()
         .await
-        .map_err(|error| EgressProxyError::new(format!("failed to read proxied response body: {error}")))?
+        .map_err(|error| {
+            EgressProxyError::new(format!("failed to read proxied response body: {error}"))
+        })?
         .to_bytes();
     let mut response_builder = Response::builder().status(parts.status);
     for (header_name, header_value) in filter_outbound_response_headers(&parts.headers) {
@@ -483,29 +535,68 @@ async fn forward_request(
 
     response_builder
         .body(Full::new(response_body))
-        .map_err(|error| EgressProxyError::new(format!("failed to build proxied response: {error}")))
+        .map_err(|error| {
+            EgressProxyError::new(format!("failed to build proxied response: {error}"))
+        })
 }
 
-fn resolve_request_host(
+fn resolve_request_target(
     request: &hyper::http::request::Parts,
-    tunneled_host: Option<&str>,
-) -> Result<String, EgressProxyError> {
-    if let Some(tunneled_host) = tunneled_host {
-        return Ok(tunneled_host.to_string());
-    }
+    tunneled_authority: Option<&str>,
+) -> Result<RequestTarget, EgressProxyError> {
+    let authority = match tunneled_authority {
+        Some(tunneled_authority) => tunneled_authority.to_string(),
+        None => {
+            if let Some(authority) = request.uri.authority() {
+                authority.as_str().to_string()
+            } else if let Some(host) = request.headers.get(HOST) {
+                host.to_str()
+                    .map(|value| value.to_string())
+                    .map_err(|error| {
+                        EgressProxyError::new(format!(
+                            "proxied request host header is invalid: {error}"
+                        ))
+                    })?
+            } else {
+                return Err(EgressProxyError::new("proxied request is missing a host"));
+            }
+        }
+    };
+    let scheme = if tunneled_authority.is_some() {
+        "https"
+    } else {
+        request.uri.scheme_str().unwrap_or("http")
+    };
+    let uri = match (
+        request.uri.scheme(),
+        request.uri.authority(),
+        tunneled_authority,
+    ) {
+        (Some(_), Some(_), None) => request.uri.clone(),
+        _ => build_direct_forward_uri(scheme, &authority, request.uri.path_and_query())?,
+    };
 
-    if let Some(host) = request.uri.host() {
-        return Ok(host.to_string());
-    }
+    Ok(RequestTarget {
+        host: normalize_authority_host(&authority),
+        authority,
+        uri,
+    })
+}
 
-    let host_header = request
-        .headers
-        .get(HOST)
-        .ok_or_else(|| EgressProxyError::new("proxied request is missing a host"))?
-        .to_str()
-        .map_err(|error| EgressProxyError::new(format!("proxied request host header is invalid: {error}")))?;
+fn build_direct_forward_uri(
+    scheme: &str,
+    authority: &str,
+    path_and_query: Option<&hyper::http::uri::PathAndQuery>,
+) -> Result<Uri, EgressProxyError> {
+    let path_and_query = path_and_query.map_or("/", |path_and_query| path_and_query.as_str());
 
-    Ok(normalize_authority_host(host_header))
+    format!("{scheme}://{authority}{path_and_query}")
+        .parse()
+        .map_err(|error| {
+            EgressProxyError::new(format!(
+                "failed to build direct forward uri for '{scheme}://{authority}{path_and_query}': {error}"
+            ))
+        })
 }
 
 fn normalize_authority_host(authority: &str) -> String {
@@ -514,7 +605,11 @@ fn normalize_authority_host(authority: &str) -> String {
         .strip_prefix('[')
         .and_then(|authority| authority.split_once(']'))
         .map_or_else(
-            || authority.split_once(':').map_or_else(|| authority.to_string(), |(host, _)| host.to_string()),
+            || {
+                authority
+                    .split_once(':')
+                    .map_or_else(|| authority.to_string(), |(host, _)| host.to_string())
+            },
             |(host, _)| host.to_string(),
         )
 }
@@ -524,12 +619,15 @@ fn match_route<'a>(
     host: &str,
     path: &str,
     method: &str,
-) -> Result<&'a EgressProxyRoute, EgressProxyError> {
+) -> Result<Option<&'a EgressProxyRoute>, EgressProxyError> {
     let matching_routes = routes
         .iter()
         .filter(|route| {
             route.host == host
-                && route.path_prefixes.iter().any(|path_prefix| path.starts_with(path_prefix))
+                && route
+                    .path_prefixes
+                    .iter()
+                    .any(|path_prefix| path.starts_with(path_prefix))
                 && route
                     .methods
                     .as_ref()
@@ -537,13 +635,13 @@ fn match_route<'a>(
         })
         .collect::<Vec<_>>();
 
-    let [route] = matching_routes.as_slice() else {
-        return Err(EgressProxyError::new(format!(
-            "no sandbox egress route matched proxied request {method} {host}{path}"
-        )));
-    };
-
-    Ok(*route)
+    match matching_routes.as_slice() {
+        [] => Ok(None),
+        [route] => Ok(Some(*route)),
+        _ => Err(EgressProxyError::new(format!(
+            "multiple sandbox egress routes matched proxied request {method} {host}{path}"
+        ))),
+    }
 }
 
 fn build_tokenizer_proxy_forward_uri(
@@ -556,7 +654,11 @@ fn build_tokenizer_proxy_forward_uri(
         ))
     })?;
     let path_and_query_url = url::Url::parse(&format!("http://proxy.internal{path_and_query}"))
-        .map_err(|error| EgressProxyError::new(format!("proxied request target '{path_and_query}' is invalid: {error}")))?;
+        .map_err(|error| {
+            EgressProxyError::new(format!(
+                "proxied request target '{path_and_query}' is invalid: {error}"
+            ))
+        })?;
     tokenizer_proxy_url.set_path(&join_url_path(
         tokenizer_proxy_url.path(),
         path_and_query_url.path(),
@@ -564,10 +666,11 @@ fn build_tokenizer_proxy_forward_uri(
     tokenizer_proxy_url.set_query(path_and_query_url.query());
     tokenizer_proxy_url.set_fragment(None);
 
-    tokenizer_proxy_url
-        .to_string()
-        .parse()
-        .map_err(|error| EgressProxyError::new(format!("failed to build tokenizer-proxy forward uri: {error}")))
+    tokenizer_proxy_url.to_string().parse().map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to build tokenizer-proxy forward uri: {error}"
+        ))
+    })
 }
 
 fn join_url_path(base_path: &str, suffix_path: &str) -> String {
@@ -589,7 +692,9 @@ fn join_url_path(base_path: &str, suffix_path: &str) -> String {
     format!("{normalized_base_path}/{normalized_suffix_path}")
 }
 
-fn filter_outbound_request_headers(headers: &hyper::HeaderMap<HeaderValue>) -> Vec<(HeaderName, HeaderValue)> {
+fn filter_outbound_request_headers(
+    headers: &hyper::HeaderMap<HeaderValue>,
+) -> Vec<(HeaderName, HeaderValue)> {
     headers
         .iter()
         .filter_map(|(name, value)| {
@@ -614,13 +719,23 @@ fn filter_outbound_request_headers(headers: &hyper::HeaderMap<HeaderValue>) -> V
         .collect()
 }
 
-fn filter_outbound_response_headers(headers: &hyper::HeaderMap<HeaderValue>) -> Vec<(HeaderName, HeaderValue)> {
+fn filter_outbound_response_headers(
+    headers: &hyper::HeaderMap<HeaderValue>,
+) -> Vec<(HeaderName, HeaderValue)> {
     headers
         .iter()
         .filter_map(|(name, value)| {
             let blocked = matches!(
                 name.as_str().to_ascii_lowercase().as_str(),
-                "connection" | "proxy-connection" | "proxy-authenticate" | "proxy-authorization" | "keep-alive" | "te" | "trailer" | "transfer-encoding" | "upgrade"
+                "connection"
+                    | "proxy-connection"
+                    | "proxy-authenticate"
+                    | "proxy-authorization"
+                    | "keep-alive"
+                    | "te"
+                    | "trailer"
+                    | "transfer-encoding"
+                    | "upgrade"
             );
             if blocked {
                 return None;
@@ -648,21 +763,31 @@ fn build_tls_acceptor(
     let server_config = ServerConfig::builder()
         .with_no_client_auth()
         .with_single_cert(certificate_chain, private_key)
-        .map_err(|error| EgressProxyError::new(format!("failed to build local egress proxy certificate chain: {error}")))?;
+        .map_err(|error| {
+            EgressProxyError::new(format!(
+                "failed to build local egress proxy certificate chain: {error}"
+            ))
+        })?;
 
     Ok(TlsAcceptor::from(Arc::new(server_config)))
 }
 
-fn load_certificate_chain(certificate_chain_pem: &str) -> Result<Vec<CertificateDer<'static>>, EgressProxyError> {
-    <(rustls_pki_types::pem::SectionKind, Vec<u8>)>::pem_slice_iter(certificate_chain_pem.as_bytes())
-        .filter_map(|section| match section {
-            Ok((rustls_pki_types::pem::SectionKind::Certificate, der)) => Some(Ok(CertificateDer::from(der))),
-            Ok(_) => None,
-            Err(error) => Some(Err(EgressProxyError::new(format!(
-                "failed to parse local egress proxy certificate chain: {error}"
-            )))),
-        })
-        .collect()
+fn load_certificate_chain(
+    certificate_chain_pem: &str,
+) -> Result<Vec<CertificateDer<'static>>, EgressProxyError> {
+    <(rustls_pki_types::pem::SectionKind, Vec<u8>)>::pem_slice_iter(
+        certificate_chain_pem.as_bytes(),
+    )
+    .filter_map(|section| match section {
+        Ok((rustls_pki_types::pem::SectionKind::Certificate, der)) => {
+            Some(Ok(CertificateDer::from(der)))
+        }
+        Ok(_) => None,
+        Err(error) => Some(Err(EgressProxyError::new(format!(
+            "failed to parse local egress proxy certificate chain: {error}"
+        )))),
+    })
+    .collect()
 }
 
 fn load_private_key(private_key_pem: &str) -> Result<PrivateKeyDer<'static>, EgressProxyError> {
@@ -684,13 +809,20 @@ fn text_response(status: StatusCode, message: impl Into<String>) -> Response<Hyp
 #[cfg(test)]
 mod tests {
     use crate::egress_proxy::{
-        EgressProxy, EgressProxyRoute, build_managed_proxy_env, join_url_path, match_route,
+        EgressProxy, EgressProxyRoute, build_direct_forward_uri, build_managed_proxy_env,
+        join_url_path, match_route,
     };
 
     #[test]
     fn joins_proxy_forward_paths_without_duplicate_slashes() {
-        assert_eq!(join_url_path("/tokenizer-proxy/egress", "/graphql"), "/tokenizer-proxy/egress/graphql");
-        assert_eq!(join_url_path("/tokenizer-proxy/egress/", "/mistlehq/repo.git"), "/tokenizer-proxy/egress/mistlehq/repo.git");
+        assert_eq!(
+            join_url_path("/tokenizer-proxy/egress", "/graphql"),
+            "/tokenizer-proxy/egress/graphql"
+        );
+        assert_eq!(
+            join_url_path("/tokenizer-proxy/egress/", "/mistlehq/repo.git"),
+            "/tokenizer-proxy/egress/mistlehq/repo.git"
+        );
     }
 
     #[test]
@@ -714,23 +846,83 @@ mod tests {
 
         let graphql_route = match_route(&routes, "api.github.com", "/graphql", "POST")
             .expect("graphql route should match");
-        assert_eq!(graphql_route.grant, "grant-a");
+        assert_eq!(
+            graphql_route
+                .expect("graphql route should resolve exactly one match")
+                .grant,
+            "grant-a"
+        );
 
-        let git_route = match_route(&routes, "github.com", "/mistlehq/mistle.git/info/refs", "GET")
-            .expect("git route should match");
-        assert_eq!(git_route.grant, "grant-b");
+        let git_route = match_route(
+            &routes,
+            "github.com",
+            "/mistlehq/mistle.git/info/refs",
+            "GET",
+        )
+        .expect("git route should match");
+        assert_eq!(
+            git_route
+                .expect("git route should resolve exactly one match")
+                .grant,
+            "grant-b"
+        );
+    }
+
+    #[test]
+    fn leaves_unmatched_requests_for_direct_passthrough() {
+        let routes = vec![EgressProxyRoute {
+            upstream_base_url: "https://api.openai.com".to_string(),
+            host: "api.openai.com".to_string(),
+            path_prefixes: vec!["/v1/responses".to_string()],
+            methods: Some(vec!["POST".to_string()]),
+            grant: "grant-a".to_string(),
+        }];
+
+        let route = match_route(
+            &routes,
+            "deb.debian.org",
+            "/debian/dists/bookworm/InRelease",
+            "GET",
+        )
+        .expect("unmatched route evaluation should succeed");
+
+        assert!(route.is_none());
+    }
+
+    #[test]
+    fn builds_https_direct_forward_uris_for_tunneled_requests() {
+        let direct_uri = build_direct_forward_uri(
+            "https",
+            "tokenizer-proxy-dev_thomas.mistle.dev",
+            Some(
+                &"/tokenizer-proxy/egress/v1/responses?stream=true"
+                    .parse()
+                    .expect("path and query should parse"),
+            ),
+        )
+        .expect("direct https forward uri should build");
+
+        assert_eq!(
+            direct_uri.to_string(),
+            "https://tokenizer-proxy-dev_thomas.mistle.dev/tokenizer-proxy/egress/v1/responses?stream=true"
+        );
     }
 
     #[test]
     fn managed_proxy_env_includes_proxy_and_ca_variables() {
         let env = build_managed_proxy_env(
-            "127.0.0.1:4819".parse().expect("socket address should parse"),
+            "127.0.0.1:4819"
+                .parse()
+                .expect("socket address should parse"),
             std::path::Path::new("/run/mistle/sandboxd/egress-proxy-ca.pem"),
             "http://tokenizer-proxy:5205/tokenizer-proxy/egress",
         )
         .expect("managed proxy environment should build");
 
-        assert_eq!(env.get("HTTPS_PROXY"), Some(&"http://127.0.0.1:4819".to_string()));
+        assert_eq!(
+            env.get("HTTPS_PROXY"),
+            Some(&"http://127.0.0.1:4819".to_string())
+        );
         assert_eq!(
             env.get("NO_PROXY"),
             Some(&"127.0.0.1,localhost,tokenizer-proxy,tokenizer-proxy:5205".to_string())
