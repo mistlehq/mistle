@@ -11,7 +11,7 @@ describe("OrganizationGeneralSettingsPageView", () => {
     cleanup();
   });
 
-  it("shows replace and remove actions when an organization logo is available", () => {
+  it("shows edit and remove actions when an organization logo is available", () => {
     render(
       <OrganizationGeneralSettingsPageView
         isLoading={false}
@@ -28,9 +28,9 @@ describe("OrganizationGeneralSettingsPageView", () => {
     );
 
     expect(screen.getByRole("button", { name: "Edit organization logo" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Remove logo" }).hasAttribute("disabled")).toBe(
-      false,
-    );
+    expect(
+      screen.getByRole("button", { name: "Remove organization logo" }).hasAttribute("disabled"),
+    ).toBe(false);
   });
 
   it("uploads and removes the organization logo through the provided handlers", async () => {
@@ -115,7 +115,7 @@ describe("OrganizationGeneralSettingsPageView", () => {
       expect(screen.getByRole("button", { name: "Edit organization logo" })).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove logo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove organization logo" }));
 
     await waitFor(() => {
       expect(removeCount).toBe(1);

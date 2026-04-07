@@ -136,12 +136,12 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
   const logoErrorMessage = uploadOrganizationLogoMutation.isError
     ? resolveApiErrorMessage({
         error: uploadOrganizationLogoMutation.error,
-        fallbackMessage: "Could not upload organization logo.",
+        fallbackMessage: "Upload failed. Please try again later.",
       })
     : deleteOrganizationLogoMutation.isError
       ? resolveApiErrorMessage({
           error: deleteOrganizationLogoMutation.error,
-          fallbackMessage: "Could not delete organization logo.",
+          fallbackMessage: "Remove failed. Please try again later.",
         })
       : organizationLogoQuery.isError
         ? resolveApiErrorMessage({
