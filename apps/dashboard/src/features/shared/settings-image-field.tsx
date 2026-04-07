@@ -116,7 +116,7 @@ export function SettingsImageField(props: SettingsImageFieldProps): React.JSX.El
           {uploadLabel}
         </label>
         {props.errorMessage === null ? null : (
-          <p className="text-destructive max-w-44 text-right text-xs leading-normal">
+          <p className="text-destructive w-full self-stretch text-right text-xs leading-normal">
             {props.errorMessage}
           </p>
         )}
