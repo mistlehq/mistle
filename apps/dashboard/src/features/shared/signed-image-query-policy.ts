@@ -13,8 +13,8 @@ export function resolveSignedImageRefetchInterval(input: {
     return false;
   }
 
-  return Math.max(
-    expiresAtTime - (input.nowMs ?? Date.now()) - SIGNED_IMAGE_URL_REFRESH_BUFFER_MS,
-    0,
-  );
+  const refreshIntervalMs =
+    expiresAtTime - (input.nowMs ?? Date.now()) - SIGNED_IMAGE_URL_REFRESH_BUFFER_MS;
+
+  return refreshIntervalMs <= 0 ? false : refreshIntervalMs;
 }

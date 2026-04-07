@@ -23,7 +23,7 @@ describe("signed image query policy", () => {
     ).toBe(60 * 60 * 1000 - SIGNED_IMAGE_URL_REFRESH_BUFFER_MS);
   });
 
-  it("does not schedule a negative refresh interval for nearly expired URLs", () => {
+  it("disables interval polling for nearly expired URLs", () => {
     const now = new Date("2026-04-07T00:00:00.000Z");
     const expiresAt = new Date(now.getTime() + 60_000).toISOString();
 
@@ -32,6 +32,6 @@ describe("signed image query policy", () => {
         expiresAt,
         nowMs: now.getTime(),
       }),
-    ).toBe(0);
+    ).toBe(false);
   });
 });
