@@ -11,7 +11,7 @@ describe("ProfileSettingsPageView", () => {
     cleanup();
   });
 
-  it("shows replace and remove actions when a profile image is available", () => {
+  it("shows edit and remove actions when a profile image is available", () => {
     render(
       <ProfileSettingsPageView
         displayName="Mistle Developer"
@@ -26,10 +26,10 @@ describe("ProfileSettingsPageView", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Replace image" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Remove image" }).hasAttribute("disabled")).toBe(
-      false,
-    );
+    expect(screen.getByRole("button", { name: "Edit profile image" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Remove profile image" }).hasAttribute("disabled"),
+    ).toBe(false);
   });
 
   it("uploads and removes the profile image through the provided handlers", async () => {
@@ -88,7 +88,9 @@ describe("ProfileSettingsPageView", () => {
 
     render(<Harness />);
 
-    const uploadInput = screen.getByLabelText("Upload profile image");
+    const uploadInput = screen.getByLabelText("Upload profile image", {
+      selector: "input",
+    });
     const uploadFile = new File([new Uint8Array([1, 2, 3])], "avatar.png", { type: "image/png" });
 
     fireEvent.change(uploadInput, {
@@ -108,16 +110,16 @@ describe("ProfileSettingsPageView", () => {
     completeUpload();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Replace image" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Edit profile image" })).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove image" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove profile image" }));
 
     await waitFor(() => {
       expect(removeCount).toBe(1);
     });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Upload image" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Upload profile image" })).toBeTruthy();
     });
   });
 });
