@@ -5,6 +5,8 @@ import type React from "react";
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { SandboxIntegrationBindingKinds } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
+  StoryGithubConnection,
+  StoryGithubResources,
   StoryIntegrationConnections,
   StoryIntegrationTargets,
   StoryOpenAiConnection,
@@ -17,24 +19,31 @@ import {
 
 const AvailableConnectionsByKind = {
   [SandboxIntegrationBindingKinds.AGENT]: [StoryOpenAiConnection],
-  [SandboxIntegrationBindingKinds.GIT]: [],
+  [SandboxIntegrationBindingKinds.GIT]: [StoryGithubConnection],
   [SandboxIntegrationBindingKinds.CONNECTOR]: [],
 } as const;
 
-const InitialRow: SandboxProfileBindingEditorRow = {
+const OpenAiInitialRow: SandboxProfileBindingEditorRow = {
   clientId: "binding-row-story-001",
   connectionId: StoryOpenAiConnection.id,
   kind: SandboxIntegrationBindingKinds.AGENT,
   config: {},
 };
 
+const GithubInitialRow: SandboxProfileBindingEditorRow = {
+  clientId: "binding-row-story-002",
+  connectionId: StoryGithubConnection.id,
+  kind: SandboxIntegrationBindingKinds.GIT,
+  config: {},
+};
+
 function SandboxProfileBindingDialogStory(input: {
   error: string | null;
-  isSubmittingIntegrationBindings: boolean;
+  row: SandboxProfileBindingEditorRow;
 }): React.JSX.Element {
   const [state, setState] = useState<SandboxProfileBindingDialogState>({
     mode: "add",
-    row: InitialRow,
+    row: input.row,
     error: input.error,
   });
 
@@ -43,7 +52,14 @@ function SandboxProfileBindingDialogStory(input: {
       availableConnections={StoryIntegrationConnections}
       availableConnectionsByKind={AvailableConnectionsByKind}
       availableTargets={StoryIntegrationTargets}
-      isSubmittingIntegrationBindings={input.isSubmittingIntegrationBindings}
+      bindingFormContext={
+        input.row.kind === SandboxIntegrationBindingKinds.GIT
+          ? {
+              resourceOverrides: [StoryGithubResources],
+            }
+          : undefined
+      }
+      isSubmittingIntegrationBindings={false}
       onClose={() => {}}
       onConnectionIdChange={(nextConnectionId) => {
         setState((currentState) => ({
@@ -91,14 +107,12 @@ type Story = StoryObj<typeof meta>;
 
 export const AddOpenAiBinding: Story = {
   render: function RenderStory(): React.JSX.Element {
-    return (
-      <SandboxProfileBindingDialogStory error={null} isSubmittingIntegrationBindings={false} />
-    );
+    return <SandboxProfileBindingDialogStory error={null} row={OpenAiInitialRow} />;
   },
 };
 
-export const AddOpenAiBindingPending: Story = {
+export const AddGithubBinding: Story = {
   render: function RenderStory(): React.JSX.Element {
-    return <SandboxProfileBindingDialogStory error={null} isSubmittingIntegrationBindings={true} />;
+    return <SandboxProfileBindingDialogStory error={null} row={GithubInitialRow} />;
   },
 };
