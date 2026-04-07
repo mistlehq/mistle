@@ -80,48 +80,8 @@ const GetSandboxInstanceResponseSchema = z
 export type GetSandboxInstanceResponse = z.infer<typeof GetSandboxInstanceResponseSchema>;
 export type ListSandboxInstancesInput =
   paths["/internal/sandbox/instances"]["get"]["parameters"]["query"];
-const ListSandboxInstancesResponseSchema = z
-  .object({
-    totalResults: z.number().int().min(0),
-    items: z.array(
-      z
-        .object({
-          id: z.string().min(1),
-          sandboxProfileId: z.string().min(1),
-          title: z.string().min(1).nullable(),
-          sandboxProfileVersion: z.number().int().min(1),
-          status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
-          startedBy: z
-            .object({
-              kind: z.enum(["user", "system"]),
-              id: z.string().min(1),
-            })
-            .strict(),
-          source: z.enum(["dashboard", "webhook"]),
-          createdAt: z.string().min(1),
-          updatedAt: z.string().min(1),
-          failureCode: z.string().min(1).nullable(),
-          failureMessage: z.string().min(1).nullable(),
-        })
-        .strict(),
-    ),
-    nextPage: z
-      .object({
-        after: z.string().min(1),
-        limit: z.number().int().min(1),
-      })
-      .strict()
-      .nullable(),
-    previousPage: z
-      .object({
-        before: z.string().min(1),
-        limit: z.number().int().min(1),
-      })
-      .strict()
-      .nullable(),
-  })
-  .strict();
-export type ListSandboxInstancesResponse = z.infer<typeof ListSandboxInstancesResponseSchema>;
+export type ListSandboxInstancesResponse =
+  paths["/internal/sandbox/instances"]["get"]["responses"]["200"]["content"]["application/json"];
 
 type InternalErrorBody = z.infer<typeof InternalErrorSchema>;
 
@@ -431,9 +391,7 @@ export function createDataPlaneSandboxInstancesClient(
       });
 
       if (result.response.status === 200 && result.data !== undefined) {
-        const response = ListSandboxInstancesResponseSchema.parse(result.data);
-
-        return response;
+        return result.data;
       }
 
       throw createClientError({
