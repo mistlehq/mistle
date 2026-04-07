@@ -10,17 +10,14 @@ const meta = {
   args: {
     alt: "Mistle profile image",
     busy: false,
-    busyAnnouncement: "Updating profile image",
-    editLabel: "Edit profile image",
     errorMessage: null,
     fallbackInitial: "U",
     imageUrl: null,
+    imageName: "profile image",
     label: "Avatar",
     name: "Mistle Developer",
     onDelete: async () => {},
     onUpload: async () => {},
-    removeLabel: "Remove profile image",
-    uploadLabel: "Upload profile image",
   },
 } satisfies Meta<typeof SettingsImageField>;
 
@@ -51,12 +48,9 @@ export const Error: Story = {
 export const OrganizationLogoVariant: Story = {
   args: {
     alt: "Mistle Labs logo",
-    busyAnnouncement: "Updating organization logo",
-    editLabel: "Edit organization logo",
     fallbackInitial: "O",
+    imageName: "organization logo",
     label: "Logo",
     name: "Mistle Labs",
-    removeLabel: "Remove organization logo",
-    uploadLabel: "Upload organization logo",
   },
 };

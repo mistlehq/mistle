@@ -24,17 +24,14 @@ export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): Re
           <SettingsImageField
             alt={`${props.displayName} profile image`}
             busy={props.profileImageBusy}
-            busyAnnouncement="Updating profile image"
-            editLabel="Edit profile image"
             errorMessage={props.profileImageErrorMessage}
             fallbackInitial="U"
             imageUrl={props.imageUrl}
+            imageName="profile image"
             label="Avatar"
             name={props.displayName}
             onDelete={props.onDeleteProfileImage}
             onUpload={props.onUploadProfileImage}
-            removeLabel="Remove profile image"
-            uploadLabel="Upload profile image"
           />
           <AutoSaveTextField
             disabled={props.saving}
