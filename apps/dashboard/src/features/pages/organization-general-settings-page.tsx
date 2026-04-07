@@ -3,12 +3,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
+  organizationLogoQueryKey,
+  useOrganizationLogoQuery,
+} from "../organizations/organization-logo-query.js";
+import {
   getOrganizationGeneral,
   updateOrganizationGeneral,
 } from "../settings/organization/organization-general-service.js";
 import {
   deleteOrganizationLogo,
-  getOrganizationLogo,
   uploadOrganizationLogo,
 } from "../settings/organization/organization-logo-service.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
@@ -20,11 +23,6 @@ const SETTINGS_ORGANIZATION_GENERAL_QUERY_KEY_PREFIX: readonly [
   "settings",
   "organization-general",
 ] = ["settings", "organization-general"];
-const SETTINGS_ORGANIZATION_LOGO_QUERY_KEY_PREFIX: readonly ["settings", "organization-logo"] = [
-  "settings",
-  "organization-logo",
-];
-
 type OrganizationFormState = {
   name: string;
 };
@@ -35,16 +33,6 @@ function settingsOrganizationGeneralQueryKey(
   return [
     SETTINGS_ORGANIZATION_GENERAL_QUERY_KEY_PREFIX[0],
     SETTINGS_ORGANIZATION_GENERAL_QUERY_KEY_PREFIX[1],
-    organizationId,
-  ];
-}
-
-function settingsOrganizationLogoQueryKey(
-  organizationId: string,
-): readonly ["settings", "organization-logo", string] {
-  return [
-    SETTINGS_ORGANIZATION_LOGO_QUERY_KEY_PREFIX[0],
-    SETTINGS_ORGANIZATION_LOGO_QUERY_KEY_PREFIX[1],
     organizationId,
   ];
 }
@@ -62,14 +50,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         organizationId,
       }),
   });
-  const organizationLogoQuery = useQuery({
-    queryKey: settingsOrganizationLogoQueryKey(organizationId),
-    queryFn: async () =>
-      getOrganizationLogo({
-        organizationId,
-      }),
-    staleTime: 15 * 60 * 1000,
-  });
+  const organizationLogoQuery = useOrganizationLogoQuery(organizationId);
 
   const saveMutation = useMutation({
     mutationFn: async (nextState: OrganizationFormState) => {
@@ -116,7 +97,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         file,
       }),
     onSuccess: async (result) => {
-      queryClient.setQueryData(settingsOrganizationLogoQueryKey(organizationId), {
+      queryClient.setQueryData(organizationLogoQueryKey(organizationId), {
         imageUrl: result.imageUrl,
       });
     },
@@ -127,7 +108,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         organizationId,
       }),
     onSuccess: async () => {
-      queryClient.setQueryData(settingsOrganizationLogoQueryKey(organizationId), {
+      queryClient.setQueryData(organizationLogoQueryKey(organizationId), {
         imageUrl: null,
       });
     },

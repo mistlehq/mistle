@@ -10,6 +10,7 @@ import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { SidebarNavGroups } from "../navigation/sidebar-nav-groups.js";
 import type { SidebarNavGroup } from "../navigation/sidebar-nav-model.js";
+import { useOrganizationLogoQuery } from "../organizations/organization-logo-query.js";
 import {
   isSettingsPath,
   resolveSettingsBackDestination,
@@ -75,6 +76,7 @@ type AppShellFrame = Pick<
 
 export function AppShell(): React.JSX.Element {
   const organizationSummary = useOrganizationSummary();
+  const organizationLogoQuery = useOrganizationLogoQuery(organizationSummary.activeOrganizationId);
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -143,6 +145,7 @@ export function AppShell(): React.JSX.Element {
     isSigningOut,
     locationPathname: location.pathname,
     organizationErrorMessage: organizationSummary.organizationErrorMessage,
+    organizationImageUrl: organizationLogoQuery.data?.imageUrl ?? null,
     organizationName: organizationSummary.organizationName ?? "",
     pageMeta,
     signOutError,
@@ -168,6 +171,7 @@ function resolveAppShellFrame(input: {
   isSigningOut: boolean;
   locationPathname: string;
   organizationErrorMessage: string | null;
+  organizationImageUrl: string | null;
   organizationName: string;
   pageMeta: ReturnType<typeof useAppPageMeta>;
   signOutError: string | null;
@@ -211,6 +215,7 @@ function resolveAppShellFrame(input: {
         onNavigateToSettings={input.handleNavigateToSettings}
         onSignOut={input.handleSignOut}
         organizationErrorMessage={input.organizationErrorMessage}
+        organizationImageUrl={input.organizationImageUrl}
         organizationName={input.organizationName}
       />
     ),
