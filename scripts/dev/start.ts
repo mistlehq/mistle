@@ -407,7 +407,14 @@ function start(): void {
   localInfraEnv = sharedDevEnv;
   localInfraStartAttempted = true;
 
-  const infraServiceNames = ["seaweedfs", "postgres", "pgbouncer", "mailpit", "otel-lgtm", "valkey"];
+  const infraServiceNames = [
+    "seaweedfs",
+    "postgres",
+    "pgbouncer",
+    "mailpit",
+    "otel-lgtm",
+    "valkey",
+  ];
 
   if (sandboxProvider === "docker") {
     infraServiceNames.splice(4, 0, "registry");

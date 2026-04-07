@@ -798,16 +798,21 @@ mod tests {
                         let mut websocket =
                             accept(stream).expect("bootstrap gateway handshake should succeed");
                         loop {
-                            match websocket
-                                .read()
-                                .expect("bootstrap gateway should read frames")
-                            {
-                                Message::Close(_) => return,
-                                Message::Text(_)
-                                | Message::Binary(_)
-                                | Message::Ping(_)
-                                | Message::Pong(_)
-                                | Message::Frame(_) => {}
+                            match websocket.read() {
+                                Ok(Message::Close(_)) => return,
+                                Ok(
+                                    Message::Text(_)
+                                    | Message::Binary(_)
+                                    | Message::Ping(_)
+                                    | Message::Pong(_)
+                                    | Message::Frame(_),
+                                ) => {}
+                                Err(tungstenite::Error::Protocol(
+                                    tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
+                                )) => return,
+                                Err(error) => {
+                                    panic!("bootstrap gateway should read frames: {error}")
+                                }
                             }
                         }
                     }
