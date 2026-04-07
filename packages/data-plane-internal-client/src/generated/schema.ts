@@ -33,7 +33,6 @@ export interface paths {
           content: {
             "application/json": {
               items: {
-                title: string | null;
                 createdAt: string;
                 failureCode: string | null;
                 failureMessage: string | null;
@@ -49,6 +48,7 @@ export interface paths {
                 };
                 /** @enum {string} */
                 status: "pending" | "starting" | "running" | "stopped" | "failed";
+                title: string | null;
                 updatedAt: string;
               }[];
               nextPage: {
@@ -408,7 +408,6 @@ export interface paths {
           };
           content: {
             "application/json": {
-              title: string | null;
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
@@ -602,6 +601,7 @@ export interface paths {
               } | null;
               /** @enum {string} */
               status: "pending" | "starting" | "running" | "stopped" | "failed";
+              title: string | null;
             } | null;
           };
         };
