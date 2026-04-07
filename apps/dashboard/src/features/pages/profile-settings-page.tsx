@@ -1,11 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
+import { PROFILE_IMAGE_QUERY_KEY, useProfileImageQuery } from "../profile/profile-image-query.js";
 import {
   deleteProfileImage,
-  getProfileImage,
   updateProfileDisplayName,
   uploadProfileImage,
 } from "../settings/profile/profile-service.js";
@@ -16,11 +16,6 @@ import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
 import { updateSessionUserImage } from "../shell/session-user-image.js";
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
-const PROFILE_IMAGE_QUERY_KEY: readonly ["settings", "profile-image"] = [
-  "settings",
-  "profile-image",
-];
-
 export function ProfileSettingsPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
@@ -29,11 +24,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
     string | null
   >(null);
   const { title, description } = resolvePageFrameText(pageMeta, "Profile");
-  const profileImageQuery = useQuery({
-    queryKey: PROFILE_IMAGE_QUERY_KEY,
-    queryFn: getProfileImage,
-    staleTime: 15 * 60 * 1000,
-  });
+  const profileImageQuery = useProfileImageQuery();
 
   const saveMutation = useMutation({
     mutationFn: async (displayName: string) => updateProfileDisplayName({ displayName }),
