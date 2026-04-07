@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildMembershipCapabilities,
+  canManageOrganization,
   getInviteAssignableRoles,
   getRoleTransitionMatrix,
   parseOrganizationRole,
@@ -58,6 +59,14 @@ describe("organization policy", () => {
         admin: [],
         member: [],
       });
+    });
+  });
+
+  describe("canManageOrganization", () => {
+    it("allows organization management for owner and admin only", () => {
+      expect(canManageOrganization("owner")).toBe(true);
+      expect(canManageOrganization("admin")).toBe(true);
+      expect(canManageOrganization("member")).toBe(false);
     });
   });
 

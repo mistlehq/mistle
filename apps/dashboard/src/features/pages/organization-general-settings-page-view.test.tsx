@@ -4,35 +4,36 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
+import { OrganizationGeneralSettingsPageView } from "./organization-general-settings-page-view.js";
 
-describe("ProfileSettingsPageView", () => {
+describe("OrganizationGeneralSettingsPageView", () => {
   afterEach(() => {
     cleanup();
   });
 
-  it("shows edit and remove actions when a profile image is available", () => {
+  it("shows edit and remove actions when an organization logo is available", () => {
     render(
-      <ProfileSettingsPageView
-        displayName="Mistle Developer"
-        email="developer@mistle.so"
-        imageUrl="https://example.com/avatar.webp"
-        onDeleteProfileImage={async () => {}}
+      <OrganizationGeneralSettingsPageView
+        isLoading={false}
+        isSaving={false}
+        loadErrorMessage={null}
+        logoBusy={false}
+        logoErrorMessage={null}
+        logoUrl="https://example.com/logo.webp"
+        name="Mistle"
+        onDeleteLogo={async () => {}}
         onSaveChanges={async () => {}}
-        onUploadProfileImage={async () => {}}
-        profileImageBusy={false}
-        profileImageErrorMessage={null}
-        saving={false}
+        onUploadLogo={async () => {}}
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Edit profile image" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit organization logo" })).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Remove profile image" }).hasAttribute("disabled"),
+      screen.getByRole("button", { name: "Remove organization logo" }).hasAttribute("disabled"),
     ).toBe(false);
   });
 
-  it("uploads and removes the profile image through the provided handlers", async () => {
+  it("uploads and removes the organization logo through the provided handlers", async () => {
     const uploadedFiles: File[] = [];
     let removeCount = 0;
     let finishUpload: (() => void) | undefined;
@@ -55,43 +56,44 @@ describe("ProfileSettingsPageView", () => {
     }
 
     function Harness(): React.JSX.Element {
-      const [imageUrl, setImageUrl] = useState<string | null>(null);
+      const [logoUrl, setLogoUrl] = useState<string | null>(null);
       const [busy, setBusy] = useState(false);
 
       return (
-        <ProfileSettingsPageView
-          displayName="Mistle Developer"
-          email="developer@mistle.so"
-          imageUrl={imageUrl}
-          onDeleteProfileImage={async () => {
+        <OrganizationGeneralSettingsPageView
+          isLoading={false}
+          isSaving={false}
+          loadErrorMessage={null}
+          logoBusy={busy}
+          logoErrorMessage={null}
+          logoUrl={logoUrl}
+          name="Mistle"
+          onDeleteLogo={async () => {
             removeCount += 1;
-            setImageUrl(null);
+            setLogoUrl(null);
           }}
           onSaveChanges={async () => {}}
-          onUploadProfileImage={async (file) => {
+          onUploadLogo={async (file) => {
             uploadedFiles.push(file);
             setBusy(true);
             const deferred = createDeferredPromise<void>();
             finishUpload = () => {
-              setImageUrl("https://example.com/updated.webp");
+              setLogoUrl("https://example.com/updated-logo.webp");
               setBusy(false);
               deferred.resolve(undefined);
             };
             await deferred.promise;
           }}
-          profileImageBusy={busy}
-          profileImageErrorMessage={null}
-          saving={false}
         />
       );
     }
 
     render(<Harness />);
 
-    const uploadInput = screen.getByLabelText("Upload profile image", {
+    const uploadInput = screen.getByLabelText("Upload organization logo", {
       selector: "input",
     });
-    const uploadFile = new File([new Uint8Array([1, 2, 3])], "avatar.png", { type: "image/png" });
+    const uploadFile = new File([new Uint8Array([1, 2, 3])], "logo.png", { type: "image/png" });
 
     fireEvent.change(uploadInput, {
       target: {
@@ -110,16 +112,16 @@ describe("ProfileSettingsPageView", () => {
     completeUpload();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Edit profile image" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Edit organization logo" })).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove profile image" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove organization logo" }));
 
     await waitFor(() => {
       expect(removeCount).toBe(1);
     });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Upload profile image" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Upload organization logo" })).toBeTruthy();
     });
   });
 });
