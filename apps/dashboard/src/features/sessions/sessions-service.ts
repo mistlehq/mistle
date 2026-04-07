@@ -20,6 +20,7 @@ const SandboxInstanceStatusResponseSchema = z
     id: z.string().min(1),
     title: z.string().min(1).nullable(),
     status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+    connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
     runtimePlan: CompiledRuntimePlanSchema.nullable(),
@@ -58,6 +59,7 @@ export type SandboxInstanceStatusResult = {
   id: string;
   title: string | null;
   status: "pending" | "starting" | "running" | "stopped" | "failed";
+  connectable: boolean;
   failureCode: string | null;
   failureMessage: string | null;
   runtimePlan: z.output<typeof CompiledRuntimePlanSchema> | null;

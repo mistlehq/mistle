@@ -29,6 +29,7 @@ export type SandboxInstanceStatus = {
   id: string;
   title: string | null;
   status: NonNullable<GetSandboxInstanceResponse>["status"];
+  connectable: boolean;
   failureCode: string | null;
   failureMessage: string | null;
   runtimePlan: NonNullable<GetSandboxInstanceResponse>["runtimePlan"];

@@ -43,6 +43,7 @@ export const sandboxInstanceStatusResponseSchema = z
     id: z.string().min(1),
     title: z.string().min(1).nullable(),
     status: sandboxInstanceStatusSchema,
+    connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
     runtimePlan: CompiledRuntimePlanSchema.nullable(),

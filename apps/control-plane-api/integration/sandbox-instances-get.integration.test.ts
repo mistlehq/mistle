@@ -121,7 +121,8 @@ describe("sandbox instances get integration", () => {
     expect(body).toEqual({
       id: "sbi_cp_get_001",
       title: "Webhook investigation",
-      status: "running",
+      status: "starting",
+      connectable: false,
       failureCode: null,
       failureMessage: null,
       runtimePlan: null,
@@ -213,7 +214,8 @@ describe("sandbox instances get integration", () => {
     expect(body).toEqual({
       id: "sbi_cp_get_pending_001",
       title: null,
-      status: "running",
+      status: "starting",
+      connectable: false,
       failureCode: null,
       failureMessage: null,
       runtimePlan: null,
@@ -267,6 +269,7 @@ describe("sandbox instances get integration", () => {
     const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
 
     expect(body.title).toBeNull();
+    expect(body.connectable).toBe(false);
     expect(body.automationConversation).toBeNull();
   });
 
@@ -380,7 +383,8 @@ describe("sandbox instances get integration", () => {
     expect(body).toEqual({
       id: "sbi_cp_get_003",
       title: null,
-      status: "running",
+      status: "starting",
+      connectable: false,
       failureCode: null,
       failureMessage: null,
       runtimePlan: null,
@@ -500,7 +504,8 @@ describe("sandbox instances get integration", () => {
     expect(body).toEqual({
       id: "sbi_cp_get_004",
       title: null,
-      status: "running",
+      status: "starting",
+      connectable: false,
       failureCode: null,
       failureMessage: null,
       runtimePlan: null,

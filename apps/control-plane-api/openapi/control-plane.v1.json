@@ -6167,6 +6167,9 @@
                       "type": "string",
                       "enum": ["pending", "starting", "running", "stopped", "failed"]
                     },
+                    "connectable": {
+                      "type": "boolean"
+                    },
                     "failureCode": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -6892,6 +6895,7 @@
                     "id",
                     "title",
                     "status",
+                    "connectable",
                     "failureCode",
                     "failureMessage",
                     "runtimePlan",
@@ -7215,6 +7219,9 @@
                       "type": "string",
                       "enum": ["pending", "starting", "running", "stopped", "failed"]
                     },
+                    "connectable": {
+                      "type": "boolean"
+                    },
                     "failureCode": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -7940,6 +7947,7 @@
                     "id",
                     "title",
                     "status",
+                    "connectable",
                     "failureCode",
                     "failureMessage",
                     "runtimePlan",

@@ -3306,6 +3306,7 @@ export interface paths {
                 providerConversationId: string | null;
                 routeId: string | null;
               } | null;
+              connectable: boolean;
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
@@ -3733,6 +3734,7 @@ export interface paths {
                 providerConversationId: string | null;
                 routeId: string | null;
               } | null;
+              connectable: boolean;
               failureCode: string | null;
               failureMessage: string | null;
               id: string;

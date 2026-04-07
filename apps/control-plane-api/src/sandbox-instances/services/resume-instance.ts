@@ -49,6 +49,7 @@ export async function resumeInstance(
   return {
     ...sandboxInstance,
     status: "starting",
+    connectable: false,
     failureCode: null,
     failureMessage: null,
   };

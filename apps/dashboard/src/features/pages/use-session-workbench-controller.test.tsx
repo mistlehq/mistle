@@ -561,6 +561,7 @@ describe("useSessionWorkbenchController", () => {
         title: null,
         id: "sbi_resume_001",
         status: "starting",
+        connectable: false,
         failureCode: null,
         failureMessage: null,
         runtimePlan: null,
@@ -572,6 +573,7 @@ describe("useSessionWorkbenchController", () => {
       title: null,
       id: "sbi_resume_001",
       status: "starting",
+      connectable: false,
       failureCode: null,
       failureMessage: null,
       runtimePlan: null,
@@ -785,6 +787,7 @@ describe("useSessionWorkbenchController", () => {
         runtimePlan: null,
         automationConversation: null,
         status: "stopped",
+        connectable: false,
       },
     });
 
@@ -857,6 +860,7 @@ describe("useSessionWorkbenchController", () => {
         title: null,
         id: sandboxInstanceId,
         status: "stopped",
+        connectable: false,
         failureCode: null,
         failureMessage: null,
         runtimePlan: null,

@@ -235,6 +235,7 @@ describe("sandbox instance resume integration", () => {
         id: sandboxInstanceId,
         title: null,
         status: "starting",
+        connectable: false,
         failureCode: null,
         failureMessage: null,
         runtimePlan: null,
@@ -321,6 +322,7 @@ describe("sandbox instance resume integration", () => {
         id: sandboxInstanceId,
         title: null,
         status: "starting",
+        connectable: false,
         failureCode: null,
         failureMessage: null,
         runtimePlan: null,
@@ -342,7 +344,7 @@ describe("sandbox instance resume integration", () => {
     }
   });
 
-  it("returns the current running status without queueing a resume workflow", async ({
+  it("returns the current effective status without queueing a resume workflow", async ({
     fixture,
   }) => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
@@ -408,7 +410,8 @@ describe("sandbox instance resume integration", () => {
       expect(body).toEqual({
         id: sandboxInstanceId,
         title: null,
-        status: "running",
+        status: "starting",
+        connectable: false,
         failureCode: null,
         failureMessage: null,
         runtimePlan: null,
