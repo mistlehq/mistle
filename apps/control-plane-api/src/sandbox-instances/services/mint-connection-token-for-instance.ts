@@ -4,10 +4,7 @@ import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import { mintConnectionToken } from "./mint-connection-token.js";
 
 type Ctx = {
-  dataPlaneClient: Pick<
-    DataPlaneSandboxInstancesClient,
-    "getSandboxInstance" | "resumeSandboxInstance"
-  >;
+  dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">;
   defaultConnectionToken: {
     gatewayWebsocketUrl: string;
     tokenTtlSeconds: number;
