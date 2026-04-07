@@ -66,6 +66,10 @@ describe("SandboxProfileBindingConfigEditor", () => {
 
     expect(screen.getByLabelText("Default model")).toBeDefined();
     expect(screen.getByLabelText("Reasoning effort")).toBeDefined();
+    expect(screen.queryByText("runtime")).toBeNull();
+    expect(screen.queryByText("config")).toBeNull();
+    expect(screen.queryByText("model")).toBeNull();
+    expect(screen.queryByText("options")).toBeNull();
     const additionalInstructionsField = screen
       .getAllByRole("textbox", {
         name: "Additional instructions",
