@@ -69,6 +69,9 @@ export function IntegrationsPage() {
           });
         }}
         showWebhookSources={directoryState.selectedDetailCard.target.webhookSource !== undefined}
+        showCreateWebhookSource={
+          directoryState.selectedDetailCard.target.webhookSource?.lifecycle === "managed"
+        }
         titleEditor={connectionEditors.titleEditor}
       />
     );

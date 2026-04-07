@@ -4365,6 +4365,10 @@
                           "webhookSource": {
                             "type": "object",
                             "properties": {
+                              "lifecycle": {
+                                "type": "string",
+                                "enum": ["implicit", "managed"]
+                              },
                               "ownerScope": {
                                 "type": "string",
                                 "enum": ["target", "connection"]
@@ -4373,7 +4377,7 @@
                                 "type": "boolean"
                               }
                             },
-                            "required": ["ownerScope", "requiresSourceSelection"],
+                            "required": ["lifecycle", "ownerScope", "requiresSourceSelection"],
                             "additionalProperties": false
                           },
                           "supportedWebhookEvents": {

@@ -2317,6 +2317,8 @@ export interface paths {
                 variantId: string;
                 webhookSource?: {
                   /** @enum {string} */
+                  lifecycle: "implicit" | "managed";
+                  /** @enum {string} */
                   ownerScope: "target" | "connection";
                   requiresSourceSelection: boolean;
                 };

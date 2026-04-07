@@ -67,6 +67,7 @@ export const IntegrationTargetSchema = z
       .optional(),
     webhookSource: z
       .object({
+        lifecycle: z.enum(["implicit", "managed"]),
         ownerScope: z.enum(["target", "connection"]),
         requiresSourceSelection: z.boolean(),
       })

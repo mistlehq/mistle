@@ -3,6 +3,7 @@ import type {
   IntegrationConnectionMethodDefinition,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
+  IntegrationWebhookSourceLifecycle,
 } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 
@@ -103,6 +104,7 @@ export type ResolvedIntegrationTargetMetadata = {
       }
   )[];
   webhookSource?: {
+    lifecycle: IntegrationWebhookSourceLifecycle;
     ownerScope: "target" | "connection";
     requiresSourceSelection: boolean;
   };
@@ -253,6 +255,7 @@ export function resolveTargetMetadata(input: {
           ? {}
           : {
               webhookSource: {
+                lifecycle: definition.webhookSource.lifecycle,
                 ownerScope: definition.webhookSource.ownerScope,
                 requiresSourceSelection: true,
               },
@@ -281,6 +284,7 @@ export function resolveTargetMetadata(input: {
       ? {}
       : {
           webhookSource: {
+            lifecycle: definition.webhookSource.lifecycle,
             ownerScope: definition.webhookSource.ownerScope,
             requiresSourceSelection: true,
           },
