@@ -50,6 +50,10 @@ export function getInviteAssignableRoles(actorRole: OrganizationRole): Organizat
   return [];
 }
 
+export function canManageOrganization(actorRole: OrganizationRole): boolean {
+  return actorRole === "owner" || actorRole === "admin";
+}
+
 export function getRoleTransitionMatrix(
   actorRole: OrganizationRole,
 ): Record<OrganizationRole, OrganizationRole[]> {
@@ -101,7 +105,7 @@ export function buildMembershipCapabilities(input: {
       assignableRoles,
     },
     memberRoleUpdate: {
-      canExecute: input.actorRole === "owner" || input.actorRole === "admin",
+      canExecute: canManageOrganization(input.actorRole),
       roleTransitionMatrix: getRoleTransitionMatrix(input.actorRole),
     },
   };
