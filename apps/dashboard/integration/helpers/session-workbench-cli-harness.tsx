@@ -828,9 +828,12 @@ async function withSessionWorkbenchCliHarness(
 }
 
 async function waitForEnabledButton(name: string): Promise<HTMLButtonElement> {
-  await waitFor(() => {
-    expect(screen.getByRole("button", { name })).toHaveProperty("disabled", false);
-  });
+  await waitFor(
+    () => {
+      expect(screen.getByRole("button", { name })).toHaveProperty("disabled", false);
+    },
+    { timeout: 5_000 },
+  );
 
   return screen.getByRole("button", { name }) as HTMLButtonElement;
 }
