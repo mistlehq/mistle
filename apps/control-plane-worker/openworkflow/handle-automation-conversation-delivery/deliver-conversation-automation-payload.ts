@@ -1,3 +1,4 @@
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   AutomationConversationDeliveryTaskStatuses,
   type ControlPlaneDatabase,
@@ -20,6 +21,7 @@ import {
   resolveAutomationConversationRouteBindingAction,
 } from "./conversation-delivery-planning.js";
 import { executeConversationProviderDelivery } from "./execute-conversation-provider-delivery.js";
+import { seedSandboxInstanceTitle } from "./seed-sandbox-instance-title.js";
 import type {
   AcquiredAutomationConnection,
   ResolvedAutomationConversationDeliveryRoute,
@@ -28,6 +30,10 @@ import type {
 export async function deliverConversationAutomationPayload(
   ctx: {
     db: ControlPlaneDatabase;
+    dataPlaneClient: Pick<
+      DataPlaneSandboxInstancesClient,
+      "getSandboxInstance" | "patchSandboxInstanceTitle"
+    >;
   },
   input: {
     taskId: string;
@@ -157,6 +163,18 @@ export async function deliverConversationAutomationPayload(
       routeId: route.id,
       providerExecutionId: deliveryResult.providerExecutionId,
       providerState: deliveryResult.providerState,
+    },
+  );
+
+  await seedSandboxInstanceTitle(
+    {
+      dataPlaneClient: ctx.dataPlaneClient,
+    },
+    {
+      organizationId: input.preparedAutomationRun.organizationId,
+      sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+      conversationName: deliveryResult.conversationMetadata?.name ?? null,
+      conversationPreview: deliveryResult.conversationMetadata?.preview ?? null,
     },
   );
 }

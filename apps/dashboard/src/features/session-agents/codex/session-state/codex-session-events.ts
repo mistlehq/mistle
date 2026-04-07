@@ -1,5 +1,6 @@
 import type {
   CodexThreadLifecycleEvent,
+  CodexThreadNameUpdate,
   CodexThreadTokenUsageSnapshot,
   CodexTurnDiffSnapshot,
   CodexTurnPlanSnapshot,
@@ -138,5 +139,30 @@ export function parseThreadTokenUsageSnapshot(notification: {
   return {
     threadId,
     usageJson: JSON.stringify(params),
+  };
+}
+
+export function parseThreadNameUpdate(notification: {
+  method: string;
+  params?: unknown;
+}): CodexThreadNameUpdate | null {
+  if (notification.method !== "thread/name/updated") {
+    return null;
+  }
+
+  const params = resolveNotificationParams(notification);
+  if (params === null) {
+    return null;
+  }
+
+  const threadId = resolveStringProperty(params, "threadId");
+  const title = resolveStringProperty(params, "name");
+  if (threadId === null || title === null) {
+    return null;
+  }
+
+  return {
+    threadId,
+    title,
   };
 }
