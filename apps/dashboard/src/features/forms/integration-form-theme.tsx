@@ -79,15 +79,6 @@ function resolveCommaSeparatedOptions(
   };
 }
 
-function resolveSchemaProperties(schema: unknown): Record<string, unknown> {
-  if (!isRecord(schema)) {
-    return {};
-  }
-
-  const properties = schema.properties;
-  return isRecord(properties) ? properties : {};
-}
-
 function CommaSeparatedStringArrayWidget(
   props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
@@ -426,37 +417,6 @@ function resolveFieldLayout(
   return options.layout === "stacked" ? "vertical" : "horizontal";
 }
 
-function resolveObjectPropertyUiSchema(uiSchema: unknown, propertyName: string): unknown {
-  if (!isRecord(uiSchema)) {
-    return undefined;
-  }
-
-  return uiSchema[propertyName];
-}
-
-function hasRenderableSchemaContent(input: { schema: unknown; uiSchema: unknown }): boolean {
-  if (isRecord(input.uiSchema) && input.uiSchema["ui:widget"] === "hidden") {
-    return false;
-  }
-
-  if (!isRecord(input.schema)) {
-    return true;
-  }
-
-  const propertySchemas = resolveSchemaProperties(input.schema);
-  const propertyNames = Object.keys(propertySchemas);
-  if (propertyNames.length === 0) {
-    return true;
-  }
-
-  return propertyNames.some((propertyName) =>
-    hasRenderableSchemaContent({
-      schema: propertySchemas[propertyName],
-      uiSchema: resolveObjectPropertyUiSchema(input.uiSchema, propertyName),
-    }),
-  );
-}
-
 function IntegrationFieldTemplate(
   props: FieldTemplateProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
@@ -506,41 +466,9 @@ function IntegrationObjectFieldTemplate(
     typeof props.schema.description === "string" && props.schema.description.length > 0
       ? props.schema.description
       : undefined;
-  const isStructuralObject = title.length === 0 && description === undefined;
-  const mappedVisibleProperties = visibleProperties.filter((property) =>
-    hasRenderableSchemaContent({
-      schema: resolveSchemaProperties(props.schema)[property.name],
-      uiSchema: resolveObjectPropertyUiSchema(props.uiSchema, property.name),
-    }),
-  );
-  const nonMappedProperties = visibleProperties.filter(
-    (property) =>
-      !hasRenderableSchemaContent({
-        schema: resolveSchemaProperties(props.schema)[property.name],
-        uiSchema: resolveObjectPropertyUiSchema(props.uiSchema, property.name),
-      }),
-  );
 
-  if (mappedVisibleProperties.length === 0 && isStructuralObject) {
-    return (
-      <>
-        {nonMappedProperties.map((property) => property.content)}
-        {hiddenProperties.map((property) => property.content)}
-      </>
-    );
-  }
-
-  if (isStructuralObject) {
-    return (
-      <>
-        {mappedVisibleProperties.map((property) => (
-          <div key={property.name}>{property.content}</div>
-        ))}
-        {props.optionalDataControl}
-        {nonMappedProperties.map((property) => property.content)}
-        {hiddenProperties.map((property) => property.content)}
-      </>
-    );
+  if (visibleProperties.length === 0 && description === undefined && title.length === 0) {
+    return <>{hiddenProperties.map((property) => property.content)}</>;
   }
 
   return (
@@ -557,12 +485,11 @@ function IntegrationObjectFieldTemplate(
             {description !== undefined ? <FieldDescription>{description}</FieldDescription> : null}
           </FieldHeader>
         ) : null}
-        {mappedVisibleProperties.map((property) => (
+        {visibleProperties.map((property) => (
           <div key={property.name}>{property.content}</div>
         ))}
         {props.optionalDataControl}
       </div>
-      {nonMappedProperties.map((property) => property.content)}
       {hiddenProperties.map((property) => property.content)}
     </>
   );
