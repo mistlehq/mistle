@@ -1,5 +1,7 @@
 import { Separator } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
+import { expect, within } from "storybook/test";
 
 import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybook/decorators.js";
 import { AuthScreenView } from "./auth-screen-view.js";
@@ -32,9 +34,19 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+function InteractiveOtpStory(args: Story["args"]): React.JSX.Element {
+  const [otp, setOtp] = useState(args?.otp ?? "");
+
+  return <AuthScreenView {...args} onOtpChange={setOtp} otp={otp} />;
+}
+
 export const EmailEntry: Story = {
   args: {
     email: "",
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText("Email address")).toHaveFocus();
   },
 };
 
@@ -110,6 +122,11 @@ export const OtpEntry: Story = {
   args: {
     authStep: "otp",
   },
+  render: InteractiveOtpStory,
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText("One-time code")).toHaveFocus();
+  },
 };
 
 export const OtpPartialEntry: Story = {
@@ -117,6 +134,7 @@ export const OtpPartialEntry: Story = {
     authStep: "otp",
     otp: "12",
   },
+  render: InteractiveOtpStory,
 };
 
 export const VerifyingOtp: Story = {
@@ -133,4 +151,5 @@ export const OtpError: Story = {
     authError: "The one-time code is invalid or expired.",
     otp: "123456",
   },
+  render: InteractiveOtpStory,
 };

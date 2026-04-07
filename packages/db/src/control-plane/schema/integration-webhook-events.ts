@@ -31,10 +31,9 @@ export const integrationWebhookEvents = controlPlaneSchema.table(
     integrationConnectionId: text("integration_connection_id")
       .notNull()
       .references(() => integrationConnections.id, { onDelete: "cascade" }),
-    integrationWebhookSourceId: text("integration_webhook_source_id").references(
-      () => integrationWebhookSources.id,
-      { onDelete: "cascade" },
-    ),
+    integrationWebhookSourceId: text("integration_webhook_source_id")
+      .notNull()
+      .references(() => integrationWebhookSources.id, { onDelete: "cascade" }),
     targetKey: text("target_key")
       .notNull()
       .references(() => integrationTargets.targetKey, { onDelete: "restrict" }),

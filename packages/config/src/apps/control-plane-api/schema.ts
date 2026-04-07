@@ -21,6 +21,17 @@ export const ControlPlaneApiDatabaseConfigSchema = z
   })
   .strict();
 
+export const ControlPlaneApiObjectStoreConfigSchema = z
+  .object({
+    bucketName: z.string().min(1),
+    region: z.string().min(1),
+    endpoint: z.string().min(1).optional(),
+    forcePathStyle: z.boolean().optional(),
+    accessKeyId: z.string().min(1),
+    secretAccessKey: z.string().min(1),
+  })
+  .strict();
+
 export const ControlPlaneApiAuthConfigSchema = z
   .object({
     baseUrl: z.string().min(1),
@@ -82,6 +93,7 @@ export const ControlPlaneApiConfigSchema = z
   .object({
     server: ControlPlaneApiServerConfigSchema,
     database: ControlPlaneApiDatabaseConfigSchema,
+    objectStore: ControlPlaneApiObjectStoreConfigSchema,
     auth: ControlPlaneApiAuthConfigSchema,
     dashboard: ControlPlaneApiDashboardConfigSchema,
     workflow: ControlPlaneApiWorkflowConfigSchema,
@@ -94,6 +106,7 @@ export const PartialControlPlaneApiConfigSchema = z
   .object({
     server: ControlPlaneApiServerConfigSchema.partial().optional(),
     database: ControlPlaneApiDatabaseConfigSchema.partial().optional(),
+    objectStore: ControlPlaneApiObjectStoreConfigSchema.partial().optional(),
     auth: ControlPlaneApiAuthConfigSchema.partial().optional(),
     dashboard: ControlPlaneApiDashboardConfigSchema.partial().optional(),
     workflow: ControlPlaneApiWorkflowConfigSchema.partial().optional(),

@@ -4,6 +4,7 @@ import { AppIds, type loadConfig } from "@mistle/config";
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
+import type { S3CompatibleObjectStore } from "@mistle/object-store";
 import type { Context, Hono } from "hono";
 import type { OpenWorkflow } from "openworkflow";
 
@@ -56,6 +57,7 @@ export type AppContextVariables = {
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
+  objectStore: S3CompatibleObjectStore;
   integrationRegistry: IntegrationRegistry;
   dataPlaneClient: DataPlaneSandboxInstancesClient;
   connectionTokenConfig: ControlPlaneApiConnectionTokenConfig;

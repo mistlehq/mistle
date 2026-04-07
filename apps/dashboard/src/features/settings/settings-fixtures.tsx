@@ -87,7 +87,12 @@ export function createProfileSettingsFixtureContent(): React.JSX.Element {
     <ProfileSettingsPageView
       displayName="Mistle Developer"
       email="developer@mistle.so"
+      imageUrl={null}
+      onDeleteProfileImage={async () => {}}
       onSaveChanges={async () => {}}
+      onUploadProfileImage={async () => {}}
+      profileImageBusy={false}
+      profileImageErrorMessage={null}
       saving={false}
     />
   );
@@ -99,8 +104,13 @@ export function createOrganizationGeneralSettingsFixtureContent(): React.JSX.Ele
       isLoading={false}
       isSaving={false}
       loadErrorMessage={null}
+      logoBusy={false}
+      logoErrorMessage={null}
+      logoUrl={null}
       name="Mistle Labs"
+      onDeleteLogo={async () => {}}
       onSaveChanges={async () => {}}
+      onUploadLogo={async () => {}}
     />
   );
 }

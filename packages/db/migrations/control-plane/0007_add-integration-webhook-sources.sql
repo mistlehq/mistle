@@ -15,7 +15,6 @@ CREATE TABLE "control_plane"."integration_webhook_sources" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "control_plane"."integration_webhook_events" ADD COLUMN "integration_webhook_source_id" text;--> statement-breakpoint
 ALTER TABLE "control_plane"."integration_webhook_sources" ADD CONSTRAINT "integration_webhook_sources_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "control_plane"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."integration_webhook_sources" ADD CONSTRAINT "integration_webhook_sources_integration_connection_id_integration_connections_id_fk" FOREIGN KEY ("integration_connection_id") REFERENCES "control_plane"."integration_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."integration_webhook_sources" ADD CONSTRAINT "integration_webhook_sources_target_key_integration_targets_target_key_fk" FOREIGN KEY ("target_key") REFERENCES "control_plane"."integration_targets"("target_key") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint

@@ -84,7 +84,7 @@ function generateWebhookSecret(): string {
   return randomBytes(32).toString("base64url");
 }
 
-function resolveConnectionConfigOrThrow(input: {
+export function resolveConnectionConfigOrThrow(input: {
   connectionId: string;
   config: Record<string, unknown> | null;
 }): Record<string, unknown> {
@@ -95,7 +95,7 @@ function resolveConnectionConfigOrThrow(input: {
   return input.config;
 }
 
-async function resolveConnectionWithTargetOrThrow(input: {
+export async function resolveConnectionWithTargetOrThrow(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
   connectionId: string;
@@ -133,7 +133,7 @@ async function resolveConnectionWithTargetOrThrow(input: {
   };
 }
 
-function resolveConnectionSecretsOrThrow(input: {
+export function resolveConnectionSecretsOrThrow(input: {
   connection: ConnectionWithTarget;
   integrationsConfig: AppContext["var"]["config"]["integrations"];
 }): Record<string, string> {
@@ -153,7 +153,7 @@ function resolveConnectionSecretsOrThrow(input: {
   });
 }
 
-function resolveWebhookSourceCapabilityOrThrow(input: {
+export function resolveWebhookSourceCapabilityOrThrow(input: {
   integrationRegistry: IntegrationRegistry;
   integrationsConfig: AppContext["var"]["config"]["integrations"];
   target: ConnectionWithTarget["target"];

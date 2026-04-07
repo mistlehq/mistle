@@ -123,6 +123,13 @@ export const IntegrationWebhookEventDefinitionSchema = z
   })
   .strict();
 
+const IntegrationWebhookSourceMetadataSchema = z
+  .object({
+    ownerScope: z.enum(["target", "connection"]),
+    requiresSourceSelection: z.boolean(),
+  })
+  .strict();
+
 export const IntegrationTargetSchema = z
   .object({
     targetKey: z.string().min(1),
@@ -134,6 +141,7 @@ export const IntegrationTargetSchema = z
     description: z.string().min(1),
     logoKey: z.string().min(1).optional(),
     connectionMethods: z.array(IntegrationConnectionMethodSchema).min(1).optional(),
+    webhookSource: IntegrationWebhookSourceMetadataSchema.optional(),
     supportedWebhookEvents: z.array(IntegrationWebhookEventDefinitionSchema).optional(),
     displayNameOverride: z.string().min(1).optional(),
     descriptionOverride: z.string().min(1).optional(),
