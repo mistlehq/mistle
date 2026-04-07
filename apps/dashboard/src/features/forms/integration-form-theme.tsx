@@ -458,6 +458,18 @@ function IntegrationObjectFieldTemplate(
   const layout = resolveFormLayout(props.registry.formContext);
   const visibleProperties = props.properties.filter((property) => !property.hidden);
   const hiddenProperties = props.properties.filter((property) => property.hidden);
+  const title =
+    typeof props.schema.title === "string" && props.schema.title.length > 0
+      ? props.schema.title
+      : "";
+  const description =
+    typeof props.schema.description === "string" && props.schema.description.length > 0
+      ? props.schema.description
+      : undefined;
+
+  if (visibleProperties.length === 0 && description === undefined && title.length === 0) {
+    return <>{hiddenProperties.map((property) => property.content)}</>;
+  }
 
   return (
     <>
@@ -467,15 +479,11 @@ function IntegrationObjectFieldTemplate(
           layout === "horizontal" ? IntegrationHorizontalFieldGroupClassName : undefined,
         )}
       >
-        {props.title.length > 0 || typeof props.description === "string" ? (
+        {title.length > 0 || description !== undefined ? (
           <FieldHeader>
-            {props.title.length > 0 ? <FieldTitle>{props.title}</FieldTitle> : null}
-            {typeof props.description === "string" ? (
-              <FieldDescription>{props.description}</FieldDescription>
-            ) : null}
+            {title.length > 0 ? <FieldTitle>{title}</FieldTitle> : null}
+            {description !== undefined ? <FieldDescription>{description}</FieldDescription> : null}
           </FieldHeader>
-        ) : props.description ? (
-          props.description
         ) : null}
         {visibleProperties.map((property) => (
           <div key={property.name}>{property.content}</div>
