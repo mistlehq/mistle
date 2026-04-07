@@ -10,7 +10,12 @@ const meta = {
   args: {
     displayName: "Mistle Developer",
     email: "developer@mistle.so",
+    imageUrl: null,
+    onDeleteProfileImage: async () => {},
     onSaveChanges: async () => {},
+    onUploadProfileImage: async () => {},
+    profileImageBusy: false,
+    profileImageErrorMessage: null,
     saving: false,
   },
 } satisfies Meta<typeof ProfileSettingsPageView>;
