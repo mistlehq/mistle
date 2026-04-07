@@ -22,13 +22,6 @@
       "when": 1772379371610,
       "tag": "0002_add-sandbox-instance-runtime-plans",
       "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1775491779881,
-      "tag": "0003_add-sandbox-instance-title",
-      "breakpoints": true
     }
   ]
 }
