@@ -116,6 +116,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     retry: false,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
+      const connectable = query.state.data?.connectable ?? null;
       const automationConversation = query.state.data?.automationConversation ?? null;
       if (
         shouldWaitForAutomationSessionThread({
@@ -137,7 +138,7 @@ export function useSessionWorkbenchLifecycleState(input: {
         return 1_000;
       }
 
-      return status === "running" || status === "failed" || status === "stopped" ? false : 1_000;
+      return connectable === true || status === "failed" || status === "stopped" ? false : 1_000;
     },
   });
   const markRecoveryBoundary = useCallback(() => {
@@ -197,6 +198,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   const connectionReadiness = resolveSessionConnectionReadiness({
     sandboxInstanceId: input.sandboxInstanceId,
     sandboxStatus: displaySandboxLifecycleStatus,
+    sandboxConnectable: sandboxStatusQuery.data?.connectable ?? null,
     isStatusPending: sandboxStatusQuery.isPending,
   });
   const stoppedSessionMessage = resolveStoppedSessionMessageForWorkbenchEntryPhase({

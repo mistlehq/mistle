@@ -22,15 +22,17 @@ export type SessionConnectionReadiness = {
     | "unknown";
 };
 
-export function isSandboxReadyForConnections(
-  sandboxStatus: string | null,
-): sandboxStatus is "running" {
-  return sandboxStatus === "running";
+export function isSandboxReadyForConnections(input: {
+  sandboxStatus: string | null;
+  sandboxConnectable: boolean | null;
+}): boolean {
+  return input.sandboxStatus === "running" && input.sandboxConnectable === true;
 }
 
 export function resolveSessionConnectionReadiness(input: {
   sandboxInstanceId: string | null;
   sandboxStatus: string | null;
+  sandboxConnectable: boolean | null;
   isStatusPending: boolean;
 }): SessionConnectionReadiness {
   if (input.sandboxInstanceId === null) {
@@ -47,14 +49,23 @@ export function resolveSessionConnectionReadiness(input: {
     };
   }
 
-  if (isSandboxReadyForConnections(input.sandboxStatus)) {
+  if (
+    isSandboxReadyForConnections({
+      sandboxStatus: input.sandboxStatus,
+      sandboxConnectable: input.sandboxConnectable,
+    })
+  ) {
     return {
       canConnect: true,
       reason: "ready",
     };
   }
 
-  if (input.sandboxStatus === "pending" || input.sandboxStatus === "starting") {
+  if (
+    input.sandboxStatus === "pending" ||
+    input.sandboxStatus === "starting" ||
+    input.sandboxStatus === "running"
+  ) {
     return {
       canConnect: false,
       reason: "starting",
