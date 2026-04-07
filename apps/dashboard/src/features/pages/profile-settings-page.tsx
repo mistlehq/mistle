@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
@@ -24,6 +25,9 @@ export function ProfileSettingsPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const session = useRequiredSession();
+  const [profileImageOperationErrorMessage, setProfileImageOperationErrorMessage] = useState<
+    string | null
+  >(null);
   const { title, description } = resolvePageFrameText(pageMeta, "Profile");
   const profileImageQuery = useQuery({
     queryKey: PROFILE_IMAGE_QUERY_KEY,
@@ -41,6 +45,9 @@ export function ProfileSettingsPage(): React.JSX.Element {
   });
   const uploadProfileImageMutation = useMutation({
     mutationFn: async (file: File) => uploadProfileImage({ file }),
+    onMutate: async () => {
+      setProfileImageOperationErrorMessage(null);
+    },
     onSuccess: async (result) => {
       queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, {
         imageUrl: result.imageUrl,
@@ -48,10 +55,22 @@ export function ProfileSettingsPage(): React.JSX.Element {
       queryClient.setQueryData(SESSION_QUERY_KEY, (currentSession) =>
         updateSessionUserImage(currentSession ?? null, result.imageUrl),
       );
+      setProfileImageOperationErrorMessage(null);
+    },
+    onError: (error) => {
+      setProfileImageOperationErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not upload profile image.",
+        }),
+      );
     },
   });
   const deleteProfileImageMutation = useMutation({
     mutationFn: deleteProfileImage,
+    onMutate: async () => {
+      setProfileImageOperationErrorMessage(null);
+    },
     onSuccess: async () => {
       queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, {
         imageUrl: null,
@@ -59,27 +78,28 @@ export function ProfileSettingsPage(): React.JSX.Element {
       queryClient.setQueryData(SESSION_QUERY_KEY, (currentSession) =>
         updateSessionUserImage(currentSession ?? null, null),
       );
+      setProfileImageOperationErrorMessage(null);
+    },
+    onError: (error) => {
+      setProfileImageOperationErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not delete profile image.",
+        }),
+      );
     },
   });
 
   const persistedDisplayName = resolveUserDisplayName(session.user);
   const imageUrl = profileImageQuery.data?.imageUrl ?? null;
-  const profileImageErrorMessage = uploadProfileImageMutation.isError
-    ? resolveApiErrorMessage({
-        error: uploadProfileImageMutation.error,
-        fallbackMessage: "Could not upload profile image.",
-      })
-    : deleteProfileImageMutation.isError
+  const profileImageErrorMessage =
+    profileImageOperationErrorMessage ??
+    (profileImageQuery.isError
       ? resolveApiErrorMessage({
-          error: deleteProfileImageMutation.error,
-          fallbackMessage: "Could not delete profile image.",
+          error: profileImageQuery.error,
+          fallbackMessage: "Could not load profile image.",
         })
-      : profileImageQuery.isError
-        ? resolveApiErrorMessage({
-            error: profileImageQuery.error,
-            fallbackMessage: "Could not load profile image.",
-          })
-        : null;
+      : null);
 
   return (
     <FormPageFrame description={description} title={title}>

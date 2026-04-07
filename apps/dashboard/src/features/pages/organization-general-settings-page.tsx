@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
@@ -41,6 +42,8 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const organizationId = useRequiredOrganizationId();
+  const [organizationLogoOperationErrorMessage, setOrganizationLogoOperationErrorMessage] =
+    useState<string | null>(null);
   const { title, description } = resolvePageFrameText(pageMeta, "General");
 
   const organizationQuery = useQuery({
@@ -96,10 +99,22 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         organizationId,
         file,
       }),
+    onMutate: async () => {
+      setOrganizationLogoOperationErrorMessage(null);
+    },
     onSuccess: async (result) => {
       queryClient.setQueryData(organizationLogoQueryKey(organizationId), {
         imageUrl: result.imageUrl,
       });
+      setOrganizationLogoOperationErrorMessage(null);
+    },
+    onError: (error) => {
+      setOrganizationLogoOperationErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Upload failed. Please try again later.",
+        }),
+      );
     },
   });
   const deleteOrganizationLogoMutation = useMutation({
@@ -107,29 +122,33 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
       deleteOrganizationLogo({
         organizationId,
       }),
+    onMutate: async () => {
+      setOrganizationLogoOperationErrorMessage(null);
+    },
     onSuccess: async () => {
       queryClient.setQueryData(organizationLogoQueryKey(organizationId), {
         imageUrl: null,
       });
+      setOrganizationLogoOperationErrorMessage(null);
+    },
+    onError: (error) => {
+      setOrganizationLogoOperationErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Remove failed. Please try again later.",
+        }),
+      );
     },
   });
 
-  const logoErrorMessage = uploadOrganizationLogoMutation.isError
-    ? resolveApiErrorMessage({
-        error: uploadOrganizationLogoMutation.error,
-        fallbackMessage: "Upload failed. Please try again later.",
-      })
-    : deleteOrganizationLogoMutation.isError
+  const logoErrorMessage =
+    organizationLogoOperationErrorMessage ??
+    (organizationLogoQuery.isError
       ? resolveApiErrorMessage({
-          error: deleteOrganizationLogoMutation.error,
-          fallbackMessage: "Remove failed. Please try again later.",
+          error: organizationLogoQuery.error,
+          fallbackMessage: "Could not load organization logo.",
         })
-      : organizationLogoQuery.isError
-        ? resolveApiErrorMessage({
-            error: organizationLogoQuery.error,
-            fallbackMessage: "Could not load organization logo.",
-          })
-        : null;
+      : null);
 
   return (
     <FormPageFrame description={description} title={title}>
