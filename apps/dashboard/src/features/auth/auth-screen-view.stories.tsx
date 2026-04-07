@@ -7,6 +7,21 @@ import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybo
 import { AuthScreenView } from "./auth-screen-view.js";
 import { GoogleSignInButton } from "./google-sign-in-button.js";
 
+const DefaultArgs = {
+  authError: null,
+  authStep: "email",
+  email: "dev@mistle.so",
+  footerError: null,
+  isSendingOtp: false,
+  isVerifyingOtp: false,
+  onEmailChange: () => {},
+  onOtpChange: () => {},
+  onSendOtp: async () => {},
+  onUseDifferentEmail: () => {},
+  onVerifyOtp: async () => {},
+  otp: "",
+} satisfies React.ComponentProps<typeof AuthScreenView>;
+
 const meta = {
   title: "Dashboard/Auth/ScreenView",
   component: AuthScreenView,
@@ -14,20 +29,7 @@ const meta = {
   parameters: {
     layout: "fullscreen",
   },
-  args: {
-    authError: null,
-    authStep: "email",
-    email: "dev@mistle.so",
-    footerError: null,
-    isSendingOtp: false,
-    isVerifyingOtp: false,
-    onEmailChange: () => {},
-    onOtpChange: () => {},
-    onSendOtp: async () => {},
-    onUseDifferentEmail: () => {},
-    onVerifyOtp: async () => {},
-    otp: "",
-  },
+  args: DefaultArgs,
 } satisfies Meta<typeof AuthScreenView>;
 
 export default meta;
@@ -35,9 +37,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 function InteractiveOtpStory(args: Story["args"]): React.JSX.Element {
-  const [otp, setOtp] = useState(args?.otp ?? "");
+  const resolvedArgs = {
+    ...DefaultArgs,
+    ...args,
+  } satisfies React.ComponentProps<typeof AuthScreenView>;
+  const [otp, setOtp] = useState(resolvedArgs.otp);
 
-  return <AuthScreenView {...args} onOtpChange={setOtp} otp={otp} />;
+  return <AuthScreenView {...resolvedArgs} onOtpChange={setOtp} otp={otp} />;
 }
 
 export const EmailEntry: Story = {
