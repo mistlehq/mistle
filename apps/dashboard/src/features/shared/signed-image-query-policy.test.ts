@@ -15,7 +15,12 @@ describe("signed image query policy", () => {
 
   it("refreshes using the server-provided delay", () => {
     expect(resolveSignedImageRefetchInterval({ refreshAfterSeconds: 3300 })).toBe(3_300_000);
-    expect(resolveSignedImageStaleTime({ refreshAfterSeconds: 3300 })).toBe(3_300_000);
+    expect(resolveSignedImageStaleTime({ refreshAfterSeconds: 3300 })).toBe(300_000);
+  });
+
+  it("caps stale time so focus or reconnect can pick up external edits", () => {
+    expect(resolveSignedImageStaleTime({ refreshAfterSeconds: 60 })).toBe(60_000);
+    expect(resolveSignedImageStaleTime({ refreshAfterSeconds: 3300 })).toBe(300_000);
   });
 
   it("disables interval polling for nearly expired URLs", () => {

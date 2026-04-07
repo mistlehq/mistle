@@ -1,41 +1,6 @@
 import { getDashboardConfig } from "../../../config.js";
+import { parseSignedImagePayload } from "../../shared/signed-image-payload.js";
 import { executeMembersOperation } from "../members/members-api-errors.js";
-
-function parseOrganizationLogoPayload(payload: unknown): {
-  imageUrl: string | null;
-  refreshAfterSeconds: number | null;
-} {
-  if (typeof payload !== "object" || payload === null) {
-    throw new Error("Organization logo response was invalid.");
-  }
-
-  if (!("imageUrl" in payload)) {
-    throw new Error("Organization logo response was missing imageUrl.");
-  }
-
-  if (payload.imageUrl !== null && typeof payload.imageUrl !== "string") {
-    throw new Error("Organization logo response imageUrl was invalid.");
-  }
-  if (
-    "refreshAfterSeconds" in payload &&
-    payload.refreshAfterSeconds !== null &&
-    (typeof payload.refreshAfterSeconds !== "number" ||
-      !Number.isFinite(payload.refreshAfterSeconds) ||
-      payload.refreshAfterSeconds < 0)
-  ) {
-    throw new Error("Organization logo response refreshAfterSeconds was invalid.");
-  }
-
-  const refreshAfterSeconds =
-    "refreshAfterSeconds" in payload && typeof payload.refreshAfterSeconds === "number"
-      ? payload.refreshAfterSeconds
-      : null;
-
-  return {
-    imageUrl: payload.imageUrl,
-    refreshAfterSeconds,
-  };
-}
 
 function createOrganizationLogoUrl(input: { organizationId: string }): URL {
   const config = getDashboardConfig();
@@ -72,7 +37,10 @@ export async function getOrganizationLogo(input: {
       );
     }
 
-    return parseOrganizationLogoPayload(await response.json());
+    return parseSignedImagePayload({
+      payload: await response.json(),
+      responseName: "Organization logo response",
+    });
   });
 }
 
@@ -108,7 +76,10 @@ export async function uploadOrganizationLogo(input: {
       );
     }
 
-    const result = parseOrganizationLogoPayload(await response.json());
+    const result = parseSignedImagePayload({
+      payload: await response.json(),
+      responseName: "Organization logo response",
+    });
     if (result.imageUrl === null) {
       throw new Error("Organization logo upload response did not include imageUrl.");
     }
