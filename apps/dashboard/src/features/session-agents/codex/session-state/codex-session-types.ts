@@ -20,6 +20,11 @@ export type CodexThreadTokenUsageSnapshot = {
   usageJson: string;
 };
 
+export type CodexThreadNameUpdate = {
+  threadId: string;
+  title: string;
+};
+
 export type CodexTurnDiffSnapshot = {
   threadId: string | null;
   turnId: string;

@@ -62,6 +62,20 @@ export type ReconcileSandboxInstanceInput = {
 };
 export type ReconcileSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/reconcile"]["post"]["responses"]["200"]["content"]["application/json"];
+export type PatchSandboxInstanceTitleInput = {
+  organizationId: string;
+  instanceId: string;
+  title: string;
+};
+const PatchSandboxInstanceTitleResponseSchema = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+  })
+  .strict();
+export type PatchSandboxInstanceTitleResponse = z.infer<
+  typeof PatchSandboxInstanceTitleResponseSchema
+>;
 export type GetSandboxInstanceInput = {
   organizationId: string;
   instanceId: string;
@@ -110,6 +124,9 @@ export type DataPlaneSandboxInstancesClient = {
   reconcileSandboxInstance: (
     input: ReconcileSandboxInstanceInput,
   ) => Promise<ReconcileSandboxInstanceAcceptedResponse>;
+  patchSandboxInstanceTitle: (
+    input: PatchSandboxInstanceTitleInput,
+  ) => Promise<PatchSandboxInstanceTitleResponse>;
   getSandboxInstance: (input: GetSandboxInstanceInput) => Promise<GetSandboxInstanceResponse>;
   listSandboxInstances: (input: ListSandboxInstancesInput) => Promise<ListSandboxInstancesResponse>;
 };
@@ -140,13 +157,14 @@ function parseInternalErrorBody(input: unknown): InternalErrorBody | undefined {
 function createClientError(input: {
   status: number;
   error: unknown;
-  operation: "start" | "resume" | "stop" | "reconcile" | "read" | "list";
+  operation: "start" | "resume" | "stop" | "reconcile" | "patch" | "read" | "list";
 }): DataPlaneSandboxInstancesClientError {
   const operationLabel = {
     start: "start",
     resume: "resume",
     stop: "stop",
     reconcile: "reconcile",
+    patch: "patch",
     read: "read",
     list: "list",
   } as const;
@@ -346,6 +364,39 @@ export function createDataPlaneSandboxInstancesClient(
         status: response.status,
         error: errorBody,
         operation: "reconcile",
+      });
+    },
+
+    async patchSandboxInstanceTitle(patchInput) {
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: patchInput.instanceId,
+        }),
+        {
+          method: "PATCH",
+          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          body: JSON.stringify({
+            organizationId: patchInput.organizationId,
+            title: patchInput.title,
+          }),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 200) {
+        const responseBody = await response.json();
+        const parsedResponse = PatchSandboxInstanceTitleResponseSchema.parse(responseBody);
+
+        return parsedResponse;
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "patch",
       });
     },
 

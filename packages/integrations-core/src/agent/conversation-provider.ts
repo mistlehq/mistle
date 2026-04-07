@@ -35,6 +35,16 @@ export type AgentConversationInspectInput = {
   providerConversationId: string;
 };
 
+export type AgentConversationReadMetadataInput = {
+  connection: AgentConversationConnection;
+  providerConversationId: string;
+};
+
+export type AgentConversationReadMetadataResult = {
+  name: string | null;
+  preview: string | null;
+};
+
 export type AgentConversationStartExecutionInput = {
   connection: AgentConversationConnection;
   providerConversationId: string;
@@ -82,6 +92,10 @@ export type AgentConversationProvider = {
     this: void,
     input: AgentConversationInspectInput,
   ): Promise<AgentConversationInspectResult>;
+  readConversationMetadata?(
+    this: void,
+    input: AgentConversationReadMetadataInput,
+  ): Promise<AgentConversationReadMetadataResult>;
   createConversation(
     this: void,
     input: AgentConversationCreateInput,

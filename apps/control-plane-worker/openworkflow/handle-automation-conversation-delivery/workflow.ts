@@ -24,7 +24,7 @@ function getConversationDeliveryStepName(input: { prefix: string; taskId: string
 export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
   HandleAutomationConversationDeliveryWorkflowSpec,
   async ({ input, step }) => {
-    const { controlPlaneInternalClient, db } = await getWorkflowContext();
+    const { controlPlaneInternalClient, dataPlaneClient, db } = await getWorkflowContext();
 
     let iteration = 0;
 
@@ -213,6 +213,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             deliverConversationAutomationPayload(
               {
                 db,
+                dataPlaneClient,
               },
               {
                 taskId: activeTask.taskId,
