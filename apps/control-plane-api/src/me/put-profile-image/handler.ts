@@ -1,7 +1,7 @@
 import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
-import { resolvePresignedImageExpiresAt } from "../../auth/services/presigned-image-response.js";
+import { resolvePresignedImageRefreshAfterSeconds } from "../../auth/services/presigned-image-response.js";
 import { putUserAvatar } from "../../auth/services/put-user-avatar.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
@@ -27,20 +27,18 @@ const routeHandler = async (
       imageBytes,
     },
   );
-  const now = new Date();
   const imageUrl = await objectStore.createPresignedGetUrl({
     objectKey: profileImage.imageObjectKey,
     expiresInSeconds: PROFILE_IMAGE_READ_URL_TTL_SECONDS,
   });
-  const expiresAt = resolvePresignedImageExpiresAt({
-    now,
+  const refreshAfterSeconds = resolvePresignedImageRefreshAfterSeconds({
     expiresInSeconds: PROFILE_IMAGE_READ_URL_TTL_SECONDS,
   });
 
   return ctx.json(
     {
       imageUrl,
-      expiresAt,
+      refreshAfterSeconds,
     },
     200,
   );

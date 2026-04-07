@@ -3,7 +3,7 @@ import { executeMembersOperation } from "../members/members-api-errors.js";
 
 function parseOrganizationLogoPayload(payload: unknown): {
   imageUrl: string | null;
-  expiresAt: string | null;
+  refreshAfterSeconds: number | null;
 } {
   if (typeof payload !== "object" || payload === null) {
     throw new Error("Organization logo response was invalid.");
@@ -12,20 +12,25 @@ function parseOrganizationLogoPayload(payload: unknown): {
   if (!("imageUrl" in payload)) {
     throw new Error("Organization logo response was missing imageUrl.");
   }
-  if (!("expiresAt" in payload)) {
-    throw new Error("Organization logo response was missing expiresAt.");
+  if (!("refreshAfterSeconds" in payload)) {
+    throw new Error("Organization logo response was missing refreshAfterSeconds.");
   }
 
   if (payload.imageUrl !== null && typeof payload.imageUrl !== "string") {
     throw new Error("Organization logo response imageUrl was invalid.");
   }
-  if (payload.expiresAt !== null && typeof payload.expiresAt !== "string") {
-    throw new Error("Organization logo response expiresAt was invalid.");
+  if (
+    payload.refreshAfterSeconds !== null &&
+    (typeof payload.refreshAfterSeconds !== "number" ||
+      !Number.isFinite(payload.refreshAfterSeconds) ||
+      payload.refreshAfterSeconds < 0)
+  ) {
+    throw new Error("Organization logo response refreshAfterSeconds was invalid.");
   }
 
   return {
     imageUrl: payload.imageUrl,
-    expiresAt: payload.expiresAt,
+    refreshAfterSeconds: payload.refreshAfterSeconds,
   };
 }
 
@@ -39,7 +44,7 @@ function createOrganizationLogoUrl(input: { organizationId: string }): URL {
 
 export async function getOrganizationLogo(input: {
   organizationId: string;
-}): Promise<{ imageUrl: string | null; expiresAt: string | null }> {
+}): Promise<{ imageUrl: string | null; refreshAfterSeconds: number | null }> {
   return executeMembersOperation("getOrganizationLogo", async () => {
     const response = await fetch(
       createOrganizationLogoUrl({ organizationId: input.organizationId }),
@@ -71,7 +76,7 @@ export async function getOrganizationLogo(input: {
 export async function uploadOrganizationLogo(input: {
   organizationId: string;
   file: File;
-}): Promise<{ imageUrl: string; expiresAt: string }> {
+}): Promise<{ imageUrl: string; refreshAfterSeconds: number }> {
   return executeMembersOperation("uploadOrganizationLogo", async () => {
     const formData = new FormData();
     formData.set("file", input.file);
@@ -104,13 +109,13 @@ export async function uploadOrganizationLogo(input: {
     if (result.imageUrl === null) {
       throw new Error("Organization logo upload response did not include imageUrl.");
     }
-    if (result.expiresAt === null) {
-      throw new Error("Organization logo upload response did not include expiresAt.");
+    if (result.refreshAfterSeconds === null) {
+      throw new Error("Organization logo upload response did not include refreshAfterSeconds.");
     }
 
     return {
       imageUrl: result.imageUrl,
-      expiresAt: result.expiresAt,
+      refreshAfterSeconds: result.refreshAfterSeconds,
     };
   });
 }

@@ -5,7 +5,7 @@ import { executeMembersOperation } from "../members/members-api-errors.js";
 
 function parseProfileImagePayload(payload: unknown): {
   imageUrl: string | null;
-  expiresAt: string | null;
+  refreshAfterSeconds: number | null;
 } {
   if (typeof payload !== "object" || payload === null) {
     throw new Error("Profile image response was invalid.");
@@ -14,20 +14,25 @@ function parseProfileImagePayload(payload: unknown): {
   if (!("imageUrl" in payload)) {
     throw new Error("Profile image response was missing imageUrl.");
   }
-  if (!("expiresAt" in payload)) {
-    throw new Error("Profile image response was missing expiresAt.");
+  if (!("refreshAfterSeconds" in payload)) {
+    throw new Error("Profile image response was missing refreshAfterSeconds.");
   }
 
   if (payload.imageUrl !== null && typeof payload.imageUrl !== "string") {
     throw new Error("Profile image response imageUrl was invalid.");
   }
-  if (payload.expiresAt !== null && typeof payload.expiresAt !== "string") {
-    throw new Error("Profile image response expiresAt was invalid.");
+  if (
+    payload.refreshAfterSeconds !== null &&
+    (typeof payload.refreshAfterSeconds !== "number" ||
+      !Number.isFinite(payload.refreshAfterSeconds) ||
+      payload.refreshAfterSeconds < 0)
+  ) {
+    throw new Error("Profile image response refreshAfterSeconds was invalid.");
   }
 
   return {
     imageUrl: payload.imageUrl,
-    expiresAt: payload.expiresAt,
+    refreshAfterSeconds: payload.refreshAfterSeconds,
   };
 }
 
@@ -38,7 +43,7 @@ function createProfileImageUrl(): URL {
 
 export async function getProfileImage(): Promise<{
   imageUrl: string | null;
-  expiresAt: string | null;
+  refreshAfterSeconds: number | null;
 }> {
   return executeMembersOperation("getProfileImage", async () => {
     const response = await requestControlPlane({
@@ -54,7 +59,7 @@ export async function getProfileImage(): Promise<{
 
 export async function uploadProfileImage(input: {
   file: File;
-}): Promise<{ imageUrl: string; expiresAt: string }> {
+}): Promise<{ imageUrl: string; refreshAfterSeconds: number }> {
   return executeMembersOperation("uploadProfileImage", async () => {
     const formData = new FormData();
     formData.set("file", input.file);
@@ -84,13 +89,13 @@ export async function uploadProfileImage(input: {
     if (result.imageUrl === null) {
       throw new Error("Profile image upload response did not include imageUrl.");
     }
-    if (result.expiresAt === null) {
-      throw new Error("Profile image upload response did not include expiresAt.");
+    if (result.refreshAfterSeconds === null) {
+      throw new Error("Profile image upload response did not include refreshAfterSeconds.");
     }
 
     return {
       imageUrl: result.imageUrl,
-      expiresAt: result.expiresAt,
+      refreshAfterSeconds: result.refreshAfterSeconds,
     };
   });
 }

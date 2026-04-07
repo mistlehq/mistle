@@ -1,20 +1,13 @@
-export const SIGNED_IMAGE_URL_REFRESH_BUFFER_MS = 5 * 60 * 1000;
-
 export function resolveSignedImageRefetchInterval(input: {
-  expiresAt: string | null | undefined;
-  nowMs?: number;
+  refreshAfterSeconds: number | null | undefined;
 }): false | number {
-  if (input.expiresAt === undefined || input.expiresAt === null) {
+  if (input.refreshAfterSeconds === undefined || input.refreshAfterSeconds === null) {
     return false;
   }
 
-  const expiresAtTime = Date.parse(input.expiresAt);
-  if (Number.isNaN(expiresAtTime)) {
+  if (!Number.isFinite(input.refreshAfterSeconds) || input.refreshAfterSeconds <= 0) {
     return false;
   }
 
-  const refreshIntervalMs =
-    expiresAtTime - (input.nowMs ?? Date.now()) - SIGNED_IMAGE_URL_REFRESH_BUFFER_MS;
-
-  return refreshIntervalMs <= 0 ? false : refreshIntervalMs;
+  return input.refreshAfterSeconds * 1000;
 }

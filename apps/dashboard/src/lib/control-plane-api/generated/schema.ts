@@ -2625,10 +2625,9 @@ export interface paths {
           };
           content: {
             "application/json": {
-              /** Format: date-time */
-              expiresAt: string | null;
               /** Format: uri */
               imageUrl: string | null;
+              refreshAfterSeconds: number | null;
             };
           };
         };
@@ -2692,10 +2691,9 @@ export interface paths {
           };
           content: {
             "application/json": {
-              /** Format: date-time */
-              expiresAt: string;
               /** Format: uri */
               imageUrl: string;
+              refreshAfterSeconds: number;
             };
           };
         };
@@ -2833,10 +2831,9 @@ export interface paths {
           };
           content: {
             "application/json": {
-              /** Format: date-time */
-              expiresAt: string | null;
               /** Format: uri */
               imageUrl: string | null;
+              refreshAfterSeconds: number | null;
             };
           };
         };
@@ -2915,10 +2912,9 @@ export interface paths {
           };
           content: {
             "application/json": {
-              /** Format: date-time */
-              expiresAt: string;
               /** Format: uri */
               imageUrl: string;
+              refreshAfterSeconds: number;
             };
           };
         };

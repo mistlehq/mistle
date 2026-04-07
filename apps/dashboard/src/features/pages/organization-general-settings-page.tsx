@@ -105,7 +105,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
     onSuccess: async (result) => {
       queryClient.setQueryData(organizationLogoQueryKey(organizationId), {
         imageUrl: result.imageUrl,
-        expiresAt: result.expiresAt,
+        refreshAfterSeconds: result.refreshAfterSeconds,
       });
       setOrganizationLogoOperationErrorMessage(null);
     },
@@ -129,7 +129,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
     onSuccess: async () => {
       queryClient.setQueryData(organizationLogoQueryKey(organizationId), {
         imageUrl: null,
-        expiresAt: null,
+        refreshAfterSeconds: null,
       });
       setOrganizationLogoOperationErrorMessage(null);
     },
@@ -145,7 +145,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
 
   const logoErrorMessage =
     organizationLogoOperationErrorMessage ??
-    (organizationLogoQuery.isError
+    (organizationLogoQuery.isError && organizationLogoQuery.data === undefined
       ? resolveApiErrorMessage({
           error: organizationLogoQuery.error,
           fallbackMessage: "Could not load organization logo.",

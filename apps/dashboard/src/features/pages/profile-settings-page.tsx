@@ -42,7 +42,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
     onSuccess: async (result) => {
       queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, {
         imageUrl: result.imageUrl,
-        expiresAt: result.expiresAt,
+        refreshAfterSeconds: result.refreshAfterSeconds,
       });
       queryClient.setQueryData(SESSION_QUERY_KEY, (currentSession) =>
         updateSessionUserImage(currentSession ?? null, result.imageUrl),
@@ -66,7 +66,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
     onSuccess: async () => {
       queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, {
         imageUrl: null,
-        expiresAt: null,
+        refreshAfterSeconds: null,
       });
       queryClient.setQueryData(SESSION_QUERY_KEY, (currentSession) =>
         updateSessionUserImage(currentSession ?? null, null),
@@ -87,7 +87,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
   const imageUrl = profileImageQuery.data?.imageUrl ?? null;
   const profileImageErrorMessage =
     profileImageOperationErrorMessage ??
-    (profileImageQuery.isError
+    (profileImageQuery.isError && profileImageQuery.data === undefined
       ? resolveApiErrorMessage({
           error: profileImageQuery.error,
           fallbackMessage: "Could not load profile image.",

@@ -15,7 +15,7 @@ export function useProfileImageQuery() {
     staleTime: 0,
     refetchInterval: (query) =>
       resolveSignedImageRefetchInterval({
-        expiresAt: query.state.data?.expiresAt,
+        refreshAfterSeconds: query.state.data?.refreshAfterSeconds,
       }),
   });
 }

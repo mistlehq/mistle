@@ -2,7 +2,7 @@ import type { RouteHandler } from "@hono/zod-openapi";
 import { ForbiddenError, withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { canManageOrganization } from "../../auth/services/organization-policy.js";
-import { resolvePresignedImageExpiresAt } from "../../auth/services/presigned-image-response.js";
+import { resolvePresignedImageRefreshAfterSeconds } from "../../auth/services/presigned-image-response.js";
 import { putOrganizationLogo } from "../../auth/services/put-organization-logo.js";
 import { PROFILE_IMAGE_READ_URL_TTL_SECONDS } from "../../me/constants.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
@@ -40,20 +40,18 @@ const routeHandler = async (
       imageBytes,
     },
   );
-  const now = new Date();
   const imageUrl = await objectStore.createPresignedGetUrl({
     objectKey: organizationLogo.logoObjectKey,
     expiresInSeconds: PROFILE_IMAGE_READ_URL_TTL_SECONDS,
   });
-  const expiresAt = resolvePresignedImageExpiresAt({
-    now,
+  const refreshAfterSeconds = resolvePresignedImageRefreshAfterSeconds({
     expiresInSeconds: PROFILE_IMAGE_READ_URL_TTL_SECONDS,
   });
 
   return ctx.json(
     {
       imageUrl,
-      expiresAt,
+      refreshAfterSeconds,
     },
     200,
   );

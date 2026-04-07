@@ -1,6 +1,7 @@
-export function resolvePresignedImageExpiresAt(input: {
-  now: Date;
+const PRESIGNED_IMAGE_REFRESH_BUFFER_SECONDS = 5 * 60;
+
+export function resolvePresignedImageRefreshAfterSeconds(input: {
   expiresInSeconds: number;
-}): string {
-  return new Date(input.now.getTime() + input.expiresInSeconds * 1000).toISOString();
+}): number {
+  return Math.max(input.expiresInSeconds - PRESIGNED_IMAGE_REFRESH_BUFFER_SECONDS, 0);
 }

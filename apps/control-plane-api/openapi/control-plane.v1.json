@@ -5086,12 +5086,12 @@
                       "type": ["string", "null"],
                       "format": "uri"
                     },
-                    "expiresAt": {
-                      "type": ["string", "null"],
-                      "format": "date-time"
+                    "refreshAfterSeconds": {
+                      "type": ["integer", "null"],
+                      "minimum": 0
                     }
                   },
-                  "required": ["imageUrl", "expiresAt"],
+                  "required": ["imageUrl", "refreshAfterSeconds"],
                   "additionalProperties": false
                 }
               }
@@ -5186,12 +5186,12 @@
                       "type": "string",
                       "format": "uri"
                     },
-                    "expiresAt": {
-                      "type": "string",
-                      "format": "date-time"
+                    "refreshAfterSeconds": {
+                      "type": "integer",
+                      "minimum": 0
                     }
                   },
-                  "required": ["imageUrl", "expiresAt"],
+                  "required": ["imageUrl", "refreshAfterSeconds"],
                   "additionalProperties": false
                 }
               }
@@ -5366,12 +5366,12 @@
                       "type": ["string", "null"],
                       "format": "uri"
                     },
-                    "expiresAt": {
-                      "type": ["string", "null"],
-                      "format": "date-time"
+                    "refreshAfterSeconds": {
+                      "type": ["integer", "null"],
+                      "minimum": 0
                     }
                   },
-                  "required": ["imageUrl", "expiresAt"],
+                  "required": ["imageUrl", "refreshAfterSeconds"],
                   "additionalProperties": false
                 }
               }
@@ -5499,12 +5499,12 @@
                       "type": "string",
                       "format": "uri"
                     },
-                    "expiresAt": {
-                      "type": "string",
-                      "format": "date-time"
+                    "refreshAfterSeconds": {
+                      "type": "integer",
+                      "minimum": 0
                     }
                   },
-                  "required": ["imageUrl", "expiresAt"],
+                  "required": ["imageUrl", "refreshAfterSeconds"],
                   "additionalProperties": false
                 }
               }
