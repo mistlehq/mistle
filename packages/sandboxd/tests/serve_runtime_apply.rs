@@ -1,11 +1,12 @@
 #![cfg(target_os = "linux")]
 
 use std::collections::BTreeMap;
+use std::ffi::OsString;
 use std::fs;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::mpsc;
+use std::sync::{LazyLock, Mutex, mpsc};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -15,9 +16,13 @@ use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 use tungstenite::{Message, accept};
 
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+static ENV_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str = "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 
 #[test]
 fn daemon_applies_startup_input_after_init_submission() {
+    let _env_guard =
+        TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
     let test_dir = create_temp_test_dir("serve_runtime_apply");
     let control_socket_path = test_dir.join("control.sock");
     let startup_output_path = test_dir.join("startup-output.txt");
@@ -65,7 +70,7 @@ fn daemon_applies_startup_input_after_init_submission() {
     control::submit_init(&control_socket_path, &startup_input)
         .expect("init submission should succeed");
 
-    wait_for_file_contents(&startup_output_path, "startup");
+    wait_for_file_contents_or_init_failure(&server, &startup_output_path, "startup");
     assert_eq!(
         server
             .startup_input()
@@ -81,12 +86,25 @@ fn daemon_applies_startup_input_after_init_submission() {
     fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
 }
 
-fn wait_for_file_contents(path: &PathBuf, expected: &str) {
+fn wait_for_file_contents_or_init_failure(
+    server: &control::ControlServer,
+    path: &PathBuf,
+    expected: &str,
+) {
     for _ in 0..100 {
         if let Ok(contents) = fs::read_to_string(path)
             && contents == expected
         {
             return;
+        }
+
+        match server.init_phase() {
+            control::InitPhase::Failed(error) => {
+                panic!("sandboxd init failed before startup output was observed: {error}");
+            }
+            control::InitPhase::Initialized
+            | control::InitPhase::Initializing
+            | control::InitPhase::Uninitialized => {}
         }
 
         ThreadSleeper.sleep(Duration::from_millis(10));
@@ -120,6 +138,49 @@ struct BootstrapGateway {
     ws_url: String,
     shutdown_sender: mpsc::Sender<()>,
     thread: Option<thread::JoinHandle<()>>,
+}
+
+struct TestEnvVarGuard {
+    _lock: std::sync::MutexGuard<'static, ()>,
+    name: &'static str,
+    previous: Option<OsString>,
+}
+
+impl TestEnvVarGuard {
+    fn set(name: &'static str, value: &str) -> Self {
+        let lock = ENV_MUTEX
+            .lock()
+            .expect("test env mutex should not be poisoned");
+        let previous = std::env::var_os(name);
+        // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+        unsafe {
+            std::env::set_var(name, value);
+        }
+        Self {
+            _lock: lock,
+            name,
+            previous,
+        }
+    }
+}
+
+impl Drop for TestEnvVarGuard {
+    fn drop(&mut self) {
+        match &self.previous {
+            Some(previous) => {
+                // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+                unsafe {
+                    std::env::set_var(self.name, previous);
+                }
+            }
+            None => {
+                // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+                unsafe {
+                    std::env::remove_var(self.name);
+                }
+            }
+        }
+    }
 }
 
 impl BootstrapGateway {
