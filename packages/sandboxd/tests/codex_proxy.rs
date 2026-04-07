@@ -1,10 +1,11 @@
-use std::net::TcpListener;
+use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, mpsc};
 use std::thread;
 
 use serde_json::{Value, json};
 use tungstenite::{Message, WebSocket, accept, connect};
+use tungstenite::stream::MaybeTlsStream;
 
 use sandboxd::codex_proxy::start_codex_proxy;
 use sandboxd::keepalive::KeepaliveManager;
@@ -156,8 +157,7 @@ fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
     wait_for_keepalive_state(&keepalive_manager, true);
     wait_for_runtime_readiness(&runtime_readiness_manager, true);
 
-    let (mut proxy_client, _) =
-        connect(proxy.listen_url()).expect("client should connect through the Codex proxy");
+    let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
     let request_id = REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
     proxy_client
         .send(Message::Text(
@@ -239,4 +239,30 @@ where
     };
 
     serde_json::from_str(payload.as_str()).expect("text payload should be valid JSON")
+}
+
+fn connect_to_proxy_with_retry(
+    url: &str,
+) -> (
+    WebSocket<MaybeTlsStream<TcpStream>>,
+    tungstenite::handshake::client::Response,
+) {
+    let mut last_error = None;
+
+    for _ in 0..50 {
+        match connect(url) {
+            Ok(connection) => return connection,
+            Err(error) => {
+                last_error = Some(error);
+                ThreadSleeper.sleep(Duration::from_millis(10));
+            }
+        }
+    }
+
+    panic!(
+        "client should connect through the Codex proxy: {}",
+        last_error
+            .map(|error| error.to_string())
+            .unwrap_or_else(|| "unknown connection error".to_string())
+    );
 }

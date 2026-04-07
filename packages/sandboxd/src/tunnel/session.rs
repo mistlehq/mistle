@@ -189,7 +189,7 @@ impl TunnelSession {
 
         let shutdown_requested = Arc::new(AtomicBool::new(false));
         let (startup_result_sender, startup_result_receiver) = std::sync::mpsc::channel();
-        let thread = Some(thread::spawn({
+        let thread = thread::spawn({
             let shutdown_requested = shutdown_requested.clone();
             let cgroup_root = PathBuf::from(DEFAULT_CGROUP_ROOT);
             let runtime = TunnelSessionRuntime {
@@ -235,19 +235,15 @@ impl TunnelSession {
                     }
                 }
             }
-        }));
+        });
 
         match startup_result_receiver.recv() {
             Ok(Ok(())) => {}
             Ok(Err(error)) => {
-                let thread = thread
-                    .expect("tunnel session thread should exist after startup failure");
                 let _ = thread.join();
                 return Err(error);
             }
             Err(_) => {
-                let thread = thread
-                    .expect("tunnel session thread should exist after startup channel closes");
                 let _ = thread.join();
                 return Err(TunnelSessionError::SessionPanicked);
             }
@@ -255,7 +251,7 @@ impl TunnelSession {
 
         Ok(Self {
             shutdown_requested,
-            thread,
+            thread: Some(thread),
         })
     }
 
@@ -314,6 +310,22 @@ struct TunnelSessionLoopContext<'a> {
     sleeper: &'a dyn Sleeper,
 }
 
+struct TunnelSessionMutableState {
+    telemetry_relay: TelemetryRelay,
+    agent_streams: BTreeMap<u32, AgentStreamState>,
+    pty_sessions: BTreeMap<String, PtySessionState>,
+    file_uploads: BTreeMap<u32, FileUploadState>,
+}
+
+struct PtyOpenContext<'a> {
+    cgroup_root: &'a Path,
+    runtime_env: &'a BTreeMap<String, String>,
+    sandbox_instance_id: &'a str,
+    pty_sessions: &'a mut BTreeMap<String, PtySessionState>,
+    clock: &'a dyn Clock,
+    sleeper: &'a dyn Sleeper,
+}
+
 async fn run_tunnel_session(
     runtime: TunnelSessionRuntime,
     gateway_ws_url: &str,
@@ -344,10 +356,16 @@ async fn run_tunnel_session(
         event_sender.clone(),
     );
 
-    let mut telemetry_relay = TelemetryRelay::default();
+    let mut session_state = TunnelSessionMutableState {
+        telemetry_relay: TelemetryRelay::default(),
+        agent_streams: BTreeMap::new(),
+        pty_sessions: BTreeMap::new(),
+        file_uploads: BTreeMap::new(),
+    };
     send_telemetry_frames(
         &tunnel_writer_sender,
-        telemetry_relay
+        session_state
+            .telemetry_relay
             .attach_tunnel_connection()
             .map_err(|error| TunnelSessionError::AttachTelemetry(error.to_string()))?,
     )?;
@@ -363,9 +381,6 @@ async fn run_tunnel_session(
         .on_tunnel_connected();
     let _ = startup_result_sender.send(Ok(()));
 
-    let mut agent_streams = BTreeMap::<u32, AgentStreamState>::new();
-    let mut pty_sessions = BTreeMap::<String, PtySessionState>::new();
-    let mut file_uploads = BTreeMap::<u32, FileUploadState>::new();
     let loop_context = TunnelSessionLoopContext {
         agent_endpoint_url: runtime.agent_endpoint_url.as_deref(),
         attachment_root: &runtime.attachment_root,
@@ -401,12 +416,12 @@ async fn run_tunnel_session(
                 write_tunnel_text(&tunnel_writer_sender, payload)?;
             }
         }
-            let Some(event) = event_receiver.recv().await else {
+        let Some(event) = event_receiver.recv().await else {
             break;
         };
 
         if runtime.shutdown_requested.load(Ordering::Relaxed) {
-            for pty_session in pty_sessions.values() {
+            for pty_session in session_state.pty_sessions.values() {
                 let _ = pty_session.session.terminate(
                     loop_context.clock,
                     loop_context.sleeper,
@@ -414,7 +429,7 @@ async fn run_tunnel_session(
                     DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
                 );
             }
-            if let Ok(frames) = telemetry_relay.detach_tunnel_connection() {
+            if let Ok(frames) = session_state.telemetry_relay.detach_tunnel_connection() {
                 let _ = send_telemetry_frames(&tunnel_writer_sender, frames);
             }
             runtime
@@ -431,20 +446,14 @@ async fn run_tunnel_session(
             return Ok(());
         }
 
-        if let Err(error) = handle_tunnel_session_event(
+        handle_tunnel_session_event(
             event,
             &tunnel_writer_sender,
             &event_sender,
             &loop_context,
-            &mut telemetry_relay,
-            &mut agent_streams,
-            &mut pty_sessions,
-            &mut file_uploads,
+            &mut session_state,
         )
-        .await
-        {
-            return Err(error);
-        }
+        .await?;
     }
 
     Ok(())
@@ -719,10 +728,7 @@ async fn handle_tunnel_session_event(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     event_sender: &mpsc::UnboundedSender<TunnelSessionEvent>,
     context: &TunnelSessionLoopContext<'_>,
-    telemetry_relay: &mut TelemetryRelay,
-    agent_streams: &mut BTreeMap<u32, AgentStreamState>,
-    pty_sessions: &mut BTreeMap<String, PtySessionState>,
-    file_uploads: &mut BTreeMap<u32, FileUploadState>,
+    session_state: &mut TunnelSessionMutableState,
 ) -> Result<(), TunnelSessionError> {
     match event {
         TunnelSessionEvent::BootstrapClosed { reason } => {
@@ -733,7 +739,7 @@ async fn handle_tunnel_session_event(
         TunnelSessionEvent::Wake => {
             let _ = poll_pty_sessions(
                 tunnel_writer_sender,
-                pty_sessions,
+                &mut session_state.pty_sessions,
                 context.clock,
                 context.sleeper,
             )?;
@@ -741,7 +747,8 @@ async fn handle_tunnel_session_event(
         }
         TunnelSessionEvent::BootstrapMessage(message) => match message {
             Message::Text(payload) => {
-                if let Some(frames) = telemetry_relay
+                if let Some(frames) = session_state
+                    .telemetry_relay
                     .handle_control_message(&payload)
                     .map_err(|error| TunnelSessionError::HandleTelemetry(error.to_string()))?
                 {
@@ -756,9 +763,9 @@ async fn handle_tunnel_session_event(
                     event_sender,
                     control_message,
                     context,
-                    agent_streams,
-                    pty_sessions,
-                    file_uploads,
+                    &mut session_state.agent_streams,
+                    &mut session_state.pty_sessions,
+                    &mut session_state.file_uploads,
                 )
                 .await
             }
@@ -768,9 +775,9 @@ async fn handle_tunnel_session_event(
                 handle_tunnel_binary_frame(
                     tunnel_writer_sender,
                     frame,
-                    agent_streams,
-                    pty_sessions,
-                    file_uploads,
+                    &mut session_state.agent_streams,
+                    &mut session_state.pty_sessions,
+                    &mut session_state.file_uploads,
                 )
             }
             Message::Ping(payload) => write_tunnel_pong(tunnel_writer_sender, payload.to_vec()),
@@ -782,11 +789,11 @@ async fn handle_tunnel_session_event(
         },
         TunnelSessionEvent::AgentMessage { stream_id, message } => match message {
             Message::Text(payload) => {
-                let Some(agent_stream) = agent_streams.get_mut(&stream_id) else {
+                let Some(agent_stream) = session_state.agent_streams.get_mut(&stream_id) else {
                     return Ok(());
                 };
                 if !agent_stream.send_window.try_consume(payload.len()) {
-                    agent_streams.remove(&stream_id);
+                    session_state.agent_streams.remove(&stream_id);
                     return write_tunnel_text(
                         tunnel_writer_sender,
                         stream_reset(
@@ -802,11 +809,11 @@ async fn handle_tunnel_session_event(
                 write_tunnel_binary(tunnel_writer_sender, encoded)
             }
             Message::Binary(payload) => {
-                let Some(agent_stream) = agent_streams.get_mut(&stream_id) else {
+                let Some(agent_stream) = session_state.agent_streams.get_mut(&stream_id) else {
                     return Ok(());
                 };
                 if !agent_stream.send_window.try_consume(payload.len()) {
-                    agent_streams.remove(&stream_id);
+                    session_state.agent_streams.remove(&stream_id);
                     return write_tunnel_text(
                         tunnel_writer_sender,
                         stream_reset(
@@ -822,7 +829,7 @@ async fn handle_tunnel_session_event(
                 write_tunnel_binary(tunnel_writer_sender, encoded)
             }
             Message::Ping(payload) => {
-                if let Some(agent_stream) = agent_streams.get(&stream_id) {
+                if let Some(agent_stream) = session_state.agent_streams.get(&stream_id) {
                     agent_stream
                         .sender
                         .send(Message::Pong(payload))
@@ -832,7 +839,7 @@ async fn handle_tunnel_session_event(
             }
             Message::Pong(_) => Ok(()),
             Message::Close(_) => {
-                agent_streams.remove(&stream_id);
+                session_state.agent_streams.remove(&stream_id);
                 write_tunnel_text(
                     tunnel_writer_sender,
                     stream_reset(
@@ -845,7 +852,7 @@ async fn handle_tunnel_session_event(
             _ => Ok(()),
         },
         TunnelSessionEvent::AgentClosed { stream_id, reason } => {
-            if agent_streams.remove(&stream_id).is_some() {
+            if session_state.agent_streams.remove(&stream_id).is_some() {
                 write_tunnel_text(
                     tunnel_writer_sender,
                     stream_reset(
@@ -907,15 +914,18 @@ async fn handle_tunnel_control_message(
             write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
         StreamControlMessage::OpenPty(message) => {
+            let mut pty_open_context = PtyOpenContext {
+                cgroup_root: context.cgroup_root,
+                runtime_env: context.runtime_env,
+                sandbox_instance_id: context.sandbox_instance_id,
+                pty_sessions,
+                clock: context.clock,
+                sleeper: context.sleeper,
+            };
             handle_pty_open(
                 tunnel_writer_sender,
                 message,
-                context.cgroup_root,
-                context.runtime_env,
-                context.sandbox_instance_id,
-                pty_sessions,
-                context.clock,
-                context.sleeper,
+                &mut pty_open_context,
             )?;
         }
         StreamControlMessage::OpenFileUpload(message) => {
@@ -1145,16 +1155,14 @@ fn handle_tunnel_binary_frame(
 fn handle_pty_open(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     message: crate::tunnel::protocol::PtyStreamOpen,
-    cgroup_root: &Path,
-    runtime_env: &BTreeMap<String, String>,
-    sandbox_instance_id: &str,
-    pty_sessions: &mut BTreeMap<String, PtySessionState>,
-    clock: &dyn Clock,
-    sleeper: &dyn Sleeper,
+    context: &mut PtyOpenContext<'_>,
 ) -> Result<(), TunnelSessionError> {
     match message.channel.session {
         crate::tunnel::protocol::PtySessionMode::Attach => {
-            let Some(pty_state) = pty_sessions.get_mut(&message.channel.pty_session_id) else {
+            let Some(pty_state) = context
+                .pty_sessions
+                .get_mut(&message.channel.pty_session_id)
+            else {
                 write_tunnel_text(
                     tunnel_writer_sender,
                     stream_open_error(
@@ -1173,7 +1181,10 @@ fn handle_pty_open(
             write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
         crate::tunnel::protocol::PtySessionMode::Create => {
-            if pty_sessions.contains_key(&message.channel.pty_session_id) {
+            if context
+                .pty_sessions
+                .contains_key(&message.channel.pty_session_id)
+            {
                 write_tunnel_text(
                     tunnel_writer_sender,
                     stream_open_error(
@@ -1192,12 +1203,12 @@ fn handle_pty_open(
                     rows: message.channel.rows,
                     command: message.channel.command.clone(),
                     args: message.channel.args.clone(),
-                    env: runtime_env.clone(),
+                    env: context.runtime_env.clone(),
                 },
-                cgroup_root,
-                sandbox_instance_id,
-                clock,
-                sleeper,
+                context.cgroup_root,
+                context.sandbox_instance_id,
+                context.clock,
+                context.sleeper,
             ) {
                 Ok(session) => session,
                 Err(error) => {
@@ -1217,7 +1228,7 @@ fn handle_pty_open(
             attached_stream_ids.insert(message.stream_id);
             let mut send_windows_by_stream_id = BTreeMap::new();
             send_windows_by_stream_id.insert(message.stream_id, StreamSendWindow::default());
-            pty_sessions.insert(
+            context.pty_sessions.insert(
                 message.channel.pty_session_id.clone(),
                 PtySessionState {
                     session,

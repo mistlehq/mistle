@@ -549,8 +549,9 @@ fn remove_stale_socket(socket_path: &Path) -> Result<(), ControlError> {
 #[cfg(test)]
 mod tests {
     use std::net::TcpListener;
+    use std::ffi::OsString;
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::sync::mpsc;
+    use std::sync::{LazyLock, Mutex, mpsc};
     use std::thread;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -564,9 +565,14 @@ mod tests {
     use crate::time::{Sleeper, ThreadSleeper};
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+    static ENV_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+    const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str =
+        "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 
     #[test]
     fn accepts_one_init_request_from_the_control_socket() {
+        let _env_guard =
+            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
         let test_dir = create_temp_test_dir("control_init");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -592,6 +598,8 @@ mod tests {
 
     #[test]
     fn rejects_second_init_requests_after_initialization_begins() {
+        let _env_guard =
+            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
         let test_dir = create_temp_test_dir("control_second_init");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -704,6 +712,49 @@ mod tests {
         ws_url: String,
         shutdown_sender: mpsc::Sender<()>,
         thread: Option<thread::JoinHandle<()>>,
+    }
+
+    struct TestEnvVarGuard {
+        _lock: std::sync::MutexGuard<'static, ()>,
+        name: &'static str,
+        previous: Option<OsString>,
+    }
+
+    impl TestEnvVarGuard {
+        fn set(name: &'static str, value: &str) -> Self {
+            let lock = ENV_MUTEX
+                .lock()
+                .expect("test env mutex should not be poisoned");
+            let previous = std::env::var_os(name);
+            // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+            unsafe {
+                std::env::set_var(name, value);
+            }
+            Self {
+                _lock: lock,
+                name,
+                previous,
+            }
+        }
+    }
+
+    impl Drop for TestEnvVarGuard {
+        fn drop(&mut self) {
+            match &self.previous {
+                Some(previous) => {
+                    // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+                    unsafe {
+                        std::env::set_var(self.name, previous);
+                    }
+                }
+                None => {
+                    // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+                    unsafe {
+                        std::env::remove_var(self.name);
+                    }
+                }
+            }
+        }
     }
 
     impl BootstrapGateway {

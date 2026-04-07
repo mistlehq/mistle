@@ -293,7 +293,7 @@ fn apply_runtime_startup_overrides(
                 ))
             })?;
         let tokenizer_proxy_base_url = resolve_tokenizer_proxy_route_base_url(
-            &tokenizer_proxy_egress_base_url,
+            tokenizer_proxy_egress_base_url,
             &route.upstream.base_url,
         )
         .map_err(SandboxdStateError::StartRuntimeProcesses)?;
@@ -325,7 +325,7 @@ fn apply_runtime_startup_overrides(
             workspace_source,
             &runtime_plan.egress_routes,
             &startup_input.egress_grant_by_rule_id,
-            &tokenizer_proxy_egress_base_url,
+            tokenizer_proxy_egress_base_url,
         )?;
     }
 

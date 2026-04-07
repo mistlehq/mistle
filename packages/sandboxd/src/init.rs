@@ -119,12 +119,13 @@ where
 mod tests {
     use std::fs;
     use std::net::TcpListener;
+    use std::ffi::OsString;
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::sync::mpsc;
+    use std::sync::{LazyLock, Mutex, mpsc};
     use std::thread;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use tungstenite::{Message, accept};
+    use tungstenite::{Error as WebSocketError, Message, accept};
 
     use crate::control;
     use crate::protocol::startup::{StartupInitResponse, StartupInput, StartupMode};
@@ -133,9 +134,14 @@ mod tests {
     use crate::init::run_init;
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+    static ENV_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+    const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str =
+        "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 
     #[test]
     fn submits_startup_input_and_writes_ok_response() {
+        let _env_guard =
+            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
         let test_dir = create_temp_test_dir("init_ok");
         let control_socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -283,16 +289,22 @@ mod tests {
                         let mut websocket =
                             accept(stream).expect("bootstrap gateway handshake should succeed");
                         loop {
-                            match websocket
-                                .read()
-                                .expect("bootstrap gateway should read frames")
-                            {
-                                Message::Close(_) => return,
-                                Message::Text(_)
-                                | Message::Binary(_)
-                                | Message::Ping(_)
-                                | Message::Pong(_)
-                                | Message::Frame(_) => {}
+                            match websocket.read() {
+                                Ok(Message::Close(_))
+                                | Err(WebSocketError::ConnectionClosed)
+                                | Err(WebSocketError::Protocol(
+                                    tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
+                                )) => return,
+                                Ok(
+                                    Message::Text(_)
+                                    | Message::Binary(_)
+                                    | Message::Ping(_)
+                                    | Message::Pong(_)
+                                    | Message::Frame(_),
+                                ) => {}
+                                Err(error) => {
+                                    panic!("bootstrap gateway should read frames: {error}")
+                                }
                             }
                         }
                     }
@@ -308,6 +320,49 @@ mod tests {
             ws_url,
             shutdown_sender,
             thread: Some(thread),
+        }
+    }
+
+    struct TestEnvVarGuard {
+        _lock: std::sync::MutexGuard<'static, ()>,
+        name: &'static str,
+        previous: Option<OsString>,
+    }
+
+    impl TestEnvVarGuard {
+        fn set(name: &'static str, value: &str) -> Self {
+            let lock = ENV_MUTEX
+                .lock()
+                .expect("test env mutex should not be poisoned");
+            let previous = std::env::var_os(name);
+            // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+            unsafe {
+                std::env::set_var(name, value);
+            }
+            Self {
+                _lock: lock,
+                name,
+                previous,
+            }
+        }
+    }
+
+    impl Drop for TestEnvVarGuard {
+        fn drop(&mut self) {
+            match &self.previous {
+                Some(previous) => {
+                    // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+                    unsafe {
+                        std::env::set_var(self.name, previous);
+                    }
+                }
+                None => {
+                    // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+                    unsafe {
+                        std::env::remove_var(self.name);
+                    }
+                }
+            }
         }
     }
 }

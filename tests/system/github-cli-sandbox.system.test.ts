@@ -475,14 +475,7 @@ async function waitForNextPtyFrame(pump: PtyFramePump, timeoutMs: number): Promi
         if (waiterIndex >= 0) {
           pump.waiters.splice(waiterIndex, 1);
         }
-        const rejectWithTimeout = (): void => {
-          reject(new Error(`Timed out after ${String(timeoutMs)}ms waiting for PTY frame.`));
-        };
-        if (Number.isFinite(PauseOnPtyTimeoutMs) && PauseOnPtyTimeoutMs > 0) {
-          setTimeout(rejectWithTimeout, PauseOnPtyTimeoutMs);
-          return;
-        }
-        rejectWithTimeout();
+        reject(new Error(`Timed out after ${String(timeoutMs)}ms waiting for PTY frame.`));
       },
     };
 
