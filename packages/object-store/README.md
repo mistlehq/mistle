@@ -11,6 +11,7 @@ operations while staying close to the underlying AWS SDK response types.
 Exported from [`src/index.ts`](./src/index.ts):
 
 - `PutObjectInput`
+- `CreatePresignedGetUrlInput`
 - `S3CompatibleObjectStore`
 - `S3CompatibleObjectStoreConfig`
 
@@ -20,7 +21,7 @@ Exported from [`src/index.ts`](./src/index.ts):
 import { S3CompatibleObjectStore } from "@mistle/object-store";
 
 const objectStore = new S3CompatibleObjectStore({
-  bucketName: "mistle-media",
+  bucketName: "mistle-assets",
   region: "us-east-1",
   endpoint: "http://127.0.0.1:8333",
   forcePathStyle: true,
@@ -39,6 +40,11 @@ await objectStore.putObject({
 const object = await objectStore.readObject("avatars/users/usr_123/avatar.webp");
 
 const bytes = await object.Body?.transformToByteArray();
+
+const presignedGetUrl = await objectStore.createPresignedGetUrl({
+  objectKey: "avatars/users/usr_123/avatar.webp",
+  expiresInSeconds: 300,
+});
 
 await objectStore.deleteObject("avatars/users/usr_123/avatar.webp");
 

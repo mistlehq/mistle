@@ -26,6 +26,7 @@ export function EmailStepForm(props: EmailStepFormProps): React.JSX.Element {
       ) : isEmailEditable ? (
         <Input
           autoComplete="email"
+          autoFocus
           className="h-12"
           id="email"
           name="email"

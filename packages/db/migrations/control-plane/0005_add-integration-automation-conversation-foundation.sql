@@ -144,6 +144,7 @@ CREATE TABLE "control_plane"."integration_targets" (
 CREATE TABLE "control_plane"."integration_webhook_events" (
 	"id" text PRIMARY KEY NOT NULL,
 	"organization_id" text NOT NULL,
+	"integration_webhook_source_id" text NOT NULL,
 	"integration_connection_id" text NOT NULL,
 	"target_key" text NOT NULL,
 	"external_event_id" text NOT NULL,

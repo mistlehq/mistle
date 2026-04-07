@@ -65,6 +65,13 @@ export const IntegrationTargetSchema = z
       )
       .min(1)
       .optional(),
+    webhookSource: z
+      .object({
+        ownerScope: z.enum(["target", "connection"]),
+        requiresSourceSelection: z.boolean(),
+      })
+      .strict()
+      .optional(),
     supportedWebhookEvents: z
       .array(
         z

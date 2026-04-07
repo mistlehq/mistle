@@ -144,6 +144,9 @@ export async function listIntegrationTargets(
           ...(resolvedMetadata.connectionMethods === undefined
             ? {}
             : { connectionMethods: resolvedMetadata.connectionMethods }),
+          ...(resolvedMetadata.webhookSource === undefined
+            ? {}
+            : { webhookSource: resolvedMetadata.webhookSource }),
           ...(resolvedMetadata.supportedWebhookEvents === undefined
             ? {}
             : { supportedWebhookEvents: resolvedMetadata.supportedWebhookEvents }),

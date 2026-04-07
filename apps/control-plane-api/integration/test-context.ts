@@ -197,6 +197,14 @@ export const it = vitestIt.extend<{
             url: runtimeDatabaseUrl,
             migrationUrl: runtimeDatabaseUrl,
           },
+          objectStore: {
+            bucketName: "integration-media",
+            region: "us-east-1",
+            endpoint: "http://127.0.0.1:8333",
+            forcePathStyle: true,
+            accessKeyId: "integration-access-key",
+            secretAccessKey: "integration-secret-key",
+          },
           workflow: {
             databaseUrl: runtimeDatabaseUrl,
             namespaceId: sharedInfraConfig.workflowNamespaceId,

@@ -1,14 +1,20 @@
-import { Skeleton, Notice } from "@mistle/ui";
+import { Notice, Skeleton } from "@mistle/ui";
 
 import { AutoSaveTextField } from "../forms/auto-save-text-field.js";
 import { FormPageSection, FormPageStack } from "../shared/form-page.js";
+import { SettingsImageField } from "../shared/settings-image-field.js";
 
 export type OrganizationGeneralSettingsPageViewProps = {
   isLoading: boolean;
   isSaving: boolean;
   loadErrorMessage: string | null;
+  logoBusy: boolean;
+  logoErrorMessage: string | null;
+  logoUrl: string | null;
   name: string;
+  onDeleteLogo: () => Promise<void>;
   onSaveChanges: (name: string) => Promise<void>;
+  onUploadLogo: (file: File) => Promise<void>;
 };
 
 export function OrganizationGeneralSettingsPageView(
@@ -50,6 +56,18 @@ export function OrganizationGeneralSettingsPageView(
     <FormPageStack>
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
+          <SettingsImageField
+            alt={`${props.name} logo`}
+            busy={props.logoBusy}
+            errorMessage={props.logoErrorMessage}
+            fallbackInitial="O"
+            imageUrl={props.logoUrl}
+            imageName="organization logo"
+            label="Logo"
+            name={props.name}
+            onDelete={props.onDeleteLogo}
+            onUpload={props.onUploadLogo}
+          />
           <AutoSaveTextField
             disabled={props.isSaving}
             id="organization-name"

@@ -1,18 +1,34 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
-import { updateProfileDisplayName } from "../settings/profile/profile-service.js";
+import {
+  deleteProfileImage,
+  getProfileImage,
+  updateProfileDisplayName,
+  uploadProfileImage,
+} from "../settings/profile/profile-service.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
+const PROFILE_IMAGE_QUERY_KEY: readonly ["settings", "profile-image"] = [
+  "settings",
+  "profile-image",
+];
+
 export function ProfileSettingsPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const session = useRequiredSession();
   const { title, description } = resolvePageFrameText(pageMeta, "Profile");
+  const profileImageQuery = useQuery({
+    queryKey: PROFILE_IMAGE_QUERY_KEY,
+    queryFn: getProfileImage,
+    staleTime: 15 * 60 * 1000,
+  });
 
   const saveMutation = useMutation({
     mutationFn: async (displayName: string) => updateProfileDisplayName({ displayName }),
@@ -22,16 +38,60 @@ export function ProfileSettingsPage(): React.JSX.Element {
       });
     },
   });
+  const uploadProfileImageMutation = useMutation({
+    mutationFn: async (file: File) => uploadProfileImage({ file }),
+    onSuccess: async (result) => {
+      queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, {
+        imageUrl: result.imageUrl,
+      });
+    },
+  });
+  const deleteProfileImageMutation = useMutation({
+    mutationFn: deleteProfileImage,
+    onSuccess: async () => {
+      queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, {
+        imageUrl: null,
+      });
+    },
+  });
 
   const persistedDisplayName = resolveUserDisplayName(session.user);
+  const imageUrl = profileImageQuery.data?.imageUrl ?? null;
+  const profileImageErrorMessage = uploadProfileImageMutation.isError
+    ? resolveApiErrorMessage({
+        error: uploadProfileImageMutation.error,
+        fallbackMessage: "Could not upload profile image.",
+      })
+    : deleteProfileImageMutation.isError
+      ? resolveApiErrorMessage({
+          error: deleteProfileImageMutation.error,
+          fallbackMessage: "Could not delete profile image.",
+        })
+      : profileImageQuery.isError
+        ? resolveApiErrorMessage({
+            error: profileImageQuery.error,
+            fallbackMessage: "Could not load profile image.",
+          })
+        : null;
 
   return (
     <FormPageFrame description={description} title={title}>
       <ProfileSettingsPageView
         displayName={persistedDisplayName}
         email={session.user.email}
+        imageUrl={imageUrl}
+        profileImageBusy={
+          uploadProfileImageMutation.isPending || deleteProfileImageMutation.isPending
+        }
+        profileImageErrorMessage={profileImageErrorMessage}
+        onDeleteProfileImage={async () => {
+          await deleteProfileImageMutation.mutateAsync();
+        }}
         onSaveChanges={async (displayNameDraft) => {
           await saveMutation.mutateAsync(displayNameDraft.trim());
+        }}
+        onUploadProfileImage={async (file) => {
+          await uploadProfileImageMutation.mutateAsync(file);
         }}
         saving={saveMutation.isPending}
       />

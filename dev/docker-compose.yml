@@ -1,6 +1,35 @@
 name: mistle-local-dev
 
 services:
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.17_full
+    environment:
+      AWS_ACCESS_KEY_ID: "${DEV_OBJECT_STORE_ACCESS_KEY_ID:-mistle-access-key}"
+      AWS_SECRET_ACCESS_KEY: "${DEV_OBJECT_STORE_SECRET_ACCESS_KEY:-mistle-secret-key}"
+    command:
+      - server
+      - -ip=0.0.0.0
+      - -dir=/data
+      - -s3
+    ports:
+      - "${DEV_OBJECT_STORE_PORT:-8333}:8333"
+    volumes:
+      - mistle_local_seaweedfs_data:/data
+
+  seaweedfs-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on:
+      seaweedfs:
+        condition: service_started
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until /usr/bin/mc alias set local http://seaweedfs:8333 "$${DEV_OBJECT_STORE_ACCESS_KEY_ID:-mistle-access-key}" "$${DEV_OBJECT_STORE_SECRET_ACCESS_KEY:-mistle-secret-key}"; do
+          sleep 1
+        done
+        /usr/bin/mc mb --ignore-existing local/"$${DEV_OBJECT_STORE_BUCKET_NAME:-mistle-assets}"
+
   postgres:
     image: postgres:18-alpine
     environment:
@@ -108,6 +137,7 @@ services:
       - "host.docker.internal:host-gateway"
 
 volumes:
+  mistle_local_seaweedfs_data:
   mistle_local_postgres_data:
   mistle_local_registry_data:
 

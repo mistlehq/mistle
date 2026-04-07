@@ -102,6 +102,10 @@ export type ResolvedIntegrationTargetMetadata = {
         };
       }
   )[];
+  webhookSource?: {
+    ownerScope: "target" | "connection";
+    requiresSourceSelection: boolean;
+  };
   supportedWebhookEvents?: ResolvedWebhookEvent[];
 };
 
@@ -245,6 +249,14 @@ export function resolveTargetMetadata(input: {
         connectionMethods: definition.connectionMethods.map((method) =>
           resolveConnectionMethod(method),
         ),
+        ...(definition.webhookSource === undefined
+          ? {}
+          : {
+              webhookSource: {
+                ownerScope: definition.webhookSource.ownerScope,
+                requiresSourceSelection: true,
+              },
+            }),
         ...(definition.supportedWebhookEvents === undefined
           ? {}
           : {
@@ -265,6 +277,14 @@ export function resolveTargetMetadata(input: {
     connectionMethods: definition.connectionMethods.map((method) =>
       resolveConnectionMethod(method),
     ),
+    ...(definition.webhookSource === undefined
+      ? {}
+      : {
+          webhookSource: {
+            ownerScope: definition.webhookSource.ownerScope,
+            requiresSourceSelection: true,
+          },
+        }),
     ...(definition.supportedWebhookEvents === undefined
       ? {}
       : {

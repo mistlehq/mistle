@@ -63,6 +63,14 @@ port = 8080
 url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 migration_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 
+[apps.control_plane_api.object_store]
+bucket_name = "mistle-assets"
+region = "us-east-1"
+endpoint = "http://seaweedfs:8333"
+force_path_style = true
+access_key_id = "replace-with-object-store-access-key"
+secret_access_key = "replace-with-object-store-secret-key"
+
 [apps.control_plane_api.auth]
 base_url = "https://api.mistle.example"
 secret = "replace-with-strong-secret"

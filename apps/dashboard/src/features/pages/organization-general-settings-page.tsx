@@ -6,6 +6,11 @@ import {
   getOrganizationGeneral,
   updateOrganizationGeneral,
 } from "../settings/organization/organization-general-service.js";
+import {
+  deleteOrganizationLogo,
+  getOrganizationLogo,
+  uploadOrganizationLogo,
+} from "../settings/organization/organization-logo-service.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
@@ -15,6 +20,10 @@ const SETTINGS_ORGANIZATION_GENERAL_QUERY_KEY_PREFIX: readonly [
   "settings",
   "organization-general",
 ] = ["settings", "organization-general"];
+const SETTINGS_ORGANIZATION_LOGO_QUERY_KEY_PREFIX: readonly ["settings", "organization-logo"] = [
+  "settings",
+  "organization-logo",
+];
 
 type OrganizationFormState = {
   name: string;
@@ -26,6 +35,16 @@ function settingsOrganizationGeneralQueryKey(
   return [
     SETTINGS_ORGANIZATION_GENERAL_QUERY_KEY_PREFIX[0],
     SETTINGS_ORGANIZATION_GENERAL_QUERY_KEY_PREFIX[1],
+    organizationId,
+  ];
+}
+
+function settingsOrganizationLogoQueryKey(
+  organizationId: string,
+): readonly ["settings", "organization-logo", string] {
+  return [
+    SETTINGS_ORGANIZATION_LOGO_QUERY_KEY_PREFIX[0],
+    SETTINGS_ORGANIZATION_LOGO_QUERY_KEY_PREFIX[1],
     organizationId,
   ];
 }
@@ -42,6 +61,14 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
       getOrganizationGeneral({
         organizationId,
       }),
+  });
+  const organizationLogoQuery = useQuery({
+    queryKey: settingsOrganizationLogoQueryKey(organizationId),
+    queryFn: async () =>
+      getOrganizationLogo({
+        organizationId,
+      }),
+    staleTime: 15 * 60 * 1000,
   });
 
   const saveMutation = useMutation({
@@ -82,6 +109,46 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
       });
     },
   });
+  const uploadOrganizationLogoMutation = useMutation({
+    mutationFn: async (file: File) =>
+      uploadOrganizationLogo({
+        organizationId,
+        file,
+      }),
+    onSuccess: async (result) => {
+      queryClient.setQueryData(settingsOrganizationLogoQueryKey(organizationId), {
+        imageUrl: result.imageUrl,
+      });
+    },
+  });
+  const deleteOrganizationLogoMutation = useMutation({
+    mutationFn: async () =>
+      deleteOrganizationLogo({
+        organizationId,
+      }),
+    onSuccess: async () => {
+      queryClient.setQueryData(settingsOrganizationLogoQueryKey(organizationId), {
+        imageUrl: null,
+      });
+    },
+  });
+
+  const logoErrorMessage = uploadOrganizationLogoMutation.isError
+    ? resolveApiErrorMessage({
+        error: uploadOrganizationLogoMutation.error,
+        fallbackMessage: "Upload failed. Please try again later.",
+      })
+    : deleteOrganizationLogoMutation.isError
+      ? resolveApiErrorMessage({
+          error: deleteOrganizationLogoMutation.error,
+          fallbackMessage: "Remove failed. Please try again later.",
+        })
+      : organizationLogoQuery.isError
+        ? resolveApiErrorMessage({
+            error: organizationLogoQuery.error,
+            fallbackMessage: "Could not load organization logo.",
+          })
+        : null;
 
   return (
     <FormPageFrame description={description} title={title}>
@@ -93,6 +160,11 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         }
         isLoading={organizationQuery.isPending}
         isSaving={saveMutation.isPending}
+        logoBusy={
+          uploadOrganizationLogoMutation.isPending || deleteOrganizationLogoMutation.isPending
+        }
+        logoErrorMessage={logoErrorMessage}
+        logoUrl={organizationLogoQuery.data?.imageUrl ?? null}
         loadErrorMessage={
           organizationQuery.isError
             ? resolveApiErrorMessage({
@@ -106,6 +178,12 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
           await saveMutation.mutateAsync({
             name: name.trim(),
           });
+        }}
+        onDeleteLogo={async () => {
+          await deleteOrganizationLogoMutation.mutateAsync();
+        }}
+        onUploadLogo={async (file) => {
+          await uploadOrganizationLogoMutation.mutateAsync(file);
         }}
       />
     </FormPageFrame>

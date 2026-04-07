@@ -30,6 +30,7 @@ export function NoOrganizationAccessViewContent(
             <Input
               aria-label="Organization name"
               aria-invalid={props.organizationNameError === null ? undefined : true}
+              autoFocus
               className="h-12"
               id="onboarding-organization-name"
               onChange={(event) => props.onOrganizationNameChange(event.currentTarget.value)}

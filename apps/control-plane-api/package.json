@@ -29,6 +29,7 @@
     "@mistle/integrations-core": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
     "@mistle/logging": "workspace:*",
+    "@mistle/object-store": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/workflow-registry": "workspace:*",
@@ -39,6 +40,7 @@
     "openworkflow": "^0.8.1",
     "pg": "^8.20.0",
     "postgres": "^3.4.8",
+    "sharp": "0.34.5",
     "typeid-js": "^1.2.0",
     "zod": "^4.3.6"
   },
