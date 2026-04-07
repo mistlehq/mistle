@@ -5,8 +5,8 @@
 //! supervision module starts and stops for the active sandbox session.
 
 pub mod adapters;
-pub mod readiness;
 mod plan;
+pub mod readiness;
 mod runtime_file;
 mod workspace_source;
 
@@ -17,10 +17,16 @@ use crate::protocol::startup::StartupInput;
 use crate::time::{SystemClock, ThreadSleeper};
 
 pub use plan::{
-    CompiledAgentRuntime, CompiledRuntimePlan, RuntimeArtifactCommand, RuntimeClient,
-    RuntimeClientConnectionMode, RuntimeClientEndpoint, RuntimeClientEndpointTransport,
-    RuntimeClientProcess, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
-    RuntimeClientProcessStopSignal,
+    CompiledAgentRuntime, CompiledEgressRoute, CompiledEgressRouteAuthInjection,
+    CompiledEgressRouteAuthInjectionType, CompiledEgressRouteCredentialResolver,
+    CompiledEgressRouteMatch, CompiledEgressRouteUpstream, CompiledRuntimeArtifact,
+    CompiledRuntimePlan,
+    CompiledWorkspaceSource,
+    RuntimeArtifactCommand, RuntimeArtifactLifecycle, RuntimeClient, RuntimeClientConnectionMode,
+    RuntimeClientEndpoint,
+    RuntimeClientEndpointTransport, RuntimeClientProcess, RuntimeClientProcessReadiness,
+    RuntimeClientProcessStopPolicy, RuntimeClientProcessStopSignal, RuntimeClientSetup,
+    RuntimeClientSetupFile, WorkspaceSourceResourceKind,
 };
 
 /// Describes why one runtime-plan setup step failed while applying startup input.
@@ -100,7 +106,7 @@ pub fn apply_runtime_plan(startup_input: &StartupInput) -> Result<(), RuntimePla
 }
 
 /// Applies the artifact, workspace-source, and setup-file portions of one compiled runtime plan.
-fn apply_compiled_runtime_plan(
+pub fn apply_compiled_runtime_plan(
     runtime_plan: &CompiledRuntimePlan,
 ) -> Result<(), RuntimePlanApplyError> {
     // Materialize artifacts, workspace sources, and setup files before later PRs add

@@ -14,6 +14,7 @@ pub mod cgroups;
 pub mod codex_proxy;
 pub mod command;
 pub mod control;
+pub mod egress_proxy;
 pub mod init;
 pub mod keepalive;
 pub mod process;

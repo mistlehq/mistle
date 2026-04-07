@@ -134,6 +134,7 @@ pub fn relay_pty_stream(
                 rows: open_message.channel.rows,
                 command: open_message.channel.command.clone(),
                 args: open_message.channel.args.clone(),
+                ..PtySpawnRequest::default()
             },
             cgroup_root,
             sandbox_instance_id,

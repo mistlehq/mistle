@@ -837,6 +837,26 @@ describe("validateCompiledBindingResults", () => {
     ).toThrow(IntegrationCompilerError);
   });
 
+  it("fails when an artifact defines a reserved proxy ca env key", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        egressRuleId: "egress_rule_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      artifactEnv: {
+        NODE_EXTRA_CA_CERTS: "/tmp/custom-ca.pem",
+      },
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrow(IntegrationCompilerError);
+  });
+
   it("accepts agent runtimes that reference an existing client endpoint", () => {
     const result = createCompiledBindingResult({
       route: createRoute({

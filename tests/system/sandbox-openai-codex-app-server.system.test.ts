@@ -16,13 +16,14 @@ import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
+import { resolveGitHubAppInstallationId } from "./helpers/github-app-installation.js";
 import { it, type SystemTestFixture } from "./system-test-context.js";
 
 const OPENAI_TARGET_KEY = "openai-default";
 const GITHUB_TARGET_KEY = "github-cloud";
 const OPENAI_API_KEY_ENV_NAME = "MISTLE_TEST_OPENAI_API_KEY";
 const GITHUB_TEST_REPOSITORY_ENV_NAME = "MISTLE_TEST_GITHUB_TEST_REPOSITORY";
-const GITHUB_INSTALLATION_ID_ENV_NAME = "MISTLE_TEST_GITHUB_INSTALLATION_ID";
+const OPENAI_CONNECTION_METHOD_ID = "api-key";
 const TEST_RESPONSE_MARKER = "SYSTEM_TEST_OK";
 const GITHUB_TEST_RESPONSE_MARKER = "GH_FOUND";
 const GITHUB_BINARY_PATH = "/usr/local/bin/gh";
@@ -70,6 +71,13 @@ const StreamResetSchema = z
     streamId: z.number().int().positive(),
     code: z.string().min(1),
     message: z.string().min(1),
+  })
+  .strict();
+
+const StreamCompleteSchema = z
+  .object({
+    type: z.literal("stream.complete"),
+    streamId: z.number().int().positive(),
   })
   .strict();
 
@@ -164,9 +172,10 @@ const StartSandboxInstanceResponseSchema = z
 const SandboxInstanceStatusResponseSchema = z
   .object({
     id: z.string().min(1),
-    status: z.enum(["starting", "running", "stopped", "failed"]),
+    status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    runtimePlan: z.unknown().nullable(),
     automationConversation: z
       .object({
         conversationId: z.string().min(1),
@@ -258,7 +267,7 @@ type SandboxScenarioContext = {
 const WebSocketJsonMessagePumps = new WeakMap<WebSocket, WebSocketJsonMessagePump>();
 
 function hasRequiredGitHubEnv(): boolean {
-  return [GITHUB_TEST_REPOSITORY_ENV_NAME, GITHUB_INSTALLATION_ID_ENV_NAME].every((name) => {
+  return [GITHUB_TEST_REPOSITORY_ENV_NAME].every((name) => {
     const value = process.env[name];
     return typeof value === "string" && value.length > 0;
   });
@@ -1543,9 +1552,9 @@ async function createOpenAiConnection(input: {
     action: async () => {
       return await requestWithTimeout({
         request: input.fixture.request,
-        path: `/v1/integration/connections/${encodeURIComponent(OPENAI_TARGET_KEY)}/api-key`,
+        path: `/v1/integration/connections/${encodeURIComponent(OPENAI_TARGET_KEY)}/form`,
         timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
-        description: "OpenAI API-key connection creation",
+        description: "OpenAI form connection creation",
         init: {
           method: "POST",
           headers: {
@@ -1554,7 +1563,13 @@ async function createOpenAiConnection(input: {
           },
           body: JSON.stringify({
             displayName: input.displayName,
-            apiKey: input.openAiApiKey,
+            methodId: OPENAI_CONNECTION_METHOD_ID,
+            config: {
+              connection_method: OPENAI_CONNECTION_METHOD_ID,
+            },
+            secrets: {
+              apiKey: input.openAiApiKey,
+            },
           }),
         },
       });
@@ -1563,10 +1578,10 @@ async function createOpenAiConnection(input: {
   const createConnectionPayload = await expectStatusJson({
     response: createConnectionResponse,
     status: 201,
-    description: "OpenAI API-key connection creation",
+    description: "OpenAI form connection creation",
   });
   if (!isRecord(createConnectionPayload)) {
-    throw new Error("Expected OpenAI API-key connection response to be an object.");
+    throw new Error("Expected OpenAI form connection response to be an object.");
   }
 
   return readNonEmptyStringField(createConnectionPayload, "id");
@@ -1884,6 +1899,7 @@ async function uploadImageOverTunnel(input: {
   try {
     getWebSocketJsonMessagePump(socket);
     const streamId = 1;
+    let completedUpload: UploadedSandboxImage | null = null;
     sendJson(socket, {
       type: "stream.open",
       streamId,
@@ -1918,10 +1934,20 @@ async function uploadImageOverTunnel(input: {
       const nextMessage = await waitForNextWebSocketJsonMessage(socket, remainingTimeMs(deadline));
       const completion = FileUploadCompletedEventSchema.safeParse(nextMessage);
       if (completion.success && completion.data.streamId === streamId) {
-        return {
+        completedUpload = {
           attachmentId: completion.data.event.attachmentId,
           path: completion.data.event.path,
         };
+        continue;
+      }
+
+      const streamComplete = StreamCompleteSchema.safeParse(nextMessage);
+      if (streamComplete.success && streamComplete.data.streamId === streamId) {
+        if (completedUpload === null) {
+          throw new Error("Received stream.complete before file upload completion event.");
+        }
+
+        return completedUpload;
       }
 
       const streamOpenError = StreamOpenErrorSchema.safeParse(nextMessage);
@@ -2331,7 +2357,17 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
         action: async ({ stepTrace, websocketTraceEntries, registerWebsocketCleanup }) => {
           const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
           const repository = parseGitHubRepository(requireEnv(GITHUB_TEST_REPOSITORY_ENV_NAME));
-          const githubInstallationId = requireEnv(GITHUB_INSTALLATION_ID_ENV_NAME);
+          const githubInstallationId = await runStep({
+            stepTrace,
+            stepName: "resolve provisioned GitHub App installation",
+            action: async () => {
+              return await resolveGitHubAppInstallationId({
+                owner: repository.owner,
+                repo: repository.repo,
+                targetKey: GITHUB_TARGET_KEY,
+              });
+            },
+          });
           const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
           const authenticatedSession = await runStep({
             stepTrace,

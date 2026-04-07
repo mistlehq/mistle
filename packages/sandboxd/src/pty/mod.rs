@@ -49,6 +49,7 @@ pub struct PtySpawnRequest {
     pub rows: Option<u16>,
     pub command: Option<String>,
     pub args: Option<Vec<String>>,
+    pub env: BTreeMap<String, String>,
 }
 
 /// Describes one observable PTY session event.
@@ -274,7 +275,7 @@ pub fn start_pty_session(request: PtySpawnRequest) -> Result<PtySession, PtyErro
     if let Some(cwd) = request.cwd {
         child_command.cwd(cwd);
     }
-    for entry in resolve_pty_environment() {
+    for entry in resolve_pty_environment(&request.env) {
         child_command.env(entry.name, entry.value);
     }
 
@@ -397,12 +398,15 @@ fn spawn_pty_exit_thread(
     });
 }
 
-fn resolve_pty_environment() -> Vec<PtyEnvironmentEntry> {
+fn resolve_pty_environment(extra_env: &BTreeMap<String, String>) -> Vec<PtyEnvironmentEntry> {
     let mut environment = BTreeMap::new();
     for (name, value) in std::env::vars() {
         environment.insert(name, value);
     }
     environment.insert("TERM".to_string(), DEFAULT_PTY_TERM.to_string());
+    for (name, value) in extra_env {
+        environment.insert(name.clone(), value.clone());
+    }
 
     environment
         .into_iter()
@@ -417,6 +421,8 @@ fn allocate_scope_id(clock: &dyn Clock) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use crate::pty::{
         DEFAULT_PTY_TERMINATE_POLL_INTERVAL, DEFAULT_PTY_TERMINATE_TIMEOUT_MS, PtyEvent,
         PtySpawnRequest, start_pty_session, start_scoped_pty_session,
@@ -480,6 +486,43 @@ mod tests {
             .expect("termination should succeed");
 
         assert_ne!(exit_code, 0);
+    }
+
+    #[test]
+    fn pty_process_inherits_requested_environment_entries() {
+        let mut env = BTreeMap::new();
+        env.insert("MISTLE_TEST_PTY_ENV".to_string(), "from-request".to_string());
+        let session = start_pty_session(PtySpawnRequest {
+            command: Some("/bin/sh".to_string()),
+            args: Some(vec![
+                "-lc".to_string(),
+                "printf '%s' \"$MISTLE_TEST_PTY_ENV\"; exit 0".to_string(),
+            ]),
+            env,
+            ..PtySpawnRequest::default()
+        })
+        .expect("pty session should start");
+
+        let mut output = Vec::new();
+        for _ in 0..20 {
+            let event = session
+                .next_event_timeout(Duration::from_millis(250))
+                .expect("pty event read should succeed")
+                .expect("pty should emit output");
+            match event {
+                PtyEvent::Output(chunk) => {
+                    output.extend(chunk);
+                    break;
+                }
+                PtyEvent::Exit(_) | PtyEvent::Closed => {}
+                PtyEvent::Error(message) => panic!("unexpected pty error: {message}"),
+            }
+        }
+
+        assert_eq!(
+            String::from_utf8(output).expect("output should be utf8"),
+            "from-request"
+        );
     }
 
     #[test]

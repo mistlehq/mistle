@@ -8,15 +8,21 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Display};
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Read, Write};
-use std::net::TcpStream;
+use std::io::{Read, Write};
+use std::any::Any;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
+use std::panic::{self, AssertUnwindSafe};
 
-use tungstenite::stream::MaybeTlsStream;
-use tungstenite::{Error as WebSocketError, Message, WebSocket, connect};
+use futures_util::{SinkExt, StreamExt};
+use tokio::runtime::Builder;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle as TokioJoinHandle;
+use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use url::Url;
 
 use crate::cgroups::DEFAULT_CGROUP_ROOT;
@@ -28,7 +34,6 @@ use crate::pty::{
 };
 use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::time::{Clock, Duration, Sleeper};
-use crate::tunnel::BootstrapTunnel;
 use crate::tunnel::protocol::{
     CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED, CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED,
     CONNECT_ERROR_CODE_PTY_SESSION_EXISTS, CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,
@@ -43,12 +48,14 @@ use crate::tunnel::protocol::{
     parse_stream_control_message, pty_exit_event, stream_complete, stream_open_error,
     stream_open_ok, stream_reset, stream_window,
 };
-use crate::tunnel::telemetry::TelemetryRelay;
+use crate::tunnel::telemetry::{TelemetryRelay, TelemetryRelayFrame};
 
 /// Default attachment root for file uploads received over the bootstrap tunnel.
 pub const DEFAULT_ATTACHMENT_ROOT: &str = "/tmp/attachments";
 /// Poll interval while the live tunnel session has no immediately available work.
 pub const DEFAULT_TUNNEL_SESSION_POLL_INTERVAL: Duration = Duration::from_millis(10);
+/// Poll interval while PTY output threads wait for the next blocking event.
+pub const DEFAULT_PTY_EVENT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const MAX_UPLOAD_SIZE_BYTES: usize = 10 * 1024 * 1024;
 const MAX_UPLOAD_THREAD_ID_LENGTH: usize = 128;
 const PNG_SIGNATURE: &[u8] = &[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -57,7 +64,6 @@ const GIF87A_SIGNATURE: &[u8] = &[0x47, 0x49, 0x46, 0x38, 0x37, 0x61];
 const GIF89A_SIGNATURE: &[u8] = &[0x47, 0x49, 0x46, 0x38, 0x39, 0x61];
 const WEBP_RIFF_SIGNATURE: &[u8] = &[0x52, 0x49, 0x46, 0x46];
 const WEBP_BRAND_SIGNATURE: &[u8] = &[0x57, 0x45, 0x42, 0x50];
-
 static UPLOAD_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Describes why the live bootstrap tunnel session could not start or stop.
@@ -145,14 +151,34 @@ pub struct TunnelSession {
     thread: Option<JoinHandle<Result<(), TunnelSessionError>>>,
 }
 
+enum TunnelWriterMessage {
+    Text(String),
+    Binary(Vec<u8>),
+    Pong(Vec<u8>),
+    Close,
+}
+
+enum TunnelSessionEvent {
+    BootstrapMessage(Message),
+    BootstrapClosed { reason: Option<String> },
+    AgentMessage { stream_id: u32, message: Message },
+    AgentClosed { stream_id: u32, reason: Option<String> },
+    Wake,
+}
+
+struct AgentStreamState {
+    sender: mpsc::UnboundedSender<Message>,
+    send_window: StreamSendWindow,
+}
+
 impl TunnelSession {
     /// Starts one live bootstrap tunnel session thread for the initialized daemon.
     pub fn start(
         startup_input: &StartupInput,
-        tunnel: BootstrapTunnel,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
         runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
         agent_endpoint_url: Option<String>,
+        runtime_env: BTreeMap<String, String>,
         clock: Arc<dyn Clock>,
         sleeper: Arc<dyn Sleeper>,
     ) -> Result<Self, TunnelSessionError> {
@@ -162,6 +188,7 @@ impl TunnelSession {
             .map_err(|error| TunnelSessionError::AttachmentRoot(error.to_string()))?;
 
         let shutdown_requested = Arc::new(AtomicBool::new(false));
+        let (startup_result_sender, startup_result_receiver) = std::sync::mpsc::channel();
         let thread = Some(thread::spawn({
             let shutdown_requested = shutdown_requested.clone();
             let cgroup_root = PathBuf::from(DEFAULT_CGROUP_ROOT);
@@ -169,6 +196,7 @@ impl TunnelSession {
                 keepalive_manager,
                 runtime_readiness_manager,
                 agent_endpoint_url,
+                runtime_env,
                 cgroup_root,
                 attachment_root,
                 sandbox_instance_id,
@@ -176,8 +204,54 @@ impl TunnelSession {
                 clock,
                 sleeper,
             };
-            move || run_tunnel_session_loop(tunnel, runtime)
+            let connected_url = startup_input.tunnel_gateway_ws_url.clone();
+            let bootstrap_token = startup_input.bootstrap_token.clone();
+            move || {
+                match panic::catch_unwind(AssertUnwindSafe(move || {
+                    let runtime_builder = Builder::new_multi_thread()
+                        .worker_threads(2)
+                        .enable_all()
+                        .build()
+                        .map_err(|error| TunnelSessionError::ConfigureTunnelSocket(error.to_string()))?;
+
+                    let startup_result_sender = startup_result_sender;
+                    runtime_builder.block_on(async move {
+                        let result =
+                            run_tunnel_session(runtime, &connected_url, &bootstrap_token, startup_result_sender)
+                                .await;
+                        if let Err(error) = &result {
+                            eprintln!("sandboxd bootstrap tunnel session exited: {error}");
+                        }
+                        result
+                    })
+                })) {
+                    Ok(result) => result,
+                    Err(payload) => {
+                        eprintln!(
+                            "sandboxd bootstrap tunnel session panicked: {}",
+                            format_panic_payload(payload.as_ref())
+                        );
+                        Err(TunnelSessionError::SessionPanicked)
+                    }
+                }
+            }
         }));
+
+        match startup_result_receiver.recv() {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => {
+                let thread = thread
+                    .expect("tunnel session thread should exist after startup failure");
+                let _ = thread.join();
+                return Err(error);
+            }
+            Err(_) => {
+                let thread = thread
+                    .expect("tunnel session thread should exist after startup channel closes");
+                let _ = thread.join();
+                return Err(TunnelSessionError::SessionPanicked);
+            }
+        }
 
         Ok(Self {
             shutdown_requested,
@@ -198,11 +272,6 @@ impl TunnelSession {
             Err(_) => Err(TunnelSessionError::SessionPanicked),
         }
     }
-}
-
-struct AgentStreamState {
-    runtime_socket: WebSocket<MaybeTlsStream<TcpStream>>,
-    send_window: StreamSendWindow,
 }
 
 struct PtySessionState {
@@ -227,6 +296,7 @@ struct TunnelSessionRuntime {
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     agent_endpoint_url: Option<String>,
+    runtime_env: BTreeMap<String, String>,
     cgroup_root: PathBuf,
     attachment_root: PathBuf,
     sandbox_instance_id: String,
@@ -234,30 +304,53 @@ struct TunnelSessionRuntime {
     clock: Arc<dyn Clock>,
     sleeper: Arc<dyn Sleeper>,
 }
-
 struct TunnelSessionLoopContext<'a> {
     agent_endpoint_url: Option<&'a str>,
     attachment_root: &'a Path,
     cgroup_root: &'a Path,
+    runtime_env: &'a BTreeMap<String, String>,
     sandbox_instance_id: &'a str,
     clock: &'a dyn Clock,
     sleeper: &'a dyn Sleeper,
 }
 
-fn run_tunnel_session_loop(
-    mut tunnel: BootstrapTunnel,
+async fn run_tunnel_session(
     runtime: TunnelSessionRuntime,
+    gateway_ws_url: &str,
+    bootstrap_token: &str,
+    startup_result_sender: std::sync::mpsc::Sender<Result<(), TunnelSessionError>>,
 ) -> Result<(), TunnelSessionError> {
-    let socket = tunnel
-        .socket
-        .as_mut()
-        .expect("bootstrap tunnel should hold an open websocket");
-    set_tunnel_socket_nonblocking(socket)?;
+    let connected_url = resolve_bootstrap_tunnel_url(gateway_ws_url, bootstrap_token)?;
+    let (bootstrap_socket, _) = match connect_async(connected_url.as_str()).await {
+        Ok(value) => value,
+        Err(error) => {
+            let startup_error = TunnelSessionError::ConfigureTunnelSocket(error.to_string());
+            let _ = startup_result_sender.send(Err(TunnelSessionError::ConfigureTunnelSocket(
+                error.to_string(),
+            )));
+            return Err(startup_error);
+        }
+    };
+    let (tunnel_writer_sender, tunnel_writer_receiver) = mpsc::unbounded_channel();
+    let (event_sender, mut event_receiver) = mpsc::unbounded_channel();
+    let _bootstrap_socket_task = spawn_bootstrap_socket_task(
+        bootstrap_socket,
+        tunnel_writer_receiver,
+        event_sender.clone(),
+    );
+    let _wake_thread = spawn_tunnel_wake_thread(
+        runtime.shutdown_requested.clone(),
+        runtime.sleeper.clone(),
+        event_sender.clone(),
+    );
 
     let mut telemetry_relay = TelemetryRelay::default();
-    telemetry_relay
-        .attach_tunnel_connection(socket)
-        .map_err(|error| TunnelSessionError::AttachTelemetry(error.to_string()))?;
+    send_telemetry_frames(
+        &tunnel_writer_sender,
+        telemetry_relay
+            .attach_tunnel_connection()
+            .map_err(|error| TunnelSessionError::AttachTelemetry(error.to_string()))?,
+    )?;
     runtime
         .keepalive_manager
         .lock()
@@ -268,6 +361,7 @@ fn run_tunnel_session_loop(
         .lock()
         .expect("runtime readiness manager lock should not be poisoned")
         .on_tunnel_connected();
+    let _ = startup_result_sender.send(Ok(()));
 
     let mut agent_streams = BTreeMap::<u32, AgentStreamState>::new();
     let mut pty_sessions = BTreeMap::<String, PtySessionState>::new();
@@ -276,41 +370,13 @@ fn run_tunnel_session_loop(
         agent_endpoint_url: runtime.agent_endpoint_url.as_deref(),
         attachment_root: &runtime.attachment_root,
         cgroup_root: &runtime.cgroup_root,
+        runtime_env: &runtime.runtime_env,
         sandbox_instance_id: &runtime.sandbox_instance_id,
         clock: runtime.clock.as_ref(),
         sleeper: runtime.sleeper.as_ref(),
     };
 
     loop {
-        if runtime.shutdown_requested.load(Ordering::Relaxed) {
-            for pty_session in pty_sessions.values() {
-                let _ = pty_session.session.terminate(
-                    loop_context.clock,
-                    loop_context.sleeper,
-                    DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
-                    DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
-                );
-            }
-            let socket = tunnel
-                .socket
-                .as_mut()
-                .expect("bootstrap tunnel should still hold a websocket while shutting down");
-            let _ = telemetry_relay.detach_tunnel_connection(socket);
-            runtime
-                .keepalive_manager
-                .lock()
-                .expect("keepalive manager lock should not be poisoned")
-                .on_tunnel_disconnected();
-            runtime
-                .runtime_readiness_manager
-                .lock()
-                .expect("runtime readiness manager lock should not be poisoned")
-                .on_tunnel_disconnected();
-            return tunnel
-                .close()
-                .map_err(|error| TunnelSessionError::WriteTunnelText(error.to_string()));
-        }
-
         {
             let publishable_state = runtime
                 .keepalive_manager
@@ -320,9 +386,7 @@ fn run_tunnel_session_loop(
             if let Some(state) = publishable_state {
                 let payload =
                     serde_json::to_string(&state).map_err(TunnelSessionError::PublishKeepalive)?;
-                tunnel
-                    .send_text(&payload)
-                    .map_err(|error| TunnelSessionError::WriteTunnelText(error.to_string()))?;
+                write_tunnel_text(&tunnel_writer_sender, payload)?;
             }
         }
         {
@@ -334,207 +398,220 @@ fn run_tunnel_session_loop(
             if let Some(state) = publishable_state {
                 let payload = serde_json::to_string(&state)
                     .map_err(TunnelSessionError::PublishRuntimeReady)?;
-                tunnel
-                    .send_text(&payload)
-                    .map_err(|error| TunnelSessionError::WriteTunnelText(error.to_string()))?;
+                write_tunnel_text(&tunnel_writer_sender, payload)?;
             }
         }
+            let Some(event) = event_receiver.recv().await else {
+            break;
+        };
 
-        let socket = tunnel
-            .socket
-            .as_mut()
-            .expect("bootstrap tunnel should hold an open websocket");
-        let agent_work = poll_agent_streams(socket, &mut agent_streams);
-        let pty_work = poll_pty_sessions(
-            socket,
+        if runtime.shutdown_requested.load(Ordering::Relaxed) {
+            for pty_session in pty_sessions.values() {
+                let _ = pty_session.session.terminate(
+                    loop_context.clock,
+                    loop_context.sleeper,
+                    DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
+                    DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
+                );
+            }
+            if let Ok(frames) = telemetry_relay.detach_tunnel_connection() {
+                let _ = send_telemetry_frames(&tunnel_writer_sender, frames);
+            }
+            runtime
+                .keepalive_manager
+                .lock()
+                .expect("keepalive manager lock should not be poisoned")
+                .on_tunnel_disconnected();
+            runtime
+                .runtime_readiness_manager
+                .lock()
+                .expect("runtime readiness manager lock should not be poisoned")
+                .on_tunnel_disconnected();
+            let _ = write_tunnel_close(&tunnel_writer_sender);
+            return Ok(());
+        }
+
+        if let Err(error) = handle_tunnel_session_event(
+            event,
+            &tunnel_writer_sender,
+            &event_sender,
+            &loop_context,
+            &mut telemetry_relay,
+            &mut agent_streams,
             &mut pty_sessions,
-            loop_context.clock,
-            loop_context.sleeper,
-        );
-
-        match socket.read() {
-            Ok(Message::Text(payload)) => {
-                if telemetry_relay
-                    .handle_control_message(payload.as_str(), socket)
-                    .map_err(|error| TunnelSessionError::HandleTelemetry(error.to_string()))?
-                {
-                    continue;
-                }
-
-                let control_message = parse_stream_control_message(payload.as_str())
-                    .map_err(|error| TunnelSessionError::ParseControl(error.to_string()))?;
-                handle_tunnel_control_message(
-                    socket,
-                    control_message,
-                    &loop_context,
-                    &mut agent_streams,
-                    &mut pty_sessions,
-                    &mut file_uploads,
-                )?;
-            }
-            Ok(Message::Binary(payload)) => {
-                let frame = decode_stream_data_frame(payload.as_ref())
-                    .map_err(|error| TunnelSessionError::ParseDataFrame(error.to_string()))?;
-                handle_tunnel_binary_frame(
-                    socket,
-                    frame,
-                    &mut agent_streams,
-                    &mut pty_sessions,
-                    &mut file_uploads,
-                )?;
-            }
-            Ok(Message::Ping(payload)) => {
-                socket
-                    .send(Message::Pong(payload))
-                    .map_err(|error| TunnelSessionError::WriteTunnelText(error.to_string()))?;
-            }
-            Ok(Message::Pong(_)) | Ok(Message::Frame(_)) => {}
-            Ok(Message::Close(_)) | Err(WebSocketError::ConnectionClosed) => {
-                runtime
-                    .keepalive_manager
-                    .lock()
-                    .expect("keepalive manager lock should not be poisoned")
-                    .on_tunnel_disconnected();
-                return Ok(());
-            }
-            Err(WebSocketError::Io(error)) if error.kind() == io::ErrorKind::WouldBlock => {
-                if !agent_work && !pty_work {
-                    runtime.sleeper.sleep(DEFAULT_TUNNEL_SESSION_POLL_INTERVAL);
-                }
-            }
-            Err(error) => return Err(TunnelSessionError::ReadTunnel(error.to_string())),
+            &mut file_uploads,
+        )
+        .await
+        {
+            return Err(error);
         }
     }
+
+    Ok(())
 }
 
-fn poll_agent_streams(
-    tunnel_socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
-    agent_streams: &mut BTreeMap<u32, AgentStreamState>,
-) -> bool {
-    let stream_ids: Vec<u32> = agent_streams.keys().copied().collect();
-    let mut did_work = false;
-    let mut closed_stream_ids = Vec::new();
-
-    for stream_id in stream_ids {
-        let Some(agent_stream) = agent_streams.get_mut(&stream_id) else {
-            continue;
+type TunnelWebSocket = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
+fn spawn_bootstrap_socket_task(
+    mut socket: TunnelWebSocket,
+    mut receiver: mpsc::UnboundedReceiver<TunnelWriterMessage>,
+    event_sender: mpsc::UnboundedSender<TunnelSessionEvent>,
+) -> TokioJoinHandle<Result<(), TunnelSessionError>> {
+    tokio::spawn(async move {
+        let notify_bootstrap_closed = |reason: Option<String>| {
+            let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed { reason });
         };
 
         loop {
-            match agent_stream.runtime_socket.read() {
-                Ok(Message::Text(payload)) => {
-                    did_work = true;
-                    if !agent_stream.send_window.try_consume(payload.len()) {
-                        let _ = write_tunnel_text(
-                            tunnel_socket,
-                            stream_reset(
-                                stream_id,
-                                STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-                                "agent stream send window is exhausted",
-                            ),
-                        );
-                        closed_stream_ids.push(stream_id);
-                        break;
-                    }
-                    let encoded = match encode_stream_data_frame(
-                        stream_id,
-                        PAYLOAD_KIND_WEBSOCKET_TEXT,
-                        payload.as_bytes(),
-                    ) {
-                        Ok(encoded) => encoded,
-                        Err(_) => {
-                            closed_stream_ids.push(stream_id);
-                            break;
-                        }
+            tokio::select! {
+                outbound = receiver.recv() => {
+                    let Some(message) = outbound else {
+                        notify_bootstrap_closed(Some("bootstrap tunnel writer channel closed".to_string()));
+                        return Ok(());
                     };
-                    if write_tunnel_binary(tunnel_socket, encoded).is_err() {
-                        closed_stream_ids.push(stream_id);
-                        break;
-                    }
-                }
-                Ok(Message::Binary(payload)) => {
-                    did_work = true;
-                    if !agent_stream.send_window.try_consume(payload.len()) {
-                        let _ = write_tunnel_text(
-                            tunnel_socket,
-                            stream_reset(
-                                stream_id,
-                                STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-                                "agent stream send window is exhausted",
-                            ),
-                        );
-                        closed_stream_ids.push(stream_id);
-                        break;
-                    }
-                    let encoded = match encode_stream_data_frame(
-                        stream_id,
-                        PAYLOAD_KIND_WEBSOCKET_BINARY,
-                        payload.as_ref(),
-                    ) {
-                        Ok(encoded) => encoded,
-                        Err(_) => {
-                            closed_stream_ids.push(stream_id);
-                            break;
+
+                    match message {
+                        TunnelWriterMessage::Text(payload) => {
+                            if let Err(error) = socket.send(Message::Text(payload.into())).await {
+                                notify_bootstrap_closed(Some(format!(
+                                    "failed to write bootstrap tunnel text frame: {error}"
+                                )));
+                                return Err(TunnelSessionError::WriteTunnelText(error.to_string()));
+                            }
                         }
-                    };
-                    if write_tunnel_binary(tunnel_socket, encoded).is_err() {
-                        closed_stream_ids.push(stream_id);
-                        break;
+                        TunnelWriterMessage::Binary(payload) => {
+                            if let Err(error) = socket.send(Message::Binary(payload.into())).await {
+                                notify_bootstrap_closed(Some(format!(
+                                    "failed to write bootstrap tunnel binary frame: {error}"
+                                )));
+                                return Err(TunnelSessionError::WriteTunnelBinary(error.to_string()));
+                            }
+                        }
+                        TunnelWriterMessage::Pong(payload) => {
+                            if let Err(error) = socket.send(Message::Pong(payload.into())).await {
+                                notify_bootstrap_closed(Some(format!(
+                                    "failed to write bootstrap tunnel pong frame: {error}"
+                                )));
+                                return Err(TunnelSessionError::WriteTunnelText(error.to_string()));
+                            }
+                        }
+                        TunnelWriterMessage::Close => {
+                            if let Err(error) = socket.send(Message::Close(None)).await {
+                                notify_bootstrap_closed(Some(format!(
+                                    "failed to write bootstrap tunnel close frame: {error}"
+                                )));
+                                return Err(TunnelSessionError::WriteTunnelText(error.to_string()));
+                            }
+                            notify_bootstrap_closed(None);
+                            return Ok(());
+                        }
                     }
                 }
-                Ok(Message::Ping(payload)) => {
-                    did_work = true;
-                    if agent_stream
-                        .runtime_socket
-                        .send(Message::Pong(payload))
-                        .is_err()
-                    {
-                        closed_stream_ids.push(stream_id);
-                        break;
+                inbound = socket.next() => {
+                    match inbound {
+                        Some(Ok(Message::Close(_))) | Some(Err(WebSocketError::ConnectionClosed)) | None => {
+                            let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed { reason: None });
+                            return Ok(());
+                        }
+                        Some(Ok(Message::Ping(payload))) => {
+                            socket
+                                .send(Message::Pong(payload))
+                                .await
+                                .map_err(|error| TunnelSessionError::WriteTunnelText(error.to_string()))?;
+                        }
+                        Some(Ok(message)) => {
+                            let _ = event_sender.send(TunnelSessionEvent::BootstrapMessage(message));
+                        }
+                        Some(Err(error)) => {
+                            let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed {
+                                reason: Some(error.to_string()),
+                            });
+                            return Ok(());
+                        }
                     }
-                }
-                Ok(Message::Pong(_)) | Ok(Message::Frame(_)) => {
-                    did_work = true;
-                }
-                Ok(Message::Close(_)) | Err(WebSocketError::ConnectionClosed) => {
-                    closed_stream_ids.push(stream_id);
-                    break;
-                }
-                Err(WebSocketError::Io(error))
-                    if matches!(
-                        error.kind(),
-                        io::ErrorKind::ConnectionReset
-                            | io::ErrorKind::BrokenPipe
-                            | io::ErrorKind::UnexpectedEof
-                    ) =>
-                {
-                    closed_stream_ids.push(stream_id);
-                    break;
-                }
-                Err(WebSocketError::Io(error)) if error.kind() == io::ErrorKind::WouldBlock => {
-                    break;
-                }
-                Err(_) => {
-                    closed_stream_ids.push(stream_id);
-                    break;
                 }
             }
         }
-    }
+    })
+}
 
-    for stream_id in closed_stream_ids {
-        agent_streams.remove(&stream_id);
-    }
+fn spawn_tunnel_wake_thread(
+    shutdown_requested: Arc<AtomicBool>,
+    sleeper: Arc<dyn Sleeper>,
+    event_sender: mpsc::UnboundedSender<TunnelSessionEvent>,
+) -> JoinHandle<()> {
+    thread::spawn(move || loop {
+        if shutdown_requested.load(Ordering::Relaxed) {
+            let _ = event_sender.send(TunnelSessionEvent::Wake);
+            return;
+        }
 
-    did_work
+        sleeper.sleep(DEFAULT_TUNNEL_SESSION_POLL_INTERVAL);
+        if event_sender.send(TunnelSessionEvent::Wake).is_err() {
+            return;
+        }
+    })
+}
+
+fn spawn_agent_stream_task(
+    stream_id: u32,
+    runtime_socket: TunnelWebSocket,
+    event_sender: mpsc::UnboundedSender<TunnelSessionEvent>,
+) -> mpsc::UnboundedSender<Message> {
+    let (mut writer, mut reader) = runtime_socket.split();
+    let (sender, mut receiver) = mpsc::unbounded_channel();
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                message = receiver.recv() => {
+                    let Some(message) = message else {
+                        let _ = writer.send(Message::Close(None)).await;
+                        let _ = event_sender.send(TunnelSessionEvent::AgentClosed {
+                            stream_id,
+                            reason: None,
+                        });
+                        return;
+                    };
+                    if let Err(error) = writer.send(message).await {
+                        let _ = event_sender.send(TunnelSessionEvent::AgentClosed {
+                            stream_id,
+                            reason: Some(error.to_string()),
+                        });
+                        return;
+                    }
+                }
+                message = reader.next() => {
+                    match message {
+                        Some(Ok(Message::Close(_))) | Some(Err(WebSocketError::ConnectionClosed)) | None => {
+                            let _ = event_sender.send(TunnelSessionEvent::AgentClosed {
+                                stream_id,
+                                reason: None,
+                            });
+                            return;
+                        }
+                        Some(Ok(message)) => {
+                            let _ = event_sender.send(TunnelSessionEvent::AgentMessage { stream_id, message });
+                        }
+                        Some(Err(error)) => {
+                            let _ = event_sender.send(TunnelSessionEvent::AgentClosed {
+                                stream_id,
+                                reason: Some(error.to_string()),
+                            });
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    sender
 }
 
 fn poll_pty_sessions(
-    tunnel_socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     pty_sessions: &mut BTreeMap<String, PtySessionState>,
     clock: &dyn Clock,
     sleeper: &dyn Sleeper,
-) -> bool {
+) -> Result<bool, TunnelSessionError> {
     let session_ids: Vec<String> = pty_sessions.keys().cloned().collect();
     let mut did_work = false;
     let mut closed_session_ids = Vec::new();
@@ -544,98 +621,88 @@ fn poll_pty_sessions(
             continue;
         };
 
-        loop {
-            let next_event = match pty_state
-                .session
-                .next_event_timeout(Duration::from_millis(0))
-            {
-                Ok(event) => event,
-                Err(_) => {
-                    closed_session_ids.push(session_id.clone());
-                    break;
-                }
-            };
-            let Some(event) = next_event else {
-                break;
-            };
-            did_work = true;
-            match event {
-                PtyEvent::Output(chunk) => {
-                    let attached_stream_ids: Vec<u32> =
-                        pty_state.attached_stream_ids.iter().copied().collect();
-                    for stream_id in attached_stream_ids {
-                        let Some(send_window) =
-                            pty_state.send_windows_by_stream_id.get_mut(&stream_id)
-                        else {
-                            continue;
-                        };
-                        if !send_window.try_consume(chunk.len()) {
-                            let _ = write_tunnel_text(
-                                tunnel_socket,
-                                stream_reset(
-                                    stream_id,
-                                    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-                                    "pty stream send window is exhausted",
-                                ),
+        let next_event = match pty_state.session.next_event_timeout(Duration::from_millis(0)) {
+            Ok(event) => event,
+            Err(_) => {
+                closed_session_ids.push(session_id.clone());
+                continue;
+            }
+        };
+        let Some(event) = next_event else {
+            continue;
+        };
+        did_work = true;
+        match event {
+            PtyEvent::Output(chunk) => {
+                let attached_stream_ids: Vec<u32> =
+                    pty_state.attached_stream_ids.iter().copied().collect();
+                for stream_id in attached_stream_ids {
+                    let Some(send_window) = pty_state.send_windows_by_stream_id.get_mut(&stream_id)
+                    else {
+                        continue;
+                    };
+                    if !send_window.try_consume(chunk.len()) {
+                        let _ = write_tunnel_text(
+                            tunnel_writer_sender,
+                            stream_reset(
+                                stream_id,
+                                STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+                                "pty stream send window is exhausted",
+                            ),
+                        );
+                        pty_state.attached_stream_ids.remove(&stream_id);
+                        pty_state.send_windows_by_stream_id.remove(&stream_id);
+                        if stream_id == pty_state.primary_stream_id {
+                            let _ = pty_state.session.terminate(
+                                clock,
+                                sleeper,
+                                DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
+                                DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
                             );
-                            pty_state.attached_stream_ids.remove(&stream_id);
-                            pty_state.send_windows_by_stream_id.remove(&stream_id);
-                            if stream_id == pty_state.primary_stream_id {
-                                let _ = pty_state.session.terminate(
-                                    clock,
-                                    sleeper,
-                                    DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
-                                    DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
-                                );
-                                closed_session_ids.push(session_id.clone());
-                                break;
-                            }
-                            continue;
+                            closed_session_ids.push(session_id.clone());
+                            break;
                         }
+                        continue;
+                    }
 
-                        let encoded = match encode_stream_data_frame(
-                            stream_id,
-                            PAYLOAD_KIND_RAW_BYTES,
-                            &chunk,
-                        ) {
+                    let encoded =
+                        match encode_stream_data_frame(stream_id, PAYLOAD_KIND_RAW_BYTES, &chunk) {
                             Ok(encoded) => encoded,
                             Err(_) => continue,
                         };
-                        let _ = write_tunnel_binary(tunnel_socket, encoded);
-                    }
+                    let _ = write_tunnel_binary(tunnel_writer_sender, encoded);
                 }
-                PtyEvent::Exit(exit_code) => {
-                    for stream_id in pty_state.attached_stream_ids.iter().copied() {
-                        let _ =
-                            write_tunnel_text(tunnel_socket, pty_exit_event(stream_id, exit_code));
-                    }
-                    closed_session_ids.push(session_id.clone());
-                    break;
-                }
-                PtyEvent::Closed => {
-                    if let Some(exit_code) = pty_state.session.exit_code() {
-                        for stream_id in pty_state.attached_stream_ids.iter().copied() {
-                            let _ = write_tunnel_text(
-                                tunnel_socket,
-                                pty_exit_event(stream_id, exit_code),
-                            );
-                        }
-                        closed_session_ids.push(session_id.clone());
-                        break;
-                    }
-                }
-                PtyEvent::Error(message) => {
+            }
+            PtyEvent::Exit(exit_code) => {
+                for stream_id in pty_state.attached_stream_ids.iter().copied() {
                     let _ = write_tunnel_text(
-                        tunnel_socket,
-                        stream_reset(
-                            pty_state.primary_stream_id,
-                            STREAM_RESET_CODE_TARGET_CLOSED,
-                            message,
-                        ),
+                        tunnel_writer_sender,
+                        pty_exit_event(stream_id, exit_code),
                     );
-                    closed_session_ids.push(session_id.clone());
-                    break;
                 }
+                closed_session_ids.push(session_id.clone());
+            }
+            PtyEvent::Closed => {
+                if let Some(exit_code) = pty_state.session.exit_code() {
+                    for stream_id in pty_state.attached_stream_ids.iter().copied() {
+                        let _ = write_tunnel_text(
+                            tunnel_writer_sender,
+                            pty_exit_event(stream_id, exit_code),
+                        );
+                    }
+                    closed_session_ids.push(session_id.clone());
+                }
+            }
+            PtyEvent::Error(message) => {
+                let _ = write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_reset(
+                        pty_state.primary_stream_id,
+                        STREAM_RESET_CODE_TARGET_CLOSED,
+                        message,
+                    ),
+                );
+                closed_session_ids.push(session_id.clone());
             }
         }
     }
@@ -644,11 +711,168 @@ fn poll_pty_sessions(
         pty_sessions.remove(&session_id);
     }
 
-    did_work
+    Ok(did_work)
 }
 
-fn handle_tunnel_control_message(
-    tunnel_socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+async fn handle_tunnel_session_event(
+    event: TunnelSessionEvent,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    event_sender: &mpsc::UnboundedSender<TunnelSessionEvent>,
+    context: &TunnelSessionLoopContext<'_>,
+    telemetry_relay: &mut TelemetryRelay,
+    agent_streams: &mut BTreeMap<u32, AgentStreamState>,
+    pty_sessions: &mut BTreeMap<String, PtySessionState>,
+    file_uploads: &mut BTreeMap<u32, FileUploadState>,
+) -> Result<(), TunnelSessionError> {
+    match event {
+        TunnelSessionEvent::BootstrapClosed { reason } => {
+            let reason_text = reason.unwrap_or_else(|| "bootstrap tunnel closed".to_string());
+            eprintln!("sandboxd bootstrap tunnel closed: {reason_text}");
+            Err(TunnelSessionError::ReadTunnel(reason_text))
+        }
+        TunnelSessionEvent::Wake => {
+            let _ = poll_pty_sessions(
+                tunnel_writer_sender,
+                pty_sessions,
+                context.clock,
+                context.sleeper,
+            )?;
+            Ok(())
+        }
+        TunnelSessionEvent::BootstrapMessage(message) => match message {
+            Message::Text(payload) => {
+                if let Some(frames) = telemetry_relay
+                    .handle_control_message(&payload)
+                    .map_err(|error| TunnelSessionError::HandleTelemetry(error.to_string()))?
+                {
+                    send_telemetry_frames(tunnel_writer_sender, frames)?;
+                    return Ok(());
+                }
+
+                let control_message = parse_stream_control_message(&payload)
+                    .map_err(|error| TunnelSessionError::ParseControl(error.to_string()))?;
+                handle_tunnel_control_message(
+                    tunnel_writer_sender,
+                    event_sender,
+                    control_message,
+                    context,
+                    agent_streams,
+                    pty_sessions,
+                    file_uploads,
+                )
+                .await
+            }
+            Message::Binary(payload) => {
+                let frame = decode_stream_data_frame(payload.as_ref())
+                    .map_err(|error| TunnelSessionError::ParseDataFrame(error.to_string()))?;
+                handle_tunnel_binary_frame(
+                    tunnel_writer_sender,
+                    frame,
+                    agent_streams,
+                    pty_sessions,
+                    file_uploads,
+                )
+            }
+            Message::Ping(payload) => write_tunnel_pong(tunnel_writer_sender, payload.to_vec()),
+            Message::Pong(_) => Ok(()),
+            Message::Close(_) => Err(TunnelSessionError::ReadTunnel(
+                "bootstrap tunnel closed".to_string(),
+            )),
+            _ => Ok(()),
+        },
+        TunnelSessionEvent::AgentMessage { stream_id, message } => match message {
+            Message::Text(payload) => {
+                let Some(agent_stream) = agent_streams.get_mut(&stream_id) else {
+                    return Ok(());
+                };
+                if !agent_stream.send_window.try_consume(payload.len()) {
+                    agent_streams.remove(&stream_id);
+                    return write_tunnel_text(
+                        tunnel_writer_sender,
+                        stream_reset(
+                            stream_id,
+                            STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+                            "agent stream send window is exhausted",
+                        ),
+                    );
+                }
+                let encoded =
+                    encode_stream_data_frame(stream_id, PAYLOAD_KIND_WEBSOCKET_TEXT, payload.as_bytes())
+                        .map_err(|error| TunnelSessionError::AgentRead(error.to_string()))?;
+                write_tunnel_binary(tunnel_writer_sender, encoded)
+            }
+            Message::Binary(payload) => {
+                let Some(agent_stream) = agent_streams.get_mut(&stream_id) else {
+                    return Ok(());
+                };
+                if !agent_stream.send_window.try_consume(payload.len()) {
+                    agent_streams.remove(&stream_id);
+                    return write_tunnel_text(
+                        tunnel_writer_sender,
+                        stream_reset(
+                            stream_id,
+                            STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+                            "agent stream send window is exhausted",
+                        ),
+                    );
+                }
+                let encoded =
+                    encode_stream_data_frame(stream_id, PAYLOAD_KIND_WEBSOCKET_BINARY, payload.as_ref())
+                        .map_err(|error| TunnelSessionError::AgentRead(error.to_string()))?;
+                write_tunnel_binary(tunnel_writer_sender, encoded)
+            }
+            Message::Ping(payload) => {
+                if let Some(agent_stream) = agent_streams.get(&stream_id) {
+                    agent_stream
+                        .sender
+                        .send(Message::Pong(payload))
+                        .map_err(|error| TunnelSessionError::AgentWrite(error.to_string()))?;
+                }
+                Ok(())
+            }
+            Message::Pong(_) => Ok(()),
+            Message::Close(_) => {
+                agent_streams.remove(&stream_id);
+                write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_reset(
+                        stream_id,
+                        STREAM_RESET_CODE_TARGET_CLOSED,
+                        "agent runtime websocket closed",
+                    ),
+                )
+            }
+            _ => Ok(()),
+        },
+        TunnelSessionEvent::AgentClosed { stream_id, reason } => {
+            if agent_streams.remove(&stream_id).is_some() {
+                write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_reset(
+                        stream_id,
+                        STREAM_RESET_CODE_TARGET_CLOSED,
+                        reason.unwrap_or_else(|| "agent runtime websocket closed".to_string()),
+                    ),
+                )?;
+            }
+            Ok(())
+        }
+    }
+}
+
+fn format_panic_payload(payload: &(dyn Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        return (*message).to_string();
+    }
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return message.clone();
+    }
+    "unknown panic payload".to_string()
+}
+
+async fn handle_tunnel_control_message(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    event_sender: &mpsc::UnboundedSender<TunnelSessionEvent>,
     control_message: StreamControlMessage,
     context: &TunnelSessionLoopContext<'_>,
     agent_streams: &mut BTreeMap<u32, AgentStreamState>,
@@ -659,7 +883,7 @@ fn handle_tunnel_control_message(
         StreamControlMessage::OpenAgent(message) => {
             let Some(runtime_endpoint_url) = context.agent_endpoint_url else {
                 write_tunnel_text(
-                    tunnel_socket,
+                    tunnel_writer_sender,
                     stream_open_error(
                         message.stream_id,
                         CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
@@ -669,23 +893,25 @@ fn handle_tunnel_control_message(
                 return Ok(());
             };
 
-            let (mut runtime_socket, _) = connect(runtime_endpoint_url)
+            let (runtime_socket, _) = connect_async(runtime_endpoint_url)
+                .await
                 .map_err(|error| TunnelSessionError::AgentDial(error.to_string()))?;
-            set_agent_socket_nonblocking(&mut runtime_socket)?;
+            let sender = spawn_agent_stream_task(message.stream_id, runtime_socket, event_sender.clone());
             agent_streams.insert(
                 message.stream_id,
                 AgentStreamState {
-                    runtime_socket,
+                    sender,
                     send_window: StreamSendWindow::default(),
                 },
             );
-            write_tunnel_text(tunnel_socket, stream_open_ok(message.stream_id))?;
+            write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
         StreamControlMessage::OpenPty(message) => {
             handle_pty_open(
-                tunnel_socket,
+                tunnel_writer_sender,
                 message,
                 context.cgroup_root,
+                context.runtime_env,
                 context.sandbox_instance_id,
                 pty_sessions,
                 context.clock,
@@ -697,7 +923,7 @@ fn handle_tunnel_control_message(
                 create_file_upload_state(&message, context.attachment_root, context.clock)
                     .map_err(TunnelSessionError::FileUpload)?;
             file_uploads.insert(message.stream_id, upload_state);
-            write_tunnel_text(tunnel_socket, stream_open_ok(message.stream_id))?;
+            write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
         StreamControlMessage::Signal(message) => {
             let Some(pty_state) = pty_sessions
@@ -705,7 +931,7 @@ fn handle_tunnel_control_message(
                 .find(|pty_state| pty_state.attached_stream_ids.contains(&message.stream_id))
             else {
                 write_tunnel_text(
-                    tunnel_socket,
+                    tunnel_writer_sender,
                     stream_reset(
                         message.stream_id,
                         STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
@@ -725,8 +951,7 @@ fn handle_tunnel_control_message(
         }
         StreamControlMessage::Close(message) => {
             if let Some(agent_stream) = agent_streams.remove(&message.stream_id) {
-                let mut runtime_socket = agent_stream.runtime_socket;
-                let _ = runtime_socket.close(None);
+                let _ = agent_stream.sender.send(Message::Close(None));
                 return Ok(());
             }
             if let Some(pty_session_id) = pty_sessions
@@ -735,7 +960,7 @@ fn handle_tunnel_control_message(
                 .map(|(session_id, _)| session_id.clone())
             {
                 handle_pty_close(
-                    tunnel_socket,
+                    tunnel_writer_sender,
                     &pty_session_id,
                     message.stream_id,
                     pty_sessions,
@@ -745,12 +970,12 @@ fn handle_tunnel_control_message(
                 return Ok(());
             }
             if let Some(upload_state) = file_uploads.remove(&message.stream_id) {
-                finalize_file_upload(tunnel_socket, message.stream_id, upload_state)?;
+                finalize_file_upload(tunnel_writer_sender, message.stream_id, upload_state)?;
                 return Ok(());
             }
 
             write_tunnel_text(
-                tunnel_socket,
+                tunnel_writer_sender,
                 stream_reset(
                     message.stream_id,
                     STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
@@ -773,10 +998,7 @@ fn handle_tunnel_control_message(
                 .values_mut()
                 .find(|pty_state| pty_state.attached_stream_ids.contains(&message.stream_id))
             {
-                let Some(send_window) = pty_state
-                    .send_windows_by_stream_id
-                    .get_mut(&message.stream_id)
-                else {
+                let Some(send_window) = pty_state.send_windows_by_stream_id.get_mut(&message.stream_id) else {
                     return Ok(());
                 };
                 send_window
@@ -786,7 +1008,7 @@ fn handle_tunnel_control_message(
             }
 
             write_tunnel_text(
-                tunnel_socket,
+                tunnel_writer_sender,
                 stream_reset(
                     message.stream_id,
                     STREAM_RESET_CODE_INVALID_STREAM_WINDOW,
@@ -803,7 +1025,7 @@ fn handle_tunnel_control_message(
 }
 
 fn handle_tunnel_binary_frame(
-    tunnel_socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     frame: crate::tunnel::protocol::StreamDataFrame,
     agent_streams: &mut BTreeMap<u32, AgentStreamState>,
     pty_sessions: &mut BTreeMap<String, PtySessionState>,
@@ -815,19 +1037,19 @@ fn handle_tunnel_binary_frame(
                 let payload = String::from_utf8(frame.payload)
                     .map_err(|error| TunnelSessionError::AgentWrite(error.to_string()))?;
                 agent_stream
-                    .runtime_socket
+                    .sender
                     .send(Message::Text(payload.into()))
                     .map_err(|error| TunnelSessionError::AgentWrite(error.to_string()))?;
             }
             PAYLOAD_KIND_WEBSOCKET_BINARY => {
                 agent_stream
-                    .runtime_socket
+                    .sender
                     .send(Message::Binary(frame.payload.into()))
                     .map_err(|error| TunnelSessionError::AgentWrite(error.to_string()))?;
             }
             _ => {
                 write_tunnel_text(
-                    tunnel_socket,
+                    tunnel_writer_sender,
                     stream_reset(
                         frame.stream_id,
                         STREAM_RESET_CODE_INVALID_STREAM_DATA,
@@ -845,7 +1067,7 @@ fn handle_tunnel_binary_frame(
     {
         if frame.payload_kind != PAYLOAD_KIND_RAW_BYTES {
             write_tunnel_text(
-                tunnel_socket,
+                tunnel_writer_sender,
                 stream_reset(
                     frame.stream_id,
                     STREAM_RESET_CODE_INVALID_STREAM_DATA,
@@ -860,7 +1082,7 @@ fn handle_tunnel_binary_frame(
             .write(&frame.payload)
             .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
         write_tunnel_text(
-            tunnel_socket,
+            tunnel_writer_sender,
             stream_window(frame.stream_id, frame.payload.len()),
         )?;
         return Ok(());
@@ -869,7 +1091,7 @@ fn handle_tunnel_binary_frame(
     if let Some(upload_state) = file_uploads.get_mut(&frame.stream_id) {
         if frame.payload_kind != PAYLOAD_KIND_RAW_BYTES {
             write_tunnel_text(
-                tunnel_socket,
+                tunnel_writer_sender,
                 stream_reset(
                     frame.stream_id,
                     STREAM_RESET_CODE_INVALID_STREAM_DATA,
@@ -884,7 +1106,7 @@ fn handle_tunnel_binary_frame(
             .saturating_add(frame.payload.len());
         if upload_state.received_bytes > upload_state.size_bytes {
             write_tunnel_text(
-                tunnel_socket,
+                tunnel_writer_sender,
                 stream_reset(
                     frame.stream_id,
                     FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
@@ -900,14 +1122,14 @@ fn handle_tunnel_binary_frame(
             .write_all(&frame.payload)
             .map_err(|error| TunnelSessionError::FileUpload(error.to_string()))?;
         write_tunnel_text(
-            tunnel_socket,
+            tunnel_writer_sender,
             stream_window(frame.stream_id, frame.payload.len()),
         )?;
         return Ok(());
     }
 
     write_tunnel_text(
-        tunnel_socket,
+        tunnel_writer_sender,
         stream_reset(
             frame.stream_id,
             STREAM_RESET_CODE_INVALID_STREAM_DATA,
@@ -921,9 +1143,10 @@ fn handle_tunnel_binary_frame(
 }
 
 fn handle_pty_open(
-    tunnel_socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     message: crate::tunnel::protocol::PtyStreamOpen,
     cgroup_root: &Path,
+    runtime_env: &BTreeMap<String, String>,
     sandbox_instance_id: &str,
     pty_sessions: &mut BTreeMap<String, PtySessionState>,
     clock: &dyn Clock,
@@ -933,7 +1156,7 @@ fn handle_pty_open(
         crate::tunnel::protocol::PtySessionMode::Attach => {
             let Some(pty_state) = pty_sessions.get_mut(&message.channel.pty_session_id) else {
                 write_tunnel_text(
-                    tunnel_socket,
+                    tunnel_writer_sender,
                     stream_open_error(
                         message.stream_id,
                         CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,
@@ -947,12 +1170,12 @@ fn handle_pty_open(
             pty_state
                 .send_windows_by_stream_id
                 .insert(message.stream_id, StreamSendWindow::default());
-            write_tunnel_text(tunnel_socket, stream_open_ok(message.stream_id))?;
+            write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
         crate::tunnel::protocol::PtySessionMode::Create => {
             if pty_sessions.contains_key(&message.channel.pty_session_id) {
                 write_tunnel_text(
-                    tunnel_socket,
+                    tunnel_writer_sender,
                     stream_open_error(
                         message.stream_id,
                         CONNECT_ERROR_CODE_PTY_SESSION_EXISTS,
@@ -969,6 +1192,7 @@ fn handle_pty_open(
                     rows: message.channel.rows,
                     command: message.channel.command.clone(),
                     args: message.channel.args.clone(),
+                    env: runtime_env.clone(),
                 },
                 cgroup_root,
                 sandbox_instance_id,
@@ -978,7 +1202,7 @@ fn handle_pty_open(
                 Ok(session) => session,
                 Err(error) => {
                     write_tunnel_text(
-                        tunnel_socket,
+                        tunnel_writer_sender,
                         stream_open_error(
                             message.stream_id,
                             CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED,
@@ -1002,7 +1226,7 @@ fn handle_pty_open(
                     send_windows_by_stream_id,
                 },
             );
-            write_tunnel_text(tunnel_socket, stream_open_ok(message.stream_id))?;
+            write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
     }
 
@@ -1010,7 +1234,7 @@ fn handle_pty_open(
 }
 
 fn handle_pty_close(
-    tunnel_socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     pty_session_id: &str,
     stream_id: u32,
     pty_sessions: &mut BTreeMap<String, PtySessionState>,
@@ -1023,7 +1247,7 @@ fn handle_pty_close(
 
     if !pty_state.attached_stream_ids.contains(&stream_id) {
         write_tunnel_text(
-            tunnel_socket,
+            tunnel_writer_sender,
             stream_reset(
                 stream_id,
                 STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
@@ -1050,13 +1274,16 @@ fn handle_pty_close(
     ) {
         Ok(exit_code) => {
             for attached_stream_id in pty_state.attached_stream_ids.iter().copied() {
-                write_tunnel_text(tunnel_socket, pty_exit_event(attached_stream_id, exit_code))?;
+                write_tunnel_text(
+                    tunnel_writer_sender,
+                    pty_exit_event(attached_stream_id, exit_code),
+                )?;
             }
             pty_sessions.remove(pty_session_id);
         }
         Err(error) => {
             write_tunnel_text(
-                tunnel_socket,
+                tunnel_writer_sender,
                 stream_reset(
                     pty_state.primary_stream_id,
                     STREAM_RESET_CODE_STREAM_CLOSE_FAILED,
@@ -1121,13 +1348,13 @@ fn create_file_upload_state(
 }
 
 fn finalize_file_upload(
-    tunnel_socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     stream_id: u32,
     upload_state: FileUploadState,
 ) -> Result<(), TunnelSessionError> {
     if upload_state.received_bytes != upload_state.size_bytes {
         write_tunnel_text(
-            tunnel_socket,
+            tunnel_writer_sender,
             stream_reset(
                 stream_id,
                 FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH,
@@ -1149,7 +1376,7 @@ fn finalize_file_upload(
     ) {
         Ok(()) => {}
         Err((code, message)) => {
-            write_tunnel_text(tunnel_socket, stream_reset(stream_id, code, message))?;
+            write_tunnel_text(tunnel_writer_sender, stream_reset(stream_id, code, message))?;
             let _ = fs::remove_file(&upload_state.temp_path);
             return Ok(());
         }
@@ -1164,7 +1391,7 @@ fn finalize_file_upload(
         .unwrap_or("attachment");
     let final_path_text = upload_state.final_path.to_string_lossy();
     write_tunnel_text(
-        tunnel_socket,
+        tunnel_writer_sender,
         file_upload_completed_event(
             stream_id,
             attachment_id,
@@ -1175,7 +1402,7 @@ fn finalize_file_upload(
             &final_path_text,
         ),
     )?;
-    write_tunnel_text(tunnel_socket, stream_complete(stream_id))?;
+    write_tunnel_text(tunnel_writer_sender, stream_complete(stream_id))?;
 
     Ok(())
 }
@@ -1195,48 +1422,94 @@ fn derive_sandbox_instance_id(gateway_ws_url: &str) -> Result<String, TunnelSess
     Ok(segment.to_string())
 }
 
-fn set_tunnel_socket_nonblocking(
-    socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
-) -> Result<(), TunnelSessionError> {
-    match socket.get_mut() {
-        MaybeTlsStream::Plain(stream) => stream
-            .set_nonblocking(true)
-            .map_err(|error| TunnelSessionError::ConfigureTunnelSocket(error.to_string())),
-        _ => Err(TunnelSessionError::ConfigureTunnelSocket(
-            "bootstrap tunnel transport is not supported by sandboxd".to_string(),
-        )),
+fn resolve_bootstrap_tunnel_url(
+    gateway_ws_url: &str,
+    bootstrap_token: &str,
+) -> Result<String, TunnelSessionError> {
+    let normalized_token = bootstrap_token.trim();
+    if normalized_token.is_empty() {
+        return Err(TunnelSessionError::InvalidGatewayUrl(
+            "sandbox tunnel bootstrap token is required".to_string(),
+        ));
     }
+
+    let mut parsed_url = Url::parse(gateway_ws_url)
+        .map_err(|error| TunnelSessionError::InvalidGatewayUrl(error.to_string()))?;
+    match parsed_url.scheme() {
+        "ws" | "wss" => {}
+        _ => {
+            return Err(TunnelSessionError::InvalidGatewayUrl(
+                "sandbox tunnel gateway ws url must use ws or wss scheme".to_string(),
+            ));
+        }
+    }
+
+    parsed_url
+        .query_pairs_mut()
+        .append_pair("bootstrap_token", normalized_token);
+    Ok(parsed_url.to_string())
 }
 
-fn set_agent_socket_nonblocking(
-    socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+fn send_telemetry_frames(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    frames: Vec<TelemetryRelayFrame>,
 ) -> Result<(), TunnelSessionError> {
-    match socket.get_mut() {
-        MaybeTlsStream::Plain(stream) => stream
-            .set_nonblocking(true)
-            .map_err(|error| TunnelSessionError::AgentSocket(error.to_string())),
-        _ => Err(TunnelSessionError::AgentSocket(
-            "agent runtime endpoints must use plain ws transports".to_string(),
-        )),
+    for frame in frames {
+        match frame {
+            TelemetryRelayFrame::Text(payload) => write_tunnel_text(tunnel_writer_sender, payload)?,
+            TelemetryRelayFrame::Binary(payload) => {
+                write_tunnel_binary(tunnel_writer_sender, payload)?
+            }
+        }
     }
+
+    Ok(())
 }
 
 fn write_tunnel_text(
-    socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     payload: String,
 ) -> Result<(), TunnelSessionError> {
-    socket
-        .send(Message::Text(payload.into()))
-        .map_err(|error| TunnelSessionError::WriteTunnelText(error.to_string()))
+    tunnel_writer_sender
+        .send(TunnelWriterMessage::Text(payload))
+        .map_err(|_| {
+            TunnelSessionError::WriteTunnelText(
+                "bootstrap tunnel writer is closed".to_string(),
+            )
+        })
 }
 
 fn write_tunnel_binary(
-    socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     payload: Vec<u8>,
 ) -> Result<(), TunnelSessionError> {
-    socket
-        .send(Message::Binary(payload.into()))
-        .map_err(|error| TunnelSessionError::WriteTunnelBinary(error.to_string()))
+    tunnel_writer_sender
+        .send(TunnelWriterMessage::Binary(payload))
+        .map_err(|_| {
+            TunnelSessionError::WriteTunnelBinary(
+                "bootstrap tunnel writer is closed".to_string(),
+            )
+        })
+}
+
+fn write_tunnel_pong(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    payload: Vec<u8>,
+) -> Result<(), TunnelSessionError> {
+    tunnel_writer_sender
+        .send(TunnelWriterMessage::Pong(payload))
+        .map_err(|_| {
+            TunnelSessionError::WriteTunnelText(
+                "bootstrap tunnel writer is closed".to_string(),
+            )
+        })
+}
+
+fn write_tunnel_close(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+) -> Result<(), TunnelSessionError> {
+    let _ = tunnel_writer_sender.send(TunnelWriterMessage::Close);
+    Ok(())
 }
 
 fn assert_upload_metadata(
@@ -1393,7 +1666,6 @@ mod tests {
     use crate::runtime::adapters::RuntimeAdapterRegistry;
     use crate::runtime::readiness::RuntimeReadinessManager;
     use crate::time::{SystemClock, ThreadSleeper};
-    use crate::tunnel::connect_bootstrap_tunnel;
     use crate::tunnel::protocol::{
         PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT, decode_stream_data_frame,
         encode_stream_data_frame,
@@ -1540,7 +1812,9 @@ mod tests {
                             saw_runtime_ready = true;
                         }
                     }
-                    other => panic!("unexpected bootstrap control message before streams: {other:?}"),
+                    other => {
+                        panic!("unexpected bootstrap control message before streams: {other:?}")
+                    }
                 }
             }
 
@@ -1595,6 +1869,17 @@ mod tests {
                     }
                 })
             );
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.window",
+                        "streamId": 7,
+                        "bytes": agent_response.payload.len()
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should restore agent stream window credit");
 
             websocket
                 .send(Message::Text(
@@ -1774,17 +2059,12 @@ mod tests {
                 Arc::new(ThreadSleeper),
             )
             .expect("runtime adapters should start");
-        let tunnel = connect_bootstrap_tunnel(
-            &startup_input.tunnel_gateway_ws_url,
-            &startup_input.bootstrap_token,
-        )
-        .expect("bootstrap tunnel should connect");
         let tunnel_session = TunnelSession::start(
             &startup_input,
-            tunnel,
             keepalive_manager,
             runtime_readiness_manager,
             Some(runtime_adapters.adapters()[0].listen_url().to_string()),
+            BTreeMap::new(),
             Arc::new(SystemClock),
             Arc::new(ThreadSleeper),
         )

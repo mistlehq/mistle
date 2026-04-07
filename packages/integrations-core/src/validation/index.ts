@@ -15,10 +15,19 @@ import type {
 const ReservedArtifactEnvKeys = new Set([
   "HTTP_PROXY",
   "HTTPS_PROXY",
+  "ALL_PROXY",
   "NO_PROXY",
   "http_proxy",
   "https_proxy",
+  "all_proxy",
   "no_proxy",
+  "SSL_CERT_FILE",
+  "CURL_CA_BUNDLE",
+  "GIT_SSL_CAINFO",
+  "REQUESTS_CA_BUNDLE",
+  "NODE_EXTRA_CA_CERTS",
+  "SSL_CERT_DIR",
+  "GIT_SSL_CAPATH",
 ]);
 
 function flattenCompiledBindingResults(input: ReadonlyArray<CompiledBindingResult>): {
