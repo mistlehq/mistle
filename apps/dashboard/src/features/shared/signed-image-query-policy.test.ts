@@ -6,15 +6,11 @@ import {
 } from "./signed-image-query-policy.js";
 
 describe("signed image query policy", () => {
-  it("does not refetch when no image URL is available", () => {
+  it("keeps empty-image states refetchable on focus or reconnect", () => {
     expect(resolveSignedImageRefetchInterval({ refreshAfterSeconds: null })).toBe(false);
     expect(resolveSignedImageRefetchInterval({ refreshAfterSeconds: undefined })).toBe(false);
-    expect(resolveSignedImageStaleTime({ refreshAfterSeconds: null })).toBe(
-      Number.POSITIVE_INFINITY,
-    );
-    expect(resolveSignedImageStaleTime({ refreshAfterSeconds: undefined })).toBe(
-      Number.POSITIVE_INFINITY,
-    );
+    expect(resolveSignedImageStaleTime({ refreshAfterSeconds: null })).toBe(0);
+    expect(resolveSignedImageStaleTime({ refreshAfterSeconds: undefined })).toBe(0);
   });
 
   it("refreshes using the server-provided delay", () => {
@@ -24,6 +20,6 @@ describe("signed image query policy", () => {
 
   it("disables interval polling for nearly expired URLs", () => {
     expect(resolveSignedImageRefetchInterval({ refreshAfterSeconds: 0 })).toBe(false);
-    expect(resolveSignedImageStaleTime({ refreshAfterSeconds: 0 })).toBe(Number.POSITIVE_INFINITY);
+    expect(resolveSignedImageStaleTime({ refreshAfterSeconds: 0 })).toBe(0);
   });
 });

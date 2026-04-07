@@ -22,5 +22,5 @@ export function resolveSignedImageStaleTime(input: {
   refreshAfterSeconds: number | null | undefined;
 }): number {
   const refreshMs = resolveSignedImageRefreshMs(input);
-  return refreshMs === false ? Number.POSITIVE_INFINITY : refreshMs;
+  return refreshMs === false ? 0 : refreshMs;
 }

@@ -14,14 +14,12 @@ function parseProfileImagePayload(payload: unknown): {
   if (!("imageUrl" in payload)) {
     throw new Error("Profile image response was missing imageUrl.");
   }
-  if (!("refreshAfterSeconds" in payload)) {
-    throw new Error("Profile image response was missing refreshAfterSeconds.");
-  }
 
   if (payload.imageUrl !== null && typeof payload.imageUrl !== "string") {
     throw new Error("Profile image response imageUrl was invalid.");
   }
   if (
+    "refreshAfterSeconds" in payload &&
     payload.refreshAfterSeconds !== null &&
     (typeof payload.refreshAfterSeconds !== "number" ||
       !Number.isFinite(payload.refreshAfterSeconds) ||
@@ -30,9 +28,14 @@ function parseProfileImagePayload(payload: unknown): {
     throw new Error("Profile image response refreshAfterSeconds was invalid.");
   }
 
+  const refreshAfterSeconds =
+    "refreshAfterSeconds" in payload && typeof payload.refreshAfterSeconds === "number"
+      ? payload.refreshAfterSeconds
+      : null;
+
   return {
     imageUrl: payload.imageUrl,
-    refreshAfterSeconds: payload.refreshAfterSeconds,
+    refreshAfterSeconds,
   };
 }
 
@@ -59,7 +62,7 @@ export async function getProfileImage(): Promise<{
 
 export async function uploadProfileImage(input: {
   file: File;
-}): Promise<{ imageUrl: string; refreshAfterSeconds: number }> {
+}): Promise<{ imageUrl: string; refreshAfterSeconds: number | null }> {
   return executeMembersOperation("uploadProfileImage", async () => {
     const formData = new FormData();
     formData.set("file", input.file);
@@ -89,10 +92,6 @@ export async function uploadProfileImage(input: {
     if (result.imageUrl === null) {
       throw new Error("Profile image upload response did not include imageUrl.");
     }
-    if (result.refreshAfterSeconds === null) {
-      throw new Error("Profile image upload response did not include refreshAfterSeconds.");
-    }
-
     return {
       imageUrl: result.imageUrl,
       refreshAfterSeconds: result.refreshAfterSeconds,

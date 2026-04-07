@@ -12,14 +12,12 @@ function parseOrganizationLogoPayload(payload: unknown): {
   if (!("imageUrl" in payload)) {
     throw new Error("Organization logo response was missing imageUrl.");
   }
-  if (!("refreshAfterSeconds" in payload)) {
-    throw new Error("Organization logo response was missing refreshAfterSeconds.");
-  }
 
   if (payload.imageUrl !== null && typeof payload.imageUrl !== "string") {
     throw new Error("Organization logo response imageUrl was invalid.");
   }
   if (
+    "refreshAfterSeconds" in payload &&
     payload.refreshAfterSeconds !== null &&
     (typeof payload.refreshAfterSeconds !== "number" ||
       !Number.isFinite(payload.refreshAfterSeconds) ||
@@ -28,9 +26,14 @@ function parseOrganizationLogoPayload(payload: unknown): {
     throw new Error("Organization logo response refreshAfterSeconds was invalid.");
   }
 
+  const refreshAfterSeconds =
+    "refreshAfterSeconds" in payload && typeof payload.refreshAfterSeconds === "number"
+      ? payload.refreshAfterSeconds
+      : null;
+
   return {
     imageUrl: payload.imageUrl,
-    refreshAfterSeconds: payload.refreshAfterSeconds,
+    refreshAfterSeconds,
   };
 }
 
@@ -76,7 +79,7 @@ export async function getOrganizationLogo(input: {
 export async function uploadOrganizationLogo(input: {
   organizationId: string;
   file: File;
-}): Promise<{ imageUrl: string; refreshAfterSeconds: number }> {
+}): Promise<{ imageUrl: string; refreshAfterSeconds: number | null }> {
   return executeMembersOperation("uploadOrganizationLogo", async () => {
     const formData = new FormData();
     formData.set("file", input.file);
@@ -109,10 +112,6 @@ export async function uploadOrganizationLogo(input: {
     if (result.imageUrl === null) {
       throw new Error("Organization logo upload response did not include imageUrl.");
     }
-    if (result.refreshAfterSeconds === null) {
-      throw new Error("Organization logo upload response did not include refreshAfterSeconds.");
-    }
-
     return {
       imageUrl: result.imageUrl,
       refreshAfterSeconds: result.refreshAfterSeconds,
