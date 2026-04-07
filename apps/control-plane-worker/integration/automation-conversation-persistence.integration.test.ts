@@ -20,7 +20,6 @@ import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
 import { activateAutomationConversationRoute } from "../openworkflow/shared/activate-conversation-route.js";
-import { AutomationConversationPersistenceErrorCodes } from "../openworkflow/shared/automation-conversation-persistence-error.js";
 import { claimAutomationConversation } from "../openworkflow/shared/claim-conversation.js";
 import { createAutomationConversationRoute } from "../openworkflow/shared/create-conversation-route.js";
 import { rebindAutomationConversationSandbox } from "../openworkflow/shared/rebind-conversation-sandbox.js";
@@ -116,13 +115,11 @@ describe("conversation persistence integration", () => {
           sandboxProfileId: scope.sandboxProfileId,
           integrationFamilyId: "openai",
           runtimeId: "codex",
-          preview: "First conversation message",
         },
       );
 
       expect(claimedAutomationConversation.id.startsWith("cnv_")).toBe(true);
       expect(claimedAutomationConversation.status).toBe(AutomationConversationStatuses.PENDING);
-      expect(claimedAutomationConversation.preview).toBe("First conversation message");
 
       const persistedAutomationConversation =
         await database.db.query.automationConversations.findFirst({
@@ -163,7 +160,6 @@ describe("conversation persistence integration", () => {
           sandboxProfileId: scope.sandboxProfileId,
           integrationFamilyId: "openai",
           runtimeId: "codex",
-          preview: "Initial message",
         },
       );
       const secondClaim = await claimAutomationConversation(
@@ -178,7 +174,6 @@ describe("conversation persistence integration", () => {
           sandboxProfileId: scope.sandboxProfileId,
           integrationFamilyId: "openai",
           runtimeId: "codex",
-          preview: "Initial message",
         },
       );
 
@@ -223,85 +218,11 @@ describe("conversation persistence integration", () => {
           sandboxProfileId: scope.sandboxProfileId,
           integrationFamilyId: "openai",
           runtimeId: "codex",
-          preview: "Dashboard message",
         },
       );
 
       expect(claimedAutomationConversation.id.startsWith("cnv_")).toBe(true);
       expect(claimedAutomationConversation.conversationKey).toBe(claimedAutomationConversation.id);
-    } finally {
-      await database.stop();
-    }
-  });
-
-  it("claiming a conversation rejects non-null title at creation time", async ({ fixture }) => {
-    const database = await createTestDatabase({
-      databaseUrl: fixture.config.workflow.databaseUrl,
-    });
-
-    try {
-      const scope = await seedConversationScope({
-        db: database.db,
-        suffix: "claim-title",
-      });
-
-      await expect(
-        claimAutomationConversation(
-          { db: database.db },
-          {
-            organizationId: scope.organizationId,
-            ownerKind: AutomationConversationOwnerKinds.AUTOMATION_TARGET,
-            ownerId: scope.automationTargetId,
-            createdByKind: AutomationConversationCreatedByKinds.WEBHOOK,
-            createdById: scope.automationId,
-            conversationKey: "key-claim-title",
-            sandboxProfileId: scope.sandboxProfileId,
-            integrationFamilyId: "openai",
-            runtimeId: "codex",
-            title: "Should be rejected",
-            preview: "Initial message",
-          },
-        ),
-      ).rejects.toMatchObject({
-        code: AutomationConversationPersistenceErrorCodes.CONVERSATION_TITLE_MUST_BE_NULL,
-      });
-    } finally {
-      await database.stop();
-    }
-  });
-
-  it("claiming a conversation truncates preview to at most 160 Unicode code units", async ({
-    fixture,
-  }) => {
-    const database = await createTestDatabase({
-      databaseUrl: fixture.config.workflow.databaseUrl,
-    });
-
-    try {
-      const scope = await seedConversationScope({
-        db: database.db,
-        suffix: "claim-preview-truncate",
-      });
-      const longPreview = "x".repeat(170);
-
-      const claimedAutomationConversation = await claimAutomationConversation(
-        { db: database.db },
-        {
-          organizationId: scope.organizationId,
-          ownerKind: AutomationConversationOwnerKinds.AUTOMATION_TARGET,
-          ownerId: scope.automationTargetId,
-          createdByKind: AutomationConversationCreatedByKinds.WEBHOOK,
-          createdById: scope.automationId,
-          conversationKey: "key-claim-preview-truncate",
-          sandboxProfileId: scope.sandboxProfileId,
-          integrationFamilyId: "openai",
-          runtimeId: "codex",
-          preview: longPreview,
-        },
-      );
-
-      expect(claimedAutomationConversation.preview).toHaveLength(160);
-      expect(claimedAutomationConversation.preview).toBe(longPreview.slice(0, 160));
     } finally {
       await database.stop();
     }
@@ -329,7 +250,6 @@ describe("conversation persistence integration", () => {
           sandboxProfileId: scope.sandboxProfileId,
           integrationFamilyId: "openai",
           runtimeId: "codex",
-          preview: "Create route message",
         },
       );
 
@@ -374,7 +294,6 @@ describe("conversation persistence integration", () => {
           sandboxProfileId: scope.sandboxProfileId,
           integrationFamilyId: "openai",
           runtimeId: "codex",
-          preview: "Activate message",
         },
       );
       const createdRoute = await createAutomationConversationRoute(
@@ -443,7 +362,6 @@ describe("conversation persistence integration", () => {
           sandboxProfileId: scope.sandboxProfileId,
           integrationFamilyId: "openai",
           runtimeId: "codex",
-          preview: "Rebind message",
         },
       );
       const createdRoute = await createAutomationConversationRoute(
@@ -504,7 +422,6 @@ describe("conversation persistence integration", () => {
           sandboxProfileId: scope.sandboxProfileId,
           integrationFamilyId: "openai",
           runtimeId: "codex",
-          preview: "Replace message",
         },
       );
       const createdRoute = await createAutomationConversationRoute(
@@ -571,7 +488,6 @@ describe("conversation persistence integration", () => {
           sandboxProfileId: scope.sandboxProfileId,
           integrationFamilyId: "openai",
           runtimeId: "codex",
-          preview: "Update execution message",
         },
       );
       const createdRoute = await createAutomationConversationRoute(
@@ -627,8 +543,6 @@ describe("conversation persistence integration", () => {
       expect(conversationAfterUpdate.lastActivityAt).not.toBe(
         conversationBeforeUpdate.lastActivityAt,
       );
-      expect(conversationAfterUpdate.title).toBe(conversationBeforeUpdate.title);
-      expect(conversationAfterUpdate.preview).toBe(conversationBeforeUpdate.preview);
     } finally {
       await database.stop();
     }

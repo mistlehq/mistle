@@ -24,8 +24,6 @@ export type ClaimAutomationConversationInput = {
   sandboxProfileId: string;
   integrationFamilyId: string;
   runtimeId: string;
-  title?: string | null;
-  preview?: string | null;
 };
 
 export async function claimAutomationConversation(
@@ -34,14 +32,6 @@ export async function claimAutomationConversation(
   },
   input: ClaimAutomationConversationInput,
 ) {
-  if (input.title !== undefined && input.title !== null) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_TITLE_MUST_BE_NULL,
-      message:
-        "AutomationConversation title must be null at claim time. Titles are user-editable after creation.",
-    });
-  }
-
   const resolvedConversationId =
     input.ownerKind === AutomationConversationOwnerKinds.INTEGRATION_BINDING
       ? typeid("cnv").toString()
@@ -78,8 +68,6 @@ export async function claimAutomationConversation(
     sandboxProfileId: input.sandboxProfileId,
     integrationFamilyId: input.integrationFamilyId,
     runtimeId: input.runtimeId,
-    title: null,
-    preview: input.preview == null ? null : input.preview.slice(0, 160),
     status: AutomationConversationStatuses.PENDING,
   };
 

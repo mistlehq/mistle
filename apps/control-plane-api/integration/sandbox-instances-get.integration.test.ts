@@ -92,8 +92,6 @@ describe("sandbox instances get integration", () => {
       integrationFamilyId: "openai",
       runtimeId: "codex",
       conversationKey: "webhook-conversation-key",
-      title: null,
-      preview: null,
       status: AutomationConversationStatuses.ACTIVE,
     });
 
@@ -184,8 +182,6 @@ describe("sandbox instances get integration", () => {
       integrationFamilyId: "openai",
       runtimeId: "codex",
       conversationKey: "webhook-conversation-key-pending",
-      title: null,
-      preview: null,
       status: AutomationConversationStatuses.PENDING,
     });
 
@@ -320,8 +316,6 @@ describe("sandbox instances get integration", () => {
         integrationFamilyId: "openai",
         runtimeId: "codex",
         conversationKey: "webhook-conversation-key-003-a",
-        title: null,
-        preview: null,
         status: AutomationConversationStatuses.ACTIVE,
       },
       {
@@ -335,8 +329,6 @@ describe("sandbox instances get integration", () => {
         integrationFamilyId: "openai",
         runtimeId: "codex",
         conversationKey: "webhook-conversation-key-003-b",
-        title: null,
-        preview: null,
         status: AutomationConversationStatuses.ACTIVE,
       },
     ]);
@@ -444,8 +436,6 @@ describe("sandbox instances get integration", () => {
         integrationFamilyId: "openai",
         runtimeId: "codex",
         conversationKey: "webhook-conversation-key-004-a",
-        title: null,
-        preview: null,
         status: AutomationConversationStatuses.ACTIVE,
       },
       {
@@ -459,8 +449,6 @@ describe("sandbox instances get integration", () => {
         integrationFamilyId: "openai",
         runtimeId: "codex",
         conversationKey: "webhook-conversation-key-004-b",
-        title: null,
-        preview: null,
         status: AutomationConversationStatuses.ACTIVE,
       },
     ]);

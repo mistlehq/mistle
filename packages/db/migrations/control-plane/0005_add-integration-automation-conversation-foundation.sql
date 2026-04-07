@@ -85,8 +85,6 @@ CREATE TABLE "control_plane"."automation_conversations" (
 	"integration_family_id" text NOT NULL,
 	"runtime_id" text NOT NULL,
 	"conversation_key" text NOT NULL,
-	"title" text,
-	"preview" text,
 	"status" text NOT NULL,
 	"last_processed_source_order_key" text,
 	"last_processed_webhook_event_id" text,
