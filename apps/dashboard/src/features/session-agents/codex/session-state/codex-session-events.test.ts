@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  parseThreadNameUpdate,
   parseThreadLifecycleEvent,
   parseThreadTokenUsageSnapshot,
   parseTurnDiffSnapshot,
@@ -78,6 +79,21 @@ describe("codex session event parsing", () => {
     ).toEqual({
       threadId: "thread_123",
       usageJson: '{"threadId":"thread_123","promptTokens":100}',
+    });
+  });
+
+  it("parses thread name update notifications", () => {
+    expect(
+      parseThreadNameUpdate({
+        method: "thread/name/updated",
+        params: {
+          threadId: "thread_123",
+          name: "Renamed thread",
+        },
+      }),
+    ).toEqual({
+      threadId: "thread_123",
+      title: "Renamed thread",
     });
   });
 });
