@@ -12,6 +12,7 @@ import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
+import { updateSessionUserImage } from "../shell/session-user-image.js";
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
 const PROFILE_IMAGE_QUERY_KEY: readonly ["settings", "profile-image"] = [
@@ -44,6 +45,9 @@ export function ProfileSettingsPage(): React.JSX.Element {
       queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, {
         imageUrl: result.imageUrl,
       });
+      queryClient.setQueryData(SESSION_QUERY_KEY, (currentSession) =>
+        updateSessionUserImage(currentSession ?? null, result.imageUrl),
+      );
     },
   });
   const deleteProfileImageMutation = useMutation({
@@ -52,6 +56,9 @@ export function ProfileSettingsPage(): React.JSX.Element {
       queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, {
         imageUrl: null,
       });
+      queryClient.setQueryData(SESSION_QUERY_KEY, (currentSession) =>
+        updateSessionUserImage(currentSession ?? null, null),
+      );
     },
   });
 
