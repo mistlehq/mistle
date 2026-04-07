@@ -19,11 +19,13 @@ export const profileImageUploadFormSchema = z
 export const profileImageResponseSchema = z
   .object({
     imageUrl: z.url(),
+    expiresAt: z.iso.datetime(),
   })
   .strict();
 
 export const profileImageStateResponseSchema = z
   .object({
     imageUrl: z.url().nullable(),
+    expiresAt: z.iso.datetime().nullable(),
   })
   .strict();

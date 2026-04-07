@@ -2,6 +2,7 @@ import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { getUserAvatar } from "../../auth/services/get-user-avatar.js";
+import { resolvePresignedImageExpiresAt } from "../../auth/services/presigned-image-response.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { PROFILE_IMAGE_READ_URL_TTL_SECONDS } from "../constants.js";
@@ -16,6 +17,7 @@ const routeHandler = async (
     db: ctx.get("db"),
     userId: user.id,
   });
+  const now = new Date();
 
   const imageUrl =
     profileImage.imageObjectKey === null
@@ -24,10 +26,18 @@ const routeHandler = async (
           objectKey: profileImage.imageObjectKey,
           expiresInSeconds: PROFILE_IMAGE_READ_URL_TTL_SECONDS,
         });
+  const expiresAt =
+    imageUrl === null
+      ? null
+      : resolvePresignedImageExpiresAt({
+          now,
+          expiresInSeconds: PROFILE_IMAGE_READ_URL_TTL_SECONDS,
+        });
 
   return ctx.json(
     {
       imageUrl,
+      expiresAt,
     },
     200,
   );

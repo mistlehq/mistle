@@ -2625,6 +2625,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              /** Format: date-time */
+              expiresAt: string | null;
               /** Format: uri */
               imageUrl: string | null;
             };
@@ -2690,6 +2692,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              /** Format: date-time */
+              expiresAt: string;
               /** Format: uri */
               imageUrl: string;
             };
@@ -2829,6 +2833,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              /** Format: date-time */
+              expiresAt: string | null;
               /** Format: uri */
               imageUrl: string | null;
             };
@@ -2909,6 +2915,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              /** Format: date-time */
+              expiresAt: string;
               /** Format: uri */
               imageUrl: string;
             };

@@ -105,6 +105,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
     onSuccess: async (result) => {
       queryClient.setQueryData(organizationLogoQueryKey(organizationId), {
         imageUrl: result.imageUrl,
+        expiresAt: result.expiresAt,
       });
       setOrganizationLogoOperationErrorMessage(null);
     },
@@ -128,6 +129,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
     onSuccess: async () => {
       queryClient.setQueryData(organizationLogoQueryKey(organizationId), {
         imageUrl: null,
+        expiresAt: null,
       });
       setOrganizationLogoOperationErrorMessage(null);
     },

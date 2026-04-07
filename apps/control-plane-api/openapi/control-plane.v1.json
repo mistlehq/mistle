@@ -5085,9 +5085,13 @@
                     "imageUrl": {
                       "type": ["string", "null"],
                       "format": "uri"
+                    },
+                    "expiresAt": {
+                      "type": ["string", "null"],
+                      "format": "date-time"
                     }
                   },
-                  "required": ["imageUrl"],
+                  "required": ["imageUrl", "expiresAt"],
                   "additionalProperties": false
                 }
               }
@@ -5181,9 +5185,13 @@
                     "imageUrl": {
                       "type": "string",
                       "format": "uri"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
                     }
                   },
-                  "required": ["imageUrl"],
+                  "required": ["imageUrl", "expiresAt"],
                   "additionalProperties": false
                 }
               }
@@ -5357,9 +5365,13 @@
                     "imageUrl": {
                       "type": ["string", "null"],
                       "format": "uri"
+                    },
+                    "expiresAt": {
+                      "type": ["string", "null"],
+                      "format": "date-time"
                     }
                   },
-                  "required": ["imageUrl"],
+                  "required": ["imageUrl", "expiresAt"],
                   "additionalProperties": false
                 }
               }
@@ -5486,9 +5498,13 @@
                     "imageUrl": {
                       "type": "string",
                       "format": "uri"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
                     }
                   },
-                  "required": ["imageUrl"],
+                  "required": ["imageUrl", "expiresAt"],
                   "additionalProperties": false
                 }
               }

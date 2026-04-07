@@ -42,6 +42,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
     onSuccess: async (result) => {
       queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, {
         imageUrl: result.imageUrl,
+        expiresAt: result.expiresAt,
       });
       queryClient.setQueryData(SESSION_QUERY_KEY, (currentSession) =>
         updateSessionUserImage(currentSession ?? null, result.imageUrl),
@@ -65,6 +66,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
     onSuccess: async () => {
       queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, {
         imageUrl: null,
+        expiresAt: null,
       });
       queryClient.setQueryData(SESSION_QUERY_KEY, (currentSession) =>
         updateSessionUserImage(currentSession ?? null, null),

@@ -26,11 +26,13 @@ export const MembershipCapabilitiesSchema = z
 export const organizationLogoResponseSchema = z
   .object({
     imageUrl: z.url(),
+    expiresAt: z.iso.datetime(),
   })
   .strict();
 
 export const organizationLogoStateResponseSchema = z
   .object({
     imageUrl: z.url().nullable(),
+    expiresAt: z.iso.datetime().nullable(),
   })
   .strict();

@@ -2,6 +2,7 @@ import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { getOrganizationLogo } from "../../auth/services/get-organization-logo.js";
+import { resolvePresignedImageExpiresAt } from "../../auth/services/presigned-image-response.js";
 import { PROFILE_IMAGE_READ_URL_TTL_SECONDS } from "../../me/constants.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
@@ -27,6 +28,7 @@ const routeHandler = async (
     db,
     organizationId,
   });
+  const now = new Date();
 
   const imageUrl =
     organizationLogo.logoObjectKey === null
@@ -35,10 +37,18 @@ const routeHandler = async (
           objectKey: organizationLogo.logoObjectKey,
           expiresInSeconds: PROFILE_IMAGE_READ_URL_TTL_SECONDS,
         });
+  const expiresAt =
+    imageUrl === null
+      ? null
+      : resolvePresignedImageExpiresAt({
+          now,
+          expiresInSeconds: PROFILE_IMAGE_READ_URL_TTL_SECONDS,
+        });
 
   return ctx.json(
     {
       imageUrl,
+      expiresAt,
     },
     200,
   );

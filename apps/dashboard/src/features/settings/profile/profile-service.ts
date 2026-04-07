@@ -3,7 +3,10 @@ import { authClient } from "../../../lib/auth/client.js";
 import { requestControlPlane } from "../../api/request-control-plane.js";
 import { executeMembersOperation } from "../members/members-api-errors.js";
 
-function parseProfileImagePayload(payload: unknown): { imageUrl: string | null } {
+function parseProfileImagePayload(payload: unknown): {
+  imageUrl: string | null;
+  expiresAt: string | null;
+} {
   if (typeof payload !== "object" || payload === null) {
     throw new Error("Profile image response was invalid.");
   }
@@ -11,13 +14,20 @@ function parseProfileImagePayload(payload: unknown): { imageUrl: string | null }
   if (!("imageUrl" in payload)) {
     throw new Error("Profile image response was missing imageUrl.");
   }
+  if (!("expiresAt" in payload)) {
+    throw new Error("Profile image response was missing expiresAt.");
+  }
 
   if (payload.imageUrl !== null && typeof payload.imageUrl !== "string") {
     throw new Error("Profile image response imageUrl was invalid.");
   }
+  if (payload.expiresAt !== null && typeof payload.expiresAt !== "string") {
+    throw new Error("Profile image response expiresAt was invalid.");
+  }
 
   return {
     imageUrl: payload.imageUrl,
+    expiresAt: payload.expiresAt,
   };
 }
 
@@ -26,7 +36,10 @@ function createProfileImageUrl(): URL {
   return new URL("/v1/me/profile-image", config.controlPlaneApiOrigin);
 }
 
-export async function getProfileImage(): Promise<{ imageUrl: string | null }> {
+export async function getProfileImage(): Promise<{
+  imageUrl: string | null;
+  expiresAt: string | null;
+}> {
   return executeMembersOperation("getProfileImage", async () => {
     const response = await requestControlPlane({
       operation: "getProfileImage",
@@ -39,7 +52,9 @@ export async function getProfileImage(): Promise<{ imageUrl: string | null }> {
   });
 }
 
-export async function uploadProfileImage(input: { file: File }): Promise<{ imageUrl: string }> {
+export async function uploadProfileImage(input: {
+  file: File;
+}): Promise<{ imageUrl: string; expiresAt: string }> {
   return executeMembersOperation("uploadProfileImage", async () => {
     const formData = new FormData();
     formData.set("file", input.file);
@@ -69,9 +84,13 @@ export async function uploadProfileImage(input: { file: File }): Promise<{ image
     if (result.imageUrl === null) {
       throw new Error("Profile image upload response did not include imageUrl.");
     }
+    if (result.expiresAt === null) {
+      throw new Error("Profile image upload response did not include expiresAt.");
+    }
 
     return {
       imageUrl: result.imageUrl,
+      expiresAt: result.expiresAt,
     };
   });
 }
