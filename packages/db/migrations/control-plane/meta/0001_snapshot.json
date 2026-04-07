@@ -437,6 +437,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "logo_object_key": {
+          "name": "logo_object_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "metadata": {
           "name": "metadata",
           "type": "text",
@@ -885,6 +891,12 @@
         },
         "image": {
           "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "image_object_key": {
+          "name": "image_object_key",
           "type": "text",
           "primaryKey": false,
           "notNull": false

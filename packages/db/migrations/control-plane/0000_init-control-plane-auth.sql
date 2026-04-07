@@ -39,6 +39,7 @@ CREATE TABLE "control_plane"."organizations" (
 	"name" text NOT NULL,
 	"slug" text NOT NULL,
 	"logo" text,
+	"logo_object_key" text,
 	"metadata" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -77,6 +78,7 @@ CREATE TABLE "control_plane"."users" (
 	"email" text NOT NULL,
 	"email_verified" boolean DEFAULT false NOT NULL,
 	"image" text,
+	"image_object_key" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
