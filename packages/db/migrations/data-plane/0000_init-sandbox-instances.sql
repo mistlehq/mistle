@@ -11,6 +11,7 @@ CREATE TABLE "data_plane"."sandbox_instances" (
 	"started_by_kind" text NOT NULL,
 	"started_by_id" text NOT NULL,
 	"source" text NOT NULL,
+	"title" text,
 	"started_at" timestamp with time zone,
 	"stopped_at" timestamp with time zone,
 	"stop_reason" text,
