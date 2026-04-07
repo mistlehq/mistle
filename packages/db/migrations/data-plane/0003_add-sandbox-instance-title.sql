@@ -1,1 +1,0 @@
-ALTER TABLE "data_plane"."sandbox_instances" ADD COLUMN "title" text;
