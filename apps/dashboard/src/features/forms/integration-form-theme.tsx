@@ -417,12 +417,67 @@ function resolveFieldLayout(
   return options.layout === "stacked" ? "vertical" : "horizontal";
 }
 
+function isObjectSchema(schema: RJSFSchema): boolean {
+  if (schema.type === "object") {
+    return true;
+  }
+
+  return isRecord(schema.properties);
+}
+
+function resolveSchemaProperties(schema: unknown): Record<string, unknown> {
+  if (!isRecord(schema)) {
+    return {};
+  }
+
+  const properties = schema.properties;
+  return isRecord(properties) ? properties : {};
+}
+
+function resolveObjectPropertyUiSchema(uiSchema: unknown, propertyName: string): unknown {
+  if (!isRecord(uiSchema)) {
+    return undefined;
+  }
+
+  return uiSchema[propertyName];
+}
+
+function hasRenderableSchemaContent(input: { schema: unknown; uiSchema: unknown }): boolean {
+  if (isRecord(input.uiSchema) && input.uiSchema["ui:widget"] === "hidden") {
+    return false;
+  }
+
+  if (!isRecord(input.schema)) {
+    return true;
+  }
+
+  const propertySchemas = resolveSchemaProperties(input.schema);
+  const propertyNames = Object.keys(propertySchemas);
+  if (propertyNames.length === 0) {
+    return true;
+  }
+
+  return propertyNames.some((propertyName) =>
+    hasRenderableSchemaContent({
+      schema: propertySchemas[propertyName],
+      uiSchema: resolveObjectPropertyUiSchema(input.uiSchema, propertyName),
+    }),
+  );
+}
+
 function IntegrationFieldTemplate(
   props: FieldTemplateProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
   if (props.hidden) {
     return props.children;
   }
+
+  // Let object nodes render through the object template directly so structural
+  // containers with only hidden descendants do not leave behind empty field shells.
+  if (isObjectSchema(props.schema)) {
+    return props.children;
+  }
+
   const layout = resolveFieldLayout(props);
   const hasErrors = (props.rawErrors ?? []).length > 0;
 
@@ -458,6 +513,7 @@ function IntegrationObjectFieldTemplate(
   const layout = resolveFormLayout(props.registry.formContext);
   const visibleProperties = props.properties.filter((property) => !property.hidden);
   const hiddenProperties = props.properties.filter((property) => property.hidden);
+  const schemaProperties = resolveSchemaProperties(props.schema);
   const title =
     typeof props.schema.title === "string" && props.schema.title.length > 0
       ? props.schema.title
@@ -466,8 +522,26 @@ function IntegrationObjectFieldTemplate(
     typeof props.schema.description === "string" && props.schema.description.length > 0
       ? props.schema.description
       : undefined;
+  const visibleRenderableProperties = visibleProperties.filter((property) =>
+    hasRenderableSchemaContent({
+      schema: schemaProperties[property.name],
+      uiSchema: resolveObjectPropertyUiSchema(props.uiSchema, property.name),
+    }),
+  );
+  const hiddenOnlyVisibleProperties = visibleProperties.filter(
+    (property) =>
+      !hasRenderableSchemaContent({
+        schema: schemaProperties[property.name],
+        uiSchema: resolveObjectPropertyUiSchema(props.uiSchema, property.name),
+      }),
+  );
 
-  if (visibleProperties.length === 0 && description === undefined && title.length === 0) {
+  if (
+    visibleRenderableProperties.length === 0 &&
+    hiddenOnlyVisibleProperties.length === 0 &&
+    description === undefined &&
+    title.length === 0
+  ) {
     return <>{hiddenProperties.map((property) => property.content)}</>;
   }
 
@@ -485,11 +559,12 @@ function IntegrationObjectFieldTemplate(
             {description !== undefined ? <FieldDescription>{description}</FieldDescription> : null}
           </FieldHeader>
         ) : null}
-        {visibleProperties.map((property) => (
+        {visibleRenderableProperties.map((property) => (
           <div key={property.name}>{property.content}</div>
         ))}
         {props.optionalDataControl}
       </div>
+      {hiddenOnlyVisibleProperties.map((property) => property.content)}
       {hiddenProperties.map((property) => property.content)}
     </>
   );
