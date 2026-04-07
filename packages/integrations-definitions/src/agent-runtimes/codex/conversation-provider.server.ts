@@ -548,6 +548,41 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
         activeExecutionId: null,
       };
     },
+    readConversationMetadata: async (input) => {
+      let threadResult: unknown;
+      try {
+        threadResult = await input.connection.request({
+          method: CodexMethodNames.THREAD_READ,
+          params: {
+            threadId: input.providerConversationId,
+          },
+        });
+      } catch (error) {
+        if (isProviderConversationMissingError(error)) {
+          throw new ConversationProviderError({
+            code: ConversationProviderErrorCodes.PROVIDER_CONVERSATION_MISSING,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Codex read conversation metadata failed with non-error exception.",
+            cause: error,
+          });
+        }
+        throw new ConversationProviderError({
+          code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Codex read conversation metadata failed with non-error exception.",
+          cause: error,
+        });
+      }
+
+      return {
+        name: readNestedString(threadResult, ["thread", "name"]),
+        preview: readNestedString(threadResult, ["thread", "preview"]),
+      };
+    },
     createConversation: async (input) => {
       let createResult: unknown;
       try {
