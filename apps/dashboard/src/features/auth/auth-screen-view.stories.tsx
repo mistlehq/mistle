@@ -1,6 +1,7 @@
 import { Separator } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { expect, within } from "storybook/test";
 
 import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybook/decorators.js";
 import { AuthScreenView } from "./auth-screen-view.js";
@@ -42,6 +43,10 @@ function InteractiveOtpStory(args: Story["args"]): React.JSX.Element {
 export const EmailEntry: Story = {
   args: {
     email: "",
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText("Email address")).toHaveFocus();
   },
 };
 
@@ -118,6 +123,10 @@ export const OtpEntry: Story = {
     authStep: "otp",
   },
   render: InteractiveOtpStory,
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText("One-time code")).toHaveFocus();
+  },
 };
 
 export const OtpPartialEntry: Story = {
