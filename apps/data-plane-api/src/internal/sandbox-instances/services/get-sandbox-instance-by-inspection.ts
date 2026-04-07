@@ -18,6 +18,10 @@ import type {
   GetSandboxInstanceResponse,
 } from "../get-sandbox-instance/schema.js";
 import { readEffectiveSandboxStatus } from "./read-effective-sandbox-status.js";
+import {
+  determineStartingSandboxInspectionOutcome,
+  StartingSandboxInspectionOutcomes,
+} from "./starting-sandbox-inspection-policy.js";
 
 type GetSandboxInstanceByInspectionContext = {
   db: DataPlaneDatabase;
@@ -59,7 +63,6 @@ async function markRunningSandboxInstanceStopped(
 
 const InspectionFailureCodes = {
   PROVIDER_RUNTIME_MISSING: "provider_runtime_missing",
-  PROVIDER_RUNTIME_STOPPED_DURING_STARTUP: "provider_runtime_stopped_during_startup",
 } as const;
 
 async function markStartingSandboxInstanceFailed(
@@ -166,7 +169,11 @@ async function inspectStartingSandboxInstance(
     };
   }
 
-  if (inspection.state === SandboxInspectStates.RUNNING) {
+  const dispositionOutcome = determineStartingSandboxInspectionOutcome({
+    providerDisposition: inspection.disposition,
+  });
+
+  if (dispositionOutcome.kind === StartingSandboxInspectionOutcomes.KEEP_STARTING) {
     return {
       id: sandboxInstance.id,
       title: sandboxInstance.title,
@@ -187,16 +194,16 @@ async function inspectStartingSandboxInstance(
 
   await markStartingSandboxInstanceFailed(ctx, {
     sandboxInstanceId: sandboxInstance.id,
-    failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_STOPPED_DURING_STARTUP,
-    failureMessage: "Sandbox runtime was not running at the provider during startup inspection.",
+    failureCode: dispositionOutcome.failureCode,
+    failureMessage: dispositionOutcome.failureMessage,
   });
 
   return {
     id: sandboxInstance.id,
     title: sandboxInstance.title,
     status: SandboxInstanceStatuses.FAILED,
-    failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_STOPPED_DURING_STARTUP,
-    failureMessage: "Sandbox runtime was not running at the provider during startup inspection.",
+    failureCode: dispositionOutcome.failureCode,
+    failureMessage: dispositionOutcome.failureMessage,
     runtimePlan: null,
   };
 }
