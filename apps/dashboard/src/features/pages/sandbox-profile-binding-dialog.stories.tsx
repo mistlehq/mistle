@@ -39,6 +39,20 @@ const GithubInitialRow: SandboxProfileBindingEditorRow = {
   config: {},
 };
 
+const StoryArgs = {
+  state: null,
+  availableConnections: StoryIntegrationConnections,
+  availableConnectionsByKind: AvailableConnectionsByKind,
+  availableTargets: StoryIntegrationTargets,
+  bindingFormContext: undefined,
+  isSubmittingIntegrationBindings: false,
+  resolveSelectedConnectionDisplayName: () => undefined,
+  onClose: () => {},
+  onConnectionIdChange: () => {},
+  onRowChange: () => {},
+  onSave: () => {},
+};
+
 function SandboxProfileBindingDialogStory(input: {
   error: string | null;
   row: SandboxProfileBindingEditorRow;
@@ -111,12 +125,14 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const AddOpenAiBinding: Story = {
+  args: StoryArgs,
   render: function RenderStory(): React.JSX.Element {
     return <SandboxProfileBindingDialogStory error={null} row={OpenAiInitialRow} />;
   },
 };
 
 export const AddGithubBinding: Story = {
+  args: StoryArgs,
   render: function RenderStory(): React.JSX.Element {
     return <SandboxProfileBindingDialogStory error={null} row={GithubInitialRow} />;
   },
