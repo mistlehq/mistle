@@ -17,7 +17,6 @@ import {
 } from "@mistle/integrations-core";
 import { eq } from "drizzle-orm";
 
-import { ensureImplicitTargetWebhookSource } from "../../integration-webhook-sources/services/ensure-implicit-target-webhook-source.js";
 import {
   decryptIntegrationConnectionSecrets,
   encryptCredentialUtf8,
@@ -450,8 +449,10 @@ export async function listIntegrationWebhookSources(
     webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT &&
     webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.TARGET
   ) {
-    const source = await ensureImplicitTargetWebhookSource({
+    const source = await ensureImplicitConnectionWebhookSource({
       db: ctx.db,
+      organizationId: input.organizationId,
+      connectionId: connection.id,
       targetKey: connection.targetKey,
       routingStrategy: webhookSourceCapability.routingStrategy,
     });
