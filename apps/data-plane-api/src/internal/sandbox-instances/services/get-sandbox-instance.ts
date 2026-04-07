@@ -50,7 +50,7 @@ export async function getSandboxInstance(
 
   return {
     id: sandboxInstance.id,
-    conversationTitle: sandboxInstance.title,
+    title: sandboxInstance.title,
     status: await readEffectiveSandboxStatus(
       {
         runtimeStateReader: ctx.runtimeStateReader,

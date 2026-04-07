@@ -2724,7 +2724,7 @@ export interface paths {
           content: {
             "application/json": {
               items: {
-                conversationTitle: string | null;
+                title: string | null;
                 createdAt: string;
                 failureCode: string | null;
                 failureMessage: string | null;
@@ -2850,7 +2850,7 @@ export interface paths {
                 providerConversationId: string | null;
                 routeId: string | null;
               } | null;
-              conversationTitle: string | null;
+              title: string | null;
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
@@ -3277,7 +3277,7 @@ export interface paths {
                 providerConversationId: string | null;
                 routeId: string | null;
               } | null;
-              conversationTitle: string | null;
+              title: string | null;
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
