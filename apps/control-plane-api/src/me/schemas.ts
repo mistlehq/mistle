@@ -21,3 +21,9 @@ export const profileImageResponseSchema = z
     imageUrl: z.url(),
   })
   .strict();
+
+export const profileImageStateResponseSchema = z
+  .object({
+    imageUrl: z.url().nullable(),
+  })
+  .strict();

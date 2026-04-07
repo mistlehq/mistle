@@ -1,19 +1,19 @@
-import { users } from "@mistle/db/control-plane";
+import { organizations } from "@mistle/db/control-plane";
 import { startSeaweedfsS3 } from "@mistle/test-harness";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { describe, expect } from "vitest";
 
-import { putUserAvatar } from "../src/auth/services/put-user-avatar.js";
+import { putOrganizationLogo } from "../src/auth/services/put-organization-logo.js";
 import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test-object-store.js";
 import { it } from "./test-context.js";
 
-describe("user avatar service integration", () => {
-  it("uploads a normalized avatar, persists imageObjectKey, and leaves image unchanged", async ({
+describe("organization logo service integration", () => {
+  it("uploads a normalized logo, persists logoObjectKey, and leaves logo unchanged", async ({
     fixture,
   }) => {
     const authenticatedSession = await fixture.authSession({
-      email: "integration-user-avatar-upload@example.com",
+      email: "integration-organization-logo-upload@example.com",
     });
     const seaweedfs = await startSeaweedfsS3({
       bucketName: "mistle-assets",
@@ -21,11 +21,11 @@ describe("user avatar service integration", () => {
     const objectStore = createTestObjectStore(seaweedfs);
 
     await fixture.db
-      .update(users)
+      .update(organizations)
       .set({
-        image: "https://example.com/existing-avatar.png",
+        logo: "https://example.com/existing-logo.png",
       })
-      .where(eq(users.id, authenticatedSession.userId));
+      .where(eq(organizations.id, authenticatedSession.organizationId));
 
     try {
       const sourceImage = await sharp({
@@ -43,43 +43,48 @@ describe("user avatar service integration", () => {
         .jpeg()
         .toBuffer();
 
-      const result = await putUserAvatar(
+      const result = await putOrganizationLogo(
         {
           db: fixture.db,
           objectStore,
         },
         {
-          userId: authenticatedSession.userId,
+          organizationId: authenticatedSession.organizationId,
           imageBytes: new Uint8Array(sourceImage),
         },
       );
 
-      expect(result.userId).toBe(authenticatedSession.userId);
-      expect(result.imageObjectKey).toMatch(
-        new RegExp(`^avatars/users/${authenticatedSession.userId}/img_[^/]+\\.webp$`, "u"),
+      expect(result.organizationId).toBe(authenticatedSession.organizationId);
+      expect(result.logoObjectKey).toMatch(
+        new RegExp(
+          `^logos/organizations/${authenticatedSession.organizationId}/img_[^/]+\\.webp$`,
+          "u",
+        ),
       );
 
-      const persistedUser = await fixture.db.query.users.findFirst({
+      const persistedOrganization = await fixture.db.query.organizations.findFirst({
         columns: {
-          image: true,
-          imageObjectKey: true,
+          logo: true,
+          logoObjectKey: true,
         },
-        where: (table, { eq }) => eq(table.id, authenticatedSession.userId),
+        where: (table, { eq }) => eq(table.id, authenticatedSession.organizationId),
       });
 
-      expect(persistedUser).toEqual({
-        image: "https://example.com/existing-avatar.png",
-        imageObjectKey: result.imageObjectKey,
+      expect(persistedOrganization).toEqual({
+        logo: "https://example.com/existing-logo.png",
+        logoObjectKey: result.logoObjectKey,
       });
 
-      const uploadedObject = await objectStore.readObject(result.imageObjectKey);
+      const uploadedObject = await objectStore.readObject(result.logoObjectKey);
 
       expect(uploadedObject.ContentType).toBe("image/webp");
       if (
         uploadedObject.Body === undefined ||
         typeof uploadedObject.Body.transformToByteArray !== "function"
       ) {
-        throw new Error("Expected uploaded avatar body to support transformToByteArray().");
+        throw new Error(
+          "Expected uploaded organization logo body to support transformToByteArray().",
+        );
       }
 
       const uploadedBytes = await uploadedObject.Body.transformToByteArray();
@@ -94,15 +99,17 @@ describe("user avatar service integration", () => {
     }
   });
 
-  it("replaces the previous avatar object and deletes the old object", async ({ fixture }) => {
+  it("replaces the previous organization logo object and deletes the old object", async ({
+    fixture,
+  }) => {
     const authenticatedSession = await fixture.authSession({
-      email: "integration-user-avatar-replace@example.com",
+      email: "integration-organization-logo-replace@example.com",
     });
     const seaweedfs = await startSeaweedfsS3({
       bucketName: "mistle-assets",
     });
     const objectStore = createTestObjectStore(seaweedfs);
-    const previousObjectKey = `avatars/users/${authenticatedSession.userId}/img_previous.webp`;
+    const previousObjectKey = `logos/organizations/${authenticatedSession.organizationId}/img_previous.webp`;
 
     try {
       await objectStore.putObject({
@@ -112,11 +119,11 @@ describe("user avatar service integration", () => {
       });
 
       await fixture.db
-        .update(users)
+        .update(organizations)
         .set({
-          imageObjectKey: previousObjectKey,
+          logoObjectKey: previousObjectKey,
         })
-        .where(eq(users.id, authenticatedSession.userId));
+        .where(eq(organizations.id, authenticatedSession.organizationId));
 
       const replacementSource = await sharp({
         create: {
@@ -134,24 +141,24 @@ describe("user avatar service integration", () => {
         .png()
         .toBuffer();
 
-      const result = await putUserAvatar(
+      const result = await putOrganizationLogo(
         {
           db: fixture.db,
           objectStore,
         },
         {
-          userId: authenticatedSession.userId,
+          organizationId: authenticatedSession.organizationId,
           imageBytes: new Uint8Array(replacementSource),
         },
       );
 
-      expect(result.imageObjectKey).not.toBe(previousObjectKey);
+      expect(result.logoObjectKey).not.toBe(previousObjectKey);
 
       await expect(objectStore.headObject(previousObjectKey)).rejects.toMatchObject({
         name: "NotFound",
       });
 
-      await expect(objectStore.headObject(result.imageObjectKey)).resolves.toMatchObject({
+      await expect(objectStore.headObject(result.logoObjectKey)).resolves.toMatchObject({
         ContentType: "image/webp",
       });
     } finally {

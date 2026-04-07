@@ -1,5 +1,4 @@
 import { users } from "@mistle/db/control-plane";
-import { S3CompatibleObjectStore } from "@mistle/object-store";
 import { startSeaweedfsS3 } from "@mistle/test-harness";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
@@ -7,6 +6,7 @@ import { describe, expect } from "vitest";
 
 import { createControlPlaneApiRuntime } from "../src/main.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
+import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test-object-store.js";
 import { it } from "./test-context.js";
 
 const IntegrationConnectionTokenConfig = {
@@ -21,6 +21,39 @@ const IntegrationSandboxRuntimeConfig = {
 } as const;
 
 describe("user avatar endpoints integration", () => {
+  it("returns null from the authenticated read endpoint when no profile image is stored", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-user-avatar-endpoint-read-empty@example.com",
+    });
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "mistle-assets",
+    });
+    const runtime = await createRuntimeWithObjectStore({
+      config: fixture.config,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      seaweedfs,
+    });
+
+    try {
+      const response = await runtime.request("/v1/me/profile-image", {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        imageUrl: null,
+      });
+    } finally {
+      await runtime.stop();
+      await seaweedfs.stop();
+    }
+  });
+
   it("uploads a profile image through the authenticated endpoint and returns a signed read URL", async ({
     fixture,
   }) => {
@@ -153,26 +186,12 @@ describe("user avatar endpoints integration", () => {
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
-    const objectStore = createObjectStore(seaweedfs);
+    const objectStore = createTestObjectStore(seaweedfs);
     const previousObjectKey = `avatars/users/${authenticatedSession.userId}/img_previous.webp`;
 
     try {
       await objectStore.putObject({
-        Body: await sharp({
-          create: {
-            width: 64,
-            height: 64,
-            channels: 4,
-            background: {
-              r: 240,
-              g: 140,
-              b: 40,
-              alpha: 1,
-            },
-          },
-        })
-          .webp()
-          .toBuffer(),
+        Body: await getStoredWebpFixtureBytes(),
         ContentType: "image/webp",
         objectKey: previousObjectKey,
       });
@@ -213,6 +232,65 @@ describe("user avatar endpoints integration", () => {
       await seaweedfs.stop();
     }
   });
+
+  it("returns a signed read URL from the authenticated read endpoint when a profile image exists", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-user-avatar-endpoint-read-existing@example.com",
+    });
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "mistle-assets",
+    });
+    const runtime = await createRuntimeWithObjectStore({
+      config: fixture.config,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      seaweedfs,
+    });
+    const objectStore = createTestObjectStore(seaweedfs);
+    const objectKey = `avatars/users/${authenticatedSession.userId}/img_existing.webp`;
+
+    try {
+      await objectStore.putObject({
+        Body: await getStoredWebpFixtureBytes(),
+        ContentType: "image/webp",
+        objectKey,
+      });
+      await runtime.db
+        .update(users)
+        .set({
+          imageObjectKey: objectKey,
+        })
+        .where(eq(users.id, authenticatedSession.userId));
+
+      const response = await runtime.request("/v1/me/profile-image", {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      });
+
+      expect(response.status).toBe(200);
+
+      const payload: unknown = await response.json();
+      const imageUrl = readImageUrl(payload);
+
+      expect(imageUrl).not.toBeNull();
+
+      if (imageUrl === null) {
+        throw new Error("Expected profile image read response to include imageUrl.");
+      }
+
+      const imageResponse = await fetch(imageUrl);
+
+      expect(imageResponse.status).toBe(200);
+      expect(imageResponse.headers.get("content-type")).toBe("image/webp");
+    } finally {
+      objectStore.destroy();
+      await runtime.stop();
+      await seaweedfs.stop();
+    }
+  });
 });
 
 async function createRuntimeWithObjectStore(input: {
@@ -235,19 +313,6 @@ async function createRuntimeWithObjectStore(input: {
     internalAuthServiceToken: input.internalAuthServiceToken,
     connectionToken: IntegrationConnectionTokenConfig,
     sandbox: IntegrationSandboxRuntimeConfig,
-  });
-}
-
-function createObjectStore(seaweedfs: Awaited<ReturnType<typeof startSeaweedfsS3>>) {
-  return new S3CompatibleObjectStore({
-    bucketName: seaweedfs.bucketName,
-    credentials: {
-      accessKeyId: seaweedfs.accessKeyId,
-      secretAccessKey: seaweedfs.secretAccessKey,
-    },
-    endpoint: seaweedfs.endpoint,
-    forcePathStyle: true,
-    region: seaweedfs.region,
   });
 }
 
