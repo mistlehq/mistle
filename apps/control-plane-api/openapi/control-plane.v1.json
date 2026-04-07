@@ -5282,7 +5282,7 @@
                             "type": "string",
                             "minLength": 1
                           },
-                          "conversationTitle": {
+                          "title": {
                             "type": ["string", "null"],
                             "minLength": 1
                           },
@@ -5341,7 +5341,7 @@
                         "required": [
                           "id",
                           "sandboxProfileId",
-                          "conversationTitle",
+                          "title",
                           "sandboxProfileDisplayName",
                           "sandboxProfileVersion",
                           "status",
@@ -5520,7 +5520,7 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "conversationTitle": {
+                    "title": {
                       "type": ["string", "null"],
                       "minLength": 1
                     },
@@ -6251,7 +6251,7 @@
                   },
                   "required": [
                     "id",
-                    "conversationTitle",
+                    "title",
                     "status",
                     "failureCode",
                     "failureMessage",
@@ -6410,7 +6410,7 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "conversationTitle": {
+                    "title": {
                       "type": ["string", "null"],
                       "minLength": 1
                     },
@@ -7141,7 +7141,7 @@
                   },
                   "required": [
                     "id",
-                    "conversationTitle",
+                    "title",
                     "status",
                     "failureCode",
                     "failureMessage",

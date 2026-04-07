@@ -162,7 +162,7 @@ export async function listSandboxInstances(
       response.items.map(async (item) => ({
         id: item.id,
         sandboxProfileId: item.sandboxProfileId,
-        conversationTitle: item.title,
+        title: item.title,
         sandboxProfileVersion: item.sandboxProfileVersion,
         status: await readEffectiveSandboxStatus(
           {
