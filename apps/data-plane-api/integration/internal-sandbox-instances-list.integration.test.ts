@@ -92,7 +92,7 @@ describe("internal sandbox instances list integration", () => {
     ]);
     expect(firstPage.items[0]).toMatchObject({
       sandboxProfileId: "sbp_list",
-      conversationTitle: "Investigate failed webhook run",
+      title: "Investigate failed webhook run",
       sandboxProfileVersion: 3,
       status: "failed",
       startedBy: {
@@ -124,7 +124,7 @@ describe("internal sandbox instances list integration", () => {
 
     expect(secondPage.totalResults).toBe(3);
     expect(secondPage.items.map((item) => item.id)).toEqual(["sbi_list_org_a_001"]);
-    expect(secondPage.items[0]?.conversationTitle).toBeNull();
+    expect(secondPage.items[0]?.title).toBeNull();
     expect(secondPage.nextPage).toBeNull();
     expect(secondPage.previousPage).not.toBeNull();
   }, 60_000);

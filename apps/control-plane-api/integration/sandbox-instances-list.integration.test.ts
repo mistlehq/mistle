@@ -161,9 +161,9 @@ describe("sandbox instances list integration", () => {
       "sbi_cp_list_a_003",
       "sbi_cp_list_a_002",
     ]);
-    expect(firstPage.items[0]?.conversationTitle).toBe("Investigate build failure");
+    expect(firstPage.items[0]?.title).toBe("Investigate build failure");
     expect(firstPage.items[1]).toMatchObject({
-      conversationTitle: null,
+      title: null,
       sandboxProfileId: "sbp_cp_list",
       sandboxProfileDisplayName: "Control Plane Profile",
       sandboxProfileVersion: 2,

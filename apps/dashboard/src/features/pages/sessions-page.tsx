@@ -168,7 +168,7 @@ export function buildOptimisticSessions(input: {
 
     items.push({
       id: session.sandboxInstanceId,
-      conversationTitle: null,
+      title: null,
       sandboxProfileId: session.profileId,
       sandboxProfileDisplayName: session.profileDisplayName,
       sandboxProfileVersion: session.profileVersion,

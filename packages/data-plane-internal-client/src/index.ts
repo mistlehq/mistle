@@ -69,7 +69,7 @@ export type GetSandboxInstanceInput = {
 const GetSandboxInstanceResponseSchema = z
   .object({
     id: z.string().min(1),
-    conversationTitle: z.string().min(1).nullable(),
+    title: z.string().min(1).nullable(),
     status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
@@ -88,7 +88,7 @@ const ListSandboxInstancesResponseSchema = z
         .object({
           id: z.string().min(1),
           sandboxProfileId: z.string().min(1),
-          conversationTitle: z.string().min(1).nullable(),
+          title: z.string().min(1).nullable(),
           sandboxProfileVersion: z.number().int().min(1),
           status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
           startedBy: z

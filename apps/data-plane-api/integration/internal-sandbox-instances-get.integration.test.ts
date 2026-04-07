@@ -137,7 +137,7 @@ describe("internal sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       id: "sbi_conventional_get_pending",
-      conversationTitle: null,
+      title: null,
       status: "pending",
       failureCode: null,
       failureMessage: null,
@@ -195,7 +195,7 @@ describe("internal sandbox instances get integration", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         id: "sbi_conventional_get_running",
-        conversationTitle: "Investigate runtime attach",
+        title: "Investigate runtime attach",
         status: "starting",
         failureCode: null,
         failureMessage: null,
@@ -255,7 +255,7 @@ describe("internal sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       id: "sbi_conventional_get_starting_missing",
-      conversationTitle: null,
+      title: null,
       status: "failed",
       failureCode: "provider_runtime_missing",
       failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
@@ -329,7 +329,7 @@ describe("internal sandbox instances get integration", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         id: "sbi_conventional_get_starting",
-        conversationTitle: null,
+        title: null,
         status: "starting",
         failureCode: null,
         failureMessage: null,
@@ -414,7 +414,7 @@ describe("internal sandbox instances get integration", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         id: "sbi_conventional_get_running_attached",
-        conversationTitle: null,
+        title: null,
         status: "running",
         failureCode: null,
         failureMessage: null,
@@ -477,7 +477,7 @@ describe("internal sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       id: "sbi_conventional_get_missing",
-      conversationTitle: null,
+      title: null,
       status: "failed",
       failureCode: "provider_runtime_missing",
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
