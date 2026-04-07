@@ -8,10 +8,6 @@ import {
 import { SandboxInstancesNotFoundCodes, SandboxInstancesNotFoundError } from "../errors.js";
 import type { SandboxInstanceAutomationConversation, SandboxInstanceStatus } from "./types.js";
 
-function isSandboxInstanceConnectable(status: SandboxInstanceStatus["status"]): boolean {
-  return status === "running";
-}
-
 async function resolveAutomationConversation(
   db: ControlPlaneDatabase,
   input: {
@@ -121,7 +117,7 @@ export async function getInstance(
     id: sandboxInstance.id,
     title: sandboxInstance.title,
     status: sandboxInstance.status,
-    connectable: isSandboxInstanceConnectable(sandboxInstance.status),
+    connectable: sandboxInstance.connectable,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
     runtimePlan: sandboxInstance.runtimePlan,

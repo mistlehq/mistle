@@ -48,18 +48,21 @@ export async function getSandboxInstance(
     return null;
   }
 
+  const status = await readEffectiveSandboxStatus(
+    {
+      runtimeStateReader: ctx.runtimeStateReader,
+    },
+    {
+      sandboxInstanceId: sandboxInstance.id,
+      persistedStatus: sandboxInstance.status,
+    },
+  );
+
   return {
     id: sandboxInstance.id,
     title: sandboxInstance.title,
-    status: await readEffectiveSandboxStatus(
-      {
-        runtimeStateReader: ctx.runtimeStateReader,
-      },
-      {
-        sandboxInstanceId: sandboxInstance.id,
-        persistedStatus: sandboxInstance.status,
-      },
-    ),
+    status,
+    connectable: status === "running",
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
     runtimePlan:

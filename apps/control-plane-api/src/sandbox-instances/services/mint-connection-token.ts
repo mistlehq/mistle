@@ -67,7 +67,7 @@ function createInstanceFailedError(
   );
 }
 
-function createInstanceNotResumableError(
+function createInstanceNotConnectableError(
   sandboxInstance: Pick<ExistingSandboxInstance, "id" | "status">,
 ): SandboxInstancesConflictError {
   return new SandboxInstancesConflictError(
@@ -112,8 +112,8 @@ export async function mintConnectionToken(
     throw createInstanceFailedError(sandboxInstance);
   }
 
-  if (sandboxInstance.status !== "running") {
-    throw createInstanceNotResumableError(sandboxInstance);
+  if (!sandboxInstance.connectable) {
+    throw createInstanceNotConnectableError(sandboxInstance);
   }
 
   const token = await mintGatewayConnectionToken({

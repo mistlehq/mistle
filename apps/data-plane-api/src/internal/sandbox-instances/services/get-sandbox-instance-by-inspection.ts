@@ -199,6 +199,7 @@ async function inspectStartingSandboxInstance(
       id: sandboxInstance.id,
       title: sandboxInstance.title,
       status: SandboxInstanceStatuses.FAILED,
+      connectable: false,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
       runtimePlan: null,
@@ -210,18 +211,21 @@ async function inspectStartingSandboxInstance(
   });
 
   if (dispositionOutcome.kind === StartingSandboxInspectionOutcomes.KEEP_STARTING) {
+    const status = await readEffectiveSandboxStatus(
+      {
+        runtimeStateReader: ctx.runtimeStateReader,
+      },
+      {
+        sandboxInstanceId: sandboxInstance.id,
+        persistedStatus: SandboxInstanceStatuses.STARTING,
+      },
+    );
+
     return {
       id: sandboxInstance.id,
       title: sandboxInstance.title,
-      status: await readEffectiveSandboxStatus(
-        {
-          runtimeStateReader: ctx.runtimeStateReader,
-        },
-        {
-          sandboxInstanceId: sandboxInstance.id,
-          persistedStatus: SandboxInstanceStatuses.STARTING,
-        },
-      ),
+      status,
+      connectable: status === "running",
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
       runtimePlan: null,
@@ -238,6 +242,7 @@ async function inspectStartingSandboxInstance(
     id: sandboxInstance.id,
     title: sandboxInstance.title,
     status: SandboxInstanceStatuses.FAILED,
+    connectable: false,
     failureCode: dispositionOutcome.failureCode,
     failureMessage: dispositionOutcome.failureMessage,
     runtimePlan: null,
@@ -254,6 +259,7 @@ function readPendingSandboxInstance(sandboxInstance: {
     id: sandboxInstance.id,
     title: sandboxInstance.title,
     status: SandboxInstanceStatuses.PENDING,
+    connectable: false,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
     runtimePlan: null,
@@ -287,6 +293,7 @@ async function inspectStoppedSandboxInstance(
       id: sandboxInstance.id,
       title: sandboxInstance.title,
       status: SandboxInstanceStatuses.FAILED,
+      connectable: false,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
       runtimePlan: null,
@@ -301,6 +308,7 @@ async function inspectStoppedSandboxInstance(
       id: sandboxInstance.id,
       title: sandboxInstance.title,
       status: SandboxInstanceStatuses.STOPPED,
+      connectable: false,
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
       runtimePlan: null,
@@ -316,6 +324,7 @@ async function inspectStoppedSandboxInstance(
     id: sandboxInstance.id,
     title: sandboxInstance.title,
     status: SandboxInstanceStatuses.FAILED,
+    connectable: false,
     failureCode: "provider_runtime_not_resumable",
     failureMessage: "Sandbox runtime was not resumable at the provider during inspection.",
     runtimePlan: null,
@@ -349,6 +358,7 @@ async function inspectRunningSandboxInstance(
       id: sandboxInstance.id,
       title: sandboxInstance.title,
       status: SandboxInstanceStatuses.FAILED,
+      connectable: false,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
       runtimePlan: null,
@@ -356,18 +366,21 @@ async function inspectRunningSandboxInstance(
   }
 
   if (inspection.state === SandboxInspectStates.RUNNING) {
+    const status = await readEffectiveSandboxStatus(
+      {
+        runtimeStateReader: ctx.runtimeStateReader,
+      },
+      {
+        sandboxInstanceId: sandboxInstance.id,
+        persistedStatus: SandboxInstanceStatuses.RUNNING,
+      },
+    );
+
     return {
       id: sandboxInstance.id,
       title: sandboxInstance.title,
-      status: await readEffectiveSandboxStatus(
-        {
-          runtimeStateReader: ctx.runtimeStateReader,
-        },
-        {
-          sandboxInstanceId: sandboxInstance.id,
-          persistedStatus: SandboxInstanceStatuses.RUNNING,
-        },
-      ),
+      status,
+      connectable: status === "running",
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
       runtimePlan: null,
@@ -382,6 +395,7 @@ async function inspectRunningSandboxInstance(
     id: sandboxInstance.id,
     title: sandboxInstance.title,
     status: SandboxInstanceStatuses.STOPPED,
+    connectable: false,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
     runtimePlan: null,
@@ -438,6 +452,7 @@ export async function getSandboxInstanceByInspection(
         id: sandboxInstance.id,
         title: sandboxInstance.title,
         status: SandboxInstanceStatuses.FAILED,
+        connectable: false,
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,
         runtimePlan: null,
