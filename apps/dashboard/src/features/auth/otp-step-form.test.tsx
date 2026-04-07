@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
