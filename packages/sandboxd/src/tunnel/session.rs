@@ -5,16 +5,16 @@
 //! traffic: keepalive publication, telemetry negotiation, agent-runtime
 //! websocket streams, PTY streams, and file uploads.
 
+use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Display};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
-use std::any::Any;
+use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use std::panic::{self, AssertUnwindSafe};
 
 use futures_util::{SinkExt, StreamExt};
 use tokio::runtime::Builder;
@@ -160,9 +160,17 @@ enum TunnelWriterMessage {
 
 enum TunnelSessionEvent {
     BootstrapMessage(Message),
-    BootstrapClosed { reason: Option<String> },
-    AgentMessage { stream_id: u32, message: Message },
-    AgentClosed { stream_id: u32, reason: Option<String> },
+    BootstrapClosed {
+        reason: Option<String>,
+    },
+    AgentMessage {
+        stream_id: u32,
+        message: Message,
+    },
+    AgentClosed {
+        stream_id: u32,
+        reason: Option<String>,
+    },
     Wake,
 }
 
@@ -206,33 +214,37 @@ impl TunnelSession {
             };
             let connected_url = startup_input.tunnel_gateway_ws_url.clone();
             let bootstrap_token = startup_input.bootstrap_token.clone();
-            move || {
-                match panic::catch_unwind(AssertUnwindSafe(move || {
-                    let runtime_builder = Builder::new_multi_thread()
-                        .worker_threads(2)
-                        .enable_all()
-                        .build()
-                        .map_err(|error| TunnelSessionError::ConfigureTunnelSocket(error.to_string()))?;
+            move || match panic::catch_unwind(AssertUnwindSafe(move || {
+                let runtime_builder = Builder::new_multi_thread()
+                    .worker_threads(2)
+                    .enable_all()
+                    .build()
+                    .map_err(|error| {
+                        TunnelSessionError::ConfigureTunnelSocket(error.to_string())
+                    })?;
 
-                    let startup_result_sender = startup_result_sender;
-                    runtime_builder.block_on(async move {
-                        let result =
-                            run_tunnel_session(runtime, &connected_url, &bootstrap_token, startup_result_sender)
-                                .await;
-                        if let Err(error) = &result {
-                            eprintln!("sandboxd bootstrap tunnel session exited: {error}");
-                        }
-                        result
-                    })
-                })) {
-                    Ok(result) => result,
-                    Err(payload) => {
-                        eprintln!(
-                            "sandboxd bootstrap tunnel session panicked: {}",
-                            format_panic_payload(payload.as_ref())
-                        );
-                        Err(TunnelSessionError::SessionPanicked)
+                let startup_result_sender = startup_result_sender;
+                runtime_builder.block_on(async move {
+                    let result = run_tunnel_session(
+                        runtime,
+                        &connected_url,
+                        &bootstrap_token,
+                        startup_result_sender,
+                    )
+                    .await;
+                    if let Err(error) = &result {
+                        eprintln!("sandboxd bootstrap tunnel session exited: {error}");
                     }
+                    result
+                })
+            })) {
+                Ok(result) => result,
+                Err(payload) => {
+                    eprintln!(
+                        "sandboxd bootstrap tunnel session panicked: {}",
+                        format_panic_payload(payload.as_ref())
+                    );
+                    Err(TunnelSessionError::SessionPanicked)
                 }
             }
         });
@@ -548,15 +560,17 @@ fn spawn_tunnel_wake_thread(
     sleeper: Arc<dyn Sleeper>,
     event_sender: mpsc::UnboundedSender<TunnelSessionEvent>,
 ) -> JoinHandle<()> {
-    thread::spawn(move || loop {
-        if shutdown_requested.load(Ordering::Relaxed) {
-            let _ = event_sender.send(TunnelSessionEvent::Wake);
-            return;
-        }
+    thread::spawn(move || {
+        loop {
+            if shutdown_requested.load(Ordering::Relaxed) {
+                let _ = event_sender.send(TunnelSessionEvent::Wake);
+                return;
+            }
 
-        sleeper.sleep(DEFAULT_TUNNEL_SESSION_POLL_INTERVAL);
-        if event_sender.send(TunnelSessionEvent::Wake).is_err() {
-            return;
+            sleeper.sleep(DEFAULT_TUNNEL_SESSION_POLL_INTERVAL);
+            if event_sender.send(TunnelSessionEvent::Wake).is_err() {
+                return;
+            }
         }
     })
 }
@@ -630,7 +644,10 @@ fn poll_pty_sessions(
             continue;
         };
 
-        let next_event = match pty_state.session.next_event_timeout(Duration::from_millis(0)) {
+        let next_event = match pty_state
+            .session
+            .next_event_timeout(Duration::from_millis(0))
+        {
             Ok(event) => event,
             Err(_) => {
                 closed_session_ids.push(session_id.clone());
@@ -747,17 +764,36 @@ async fn handle_tunnel_session_event(
         }
         TunnelSessionEvent::BootstrapMessage(message) => match message {
             Message::Text(payload) => {
-                if let Some(frames) = session_state
+                match session_state
                     .telemetry_relay
                     .handle_control_message(&payload)
-                    .map_err(|error| TunnelSessionError::HandleTelemetry(error.to_string()))?
                 {
-                    send_telemetry_frames(tunnel_writer_sender, frames)?;
-                    return Ok(());
+                    Ok(Some(frames)) => {
+                        send_telemetry_frames(tunnel_writer_sender, frames)?;
+                        return Ok(());
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        report_dropped_bootstrap_text_message(
+                            tunnel_writer_sender,
+                            &mut session_state.telemetry_relay,
+                            format!("telemetry control rejected: {error}"),
+                        );
+                        return Ok(());
+                    }
                 }
 
-                let control_message = parse_stream_control_message(&payload)
-                    .map_err(|error| TunnelSessionError::ParseControl(error.to_string()))?;
+                let control_message = match parse_stream_control_message(&payload) {
+                    Ok(message) => message,
+                    Err(error) => {
+                        report_dropped_bootstrap_text_message(
+                            tunnel_writer_sender,
+                            &mut session_state.telemetry_relay,
+                            error.to_string(),
+                        );
+                        return Ok(());
+                    }
+                };
                 handle_tunnel_control_message(
                     tunnel_writer_sender,
                     event_sender,
@@ -770,8 +806,17 @@ async fn handle_tunnel_session_event(
                 .await
             }
             Message::Binary(payload) => {
-                let frame = decode_stream_data_frame(payload.as_ref())
-                    .map_err(|error| TunnelSessionError::ParseDataFrame(error.to_string()))?;
+                let frame = match decode_stream_data_frame(payload.as_ref()) {
+                    Ok(frame) => frame,
+                    Err(error) => {
+                        report_dropped_bootstrap_binary_frame(
+                            tunnel_writer_sender,
+                            &mut session_state.telemetry_relay,
+                            error.to_string(),
+                        );
+                        return Ok(());
+                    }
+                };
                 handle_tunnel_binary_frame(
                     tunnel_writer_sender,
                     frame,
@@ -803,9 +848,12 @@ async fn handle_tunnel_session_event(
                         ),
                     );
                 }
-                let encoded =
-                    encode_stream_data_frame(stream_id, PAYLOAD_KIND_WEBSOCKET_TEXT, payload.as_bytes())
-                        .map_err(|error| TunnelSessionError::AgentRead(error.to_string()))?;
+                let encoded = encode_stream_data_frame(
+                    stream_id,
+                    PAYLOAD_KIND_WEBSOCKET_TEXT,
+                    payload.as_bytes(),
+                )
+                .map_err(|error| TunnelSessionError::AgentRead(error.to_string()))?;
                 write_tunnel_binary(tunnel_writer_sender, encoded)
             }
             Message::Binary(payload) => {
@@ -823,9 +871,12 @@ async fn handle_tunnel_session_event(
                         ),
                     );
                 }
-                let encoded =
-                    encode_stream_data_frame(stream_id, PAYLOAD_KIND_WEBSOCKET_BINARY, payload.as_ref())
-                        .map_err(|error| TunnelSessionError::AgentRead(error.to_string()))?;
+                let encoded = encode_stream_data_frame(
+                    stream_id,
+                    PAYLOAD_KIND_WEBSOCKET_BINARY,
+                    payload.as_ref(),
+                )
+                .map_err(|error| TunnelSessionError::AgentRead(error.to_string()))?;
                 write_tunnel_binary(tunnel_writer_sender, encoded)
             }
             Message::Ping(payload) => {
@@ -867,6 +918,51 @@ async fn handle_tunnel_session_event(
     }
 }
 
+fn report_dropped_bootstrap_text_message(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    telemetry_relay: &mut TelemetryRelay,
+    reason: impl Display,
+) {
+    report_dropped_bootstrap_message(
+        tunnel_writer_sender,
+        telemetry_relay,
+        format!("sandboxd dropped bootstrap control message: {reason}"),
+    );
+}
+
+fn report_dropped_bootstrap_binary_frame(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    telemetry_relay: &mut TelemetryRelay,
+    reason: impl Display,
+) {
+    report_dropped_bootstrap_message(
+        tunnel_writer_sender,
+        telemetry_relay,
+        format!("sandboxd dropped bootstrap data frame: {reason}"),
+    );
+}
+
+fn report_dropped_bootstrap_message(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    telemetry_relay: &mut TelemetryRelay,
+    message: String,
+) {
+    eprintln!("{message}");
+
+    match telemetry_relay.enqueue_log_line(&message) {
+        Ok(frames) => {
+            if let Err(error) = send_telemetry_frames(tunnel_writer_sender, frames) {
+                eprintln!(
+                    "sandboxd failed to publish dropped bootstrap message telemetry: {error}"
+                );
+            }
+        }
+        Err(error) => {
+            eprintln!("sandboxd failed to queue dropped bootstrap message telemetry: {error}");
+        }
+    }
+}
+
 fn format_panic_payload(payload: &(dyn Any + Send)) -> String {
     if let Some(message) = payload.downcast_ref::<&str>() {
         return (*message).to_string();
@@ -903,7 +999,8 @@ async fn handle_tunnel_control_message(
             let (runtime_socket, _) = connect_async(runtime_endpoint_url)
                 .await
                 .map_err(|error| TunnelSessionError::AgentDial(error.to_string()))?;
-            let sender = spawn_agent_stream_task(message.stream_id, runtime_socket, event_sender.clone());
+            let sender =
+                spawn_agent_stream_task(message.stream_id, runtime_socket, event_sender.clone());
             agent_streams.insert(
                 message.stream_id,
                 AgentStreamState {
@@ -922,11 +1019,7 @@ async fn handle_tunnel_control_message(
                 clock: context.clock,
                 sleeper: context.sleeper,
             };
-            handle_pty_open(
-                tunnel_writer_sender,
-                message,
-                &mut pty_open_context,
-            )?;
+            handle_pty_open(tunnel_writer_sender, message, &mut pty_open_context)?;
         }
         StreamControlMessage::OpenFileUpload(message) => {
             let upload_state =
@@ -1008,7 +1101,10 @@ async fn handle_tunnel_control_message(
                 .values_mut()
                 .find(|pty_state| pty_state.attached_stream_ids.contains(&message.stream_id))
             {
-                let Some(send_window) = pty_state.send_windows_by_stream_id.get_mut(&message.stream_id) else {
+                let Some(send_window) = pty_state
+                    .send_windows_by_stream_id
+                    .get_mut(&message.stream_id)
+                else {
                     return Ok(());
                 };
                 send_window
@@ -1484,9 +1580,7 @@ fn write_tunnel_text(
     tunnel_writer_sender
         .send(TunnelWriterMessage::Text(payload))
         .map_err(|_| {
-            TunnelSessionError::WriteTunnelText(
-                "bootstrap tunnel writer is closed".to_string(),
-            )
+            TunnelSessionError::WriteTunnelText("bootstrap tunnel writer is closed".to_string())
         })
 }
 
@@ -1497,9 +1591,7 @@ fn write_tunnel_binary(
     tunnel_writer_sender
         .send(TunnelWriterMessage::Binary(payload))
         .map_err(|_| {
-            TunnelSessionError::WriteTunnelBinary(
-                "bootstrap tunnel writer is closed".to_string(),
-            )
+            TunnelSessionError::WriteTunnelBinary("bootstrap tunnel writer is closed".to_string())
         })
 }
 
@@ -1510,9 +1602,7 @@ fn write_tunnel_pong(
     tunnel_writer_sender
         .send(TunnelWriterMessage::Pong(payload))
         .map_err(|_| {
-            TunnelSessionError::WriteTunnelText(
-                "bootstrap tunnel writer is closed".to_string(),
-            )
+            TunnelSessionError::WriteTunnelText("bootstrap tunnel writer is closed".to_string())
         })
 }
 
@@ -1682,6 +1772,7 @@ mod tests {
         encode_stream_data_frame,
     };
     use crate::tunnel::session::TunnelSession;
+    use crate::tunnel::telemetry::decode_telemetry_data_frame;
 
     static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(900);
     #[test]
@@ -2103,6 +2194,149 @@ mod tests {
         }
     }
 
+    #[test]
+    fn drops_invalid_bootstrap_messages_and_keeps_tunnel_alive() {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+            let telemetry_open = read_json_text_message(&mut websocket);
+            assert_eq!(telemetry_open["type"], "telemetry.open");
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "telemetry.open.ok",
+                        "streamId": telemetry_open["streamId"],
+                        "initialWindowBytes": 1024
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should acknowledge telemetry.open");
+
+            let mut saw_keepalive = false;
+            while !saw_keepalive {
+                let control_message = read_json_text_message(&mut websocket);
+                if control_message["type"] == Value::String("keepalive.state".to_string()) {
+                    saw_keepalive = true;
+                }
+            }
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.reset",
+                        "streamId": 99,
+                        "code": "unexpected",
+                        "message": "unexpected control"
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should send an unsupported bootstrap control message");
+            assert_eq!(
+                read_telemetry_log_line(&mut websocket),
+                "sandboxd dropped bootstrap control message: unsupported control message type 'stream.reset'"
+            );
+            websocket
+                .send(Message::Binary(vec![0x01, 0x02, 0x03].into()))
+                .expect("gateway should send an invalid bootstrap data frame");
+            assert_eq!(
+                read_telemetry_log_line(&mut websocket),
+                "sandboxd dropped bootstrap data frame: data frame must be at least 6 bytes long"
+            );
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.open",
+                        "streamId": 9,
+                        "channel": {
+                            "kind": "fileUpload",
+                            "threadId": "thread_invalid_bootstrap",
+                            "mimeType": "image/png",
+                            "originalFilename": "image.png",
+                            "sizeBytes": 8
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should open a file upload stream after invalid messages");
+            assert_eq!(
+                read_stream_text_message(&mut websocket),
+                json!({
+                    "type": "stream.open.ok",
+                    "streamId": 9
+                })
+            );
+
+            websocket
+                .close(None)
+                .expect("gateway websocket should close cleanly");
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal the tunnel session finished");
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "mistle/sandbox-base:dev"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: BTreeMap::new(),
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let tunnel_session = TunnelSession::start(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            None,
+            BTreeMap::new(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("tunnel session should start");
+
+        gateway_done_receiver
+            .recv()
+            .expect("gateway should complete the bootstrap interaction");
+
+        tunnel_session
+            .close()
+            .expect("tunnel session should stop cleanly");
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+    }
+
     fn read_json_text_message<S>(socket: &mut WebSocket<S>) -> Value
     where
         S: std::io::Read + std::io::Write,
@@ -2142,5 +2376,34 @@ mod tests {
         };
 
         decode_stream_data_frame(payload.as_ref()).expect("binary frame should decode")
+    }
+
+    fn read_telemetry_log_line<S>(socket: &mut WebSocket<S>) -> String
+    where
+        S: std::io::Read + std::io::Write,
+    {
+        loop {
+            match socket
+                .read()
+                .expect("websocket should receive one telemetry frame")
+            {
+                Message::Text(payload) => {
+                    let message: Value = serde_json::from_str(payload.as_str())
+                        .expect("text payload should be valid json");
+                    match message["type"].as_str() {
+                        Some("keepalive.state") | Some("runtime.ready") => continue,
+                        _ => panic!("expected websocket binary telemetry frame"),
+                    }
+                }
+                Message::Binary(payload) => {
+                    return String::from_utf8(
+                        decode_telemetry_data_frame(payload.as_ref())
+                            .expect("telemetry frame should decode"),
+                    )
+                    .expect("telemetry frame should contain utf-8 log text");
+                }
+                _ => panic!("expected websocket binary telemetry frame"),
+            }
+        }
     }
 }
