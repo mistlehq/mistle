@@ -615,23 +615,10 @@ export class TunnelProtocolTranslator {
       tunnelStreamId: controlMessage.streamId,
     });
     if (route === undefined) {
-      if (
-        controlMessage.type === "stream.complete" ||
-        (controlMessage.type === "stream.event" &&
-          (controlMessage.event.type === "pty.exit" ||
-            controlMessage.event.type === "fileUpload.completed"))
-      ) {
-        return createTranslation({
-          delivery: {
-            kind: "drop",
-          },
-        });
-      }
-
       return createTranslation({
-        delivery: createRespondDelivery(
-          createUnboundInteractiveStreamResetPayload(controlMessage.streamId),
-        ),
+        delivery: {
+          kind: "drop",
+        },
       });
     }
 
