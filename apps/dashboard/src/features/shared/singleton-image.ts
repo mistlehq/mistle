@@ -1,27 +1,10 @@
 import { getDashboardConfig } from "../../config.js";
+import type { paths } from "../../lib/control-plane-api/generated/schema.js";
 
-export type SingletonImageMetadata = {
-  hasImage: boolean;
-  imageVersion: string | null;
-};
+export type SingletonImageMetadata =
+  paths["/v1/me/profile-image"]["get"]["responses"][200]["content"]["application/json"];
 
 export const ProfileImageContentPath = "/v1/me/profile-image/content";
-
-function resolveSingletonImageResponseErrorMessage(input: {
-  fallbackMessage: string;
-  payload: unknown;
-}): string {
-  if (
-    typeof input.payload === "object" &&
-    input.payload !== null &&
-    "message" in input.payload &&
-    typeof input.payload.message === "string"
-  ) {
-    return input.payload.message;
-  }
-
-  return input.fallbackMessage;
-}
 
 export function parseSingletonImageMetadata(input: {
   payload: unknown;
@@ -58,19 +41,6 @@ export async function readSingletonImageMetadataResponse(input: {
     payload: await input.response.json(),
     resourceName: input.resourceName,
   });
-}
-
-export async function throwSingletonImageResponseError(input: {
-  fallbackMessage: string;
-  response: Response;
-}): Promise<never> {
-  const payload: unknown = await input.response.json().catch(() => null);
-  throw new Error(
-    resolveSingletonImageResponseErrorMessage({
-      fallbackMessage: input.fallbackMessage,
-      payload,
-    }),
-  );
 }
 
 export function assertSingletonImageHasVersion(input: {

@@ -2,15 +2,14 @@ import { getDashboardConfig } from "../../../config.js";
 import {
   assertSingletonImageHasVersion,
   readSingletonImageMetadataResponse,
-  throwSingletonImageResponseError,
   type SingletonImageMetadata,
 } from "../../shared/singleton-image.js";
 import { executeMembersOperation } from "../members/members-api-errors.js";
 
-function createOrganizationLogoUrl(input: { organizationId: string }): URL {
+function createOrganizationLogoUrl(organizationId: string): URL {
   const config = getDashboardConfig();
   return new URL(
-    `/v1/organizations/${encodeURIComponent(input.organizationId)}/logo`,
+    `/v1/organizations/${encodeURIComponent(organizationId)}/logo`,
     config.controlPlaneApiOrigin,
   );
 }
@@ -19,22 +18,24 @@ export async function getOrganizationLogo(input: {
   organizationId: string;
 }): Promise<SingletonImageMetadata> {
   return executeMembersOperation("getOrganizationLogo", async () => {
-    const response = await fetch(
-      createOrganizationLogoUrl({ organizationId: input.organizationId }),
-      {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          accept: "application/json",
-        },
+    const response = await fetch(createOrganizationLogoUrl(input.organizationId), {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        accept: "application/json",
       },
-    );
+    });
 
     if (!response.ok) {
-      return throwSingletonImageResponseError({
-        fallbackMessage: "Could not load organization logo.",
-        response,
-      });
+      const payload: unknown = await response.json().catch(() => null);
+      throw new Error(
+        typeof payload === "object" &&
+          payload !== null &&
+          "message" in payload &&
+          typeof payload.message === "string"
+          ? payload.message
+          : "Could not load organization logo.",
+      );
     }
 
     return readSingletonImageMetadataResponse({
@@ -52,23 +53,25 @@ export async function uploadOrganizationLogo(input: {
     const formData = new FormData();
     formData.set("file", input.file);
 
-    const response = await fetch(
-      createOrganizationLogoUrl({ organizationId: input.organizationId }),
-      {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          accept: "application/json",
-        },
-        body: formData,
+    const response = await fetch(createOrganizationLogoUrl(input.organizationId), {
+      method: "PUT",
+      credentials: "include",
+      headers: {
+        accept: "application/json",
       },
-    );
+      body: formData,
+    });
 
     if (!response.ok) {
-      return throwSingletonImageResponseError({
-        fallbackMessage: "Could not upload organization logo.",
-        response,
-      });
+      const payload: unknown = await response.json().catch(() => null);
+      throw new Error(
+        typeof payload === "object" &&
+          payload !== null &&
+          "message" in payload &&
+          typeof payload.message === "string"
+          ? payload.message
+          : "Could not upload organization logo.",
+      );
     }
 
     const result = await readSingletonImageMetadataResponse({
@@ -86,22 +89,24 @@ export async function uploadOrganizationLogo(input: {
 
 export async function deleteOrganizationLogo(input: { organizationId: string }): Promise<void> {
   return executeMembersOperation("deleteOrganizationLogo", async () => {
-    const response = await fetch(
-      createOrganizationLogoUrl({ organizationId: input.organizationId }),
-      {
-        method: "DELETE",
-        credentials: "include",
-        headers: {
-          accept: "application/json",
-        },
+    const response = await fetch(createOrganizationLogoUrl(input.organizationId), {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        accept: "application/json",
       },
-    );
+    });
 
     if (!response.ok) {
-      return throwSingletonImageResponseError({
-        fallbackMessage: "Could not delete organization logo.",
-        response,
-      });
+      const payload: unknown = await response.json().catch(() => null);
+      throw new Error(
+        typeof payload === "object" &&
+          payload !== null &&
+          "message" in payload &&
+          typeof payload.message === "string"
+          ? payload.message
+          : "Could not delete organization logo.",
+      );
     }
 
     await response.text();
