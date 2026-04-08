@@ -1,20 +1,23 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { NotFoundResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { profileImageMetadataResponseSchema } from "../schemas.js";
+import { RedirectLocationHeaderSchema } from "../../integration-connections/schemas.js";
 
 export const route = createRoute({
   method: "get",
-  path: "/profile-image",
+  path: "/profile-image/content",
   tags: ["Me"],
+  request: {
+    query: z
+      .object({
+        v: z.string().min(1).optional(),
+      })
+      .strict(),
+  },
   responses: {
-    200: {
-      description: "Read the authenticated user's current profile image metadata.",
-      content: {
-        "application/json": {
-          schema: profileImageMetadataResponseSchema,
-        },
-      },
+    302: {
+      description: "Redirect to the authenticated user's current profile image content.",
+      headers: RedirectLocationHeaderSchema,
     },
     401: {
       description: "Authentication is required.",
@@ -25,7 +28,7 @@ export const route = createRoute({
       },
     },
     404: {
-      description: "Authenticated user was not found.",
+      description: "Authenticated user profile image was not found.",
       content: {
         "application/json": {
           schema: NotFoundResponseSchema,

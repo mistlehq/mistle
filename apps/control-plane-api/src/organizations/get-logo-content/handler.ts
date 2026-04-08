@@ -1,7 +1,8 @@
 import type { RouteHandler } from "@hono/zod-openapi";
-import { withHttpErrorHandler } from "@mistle/http/errors.js";
+import { NotFoundError, withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { getOrganizationLogo } from "../../auth/services/get-organization-logo.js";
+import { PROFILE_IMAGE_READ_URL_TTL_SECONDS } from "../../me/constants.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { getActiveOrganizationRole } from "../services/get-active-organization-role.js";
@@ -26,13 +27,16 @@ const routeHandler = async (
     organizationId,
   });
 
-  return ctx.json(
-    {
-      hasImage: organizationLogo.logoObjectKey !== null,
-      imageVersion: organizationLogo.logoObjectKey,
-    },
-    200,
-  );
+  if (organizationLogo.logoObjectKey === null) {
+    throw new NotFoundError("NOT_FOUND", "Organization logo was not found.");
+  }
+
+  const imageUrl = await ctx.get("objectStore").createPresignedGetUrl({
+    objectKey: organizationLogo.logoObjectKey,
+    expiresInSeconds: PROFILE_IMAGE_READ_URL_TTL_SECONDS,
+  });
+
+  return ctx.redirect(imageUrl, 302);
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(

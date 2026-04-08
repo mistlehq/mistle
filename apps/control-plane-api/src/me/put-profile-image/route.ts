@@ -5,7 +5,7 @@ import {
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { profileImageResponseSchema, profileImageUploadFormSchema } from "../schemas.js";
+import { profileImageMetadataResponseSchema, profileImageUploadFormSchema } from "../schemas.js";
 
 export const route = createRoute({
   method: "put",
@@ -26,7 +26,7 @@ export const route = createRoute({
       description: "Upload or replace the authenticated user's profile image.",
       content: {
         "application/json": {
-          schema: profileImageResponseSchema,
+          schema: profileImageMetadataResponseSchema,
         },
       },
     },

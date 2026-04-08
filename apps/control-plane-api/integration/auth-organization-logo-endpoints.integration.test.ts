@@ -50,7 +50,8 @@ describe("organization logo endpoints integration", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
-        imageUrl: null,
+        hasImage: false,
+        imageVersion: null,
       });
     } finally {
       await runtime.stop();
@@ -58,7 +59,7 @@ describe("organization logo endpoints integration", () => {
     }
   });
 
-  it("uploads an organization logo through the authenticated endpoint and returns a signed read URL", async ({
+  it("uploads an organization logo through the authenticated endpoint and returns image metadata", async ({
     fixture,
   }) => {
     const authenticatedSession = await fixture.authSession({
@@ -108,10 +109,9 @@ describe("organization logo endpoints integration", () => {
 
       expect(response.status).toBe(200);
 
-      const payload: unknown = await response.json();
-      const imageUrl = readImageUrl(payload);
-
-      expect(imageUrl).not.toBeNull();
+      const payload = readImageMetadata(await response.json());
+      expect(payload.hasImage).toBe(true);
+      expect(payload.imageVersion).not.toBeNull();
 
       const persistedOrganization = await runtime.db.query.organizations.findFirst({
         columns: {
@@ -127,8 +127,28 @@ describe("organization logo endpoints integration", () => {
         ),
       );
 
+      if (payload.imageVersion === null) {
+        throw new Error("Expected organization logo response to include imageVersion.");
+      }
+
+      expect(payload.imageVersion).toBe(persistedOrganization?.logoObjectKey ?? null);
+
+      const contentResponse = await runtime.request(
+        `/v1/organizations/${encodeURIComponent(authenticatedSession.organizationId)}/logo/content?v=${encodeURIComponent(payload.imageVersion)}`,
+        {
+          method: "GET",
+          headers: {
+            cookie: authenticatedSession.cookie,
+          },
+          redirect: "manual",
+        },
+      );
+
+      expect(contentResponse.status).toBe(302);
+      const imageUrl = contentResponse.headers.get("location");
+      expect(imageUrl).not.toBeNull();
       if (imageUrl === null) {
-        throw new Error("Expected organization logo response to include imageUrl.");
+        throw new Error("Expected organization logo content response to include location.");
       }
 
       const imageResponse = await fetch(imageUrl);
@@ -141,6 +161,44 @@ describe("organization logo endpoints integration", () => {
       expect(imageMetadata.format).toBe("webp");
       expect(imageMetadata.width).toBe(512);
       expect(imageMetadata.height).toBe(512);
+    } finally {
+      await runtime.stop();
+      await seaweedfs.stop();
+    }
+  });
+
+  it("returns not found from the authenticated content endpoint when no logo is stored", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-organization-logo-endpoint-content-missing@example.com",
+    });
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "mistle-assets",
+    });
+    const runtime = await createRuntimeWithObjectStore({
+      config: fixture.config,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      seaweedfs,
+    });
+
+    try {
+      const response = await runtime.request(
+        `/v1/organizations/${encodeURIComponent(authenticatedSession.organizationId)}/logo/content`,
+        {
+          method: "GET",
+          headers: {
+            cookie: authenticatedSession.cookie,
+          },
+          redirect: "manual",
+        },
+      );
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({
+        code: "NOT_FOUND",
+        message: "Organization logo was not found.",
+      });
     } finally {
       await runtime.stop();
       await seaweedfs.stop();
@@ -249,7 +307,7 @@ describe("organization logo endpoints integration", () => {
     }
   });
 
-  it("returns a signed read URL from the authenticated read endpoint when a logo exists", async ({
+  it("returns image metadata from the authenticated read endpoint when a logo exists", async ({
     fixture,
   }) => {
     const authenticatedSession = await fixture.authSession({
@@ -291,13 +349,29 @@ describe("organization logo endpoints integration", () => {
 
       expect(response.status).toBe(200);
 
-      const payload: unknown = await response.json();
-      const imageUrl = readImageUrl(payload);
+      const payload = readImageMetadata(await response.json());
 
+      expect(payload).toEqual({
+        hasImage: true,
+        imageVersion: objectKey,
+      });
+
+      const contentResponse = await runtime.request(
+        `/v1/organizations/${encodeURIComponent(authenticatedSession.organizationId)}/logo/content?v=${encodeURIComponent(objectKey)}`,
+        {
+          method: "GET",
+          headers: {
+            cookie: authenticatedSession.cookie,
+          },
+          redirect: "manual",
+        },
+      );
+
+      expect(contentResponse.status).toBe(302);
+      const imageUrl = contentResponse.headers.get("location");
       expect(imageUrl).not.toBeNull();
-
       if (imageUrl === null) {
-        throw new Error("Expected organization logo read response to include imageUrl.");
+        throw new Error("Expected organization logo content response to include location.");
       }
 
       const imageResponse = await fetch(imageUrl);
@@ -337,6 +411,47 @@ describe("organization logo endpoints integration", () => {
           headers: {
             cookie: secondSession.cookie,
           },
+        },
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        code: "FORBIDDEN",
+        message: "Forbidden API request.",
+      });
+    } finally {
+      await runtime.stop();
+      await seaweedfs.stop();
+    }
+  });
+
+  it("returns forbidden from the content endpoint when the request targets a different organization than the active session organization", async ({
+    fixture,
+  }) => {
+    const firstSession = await fixture.authSession({
+      email: "integration-organization-logo-content-endpoint-forbidden-first@example.com",
+    });
+    const secondSession = await fixture.authSession({
+      email: "integration-organization-logo-content-endpoint-forbidden-second@example.com",
+    });
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "mistle-assets",
+    });
+    const runtime = await createRuntimeWithObjectStore({
+      config: fixture.config,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      seaweedfs,
+    });
+
+    try {
+      const response = await runtime.request(
+        `/v1/organizations/${encodeURIComponent(firstSession.organizationId)}/logo/content`,
+        {
+          method: "GET",
+          headers: {
+            cookie: secondSession.cookie,
+          },
+          redirect: "manual",
         },
       );
 
@@ -514,16 +629,29 @@ async function createRuntimeWithObjectStore(input: {
   });
 }
 
-function readImageUrl(payload: unknown): string | null {
+function readImageMetadata(payload: unknown): {
+  hasImage: boolean;
+  imageVersion: string | null;
+} {
   if (typeof payload !== "object" || payload === null) {
-    return null;
+    throw new Error("Expected image metadata payload.");
   }
 
-  if (!("imageUrl" in payload) || typeof payload.imageUrl !== "string") {
-    return null;
+  if (!("hasImage" in payload) || typeof payload.hasImage !== "boolean") {
+    throw new Error("Expected image metadata hasImage.");
   }
 
-  return payload.imageUrl;
+  if (
+    !("imageVersion" in payload) ||
+    (payload.imageVersion !== null && typeof payload.imageVersion !== "string")
+  ) {
+    throw new Error("Expected image metadata imageVersion.");
+  }
+
+  return {
+    hasImage: payload.hasImage,
+    imageVersion: payload.imageVersion,
+  };
 }
 
 async function addMemberToActiveOrganization(input: {

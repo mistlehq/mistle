@@ -46,7 +46,8 @@ describe("user avatar endpoints integration", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
-        imageUrl: null,
+        hasImage: false,
+        imageVersion: null,
       });
     } finally {
       await runtime.stop();
@@ -54,7 +55,7 @@ describe("user avatar endpoints integration", () => {
     }
   });
 
-  it("uploads a profile image through the authenticated endpoint and returns a signed read URL", async ({
+  it("uploads a profile image through the authenticated endpoint and returns image metadata", async ({
     fixture,
   }) => {
     const authenticatedSession = await fixture.authSession({
@@ -101,10 +102,9 @@ describe("user avatar endpoints integration", () => {
 
       expect(response.status).toBe(200);
 
-      const payload: unknown = await response.json();
-      const imageUrl = readImageUrl(payload);
-
-      expect(imageUrl).not.toBeNull();
+      const payload = readImageMetadata(await response.json());
+      expect(payload.hasImage).toBe(true);
+      expect(payload.imageVersion).not.toBeNull();
 
       const persistedUser = await runtime.db.query.users.findFirst({
         columns: {
@@ -117,8 +117,28 @@ describe("user avatar endpoints integration", () => {
         new RegExp(`^avatars/users/${authenticatedSession.userId}/img_[^/]+\\.webp$`, "u"),
       );
 
+      if (payload.imageVersion === null) {
+        throw new Error("Expected profile image response to include imageVersion.");
+      }
+
+      expect(payload.imageVersion).toBe(persistedUser?.imageObjectKey ?? null);
+
+      const contentResponse = await runtime.request(
+        `/v1/me/profile-image/content?v=${encodeURIComponent(payload.imageVersion)}`,
+        {
+          method: "GET",
+          headers: {
+            cookie: authenticatedSession.cookie,
+          },
+          redirect: "manual",
+        },
+      );
+
+      expect(contentResponse.status).toBe(302);
+      const imageUrl = contentResponse.headers.get("location");
+      expect(imageUrl).not.toBeNull();
       if (imageUrl === null) {
-        throw new Error("Expected profile image response to include imageUrl.");
+        throw new Error("Expected profile image content response to include location.");
       }
 
       const imageResponse = await fetch(imageUrl);
@@ -131,6 +151,41 @@ describe("user avatar endpoints integration", () => {
       expect(imageMetadata.format).toBe("webp");
       expect(imageMetadata.width).toBe(512);
       expect(imageMetadata.height).toBe(512);
+    } finally {
+      await runtime.stop();
+      await seaweedfs.stop();
+    }
+  });
+
+  it("returns not found from the authenticated content endpoint when no profile image is stored", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-user-avatar-endpoint-content-missing@example.com",
+    });
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "mistle-assets",
+    });
+    const runtime = await createRuntimeWithObjectStore({
+      config: fixture.config,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      seaweedfs,
+    });
+
+    try {
+      const response = await runtime.request("/v1/me/profile-image/content", {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+        redirect: "manual",
+      });
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({
+        code: "NOT_FOUND",
+        message: "Profile image was not found.",
+      });
     } finally {
       await runtime.stop();
       await seaweedfs.stop();
@@ -233,7 +288,7 @@ describe("user avatar endpoints integration", () => {
     }
   });
 
-  it("returns a signed read URL from the authenticated read endpoint when a profile image exists", async ({
+  it("returns image metadata from the authenticated read endpoint when a profile image exists", async ({
     fixture,
   }) => {
     const authenticatedSession = await fixture.authSession({
@@ -272,13 +327,29 @@ describe("user avatar endpoints integration", () => {
 
       expect(response.status).toBe(200);
 
-      const payload: unknown = await response.json();
-      const imageUrl = readImageUrl(payload);
+      const payload = readImageMetadata(await response.json());
 
+      expect(payload).toEqual({
+        hasImage: true,
+        imageVersion: objectKey,
+      });
+
+      const contentResponse = await runtime.request(
+        `/v1/me/profile-image/content?v=${encodeURIComponent(objectKey)}`,
+        {
+          method: "GET",
+          headers: {
+            cookie: authenticatedSession.cookie,
+          },
+          redirect: "manual",
+        },
+      );
+
+      expect(contentResponse.status).toBe(302);
+      const imageUrl = contentResponse.headers.get("location");
       expect(imageUrl).not.toBeNull();
-
       if (imageUrl === null) {
-        throw new Error("Expected profile image read response to include imageUrl.");
+        throw new Error("Expected profile image content response to include location.");
       }
 
       const imageResponse = await fetch(imageUrl);
@@ -316,14 +387,27 @@ async function createRuntimeWithObjectStore(input: {
   });
 }
 
-function readImageUrl(payload: unknown): string | null {
+function readImageMetadata(payload: unknown): {
+  hasImage: boolean;
+  imageVersion: string | null;
+} {
   if (typeof payload !== "object" || payload === null) {
-    return null;
+    throw new Error("Expected image metadata payload.");
   }
 
-  if (!("imageUrl" in payload) || typeof payload.imageUrl !== "string") {
-    return null;
+  if (!("hasImage" in payload) || typeof payload.hasImage !== "boolean") {
+    throw new Error("Expected image metadata hasImage.");
   }
 
-  return payload.imageUrl;
+  if (
+    !("imageVersion" in payload) ||
+    (payload.imageVersion !== null && typeof payload.imageVersion !== "string")
+  ) {
+    throw new Error("Expected image metadata imageVersion.");
+  }
+
+  return {
+    hasImage: payload.hasImage,
+    imageVersion: payload.imageVersion,
+  };
 }

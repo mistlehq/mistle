@@ -5076,18 +5076,21 @@
         "tags": ["Me"],
         "responses": {
           "200": {
-            "description": "Read the authenticated user's current profile image URL.",
+            "description": "Read the authenticated user's current profile image metadata.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "imageUrl": {
+                    "hasImage": {
+                      "type": "boolean"
+                    },
+                    "imageVersion": {
                       "type": ["string", "null"],
-                      "format": "uri"
+                      "minLength": 1
                     }
                   },
-                  "required": ["imageUrl"],
+                  "required": ["hasImage", "imageVersion"],
                   "additionalProperties": false
                 }
               }
@@ -5178,12 +5181,15 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "imageUrl": {
-                      "type": "string",
-                      "format": "uri"
+                    "hasImage": {
+                      "type": "boolean"
+                    },
+                    "imageVersion": {
+                      "type": ["string", "null"],
+                      "minLength": 1
                     }
                   },
-                  "required": ["imageUrl"],
+                  "required": ["hasImage", "imageVersion"],
                   "additionalProperties": false
                 }
               }
@@ -5332,6 +5338,91 @@
         }
       }
     },
+    "/v1/me/profile-image/content": {
+      "get": {
+        "tags": ["Me"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "v",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the authenticated user's current profile image content.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "required": true
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Authenticated user profile image was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/organizations/{organizationId}/logo": {
       "get": {
         "tags": ["Organizations"],
@@ -5348,18 +5439,21 @@
         ],
         "responses": {
           "200": {
-            "description": "Read the active organization's current logo URL.",
+            "description": "Read the active organization's current logo metadata.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "imageUrl": {
+                    "hasImage": {
+                      "type": "boolean"
+                    },
+                    "imageVersion": {
                       "type": ["string", "null"],
-                      "format": "uri"
+                      "minLength": 1
                     }
                   },
-                  "required": ["imageUrl"],
+                  "required": ["hasImage", "imageVersion"],
                   "additionalProperties": false
                 }
               }
@@ -5477,18 +5571,21 @@
         },
         "responses": {
           "200": {
-            "description": "Upload or replace the active organization's logo.",
+            "description": "Upload or replace the active organization's logo and return current metadata.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "imageUrl": {
-                      "type": "string",
-                      "format": "uri"
+                    "hasImage": {
+                      "type": "boolean"
+                    },
+                    "imageVersion": {
+                      "type": ["string", "null"],
+                      "minLength": 1
                     }
                   },
-                  "required": ["imageUrl"],
+                  "required": ["hasImage", "imageVersion"],
                   "additionalProperties": false
                 }
               }
@@ -5658,6 +5755,122 @@
           },
           "404": {
             "description": "Organization was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/logo/content": {
+      "get": {
+        "tags": ["Organizations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "organizationId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "v",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the active organization's current logo content.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "required": true
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization logo was not found.",
             "content": {
               "application/json": {
                 "schema": {

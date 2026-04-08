@@ -3,44 +3,27 @@ import {
   ForbiddenResponseSchema,
   NotFoundResponseSchema,
   UnauthorizedResponseSchema,
-  ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { profileImageUploadFormSchema } from "../../me/schemas.js";
+import { RedirectLocationHeaderSchema } from "../../integration-connections/schemas.js";
 import { OrganizationLogoParamsSchema } from "../organization-logo-schema.js";
-import { organizationLogoResponseSchema } from "../schemas.js";
 
 export const route = createRoute({
-  method: "put",
-  path: "/{organizationId}/logo",
+  method: "get",
+  path: "/{organizationId}/logo/content",
   tags: ["Organizations"],
   request: {
     params: OrganizationLogoParamsSchema,
-    body: {
-      required: true,
-      content: {
-        "multipart/form-data": {
-          schema: profileImageUploadFormSchema,
-        },
-      },
-    },
+    query: z
+      .object({
+        v: z.string().min(1).optional(),
+      })
+      .strict(),
   },
   responses: {
-    200: {
-      description: "Upload or replace the active organization's logo and return current metadata.",
-      content: {
-        "application/json": {
-          schema: organizationLogoResponseSchema,
-        },
-      },
-    },
-    400: {
-      description: "Invalid request.",
-      content: {
-        "application/json": {
-          schema: ValidationErrorResponseSchema,
-        },
-      },
+    302: {
+      description: "Redirect to the active organization's current logo content.",
+      headers: RedirectLocationHeaderSchema,
     },
     401: {
       description: "Authentication is required.",
@@ -59,7 +42,7 @@ export const route = createRoute({
       },
     },
     404: {
-      description: "Organization was not found.",
+      description: "Organization logo was not found.",
       content: {
         "application/json": {
           schema: NotFoundResponseSchema,

@@ -25,12 +25,7 @@ export const MembershipCapabilitiesSchema = z
 
 export const organizationLogoResponseSchema = z
   .object({
-    imageUrl: z.url(),
-  })
-  .strict();
-
-export const organizationLogoStateResponseSchema = z
-  .object({
-    imageUrl: z.url().nullable(),
+    hasImage: z.boolean(),
+    imageVersion: z.string().min(1).nullable(),
   })
   .strict();

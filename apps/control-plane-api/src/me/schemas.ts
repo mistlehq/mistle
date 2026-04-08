@@ -16,14 +16,9 @@ export const profileImageUploadFormSchema = z
   })
   .strict();
 
-export const profileImageResponseSchema = z
+export const profileImageMetadataResponseSchema = z
   .object({
-    imageUrl: z.url(),
-  })
-  .strict();
-
-export const profileImageStateResponseSchema = z
-  .object({
-    imageUrl: z.url().nullable(),
+    hasImage: z.boolean(),
+    imageVersion: z.string().min(1).nullable(),
   })
   .strict();

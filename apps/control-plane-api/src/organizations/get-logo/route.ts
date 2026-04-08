@@ -6,7 +6,7 @@ import {
 } from "@mistle/http/errors.js";
 
 import { OrganizationLogoParamsSchema } from "../organization-logo-schema.js";
-import { organizationLogoStateResponseSchema } from "../schemas.js";
+import { organizationLogoResponseSchema } from "../schemas.js";
 
 export const route = createRoute({
   method: "get",
@@ -17,10 +17,10 @@ export const route = createRoute({
   },
   responses: {
     200: {
-      description: "Read the active organization's current logo URL.",
+      description: "Read the active organization's current logo metadata.",
       content: {
         "application/json": {
-          schema: organizationLogoStateResponseSchema,
+          schema: organizationLogoResponseSchema,
         },
       },
     },
