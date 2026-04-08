@@ -10,6 +10,9 @@ export async function listMemberAvatars(input: {
 }): Promise<MemberAvatar[]> {
   try {
     const client = getControlPlaneApiClient();
+    // Member-list avatars use a separate batched contract from singleton image
+    // surfaces. The API returns ready-to-render per-user URLs for the current
+    // list view instead of the stable redirect-backed singleton content path.
     const { data } = await client.POST("/v1/organizations/{organizationId}/member-avatars", {
       credentials: "include",
       params: {

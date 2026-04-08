@@ -57,6 +57,9 @@ export function createSingletonImageContentUrl(input: {
   path: string;
   image: SingletonImageMetadata | null | undefined;
 }): string | null {
+  // Singleton identity surfaces keep a stable control-plane content URL and
+  // vary the image version in the query string so callers do not need a fresh
+  // signed URL every time the image is rendered.
   if (input.image === undefined || input.image === null || !input.image.hasImage) {
     return null;
   }

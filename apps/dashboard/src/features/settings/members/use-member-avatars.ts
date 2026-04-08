@@ -15,6 +15,9 @@ export function useMemberAvatars(input: {
   const queryKeys = buildMembersQueryKeys(input.organizationId);
   const memberAvatarsQuery = useQuery({
     queryKey: [...queryKeys.memberAvatars, ...visibleMemberUserIds],
+    // This list query is intentionally separate from the singleton avatar
+    // helpers used by profile and organization settings. List rows fetch
+    // batched member avatar URLs for the current visible member set.
     queryFn: async () =>
       listMemberAvatars({
         organizationId: input.organizationId,
