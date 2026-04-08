@@ -155,6 +155,7 @@ export async function listInstances(
       items: sandboxInstances.items.map((item) => ({
         ...item,
         title: item.title,
+        keepaliveActive: item.keepaliveActive,
         sandboxProfileDisplayName: sandboxProfileDisplayNames.get(item.sandboxProfileId) ?? null,
         startedBy: {
           ...item.startedBy,

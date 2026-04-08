@@ -122,6 +122,7 @@ describe("SessionsPage", () => {
         sandboxProfileDisplayName: "Alpha Profile",
         sandboxProfileVersion: 3,
         status: "starting",
+        keepaliveActive: false,
         startedBy: {
           kind: "user",
           id: "user-id",

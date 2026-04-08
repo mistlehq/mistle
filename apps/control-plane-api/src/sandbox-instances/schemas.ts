@@ -69,6 +69,7 @@ export const sandboxInstanceListItemSchema = z
     sandboxProfileDisplayName: z.string().min(1).nullable(),
     sandboxProfileVersion: z.number().int().min(1),
     status: sandboxInstanceStatusSchema,
+    keepaliveActive: z.boolean(),
     startedBy: sandboxInstanceStartedBySchema,
     source: sandboxInstanceSourceSchema,
     createdAt: z.string().min(1),

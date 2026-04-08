@@ -47,6 +47,7 @@ export const SandboxInstanceListItemSchema = z
     title: z.string().min(1).nullable(),
     sandboxProfileVersion: z.number().int().min(1),
     status: DataPlaneSandboxInstanceStatusSchema,
+    keepaliveActive: z.boolean(),
     startedBy: SandboxInstanceStartedBySchema,
     source: SandboxInstanceSourceSchema,
     createdAt: z.string().min(1),

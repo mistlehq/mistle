@@ -17,9 +17,9 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppRuntimeResources } from "../../../resources.js";
+import { resolveEffectiveSandboxInstanceStatus } from "../effective-sandbox-instance-status.js";
 import type { ListSandboxInstancesInput } from "../list-sandbox-instances/schema.js";
 import type { ListSandboxInstancesResponse } from "../schemas.js";
-import { readEffectiveSandboxStatus } from "./read-effective-sandbox-status.js";
 
 export const InvalidListSandboxInstancesInputErrorCode = "INVALID_LIST_INPUT";
 export const InvalidPaginationCursorErrorCode = "INVALID_PAGINATION_CURSOR";
@@ -53,6 +53,30 @@ type ListSandboxInstancesContext = {
   db: DataPlaneDatabase;
   runtimeStateReader: AppRuntimeResources["runtimeStateReader"];
 };
+
+async function resolveListedSandboxRuntimeState(
+  ctx: Pick<ListSandboxInstancesContext, "runtimeStateReader">,
+  input: {
+    sandboxInstanceId: string;
+    persistedStatus: SandboxInstance["status"];
+  },
+): Promise<{
+  status: ListSandboxInstancesResponse["items"][number]["status"];
+  keepaliveActive: boolean;
+}> {
+  const runtimeStateSnapshot = await ctx.runtimeStateReader.readSnapshot({
+    sandboxInstanceId: input.sandboxInstanceId,
+    nowMs: Date.now(),
+  });
+
+  return {
+    status: resolveEffectiveSandboxInstanceStatus({
+      persistedStatus: input.persistedStatus,
+      runtimeStateSnapshot,
+    }),
+    keepaliveActive: runtimeStateSnapshot.keepalive.active,
+  };
+}
 
 function createInvalidCursorErrorMessage(input: {
   cursorName: string;
@@ -159,30 +183,30 @@ export async function listSandboxInstances(
     });
 
     const items = await Promise.all(
-      response.items.map(async (item) => ({
-        id: item.id,
-        sandboxProfileId: item.sandboxProfileId,
-        title: item.title,
-        sandboxProfileVersion: item.sandboxProfileVersion,
-        status: await readEffectiveSandboxStatus(
-          {
-            runtimeStateReader: ctx.runtimeStateReader,
+      response.items.map(async (item) => {
+        const runtimeState = await resolveListedSandboxRuntimeState(ctx, {
+          sandboxInstanceId: item.id,
+          persistedStatus: item.status,
+        });
+
+        return {
+          id: item.id,
+          sandboxProfileId: item.sandboxProfileId,
+          title: item.title,
+          sandboxProfileVersion: item.sandboxProfileVersion,
+          status: runtimeState.status,
+          keepaliveActive: runtimeState.keepaliveActive,
+          startedBy: {
+            kind: item.startedByKind,
+            id: item.startedById,
           },
-          {
-            sandboxInstanceId: item.id,
-            persistedStatus: item.status,
-          },
-        ),
-        startedBy: {
-          kind: item.startedByKind,
-          id: item.startedById,
-        },
-        source: item.source,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-        failureCode: item.failureCode,
-        failureMessage: item.failureMessage,
-      })),
+          source: item.source,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          failureCode: item.failureCode,
+          failureMessage: item.failureMessage,
+        };
+      }),
     );
 
     return {

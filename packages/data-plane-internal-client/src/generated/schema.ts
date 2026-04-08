@@ -37,6 +37,7 @@ export interface paths {
                 failureCode: string | null;
                 failureMessage: string | null;
                 id: string;
+                keepaliveActive: boolean;
                 sandboxProfileId: string;
                 sandboxProfileVersion: number;
                 /** @enum {string} */
