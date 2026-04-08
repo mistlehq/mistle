@@ -61,6 +61,7 @@ function resolveSelectWidgetOptions(input: {
 }
 
 export const IntegrationHorizontalFieldGroupClassName = "gap-6 flex flex-col";
+const IntegrationVerticalFieldGroupClassName = "gap-6 flex flex-col";
 export const IntegrationSelectContentClassName =
   "w-max min-w-(--anchor-width) max-w-[min(32rem,calc(100vw-2rem))]";
 
@@ -181,6 +182,64 @@ function TextWidget(
       }}
       placeholder={props.placeholder}
       type="text"
+      value={value}
+    />
+  );
+}
+
+function EmailWidget(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element {
+  const value = resolveTextInputValue(props.value);
+
+  return (
+    <Input
+      aria-label={props.label}
+      autoFocus={props.autofocus}
+      className="w-full"
+      disabled={props.disabled || props.readonly}
+      id={props.id}
+      onBlur={(event) => {
+        props.onBlur(props.id, event.currentTarget.value);
+      }}
+      onChange={(event) => {
+        const nextValue = event.currentTarget.value;
+        props.onChange(nextValue.length === 0 ? undefined : nextValue);
+      }}
+      onFocus={(event) => {
+        props.onFocus(props.id, event.currentTarget.value);
+      }}
+      placeholder={props.placeholder}
+      type="email"
+      value={value}
+    />
+  );
+}
+
+function URLWidget(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element {
+  const value = resolveTextInputValue(props.value);
+
+  return (
+    <Input
+      aria-label={props.label}
+      autoFocus={props.autofocus}
+      className="w-full"
+      disabled={props.disabled || props.readonly}
+      id={props.id}
+      onBlur={(event) => {
+        props.onBlur(props.id, event.currentTarget.value);
+      }}
+      onChange={(event) => {
+        const nextValue = event.currentTarget.value;
+        props.onChange(nextValue.length === 0 ? undefined : nextValue);
+      }}
+      onFocus={(event) => {
+        props.onFocus(props.id, event.currentTarget.value);
+      }}
+      placeholder={props.placeholder}
+      type="url"
       value={value}
     />
   );
@@ -529,10 +588,7 @@ function IntegrationFieldTemplate(
     >
       {props.displayLabel && props.label.length > 0 ? (
         <FieldHeader>
-          <FieldLabel htmlFor={props.id}>
-            {props.label}
-            {props.required ? <span className="text-destructive">*</span> : null}
-          </FieldLabel>
+          <FieldLabel htmlFor={props.id}>{props.label}</FieldLabel>
           {props.description}
         </FieldHeader>
       ) : null}
@@ -588,6 +644,7 @@ function IntegrationObjectFieldTemplate(
       <div
         className={cn(
           props.className,
+          IntegrationVerticalFieldGroupClassName,
           layout === "horizontal" ? IntegrationHorizontalFieldGroupClassName : undefined,
         )}
       >
@@ -618,6 +675,8 @@ export const IntegrationFormTemplates = {
 
 export const IntegrationFormWidgets = {
   TextWidget,
+  EmailWidget,
+  URLWidget,
   PasswordWidget,
   SelectWidget,
   CheckboxesWidget,
