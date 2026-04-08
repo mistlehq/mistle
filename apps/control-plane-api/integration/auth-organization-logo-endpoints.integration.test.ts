@@ -6,6 +6,7 @@ import { describe, expect } from "vitest";
 
 import { createControlPlaneApiRuntime } from "../src/main.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
+import { readImageMetadata } from "./helpers/image-metadata.js";
 import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test-object-store.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
@@ -627,31 +628,6 @@ async function createRuntimeWithObjectStore(input: {
     connectionToken: IntegrationConnectionTokenConfig,
     sandbox: IntegrationSandboxRuntimeConfig,
   });
-}
-
-function readImageMetadata(payload: unknown): {
-  hasImage: boolean;
-  imageVersion: string | null;
-} {
-  if (typeof payload !== "object" || payload === null) {
-    throw new Error("Expected image metadata payload.");
-  }
-
-  if (!("hasImage" in payload) || typeof payload.hasImage !== "boolean") {
-    throw new Error("Expected image metadata hasImage.");
-  }
-
-  if (
-    !("imageVersion" in payload) ||
-    (payload.imageVersion !== null && typeof payload.imageVersion !== "string")
-  ) {
-    throw new Error("Expected image metadata imageVersion.");
-  }
-
-  return {
-    hasImage: payload.hasImage,
-    imageVersion: payload.imageVersion,
-  };
 }
 
 async function addMemberToActiveOrganization(input: {
