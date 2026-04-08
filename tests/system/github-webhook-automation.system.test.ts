@@ -7,15 +7,16 @@ import { randomUUID } from "node:crypto";
 import { AutomationRunStatuses } from "@mistle/db/control-plane";
 import {
   CodexJsonRpcClient,
-  CodexSessionClient,
+  AgentStreamClient,
   readCodexThread,
   resumeCodexThread,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
-import { createNodeCodexSessionRuntime } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
 import { systemSleeper } from "@mistle/time";
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { z } from "zod";
 
+import { createNodeSandboxSessionRuntime } from "../../packages/sandbox-session-client/src/node.js";
+import { SandboxSessionTransport } from "../../packages/sandbox-session-client/src/transport.js";
 import {
   startCloudflaredTunnel,
   type StartedCloudflaredTunnel,
@@ -663,7 +664,8 @@ describeIf("system GitHub webhook automation", () => {
       expect(automation.id.length).toBeGreaterThan(0);
 
       let issueNumber: number | null = null;
-      let sessionClient: CodexSessionClient | null = null;
+      let sessionClient: AgentStreamClient | null = null;
+      let sessionTransport: SandboxSessionTransport | null = null;
       let rpcClient: CodexJsonRpcClient | null = null;
 
       try {
@@ -854,16 +856,22 @@ describeIf("system GitHub webhook automation", () => {
           },
         });
 
-        sessionClient = new CodexSessionClient({
+        sessionTransport = new SandboxSessionTransport({
+          runtime: createNodeSandboxSessionRuntime(),
+        });
+        await sessionTransport.connect({
           connectionUrl: resolveGatewayWebSocketUrl({
             mintedUrl: mintedConnectionToken.url,
             gatewayBaseUrl: dataPlaneGatewayBaseUrl,
           }),
-          runtime: createNodeCodexSessionRuntime(),
         });
-        await sessionClient.connect();
+        const connectedSessionClient = new AgentStreamClient({
+          transport: sessionTransport,
+        });
+        await connectedSessionClient.connect();
+        sessionClient = connectedSessionClient;
 
-        const codexRpcClient = new CodexJsonRpcClient(sessionClient);
+        const codexRpcClient = new CodexJsonRpcClient(connectedSessionClient);
         rpcClient = codexRpcClient;
         await codexRpcClient.initialize({
           clientInfo: {
@@ -899,6 +907,7 @@ describeIf("system GitHub webhook automation", () => {
       } finally {
         rpcClient?.dispose();
         sessionClient?.disconnect();
+        sessionTransport?.disconnect(1000, "System test cleanup.");
 
         if (issueNumber !== null) {
           await closeGitHubIssue({

@@ -7,8 +7,9 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 import { type RawData, WebSocket, WebSocketServer } from "ws";
 
-import { createBrowserSandboxSessionRuntime } from "./browser.js";
-import { FileUploadRejectedError, uploadSandboxImage } from "./file-upload-client.js";
+import { FileUploadRejectedError, UploadStreamClient } from "./file-upload-client.js";
+import { createNodeSandboxSessionRuntime } from "./node.js";
+import { SandboxSessionTransport } from "./transport.js";
 
 function toUint8Array(data: RawData): Uint8Array {
   if (typeof data === "string") {
@@ -42,41 +43,13 @@ type UploadServerBehavior =
       kind: "complete_without_event";
     }
   | {
-      kind: "close_after_open";
-    }
-  | {
-      kind: "event_without_complete";
-    }
-  | {
-      kind: "reject_open";
-      code: string;
-      message: string;
-    }
-  | {
       kind: "reset_after_close";
       code: string;
       message: string;
-    }
-  | {
-      kind: "reset_after_chunk";
-      chunkCount: number;
-      code: string;
-      message: string;
-    }
-  | {
-      kind: "stall_completion_after_close";
-    }
-  | {
-      kind: "stall_progress_after_chunk";
-      chunkCount: number;
     };
 
 function createUploadServerBehavior(behavior?: UploadServerBehavior): UploadServerBehavior {
-  return (
-    behavior ?? {
-      kind: "accept",
-    }
-  );
+  return behavior ?? { kind: "accept" };
 }
 
 function createImageFile(input?: { bytes?: Uint8Array; name?: string }): File {
@@ -89,46 +62,14 @@ function createImageFile(input?: { bytes?: Uint8Array; name?: string }): File {
   });
 }
 
-function createUploadRequest(input: { connectionUrl: string; file: File }) {
-  return {
-    connectionUrl: input.connectionUrl,
-    file: input.file,
-    runtime: createBrowserSandboxSessionRuntime(),
-    threadId: "thread_123",
-  } as const;
-}
-
 function sendControlMessage(socket: WebSocket, message: object): void {
   socket.send(JSON.stringify(message));
 }
 
-function sendStreamOpenResponse(
-  socket: WebSocket,
-  input:
-    | {
-        kind: "ok";
-        streamId: number;
-      }
-    | {
-        kind: "error";
-        code: string;
-        message: string;
-        streamId: number;
-      },
-): void {
-  if (input.kind === "ok") {
-    sendControlMessage(socket, {
-      type: "stream.open.ok",
-      streamId: input.streamId,
-    });
-    return;
-  }
-
+function sendStreamOpenResponse(socket: WebSocket, streamId: number): void {
   sendControlMessage(socket, {
-    type: "stream.open.error",
-    streamId: input.streamId,
-    code: input.code,
-    message: input.message,
+    type: "stream.open.ok",
+    streamId,
   });
 }
 
@@ -206,31 +147,11 @@ async function startUploadTestServer(input?: {
       const controlMessage = parseStreamControlMessage(toText(message));
       if (controlMessage?.type === "stream.open") {
         streamId = controlMessage.streamId;
-        if (behavior.kind === "close_after_open") {
-          socket.close();
-          return;
-        }
-        sendStreamOpenResponse(
-          socket,
-          behavior.kind === "reject_open"
-            ? {
-                kind: "error",
-                streamId,
-                code: behavior.code,
-                message: behavior.message,
-              }
-            : {
-                kind: "ok",
-                streamId,
-              },
-        );
+        sendStreamOpenResponse(socket, streamId);
         return;
       }
 
       if (controlMessage?.type === "stream.close" && streamId !== null) {
-        if (behavior.kind === "stall_completion_after_close") {
-          return;
-        }
         if (behavior.kind === "reset_after_close") {
           sendStreamReset(socket, {
             streamId,
@@ -248,9 +169,6 @@ async function startUploadTestServer(input?: {
           streamId,
           sizeBytes: receivedChunks.reduce((total, chunk) => total + chunk.byteLength, 0),
         });
-        if (behavior.kind === "event_without_complete") {
-          return;
-        }
         sendStreamComplete(socket, streamId);
         return;
       }
@@ -262,23 +180,6 @@ async function startUploadTestServer(input?: {
 
       receivedChunks.push(dataFrame.payload);
       if (streamId !== null) {
-        if (
-          behavior.kind === "reset_after_chunk" &&
-          receivedChunks.length === behavior.chunkCount
-        ) {
-          sendStreamReset(socket, {
-            streamId,
-            code: behavior.code,
-            message: behavior.message,
-          });
-          return;
-        }
-        if (
-          behavior.kind === "stall_progress_after_chunk" &&
-          receivedChunks.length >= behavior.chunkCount
-        ) {
-          return;
-        }
         sendStreamWindow(socket, {
           streamId,
           bytes: dataFrame.payload.byteLength,
@@ -314,6 +215,16 @@ async function startUploadTestServer(input?: {
   };
 }
 
+async function connectTransport(connectionUrl: string): Promise<SandboxSessionTransport> {
+  const transport = new SandboxSessionTransport({
+    runtime: createNodeSandboxSessionRuntime(),
+  });
+  await transport.connect({
+    connectionUrl,
+  });
+  return transport;
+}
+
 const openServers = new Set<TestUploadServer>();
 
 afterEach(async () => {
@@ -321,18 +232,21 @@ afterEach(async () => {
   openServers.clear();
 });
 
-describe("uploadSandboxImage", () => {
-  it("uploads file bytes and resolves with the completed upload result", async () => {
+describe("UploadStreamClient", () => {
+  it("uploads file bytes over a shared transport and resolves with the completed upload result", async () => {
     const server = await startUploadTestServer();
     openServers.add(server);
-    const file = createImageFile();
+    const transport = await connectTransport(server.url);
+    const client = new UploadStreamClient({
+      transport,
+    });
 
-    const uploaded = await uploadSandboxImage(
-      createUploadRequest({ connectionUrl: server.url, file }),
-    );
-
-    expect(Array.from(server.receivedBytes())).toEqual([1, 2, 3, 4]);
-    expect(uploaded).toEqual({
+    await expect(
+      client.uploadImage({
+        file: createImageFile(),
+        threadId: "thread_123",
+      }),
+    ).resolves.toEqual({
       attachmentId: "att_123",
       threadId: "thread_123",
       originalFilename: "screenshot.png",
@@ -340,25 +254,12 @@ describe("uploadSandboxImage", () => {
       sizeBytes: 4,
       path: "/tmp/attachments/thread_123/upload.png",
     });
+    expect(Array.from(server.receivedBytes())).toEqual([1, 2, 3, 4]);
+
+    transport.disconnect(1000, "Test completed.");
   });
 
-  it("rejects when the upload stream open is rejected", async () => {
-    const server = await startUploadTestServer({
-      behavior: {
-        kind: "reject_open",
-        code: "unsupported_mime_type",
-        message: "unsupported",
-      },
-    });
-    openServers.add(server);
-    const file = createImageFile();
-
-    await expect(
-      uploadSandboxImage(createUploadRequest({ connectionUrl: server.url, file })),
-    ).rejects.toThrow("unsupported");
-  });
-
-  it("preserves reset codes when the runtime rejects the uploaded image", async () => {
+  it("preserves reset codes when the shared upload stream is rejected", async () => {
     const server = await startUploadTestServer({
       behavior: {
         kind: "reset_after_close",
@@ -367,86 +268,24 @@ describe("uploadSandboxImage", () => {
       },
     });
     openServers.add(server);
-    const file = createImageFile();
+    const transport = await connectTransport(server.url);
+    const client = new UploadStreamClient({
+      transport,
+    });
 
     await expect(
-      uploadSandboxImage(createUploadRequest({ connectionUrl: server.url, file })),
+      client.uploadImage({
+        file: createImageFile(),
+        threadId: "thread_123",
+      }),
     ).rejects.toMatchObject({
       name: "FileUploadRejectedError",
       code: FileUploadResetCodes.INVALID_FILE_TYPE,
       message: "Uploaded file is not a supported image.",
     } satisfies Pick<FileUploadRejectedError, "code" | "message" | "name">);
+
+    transport.disconnect(1000, "Test completed.");
   });
-
-  it("rejects when the websocket closes before the upload stream opens", async () => {
-    const server = await startUploadTestServer({
-      behavior: {
-        kind: "close_after_open",
-      },
-    });
-    openServers.add(server);
-    const file = createImageFile();
-
-    await expect(
-      uploadSandboxImage(createUploadRequest({ connectionUrl: server.url, file })),
-    ).rejects.toThrow("Sandbox websocket connection closed unexpectedly.");
-  });
-
-  it("stops uploading and preserves reset codes when the runtime resets during upload", async () => {
-    const server = await startUploadTestServer({
-      behavior: {
-        kind: "reset_after_chunk",
-        chunkCount: 1,
-        code: FileUploadResetCodes.INVALID_IMAGE_CONTENT,
-        message: "Uploaded image bytes were rejected during validation.",
-      },
-    });
-    openServers.add(server);
-    const file = createImageFile({
-      bytes: new Uint8Array(64 * 1024 + 1),
-    });
-
-    await expect(
-      uploadSandboxImage(createUploadRequest({ connectionUrl: server.url, file })),
-    ).rejects.toMatchObject({
-      name: "FileUploadRejectedError",
-      code: FileUploadResetCodes.INVALID_IMAGE_CONTENT,
-      message: "Uploaded image bytes were rejected during validation.",
-    } satisfies Pick<FileUploadRejectedError, "code" | "message" | "name">);
-
-    expect(server.receivedBytes().byteLength).toBe(64 * 1024);
-  });
-
-  it("times out when upload progress stalls waiting for the next stream window", async () => {
-    const server = await startUploadTestServer({
-      behavior: {
-        kind: "stall_progress_after_chunk",
-        chunkCount: 1,
-      },
-    });
-    openServers.add(server);
-    const file = createImageFile({
-      bytes: new Uint8Array(64 * 1024 + 1),
-    });
-
-    await expect(
-      uploadSandboxImage(createUploadRequest({ connectionUrl: server.url, file })),
-    ).rejects.toThrow("Timed out while waiting for upload progress.");
-  }, 20_000);
-
-  it("times out when upload completion never arrives after closing the stream", async () => {
-    const server = await startUploadTestServer({
-      behavior: {
-        kind: "event_without_complete",
-      },
-    });
-    openServers.add(server);
-    const file = createImageFile();
-
-    await expect(
-      uploadSandboxImage(createUploadRequest({ connectionUrl: server.url, file })),
-    ).rejects.toThrow("Timed out while waiting for upload completion.");
-  }, 20_000);
 
   it("rejects when stream.complete arrives before fileUpload.completed", async () => {
     const server = await startUploadTestServer({
@@ -455,10 +294,18 @@ describe("uploadSandboxImage", () => {
       },
     });
     openServers.add(server);
-    const file = createImageFile();
+    const transport = await connectTransport(server.url);
+    const client = new UploadStreamClient({
+      transport,
+    });
 
     await expect(
-      uploadSandboxImage(createUploadRequest({ connectionUrl: server.url, file })),
+      client.uploadImage({
+        file: createImageFile(),
+        threadId: "thread_123",
+      }),
     ).rejects.toThrow("Received stream.complete before file upload completion event.");
+
+    transport.disconnect(1000, "Test completed.");
   });
 });

@@ -265,7 +265,7 @@ describe("useSessionWorkbenchController", () => {
         previousSandboxInstanceId: "sbi_old",
         sandboxInstanceId: "sbi_new",
         sandboxStatus: "running",
-        transportState: "detached",
+        sessionConnectionState: "detached",
       }),
     ).toEqual({
       kind: "idle",

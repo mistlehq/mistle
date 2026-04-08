@@ -1,4 +1,4 @@
-import type { SandboxSessionRuntime } from "./runtime.js";
+import type { SandboxSessionTransport } from "./transport.js";
 
 export const SandboxPtyStates = {
   IDLE: "idle",
@@ -32,9 +32,7 @@ export type SandboxPtyResetInfo = {
   message: string;
 };
 
-export type SandboxPtyClientInput = {
-  connectionUrl: string;
-  runtime: SandboxSessionRuntime;
-  connectTimeoutMs?: number;
+export type PtyStreamClientInput = {
+  transport: SandboxSessionTransport;
   closeTimeoutMs?: number;
 };
