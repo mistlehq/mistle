@@ -5,7 +5,11 @@ import {
   type StreamOpenOK,
 } from "@mistle/sandbox-session-protocol";
 
-import { SandboxSessionSocketReadyStates, type SandboxSessionSendGuarantee } from "./runtime.js";
+import {
+  SandboxSessionSocketReadyStates,
+  type SandboxSessionSendGuarantee,
+  type SandboxSessionSocket,
+} from "./runtime.js";
 import { isRecord } from "./shared/is-record.js";
 import {
   SandboxSessionStreamOpenError,
@@ -212,7 +216,7 @@ export class AgentStreamClient {
     return this.#resetInfo;
   }
 
-  get socket(): import("./runtime.js").SandboxSessionSocket | null {
+  get socket(): SandboxSessionSocket | null {
     return this.#transport.socket;
   }
 

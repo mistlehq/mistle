@@ -10,7 +10,7 @@ import {
   type CodexJsonRpcClient,
   type CodexJsonRpcNotification,
   type CodexJsonRpcServerRequest,
-  type CodexSessionClient,
+  type AgentStreamClient,
   type CodexThreadSummary,
   type CodexTurnInputLocalImageItem,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
@@ -136,7 +136,7 @@ export type UseCodexSessionStateResult = {
 
 export function useCodexSessionState(input: {
   transportRef: RefObject<SandboxSessionTransport | null>;
-  sessionClientRef: RefObject<CodexSessionClient | null>;
+  sessionClientRef: RefObject<AgentStreamClient | null>;
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
   sessionEventUnsubscribersRef: RefObject<(() => void)[]>;
 }): UseCodexSessionStateResult {
