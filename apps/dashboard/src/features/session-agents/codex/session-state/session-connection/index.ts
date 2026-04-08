@@ -1,5 +1,6 @@
 export {
   useCodexSessionConnection,
+  type ConnectCodexSessionInput,
   type CodexSessionConnectionLifecycleState,
 } from "./use-codex-session-connection.js";
 export {

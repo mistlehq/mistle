@@ -3,6 +3,7 @@ import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 
 import type { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
+import type { ConnectCodexSessionInput } from "../session-agents/codex/session-state/session-connection/index.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   InitialSessionMainPanelHandoffState,
@@ -45,13 +46,6 @@ type SessionMainPanelHandoffResult = {
 
 const ChatRestoreTimeoutMs = 30_000;
 
-type ChatRestoreConnectionInput = {
-  sandboxInstanceId: string;
-  targetThreadId: string | null;
-  providerThreadId?: string;
-  selectionPolicy?: "most_recently_updated";
-};
-
 async function closeAndDisconnectCliPty(
   cliPtyState: ReturnType<typeof useSandboxPtyState>,
 ): Promise<void> {
@@ -64,18 +58,24 @@ async function closeAndDisconnectCliPty(
 export function resolveChatRestoreConnectionInput(input: {
   sandboxInstanceId: string;
   durableThreadId: string | null;
-}): ChatRestoreConnectionInput {
+}): ConnectCodexSessionInput {
+  if (input.durableThreadId === null) {
+    return {
+      sandboxInstanceId: input.sandboxInstanceId,
+      targetThreadId: null,
+      selectionPolicy: "most_recently_updated",
+    };
+  }
+
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     targetThreadId: input.durableThreadId,
-    ...(input.durableThreadId === null
-      ? { selectionPolicy: "most_recently_updated" as const }
-      : { providerThreadId: input.durableThreadId }),
+    providerThreadId: input.durableThreadId,
   };
 }
 
 export type {
-  ChatRestoreConnectionInput,
+  ConnectCodexSessionInput as ChatRestoreConnectionInput,
   SessionMainPanelHandoffResult,
   UseSessionMainPanelHandoffInput,
 };

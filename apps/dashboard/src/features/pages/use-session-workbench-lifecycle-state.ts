@@ -317,11 +317,19 @@ export function useSessionWorkbenchLifecycleState(input: {
     }
 
     setHasAttemptedAutoConnect(true);
-    connectSession({
-      sandboxInstanceId: input.sandboxInstanceId,
-      targetThreadId: automationConversation?.providerConversationId ?? null,
-      providerThreadId: automationConversation?.providerConversationId ?? null,
-    });
+    const providerThreadId = automationConversation?.providerConversationId ?? null;
+    connectSession(
+      providerThreadId === null
+        ? {
+            sandboxInstanceId: input.sandboxInstanceId,
+            targetThreadId: null,
+          }
+        : {
+            sandboxInstanceId: input.sandboxInstanceId,
+            targetThreadId: providerThreadId,
+            providerThreadId,
+          },
+    );
   }, [
     automationConversation,
     connectSession,

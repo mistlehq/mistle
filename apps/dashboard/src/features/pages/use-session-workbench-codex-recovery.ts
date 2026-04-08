@@ -368,7 +368,14 @@ export function useSessionWorkbenchCodexRecovery(input: {
       return;
     }
 
-    input.connectSession(recoveryInput);
+    input.connectSession(
+      recoveryInput.targetThreadId === null
+        ? recoveryInput
+        : {
+            sandboxInstanceId: recoveryInput.sandboxInstanceId,
+            targetThreadId: recoveryInput.targetThreadId,
+          },
+    );
   }, [
     codexRecoveryState,
     input.connectSession,

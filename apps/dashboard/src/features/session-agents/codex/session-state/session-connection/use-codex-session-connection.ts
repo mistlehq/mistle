@@ -36,6 +36,20 @@ type CodexThreadCollectionsRefreshResult = {
 
 export type CodexConnectionThreadSelectionPolicy = "oldest" | "most_recently_updated";
 
+export type ConnectCodexSessionInput =
+  | {
+      sandboxInstanceId: string;
+      targetThreadId: string;
+      providerThreadId?: string | null;
+      selectionPolicy?: never;
+    }
+  | {
+      sandboxInstanceId: string;
+      targetThreadId: null;
+      providerThreadId?: never;
+      selectionPolicy?: CodexConnectionThreadSelectionPolicy;
+    };
+
 export type CodexSessionConnectionLifecycleState = {
   step: StartSessionStep;
   lifecycleErrorMessage: string | null;
@@ -50,12 +64,7 @@ export type CodexSessionConnectionLifecycleState = {
   agentConnectionState: CodexSessionConnectionState;
   agentConnectionError: string | null;
   isStartingSession: boolean;
-  connectSession: (input: {
-    sandboxInstanceId: string;
-    targetThreadId: string | null;
-    providerThreadId?: string | null;
-    selectionPolicy?: CodexConnectionThreadSelectionPolicy;
-  }) => void;
+  connectSession: (input: ConnectCodexSessionInput) => void;
   recoverSession: (input: { sandboxInstanceId: string; targetThreadId: string | null }) => void;
   detachSessionTransport: () => void;
   disconnectSession: () => void;
@@ -297,12 +306,7 @@ export function useCodexSessionConnection(input: {
   );
 
   const connectSessionMutation = useMutation({
-    mutationFn: async (connectInput: {
-      targetThreadId: string | null;
-      sandboxInstanceId: string;
-      providerThreadId?: string | null;
-      selectionPolicy?: CodexConnectionThreadSelectionPolicy;
-    }) => {
+    mutationFn: async (connectInput: ConnectCodexSessionInput) => {
       const generation = input.connectionGenerationRef.current + 1;
       input.connectionGenerationRef.current = generation;
       teardownConnection("Superseded by a new Codex session.");
@@ -499,12 +503,7 @@ export function useCodexSessionConnection(input: {
   });
 
   const connectSession = useCallback(
-    (connectInput: {
-      sandboxInstanceId: string;
-      targetThreadId: string | null;
-      providerThreadId?: string | null;
-      selectionPolicy?: CodexConnectionThreadSelectionPolicy;
-    }) => {
+    (connectInput: ConnectCodexSessionInput) => {
       connectSessionMutation.mutate(connectInput);
     },
     [connectSessionMutation],
