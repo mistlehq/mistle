@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { AutomationRunStatuses } from "@mistle/db/control-plane";
 import {
   CodexJsonRpcClient,
-  CodexSessionClient,
+  AgentStreamClient,
   readCodexThread,
   resumeCodexThread,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
@@ -664,7 +664,7 @@ describeIf("system GitHub webhook automation", () => {
       expect(automation.id.length).toBeGreaterThan(0);
 
       let issueNumber: number | null = null;
-      let sessionClient: CodexSessionClient | null = null;
+      let sessionClient: AgentStreamClient | null = null;
       let sessionTransport: SandboxSessionTransport | null = null;
       let rpcClient: CodexJsonRpcClient | null = null;
 
@@ -865,7 +865,7 @@ describeIf("system GitHub webhook automation", () => {
             gatewayBaseUrl: dataPlaneGatewayBaseUrl,
           }),
         });
-        const connectedSessionClient = new CodexSessionClient({
+        const connectedSessionClient = new AgentStreamClient({
           transport: sessionTransport,
         });
         await connectedSessionClient.connect();
