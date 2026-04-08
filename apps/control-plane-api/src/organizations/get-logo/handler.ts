@@ -2,6 +2,7 @@ import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { getOrganizationLogo } from "../../auth/services/get-organization-logo.js";
+import { createSingletonImageMetadataResponse } from "../../lib/singleton-image-metadata.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { getActiveOrganizationRole } from "../services/get-active-organization-role.js";
@@ -26,13 +27,7 @@ const routeHandler = async (
     organizationId,
   });
 
-  return ctx.json(
-    {
-      hasImage: organizationLogo.logoObjectKey !== null,
-      imageVersion: organizationLogo.logoObjectKey,
-    },
-    200,
-  );
+  return ctx.json(createSingletonImageMetadataResponse(organizationLogo.logoObjectKey), 200);
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(

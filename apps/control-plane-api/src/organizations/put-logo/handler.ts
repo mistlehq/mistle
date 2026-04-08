@@ -3,6 +3,7 @@ import { ForbiddenError, withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { canManageOrganization } from "../../auth/services/organization-policy.js";
 import { putOrganizationLogo } from "../../auth/services/put-organization-logo.js";
+import { createSingletonImageMetadataResponse } from "../../lib/singleton-image-metadata.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { getActiveOrganizationRole } from "../services/get-active-organization-role.js";
@@ -38,13 +39,7 @@ const routeHandler = async (
     },
   );
 
-  return ctx.json(
-    {
-      hasImage: true,
-      imageVersion: organizationLogo.logoObjectKey,
-    },
-    200,
-  );
+  return ctx.json(createSingletonImageMetadataResponse(organizationLogo.logoObjectKey), 200);
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(

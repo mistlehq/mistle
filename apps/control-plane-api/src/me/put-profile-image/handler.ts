@@ -2,6 +2,7 @@ import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { putUserAvatar } from "../../auth/services/put-user-avatar.js";
+import { createSingletonImageMetadataResponse } from "../../lib/singleton-image-metadata.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { route } from "./route.js";
@@ -25,13 +26,7 @@ const routeHandler = async (
     },
   );
 
-  return ctx.json(
-    {
-      hasImage: true,
-      imageVersion: profileImage.imageObjectKey,
-    },
-    200,
-  );
+  return ctx.json(createSingletonImageMetadataResponse(profileImage.imageObjectKey), 200);
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(

@@ -4,22 +4,10 @@ import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { describe, expect } from "vitest";
 
-import { createControlPlaneApiRuntime } from "../src/main.js";
-import type { ControlPlaneApiConfig } from "../src/types.js";
+import { createRuntimeWithObjectStore } from "./helpers/control-plane-runtime-with-object-store.js";
 import { readImageMetadata } from "./helpers/image-metadata.js";
 import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test-object-store.js";
 import { it } from "./test-context.js";
-
-const IntegrationConnectionTokenConfig = {
-  secret: "integration-connection-secret",
-  issuer: "integration-issuer",
-  audience: "integration-audience",
-} as const;
-
-const IntegrationSandboxRuntimeConfig = {
-  defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
-  gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-} as const;
 
 describe("user avatar endpoints integration", () => {
   it("returns null from the authenticated read endpoint when no profile image is stored", async ({
@@ -364,26 +352,3 @@ describe("user avatar endpoints integration", () => {
     }
   });
 });
-
-async function createRuntimeWithObjectStore(input: {
-  config: ControlPlaneApiConfig;
-  internalAuthServiceToken: string;
-  seaweedfs: Awaited<ReturnType<typeof startSeaweedfsS3>>;
-}) {
-  return createControlPlaneApiRuntime({
-    app: {
-      ...input.config,
-      objectStore: {
-        bucketName: input.seaweedfs.bucketName,
-        region: input.seaweedfs.region,
-        endpoint: input.seaweedfs.endpoint,
-        forcePathStyle: true,
-        accessKeyId: input.seaweedfs.accessKeyId,
-        secretAccessKey: input.seaweedfs.secretAccessKey,
-      },
-    },
-    internalAuthServiceToken: input.internalAuthServiceToken,
-    connectionToken: IntegrationConnectionTokenConfig,
-    sandbox: IntegrationSandboxRuntimeConfig,
-  });
-}

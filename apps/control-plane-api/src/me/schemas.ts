@@ -1,5 +1,7 @@
 import { z } from "@hono/zod-openapi";
 
+import { singletonImageMetadataResponseSchema } from "../lib/singleton-image-metadata.js";
+
 const multipartFileSchema = z
   .unknown()
   .openapi({
@@ -16,9 +18,4 @@ export const profileImageUploadFormSchema = z
   })
   .strict();
 
-export const profileImageMetadataResponseSchema = z
-  .object({
-    hasImage: z.boolean(),
-    imageVersion: z.string().min(1).nullable(),
-  })
-  .strict();
+export const profileImageMetadataResponseSchema = singletonImageMetadataResponseSchema;

@@ -1,6 +1,7 @@
 import { z } from "@hono/zod-openapi";
 
 import { ORGANIZATION_ROLES } from "../auth/services/organization-policy.js";
+import { singletonImageMetadataResponseSchema } from "../lib/singleton-image-metadata.js";
 
 export const OrganizationRoleSchema = z.enum(ORGANIZATION_ROLES);
 
@@ -23,9 +24,4 @@ export const MembershipCapabilitiesSchema = z
   })
   .strict();
 
-export const organizationLogoResponseSchema = z
-  .object({
-    hasImage: z.boolean(),
-    imageVersion: z.string().min(1).nullable(),
-  })
-  .strict();
+export const organizationLogoResponseSchema = singletonImageMetadataResponseSchema;
