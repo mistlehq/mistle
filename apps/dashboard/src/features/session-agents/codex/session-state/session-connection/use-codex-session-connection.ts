@@ -2,14 +2,14 @@ import type {
   CodexJsonRpcClient,
   CodexJsonRpcNotification,
   CodexJsonRpcServerRequest,
-  CodexSessionClient,
+  AgentStreamClient,
   CodexSessionConnectionState,
   CodexThreadSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import {
   createBrowserCodexSessionRuntime,
   CodexJsonRpcClient as CodexJsonRpcClientConstructor,
-  CodexSessionClient as CodexSessionClientConstructor,
+  AgentStreamClient as AgentStreamClientConstructor,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useMutation } from "@tanstack/react-query";
@@ -91,7 +91,7 @@ export function useCodexSessionConnection(input: {
   }) => Promise<CodexThreadCollectionsRefreshResult>;
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
   transportRef: RefObject<SandboxSessionTransport | null>;
-  sessionClientRef: RefObject<CodexSessionClient | null>;
+  sessionClientRef: RefObject<AgentStreamClient | null>;
   sessionEventUnsubscribersRef: RefObject<(() => void)[]>;
   lifecycleErrorMessage: string | null;
   setLifecycleErrorMessage: (message: string | null) => void;
@@ -196,7 +196,7 @@ export function useCodexSessionConnection(input: {
     (listenerInput: {
       generation: number;
       rpcClient: CodexJsonRpcClient;
-      sessionClient: CodexSessionClient;
+      sessionClient: AgentStreamClient;
     }): void => {
       input.sessionClientRef.current = listenerInput.sessionClient;
       input.rpcClientRef.current = listenerInput.rpcClient;
@@ -344,7 +344,7 @@ export function useCodexSessionConnection(input: {
         connectionUrl: mintedConnection.connectionUrl,
       });
       input.ensureCurrentGeneration(generation);
-      const sessionClient = new CodexSessionClientConstructor({
+      const sessionClient = new AgentStreamClientConstructor({
         transport,
       });
       const rpcClient = new CodexJsonRpcClientConstructor(sessionClient);
