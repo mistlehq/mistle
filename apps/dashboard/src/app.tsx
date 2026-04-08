@@ -14,6 +14,7 @@ import { AutomationsPage } from "./features/pages/automations-page.js";
 import { HomePage } from "./features/pages/home-page.js";
 import { IntegrationsCallbackResultPage } from "./features/pages/integrations-callback-result-page.js";
 import { InvitationAcceptPage } from "./features/pages/invitation-accept-page.js";
+import { NewSessionPage } from "./features/pages/new-session-page.js";
 import { OrganizationGeneralSettingsPage } from "./features/pages/organization-general-settings-page.js";
 import { OrganizationIntegrationsSettingsPage } from "./features/pages/organization-integrations-settings-page.js";
 import { OrganizationMembersSettingsPage } from "./features/pages/organization-members-settings-page.js";
@@ -80,6 +81,7 @@ export const APP_ROUTES = createRoutesFromElements(
         </Route>
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.sessions} path="sessions">
           <Route element={<SessionsPage />} index />
+          <Route element={<NewSessionPage />} handle={ROUTE_HANDLES.sessionsNew} path="new" />
           <Route
             element={<SessionWorkbenchPage />}
             handle={ROUTE_HANDLES.sessionsDetail}

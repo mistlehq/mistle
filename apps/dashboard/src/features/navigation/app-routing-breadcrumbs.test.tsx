@@ -92,7 +92,10 @@ describe("app routing breadcrumb integration", () => {
   const dashboardRoutes = createRoutesFromElements(
     <Route element={<Outlet />} path="/">
       <Route element={<PageHarness />} handle={ROUTE_HANDLES.dashboard} index />
-      <Route element={<PageHarness />} handle={ROUTE_HANDLES.sessions} path="sessions" />
+      <Route element={<Outlet />} handle={ROUTE_HANDLES.sessions} path="sessions">
+        <Route element={<PageHarness />} index />
+        <Route element={<PageHarness />} handle={ROUTE_HANDLES.sessionsNew} path="new" />
+      </Route>
     </Route>,
   );
 
@@ -191,6 +194,14 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('data-slot="meta-title">Sessions');
     expect(markup).toContain('data-slot="meta-description"></p>');
+
+    await router.navigate("/sessions/new");
+    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+
+    expect(markup).toContain('href="/sessions"');
+    expect(markup).toContain("New");
+    expect(markup).toContain('data-slot="meta-title">New session');
+    expect(markup).toContain("Start a sandbox-backed session from a sandbox profile.");
   });
 
   it("renders automations breadcrumbs for list, create, and detail routes", async () => {

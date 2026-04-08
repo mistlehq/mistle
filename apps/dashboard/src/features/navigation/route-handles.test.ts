@@ -12,6 +12,11 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.dashboard.description).toBe("");
     expect(ROUTE_HANDLES.sessions.title).toBe("Sessions");
     expect(ROUTE_HANDLES.sessions.description).toBe("");
+    expect(ROUTE_HANDLES.sessionsNew.title).toBe("New session");
+    expect(ROUTE_HANDLES.sessionsNew.description).toBe(
+      "Start a sandbox-backed session from a sandbox profile.",
+    );
+    expect(ROUTE_HANDLES.sessionsNew.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.sessionsDetail.title).toBe("Session");
     expect(ROUTE_HANDLES.sessionsDetail.description).toBe(
       "Interact with one sandbox-backed Codex session.",

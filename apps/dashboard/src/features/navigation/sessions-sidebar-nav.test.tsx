@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { SidebarProvider } from "@mistle/ui";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
@@ -42,27 +41,13 @@ const groups: SessionsSidebarNavGroup[] = [
   },
 ];
 
-function createQueryClient(): QueryClient {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
-}
-
 function renderSidebarNav(input?: { groups?: readonly SessionsSidebarNavGroup[] }): void {
-  const queryClient = createQueryClient();
-
   render(
-    <QueryClientProvider client={queryClient}>
-      <SidebarProvider>
-        <MemoryRouter initialEntries={["/sessions"]}>
-          <SessionsSidebarNav groups={input?.groups ?? groups} />
-        </MemoryRouter>
-      </SidebarProvider>
-    </QueryClientProvider>,
+    <SidebarProvider>
+      <MemoryRouter initialEntries={["/sessions"]}>
+        <SessionsSidebarNav groups={input?.groups ?? groups} />
+      </MemoryRouter>
+    </SidebarProvider>,
   );
 }
 
@@ -99,10 +84,12 @@ function installMatchMediaStub(): void {
 describe("SessionsSidebarNav", () => {
   installMatchMediaStub();
 
-  it("renders a new session action above the search field", () => {
+  it("renders a new session link above the search field", () => {
     renderSidebarNav();
 
-    expect(screen.getByRole("button", { name: "Create a new session" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Create a new session" }).getAttribute("href")).toBe(
+      "/sessions/new",
+    );
     expect(screen.getByRole("textbox", { name: "Search sessions" })).toBeDefined();
   });
 
@@ -146,7 +133,7 @@ describe("SessionsSidebarNav", () => {
       groups: [],
     });
 
-    expect(screen.getByRole("button", { name: "Create a new session" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Create a new session" })).toBeDefined();
     expect(screen.getByText("No openable sessions yet.")).toBeDefined();
   });
 });

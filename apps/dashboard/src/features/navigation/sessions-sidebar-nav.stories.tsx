@@ -6,12 +6,10 @@ import {
   SidebarMenuItem,
 } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybook/decorators.js";
 import { ErrorNotice } from "../auth/error-notice.js";
-import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { AppShellView } from "../shell/app-shell-view.js";
 import { OrganizationMenuTrigger } from "../shell/organization-menu-trigger.js";
 import { SessionsNavToggleItem } from "./sessions-nav-toggle-item.js";
@@ -24,29 +22,6 @@ import { SessionsSidebarNav } from "./sessions-sidebar-nav.js";
 
 type SessionsSidebarStoryArgs = {
   items: SessionsSidebarSourceItem[];
-};
-
-const StoryLaunchableProfiles: LaunchableSandboxProfilesResult = {
-  items: [
-    {
-      id: "sbp_repo_maintainer",
-      displayName: "Repo Maintainer",
-      latestVersion: 12,
-      latestVersionCreatedAt: "2026-04-08T08:55:00.000Z",
-    },
-    {
-      id: "sbp_docs",
-      displayName: "Docs Maintainer",
-      latestVersion: 7,
-      latestVersionCreatedAt: "2026-04-08T08:45:00.000Z",
-    },
-    {
-      id: "sbp_finance",
-      displayName: "Finance Investigator",
-      latestVersion: 4,
-      latestVersionCreatedAt: "2026-04-08T08:15:00.000Z",
-    },
-  ],
 };
 
 function SidebarModeAnimatedSection(input: {
@@ -71,108 +46,92 @@ function SidebarModeAnimatedSection(input: {
 
 function SessionsSidebarStory(input: SessionsSidebarStoryArgs): React.JSX.Element {
   const [showSessionsView, setShowSessionsView] = useState(true);
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            retry: false,
-          },
-        },
-      }),
-  );
   const groups = buildSessionsSidebarNavGroups(input.items);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AppShellView
-        breadcrumbs={<p className="truncate text-sm">Sessions / Sidebar Exploration</p>}
-        contentInsetOwner="app-shell"
-        headerActions={null}
-        mainContent={
-          <div className="rounded-xl border bg-card p-6 shadow-xs">
-            <h2 className="font-semibold text-lg">Sessions sidebar preview</h2>
-            <p className="mt-2 text-muted-foreground text-sm">
-              Storybook preview for the alternate left-nav sessions view. The switch is local to the
-              story for now.
-            </p>
-          </div>
-        }
-        showBreadcrumbs
-        sidebarContent={
-          <>
-            <style>{`
-              @keyframes sidebar-mode-enter {
-                from {
-                  opacity: 0;
-                }
-                to {
-                  opacity: 1;
-                }
+    <AppShellView
+      breadcrumbs={<p className="truncate text-sm">Sessions / Sidebar Exploration</p>}
+      contentInsetOwner="app-shell"
+      headerActions={null}
+      mainContent={
+        <div className="rounded-xl border bg-card p-6 shadow-xs">
+          <h2 className="font-semibold text-lg">Sessions sidebar preview</h2>
+          <p className="mt-2 text-muted-foreground text-sm">
+            Storybook preview for the alternate left-nav sessions view. The switch is local to the
+            story for now.
+          </p>
+        </div>
+      }
+      showBreadcrumbs
+      sidebarContent={
+        <>
+          <style>{`
+            @keyframes sidebar-mode-enter {
+              from {
+                opacity: 0;
               }
-            `}</style>
-            {showSessionsView ? (
-              <SidebarModeAnimatedSection key="sessions" modeKey="sessions">
-                <SessionsSidebarModeControl
-                  checked={showSessionsView}
-                  onCheckedChange={setShowSessionsView}
-                />
-                <SessionsSidebarNav
-                  groups={groups}
-                  loadLaunchableProfiles={async () => StoryLaunchableProfiles}
-                  startSession={async () => {}}
-                />
-              </SidebarModeAnimatedSection>
-            ) : (
-              <SidebarModeAnimatedSection key="app" modeKey="app">
-                <SidebarGroup className="pt-0">
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-                      <SidebarMenuItem>
-                        <SidebarMenuButton isActive render={<a href="/" />}>
-                          <span>Home</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                      <SidebarMenuItem>
-                        <SidebarMenuButton render={<a href="/automations" />}>
-                          <span>Automations</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                      <SidebarMenuItem>
-                        <SidebarMenuButton render={<a href="/sandbox-profiles" />}>
-                          <span>Sandbox Profiles</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                      <SessionsNavToggleItem
-                        checked={showSessionsView}
-                        onCheckedChange={setShowSessionsView}
-                      />
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </SidebarGroup>
-              </SidebarModeAnimatedSection>
-            )}
-          </>
-        }
-        sidebarFooterContent={<ErrorNotice message={null} />}
-        sidebarHeaderContent={
-          showSessionsView ? null : (
-            <SidebarModeAnimatedSection key="app-header" modeKey="app-header">
-              <OrganizationMenuTrigger
-                isSigningOut={false}
-                onNavigateToSettings={function onNavigateToSettings() {}}
-                onSignOut={function onSignOut() {}}
-                organizationErrorMessage={null}
-                organizationImageUrl={null}
-                organizationName="Mistle Labs"
+              to {
+                opacity: 1;
+              }
+            }
+          `}</style>
+          {showSessionsView ? (
+            <SidebarModeAnimatedSection key="sessions" modeKey="sessions">
+              <SessionsSidebarModeControl
+                checked={showSessionsView}
+                onCheckedChange={setShowSessionsView}
               />
+              <SessionsSidebarNav groups={groups} />
             </SidebarModeAnimatedSection>
-          )
-        }
-        topLoadingBar={<div className="h-0" />}
-        viewportMode="document"
-      />
-    </QueryClientProvider>
+          ) : (
+            <SidebarModeAnimatedSection key="app" modeKey="app">
+              <SidebarGroup className="pt-0">
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton isActive render={<a href="/" />}>
+                        <span>Home</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton render={<a href="/automations" />}>
+                        <span>Automations</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton render={<a href="/sandbox-profiles" />}>
+                        <span>Sandbox Profiles</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SessionsNavToggleItem
+                      checked={showSessionsView}
+                      onCheckedChange={setShowSessionsView}
+                    />
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </SidebarModeAnimatedSection>
+          )}
+        </>
+      }
+      sidebarFooterContent={<ErrorNotice message={null} />}
+      sidebarHeaderContent={
+        showSessionsView ? null : (
+          <SidebarModeAnimatedSection key="app-header" modeKey="app-header">
+            <OrganizationMenuTrigger
+              isSigningOut={false}
+              onNavigateToSettings={function onNavigateToSettings() {}}
+              onSignOut={function onSignOut() {}}
+              organizationErrorMessage={null}
+              organizationImageUrl={null}
+              organizationName="Mistle Labs"
+            />
+          </SidebarModeAnimatedSection>
+        )
+      }
+      topLoadingBar={<div className="h-0" />}
+      viewportMode="document"
+    />
   );
 }
 
@@ -259,5 +218,13 @@ export const EmptyState: Story = {
         keepaliveActive: false,
       },
     ],
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "`New` now links to `/sessions/new`, so the empty sessions sidebar routes into the dedicated new-session page instead of opening an in-sidebar dialog.",
+      },
+    },
   },
 };
