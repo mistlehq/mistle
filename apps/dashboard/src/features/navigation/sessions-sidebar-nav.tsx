@@ -123,12 +123,12 @@ export function SessionsSidebarNav(input: {
           >
             <CollapsibleTrigger
               aria-label={`Toggle ${group.profileName} sessions`}
-              className="text-sidebar-foreground/70 hover:text-sidebar-foreground peer flex h-7 w-full items-center justify-between rounded-md px-2 text-[11px] font-semibold tracking-[0.08em] uppercase outline-hidden transition-colors"
+              className="text-sidebar-foreground/70 hover:text-sidebar-foreground group/header flex h-7 w-full items-center justify-between rounded-md px-2 text-[11px] font-semibold tracking-[0.08em] uppercase outline-hidden transition-colors"
             >
               <span className="truncate">{group.profileName}</span>
               <CaretRightIcon
                 aria-hidden
-                className={`pointer-events-none size-3 shrink-0 opacity-0 transition-[opacity,transform] peer-hover:opacity-100 ${
+                className={`pointer-events-none size-3 shrink-0 opacity-0 transition-[opacity,transform] group-hover/header:opacity-100 ${
                   hasActiveSearch || expandedProfileIds.has(group.profileId) ? "rotate-90" : ""
                 }`}
               />
@@ -211,7 +211,9 @@ function SessionsSidebarItemLabel(input: { label: string }): React.JSX.Element {
           </span>
         }
       />
-      <TooltipContent side="top">{input.label}</TooltipContent>
+      <TooltipContent showArrow={false} side="top" variant="light">
+        {input.label}
+      </TooltipContent>
     </Tooltip>
   );
 }
