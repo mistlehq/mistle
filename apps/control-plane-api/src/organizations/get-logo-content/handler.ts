@@ -1,7 +1,8 @@
 import type { RouteHandler } from "@hono/zod-openapi";
-import { NotFoundError, withHttpErrorHandler } from "@mistle/http/errors.js";
+import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { getOrganizationLogo } from "../../auth/services/get-organization-logo.js";
+import { requireCurrentSingletonImageObjectKey } from "../../lib/singleton-image-content.js";
 import { PROFILE_IMAGE_READ_URL_TTL_SECONDS } from "../../me/constants.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
@@ -27,17 +28,14 @@ const routeHandler = async (
     db,
     organizationId,
   });
-
-  if (
-    organizationLogo.logoObjectKey === null ||
-    requestedImageVersion === undefined ||
-    requestedImageVersion !== organizationLogo.logoObjectKey
-  ) {
-    throw new NotFoundError("NOT_FOUND", "Organization logo was not found.");
-  }
+  const objectKey = requireCurrentSingletonImageObjectKey({
+    currentObjectKey: organizationLogo.logoObjectKey,
+    notFoundMessage: "Organization logo was not found.",
+    requestedImageVersion,
+  });
 
   const imageUrl = await ctx.get("objectStore").createPresignedGetUrl({
-    objectKey: organizationLogo.logoObjectKey,
+    objectKey,
     expiresInSeconds: PROFILE_IMAGE_READ_URL_TTL_SECONDS,
   });
 

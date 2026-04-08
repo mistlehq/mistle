@@ -1,7 +1,8 @@
 import type { RouteHandler } from "@hono/zod-openapi";
-import { NotFoundError, withHttpErrorHandler } from "@mistle/http/errors.js";
+import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { getUserAvatar } from "../../auth/services/get-user-avatar.js";
+import { requireCurrentSingletonImageObjectKey } from "../../lib/singleton-image-content.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { PROFILE_IMAGE_READ_URL_TTL_SECONDS } from "../constants.js";
@@ -16,17 +17,14 @@ const routeHandler = async (
     db: ctx.get("db"),
     userId: user.id,
   });
-
-  if (
-    profileImage.imageObjectKey === null ||
-    requestedImageVersion === undefined ||
-    requestedImageVersion !== profileImage.imageObjectKey
-  ) {
-    throw new NotFoundError("NOT_FOUND", "Profile image was not found.");
-  }
+  const objectKey = requireCurrentSingletonImageObjectKey({
+    currentObjectKey: profileImage.imageObjectKey,
+    notFoundMessage: "Profile image was not found.",
+    requestedImageVersion,
+  });
 
   const imageUrl = await ctx.get("objectStore").createPresignedGetUrl({
-    objectKey: profileImage.imageObjectKey,
+    objectKey,
     expiresInSeconds: PROFILE_IMAGE_READ_URL_TTL_SECONDS,
   });
 
