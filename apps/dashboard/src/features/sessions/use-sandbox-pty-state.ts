@@ -1,15 +1,13 @@
 import {
-  SandboxPtyClient,
+  PtyStreamClient,
   SandboxPtyStates,
+  type SandboxSessionTransport,
   type SandboxPtyExitInfo,
   type SandboxPtyOpenOptions,
   type SandboxPtyResetInfo,
   type SandboxPtyState,
 } from "@mistle/sandbox-session-client";
-import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
 import { useCallback, useEffect, useRef, useState } from "react";
-
-import { mintSandboxInstanceConnectionToken } from "./sessions-service.js";
 
 type SandboxPtyLifecycleState = {
   connectedSandboxInstanceId: string | null;
@@ -40,8 +38,13 @@ function isNonEmptyString(value: string): boolean {
 
 export type { SandboxPtyLifecycleState, UseSandboxPtyStateResult };
 
-export function useSandboxPtyState(): UseSandboxPtyStateResult {
-  const clientRef = useRef<SandboxPtyClient | null>(null);
+export function useSandboxPtyState(hookInput: {
+  ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
+    sandboxInstanceId: string;
+    transport: SandboxSessionTransport;
+  }>;
+}): UseSandboxPtyStateResult {
+  const clientRef = useRef<PtyStreamClient | null>(null);
   const connectedSandboxInstanceIdRef = useRef<string | null>(null);
   const listenerCleanupRef = useRef<(() => void)[]>([]);
   const openGenerationRef = useRef(0);
@@ -81,7 +84,7 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
   }, []);
 
   const bindClient = useCallback(
-    (client: SandboxPtyClient, generation: number): void => {
+    (client: PtyStreamClient, generation: number): void => {
       detachClientListeners();
       listenerCleanupRef.current = [
         client.onState((nextState) => {
@@ -152,8 +155,8 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
   }, [disconnectCurrentClient]);
 
   const openPty = useCallback(
-    async (input: { sandboxInstanceId: string } & SandboxPtyOpenOptions): Promise<void> => {
-      if (!isNonEmptyString(input.sandboxInstanceId)) {
+    async (openInput: { sandboxInstanceId: string } & SandboxPtyOpenOptions): Promise<void> => {
+      if (!isNonEmptyString(openInput.sandboxInstanceId)) {
         throw new Error("Sandbox instance id is required to open a PTY session.");
       }
 
@@ -164,7 +167,7 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
       const existingSandboxInstanceId = connectedSandboxInstanceIdRef.current;
       const canReuseConnection =
         existingClient !== null &&
-        existingSandboxInstanceId === input.sandboxInstanceId &&
+        existingSandboxInstanceId === openInput.sandboxInstanceId &&
         existingClient.state === SandboxPtyStates.CONNECTED;
 
       setErrorMessage(null);
@@ -178,17 +181,17 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
 
         try {
           await existingClient.open({
-            ptySessionId: input.ptySessionId,
-            cols: input.cols,
-            rows: input.rows,
-            ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
-            ...(input.command === undefined ? {} : { command: input.command }),
-            ...(input.args === undefined ? {} : { args: input.args }),
+            ptySessionId: openInput.ptySessionId,
+            cols: openInput.cols,
+            rows: openInput.rows,
+            ...(openInput.cwd === undefined ? {} : { cwd: openInput.cwd }),
+            ...(openInput.command === undefined ? {} : { command: openInput.command }),
+            ...(openInput.args === undefined ? {} : { args: openInput.args }),
           });
 
           if (isCurrentGeneration(generation)) {
-            connectedSandboxInstanceIdRef.current = input.sandboxInstanceId;
-            setConnectedSandboxInstanceId(input.sandboxInstanceId);
+            connectedSandboxInstanceIdRef.current = openInput.sandboxInstanceId;
+            setConnectedSandboxInstanceId(openInput.sandboxInstanceId);
           }
 
           return;
@@ -212,16 +215,15 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
         }
       }
 
-      const mintedConnection = await mintSandboxInstanceConnectionToken({
-        instanceId: input.sandboxInstanceId,
+      const transportConnection = await hookInput.ensureTransportConnected({
+        sandboxInstanceId: openInput.sandboxInstanceId,
       });
       if (!isCurrentGeneration(generation)) {
         throw new Error("Sandbox PTY connection attempt was superseded.");
       }
 
-      const client = new SandboxPtyClient({
-        connectionUrl: mintedConnection.connectionUrl,
-        runtime: createBrowserSandboxSessionRuntime(),
+      const client = new PtyStreamClient({
+        transport: transportConnection.transport,
       });
 
       clientRef.current = client;
@@ -235,20 +237,20 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
         }
 
         await client.open({
-          ptySessionId: input.ptySessionId,
-          cols: input.cols,
-          rows: input.rows,
-          ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
-          ...(input.command === undefined ? {} : { command: input.command }),
-          ...(input.args === undefined ? {} : { args: input.args }),
+          ptySessionId: openInput.ptySessionId,
+          cols: openInput.cols,
+          rows: openInput.rows,
+          ...(openInput.cwd === undefined ? {} : { cwd: openInput.cwd }),
+          ...(openInput.command === undefined ? {} : { command: openInput.command }),
+          ...(openInput.args === undefined ? {} : { args: openInput.args }),
         });
         if (!isCurrentGeneration(generation)) {
           await client.disconnect();
           throw new Error("Sandbox PTY connection attempt was superseded.");
         }
 
-        connectedSandboxInstanceIdRef.current = input.sandboxInstanceId;
-        setConnectedSandboxInstanceId(input.sandboxInstanceId);
+        connectedSandboxInstanceIdRef.current = openInput.sandboxInstanceId;
+        setConnectedSandboxInstanceId(openInput.sandboxInstanceId);
       } catch (error) {
         try {
           await client.disconnect();
@@ -271,7 +273,13 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
         throw resolvedError;
       }
     },
-    [bindClient, clearConnectedSandboxInstanceId, disconnectCurrentClient, isCurrentGeneration],
+    [
+      bindClient,
+      clearConnectedSandboxInstanceId,
+      disconnectCurrentClient,
+      hookInput,
+      isCurrentGeneration,
+    ],
   );
 
   const writeInput = useCallback(async (data: string | Uint8Array): Promise<void> => {

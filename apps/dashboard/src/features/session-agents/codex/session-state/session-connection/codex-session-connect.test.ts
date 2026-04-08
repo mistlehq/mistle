@@ -171,25 +171,17 @@ describe("codex session connect", () => {
     ).toBe("error_broken_persisted");
   });
 
-  it("builds the connected session snapshot from the minted connection", () => {
+  it("builds the connected session snapshot", () => {
     expect(
       createConnectedCodexSession({
         sandboxInstanceId: "sandbox_123",
         connectedAtIso: "2026-03-20T00:00:00.000Z",
-        mintedConnection: {
-          instanceId: "sandbox_123",
-          connectionUrl: "wss://example.test/codex",
-          connectionToken: "token_123",
-          connectionExpiresAt: "2026-03-20T01:00:00.000Z",
-        },
         providerThreadId: null,
         activeThreadId: "thread_123",
       }),
     ).toEqual({
       sandboxInstanceId: "sandbox_123",
       connectedAtIso: "2026-03-20T00:00:00.000Z",
-      expiresAtIso: "2026-03-20T01:00:00.000Z",
-      connectionUrl: "wss://example.test/codex",
       providerThreadId: null,
       activeThreadId: "thread_123",
     });
