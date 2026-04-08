@@ -1,23 +1,9 @@
 import { getDashboardConfig } from "../../../config.js";
+import {
+  parseSingletonImageMetadata,
+  type SingletonImageMetadata,
+} from "../../shared/singleton-image.js";
 import { executeMembersOperation } from "../members/members-api-errors.js";
-
-function parseOrganizationLogoPayload(payload: unknown): { imageUrl: string | null } {
-  if (typeof payload !== "object" || payload === null) {
-    throw new Error("Organization logo response was invalid.");
-  }
-
-  if (!("imageUrl" in payload)) {
-    throw new Error("Organization logo response was missing imageUrl.");
-  }
-
-  if (payload.imageUrl !== null && typeof payload.imageUrl !== "string") {
-    throw new Error("Organization logo response imageUrl was invalid.");
-  }
-
-  return {
-    imageUrl: payload.imageUrl,
-  };
-}
 
 function createOrganizationLogoUrl(input: { organizationId: string }): URL {
   const config = getDashboardConfig();
@@ -29,7 +15,7 @@ function createOrganizationLogoUrl(input: { organizationId: string }): URL {
 
 export async function getOrganizationLogo(input: {
   organizationId: string;
-}): Promise<{ imageUrl: string | null }> {
+}): Promise<SingletonImageMetadata> {
   return executeMembersOperation("getOrganizationLogo", async () => {
     const response = await fetch(
       createOrganizationLogoUrl({ organizationId: input.organizationId }),
@@ -54,14 +40,17 @@ export async function getOrganizationLogo(input: {
       );
     }
 
-    return parseOrganizationLogoPayload(await response.json());
+    return parseSingletonImageMetadata({
+      payload: await response.json(),
+      resourceName: "Organization logo",
+    });
   });
 }
 
 export async function uploadOrganizationLogo(input: {
   organizationId: string;
   file: File;
-}): Promise<{ imageUrl: string }> {
+}): Promise<SingletonImageMetadata> {
   return executeMembersOperation("uploadOrganizationLogo", async () => {
     const formData = new FormData();
     formData.set("file", input.file);
@@ -90,14 +79,15 @@ export async function uploadOrganizationLogo(input: {
       );
     }
 
-    const result = parseOrganizationLogoPayload(await response.json());
-    if (result.imageUrl === null) {
-      throw new Error("Organization logo upload response did not include imageUrl.");
+    const result = parseSingletonImageMetadata({
+      payload: await response.json(),
+      resourceName: "Organization logo",
+    });
+    if (!result.hasImage || result.imageVersion === null) {
+      throw new Error("Organization logo upload response did not include image metadata.");
     }
 
-    return {
-      imageUrl: result.imageUrl,
-    };
+    return result;
   });
 }
 

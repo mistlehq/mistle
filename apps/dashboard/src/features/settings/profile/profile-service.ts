@@ -1,32 +1,18 @@
 import { getDashboardConfig } from "../../../config.js";
 import { authClient } from "../../../lib/auth/client.js";
 import { requestControlPlane } from "../../api/request-control-plane.js";
+import {
+  parseSingletonImageMetadata,
+  type SingletonImageMetadata,
+} from "../../shared/singleton-image.js";
 import { executeMembersOperation } from "../members/members-api-errors.js";
-
-function parseProfileImagePayload(payload: unknown): { imageUrl: string | null } {
-  if (typeof payload !== "object" || payload === null) {
-    throw new Error("Profile image response was invalid.");
-  }
-
-  if (!("imageUrl" in payload)) {
-    throw new Error("Profile image response was missing imageUrl.");
-  }
-
-  if (payload.imageUrl !== null && typeof payload.imageUrl !== "string") {
-    throw new Error("Profile image response imageUrl was invalid.");
-  }
-
-  return {
-    imageUrl: payload.imageUrl,
-  };
-}
 
 function createProfileImageUrl(): URL {
   const config = getDashboardConfig();
   return new URL("/v1/me/profile-image", config.controlPlaneApiOrigin);
 }
 
-export async function getProfileImage(): Promise<{ imageUrl: string | null }> {
+export async function getProfileImage(): Promise<SingletonImageMetadata> {
   return executeMembersOperation("getProfileImage", async () => {
     const response = await requestControlPlane({
       operation: "getProfileImage",
@@ -35,11 +21,14 @@ export async function getProfileImage(): Promise<{ imageUrl: string | null }> {
       fallbackMessage: "Could not load profile image.",
     });
 
-    return parseProfileImagePayload(await response.json());
+    return parseSingletonImageMetadata({
+      payload: await response.json(),
+      resourceName: "Profile image",
+    });
   });
 }
 
-export async function uploadProfileImage(input: { file: File }): Promise<{ imageUrl: string }> {
+export async function uploadProfileImage(input: { file: File }): Promise<SingletonImageMetadata> {
   return executeMembersOperation("uploadProfileImage", async () => {
     const formData = new FormData();
     formData.set("file", input.file);
@@ -65,14 +54,15 @@ export async function uploadProfileImage(input: { file: File }): Promise<{ image
       );
     }
 
-    const result = parseProfileImagePayload(await response.json());
-    if (result.imageUrl === null) {
-      throw new Error("Profile image upload response did not include imageUrl.");
+    const result = parseSingletonImageMetadata({
+      payload: await response.json(),
+      resourceName: "Profile image",
+    });
+    if (!result.hasImage || result.imageVersion === null) {
+      throw new Error("Profile image upload response did not include image metadata.");
     }
 
-    return {
-      imageUrl: result.imageUrl,
-    };
+    return result;
   });
 }
 

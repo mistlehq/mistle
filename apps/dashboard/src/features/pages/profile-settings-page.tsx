@@ -10,6 +10,7 @@ import {
   uploadProfileImage,
 } from "../settings/profile/profile-service.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { createProfileImageContentUrl } from "../shared/singleton-image.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
@@ -49,11 +50,9 @@ export function ProfileSettingsPage(): React.JSX.Element {
       setProfileImageOperationErrorMessage(null);
     },
     onSuccess: async (result) => {
-      queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, {
-        imageUrl: result.imageUrl,
-      });
+      queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, result);
       queryClient.setQueryData(SESSION_QUERY_KEY, (currentSession) =>
-        updateSessionUserImage(currentSession ?? null, result.imageUrl),
+        updateSessionUserImage(currentSession ?? null, createProfileImageContentUrl(result)),
       );
       setProfileImageOperationErrorMessage(null);
     },
@@ -73,7 +72,8 @@ export function ProfileSettingsPage(): React.JSX.Element {
     },
     onSuccess: async () => {
       queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, {
-        imageUrl: null,
+        hasImage: false,
+        imageVersion: null,
       });
       queryClient.setQueryData(SESSION_QUERY_KEY, (currentSession) =>
         updateSessionUserImage(currentSession ?? null, null),
@@ -91,7 +91,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
   });
 
   const persistedDisplayName = resolveUserDisplayName(session.user);
-  const imageUrl = profileImageQuery.data?.imageUrl ?? null;
+  const imageUrl = createProfileImageContentUrl(profileImageQuery.data);
   const profileImageErrorMessage =
     profileImageOperationErrorMessage ??
     (profileImageQuery.isError

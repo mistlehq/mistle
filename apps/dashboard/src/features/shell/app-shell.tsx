@@ -18,6 +18,7 @@ import {
 } from "../settings/model.js";
 import { SettingsBackButton } from "../settings/settings-back-button.js";
 import { SettingsSectionNav } from "../settings/settings-section-nav.js";
+import { createOrganizationLogoContentUrl } from "../shared/singleton-image.js";
 import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
 import { AppShellView } from "./app-shell-view.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
@@ -145,7 +146,10 @@ export function AppShell(): React.JSX.Element {
     isSigningOut,
     locationPathname: location.pathname,
     organizationErrorMessage: organizationSummary.organizationErrorMessage,
-    organizationImageUrl: organizationLogoQuery.data?.imageUrl ?? null,
+    organizationImageUrl: createOrganizationLogoContentUrl({
+      organizationId: organizationSummary.activeOrganizationId,
+      image: organizationLogoQuery.data,
+    }),
     organizationName: organizationSummary.organizationName ?? "",
     pageMeta,
     signOutError,
