@@ -1,82 +1,32 @@
-import { CpuIcon, HouseIcon, LightningIcon, TerminalIcon } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 
 import { authClient } from "../../lib/auth/client.js";
-import { ErrorNotice } from "../auth/error-notice.js";
 import { resolveErrorMessage } from "../auth/messages.js";
-import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
-import { SidebarNavGroups } from "../navigation/sidebar-nav-groups.js";
-import type { SidebarNavGroup } from "../navigation/sidebar-nav-model.js";
 import { useOrganizationLogoQuery } from "../organizations/organization-logo-query.js";
 import {
   isSettingsPath,
   resolveSettingsBackDestination,
   SETTINGS_DEFAULT_PATH,
 } from "../settings/model.js";
-import { SettingsBackButton } from "../settings/settings-back-button.js";
-import { SettingsSectionNav } from "../settings/settings-section-nav.js";
+import {
+  getBestEffortBrowserStorage,
+  readBrowserStorageItem,
+  writeBrowserStorageItem,
+} from "../shared/browser-storage.js";
 import {
   createOrganizationLogoContentPath,
   createSingletonImageContentUrl,
 } from "../shared/singleton-image.js";
+import { resolveAppShellFrame } from "./app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
 import { AppShellView } from "./app-shell-view.js";
-import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 import { clearAuthenticatedSessionCache } from "./session-cache.js";
-import { TopLoadingBar } from "./top-loading-bar.js";
 import { useOrganizationSummary } from "./use-organization-summary.js";
 
-const MAIN_NAV_GROUPS: readonly SidebarNavGroup[] = [
-  {
-    items: [
-      { to: "/", label: "Home", icon: HomeNavIcon, matchMode: "exact" },
-      { to: "/automations", label: "Automations", icon: AutomationsNavIcon },
-      { to: "/sandbox-profiles", label: "Sandbox Profiles", icon: SandboxProfilesNavIcon },
-      { to: "/sessions", label: "Sessions", icon: SessionsNavIcon },
-    ],
-  },
-];
-
-function HomeNavIcon(props: { className?: string; "aria-hidden"?: boolean }): React.JSX.Element {
-  return <HouseIcon {...props} />;
-}
-
-function SandboxProfilesNavIcon(props: {
-  className?: string;
-  "aria-hidden"?: boolean;
-}): React.JSX.Element {
-  return <CpuIcon {...props} />;
-}
-
-function AutomationsNavIcon(props: {
-  className?: string;
-  "aria-hidden"?: boolean;
-}): React.JSX.Element {
-  return <LightningIcon {...props} />;
-}
-
-function SessionsNavIcon(props: {
-  className?: string;
-  "aria-hidden"?: boolean;
-}): React.JSX.Element {
-  return <TerminalIcon {...props} />;
-}
-
-type AppShellFrame = Pick<
-  React.ComponentProps<typeof AppShellView>,
-  | "breadcrumbs"
-  | "contentInsetOwner"
-  | "showBreadcrumbs"
-  | "sidebarContent"
-  | "sidebarFooterContent"
-  | "sidebarHeaderClassName"
-  | "sidebarHeaderContent"
-  | "topLoadingBar"
-  | "viewportMode"
->;
+const SESSIONS_SIDEBAR_MODE_STORAGE_KEY = "dashboard.sessions-sidebar.enabled";
 
 export function AppShell(): React.JSX.Element {
   const organizationSummary = useOrganizationSummary();
@@ -89,6 +39,9 @@ export function AppShell(): React.JSX.Element {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
+  const [showSessionsSidebar, setShowSessionsSidebar] = useState(() =>
+    readSessionsSidebarEnabledPreference(),
+  );
   const inSettings = isSettingsPath(location.pathname);
   const inSandboxProfiles =
     location.pathname === "/sandbox-profiles" || location.pathname.startsWith("/sandbox-profiles/");
@@ -104,6 +57,10 @@ export function AppShell(): React.JSX.Element {
       previousNonSettingsPathRef.current = location.pathname;
     }
   }, [location.pathname]);
+
+  useEffect(() => {
+    persistSessionsSidebarEnabledPreference(showSessionsSidebar);
+  }, [showSessionsSidebar]);
 
   async function handleSignOut(): Promise<void> {
     setSignOutError(null);
@@ -157,6 +114,8 @@ export function AppShell(): React.JSX.Element {
     organizationName: organizationSummary.organizationName ?? "",
     pageMeta,
     signOutError,
+    showSessionsSidebar,
+    setShowSessionsSidebar,
   });
 
   return (
@@ -166,68 +125,21 @@ export function AppShell(): React.JSX.Element {
   );
 }
 
-function resolveAppShellFrame(input: {
-  handleBackToApp: () => void;
-  handleNavigateToSettings: () => void;
-  handleSignOut: () => void;
-  inAutomations: boolean;
-  inDashboardRoot: boolean;
-  inSandboxProfiles: boolean;
-  inSessionDetail: boolean;
-  inSessions: boolean;
-  inSettings: boolean;
-  isSigningOut: boolean;
-  locationPathname: string;
-  organizationErrorMessage: string | null;
-  organizationImageUrl: string | null;
-  organizationName: string;
-  pageMeta: ReturnType<typeof useAppPageMeta>;
-  signOutError: string | null;
-}): AppShellFrame {
-  const showBreadcrumbs =
-    input.inSettings ||
-    input.inSandboxProfiles ||
-    input.inAutomations ||
-    input.inDashboardRoot ||
-    input.inSessions;
+function readSessionsSidebarEnabledPreference(): boolean {
+  const storage = getBestEffortBrowserStorage("local");
+  const storedValue = readBrowserStorageItem({
+    key: SESSIONS_SIDEBAR_MODE_STORAGE_KEY,
+    storage,
+  });
 
-  if (input.inSettings) {
-    return {
-      breadcrumbs: showBreadcrumbs ? <AppBreadcrumbs /> : null,
-      contentInsetOwner: "child",
-      showBreadcrumbs,
-      sidebarContent: <SettingsSectionNav />,
-      sidebarFooterContent: <ErrorNotice message={input.signOutError} />,
-      sidebarHeaderClassName: "pb-0",
-      sidebarHeaderContent: <SettingsBackButton onBack={input.handleBackToApp} />,
-      topLoadingBar: <TopLoadingBar />,
-      viewportMode: input.pageMeta.appShellViewportMode,
-    };
-  }
+  return storedValue === "true";
+}
 
-  return {
-    breadcrumbs: showBreadcrumbs ? <AppBreadcrumbs /> : null,
-    contentInsetOwner: input.pageMeta.appShellInsetOwner,
-    showBreadcrumbs,
-    sidebarContent: (
-      <SidebarNavGroups
-        groups={MAIN_NAV_GROUPS}
-        pathname={input.locationPathname}
-        showGroupLabel={false}
-      />
-    ),
-    sidebarFooterContent: <ErrorNotice message={input.signOutError} />,
-    sidebarHeaderContent: (
-      <OrganizationMenuTrigger
-        isSigningOut={input.isSigningOut}
-        onNavigateToSettings={input.handleNavigateToSettings}
-        onSignOut={input.handleSignOut}
-        organizationErrorMessage={input.organizationErrorMessage}
-        organizationImageUrl={input.organizationImageUrl}
-        organizationName={input.organizationName}
-      />
-    ),
-    topLoadingBar: <TopLoadingBar />,
-    viewportMode: input.inSessionDetail ? "workspace" : input.pageMeta.appShellViewportMode,
-  };
+function persistSessionsSidebarEnabledPreference(enabled: boolean): void {
+  const storage = getBestEffortBrowserStorage("local");
+  writeBrowserStorageItem({
+    key: SESSIONS_SIDEBAR_MODE_STORAGE_KEY,
+    value: enabled ? "true" : "false",
+    storage,
+  });
 }
