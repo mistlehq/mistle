@@ -14,7 +14,7 @@ export type AuthorizedEgressGrant = {
   authInjectionType: "bearer" | "basic" | "header" | "query";
   authInjectionTarget: string;
   authInjectionUsername?: string;
-  purpose?: string;
+  slotKey?: string;
   resolverKey?: string;
   allowedMethods?: ReadonlyArray<string>;
   allowedPathPrefixes?: ReadonlyArray<string>;

@@ -115,6 +115,55 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
     fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
 }
 
+#[test]
+fn accepts_runtime_plan_egress_routes_with_slot_key_credential_resolvers() {
+    let startup_input = StartupInput {
+        startup_mode: StartupMode::New,
+        bootstrap_token: "bootstrap-token-value".to_string(),
+        tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+        tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+        runtime_plan: serde_json::json!({
+          "sandboxProfileId": "sbp_123",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "mistle/sandbox-base:dev"
+          },
+          "egressRoutes": [
+            {
+              "egressRuleId": "egress_rule_bind_openai_agent",
+              "bindingId": "bind_openai_agent",
+              "match": {
+                "hosts": ["api.openai.com"],
+                "pathPrefixes": ["/v1/responses"],
+                "methods": ["POST"]
+              },
+              "upstream": {
+                "baseUrl": "https://api.openai.com/v1"
+              },
+              "authInjection": {
+                "type": "bearer",
+                "target": "authorization"
+              },
+              "credentialResolver": {
+                "connectionId": "icn_test",
+                "secretType": "api_key",
+                "slotKey": "openai.openai-default.api-key.api-key"
+              }
+            }
+          ],
+          "artifacts": [],
+          "runtimeClients": [],
+          "workspaceSources": [],
+          "agentRuntimes": []
+        }),
+        egress_grant_by_rule_id: BTreeMap::new(),
+    };
+
+    runtime::apply_runtime_plan(&startup_input)
+        .expect("runtime plan apply should accept slotKey credential resolvers");
+}
+
 fn create_git_repository(path: &Path) {
     fs::create_dir_all(path).expect("git repository dir should be creatable");
     run_command(&["git", "init", "--quiet"], path);

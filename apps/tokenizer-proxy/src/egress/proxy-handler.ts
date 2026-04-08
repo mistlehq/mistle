@@ -321,7 +321,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           bindingId: egressGrant.bindingId,
           connectionId: egressGrant.connectionId,
           secretType: egressGrant.secretType,
-          ...(egressGrant.purpose === undefined ? {} : { purpose: egressGrant.purpose }),
+          ...(egressGrant.slotKey === undefined ? {} : { slotKey: egressGrant.slotKey }),
           ...(egressGrant.resolverKey === undefined
             ? {}
             : { resolverKey: egressGrant.resolverKey }),
@@ -350,9 +350,9 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                       connectionId: egressGrant.connectionId,
                       bindingId: egressGrant.bindingId,
                       secretType: egressGrant.secretType,
-                      ...(egressGrant.purpose === undefined
+                      ...(egressGrant.slotKey === undefined
                         ? {}
-                        : { purpose: egressGrant.purpose }),
+                        : { slotKey: egressGrant.slotKey }),
                       ...(egressGrant.resolverKey === undefined
                         ? {}
                         : { resolverKey: egressGrant.resolverKey }),

@@ -2,7 +2,7 @@ export type CredentialCacheKeyInput = {
   bindingId: string;
   connectionId: string;
   secretType: string;
-  purpose?: string;
+  slotKey?: string;
   resolverKey?: string;
 };
 
@@ -28,7 +28,7 @@ function toCacheKey(input: CredentialCacheKeyInput): string {
     input.bindingId,
     input.connectionId,
     input.secretType,
-    input.purpose ?? "",
+    input.slotKey ?? "",
     input.resolverKey ?? "",
   ].join(":");
 }

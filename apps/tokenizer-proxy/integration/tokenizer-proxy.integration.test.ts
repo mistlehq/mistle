@@ -41,7 +41,7 @@ async function mintIntegrationEgressGrant(input: {
   authInjectionUsername?: string;
   connectionId: string;
   secretType: string;
-  purpose?: string;
+  slotKey?: string;
   resolverKey?: string;
   allowedMethods?: ReadonlyArray<string>;
   allowedPathPrefixes?: ReadonlyArray<string>;
@@ -60,7 +60,7 @@ async function mintIntegrationEgressGrant(input: {
       ...(input.authInjectionUsername === undefined
         ? {}
         : { authInjectionUsername: input.authInjectionUsername }),
-      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+      ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
       ...(input.resolverKey === undefined ? {} : { resolverKey: input.resolverKey }),
       ...(input.allowedMethods === undefined ? {} : { allowedMethods: input.allowedMethods }),
       ...(input.allowedPathPrefixes === undefined
@@ -800,6 +800,7 @@ describe("tokenizer proxy integration", () => {
       authInjectionTarget: "authorization",
       connectionId: "icn_openai",
       secretType: "api_key",
+      slotKey: "openai.openai-default.api-key.api-key",
       resolverKey: "default",
       allowedMethods: ["GET"],
       allowedPathPrefixes: ["/v1"],
@@ -830,6 +831,15 @@ describe("tokenizer proxy integration", () => {
 
       expect(message).toBe("pong\n");
       expect(upstreamService.capturedAuthorizationHeader()).toBe("Bearer sk-live-proxy");
+      expect(controlPlaneServer.requests).toEqual([
+        {
+          bindingId: "ibd_openai",
+          connectionId: "icn_openai",
+          resolverKey: "default",
+          secretType: "api_key",
+          slotKey: "openai.openai-default.api-key.api-key",
+        },
+      ]);
     } finally {
       await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamService.stop()]);
     }

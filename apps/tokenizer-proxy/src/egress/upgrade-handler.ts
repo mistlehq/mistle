@@ -264,7 +264,7 @@ async function resolveCredentialValue(input: {
     bindingId: input.egressGrant.bindingId,
     connectionId: input.egressGrant.connectionId,
     secretType: input.egressGrant.secretType,
-    ...(input.egressGrant.purpose === undefined ? {} : { purpose: input.egressGrant.purpose }),
+    ...(input.egressGrant.slotKey === undefined ? {} : { slotKey: input.egressGrant.slotKey }),
     ...(input.egressGrant.resolverKey === undefined
       ? {}
       : { resolverKey: input.egressGrant.resolverKey }),
@@ -279,7 +279,7 @@ async function resolveCredentialValue(input: {
     connectionId: input.egressGrant.connectionId,
     bindingId: input.egressGrant.bindingId,
     secretType: input.egressGrant.secretType,
-    ...(input.egressGrant.purpose === undefined ? {} : { purpose: input.egressGrant.purpose }),
+    ...(input.egressGrant.slotKey === undefined ? {} : { slotKey: input.egressGrant.slotKey }),
     ...(input.egressGrant.resolverKey === undefined
       ? {}
       : { resolverKey: input.egressGrant.resolverKey }),

@@ -1,22 +1,21 @@
 #![cfg(target_os = "linux")]
 
 use std::collections::BTreeMap;
-use std::ffi::OsString;
 use std::fs;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{LazyLock, Mutex, mpsc};
+use std::sync::mpsc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use sandboxd::control;
 use sandboxd::protocol::startup::{StartupInput, StartupMode};
+use sandboxd::test_support::TestEnvVarGuard;
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 use tungstenite::{Message, accept};
 
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
-static ENV_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str = "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 
 #[test]
@@ -138,49 +137,6 @@ struct BootstrapGateway {
     ws_url: String,
     shutdown_sender: mpsc::Sender<()>,
     thread: Option<thread::JoinHandle<()>>,
-}
-
-struct TestEnvVarGuard {
-    _lock: std::sync::MutexGuard<'static, ()>,
-    name: &'static str,
-    previous: Option<OsString>,
-}
-
-impl TestEnvVarGuard {
-    fn set(name: &'static str, value: &str) -> Self {
-        let lock = ENV_MUTEX
-            .lock()
-            .expect("test env mutex should not be poisoned");
-        let previous = std::env::var_os(name);
-        // SAFETY: tests serialize environment mutation through ENV_MUTEX.
-        unsafe {
-            std::env::set_var(name, value);
-        }
-        Self {
-            _lock: lock,
-            name,
-            previous,
-        }
-    }
-}
-
-impl Drop for TestEnvVarGuard {
-    fn drop(&mut self) {
-        match &self.previous {
-            Some(previous) => {
-                // SAFETY: tests serialize environment mutation through ENV_MUTEX.
-                unsafe {
-                    std::env::set_var(self.name, previous);
-                }
-            }
-            None => {
-                // SAFETY: tests serialize environment mutation through ENV_MUTEX.
-                unsafe {
-                    std::env::remove_var(self.name);
-                }
-            }
-        }
-    }
 }
 
 impl BootstrapGateway {

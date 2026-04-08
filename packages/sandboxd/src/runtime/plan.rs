@@ -75,7 +75,7 @@ pub enum CompiledEgressRouteAuthInjectionType {
 pub struct CompiledEgressRouteCredentialResolver {
     pub connection_id: String,
     pub secret_type: String,
-    pub purpose: Option<String>,
+    pub slot_key: Option<String>,
     pub resolver_key: Option<String>,
 }
 

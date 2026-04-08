@@ -36,6 +36,9 @@ const StartDaemonCommand = "/usr/bin/tini -s -- /usr/local/bin/sandboxd";
 const DaemonSocketPath = "/run/mistle/sandboxd/control.sock";
 const DaemonReadinessPollIntervalMs = 100;
 const DaemonReadinessPollAttempts = 100;
+// E2B treats `timeoutMs: 0` as "disable request lifetime timeout".
+const E2BCommandTimeoutDisabledMs = 0;
+const E2BInitCommandTimeoutMs = 2 * 60 * 1000;
 export type E2BStartSandboxResponse = {
   sandboxId: string;
 };
@@ -231,12 +234,18 @@ export class E2BApiClient implements E2BClient {
       const handle = await sandbox.commands.run(InitCommand, {
         background: true,
         stdin: true,
+        timeoutMs: E2BInitCommandTimeoutMs,
         user: "root",
       });
 
-      await sandbox.commands.sendStdin(handle.pid, parsedRequest.payload);
-      await sandbox.commands.closeStdin(handle.pid);
-      await handle.wait();
+      try {
+        await sandbox.commands.sendStdin(handle.pid, parsedRequest.payload);
+        await sandbox.commands.closeStdin(handle.pid);
+        await handle.wait();
+      } catch (error) {
+        await handle.kill().catch(() => undefined);
+        throw error;
+      }
     } catch (error) {
       if (error instanceof CommandExitError) {
         throw createCommandExitError({
@@ -258,6 +267,7 @@ export class E2BApiClient implements E2BClient {
     try {
       const handle = await sandbox.commands.run(StartDaemonCommand, {
         background: true,
+        timeoutMs: E2BCommandTimeoutDisabledMs,
         user: "root",
       });
       const exitPromise = handle

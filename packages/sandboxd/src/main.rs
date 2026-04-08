@@ -1,7 +1,7 @@
 fn main() {
-    let mut stdin = std::io::stdin().lock();
-    let mut stdout = std::io::stdout().lock();
-    let mut stderr = std::io::stderr().lock();
+    let mut stdin = std::io::stdin();
+    let mut stdout = std::io::stdout();
+    let mut stderr = std::io::stderr();
 
     std::process::exit(sandboxd::run(
         std::env::args().skip(1),
