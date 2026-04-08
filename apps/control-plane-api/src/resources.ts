@@ -1,6 +1,6 @@
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import { S3CompatibleObjectStore } from "@mistle/object-store";
 import { Pool } from "pg";
 

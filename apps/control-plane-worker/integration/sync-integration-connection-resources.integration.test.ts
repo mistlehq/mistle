@@ -15,7 +15,7 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 

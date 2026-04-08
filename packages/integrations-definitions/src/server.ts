@@ -4,14 +4,14 @@ import {
   type IntegrationDefinitionsBundle,
 } from "@mistle/integrations-core";
 
-import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/browser.js";
-import { JiraDefinition } from "./jira/browser.js";
+import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/index.js";
+import { JiraDefinition } from "./jira/index.js";
 import { LinearDefinition } from "./linear/index.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
 
-export * from "./jira/browser.js";
-export * from "./github/browser.js";
+export * from "./jira/index.js";
+export * from "./github/index.js";
 export * from "./linear/index.js";
 export * from "./openai/index.js";
 export * from "./forms/index.js";

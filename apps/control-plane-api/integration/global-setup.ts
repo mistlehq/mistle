@@ -5,7 +5,7 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import {
   acquireSharedPostgresInfra,
   createIntegrationTemplateDatabaseName,

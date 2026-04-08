@@ -1,4 +1,4 @@
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 
 const IntegrationRegistry = createIntegrationRegistry();
 

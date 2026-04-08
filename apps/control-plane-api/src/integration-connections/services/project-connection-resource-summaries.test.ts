@@ -1,5 +1,5 @@
 import { IntegrationConnectionResourceSyncStates } from "@mistle/db/control-plane";
-import { GitHubCloudDefinition } from "@mistle/integrations-definitions";
+import { GitHubCloudDefinition } from "@mistle/integrations-definitions/server";
 import { describe, expect, it } from "vitest";
 
 import { projectConnectionResourceSummaries } from "./project-connection-resource-summaries.js";

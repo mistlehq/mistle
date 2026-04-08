@@ -3,7 +3,7 @@ import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-interna
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import { Pool } from "pg";
 
 import { createControlPlaneOpenWorkflow } from "./client.js";

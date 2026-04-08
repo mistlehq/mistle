@@ -1,4 +1,4 @@
-import { OpenAiReasoningEffortLabelByValue } from "@mistle/integrations-definitions";
+import { OpenAiReasoningEffortLabelByValue } from "@mistle/integrations-definitions/openai";
 import {
   Button,
   Select,

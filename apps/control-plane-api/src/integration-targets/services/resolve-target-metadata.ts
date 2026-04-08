@@ -5,7 +5,7 @@ import type {
   IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookSourceLifecycle,
 } from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 
 const IntegrationRegistry = createIntegrationRegistry();
 

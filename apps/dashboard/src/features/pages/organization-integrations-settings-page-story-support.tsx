@@ -1,6 +1,6 @@
 import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
-import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
+import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions/openai";
 import { useState } from "react";
 import type React from "react";
 
