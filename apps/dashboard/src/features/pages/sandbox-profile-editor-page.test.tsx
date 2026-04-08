@@ -161,11 +161,11 @@ describe("IntegrationsEditorSection", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(getSectionAddButton("Agent Bindings"));
+    fireEvent.click(getSectionAddButton("Agent Harness"));
 
-    expect(screen.getByRole("heading", { name: "Add binding" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Add agent harness" })).toBeDefined();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add binding" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Edit binding" })).toBeDefined();
@@ -183,13 +183,34 @@ describe("IntegrationsEditorSection", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(getSectionAddButton("Agent Bindings"));
+    fireEvent.click(getSectionAddButton("Agent Harness"));
     fireEvent.click(screen.getByRole("combobox", { name: "Add binding connection" }));
 
     const listbox = await screen.findByRole("listbox");
 
     expect(within(listbox).getByText("Primary OpenAI Workspace")).toBeDefined();
     expect(within(listbox).getByText("Backup OpenAI Workspace")).toBeDefined();
+  });
+
+  it("disables adding another agent harness after one is assigned", async () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(getSectionAddButton("Agent Harness"));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(getSectionAddButton("Agent Harness").hasAttribute("disabled")).toBe(true);
+    });
+
+    expect(
+      screen.queryByText("Only one agent harness can be assigned to a sandbox profile."),
+    ).toBeNull();
   });
 
   it("preserves edited row identity when changing connection", () => {

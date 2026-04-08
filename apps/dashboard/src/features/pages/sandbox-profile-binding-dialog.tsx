@@ -36,6 +36,16 @@ export type SandboxProfileBindingDialogState = {
   error: string | null;
 };
 
+function formatAddBindingLabel(kind: SandboxProfileBindingEditorRow["kind"]): string {
+  if (kind === "agent") {
+    return "Add agent harness";
+  }
+  if (kind === "git") {
+    return "Add Git provider";
+  }
+  return "Add connector";
+}
+
 export function SandboxProfileBindingDialog(input: {
   state: SandboxProfileBindingDialogState | null;
   availableConnections: readonly IntegrationConnectionSummary[];
@@ -66,7 +76,11 @@ export function SandboxProfileBindingDialog(input: {
       {input.state ? (
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader variant="sectioned">
-            <DialogTitle>{input.state.mode === "add" ? "Add binding" : "Edit binding"}</DialogTitle>
+            <DialogTitle>
+              {input.state.mode === "add"
+                ? formatAddBindingLabel(input.state.row.kind)
+                : "Edit binding"}
+            </DialogTitle>
           </DialogHeader>
           <div className={IntegrationHorizontalFieldGroupClassName}>
             <Field className="gap-2" contentWidth="fill" orientation="horizontal">
@@ -136,7 +150,7 @@ export function SandboxProfileBindingDialog(input: {
               type="button"
             >
               {input.state.mode === "add" ? <PlusIcon /> : null}
-              {input.state.mode === "add" ? "Add binding" : "Save changes"}
+              {input.state.mode === "add" ? "Add" : "Save changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
