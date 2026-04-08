@@ -15,7 +15,12 @@ import type {
   SandboxInstanceListItem,
   SandboxInstancesListResult,
 } from "../sessions/sessions-types.js";
-import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
+
+function storyOrganizationSummaryQueryKey(
+  organizationId: string | null,
+): readonly ["shell", "organization-summary", string | null] {
+  return ["shell", "organization-summary", organizationId];
+}
 
 export function buildStoryLaunchableSandboxProfile(
   overrides: Partial<LaunchableSandboxProfile> & Pick<LaunchableSandboxProfile, "id">,
@@ -75,7 +80,7 @@ export function createSessionsPageStoryQueryClient(input?: {
   });
 
   seedAuthenticatedSession(queryClient);
-  queryClient.setQueryData(organizationSummaryQueryKey("org_123"), {
+  queryClient.setQueryData(storyOrganizationSummaryQueryKey("org_123"), {
     name: "Mistle Labs",
   });
   queryClient.setQueryData(organizationLogoQueryKey("org_123"), null);
@@ -87,6 +92,19 @@ export function createSessionsPageStoryQueryClient(input?: {
   queryClient.setQueryData(
     sandboxInstancesListQueryKey({
       limit: 20,
+      after: null,
+      before: null,
+    }),
+    input?.sandboxInstancesList ?? {
+      items: [],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 0,
+    },
+  );
+  queryClient.setQueryData(
+    sandboxInstancesListQueryKey({
+      limit: 100,
       after: null,
       before: null,
     }),

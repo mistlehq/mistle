@@ -27,7 +27,7 @@ import { AppShellView } from "./app-shell-view.js";
 import { clearAuthenticatedSessionCache } from "./session-cache.js";
 import { useOrganizationSummary } from "./use-organization-summary.js";
 
-export const SESSIONS_SIDEBAR_MODE_STORAGE_KEY = "dashboard.sessions-sidebar.enabled";
+const SESSIONS_SIDEBAR_MODE_STORAGE_KEY = "dashboard.sessions-sidebar.enabled";
 
 export function AppShell(): React.JSX.Element {
   const organizationSummary = useOrganizationSummary();

@@ -1,12 +1,25 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { useState } from "react";
+import {
+  createMemoryRouter,
+  createRoutesFromElements,
+  Outlet,
+  Route,
+  RouterProvider,
+  useLocation,
+  useNavigate,
+} from "react-router";
 
-import { APP_ROUTES } from "../../app.js";
+import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
+import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
-import { readBrowserStorageItem, writeBrowserStorageItem } from "../shared/browser-storage.js";
-import { SESSIONS_SIDEBAR_MODE_STORAGE_KEY } from "../shell/app-shell.js";
+import { resolveAppShellFrame } from "../shell/app-shell-frame.js";
+import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
+import { shouldNavigateToNewSessionOnSidebarModeEnable } from "../shell/app-shell-sessions-sidebar-mode.js";
+import { AppShellView } from "../shell/app-shell-view.js";
+import { NewSessionPage } from "./new-session-page.js";
+import { SessionsPage } from "./sessions-page.js";
 import { createSessionsPageStoryQueryClient } from "./sessions-page.story-fixtures.js";
 
 type SessionsStoryHarnessProps = {
@@ -17,21 +30,6 @@ type SessionsStoryHarnessProps = {
 };
 
 export function SessionsStoryHarness(input: SessionsStoryHarnessProps): React.JSX.Element {
-  const [previousSessionsSidebarPreference] = useState(() => {
-    const storage = window.localStorage;
-    const previousValue = readBrowserStorageItem({
-      key: SESSIONS_SIDEBAR_MODE_STORAGE_KEY,
-      storage,
-    });
-
-    writeBrowserStorageItem({
-      key: SESSIONS_SIDEBAR_MODE_STORAGE_KEY,
-      value: input.showSessionsSidebar === false ? "false" : "true",
-      storage,
-    });
-
-    return previousValue;
-  });
   const [queryClient] = useState(() =>
     createSessionsPageStoryQueryClient({
       ...(input.launchableProfiles !== undefined
@@ -43,29 +41,91 @@ export function SessionsStoryHarness(input: SessionsStoryHarnessProps): React.JS
     }),
   );
   const [router] = useState(() =>
-    createMemoryRouter(APP_ROUTES, {
-      initialEntries: [...input.initialEntries],
-    }),
+    createMemoryRouter(
+      createRoutesFromElements(
+        <Route
+          element={
+            <SessionsStoryShell
+              {...(input.showSessionsSidebar !== undefined
+                ? { initialShowSessionsSidebar: input.showSessionsSidebar }
+                : {})}
+            />
+          }
+        >
+          <Route element={<StoryRouteOutlet />} handle={ROUTE_HANDLES.sessions} path="/sessions">
+            <Route element={<SessionsPage />} index />
+            <Route element={<NewSessionPage />} handle={ROUTE_HANDLES.sessionsNew} path="new" />
+          </Route>
+        </Route>,
+      ),
+      {
+        initialEntries: [...input.initialEntries],
+      },
+    ),
   );
-
-  useEffect(() => {
-    return () => {
-      if (previousSessionsSidebarPreference === null) {
-        window.localStorage.removeItem(SESSIONS_SIDEBAR_MODE_STORAGE_KEY);
-        return;
-      }
-
-      writeBrowserStorageItem({
-        key: SESSIONS_SIDEBAR_MODE_STORAGE_KEY,
-        value: previousSessionsSidebarPreference,
-        storage: window.localStorage,
-      });
-    };
-  }, [previousSessionsSidebarPreference]);
 
   return (
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
     </QueryClientProvider>
   );
+}
+
+function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): React.JSX.Element {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
+  const [showSessionsSidebar, setShowSessionsSidebar] = useState(
+    input.initialShowSessionsSidebar !== false,
+  );
+  const inSessions =
+    location.pathname === "/sessions" || location.pathname.startsWith("/sessions/");
+  const inSessionDetail = location.pathname.startsWith("/sessions/");
+  const appShellFrame = resolveAppShellFrame({
+    handleBackToApp: () => {},
+    handleNavigateToSettings: () => {},
+    handleSignOut: () => {},
+    inAutomations: false,
+    inDashboardRoot: false,
+    inSandboxProfiles: false,
+    inSessionDetail,
+    inSessions,
+    inSettings: false,
+    isSigningOut: false,
+    locationPathname: location.pathname,
+    organizationErrorMessage: null,
+    organizationImageUrl: null,
+    organizationName: "Mistle Labs",
+    pageMeta: {
+      appShellInsetOwner: location.pathname === "/sessions/new" ? "child" : "app-shell",
+      appShellViewportMode: "document",
+      title: null,
+      headerIcon: null,
+      supportingText: null,
+    },
+    signOutError: null,
+    showSessionsSidebar,
+    onShowSessionsSidebarChange: (checked) => {
+      setShowSessionsSidebar(checked);
+
+      if (checked && shouldNavigateToNewSessionOnSidebarModeEnable(location.pathname)) {
+        void navigate("/sessions/new");
+      }
+    },
+  });
+
+  return (
+    <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
+      <AppShellView
+        {...appShellFrame}
+        breadcrumbs={<AppBreadcrumbs />}
+        headerActions={headerActions}
+        mainContent={<Outlet />}
+      />
+    </AppShellHeaderActionsContext.Provider>
+  );
+}
+
+function StoryRouteOutlet(): React.JSX.Element {
+  return <Outlet />;
 }
