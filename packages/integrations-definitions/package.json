@@ -11,7 +11,7 @@
     },
     "./server": {
       "types": "./src/server.ts",
-      "node": "./src/server.ts",
+      "node": "./dist/server.js",
       "import": "./src/server.ts",
       "default": "./src/server.ts"
     },
