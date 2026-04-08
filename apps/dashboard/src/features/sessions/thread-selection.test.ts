@@ -94,9 +94,34 @@ describe("selectPreferredThreadId", () => {
     expect(result).toBe("thread_old_but_active");
   });
 
-  it("falls back to the last loaded-only thread when most recent update is requested", () => {
+  it("ignores loaded-only thread ids when most recent update is requested", () => {
     const result = selectPreferredThreadId({
       availableThreads: [],
+      loadedThreadIds: ["thread_old_loaded", "thread_new_loaded"],
+      selectionPolicy: "most_recently_updated",
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it("still prefers the most recently updated loaded thread when details are available", () => {
+    const result = selectPreferredThreadId({
+      availableThreads: [
+        {
+          id: "thread_old_loaded",
+          name: null,
+          preview: null,
+          updatedAt: 10,
+          createdAt: 1,
+        },
+        {
+          id: "thread_new_loaded",
+          name: null,
+          preview: null,
+          updatedAt: 20,
+          createdAt: 2,
+        },
+      ],
       loadedThreadIds: ["thread_old_loaded", "thread_new_loaded"],
       selectionPolicy: "most_recently_updated",
     });
