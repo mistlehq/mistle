@@ -24,6 +24,8 @@ pub mod pty;
 pub mod runtime;
 pub mod sandboxd_state;
 pub mod security;
+#[doc(hidden)]
+pub mod test_support;
 pub mod time;
 pub mod tunnel;
 

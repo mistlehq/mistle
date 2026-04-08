@@ -164,10 +164,13 @@ export function IntegrationsEditorSection(
   }
 
   function openAddDialog(kind: SandboxIntegrationBindingKind): void {
-    const firstConnectionId = availableConnectionsByKind[kind][0]?.id ?? "";
+    const initialConnectionId =
+      availableConnectionsByKind[kind].length === 1
+        ? (availableConnectionsByKind[kind][0]?.id ?? "")
+        : "";
     setIntegrationDialogState({
       mode: "add",
-      row: createDraftRow(kind, firstConnectionId),
+      row: createDraftRow(kind, initialConnectionId),
       error: null,
     });
   }

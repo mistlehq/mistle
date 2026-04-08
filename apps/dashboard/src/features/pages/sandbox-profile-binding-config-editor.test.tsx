@@ -216,7 +216,7 @@ describe("SandboxProfileBindingConfigEditor", () => {
         properties: {
           tools: {
             title: "Tools",
-            default: [],
+            default: ["github-cli"],
           },
         },
       },
@@ -290,7 +290,7 @@ describe("SandboxProfileBindingConfigEditor", () => {
         properties: {
           tools: {
             title: "Tools",
-            default: [],
+            default: ["jira-cli"],
           },
         },
       },
@@ -342,5 +342,7 @@ describe("SandboxProfileBindingConfigEditor", () => {
 
     expect(screen.getByText("Jira CLI")).toBeDefined();
     expect(screen.queryByText("jira-cli")).toBeNull();
+    const jiraCliCheckbox = screen.getByRole("checkbox", { name: /Jira CLI/ });
+    expect(jiraCliCheckbox.getAttribute("aria-checked")).toBe("true");
   });
 });

@@ -12,7 +12,7 @@ export function resolveJiraBindingConfigForm(
       properties: {
         tools: {
           title: "Tools",
-          default: [],
+          default: [JiraToolIds.JIRA_CLI],
           items: {
             type: "string",
             enum: [JiraToolIds.JIRA_CLI],

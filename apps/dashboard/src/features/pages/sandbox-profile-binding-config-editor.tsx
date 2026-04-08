@@ -451,14 +451,6 @@ export function SandboxProfileBindingConfigEditor(input: {
     targets: input.availableTargets,
   });
 
-  if (configUiModel.mode === "missing-connection") {
-    return (
-      <p className="text-muted-foreground text-sm">
-        Select a connection to configure this binding.
-      </p>
-    );
-  }
-
   if (configUiModel.mode === "unsupported") {
     return (
       <div className="gap-2 flex flex-col">
@@ -482,7 +474,7 @@ export function SandboxProfileBindingConfigEditor(input: {
     );
   }
 
-  if (configUiModel.mode === "no-config") {
+  if (configUiModel.mode === "missing-connection" || configUiModel.mode === "no-config") {
     return <></>;
   }
 

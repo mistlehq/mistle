@@ -491,7 +491,9 @@ fn begin_init(
             }
         }
     }));
-    Ok(())
+    drop(init_thread_guard);
+
+    join_init_thread(init_thread)
 }
 
 fn join_init_thread(init_thread: &SharedInitThread) -> Result<(), ControlError> {
@@ -549,9 +551,8 @@ fn remove_stale_socket(socket_path: &Path) -> Result<(), ControlError> {
 #[cfg(test)]
 mod tests {
     use std::net::TcpListener;
-    use std::ffi::OsString;
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::sync::{LazyLock, Mutex, mpsc};
+    use std::sync::mpsc;
     use std::thread;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -561,11 +562,11 @@ mod tests {
         DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, InitPhase, start_control_server, submit_init,
     };
     use crate::protocol::startup::{StartupInput, StartupMode};
+    use crate::test_support::TestEnvVarGuard;
     use crate::time::testing::ManualSleeper;
     use crate::time::{Sleeper, ThreadSleeper};
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
-    static ENV_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
     const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str =
         "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 
@@ -621,6 +622,44 @@ mod tests {
                 || error
                     .to_string()
                     .contains("sandboxd is already initializing")
+        );
+
+        server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn returns_init_failure_to_the_control_socket_client() {
+        let _env_guard = TestEnvVarGuard::unset(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV);
+        let test_dir = create_temp_test_dir("control_init_failure");
+        let socket_path = test_dir.join("control.sock");
+        let gateway = start_bootstrap_gateway();
+        let startup_input = valid_startup_input("bootstrap-token-value", &gateway.ws_url);
+        let server = start_control_server(
+            &socket_path,
+            ThreadSleeper,
+            DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
+        )
+        .expect("control server should start");
+
+        let error = submit_init(&socket_path, &startup_input)
+            .expect_err("init submission should fail when required env is missing");
+
+        assert!(
+            error
+                .to_string()
+                .contains(
+                    "failed to initialize sandboxd state: failed to start runtime client processes: required sandbox env 'SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL' is missing"
+                )
+        );
+        assert_eq!(
+            server.init_phase(),
+            InitPhase::Failed(
+                "failed to start runtime client processes: required sandbox env 'SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL' is missing".to_string()
+            )
         );
 
         server.close().expect("control server should stop cleanly");
@@ -712,49 +751,6 @@ mod tests {
         ws_url: String,
         shutdown_sender: mpsc::Sender<()>,
         thread: Option<thread::JoinHandle<()>>,
-    }
-
-    struct TestEnvVarGuard {
-        _lock: std::sync::MutexGuard<'static, ()>,
-        name: &'static str,
-        previous: Option<OsString>,
-    }
-
-    impl TestEnvVarGuard {
-        fn set(name: &'static str, value: &str) -> Self {
-            let lock = ENV_MUTEX
-                .lock()
-                .expect("test env mutex should not be poisoned");
-            let previous = std::env::var_os(name);
-            // SAFETY: tests serialize environment mutation through ENV_MUTEX.
-            unsafe {
-                std::env::set_var(name, value);
-            }
-            Self {
-                _lock: lock,
-                name,
-                previous,
-            }
-        }
-    }
-
-    impl Drop for TestEnvVarGuard {
-        fn drop(&mut self) {
-            match &self.previous {
-                Some(previous) => {
-                    // SAFETY: tests serialize environment mutation through ENV_MUTEX.
-                    unsafe {
-                        std::env::set_var(self.name, previous);
-                    }
-                }
-                None => {
-                    // SAFETY: tests serialize environment mutation through ENV_MUTEX.
-                    unsafe {
-                        std::env::remove_var(self.name);
-                    }
-                }
-            }
-        }
     }
 
     impl BootstrapGateway {

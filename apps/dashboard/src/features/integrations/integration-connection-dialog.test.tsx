@@ -232,6 +232,22 @@ describe("IntegrationConnectionDialog", () => {
     expect(screen.queryByRole("radio")).toBeNull();
   });
 
+  it("does not preselect an auth method in create mode", () => {
+    renderDialog({
+      methodId: "",
+    });
+
+    expect(
+      screen.getByRole("combobox", { name: "Authentication method" }).textContent ?? "",
+    ).toContain("Select authentication method");
+    expect(screen.queryByPlaceholderText("Enter API key")).toBeNull();
+    expect(
+      screen.queryByText(
+        "Continue to GitHub to install the app and finish connecting this account.",
+      ),
+    ).toBeNull();
+  });
+
   it.each([
     {
       name: "renders Save for redirect connections in update mode",

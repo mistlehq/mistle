@@ -33,7 +33,7 @@ export function resolveGitHubBindingConfigForm(
         },
         tools: {
           title: "Tools",
-          default: [],
+          default: [GitHubToolIds.GITHUB_CLI],
           items: {
             type: "string",
             enum: [GitHubToolIds.GITHUB_CLI],

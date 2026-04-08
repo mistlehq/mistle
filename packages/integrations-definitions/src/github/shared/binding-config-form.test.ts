@@ -84,7 +84,7 @@ describe("github binding config forms", () => {
         },
         tools: {
           title: "Tools",
-          default: [],
+          default: ["github-cli"],
           items: {
             type: "string",
             enum: ["github-cli"],

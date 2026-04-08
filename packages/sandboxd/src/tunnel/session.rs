@@ -18,12 +18,14 @@ use std::thread::{self, JoinHandle};
 
 use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
+use tokio::net::{TcpStream, lookup_host};
 use tokio::runtime::Builder;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle as TokioJoinHandle;
-use tokio_tungstenite::connect_async;
-use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message};
+use tokio::time::timeout;
+use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message, client::IntoClientRequest};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{client_async_tls_with_config, connect_async};
 use url::Url;
 
 use crate::cgroups::DEFAULT_CGROUP_ROOT;
@@ -57,6 +59,12 @@ pub const DEFAULT_ATTACHMENT_ROOT: &str = "/tmp/attachments";
 pub const DEFAULT_TUNNEL_SESSION_POLL_INTERVAL: Duration = Duration::from_millis(10);
 /// Poll interval while PTY output threads wait for the next blocking event.
 pub const DEFAULT_PTY_EVENT_POLL_INTERVAL: Duration = Duration::from_millis(10);
+/// Maximum time to wait for bootstrap tunnel DNS resolution.
+pub const DEFAULT_BOOTSTRAP_TUNNEL_LOOKUP_TIMEOUT: Duration = Duration::from_secs(10);
+/// Maximum time to wait for one bootstrap tunnel TCP dial.
+pub const DEFAULT_BOOTSTRAP_TUNNEL_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+/// Maximum time to wait for the bootstrap websocket handshake.
+pub const DEFAULT_BOOTSTRAP_TUNNEL_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_UPLOAD_SIZE_BYTES: usize = 10 * 1024 * 1024;
 const MAX_UPLOAD_THREAD_ID_LENGTH: usize = 128;
 const PNG_SIGNATURE: &[u8] = &[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -361,12 +369,11 @@ async fn run_tunnel_session(
     startup_result_sender: std::sync::mpsc::Sender<Result<(), TunnelSessionError>>,
 ) -> Result<(), TunnelSessionError> {
     let connected_url = resolve_bootstrap_tunnel_url(gateway_ws_url, bootstrap_token)?;
-    let (bootstrap_socket, _) = match connect_async(connected_url.as_str()).await {
+    let (bootstrap_socket, _) = match connect_bootstrap_websocket(connected_url.as_str()).await {
         Ok(value) => value,
-        Err(error) => {
-            let startup_error = TunnelSessionError::ConfigureTunnelSocket(error.to_string());
+        Err(startup_error) => {
             let _ = startup_result_sender.send(Err(TunnelSessionError::ConfigureTunnelSocket(
-                error.to_string(),
+                startup_error.to_string(),
             )));
             return Err(startup_error);
         }
@@ -491,7 +498,106 @@ async fn run_tunnel_session(
     Ok(())
 }
 
-type TunnelWebSocket = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
+type TunnelWebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
+
+async fn connect_bootstrap_websocket(
+    connected_url: &str,
+) -> Result<
+    (
+        TunnelWebSocket,
+        tokio_tungstenite::tungstenite::handshake::client::Response,
+    ),
+    TunnelSessionError,
+> {
+    let request = connected_url
+        .into_client_request()
+        .map_err(|error| TunnelSessionError::ConfigureTunnelSocket(error.to_string()))?;
+    let uri = request.uri().clone();
+    let host = uri
+        .host()
+        .ok_or_else(|| {
+            TunnelSessionError::ConfigureTunnelSocket(format!(
+                "bootstrap websocket URL is missing a host: {connected_url}"
+            ))
+        })?
+        .to_string();
+    let port = uri.port_u16().unwrap_or_else(|| match uri.scheme_str() {
+        Some("wss") => 443,
+        Some("ws") => 80,
+        _ => 0,
+    });
+    if port == 0 {
+        return Err(TunnelSessionError::ConfigureTunnelSocket(format!(
+            "bootstrap websocket URL must use ws or wss scheme: {connected_url}"
+        )));
+    }
+
+    let resolved_addresses = timeout(
+        DEFAULT_BOOTSTRAP_TUNNEL_LOOKUP_TIMEOUT,
+        lookup_host((host.as_str(), port)),
+    )
+    .await
+    .map_err(|_| {
+        TunnelSessionError::ConfigureTunnelSocket(format!(
+            "bootstrap websocket host lookup timed out after {}ms: {host}:{port}",
+            DEFAULT_BOOTSTRAP_TUNNEL_LOOKUP_TIMEOUT.as_millis()
+        ))
+    })?
+    .map_err(|error| TunnelSessionError::ConfigureTunnelSocket(error.to_string()))?
+    .collect::<Vec<_>>();
+    if resolved_addresses.is_empty() {
+        return Err(TunnelSessionError::ConfigureTunnelSocket(format!(
+            "bootstrap websocket host lookup returned no addresses: {host}:{port}"
+        )));
+    }
+
+    let mut last_connect_error = None;
+    for address in resolved_addresses {
+        let socket = match timeout(
+            DEFAULT_BOOTSTRAP_TUNNEL_CONNECT_TIMEOUT,
+            TcpStream::connect(address),
+        )
+        .await
+        {
+            Ok(Ok(socket)) => socket,
+            Ok(Err(error)) => {
+                last_connect_error = Some(format!("{address}: {error}"));
+                continue;
+            }
+            Err(_) => {
+                last_connect_error = Some(format!(
+                    "{address}: tcp connect timed out after {}ms",
+                    DEFAULT_BOOTSTRAP_TUNNEL_CONNECT_TIMEOUT.as_millis()
+                ));
+                continue;
+            }
+        };
+
+        match timeout(
+            DEFAULT_BOOTSTRAP_TUNNEL_HANDSHAKE_TIMEOUT,
+            client_async_tls_with_config(request.clone(), socket, None, None),
+        )
+        .await
+        {
+            Ok(Ok(result)) => return Ok(result),
+            Ok(Err(error)) => {
+                last_connect_error = Some(format!("{address}: {error}"));
+            }
+            Err(_) => {
+                last_connect_error = Some(format!(
+                    "{address}: websocket handshake timed out after {}ms",
+                    DEFAULT_BOOTSTRAP_TUNNEL_HANDSHAKE_TIMEOUT.as_millis()
+                ));
+            }
+        }
+    }
+
+    Err(TunnelSessionError::ConfigureTunnelSocket(
+        last_connect_error
+            .unwrap_or_else(|| format!("bootstrap websocket connect failed for {connected_url}")),
+    ))
+}
+
 fn spawn_bootstrap_socket_task(
     mut socket: TunnelWebSocket,
     mut receiver: mpsc::UnboundedReceiver<TunnelWriterMessage>,

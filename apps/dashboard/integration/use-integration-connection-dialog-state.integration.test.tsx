@@ -41,6 +41,109 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
     cleanup();
   });
 
+  it("starts without a selected auth method when create mode has multiple methods", () => {
+    const queryClient = createTestQueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(
+      () => useIntegrationConnectionDialogState({ queryKey: ["integration-directory"] }),
+      { wrapper },
+    );
+
+    act(() => {
+      result.current.openDialog({
+        mode: "create",
+        methods: [
+          {
+            id: IntegrationConnectionMethodIds.API_KEY,
+            label: "API key",
+            kind: "form",
+            secretFields: [
+              {
+                name: "apiKey",
+                label: "API key",
+                inputType: "password",
+              },
+            ],
+          },
+          {
+            id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+            label: "GitHub App installation",
+            kind: "redirect",
+            ui: {
+              create: {
+                submitLabel: "Install GitHub App",
+                helperText: "Continue to GitHub to install the app and finish connecting.",
+              },
+            },
+          },
+        ],
+        targetConfig: {},
+        targetDisplayName: "GitHub",
+        targetFamilyId: "github",
+        targetKey: "github-cloud",
+        targetVariantId: "github-cloud",
+      });
+    });
+
+    expect(result.current.methodId).toBe("");
+    expect(result.current.configForm).toEqual({
+      mode: "none",
+    });
+  });
+
+  it("requires selecting an auth method before create submit", () => {
+    const queryClient = createTestQueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(
+      () => useIntegrationConnectionDialogState({ queryKey: ["integration-directory"] }),
+      { wrapper },
+    );
+
+    act(() => {
+      result.current.openDialog({
+        mode: "create",
+        methods: [
+          {
+            id: IntegrationConnectionMethodIds.API_KEY,
+            label: "API key",
+            kind: "form",
+            secretFields: [
+              {
+                name: "apiKey",
+                label: "API key",
+                inputType: "password",
+              },
+            ],
+          },
+          {
+            id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+            label: "GitHub App installation",
+            kind: "redirect",
+            ui: {
+              create: {
+                submitLabel: "Install GitHub App",
+                helperText: "Continue to GitHub to install the app and finish connecting.",
+              },
+            },
+          },
+        ],
+        targetConfig: {},
+        targetDisplayName: "GitHub",
+        targetFamilyId: "github",
+        targetKey: "github-cloud",
+        targetVariantId: "github-cloud",
+      });
+      result.current.onConnectionDisplayNameChange("GitHub connection");
+      result.current.submitDialog();
+    });
+
+    expect(result.current.error).toBe("Authentication method is required.");
+  });
+
   it("submits form updates without secret when the secret is blank", async () => {
     const capturedRequests: CapturedRequest[] = [];
     const server = createServer((request, response) => {

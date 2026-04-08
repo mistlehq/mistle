@@ -425,7 +425,7 @@ mod tests {
                     credential_resolver: crate::runtime::CompiledEgressRouteCredentialResolver {
                         connection_id: "icn_test".to_string(),
                         secret_type: "api_key".to_string(),
-                        purpose: None,
+                        slot_key: None,
                         resolver_key: None,
                     },
                 },
@@ -448,7 +448,7 @@ mod tests {
                     credential_resolver: crate::runtime::CompiledEgressRouteCredentialResolver {
                         connection_id: "icn_github".to_string(),
                         secret_type: "github_app_installation_token".to_string(),
-                        purpose: None,
+                        slot_key: None,
                         resolver_key: Some("github_app_installation_token".to_string()),
                     },
                 },

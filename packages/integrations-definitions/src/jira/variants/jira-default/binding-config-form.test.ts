@@ -20,7 +20,7 @@ describe("jira binding config forms", () => {
       properties: {
         tools: {
           title: "Tools",
-          default: [],
+          default: ["jira-cli"],
           items: {
             type: "string",
             enum: ["jira-cli"],

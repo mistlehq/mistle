@@ -165,6 +165,10 @@ describe("IntegrationsEditorSection", () => {
 
     expect(screen.getByRole("heading", { name: "Add agent harness" })).toBeDefined();
 
+    fireEvent.click(screen.getByRole("combobox", { name: "Add binding connection" }));
+    const listbox = await screen.findByRole("listbox");
+    fireEvent.click(within(listbox).getByText("Primary OpenAI Workspace"));
+
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
@@ -173,6 +177,40 @@ describe("IntegrationsEditorSection", () => {
       expect(screen.getByText("Primary OpenAI Workspace")).toBeDefined();
     });
   }, 10000);
+
+  it("requires explicitly selecting a connection before adding a binding", async () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(getSectionAddButton("Agent Harness"));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(screen.getByText("Select a connection to add this binding.")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Edit binding" })).toBeNull();
+  });
+
+  it("defaults the binding connection when only one option is available", async () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(getSectionAddButton("Git Providers"));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Edit binding" })).toBeDefined();
+      expect(screen.getByText("target-git")).toBeDefined();
+    });
+  });
 
   it("lists distinct connection display names for duplicate provider connections", async () => {
     const queryClient = createTestQueryClient();
@@ -202,6 +240,9 @@ describe("IntegrationsEditorSection", () => {
     );
 
     fireEvent.click(getSectionAddButton("Agent Harness"));
+    fireEvent.click(screen.getByRole("combobox", { name: "Add binding connection" }));
+    const listbox = await screen.findByRole("listbox");
+    fireEvent.click(within(listbox).getByText("Primary OpenAI Workspace"));
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
