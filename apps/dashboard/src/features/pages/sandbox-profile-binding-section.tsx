@@ -63,7 +63,7 @@ export function SandboxProfileBindingSection(input: {
           addConstraintMessage === null ? (
             addButton
           ) : (
-            <Tooltip>
+            <Tooltip delay={0}>
               <TooltipTrigger render={<span className="inline-flex" />}>{addButton}</TooltipTrigger>
               <TooltipContent side="top">{addConstraintMessage}</TooltipContent>
             </Tooltip>

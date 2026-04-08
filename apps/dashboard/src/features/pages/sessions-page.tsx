@@ -106,7 +106,7 @@ export function SandboxSessionStatusBadge(input: {
   const tooltipMessage = input.failureMessage;
 
   return (
-    <Tooltip>
+    <Tooltip delay={0}>
       <TooltipTrigger
         aria-label="View failure details"
         render={

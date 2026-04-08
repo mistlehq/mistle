@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { SidebarProvider } from "@mistle/ui";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
@@ -42,9 +43,11 @@ const groups: SessionsSidebarNavGroup[] = [
 
 function renderSidebarNav(): void {
   render(
-    <MemoryRouter initialEntries={["/sessions"]}>
-      <SessionsSidebarNav groups={groups} />
-    </MemoryRouter>,
+    <SidebarProvider>
+      <MemoryRouter initialEntries={["/sessions"]}>
+        <SessionsSidebarNav groups={groups} />
+      </MemoryRouter>
+    </SidebarProvider>,
   );
 }
 
@@ -52,7 +55,32 @@ afterEach(() => {
   cleanup();
 });
 
+function installMatchMediaStub(): void {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  });
+}
+
 describe("SessionsSidebarNav", () => {
+  installMatchMediaStub();
+
+  it("renders a new session action above the search field", () => {
+    renderSidebarNav();
+
+    expect(screen.getByRole("button", { name: "New" })).toBeDefined();
+    expect(screen.getByRole("textbox", { name: "Search sessions" })).toBeDefined();
+  });
+
   it("allows sandbox profile groups to be collapsed and expanded", () => {
     renderSidebarNav();
 
@@ -90,5 +118,18 @@ describe("SessionsSidebarNav", () => {
 
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("link", { name: "Review migration draft" })).toBeDefined();
+  });
+
+  it("keeps the new session action visible when there are no groups", () => {
+    render(
+      <SidebarProvider>
+        <MemoryRouter initialEntries={["/sessions"]}>
+          <SessionsSidebarNav groups={[]} />
+        </MemoryRouter>
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "New" })).toBeDefined();
+    expect(screen.getByText("No openable sessions yet.")).toBeDefined();
   });
 });

@@ -150,7 +150,7 @@ function AutomationIssueIndicator(input: {
   }
 
   return (
-    <Tooltip>
+    <Tooltip delay={0}>
       <TooltipTrigger
         aria-label="View automation issue details"
         className="inline-flex shrink-0 items-center justify-center rounded-full text-destructive outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"

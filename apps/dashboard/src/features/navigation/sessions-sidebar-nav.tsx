@@ -5,6 +5,9 @@ import {
   Input,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
@@ -12,9 +15,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@mistle/ui";
-import { CaretRightIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
+import { CaretRightIcon, MagnifyingGlassIcon, PlusIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router";
+import { NavLink, useLocation, useNavigate } from "react-router";
 
 import type {
   SessionsSidebarAttentionState,
@@ -47,6 +50,7 @@ export function SessionsSidebarNav(input: {
   emptyMessage?: string;
 }): React.JSX.Element {
   const location = useLocation();
+  const navigate = useNavigate();
   const emptyMessage = input.emptyMessage ?? "No openable sessions yet.";
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedProfileIds, setExpandedProfileIds] = useState(
@@ -78,10 +82,6 @@ export function SessionsSidebarNav(input: {
     });
   }, [input.groups]);
 
-  if (input.groups.length === 0) {
-    return <div className="px-4 py-3 text-muted-foreground text-sm">{emptyMessage}</div>;
-  }
-
   return (
     <>
       <div className="px-2 pt-2 pb-1">
@@ -98,9 +98,26 @@ export function SessionsSidebarNav(input: {
           />
         </div>
       </div>
+      <SidebarGroup className="pt-0 pb-0">
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => {
+                  void navigate("/sessions");
+                }}
+                type="button"
+              >
+                <PlusIcon aria-hidden className="size-4" />
+                <span>New</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
       {visibleGroups.length === 0 ? (
         <div className="px-4 py-2 text-muted-foreground text-sm">
-          No sessions match your search.
+          {input.groups.length === 0 ? emptyMessage : "No sessions match your search."}
         </div>
       ) : null}
       {visibleGroups.map((group) => (
