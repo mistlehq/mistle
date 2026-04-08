@@ -7,6 +7,10 @@ import {
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationConnectionMethodId, IntegrationRegistry } from "@mistle/integrations-core";
+import {
+  IntegrationWebhookSourceLifecycles,
+  IntegrationWebhookSourceOwnerScopes,
+} from "@mistle/integrations-core";
 
 import {
   encryptCredentialUtf8,
@@ -22,6 +26,7 @@ import {
   parseCreateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
 } from "./form-connection-methods.js";
+import { ensureImplicitConnectionWebhookSource } from "./webhook-sources.js";
 
 export type CreateFormConnectionInput = {
   organizationId: string;
@@ -166,6 +171,20 @@ export async function createFormConnection(
           connectionId: createdConnection.id,
           credentialId: createdCredential.id,
           slotKey: parsedSecret.persistedSecretRef.slotKey,
+        });
+      }
+
+      const webhookSourceCapability = definition.webhookSource;
+      if (
+        webhookSourceCapability?.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT &&
+        webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION
+      ) {
+        await ensureImplicitConnectionWebhookSource({
+          db: tx,
+          organizationId: input.organizationId,
+          connectionId: createdConnection.id,
+          targetKey: input.targetKey,
+          routingStrategy: webhookSourceCapability.routingStrategy,
         });
       }
 

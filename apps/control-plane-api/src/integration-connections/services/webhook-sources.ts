@@ -257,8 +257,16 @@ export async function ensureImplicitConnectionWebhookSource(input: {
   });
 
   if (existingSource !== undefined) {
+    if (input.routingStrategy === "path" && existingSource.endpointKey == null) {
+      throw new Error(
+        `Implicit path-routed webhook source '${existingSource.id}' is missing endpointKey.`,
+      );
+    }
+
     return existingSource;
   }
+
+  const endpointKey = input.routingStrategy === "path" ? generateEndpointKey() : undefined;
 
   const [createdSource] = await input.db
     .insert(integrationWebhookSources)
@@ -268,6 +276,7 @@ export async function ensureImplicitConnectionWebhookSource(input: {
       integrationConnectionId: input.connectionId,
       targetKey: input.targetKey,
       routingStrategy: input.routingStrategy,
+      ...(endpointKey === undefined ? {} : { endpointKey }),
       status: IntegrationWebhookSourceStatuses.ACTIVE,
     })
     .returning();
