@@ -4,12 +4,20 @@ import {
   integrationTargets,
   IntegrationWebhookSourceOwnerScopes,
 } from "@mistle/db/control-plane";
+import {
+  createIntegrationRegistry,
+  JiraConnectionMethodIds,
+} from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import {
   CreateIntegrationWebhookSourceBadRequestResponseSchema,
   CreateIntegrationWebhookSourceBodySchema,
 } from "../src/integration-connections/create-integration-webhook-source/schema.js";
+import {
+  resolveConnectionSecretsOrThrow,
+  resolveConnectionWithTargetOrThrow,
+} from "../src/integration-connections/services/webhook-sources.js";
 import { it } from "./test-context.js";
 
 describe("integration connection webhook sources integration", () => {
@@ -129,20 +137,34 @@ describe("integration connection webhook sources integration", () => {
         },
       });
 
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_jira_service_account",
-      organizationId: authenticatedSession.organizationId,
-      targetKey,
-      displayName: "Service account Jira",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: "jira-service-account-api-token",
-        cloud_id: "cloud-123",
+    const createConnectionResponse = await fixture.request(
+      "/v1/integration/connections/jira-default/form",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Service account Jira",
+          methodId: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+          config: {
+            connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+            cloud_id: "cloud-123",
+          },
+          secrets: {
+            apiKey: "jira-service-account-token",
+          },
+        }),
       },
-    });
+    );
+    expect(createConnectionResponse.status).toBe(201);
+    const createdConnection = (await createConnectionResponse.json()) as {
+      id: string;
+    };
 
     const response = await fixture.request(
-      "/v1/integration/connections/icn_jira_service_account/webhook-sources",
+      `/v1/integration/connections/${createdConnection.id}/webhook-sources`,
       {
         method: "POST",
         headers: {
@@ -163,5 +185,75 @@ describe("integration connection webhook sources integration", () => {
     );
     expect(responseBody.code).toBe("INVALID_WEBHOOK_SOURCE_INPUT");
     expect(responseBody.message).toContain("personal API token");
+  });
+
+  it("resolves Jira personal PAT webhook secrets from linked credentials", async ({ fixture }) => {
+    const targetKey = "jira-default";
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connection-webhook-sources-jira-personal@example.com",
+    });
+
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey,
+        familyId: "jira",
+        variantId: "jira-default",
+        enabled: true,
+        config: {},
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "jira",
+          variantId: "jira-default",
+          enabled: true,
+          config: {},
+        },
+      });
+
+    const createConnectionResponse = await fixture.request(
+      "/v1/integration/connections/jira-default/form",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Personal Jira",
+          methodId: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
+          config: {
+            connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
+            site_url: "https://mistle-test.atlassian.net",
+            email: "jira@example.com",
+          },
+          secrets: {
+            apiKey: "jira-personal-token",
+          },
+        }),
+      },
+    );
+    expect(createConnectionResponse.status).toBe(201);
+    const createdConnection = (await createConnectionResponse.json()) as {
+      id: string;
+    };
+
+    const connection = await resolveConnectionWithTargetOrThrow({
+      db: fixture.db,
+      organizationId: authenticatedSession.organizationId,
+      connectionId: createdConnection.id,
+    });
+
+    const resolvedSecrets = await resolveConnectionSecretsOrThrow({
+      db: fixture.db,
+      integrationRegistry: createIntegrationRegistry(),
+      integrationsConfig: fixture.config.integrations,
+      connection,
+    });
+
+    expect(resolvedSecrets).toEqual({
+      apiKey: "jira-personal-token",
+    });
   });
 });

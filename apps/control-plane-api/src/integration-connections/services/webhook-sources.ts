@@ -17,8 +17,8 @@ import {
 } from "@mistle/integrations-core";
 import { eq } from "drizzle-orm";
 
+import { resolveIntegrationCredential } from "../../internal/integration-credentials/services/resolve-credential.js";
 import {
-  decryptIntegrationConnectionSecrets,
   encryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
@@ -132,24 +132,77 @@ export async function resolveConnectionWithTargetOrThrow(input: {
   };
 }
 
-export function resolveConnectionSecretsOrThrow(input: {
+function resolveConnectionMethodIdOrThrow(input: {
+  connectionId: string;
+  config: Record<string, unknown>;
+}): string {
+  const connectionMethodId = input.config["connection_method"];
+  if (typeof connectionMethodId !== "string" || connectionMethodId.length === 0) {
+    throw new Error(
+      `Integration connection '${input.connectionId}' is missing a valid connection_method.`,
+    );
+  }
+
+  return connectionMethodId;
+}
+
+export async function resolveConnectionSecretsOrThrow(input: {
+  db: ControlPlaneDatabase;
+  integrationRegistry: IntegrationRegistry;
   connection: ConnectionWithTarget;
   integrationsConfig: AppContext["var"]["config"]["integrations"];
-}): Record<string, string> {
-  if (input.connection.secrets === null) {
+}): Promise<Record<string, string>> {
+  const connectionConfig = resolveConnectionConfigOrThrow({
+    connectionId: input.connection.id,
+    config: input.connection.config,
+  });
+  const definition = input.integrationRegistry.getDefinition({
+    familyId: input.connection.target.familyId,
+    variantId: input.connection.target.variantId,
+  });
+  if (definition === undefined) {
+    throw new Error(
+      `Integration definition '${input.connection.target.familyId}/${input.connection.target.variantId}' is not registered.`,
+    );
+  }
+
+  const connectionMethodId = resolveConnectionMethodIdOrThrow({
+    connectionId: input.connection.id,
+    config: connectionConfig,
+  });
+  const connectionMethod = definition.connectionMethods.find(
+    (method) => method.id === connectionMethodId,
+  );
+  if (connectionMethod === undefined) {
+    throw new Error(
+      `Integration connection '${input.connection.id}' references unknown method '${connectionMethodId}'.`,
+    );
+  }
+
+  if (connectionMethod.kind !== "form") {
     return {};
   }
 
-  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-    masterKeyVersion: input.connection.secrets.masterKeyVersion,
-    masterEncryptionKeys: input.integrationsConfig.masterEncryptionKeys,
-  });
+  const resolvedFieldSecrets = await Promise.all(
+    connectionMethod.secretFields.map(async (field) => {
+      const resolvedCredential = await resolveIntegrationCredential(
+        {
+          db: input.db,
+          integrationRegistry: input.integrationRegistry,
+          integrationsConfig: input.integrationsConfig,
+        },
+        {
+          connectionId: input.connection.id,
+          secretType: field.secretType,
+          slotKey: field.slotKey,
+        },
+      );
 
-  return decryptIntegrationConnectionSecrets({
-    nonce: input.connection.secrets.nonce,
-    ciphertext: input.connection.secrets.ciphertext,
-    masterEncryptionKeyMaterial,
-  });
+      return [field.name, resolvedCredential.value] as const;
+    }),
+  );
+
+  return Object.fromEntries(resolvedFieldSecrets);
 }
 
 export function resolveWebhookSourceCapabilityOrThrow(input: {
@@ -609,7 +662,9 @@ export async function createIntegrationWebhookSource(
   const webhookSecret = generateWebhookSecret();
   const endpointKey =
     webhookSourceCapability.routingStrategy === "path" ? generateEndpointKey() : undefined;
-  const connectionSecrets = resolveConnectionSecretsOrThrow({
+  const connectionSecrets = await resolveConnectionSecretsOrThrow({
+    db: ctx.db,
+    integrationRegistry: ctx.integrationRegistry,
     connection,
     integrationsConfig: ctx.integrationsConfig,
   });
@@ -809,7 +864,9 @@ export async function deleteIntegrationWebhookSource(
             config: connection.config,
           }),
         },
-        connectionSecrets: resolveConnectionSecretsOrThrow({
+        connectionSecrets: await resolveConnectionSecretsOrThrow({
+          db: ctx.db,
+          integrationRegistry: ctx.integrationRegistry,
           connection,
           integrationsConfig: ctx.integrationsConfig,
         }),

@@ -25,7 +25,6 @@ import { ensureImplicitConnectionWebhookSource } from "../../integration-connect
 import { ensureImplicitTargetWebhookSource } from "../../integration-webhook-sources/services/ensure-implicit-target-webhook-source.js";
 import {
   decryptCredentialUtf8,
-  decryptIntegrationConnectionSecrets,
   resolveMasterEncryptionKeyMaterial,
   type IntegrationConnectionSecrets,
   unwrapOrganizationCredentialKey,
@@ -61,11 +60,6 @@ type ActiveWebhookConnection = {
   status: IntegrationConnection["status"];
   externalSubjectId: string | null;
   config: Record<string, unknown> | null;
-  secrets: {
-    ciphertext: string;
-    nonce: string;
-    masterKeyVersion: number;
-  } | null;
 };
 
 function toWebhookConnectionOrThrow(input: {
@@ -88,11 +82,10 @@ function toWebhookConnectionOrThrow(input: {
   };
 }
 
-async function resolveConnectionSecretsOrThrow(input: {
+function assertConnectionCandidateExistsOrThrow(input: {
   connectionId: string;
   connectionsById: ReadonlyMap<string, ActiveWebhookConnection>;
-  integrationsConfig: AppContext["var"]["config"]["integrations"];
-}): Promise<IntegrationConnectionSecrets> {
+}): void {
   const connection = input.connectionsById.get(input.connectionId);
 
   if (connection === undefined) {
@@ -101,23 +94,6 @@ async function resolveConnectionSecretsOrThrow(input: {
       `Webhook connection '${input.connectionId}' is not an active connection for this target.`,
     );
   }
-
-  if (connection.secrets === null) {
-    return {};
-  }
-
-  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-    masterKeyVersion: connection.secrets.masterKeyVersion,
-    masterEncryptionKeys: input.integrationsConfig.masterEncryptionKeys,
-  });
-
-  return {
-    ...decryptIntegrationConnectionSecrets({
-      nonce: connection.secrets.nonce,
-      ciphertext: connection.secrets.ciphertext,
-      masterEncryptionKeyMaterial,
-    }),
-  };
 }
 
 async function resolveWebhookSourceSecretOrThrow(input: {
@@ -331,7 +307,6 @@ export async function receiveIntegrationWebhook(
       status: true,
       externalSubjectId: true,
       config: true,
-      secrets: true,
     },
   });
   const activeConnectionsById: ReadonlyMap<string, ActiveWebhookConnection> = new Map(
@@ -361,15 +336,16 @@ export async function receiveIntegrationWebhook(
         secrets: parsedTargetSecrets,
       },
       connections: webhookConnections,
-      resolveConnectionSecrets: ({ connectionId }) =>
-        resolveConnectionSecretsOrThrow({
+      resolveConnectionSecrets: ({ connectionId }) => {
+        assertConnectionCandidateExistsOrThrow({
           connectionId,
           connectionsById: activeConnectionsById,
-          integrationsConfig,
-        }).then((connectionSecrets) => ({
-          ...connectionSecrets,
+        });
+
+        return Promise.resolve({
           ...webhookSourceSecrets,
-        })),
+        });
+      },
       headers: normalizeWebhookHeaders(input.headers),
       rawBody: input.rawBody,
     });

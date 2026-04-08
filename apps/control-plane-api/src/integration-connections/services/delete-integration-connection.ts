@@ -137,7 +137,9 @@ export async function deleteIntegrationConnection(
           webhookSourceCapability.deleteRegistration?.bind(webhookSourceCapability);
 
         if (deleteRegistration !== undefined) {
-          const connectionSecrets = resolveConnectionSecretsOrThrow({
+          const connectionSecrets = await resolveConnectionSecretsOrThrow({
+            db: ctx.db,
+            integrationRegistry: ctx.integrationRegistry,
             connection,
             integrationsConfig: ctx.integrationsConfig,
           });
