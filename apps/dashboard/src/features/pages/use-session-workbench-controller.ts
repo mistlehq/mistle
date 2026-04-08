@@ -150,7 +150,6 @@ export function useSessionWorkbenchController(input: {
   const rpcClientRef = useRef<CodexJsonRpcClient | null>(null);
   const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
   const sessionState = useCodexSessionState({
-    transportRef: transportManager.transportRef,
     ensureTransportConnected: transportManager.ensureTransportConnected,
     sessionClientRef,
     rpcClientRef,

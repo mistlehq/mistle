@@ -9,8 +9,6 @@ describe("resolveThreadTitlePatchInput", () => {
         sessionSnapshot: {
           sandboxInstanceId: "sbi_123",
           connectedAtIso: "2026-04-07T00:00:00.000Z",
-          expiresAtIso: "2026-04-07T01:00:00.000Z",
-          connectionUrl: "wss://sandbox.example.test",
           providerThreadId: "thread_123",
           activeThreadId: "thread_123",
         },
@@ -31,8 +29,6 @@ describe("resolveThreadTitlePatchInput", () => {
         sessionSnapshot: {
           sandboxInstanceId: "sbi_123",
           connectedAtIso: "2026-04-07T00:00:00.000Z",
-          expiresAtIso: "2026-04-07T01:00:00.000Z",
-          connectionUrl: "wss://sandbox.example.test",
           providerThreadId: "thread_123",
           activeThreadId: "thread_456",
         },
@@ -50,8 +46,6 @@ describe("resolveThreadTitlePatchInput", () => {
         sessionSnapshot: {
           sandboxInstanceId: "sbi_123",
           connectedAtIso: "2026-04-07T00:00:00.000Z",
-          expiresAtIso: "2026-04-07T01:00:00.000Z",
-          connectionUrl: "wss://sandbox.example.test",
           providerThreadId: null,
           activeThreadId: "thread_123",
         },
