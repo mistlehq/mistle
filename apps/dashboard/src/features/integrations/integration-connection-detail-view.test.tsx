@@ -360,8 +360,12 @@ describe("IntegrationConnectionDetailView", () => {
     );
 
     expect(screen.getByText("Webhooks")).toBeTruthy();
+    expect(
+      screen.getByText("Copy the callback URL into your provider's webhook configuration."),
+    ).toBeTruthy();
     expect(screen.getByText("Primary Jira webhook")).toBeTruthy();
     expect(screen.getByText("whsec_jira_123")).toBeTruthy();
+    expect(screen.queryByText("Endpoint key")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Create webhook" }));
     expect(createdConnectionId).toBe("icn_jira_primary");

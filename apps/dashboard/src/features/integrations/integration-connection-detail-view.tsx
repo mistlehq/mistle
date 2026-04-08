@@ -444,7 +444,7 @@ function WebhookSourcesSection(input: {
         <div className="gap-1 flex flex-col">
           <h3 className="font-medium text-sm">Webhooks</h3>
           <p className="text-muted-foreground text-xs">
-            Manage provider webhook registrations for this connection.
+            Copy the callback URL into your provider's webhook configuration.
           </p>
         </div>
         {input.onCreateWebhookSource ? (
@@ -550,9 +550,6 @@ function WebhookSourceCard(input: {
         <MetadataField label="Target" value={input.source.targetKey} />
         {input.source.callbackUrl === undefined ? null : (
           <MetadataField label="Callback URL" value={input.source.callbackUrl} />
-        )}
-        {input.source.endpointKey === undefined ? null : (
-          <MetadataField label="Endpoint key" value={input.source.endpointKey} />
         )}
         {input.source.remoteRegistrationId === undefined ? null : (
           <MetadataField label="Provider registration" value={input.source.remoteRegistrationId} />
