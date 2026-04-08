@@ -1,5 +1,6 @@
 import { SidebarMenuButton, SidebarMenuItem, Switch } from "@mistle/ui";
 import { TerminalIcon } from "@phosphor-icons/react";
+import { NavLink } from "react-router";
 
 export function SessionsNavToggleItem(input: {
   checked: boolean;
@@ -7,7 +8,7 @@ export function SessionsNavToggleItem(input: {
 }): React.JSX.Element {
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton className="pr-12" render={<a href="/sessions" />}>
+      <SidebarMenuButton className="pr-12" render={<NavLink to="/sessions" />}>
         <TerminalIcon aria-hidden className="size-4 shrink-0" />
         <span>Sessions</span>
       </SidebarMenuButton>
