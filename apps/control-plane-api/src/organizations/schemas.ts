@@ -25,3 +25,13 @@ export const MembershipCapabilitiesSchema = z
   .strict();
 
 export const organizationLogoResponseSchema = singletonImageMetadataResponseSchema;
+
+export const MemberAvatarSchema = z
+  .object({
+    userId: z.string().min(1),
+    hasImage: z.boolean(),
+    imageUrl: z.url().nullable(),
+  })
+  .strict();
+
+export const MemberAvatarsResponseSchema = z.array(MemberAvatarSchema);

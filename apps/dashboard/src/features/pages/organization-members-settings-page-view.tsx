@@ -84,6 +84,7 @@ export function OrganizationMembersSettingsPageView(
         invitationActionState={props.invitationActionState}
         invitations={props.invitations}
         members={props.members}
+        organizationId={props.organizationId}
         onChangeRole={props.onChangeRole}
         onRemoveMember={props.onRemoveMember}
         onResendInvite={props.onResendInvite}

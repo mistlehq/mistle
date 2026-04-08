@@ -1,4 +1,9 @@
-import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
+import type {
+  MemberAvatar,
+  MembershipCapabilities,
+  SettingsInvitation,
+  SettingsMember,
+} from "./members-api.js";
 import {
   buildMembersDirectoryRowActionDescriptors,
   directoryRowActionsContentClassName,
@@ -19,6 +24,8 @@ export type MembersDirectoryTableRowViewModel = {
   email: string;
   status: string;
   date: string;
+  showMemberAvatar: boolean;
+  memberAvatar: MemberAvatar | null;
   actionsLabel: string;
   actionsContentClassName?: string;
   actionFeedback: MembersDirectoryActionFeedback | null;
@@ -72,6 +79,7 @@ function toMembersTableAction(input: {
 
 export function buildMembersDirectoryTableRowViewModels(input: {
   rows: MembersDirectoryRow[];
+  memberAvatarsByUserId: ReadonlyMap<string, MemberAvatar>;
   capabilities: MembershipCapabilities | null;
   canManageInvitations: boolean;
   pendingMemberOperation: MembersDirectoryPendingMemberOperation;
@@ -108,6 +116,9 @@ export function buildMembersDirectoryTableRowViewModels(input: {
       email: formattedRow.email,
       status: formattedRow.status,
       date: formattedRow.date,
+      showMemberAvatar: row.kind === "member",
+      memberAvatar:
+        row.kind === "member" ? (input.memberAvatarsByUserId.get(row.member.userId) ?? null) : null,
       actionsLabel: directoryRowActionsLabel(row),
       actionFeedback,
       actions,

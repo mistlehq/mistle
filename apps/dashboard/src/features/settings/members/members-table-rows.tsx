@@ -1,5 +1,15 @@
-import { DropdownMenuItem, MoreActionsMenu, TableCell, TableRow } from "@mistle/ui";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+  DropdownMenuItem,
+  MoreActionsMenu,
+  TableCell,
+  TableRow,
+} from "@mistle/ui";
 
+import { deriveInitials } from "../../shared/derive-initials.js";
+import type { MemberAvatar } from "./members-api.js";
 import type {
   MembersDirectoryActionDescriptor,
   MembersDirectoryActionFeedback,
@@ -80,6 +90,8 @@ export function DirectoryTableRow(input: {
   email: string;
   status: string;
   date: string;
+  showMemberAvatar: boolean;
+  memberAvatar: MemberAvatar | null;
   actionsLabel: string;
   actionsContentClassName?: string;
   actionFeedback: MembersDirectoryActionFeedback | null;
@@ -87,7 +99,21 @@ export function DirectoryTableRow(input: {
 }): React.JSX.Element {
   return (
     <TableRow>
-      <TableCell className="font-medium whitespace-normal break-words">{input.name}</TableCell>
+      <TableCell className="font-medium whitespace-normal break-words">
+        {!input.showMemberAvatar ? (
+          input.name
+        ) : (
+          <div className="flex items-center gap-3">
+            <Avatar className="bg-muted h-8 w-8 shrink-0">
+              {input.memberAvatar === null || input.memberAvatar.imageUrl === null ? null : (
+                <AvatarImage alt={`${input.name} avatar`} src={input.memberAvatar.imageUrl} />
+              )}
+              <AvatarFallback>{deriveInitials({ name: input.name, fallback: "?" })}</AvatarFallback>
+            </Avatar>
+            <span>{input.name}</span>
+          </div>
+        )}
+      </TableCell>
       <TableCell className="whitespace-normal break-words">{input.email}</TableCell>
       <TableCell className="whitespace-nowrap">{input.status}</TableCell>
       <TableCell className="whitespace-nowrap">{input.date}</TableCell>

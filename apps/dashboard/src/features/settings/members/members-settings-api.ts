@@ -2,11 +2,13 @@ import {
   getMembershipCapabilities,
   inviteMember,
   listInvitations,
+  listMemberAvatars,
   listMembers,
   removeMember,
   revokeInvitation,
   updateMemberRole,
   type InviteMemberResponse,
+  type MemberAvatar,
   type MembershipCapabilities,
   type OrganizationRole,
   type SettingsInvitation,
@@ -16,6 +18,10 @@ import {
 export type MembersSettingsApi = {
   getMembershipCapabilities: (input: { organizationId: string }) => Promise<MembershipCapabilities>;
   listMembers: (input: { organizationId: string }) => Promise<SettingsMember[]>;
+  listMemberAvatars: (input: {
+    organizationId: string;
+    userIds: readonly string[];
+  }) => Promise<MemberAvatar[]>;
   listInvitations: (input: { organizationId: string }) => Promise<SettingsInvitation[]>;
   inviteMember: (input: {
     organizationId: string;
@@ -35,6 +41,7 @@ export type MembersSettingsApi = {
 export const defaultMembersSettingsApi: MembersSettingsApi = {
   getMembershipCapabilities,
   listMembers,
+  listMemberAvatars,
   listInvitations,
   inviteMember,
   revokeInvitation,

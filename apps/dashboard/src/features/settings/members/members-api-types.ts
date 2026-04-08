@@ -4,6 +4,11 @@ export type MembershipCapabilitiesResponse =
   paths["/v1/organizations/{organizationId}/membership-capabilities"]["get"]["responses"][200]["content"]["application/json"];
 export type MembershipCapabilities = MembershipCapabilitiesResponse;
 export type OrganizationRole = MembershipCapabilities["actorRole"];
+export type MemberAvatar = {
+  userId: string;
+  hasImage: boolean;
+  imageUrl: string | null;
+};
 
 export type SettingsMember = {
   id: string;
