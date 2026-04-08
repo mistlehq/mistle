@@ -1,0 +1,154 @@
+import type { Meta, StoryObj } from "@storybook/react-vite";
+
+import { withDashboardPageStory } from "../../storybook/decorators.js";
+import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
+import {
+  buildSandboxInstanceListItemFixture,
+  buildStoryLaunchableSandboxProfile,
+} from "./sessions-page.story-fixtures.js";
+import { SessionsStoryHarness } from "./sessions-story-harness.js";
+
+type SessionsSidebarModeStoryArgs = {
+  initialEntries: readonly string[];
+  launchableProfiles?: LaunchableSandboxProfilesResult["items"];
+  sandboxInstancesList?: SandboxInstancesListResult;
+  showSessionsSidebar?: boolean;
+};
+
+function SessionsSidebarModeStory(input: SessionsSidebarModeStoryArgs): React.JSX.Element {
+  return (
+    <SessionsStoryHarness
+      initialEntries={input.initialEntries}
+      launchableProfiles={input.launchableProfiles}
+      sandboxInstancesList={input.sandboxInstancesList}
+      showSessionsSidebar={input.showSessionsSidebar}
+    />
+  );
+}
+
+function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
+  return {
+    items: [
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_working_alpha",
+        title:
+          "Investigate flaky test run after gateway lease handoff in the repo-maintainer sandbox",
+        sandboxProfileId: "sbp_repo_maintainer",
+        sandboxProfileDisplayName: "Repo Maintainer",
+        status: "running",
+        createdAt: "2026-04-08T09:00:00.000Z",
+        keepaliveActive: true,
+      }),
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_ready_alpha",
+        title: "Review migration draft",
+        sandboxProfileId: "sbp_repo_maintainer",
+        sandboxProfileDisplayName: "Repo Maintainer",
+        status: "running",
+        createdAt: "2026-04-08T08:50:00.000Z",
+        keepaliveActive: false,
+      }),
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_starting_docs",
+        title:
+          "Draft onboarding guide for new operators working across control plane and gateway runtime flows",
+        sandboxProfileId: "sbp_docs",
+        sandboxProfileDisplayName: "Docs Maintainer",
+        status: "starting",
+        createdAt: "2026-04-08T08:40:00.000Z",
+        keepaliveActive: false,
+      }),
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_stopped_finance",
+        title: null,
+        sandboxProfileId: "sbp_finance",
+        sandboxProfileDisplayName: "Finance Investigator",
+        status: "stopped",
+        createdAt: "2026-04-08T07:30:00.000Z",
+        keepaliveActive: false,
+      }),
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_failed_hidden",
+        title: "Hidden failed run",
+        sandboxProfileId: "sbp_hidden",
+        sandboxProfileDisplayName: "Hidden Profile",
+        status: "failed",
+        createdAt: "2026-04-08T06:30:00.000Z",
+        keepaliveActive: false,
+      }),
+    ],
+    nextPage: null,
+    previousPage: null,
+    totalResults: 5,
+  };
+}
+
+const meta = {
+  title: "Dashboard/Sessions/SidebarMode",
+  component: SessionsSidebarModeStory,
+  tags: ["autodocs"],
+  decorators: [withDashboardPageStory],
+  parameters: {
+    layout: "fullscreen",
+  },
+  args: {
+    initialEntries: ["/sessions/new"],
+    showSessionsSidebar: true,
+    launchableProfiles: [
+      buildStoryLaunchableSandboxProfile({
+        id: "sbp_profile_alpha",
+        displayName: "Alpha Profile",
+      }),
+      buildStoryLaunchableSandboxProfile({
+        id: "sbp_profile_beta",
+        displayName: "Beta Profile",
+        latestVersion: 7,
+      }),
+    ],
+    sandboxInstancesList: buildMixedOpenableSessionsList(),
+  },
+  render: function RenderStory(args): React.JSX.Element {
+    return <SessionsSidebarModeStory {...args} />;
+  },
+} satisfies Meta<typeof SessionsSidebarModeStory>;
+
+export default meta;
+
+type Story = StoryObj<typeof meta>;
+
+export const EmptyState: Story = {
+  args: {
+    initialEntries: ["/sessions/new"],
+    showSessionsSidebar: true,
+    sandboxInstancesList: {
+      items: [],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 0,
+    },
+  },
+};
+
+export const NoLaunchableProfiles: Story = {
+  args: {
+    initialEntries: ["/sessions/new"],
+    showSessionsSidebar: true,
+    launchableProfiles: [],
+    sandboxInstancesList: {
+      items: [],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 0,
+    },
+  },
+};
+
+export const MixedOpenableStates: Story = {};
+
+export const SessionSelected: Story = {
+  args: {
+    initialEntries: ["/sessions/sbi_working_alpha"],
+    showSessionsSidebar: true,
+  },
+};

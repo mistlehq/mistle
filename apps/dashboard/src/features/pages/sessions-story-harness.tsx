@@ -8,6 +8,7 @@ import {
   RouterProvider,
   useLocation,
   useNavigate,
+  useParams,
 } from "react-router";
 
 import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
@@ -55,6 +56,11 @@ export function SessionsStoryHarness(input: SessionsStoryHarnessProps): React.JS
           <Route element={<StoryRouteOutlet />} handle={ROUTE_HANDLES.sessions} path="/sessions">
             <Route element={<SessionsPage />} index />
             <Route element={<NewSessionPage />} handle={ROUTE_HANDLES.sessionsNew} path="new" />
+            <Route
+              element={<SessionDetailStoryPage />}
+              handle={ROUTE_HANDLES.sessionsDetail}
+              path=":sandboxInstanceId"
+            />
           </Route>
         </Route>,
       ),
@@ -76,7 +82,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
   const navigate = useNavigate();
   const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
   const [showSessionsSidebar, setShowSessionsSidebar] = useState(
-    input.initialShowSessionsSidebar !== false,
+    input.initialShowSessionsSidebar === true,
   );
   const inSessions =
     location.pathname === "/sessions" || location.pathname.startsWith("/sessions/");
@@ -128,4 +134,29 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
 
 function StoryRouteOutlet(): React.JSX.Element {
   return <Outlet />;
+}
+
+function SessionDetailStoryPage(): React.JSX.Element {
+  const params = useParams<{ sandboxInstanceId: string }>();
+  const sandboxInstanceId = params.sandboxInstanceId ?? "unknown-session";
+
+  return (
+    <div className="flex min-h-full flex-col bg-background">
+      <div className="flex flex-1 items-center justify-center px-6 py-10">
+        <div className="w-full max-w-2xl rounded-xl border bg-card p-8 shadow-xs">
+          <p className="text-muted-foreground text-sm uppercase tracking-[0.18em]">
+            Storybook session detail
+          </p>
+          <h1 className="mt-3 font-semibold text-2xl">Session detail preview</h1>
+          <p className="mt-3 text-muted-foreground text-sm">
+            Storybook routes sidebar session links to this placeholder instead of the full session
+            workbench.
+          </p>
+          <div className="mt-6 rounded-lg border bg-muted/40 px-4 py-3 font-mono text-sm">
+            {sandboxInstanceId}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
