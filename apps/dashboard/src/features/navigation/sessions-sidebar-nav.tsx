@@ -57,7 +57,7 @@ export function SessionsSidebarNav(input: {
 
   return (
     <>
-      <div className="px-4 pt-1 pb-2">
+      <div className="px-2 pt-2 pb-1">
         <div className="relative">
           <MagnifyingGlassIcon
             aria-hidden
@@ -67,7 +67,6 @@ export function SessionsSidebarNav(input: {
             aria-label="Search sessions"
             className="h-8 border-border/70 bg-background pl-9 text-sm shadow-none"
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search sessions"
             value={searchQuery}
           />
         </div>
