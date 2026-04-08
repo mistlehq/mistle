@@ -1,18 +1,15 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
-import { useQuery } from "@tanstack/react-query";
 
 import { InvitationDetailsDialog } from "./invitation-details-dialog.js";
 import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
-import { listMemberAvatars } from "./members-avatars-service.js";
 import {
   type MembersDirectoryInvitationActionState,
   type MembersDirectoryPendingMemberOperation,
-  type MembersDirectoryRow,
 } from "./members-directory-model.js";
 import { MembersDirectoryToolbar } from "./members-directory-toolbar.js";
-import { buildMembersQueryKeys } from "./members-query-keys.js";
 import { DirectoryTableRow } from "./members-table-rows.js";
 import { buildMembersDirectoryTableRowViewModels } from "./members-table-view-model.js";
+import { useMemberAvatars } from "./use-member-avatars.js";
 import { useMembersDirectoryTableState } from "./use-members-directory-table-state.js";
 
 export function MembersDirectoryTable(input: {
@@ -42,21 +39,10 @@ export function MembersDirectoryTable(input: {
     members: input.members,
     invitations: input.invitations,
   });
-  const visibleMemberUserIds = dedupeMemberUserIds(visibleRows);
-  const queryKeys = buildMembersQueryKeys(input.organizationId);
-  const memberAvatarsQuery = useQuery({
-    queryKey: [...queryKeys.memberAvatars, ...visibleMemberUserIds],
-    queryFn: async () =>
-      listMemberAvatars({
-        organizationId: input.organizationId,
-        userIds: visibleMemberUserIds,
-      }),
-    enabled: visibleMemberUserIds.length > 0,
-    staleTime: 60_000,
+  const memberAvatarsByUserId = useMemberAvatars({
+    organizationId: input.organizationId,
+    rows: visibleRows,
   });
-  const memberAvatarsByUserId = new Map(
-    (memberAvatarsQuery.data ?? []).map((avatar) => [avatar.userId, avatar] as const),
-  );
   const tableRows = buildMembersDirectoryTableRowViewModels({
     rows: visibleRows,
     memberAvatarsByUserId,
@@ -146,15 +132,4 @@ export function MembersDirectoryTable(input: {
       />
     </>
   );
-}
-
-function dedupeMemberUserIds(rows: readonly MembersDirectoryRow[]): string[] {
-  const userIds = new Set<string>();
-  for (const row of rows) {
-    if (row.kind === "member") {
-      userIds.add(row.member.userId);
-    }
-  }
-
-  return [...userIds];
 }
