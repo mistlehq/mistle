@@ -28,7 +28,9 @@ function installMatchMediaStub(): void {
   });
 }
 
-function createNewSessionPageQueryClient(): ReturnType<typeof createTestQueryClient> {
+function createNewSessionPageQueryClient(input?: {
+  launchableProfiles?: LaunchableSandboxProfilesResult["items"];
+}): ReturnType<typeof createTestQueryClient> {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
     staleTime: Number.POSITIVE_INFINITY,
@@ -36,7 +38,7 @@ function createNewSessionPageQueryClient(): ReturnType<typeof createTestQueryCli
 
   seedAuthenticatedSession(queryClient);
   queryClient.setQueryData(launchableSandboxProfilesQueryKey(), {
-    items: [
+    items: input?.launchableProfiles ?? [
       buildStoryLaunchableSandboxProfile({
         id: "sbp_profile_alpha",
         displayName: "Alpha Profile",
@@ -52,8 +54,10 @@ function createNewSessionPageQueryClient(): ReturnType<typeof createTestQueryCli
   return queryClient;
 }
 
-function renderNewSessionPage() {
-  const queryClient = createNewSessionPageQueryClient();
+function renderNewSessionPage(input?: {
+  launchableProfiles?: LaunchableSandboxProfilesResult["items"];
+}) {
+  const queryClient = createNewSessionPageQueryClient(input);
 
   return render(
     <QueryClientProvider client={queryClient}>
@@ -97,5 +101,15 @@ describe("NewSessionPage", () => {
     fireEvent.click(screen.getByRole("option", { name: "Alpha Profile" }));
 
     expect((profileCombobox as HTMLInputElement).value).toBe("Alpha Profile");
+  });
+
+  it("shows a neutral notice and hides launch controls when no profiles are available", () => {
+    renderNewSessionPage({
+      launchableProfiles: [],
+    });
+
+    expect(screen.getByText("No launchable sandbox profiles are available yet.")).toBeDefined();
+    expect(screen.queryByRole("combobox", { name: "Sandbox profile" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
   });
 });

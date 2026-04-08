@@ -82,6 +82,10 @@ export function NewSessionPage(): React.JSX.Element {
         fallbackMessage: "Could not load sandbox profiles.",
       })
     : null;
+  const hasNoLaunchableProfiles =
+    !selectableProfilesQuery.isPending &&
+    !selectableProfilesQuery.isError &&
+    selectableProfiles.length === 0;
 
   useEffect(() => {
     if (
@@ -124,77 +128,82 @@ export function NewSessionPage(): React.JSX.Element {
             {startErrorMessage}
           </Notice>
         ) : null}
+        {hasNoLaunchableProfiles ? (
+          <Notice
+            className="[&_[data-slot=notice-content]]:items-center [&_[data-slot=notice-main]]:justify-center [&_[data-slot=notice-title]]:text-center"
+            title="No launchable sandbox profiles are available yet."
+          />
+        ) : null}
 
-        <form className="flex flex-col gap-4" onSubmit={handleCreateSessionSubmit}>
-          <Field>
-            <FieldLabel className="sr-only" htmlFor="new-session-profile-combobox">
-              Sandbox profile
-            </FieldLabel>
-            <FieldContent>
-              <Combobox<{ value: string; label: string }>
-                autoHighlight
-                disabled={selectableProfilesQuery.isPending || startSessionMutation.isPending}
-                inputValue={profileQueryText}
-                items={profileOptions}
-                isItemEqualToValue={(item, value) => item.value === value.value}
-                onInputValueChange={setProfileQueryText}
-                onOpenChange={(open) => {
-                  if (!open) {
-                    setProfileQueryText(selectedProfile?.displayName ?? "");
-                  }
-                }}
-                onValueChange={(value) => {
-                  setStartErrorMessage(null);
-                  if (value === null) {
-                    setProfileQueryText("");
-                    setSelectedProfileId(null);
-                    return;
-                  }
-
-                  setProfileQueryText(value.label);
-                  setSelectedProfileId(value.value);
-                }}
-                value={selectedProfileOption}
-              >
-                <ComboboxInput
-                  className="w-full"
+        {hasNoLaunchableProfiles ? null : (
+          <form className="flex flex-col gap-4" onSubmit={handleCreateSessionSubmit}>
+            <Field>
+              <FieldLabel className="sr-only" htmlFor="new-session-profile-combobox">
+                Sandbox profile
+              </FieldLabel>
+              <FieldContent>
+                <Combobox<{ value: string; label: string }>
+                  autoHighlight
                   disabled={selectableProfilesQuery.isPending || startSessionMutation.isPending}
-                  id="new-session-profile-combobox"
-                  placeholder="Select a sandbox profile"
-                  showClear={false}
-                />
-                <ComboboxContent className="p-0">
-                  <ComboboxList className="max-h-64">
-                    {profileOptions.map((option) => (
-                      <ComboboxItem key={option.value} value={option}>
-                        <span className="truncate">{option.label}</span>
-                      </ComboboxItem>
-                    ))}
-                    <ComboboxEmpty>No matching sandbox profiles.</ComboboxEmpty>
-                  </ComboboxList>
-                </ComboboxContent>
-              </Combobox>
-            </FieldContent>
-          </Field>
+                  inputValue={profileQueryText}
+                  items={profileOptions}
+                  isItemEqualToValue={(item, value) => item.value === value.value}
+                  onInputValueChange={setProfileQueryText}
+                  onOpenChange={(open) => {
+                    if (!open) {
+                      setProfileQueryText(selectedProfile?.displayName ?? "");
+                    }
+                  }}
+                  onValueChange={(value) => {
+                    setStartErrorMessage(null);
+                    if (value === null) {
+                      setProfileQueryText("");
+                      setSelectedProfileId(null);
+                      return;
+                    }
 
-          {selectableProfilesQuery.isPending ? (
-            <p className="text-muted-foreground text-center text-sm">Loading sandbox profiles...</p>
-          ) : null}
-          {selectableProfilesErrorMessage ? (
-            <FieldError errors={[{ message: selectableProfilesErrorMessage }]} />
-          ) : null}
-          {!selectableProfilesQuery.isPending &&
-          !selectableProfilesQuery.isError &&
-          selectableProfiles.length === 0 ? (
-            <FieldError errors={[{ message: "No launchable sandbox profiles are available." }]} />
-          ) : null}
+                    setProfileQueryText(value.label);
+                    setSelectedProfileId(value.value);
+                  }}
+                  value={selectedProfileOption}
+                >
+                  <ComboboxInput
+                    className="w-full"
+                    disabled={selectableProfilesQuery.isPending || startSessionMutation.isPending}
+                    id="new-session-profile-combobox"
+                    placeholder="Select a sandbox profile"
+                    showClear={false}
+                  />
+                  <ComboboxContent className="p-0">
+                    <ComboboxList className="max-h-64">
+                      {profileOptions.map((option) => (
+                        <ComboboxItem key={option.value} value={option}>
+                          <span className="truncate">{option.label}</span>
+                        </ComboboxItem>
+                      ))}
+                      <ComboboxEmpty>No matching sandbox profiles.</ComboboxEmpty>
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </FieldContent>
+            </Field>
 
-          <div className="flex justify-center">
-            <Button disabled={!canStartSession} size="lg" type="submit">
-              {startSessionMutation.isPending ? "Starting sandbox..." : "Start"}
-            </Button>
-          </div>
-        </form>
+            {selectableProfilesQuery.isPending ? (
+              <p className="text-muted-foreground text-center text-sm">
+                Loading sandbox profiles...
+              </p>
+            ) : null}
+            {selectableProfilesErrorMessage ? (
+              <FieldError errors={[{ message: selectableProfilesErrorMessage }]} />
+            ) : null}
+
+            <div className="flex justify-center">
+              <Button disabled={!canStartSession} size="lg" type="submit">
+                {startSessionMutation.isPending ? "Starting sandbox..." : "Start"}
+              </Button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
