@@ -1,6 +1,6 @@
 import type {
   CodexJsonRpcClient,
-  CodexSessionClient,
+  AgentStreamClient,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
@@ -146,11 +146,10 @@ export function useSessionWorkbenchController(input: {
   const transportManager = useSessionWorkbenchTransport({
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  const sessionClientRef = useRef<CodexSessionClient | null>(null);
+  const sessionClientRef = useRef<AgentStreamClient | null>(null);
   const rpcClientRef = useRef<CodexJsonRpcClient | null>(null);
   const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
   const sessionState = useCodexSessionState({
-    transportRef: transportManager.transportRef,
     ensureTransportConnected: transportManager.ensureTransportConnected,
     sessionClientRef,
     rpcClientRef,
@@ -214,6 +213,7 @@ export function useSessionWorkbenchController(input: {
             threadId: sessionSnapshot.activeThreadId,
           }
         : null,
+    ensureTransportConnected: transportManager.ensureTransportConnected,
   });
 
   return {

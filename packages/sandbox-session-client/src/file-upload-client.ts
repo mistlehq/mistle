@@ -1,28 +1,24 @@
 import {
-  DefaultStreamWindowBytes,
-  encodeDataFrame,
   FileUploadResetCodes,
-  parseStreamControlMessage,
   PayloadKindRawBytes,
   type FileUploadCompletedEvent,
   type StreamControlMessage,
-  type StreamOpen,
 } from "@mistle/sandbox-session-protocol";
+import { systemScheduler } from "@mistle/time";
 
+import { SandboxSessionSocketReadyStates } from "./runtime.js";
 import {
-  SandboxSessionSocketReadyStates,
-  type SandboxSessionRuntime,
-  type SandboxSessionSocket,
-} from "./runtime.js";
+  type SandboxSessionStream,
+  type SandboxSessionStreamEvent,
+  type SandboxSessionTransport,
+} from "./transport.js";
 
 const UploadIdleTimeoutMs = 15_000;
 const UploadChunkSizeBytes = 64 * 1024;
 
-export type UploadSandboxImageInput = {
-  connectionUrl: string;
-  file: File;
-  runtime: SandboxSessionRuntime;
-  threadId: string;
+export type UploadStreamClientInput = {
+  idleTimeoutMs?: number;
+  transport: SandboxSessionTransport;
 };
 
 export type UploadedSandboxImage = {
@@ -67,35 +63,16 @@ type ControlMessagePump = {
   waiters: PendingControlMessageWaiter[];
 };
 
-function readMessageEventPayload(event: unknown): unknown {
-  if (typeof event === "object" && event !== null && "data" in event) {
-    return event.data;
-  }
-
-  return event;
-}
-
-function readTextPayload(value: unknown): string | null {
-  return typeof value === "string" ? value : null;
-}
-
-function createUploadOpenMessage(input: {
-  file: File;
-  streamId: number;
-  threadId: string;
-}): StreamOpen {
-  return {
-    type: "stream.open",
-    streamId: input.streamId,
-    channel: {
-      kind: "fileUpload",
-      mimeType: input.file.type,
-      originalFilename: input.file.name,
-      sizeBytes: input.file.size,
-      threadId: input.threadId,
-    },
-  };
-}
+const UploadTimeoutRuntime = {
+  scheduleTimeout(callback: () => void, delayMs: number): { cancel: () => void } {
+    const handle = systemScheduler.schedule(callback, delayMs);
+    return {
+      cancel: () => {
+        systemScheduler.cancel(handle);
+      },
+    };
+  },
+};
 
 function normalizeCompletionEvent(event: FileUploadCompletedEvent): UploadedSandboxImage {
   return {
@@ -121,7 +98,10 @@ function isFileUploadCompletedEvent(message: StreamControlMessage): message is E
   return message.type === "stream.event" && message.event.type === "fileUpload.completed";
 }
 
-function getMessagePump(socket: SandboxSessionSocket): ControlMessagePump {
+function getStreamMessagePump(stream: SandboxSessionStream): {
+  pump: ControlMessagePump;
+  unsubscribe: () => void;
+} {
   const queue: QueuedControlMessage[] = [];
   const waiters: PendingControlMessageWaiter[] = [];
 
@@ -141,7 +121,7 @@ function getMessagePump(socket: SandboxSessionSocket): ControlMessagePump {
       }
 
       const waiterIndex = waiters.findIndex((waiter) => {
-        return queued.message !== undefined && waiter.predicate(queued.message);
+        return waiter.predicate(queued.message);
       });
       if (waiterIndex < 0) {
         queueIndex += 1;
@@ -150,64 +130,60 @@ function getMessagePump(socket: SandboxSessionSocket): ControlMessagePump {
 
       const [waiter] = waiters.splice(waiterIndex, 1);
       queue.splice(queueIndex, 1);
-      if (waiter !== undefined && queued.message !== undefined) {
-        waiter.resolve(queued.message);
-      }
+      waiter?.resolve(queued.message);
     }
   }
 
-  socket.addEventListener("message", (event) => {
-    const payload = readTextPayload(readMessageEventPayload(event));
-    if (payload === null) {
+  const unsubscribe = stream.onEvent((event: SandboxSessionStreamEvent) => {
+    if (event.type === "control") {
+      queue.push({
+        kind: "message",
+        message: event.message,
+      });
+      drain();
       return;
     }
 
-    const controlMessage = parseStreamControlMessage(payload);
-    if (controlMessage === undefined) {
+    if (event.type !== "state_changed") {
       return;
     }
 
-    queue.push({
-      kind: "message",
-      message: controlMessage,
-    });
-    drain();
-  });
-  socket.addEventListener("error", () => {
-    queue.push({
-      kind: "error",
-      error: new Error("Sandbox websocket connection failed."),
-    });
-    drain();
-  });
-  socket.addEventListener("close", () => {
-    queue.push({
-      kind: "error",
-      error: new Error("Sandbox websocket connection closed unexpectedly."),
-    });
-    drain();
+    if (event.state === "transport_closed") {
+      queue.push({
+        kind: "error",
+        error: new Error(event.errorMessage ?? "Sandbox websocket connection closed unexpectedly."),
+      });
+      drain();
+      return;
+    }
+
+    if (event.state === "reset") {
+      queue.push({
+        kind: "error",
+        error: new Error(event.errorMessage ?? "Sandbox upload stream reset unexpectedly."),
+      });
+      drain();
+    }
   });
 
   return {
-    queue,
-    waiters,
+    pump: {
+      queue,
+      waiters,
+    },
+    unsubscribe,
   };
 }
 
 async function waitForControlMessage(input: {
   pump: ControlMessagePump;
   predicate: (message: StreamControlMessage) => boolean;
-  runtime: SandboxSessionRuntime;
+  runtime: {
+    scheduleTimeout: (callback: () => void, delayMs: number) => { cancel: () => void };
+  };
   timeoutMs: number;
   timeoutMessage: string;
 }): Promise<StreamControlMessage> {
-  const queuedError = input.pump.queue.find((queued): queued is { kind: "error"; error: Error } => {
-    return queued.kind === "error";
-  });
-  if (queuedError !== undefined) {
-    throw queuedError.error;
-  }
-
   const queuedMessage = input.pump.queue.find(
     (
       queued,
@@ -221,6 +197,13 @@ async function waitForControlMessage(input: {
   if (queuedMessage !== undefined) {
     input.pump.queue.splice(input.pump.queue.indexOf(queuedMessage), 1);
     return queuedMessage.message;
+  }
+
+  const queuedError = input.pump.queue.find((queued): queued is { kind: "error"; error: Error } => {
+    return queued.kind === "error";
+  });
+  if (queuedError !== undefined) {
+    throw queuedError.error;
   }
 
   return await new Promise((resolve, reject) => {
@@ -248,169 +231,85 @@ async function waitForControlMessage(input: {
   });
 }
 
-async function waitForUploadTerminalResult(input: {
-  completedUpload: UploadedSandboxImage | null;
-  pump: ControlMessagePump;
-  runtime: SandboxSessionRuntime;
-  socket: SandboxSessionSocket;
-  streamId: number;
-}): Promise<UploadedSandboxImage> {
-  let completedUpload = input.completedUpload;
+export class UploadStreamClient {
+  readonly #idleTimeoutMs: number;
+  readonly #transport: SandboxSessionTransport;
 
-  while (true) {
-    const uploadResultMessage = await waitForControlMessage({
-      pump: input.pump,
-      predicate: (message) => {
-        return (
-          message.streamId === input.streamId &&
-          (isFileUploadCompletedEvent(message) ||
-            message.type === "stream.complete" ||
-            message.type === "stream.reset")
-        );
-      },
-      runtime: input.runtime,
-      timeoutMs: UploadIdleTimeoutMs,
-      timeoutMessage: "Timed out while waiting for upload completion.",
-    });
-    if (uploadResultMessage.type === "stream.reset") {
-      throw toFileUploadError({
-        code: uploadResultMessage.code,
-        message: uploadResultMessage.message,
-      });
-    }
-    if (uploadResultMessage.type === "stream.complete") {
-      if (completedUpload === null) {
-        throw new Error("Received stream.complete before file upload completion event.");
-      }
-
-      input.socket.close(1000, "Upload completed.");
-      return completedUpload;
-    }
-    if (!isFileUploadCompletedEvent(uploadResultMessage)) {
-      throw new Error("Expected file upload completion event before stream completion.");
-    }
-
-    completedUpload = normalizeCompletionEvent(uploadResultMessage.event);
+  constructor(input: UploadStreamClientInput) {
+    this.#transport = input.transport;
+    this.#idleTimeoutMs = input.idleTimeoutMs ?? UploadIdleTimeoutMs;
   }
-}
 
-export async function uploadSandboxImage(
-  input: UploadSandboxImageInput,
-): Promise<UploadedSandboxImage> {
-  const socket = input.runtime.createSocket(input.connectionUrl);
-  const messagePump = getMessagePump(socket);
-  const streamId = input.runtime.createStreamId();
-  let availableWindowBytes = 0;
-  let completedUpload: UploadedSandboxImage | null = null;
-
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const handleOpen = (): void => {
-        cleanup();
-        resolve();
-      };
-      const handleError = (): void => {
-        cleanup();
-        reject(new Error("Sandbox websocket connection failed."));
-      };
-      const handleClose = (): void => {
-        cleanup();
-        reject(new Error("Sandbox websocket connection closed before upload stream was ready."));
-      };
-      const cleanup = (): void => {
-        socket.removeEventListener("open", handleOpen);
-        socket.removeEventListener("error", handleError);
-        socket.removeEventListener("close", handleClose);
-      };
-
-      socket.addEventListener("open", handleOpen);
-      socket.addEventListener("error", handleError);
-      socket.addEventListener("close", handleClose);
-    });
-
-    await socket.send(JSON.stringify(createUploadOpenMessage({ ...input, streamId })));
-
-    const openResponse = await waitForControlMessage({
-      pump: messagePump,
-      predicate: (message) => {
-        return (
-          message.streamId === streamId &&
-          (message.type === "stream.open.ok" || message.type === "stream.open.error")
-        );
-      },
-      runtime: input.runtime,
-      timeoutMs: UploadIdleTimeoutMs,
-      timeoutMessage: "Timed out while waiting for upload stream to open.",
-    });
-    if (openResponse.type === "stream.open.error") {
-      throw new Error(openResponse.message);
+  async uploadImage(input: { file: File; threadId: string }): Promise<UploadedSandboxImage> {
+    if (this.#transport.readyState !== SandboxSessionSocketReadyStates.OPEN) {
+      throw new Error("Sandbox session socket is not open.");
     }
 
-    availableWindowBytes = DefaultStreamWindowBytes;
+    const stream = await this.#transport.openStream({
+      channel: {
+        kind: "fileUpload",
+        mimeType: input.file.type,
+        originalFilename: input.file.name,
+        sizeBytes: input.file.size,
+        threadId: input.threadId,
+      },
+    });
+    const { pump, unsubscribe } = getStreamMessagePump(stream);
+    let completedUpload: UploadedSandboxImage | null = null;
 
-    let offset = 0;
-    while (offset < input.file.size) {
-      if (socket.readyState !== SandboxSessionSocketReadyStates.OPEN) {
-        throw new Error("Sandbox session socket is not open.");
-      }
-      if (availableWindowBytes === 0) {
-        const nextControlMessage = await waitForControlMessage({
-          pump: messagePump,
-          predicate: (message) => {
-            return (
-              message.streamId === streamId &&
-              (message.type === "stream.window" ||
-                message.type === "stream.reset" ||
-                (message.type === "stream.event" && message.event.type === "fileUpload.completed"))
-            );
-          },
-          runtime: input.runtime,
-          timeoutMs: UploadIdleTimeoutMs,
-          timeoutMessage: "Timed out while waiting for upload progress.",
-        });
-        if (nextControlMessage.type === "stream.window") {
-          availableWindowBytes += nextControlMessage.bytes;
-        } else if (nextControlMessage.type === "stream.reset") {
-          throw toFileUploadError({
-            code: nextControlMessage.code,
-            message: nextControlMessage.message,
-          });
-        } else if (isFileUploadCompletedEvent(nextControlMessage)) {
-          completedUpload = normalizeCompletionEvent(nextControlMessage.event);
-        }
-      }
-
-      const nextOffset = Math.min(
-        input.file.size,
-        offset + Math.min(UploadChunkSizeBytes, availableWindowBytes),
-      );
-      const chunkBytes = new Uint8Array(await input.file.slice(offset, nextOffset).arrayBuffer());
-      availableWindowBytes -= chunkBytes.byteLength;
-      await socket.send(
-        encodeDataFrame({
-          streamId,
+    try {
+      let offset = 0;
+      while (offset < input.file.size) {
+        const nextOffset = Math.min(input.file.size, offset + UploadChunkSizeBytes);
+        const chunkBytes = new Uint8Array(await input.file.slice(offset, nextOffset).arrayBuffer());
+        await stream.sendDataFrame({
           payloadKind: PayloadKindRawBytes,
           payload: chunkBytes,
-        }),
-      );
-      offset = nextOffset;
-    }
+        });
+        offset = nextOffset;
+      }
 
-    await socket.send(
-      JSON.stringify({
+      await stream.sendControl({
         type: "stream.close",
-        streamId,
-      }),
-    );
-    return await waitForUploadTerminalResult({
-      completedUpload,
-      pump: messagePump,
-      runtime: input.runtime,
-      socket,
-      streamId,
-    });
-  } catch (error) {
-    socket.close(1000, "Upload aborted.");
-    throw error;
+      });
+
+      while (true) {
+        const uploadResultMessage = await waitForControlMessage({
+          pump,
+          predicate: (message) => {
+            return (
+              message.streamId === stream.streamId &&
+              (isFileUploadCompletedEvent(message) ||
+                message.type === "stream.complete" ||
+                message.type === "stream.reset")
+            );
+          },
+          runtime: UploadTimeoutRuntime,
+          timeoutMs: this.#idleTimeoutMs,
+          timeoutMessage: "Timed out while waiting for upload completion.",
+        });
+        if (uploadResultMessage.type === "stream.reset") {
+          throw toFileUploadError({
+            code: uploadResultMessage.code,
+            message: uploadResultMessage.message,
+          });
+        }
+        if (uploadResultMessage.type === "stream.complete") {
+          if (completedUpload === null) {
+            throw new Error("Received stream.complete before file upload completion event.");
+          }
+
+          return completedUpload;
+        }
+        if (!isFileUploadCompletedEvent(uploadResultMessage)) {
+          throw new Error("Expected file upload completion event before stream completion.");
+        }
+
+        completedUpload = normalizeCompletionEvent(uploadResultMessage.event);
+      }
+    } finally {
+      unsubscribe();
+      stream.dispose();
+    }
   }
 }
