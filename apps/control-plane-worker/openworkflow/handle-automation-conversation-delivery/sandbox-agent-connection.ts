@@ -1,5 +1,6 @@
 import {
-  SandboxSessionClient,
+  AgentStreamClient,
+  SandboxSessionTransport,
   type SandboxSessionSocket,
   SandboxSessionSocketReadyStates,
 } from "@mistle/sandbox-session-client";
@@ -22,7 +23,7 @@ export type CloseSandboxAgentConnectionInput = {
 export type SandboxAgentConnection = {
   streamId: number;
   socket: SandboxSessionSocket;
-  sessionClient: SandboxSessionClient;
+  sessionClient: AgentStreamClient;
   sendText: (message: string) => Promise<void>;
   close: (input?: CloseSandboxAgentConnectionInput) => Promise<void>;
 };
@@ -33,7 +34,7 @@ export type SendSandboxAgentMessageInput = {
   autoClose?: boolean;
 };
 
-function formatOpenErrorMessage(client: SandboxSessionClient): string {
+function formatOpenErrorMessage(client: AgentStreamClient): string {
   const openError = client.openError;
   if (openError === null) {
     return (
@@ -44,7 +45,7 @@ function formatOpenErrorMessage(client: SandboxSessionClient): string {
   return `Sandbox agent stream.open request was rejected (${openError.code}): ${openError.message}`;
 }
 
-function formatResetErrorMessage(client: SandboxSessionClient): string | null {
+function formatResetErrorMessage(client: AgentStreamClient): string | null {
   const resetInfo = client.resetInfo;
   if (resetInfo === null) {
     return null;
@@ -56,16 +57,24 @@ function formatResetErrorMessage(client: SandboxSessionClient): string | null {
 export async function connectSandboxAgentConnection(
   input: ConnectSandboxAgentConnectionInput,
 ): Promise<SandboxAgentConnection> {
-  const client = new SandboxSessionClient({
-    connectionUrl: input.connectionUrl,
-    runtime: createNodeSandboxSessionRuntime(),
+  const runtime = createNodeSandboxSessionRuntime();
+  const transport = new SandboxSessionTransport({
+    runtime,
     connectTimeoutMs: input.connectTimeoutMs ?? DefaultConnectTimeoutMs,
+  });
+  const client = new AgentStreamClient({
+    transport,
+  });
+
+  await transport.connect({
+    connectionUrl: input.connectionUrl,
   });
 
   try {
     await client.connect();
   } catch (error) {
     client.disconnect();
+    transport.disconnect();
 
     if (client.openError !== null) {
       throw new Error(formatOpenErrorMessage(client), {
@@ -79,12 +88,14 @@ export async function connectSandboxAgentConnection(
   const streamId = client.streamId;
   if (streamId === null) {
     client.disconnect();
+    transport.disconnect();
     throw new Error("Sandbox session client did not expose streamId after connect.");
   }
 
   const socket = client.socket;
   if (socket === null) {
     client.disconnect();
+    transport.disconnect();
     throw new Error("Sandbox session client did not expose socket after connect.");
   }
 
@@ -109,7 +120,8 @@ export async function connectSandboxAgentConnection(
     close: async (closeInput) =>
       await new Promise<void>((resolve, reject) => {
         if (socket.readyState === SandboxSessionSocketReadyStates.CLOSED) {
-          client.disconnect(
+          client.disconnect();
+          transport.disconnect(
             closeInput?.code ?? DefaultCloseCode,
             closeInput?.reason ?? DefaultCloseReason,
           );
@@ -137,7 +149,8 @@ export async function connectSandboxAgentConnection(
         socket.addEventListener("close", handleClose);
         socket.addEventListener("error", handleError);
 
-        client.disconnect(
+        client.disconnect();
+        transport.disconnect(
           closeInput?.code ?? DefaultCloseCode,
           closeInput?.reason ?? DefaultCloseReason,
         );

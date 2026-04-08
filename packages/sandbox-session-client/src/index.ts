@@ -1,4 +1,4 @@
-export * from "./client.js";
+export * from "./agent-stream-client.js";
 export * from "./file-upload-client.js";
 export * from "./pty-client.js";
 export * from "./pty-types.js";

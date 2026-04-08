@@ -14,6 +14,7 @@ import {
   type CodexThreadSummary,
   type CodexTurnInputLocalImageItem,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 
@@ -135,6 +136,7 @@ export type UseCodexSessionStateResult = {
 
 export function useCodexSessionState(): UseCodexSessionStateResult {
   const queryClient = useQueryClient();
+  const transportRef = useRef<SandboxSessionTransport | null>(null);
   const sessionClientRef = useRef<CodexSessionClient | null>(null);
   const rpcClientRef = useRef<CodexJsonRpcClient | null>(null);
   const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
@@ -273,6 +275,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     onServerRequestReceived: handleServerRequestReceived,
     refreshThreadCollections,
     rpcClientRef,
+    transportRef,
     sessionClientRef,
     sessionEventUnsubscribersRef,
     lifecycleErrorMessage,

@@ -11,6 +11,7 @@ import {
   CodexJsonRpcClient as CodexJsonRpcClientConstructor,
   CodexSessionClient as CodexSessionClientConstructor,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
@@ -89,6 +90,7 @@ export function useCodexSessionConnection(input: {
     generation?: number;
   }) => Promise<CodexThreadCollectionsRefreshResult>;
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
+  transportRef: RefObject<SandboxSessionTransport | null>;
   sessionClientRef: RefObject<CodexSessionClient | null>;
   sessionEventUnsubscribersRef: RefObject<(() => void)[]>;
   lifecycleErrorMessage: string | null;
@@ -139,10 +141,17 @@ export function useCodexSessionConnection(input: {
       input.sessionEventUnsubscribersRef.current = [];
       input.rpcClientRef.current?.dispose();
       input.rpcClientRef.current = null;
-      input.sessionClientRef.current?.disconnect(1000, reason);
+      input.sessionClientRef.current?.disconnect();
       input.sessionClientRef.current = null;
+      input.transportRef.current?.disconnect(1000, reason);
+      input.transportRef.current = null;
     },
-    [input.rpcClientRef, input.sessionClientRef, input.sessionEventUnsubscribersRef],
+    [
+      input.rpcClientRef,
+      input.sessionClientRef,
+      input.sessionEventUnsubscribersRef,
+      input.transportRef,
+    ],
   );
 
   const detachSessionTransport = useCallback((): void => {
@@ -327,9 +336,16 @@ export function useCodexSessionConnection(input: {
         throw describeCodexSessionStepError("Minting sandbox connection token", error);
       }
 
-      const sessionClient = new CodexSessionClientConstructor({
-        connectionUrl: mintedConnection.connectionUrl,
+      const transport = new SandboxSessionTransport({
         runtime: createBrowserCodexSessionRuntime(),
+      });
+      input.transportRef.current = transport;
+      await transport.connect({
+        connectionUrl: mintedConnection.connectionUrl,
+      });
+      input.ensureCurrentGeneration(generation);
+      const sessionClient = new CodexSessionClientConstructor({
+        transport,
       });
       const rpcClient = new CodexJsonRpcClientConstructor(sessionClient);
       attachProtocolListeners({
@@ -350,7 +366,8 @@ export function useCodexSessionConnection(input: {
         await rpcClient.initialize();
         input.ensureCurrentGeneration(generation);
       } catch (error) {
-        sessionClient.disconnect(1000, "Initialization failed.");
+        sessionClient.disconnect();
+        transport.disconnect(1000, "Initialization failed.");
         throw describeCodexSessionStepError("Initializing Codex app server", error);
       }
 

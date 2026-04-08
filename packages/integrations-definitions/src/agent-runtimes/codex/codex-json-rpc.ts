@@ -1,5 +1,5 @@
 import {
-  SandboxSessionClient,
+  AgentStreamClient,
   SandboxSessionSendGuarantees,
   type SandboxSessionSendGuarantee,
   type SandboxSessionResetInfo,
@@ -65,7 +65,7 @@ export class CodexJsonRpcRequestError extends Error {
 }
 
 export class CodexJsonRpcClient {
-  readonly #sessionClient: SandboxSessionClient;
+  readonly #sessionClient: AgentStreamClient;
   readonly #pendingRequests = new Map<CodexJsonRpcId, PendingRequest>();
   readonly #notificationListeners = new Set<NotificationListener>();
   readonly #serverRequestListeners = new Set<ServerRequestListener>();
@@ -73,7 +73,7 @@ export class CodexJsonRpcClient {
 
   #nextId = 0;
 
-  constructor(sessionClient: SandboxSessionClient) {
+  constructor(sessionClient: AgentStreamClient) {
     this.#sessionClient = sessionClient;
     this.#unsubscribeSessionEvent = sessionClient.onEvent((event) => {
       this.#handleSessionEvent(event);
