@@ -45,6 +45,13 @@ type SessionMainPanelHandoffResult = {
 
 const ChatRestoreTimeoutMs = 30_000;
 
+type ChatRestoreConnectionInput = {
+  sandboxInstanceId: string;
+  targetThreadId: string | null;
+  providerThreadId?: string;
+  selectionPolicy?: "most_recently_updated";
+};
+
 async function closeAndDisconnectCliPty(
   cliPtyState: ReturnType<typeof useSandboxPtyState>,
 ): Promise<void> {
@@ -54,7 +61,24 @@ async function closeAndDisconnectCliPty(
   await Promise.all([closePromise, disconnectPromise]);
 }
 
-export type { SessionMainPanelHandoffResult, UseSessionMainPanelHandoffInput };
+export function resolveChatRestoreConnectionInput(input: {
+  sandboxInstanceId: string;
+  durableThreadId: string | null;
+}): ChatRestoreConnectionInput {
+  return {
+    sandboxInstanceId: input.sandboxInstanceId,
+    targetThreadId: input.durableThreadId,
+    ...(input.durableThreadId === null
+      ? { selectionPolicy: "most_recently_updated" as const }
+      : { providerThreadId: input.durableThreadId }),
+  };
+}
+
+export type {
+  ChatRestoreConnectionInput,
+  SessionMainPanelHandoffResult,
+  UseSessionMainPanelHandoffInput,
+};
 
 export function useSessionMainPanelHandoff(
   input: UseSessionMainPanelHandoffInput,
@@ -139,12 +163,12 @@ export function useSessionMainPanelHandoff(
 
     // Restore honors durable provider authority when one exists. Otherwise local
     // sessions intentionally reconnect using the most recently updated thread.
-    input.lifecycle.connectSession({
-      sandboxInstanceId: input.sandboxInstanceId,
-      targetThreadId: durableThreadId,
-      ...(durableThreadId === null ? {} : { providerThreadId: durableThreadId }),
-      selectionPolicy: durableThreadId === null ? "most_recently_updated" : "oldest",
-    });
+    input.lifecycle.connectSession(
+      resolveChatRestoreConnectionInput({
+        sandboxInstanceId: input.sandboxInstanceId,
+        durableThreadId,
+      }),
+    );
   }, [
     clearRestoreTimeout,
     input.cliPtyState,
