@@ -483,11 +483,7 @@ export function SandboxProfileBindingConfigEditor(input: {
   }
 
   if (configUiModel.mode === "no-config") {
-    return (
-      <p className="text-muted-foreground text-sm">
-        No additional config required for this binding.
-      </p>
-    );
+    return <></>;
   }
 
   return (

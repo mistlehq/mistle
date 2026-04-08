@@ -254,6 +254,7 @@ function CheckboxesWidget(
 
   return (
     <div
+      data-slot="checkbox-group"
       className={cn(
         "gap-3 flex flex-col",
         inline ? "sm:flex-row sm:flex-wrap sm:gap-4" : undefined,

@@ -115,4 +115,40 @@ describe("formatSandboxProfileBindingSummaryItems", () => {
       },
     ]);
   });
+
+  it("returns no summary items when a binding has no additional config", () => {
+    const target: IntegrationTargetSummary = {
+      targetKey: "target-linear",
+      displayName: "Linear",
+      familyId: "linear",
+      variantId: "linear-default",
+      config: {},
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+    const connection: IntegrationConnectionSummary = {
+      id: "connection-linear",
+      displayName: "Linear Workspace",
+      targetKey: target.targetKey,
+      status: "active",
+      config: {
+        connection_method: "api-key",
+      },
+    };
+    const row: SandboxProfileBindingEditorRow = {
+      clientId: "row-linear",
+      connectionId: connection.id,
+      kind: "connector",
+      config: {},
+    };
+
+    expect(
+      formatSandboxProfileBindingSummaryItems({
+        row,
+        availableConnections: [connection],
+        availableTargets: [target],
+      }),
+    ).toEqual([]);
+  });
 });

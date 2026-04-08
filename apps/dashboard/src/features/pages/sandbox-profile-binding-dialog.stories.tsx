@@ -11,6 +11,8 @@ import {
   StoryGithubResources,
   StoryIntegrationConnections,
   StoryIntegrationTargets,
+  StoryJiraConnection,
+  StoryLinearConnection,
   StoryOpenAiConnection,
 } from "./integrations-editor-section-story-support.js";
 import type { SandboxProfileBindingEditorRow } from "./sandbox-profile-binding-config-editor.js";

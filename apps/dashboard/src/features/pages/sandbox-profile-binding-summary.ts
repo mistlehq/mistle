@@ -162,12 +162,7 @@ export function formatSandboxProfileBindingSummaryItems(input: {
   }
 
   if (configUiModel.mode === "no-config") {
-    return [
-      {
-        label: "Config",
-        value: "No additional config required.",
-      },
-    ];
+    return [];
   }
 
   if (configUiModel.mode === "unsupported") {

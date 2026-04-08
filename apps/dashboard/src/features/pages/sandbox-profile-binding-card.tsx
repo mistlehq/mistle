@@ -103,16 +103,18 @@ export function SandboxProfileBindingCard(input: {
         </div>
       </div>
 
-      <dl className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {summaryItems.map((item) => (
-          <div className="gap-1 flex flex-col" key={item.label}>
-            <dt className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-              {item.label}
-            </dt>
-            <dd className="text-sm">{item.value}</dd>
-          </div>
-        ))}
-      </dl>
+      {summaryItems.length > 0 ? (
+        <dl className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {summaryItems.map((item) => (
+            <div className="gap-1 flex flex-col" key={item.label}>
+              <dt className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+                {item.label}
+              </dt>
+              <dd className="text-sm">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
 
       {input.errorMessage === undefined ? null : (
         <Notice variant="alert">{input.errorMessage}</Notice>
