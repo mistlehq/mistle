@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 
-import { FileUploadRejectedError, FileUploadResetCodes } from "@mistle/sandbox-session-client";
+import {
+  FileUploadRejectedError,
+  FileUploadResetCodes,
+  SandboxSessionTransport,
+} from "@mistle/sandbox-session-client";
+import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -42,29 +47,34 @@ function createDeferredPromise<T>() {
 }
 
 function createDependencies(input: {
-  uploadSandboxImage: SessionComposerAttachmentControlDependencies["uploadSandboxImage"];
+  uploadImage: (input: { file: File; threadId: string }) => Promise<typeof UploadedImageFixture>;
 }): SessionComposerAttachmentControlDependencies {
   return {
-    mintSandboxInstanceConnectionToken: async () => {
+    createUploadStreamClient: () => {
       return {
-        instanceId: "sbi_123",
-        connectionUrl: "ws://sandbox.test/upload",
-        connectionToken: "tok_123",
-        connectionExpiresAt: "2026-03-30T00:00:00.000Z",
+        uploadImage: input.uploadImage,
       };
     },
-    uploadSandboxImage: input.uploadSandboxImage,
   };
 }
 
 function renderAttachmentControl(input: {
   dependencies: SessionComposerAttachmentControlDependencies;
 }) {
+  const transport = new SandboxSessionTransport({
+    runtime: createBrowserSandboxSessionRuntime(),
+  });
   return renderHook(() =>
     useSessionComposerAttachmentControl({
       attachmentTarget: {
         sandboxInstanceId: "sbi_123",
         threadId: "thread_123",
+      },
+      ensureTransportConnected: async () => {
+        return {
+          sandboxInstanceId: "sbi_123",
+          transport,
+        };
       },
       dependencies: input.dependencies,
     }),
@@ -89,7 +99,7 @@ describe("useSessionComposerAttachmentControl", () => {
     const deferredUpload = createDeferredPromise<typeof UploadedImageFixture>();
     const { result } = renderAttachmentControl({
       dependencies: createDependencies({
-        uploadSandboxImage: async () => {
+        uploadImage: async () => {
           return await deferredUpload.promise;
         },
       }),
@@ -117,7 +127,7 @@ describe("useSessionComposerAttachmentControl", () => {
     let attemptCount = 0;
     const { result } = renderAttachmentControl({
       dependencies: createDependencies({
-        uploadSandboxImage: async () => {
+        uploadImage: async () => {
           attemptCount += 1;
           if (attemptCount === 1) {
             throw new FileUploadRejectedError({
