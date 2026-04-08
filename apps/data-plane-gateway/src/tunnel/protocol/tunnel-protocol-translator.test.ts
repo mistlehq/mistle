@@ -170,6 +170,106 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
+  it("allows multiple concurrent stream.open messages from the same client session", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 41,
+          channel: {
+            kind: "pty",
+            session: "create",
+            ptySessionId: "terminal",
+            cols: 80,
+            rows: 24,
+          },
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "forward",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "pty",
+            session: "create",
+            ptySessionId: "terminal",
+            cols: 80,
+            rows: 24,
+          },
+        }),
+      },
+    });
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 42,
+          channel: {
+            kind: "agent",
+          },
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "forward",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 2,
+          channel: {
+            kind: "agent",
+          },
+        }),
+      },
+    });
+  });
+
+  it("rejects duplicate client stream bindings even within the same client session", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await translator.translateInboundMessage({
+      clientSessionId: "conn_1",
+      payload: JSON.stringify({
+        type: "stream.open",
+        streamId: 41,
+        channel: {
+          kind: "pty",
+          session: "create",
+          ptySessionId: "terminal",
+          cols: 80,
+          rows: 24,
+        },
+      }),
+      sandboxInstanceId: SandboxInstanceId,
+      sourcePeerSide: "connection",
+    });
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 41,
+          channel: {
+            kind: "agent",
+          },
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).rejects.toThrow("Client stream binding already exists for session 'conn_1' stream 41.");
+  });
+
   it("maps a connection fileUpload stream.open to the bootstrap stream id", async () => {
     const { translator } = await createTranslatorHarness();
 

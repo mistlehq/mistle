@@ -16,7 +16,6 @@ import {
 import { BootstrapTunnelNotConnectedError } from "../bootstrap-tunnel-not-connected-error.js";
 import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
 import {
-  ClientSessionActiveStreamError,
   TunnelSessionBindingLimitExceededError,
   type ClientStreamBinding,
 } from "../tunnel-session/index.js";
@@ -200,13 +199,6 @@ function toStreamOpenErrorPayload(input: { error: Error; streamId: number }): st
   if (input.error instanceof BootstrapTunnelNotConnectedError) {
     return createStreamOpenErrorPayload({
       code: "bootstrap_not_connected",
-      message: input.error.message,
-      streamId: input.streamId,
-    });
-  }
-  if (input.error instanceof ClientSessionActiveStreamError) {
-    return createStreamOpenErrorPayload({
-      code: "client_session_already_open",
       message: input.error.message,
       streamId: input.streamId,
     });

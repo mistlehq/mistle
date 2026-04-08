@@ -1,5 +1,4 @@
 export {
-  ClientSessionActiveStreamError,
   TunnelSessionBindingLimitExceededError,
   type ClientStreamBinding,
 } from "./sandbox-tunnel-session.js";

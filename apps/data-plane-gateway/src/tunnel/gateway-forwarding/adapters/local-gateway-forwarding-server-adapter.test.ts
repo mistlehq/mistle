@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { BootstrapTunnelNotConnectedError } from "../../bootstrap-tunnel-not-connected-error.js";
 import { InMemoryTunnelSessionRegistryAdapter } from "../../tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
-import {
-  ClientSessionActiveStreamError,
-  TunnelSessionRegistry,
-} from "../../tunnel-session/index.js";
+import { TunnelSessionRegistry } from "../../tunnel-session/index.js";
 import { LocalGatewayForwardingServerAdapter } from "./local-gateway-forwarding-server-adapter.js";
 
 describe("LocalGatewayForwardingServerAdapter", () => {
@@ -138,7 +135,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
     });
   });
 
-  it("rejects opening a second active stream for the same client session", async () => {
+  it("allows opening multiple active streams for the same client session", async () => {
     const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter(2));
     registry.attachBootstrapSession({
       sandboxInstanceId: "sbi_test",
@@ -174,6 +171,19 @@ describe("LocalGatewayForwardingServerAdapter", () => {
           clientStreamId: 8,
         },
       ),
-    ).rejects.toThrow(ClientSessionActiveStreamError);
+    ).resolves.toEqual({
+      bootstrapTarget: {
+        sandboxInstanceId: "sbi_test",
+        side: "bootstrap",
+        nodeId: "dpg_test",
+        sessionId: "sess_bootstrap",
+      },
+      binding: {
+        channelKind: "agent",
+        clientSessionId: "conn_1",
+        clientStreamId: 8,
+        tunnelStreamId: 2,
+      },
+    });
   });
 });
