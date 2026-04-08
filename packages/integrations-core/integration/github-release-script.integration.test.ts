@@ -24,6 +24,7 @@ const ApiKeyConnectionMethods = [
         label: "API key",
         inputType: "password",
         secretType: "api_key",
+        slotKey: "test.github-release.api-key.api-key",
       },
     ],
   },

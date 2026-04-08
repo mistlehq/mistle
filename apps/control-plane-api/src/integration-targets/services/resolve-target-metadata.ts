@@ -89,6 +89,7 @@ export type ResolvedIntegrationTargetMetadata = {
           placeholder?: string;
           description?: string;
           inputType: "password" | "text";
+          slotKey: string;
         }[];
       }
     | {
@@ -125,6 +126,7 @@ function resolveConnectionMethod(
         ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
         ...(field.description === undefined ? {} : { description: field.description }),
         inputType: field.inputType,
+        slotKey: field.slotKey,
       })),
     };
   }

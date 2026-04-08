@@ -46,6 +46,7 @@ function toBrowserSafeConnectionMethod(
       ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
       ...(field.description === undefined ? {} : { description: field.description }),
       inputType: field.inputType,
+      slotKey: field.slotKey,
     })),
   };
 }

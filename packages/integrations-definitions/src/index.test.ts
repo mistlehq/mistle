@@ -40,14 +40,26 @@ describe("integrations-definitions index", () => {
           id: "jira-personal-api-token",
           label: "Personal API token",
           kind: "form",
-          secretFields: [{ name: "apiKey", label: "Personal API token", inputType: "password" }],
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "Personal API token",
+              inputType: "password",
+              slotKey: "jira.jira-default.jira-personal-api-token.api-key",
+            },
+          ],
         },
         {
           id: "jira-service-account-api-token",
           label: "Service account API token",
           kind: "form",
           secretFields: [
-            { name: "apiKey", label: "Service account API token", inputType: "password" },
+            {
+              name: "apiKey",
+              label: "Service account API token",
+              inputType: "password",
+              slotKey: "jira.jira-default.jira-service-account-api-token.api-key",
+            },
           ],
         },
         {
@@ -59,6 +71,8 @@ describe("integrations-definitions index", () => {
               name: "clientSecret",
               label: "Client secret",
               inputType: "password",
+              slotKey:
+                "jira.jira-default.jira-service-account-oauth-client-credentials.client-secret",
             },
           ],
         },
@@ -92,7 +106,14 @@ describe("integrations-definitions index", () => {
           id: "api-key",
           label: "API key",
           kind: "form",
-          secretFields: [{ name: "apiKey", label: "API key", inputType: "password" }],
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+              slotKey: "github.github-cloud.api-key.api-key",
+            },
+          ],
         },
         {
           id: "github-app-installation",
@@ -160,7 +181,14 @@ describe("integrations-definitions index", () => {
           id: "api-key",
           label: "API key",
           kind: "form",
-          secretFields: [{ name: "apiKey", label: "API key", inputType: "password" }],
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+              slotKey: "github.github-enterprise-server.api-key.api-key",
+            },
+          ],
         },
         {
           id: "github-app-installation",
@@ -200,7 +228,14 @@ describe("integrations-definitions index", () => {
           id: "api-key",
           label: "API key",
           kind: "form",
-          secretFields: [{ name: "apiKey", label: "API key", inputType: "password" }],
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+              slotKey: "linear.linear-default.api-key.api-key",
+            },
+          ],
         },
       ],
     });

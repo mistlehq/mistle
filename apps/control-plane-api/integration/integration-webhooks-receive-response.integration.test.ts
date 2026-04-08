@@ -42,6 +42,7 @@ const ImmediateResponseWebhookDefinition: IntegrationDefinition<
           label: "API key",
           inputType: "password",
           secretType: "api_key",
+          slotKey: "test-webhook.test-webhook-response.api-key.api-key",
         },
       ],
     },

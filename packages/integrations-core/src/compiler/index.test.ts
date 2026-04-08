@@ -43,6 +43,7 @@ const ApiKeyConnectionMethods = [
         label: "API key",
         inputType: "password",
         secretType: "api_key",
+        slotKey: "test.openai.api-key.api-key",
       },
     ],
   },

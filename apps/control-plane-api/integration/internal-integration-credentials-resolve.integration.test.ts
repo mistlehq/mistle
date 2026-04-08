@@ -64,6 +64,7 @@ function createClientCredentialsRegistry(): IntegrationRegistry {
             label: "Client secret",
             inputType: "password",
             secretType: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+            slotKey: "oauth2.client-credentials-test.oauth2-client-credentials-test.client-secret",
           },
         ],
         configSchema: z

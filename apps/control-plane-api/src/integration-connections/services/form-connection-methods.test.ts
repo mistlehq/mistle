@@ -31,6 +31,7 @@ describe("resolveFormConnectionMethodOrThrow", () => {
               label: "API key",
               inputType: "password",
               secretType: IntegrationCredentialSecretKinds.API_KEY,
+              slotKey: "test.api-key",
             },
           ],
           configSchema: z
@@ -98,6 +99,7 @@ describe("parseFormConnectionConfigOrThrow", () => {
             label: "API key",
             inputType: "password",
             secretType: IntegrationCredentialSecretKinds.API_KEY,
+            slotKey: "test.api-key",
           },
         ],
         configSchema: z
@@ -133,6 +135,7 @@ describe("parseFormConnectionConfigOrThrow", () => {
               label: "API key",
               inputType: "password",
               secretType: IntegrationCredentialSecretKinds.API_KEY,
+              slotKey: "test.api-key",
             },
           ],
           configSchema: z
@@ -219,6 +222,7 @@ describe("parseCreateFormSecretsOrThrow", () => {
             label: "API key",
             inputType: "password",
             secretType: IntegrationCredentialSecretKinds.API_KEY,
+            slotKey: "test.api-key",
           },
         ],
         configSchema: z.object({}).loose(),
@@ -236,6 +240,7 @@ describe("parseCreateFormSecretsOrThrow", () => {
           label: "API key",
           inputType: "password",
           secretType: IntegrationCredentialSecretKinds.API_KEY,
+          slotKey: "test.api-key",
         },
         normalizedValue: "sk-test-api-key",
         persistedSecretRef: {
@@ -261,6 +266,7 @@ describe("parseUpdateFormSecretsOrThrow", () => {
             label: "API key",
             inputType: "password",
             secretType: IntegrationCredentialSecretKinds.API_KEY,
+            slotKey: "test.api-key",
           },
         ],
         configSchema: z.object({}).loose(),
@@ -278,6 +284,7 @@ describe("parseUpdateFormSecretsOrThrow", () => {
           label: "API key",
           inputType: "password",
           secretType: IntegrationCredentialSecretKinds.API_KEY,
+          slotKey: "test.api-key",
         },
         normalizedValue: "sk-rotated-api-key",
         persistedSecretRef: {

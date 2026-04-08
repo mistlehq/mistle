@@ -7,6 +7,12 @@ export const OpenAiApiKeyCredentialSecretTypes: {
   API_KEY: "api_key",
 };
 
+export const OpenAiCredentialSlotKeys: {
+  API_KEY: "openai.openai-default.api-key.api-key";
+} = {
+  API_KEY: "openai.openai-default.api-key.api-key",
+};
+
 export const OpenAiConnectionConfigSchema = z.looseObject({
   connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),
 });

@@ -12,6 +12,15 @@ export const JiraCredentialSecretTypes = {
   OAUTH2_CLIENT_SECRET: "oauth2_client_secret",
 } as const;
 
+export const JiraCredentialSlotKeys = {
+  PERSONAL_API_TOKEN_API_KEY: "jira.jira-default.jira-personal-api-token.api-key",
+  SERVICE_ACCOUNT_API_TOKEN_API_KEY: "jira.jira-default.jira-service-account-api-token.api-key",
+  SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS_CLIENT_SECRET:
+    "jira.jira-default.jira-service-account-oauth-client-credentials.client-secret",
+  SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS_ACCESS_TOKEN:
+    "jira.jira-default.jira-service-account-oauth-client-credentials.access-token",
+} as const;
+
 export function normalizeJiraBaseUrl(input: string): string {
   const parsedUrl = new URL(input);
   const pathnameWithoutTrailingSlash = parsedUrl.pathname.endsWith("/")

@@ -6,7 +6,11 @@ import {
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
-import { type LinearConnectionConfig, LinearConnectionConfigSchema } from "./auth.js";
+import {
+  type LinearConnectionConfig,
+  LinearConnectionConfigSchema,
+  LinearCredentialSlotKeys,
+} from "./auth.js";
 import { LinearBindingConfigSchema } from "./binding-config-schema.js";
 import { compileLinearBinding } from "./compile-binding.js";
 import { LinearConnectionConfigForm } from "./connection-config-form.js";
@@ -43,6 +47,7 @@ export const LinearDefinition: LinearIntegrationDefinition = {
           placeholder: "Enter API key",
           inputType: "password",
           secretType: "api_key",
+          slotKey: LinearCredentialSlotKeys.API_KEY,
         },
       ],
       configSchema: LinearConnectionConfigSchema,

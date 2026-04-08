@@ -2229,6 +2229,7 @@ export interface paths {
                         label: string;
                         name: string;
                         placeholder?: string;
+                        slotKey: string;
                       }[];
                     }
                   | {

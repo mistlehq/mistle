@@ -12,6 +12,7 @@ import {
 import { resolveGitHubBindingConfigForm } from "../../shared/binding-config-form.js";
 import { GitHubApiKeyConnectionConfigForm } from "../../shared/connection-config-form.js";
 import { GitHubFamilyId } from "../../shared/constants.js";
+import { GitHubCredentialSlotKeys } from "../../shared/slot-keys.js";
 import { GitHubSupportedWebhookEvents } from "../../shared/supported-webhook-events.js";
 import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
 import { GitHubCloudBindingConfigSchema } from "./binding-config-schema.js";
@@ -48,6 +49,7 @@ export const GitHubCloudBaseDefinition: GitHubCloudBaseIntegrationDefinition = {
           placeholder: "Enter API key",
           inputType: "password",
           secretType: "api_key",
+          slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_API_KEY,
         },
       ],
       configSchema: GitHubApiKeyConnectionConfigSchema,

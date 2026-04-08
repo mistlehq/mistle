@@ -7,6 +7,12 @@ export const LinearCredentialSecretTypes: {
   API_KEY: "api_key",
 };
 
+export const LinearCredentialSlotKeys: {
+  API_KEY: "linear.linear-default.api-key.api-key";
+} = {
+  API_KEY: "linear.linear-default.api-key.api-key",
+};
+
 export const LinearConnectionConfigSchema = z
   .object({
     connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),

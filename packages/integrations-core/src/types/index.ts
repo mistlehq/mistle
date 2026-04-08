@@ -46,6 +46,7 @@ export type IntegrationConnectionMethodSecretField = {
   description?: string;
   inputType: "password" | "text";
   secretType: string;
+  slotKey: string;
 };
 
 export type IntegrationBrowserSafeConnectionMethodSecretField = Omit<
