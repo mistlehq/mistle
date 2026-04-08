@@ -32,40 +32,21 @@ export function parseSingletonImageMetadata(input: {
   };
 }
 
-export function createProfileImageContentUrl(
-  image: SingletonImageMetadata | null | undefined,
-): string | null {
-  if (image === undefined || image === null || !image.hasImage) {
-    return null;
-  }
-
-  if (image.imageVersion === null) {
-    throw new Error("Profile image metadata was missing imageVersion.");
-  }
-
-  const config = getDashboardConfig();
-  const url = new URL("/v1/me/profile-image/content", config.controlPlaneApiOrigin);
-  url.searchParams.set("v", image.imageVersion);
-  return url.toString();
-}
-
-export function createOrganizationLogoContentUrl(input: {
-  organizationId: string;
+export function createSingletonImageContentUrl(input: {
+  pathname: string;
   image: SingletonImageMetadata | null | undefined;
+  missingVersionMessage: string;
 }): string | null {
   if (input.image === undefined || input.image === null || !input.image.hasImage) {
     return null;
   }
 
   if (input.image.imageVersion === null) {
-    throw new Error("Organization logo metadata was missing imageVersion.");
+    throw new Error(input.missingVersionMessage);
   }
 
   const config = getDashboardConfig();
-  const url = new URL(
-    `/v1/organizations/${encodeURIComponent(input.organizationId)}/logo/content`,
-    config.controlPlaneApiOrigin,
-  );
+  const url = new URL(input.pathname, config.controlPlaneApiOrigin);
   url.searchParams.set("v", input.image.imageVersion);
   return url.toString();
 }

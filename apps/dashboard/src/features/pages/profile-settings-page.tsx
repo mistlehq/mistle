@@ -10,7 +10,7 @@ import {
   uploadProfileImage,
 } from "../settings/profile/profile-service.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
-import { createProfileImageContentUrl } from "../shared/singleton-image.js";
+import { createSingletonImageContentUrl } from "../shared/singleton-image.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
@@ -52,7 +52,14 @@ export function ProfileSettingsPage(): React.JSX.Element {
     onSuccess: async (result) => {
       queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, result);
       queryClient.setQueryData(SESSION_QUERY_KEY, (currentSession) =>
-        updateSessionUserImage(currentSession ?? null, createProfileImageContentUrl(result)),
+        updateSessionUserImage(
+          currentSession ?? null,
+          createSingletonImageContentUrl({
+            pathname: "/v1/me/profile-image/content",
+            image: result,
+            missingVersionMessage: "Profile image metadata was missing imageVersion.",
+          }),
+        ),
       );
       setProfileImageOperationErrorMessage(null);
     },
@@ -91,7 +98,11 @@ export function ProfileSettingsPage(): React.JSX.Element {
   });
 
   const persistedDisplayName = resolveUserDisplayName(session.user);
-  const imageUrl = createProfileImageContentUrl(profileImageQuery.data);
+  const imageUrl = createSingletonImageContentUrl({
+    pathname: "/v1/me/profile-image/content",
+    image: profileImageQuery.data,
+    missingVersionMessage: "Profile image metadata was missing imageVersion.",
+  });
   const profileImageErrorMessage =
     profileImageOperationErrorMessage ??
     (profileImageQuery.isError
