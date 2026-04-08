@@ -3,6 +3,7 @@ import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
+import { IntegrationTargetsPageSchema as DashboardIntegrationTargetsPageSchema } from "../../dashboard/src/features/integrations/integrations-service-shared.js";
 import { ListIntegrationTargetsResponseSchema } from "../src/integration-targets/index.js";
 import { it } from "./test-context.js";
 
@@ -342,6 +343,82 @@ describe("integration targets discovery integration", () => {
 
     const bodyText = await response.text();
     expect(bodyText).toContain('"code":"INVALID_PAGINATION_CURSOR"');
+  });
+
+  it("returns integration target payloads the dashboard parser can consume", async ({
+    fixture,
+  }) => {
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "github-dashboard-contract-it",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          base_url: "https://github.com",
+          app_id: "123456",
+        },
+        displayNameOverride: "GitHub Dashboard Contract",
+        descriptionOverride: "GitHub contract target",
+      })
+      .onConflictDoNothing();
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-targets-dashboard-contract@example.com",
+    });
+
+    const response = await fixture.request("/v1/integration/targets?limit=100", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+
+    const page = DashboardIntegrationTargetsPageSchema.parse(await response.json());
+    const githubTarget = page.items.find(
+      (item) => item.targetKey === "github-dashboard-contract-it",
+    );
+
+    expect(githubTarget).toMatchObject({
+      targetKey: "github-dashboard-contract-it",
+      familyId: "github",
+      variantId: "github-cloud",
+      enabled: true,
+      displayName: "GitHub Dashboard Contract",
+      description: "GitHub contract target",
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+              slotKey: "github.github-cloud.api-key.api-key",
+            },
+          ],
+        },
+        {
+          id: "github-app-installation",
+          label: "GitHub App installation",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Install GitHub App",
+              helperText:
+                "Continue to GitHub to install the app and finish connecting this account.",
+            },
+          },
+        },
+      ],
+      targetHealth: {
+        configStatus: "invalid",
+      },
+    });
   });
 
   it("returns 400 for invalid list query payload", async ({ fixture }) => {
