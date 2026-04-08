@@ -17,6 +17,7 @@ import {
 
 import {
   SandboxSessionSocketReadyStates,
+  type SandboxScheduledTask,
   type SandboxSessionRuntime,
   type SandboxSessionSendGuarantee,
   type SandboxSessionSocket,
@@ -118,7 +119,7 @@ type PendingOpen = {
   streamId: number;
   resolve: () => void;
   reject: (error: Error) => void;
-  timeoutTask: import("./runtime.js").SandboxScheduledTask;
+  timeoutTask: SandboxScheduledTask;
 };
 
 type ActiveStreamRecord = {

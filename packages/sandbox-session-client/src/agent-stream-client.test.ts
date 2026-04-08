@@ -8,7 +8,7 @@ import {
 } from "@mistle/sandbox-session-protocol";
 import { systemSleeper } from "@mistle/time";
 import { afterEach, describe, expect, it } from "vitest";
-import { type RawData, WebSocketServer } from "ws";
+import { type RawData, type WebSocket as NodeWebSocket, WebSocketServer } from "ws";
 
 import { AgentStreamClient, parseStreamOpenControlMessage } from "./agent-stream-client.js";
 import { createBrowserSandboxSessionRuntime } from "./browser.js";
@@ -120,7 +120,7 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
     wsServer.once("error", (error) => reject(error));
   });
 
-  let connectedSocket: import("ws").WebSocket | null = null;
+  let connectedSocket: NodeWebSocket | null = null;
   let activeStreamId: number | null = null;
   const openRequests: string[] = [];
   const receivedPayloads: Array<{ streamId: number; payload: string }> = [];

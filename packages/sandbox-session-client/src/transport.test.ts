@@ -10,7 +10,7 @@ import {
 } from "@mistle/sandbox-session-protocol";
 import { systemSleeper } from "@mistle/time";
 import { afterEach, describe, expect, it } from "vitest";
-import { type RawData, WebSocketServer } from "ws";
+import { type RawData, type WebSocket as NodeWebSocket, WebSocketServer } from "ws";
 
 import { createNodeSandboxSessionRuntime } from "./node.js";
 import { SandboxSessionSocketReadyStates } from "./runtime.js";
@@ -82,7 +82,7 @@ async function startTestServer(input?: {
   const receivedDataFrames: StreamDataFrame[] = [];
   const rejectChannelKinds = new Set(input?.rejectChannelKinds ?? []);
   let currentConnectionCount = 0;
-  let clientSocket: import("ws").WebSocket | null = null;
+  let clientSocket: NodeWebSocket | null = null;
 
   wsServer.on("connection", (socket) => {
     currentConnectionCount += 1;

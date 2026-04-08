@@ -6,7 +6,7 @@ import {
 } from "@mistle/sandbox-session-protocol";
 import { systemSleeper } from "@mistle/time";
 import { afterEach, describe, expect, it } from "vitest";
-import { type RawData, WebSocketServer } from "ws";
+import { type RawData, type WebSocket as NodeWebSocket, WebSocketServer } from "ws";
 
 import { createNodeSandboxSessionRuntime } from "./node.js";
 import { PtyStreamClient } from "./pty-stream-client.js";
@@ -119,7 +119,7 @@ async function startTestServer(): Promise<TestServer> {
   });
 
   let activeStreamId: number | null = null;
-  let connectedSocket: import("ws").WebSocket | null = null;
+  let connectedSocket: NodeWebSocket | null = null;
 
   wsServer.on("connection", (socket) => {
     connectedSocket = socket;
