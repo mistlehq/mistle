@@ -18,7 +18,11 @@ import {
 } from "../settings/model.js";
 import { SettingsBackButton } from "../settings/settings-back-button.js";
 import { SettingsSectionNav } from "../settings/settings-section-nav.js";
-import { createSingletonImageContentUrl } from "../shared/singleton-image.js";
+import {
+  createOrganizationLogoContentPath,
+  createSingletonImageContentUrl,
+  createSingletonImageMissingVersionMessage,
+} from "../shared/singleton-image.js";
 import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
 import { AppShellView } from "./app-shell-view.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
@@ -147,9 +151,9 @@ export function AppShell(): React.JSX.Element {
     locationPathname: location.pathname,
     organizationErrorMessage: organizationSummary.organizationErrorMessage,
     organizationImageUrl: createSingletonImageContentUrl({
-      pathname: `/v1/organizations/${encodeURIComponent(organizationSummary.activeOrganizationId)}/logo/content`,
+      path: createOrganizationLogoContentPath(organizationSummary.activeOrganizationId),
       image: organizationLogoQuery.data,
-      missingVersionMessage: "Organization logo metadata was missing imageVersion.",
+      missingVersionMessage: createSingletonImageMissingVersionMessage("Organization logo"),
     }),
     organizationName: organizationSummary.organizationName ?? "",
     pageMeta,

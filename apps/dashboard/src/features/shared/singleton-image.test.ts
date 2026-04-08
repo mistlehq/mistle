@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { createSingletonImageContentUrl, parseSingletonImageMetadata } from "./singleton-image.js";
+import {
+  createOrganizationLogoContentPath,
+  createSingletonImageContentUrl,
+  createSingletonImageMissingVersionMessage,
+  parseSingletonImageMetadata,
+  ProfileImageContentPath,
+} from "./singleton-image.js";
 
 describe("parseSingletonImageMetadata", () => {
   it("parses singleton image metadata payloads", () => {
@@ -34,12 +40,12 @@ describe("createSingletonImageContentUrl", () => {
   it("returns null when no image exists", () => {
     expect(
       createSingletonImageContentUrl({
-        pathname: "/v1/me/profile-image/content",
+        path: ProfileImageContentPath,
         image: {
           hasImage: false,
           imageVersion: null,
         },
-        missingVersionMessage: "Profile image metadata was missing imageVersion.",
+        missingVersionMessage: createSingletonImageMissingVersionMessage("Profile image"),
       }),
     ).toBeNull();
   });
@@ -47,12 +53,12 @@ describe("createSingletonImageContentUrl", () => {
   it("builds a stable profile content URL when an image exists", () => {
     expect(
       createSingletonImageContentUrl({
-        pathname: "/v1/me/profile-image/content",
+        path: ProfileImageContentPath,
         image: {
           hasImage: true,
           imageVersion: "avatars/users/usr_123/img_123.webp",
         },
-        missingVersionMessage: "Profile image metadata was missing imageVersion.",
+        missingVersionMessage: createSingletonImageMissingVersionMessage("Profile image"),
       }),
     ).toBe(
       "http://localhost:3000/v1/me/profile-image/content?v=avatars%2Fusers%2Fusr_123%2Fimg_123.webp",
@@ -62,12 +68,12 @@ describe("createSingletonImageContentUrl", () => {
   it("builds a stable organization logo content URL when an image exists", () => {
     expect(
       createSingletonImageContentUrl({
-        pathname: "/v1/organizations/org_123/logo/content",
+        path: createOrganizationLogoContentPath("org_123"),
         image: {
           hasImage: true,
           imageVersion: "logos/organizations/org_123/img_123.webp",
         },
-        missingVersionMessage: "Organization logo metadata was missing imageVersion.",
+        missingVersionMessage: createSingletonImageMissingVersionMessage("Organization logo"),
       }),
     ).toBe(
       "http://localhost:3000/v1/organizations/org_123/logo/content?v=logos%2Forganizations%2Forg_123%2Fimg_123.webp",

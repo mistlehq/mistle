@@ -10,7 +10,11 @@ import {
   uploadProfileImage,
 } from "../settings/profile/profile-service.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
-import { createSingletonImageContentUrl } from "../shared/singleton-image.js";
+import {
+  createSingletonImageContentUrl,
+  createSingletonImageMissingVersionMessage,
+  ProfileImageContentPath,
+} from "../shared/singleton-image.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
@@ -55,9 +59,9 @@ export function ProfileSettingsPage(): React.JSX.Element {
         updateSessionUserImage(
           currentSession ?? null,
           createSingletonImageContentUrl({
-            pathname: "/v1/me/profile-image/content",
+            path: ProfileImageContentPath,
             image: result,
-            missingVersionMessage: "Profile image metadata was missing imageVersion.",
+            missingVersionMessage: createSingletonImageMissingVersionMessage("Profile image"),
           }),
         ),
       );
@@ -99,9 +103,9 @@ export function ProfileSettingsPage(): React.JSX.Element {
 
   const persistedDisplayName = resolveUserDisplayName(session.user);
   const imageUrl = createSingletonImageContentUrl({
-    pathname: "/v1/me/profile-image/content",
+    path: ProfileImageContentPath,
     image: profileImageQuery.data,
-    missingVersionMessage: "Profile image metadata was missing imageVersion.",
+    missingVersionMessage: createSingletonImageMissingVersionMessage("Profile image"),
   });
   const profileImageErrorMessage =
     profileImageOperationErrorMessage ??

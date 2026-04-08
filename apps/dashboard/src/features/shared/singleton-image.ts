@@ -5,6 +5,8 @@ export type SingletonImageMetadata = {
   imageVersion: string | null;
 };
 
+export const ProfileImageContentPath = "/v1/me/profile-image/content";
+
 export function parseSingletonImageMetadata(input: {
   payload: unknown;
   resourceName: string;
@@ -32,8 +34,12 @@ export function parseSingletonImageMetadata(input: {
   };
 }
 
+export function createSingletonImageMissingVersionMessage(resourceName: string): string {
+  return `${resourceName} metadata was missing imageVersion.`;
+}
+
 export function createSingletonImageContentUrl(input: {
-  pathname: string;
+  path: string;
   image: SingletonImageMetadata | null | undefined;
   missingVersionMessage: string;
 }): string | null {
@@ -46,7 +52,11 @@ export function createSingletonImageContentUrl(input: {
   }
 
   const config = getDashboardConfig();
-  const url = new URL(input.pathname, config.controlPlaneApiOrigin);
+  const url = new URL(input.path, config.controlPlaneApiOrigin);
   url.searchParams.set("v", input.image.imageVersion);
   return url.toString();
+}
+
+export function createOrganizationLogoContentPath(organizationId: string): string {
+  return `/v1/organizations/${encodeURIComponent(organizationId)}/logo/content`;
 }
