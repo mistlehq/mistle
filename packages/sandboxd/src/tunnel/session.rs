@@ -1263,8 +1263,7 @@ fn handle_pty_close(
                 stream_id,
                 STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
                 format!(
-                    "stream close streamId {} is not attached to the active PTY session",
-                    stream_id
+                    "stream close streamId {stream_id} is not attached to the active PTY session"
                 ),
             ),
         )?;
