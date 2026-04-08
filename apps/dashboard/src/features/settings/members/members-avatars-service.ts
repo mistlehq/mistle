@@ -2,6 +2,7 @@ import { getControlPlaneApiClient } from "../../../lib/control-plane-api/client.
 import { normalizeHttpApiError } from "../../api/http-api-error.js";
 import { MembersApiError } from "./members-api-errors.js";
 import type { MemberAvatar } from "./members-api-types.js";
+import { parseMemberAvatars } from "./members-avatars-parser.js";
 
 export async function listMemberAvatars(input: {
   organizationId: string;
@@ -21,7 +22,8 @@ export async function listMemberAvatars(input: {
       },
     });
 
-    if (data === undefined) {
+    const parsed = parseMemberAvatars(data);
+    if (parsed === null) {
       throw new MembersApiError({
         operation: "listMemberAvatars",
         status: 500,
@@ -31,7 +33,7 @@ export async function listMemberAvatars(input: {
       });
     }
 
-    return data;
+    return parsed;
   } catch (error) {
     throw new MembersApiError(
       normalizeHttpApiError({
