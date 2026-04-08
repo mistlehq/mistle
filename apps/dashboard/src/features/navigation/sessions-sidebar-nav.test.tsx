@@ -42,24 +42,38 @@ const groups: SessionsSidebarNavGroup[] = [
   },
 ];
 
-function renderSidebarNav(): void {
-  const queryClient = new QueryClient({
+function createQueryClient(): QueryClient {
+  return new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
       },
     },
   });
+}
+
+function renderSidebarNav(input?: { groups?: readonly SessionsSidebarNavGroup[] }): void {
+  const queryClient = createQueryClient();
 
   render(
     <QueryClientProvider client={queryClient}>
       <SidebarProvider>
         <MemoryRouter initialEntries={["/sessions"]}>
-          <SessionsSidebarNav groups={groups} />
+          <SessionsSidebarNav groups={input?.groups ?? groups} />
         </MemoryRouter>
       </SidebarProvider>
     </QueryClientProvider>,
   );
+}
+
+function getRepoMaintainerTrigger(): HTMLElement {
+  return screen.getByRole("button", {
+    name: "Toggle Repo Maintainer sessions",
+  });
+}
+
+function getSearchInput(): HTMLElement {
+  return screen.getByRole("textbox", { name: "Search sessions" });
 }
 
 afterEach(() => {
@@ -95,9 +109,7 @@ describe("SessionsSidebarNav", () => {
   it("allows sandbox profile groups to be collapsed and expanded", () => {
     renderSidebarNav();
 
-    const trigger = screen.getByRole("button", {
-      name: "Toggle Repo Maintainer sessions",
-    });
+    const trigger = getRepoMaintainerTrigger();
 
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("link", { name: "Review migration draft" })).toBeDefined();
@@ -116,14 +128,12 @@ describe("SessionsSidebarNav", () => {
   it("expands matching groups while search is active", () => {
     renderSidebarNav();
 
-    const trigger = screen.getByRole("button", {
-      name: "Toggle Repo Maintainer sessions",
-    });
+    const trigger = getRepoMaintainerTrigger();
 
     fireEvent.click(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Search sessions" }), {
+    fireEvent.change(getSearchInput(), {
       target: { value: "migration" },
     });
 
@@ -132,23 +142,9 @@ describe("SessionsSidebarNav", () => {
   });
 
   it("keeps the new session action visible when there are no groups", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
+    renderSidebarNav({
+      groups: [],
     });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <SidebarProvider>
-          <MemoryRouter initialEntries={["/sessions"]}>
-            <SessionsSidebarNav groups={[]} />
-          </MemoryRouter>
-        </SidebarProvider>
-      </QueryClientProvider>,
-    );
 
     expect(screen.getByRole("button", { name: "Create a new session" })).toBeDefined();
     expect(screen.getByText("No openable sessions yet.")).toBeDefined();
