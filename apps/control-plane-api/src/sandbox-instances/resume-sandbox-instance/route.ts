@@ -5,6 +5,7 @@ import {
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
+import { conflictResponseSchema } from "../create-sandbox-instance-connection-token/schema.js";
 import {
   sandboxInstanceIdParamsSchema,
   sandboxInstanceStatusResponseSchema,
@@ -65,6 +66,14 @@ export const route = createRoute({
       content: {
         "application/json": {
           schema: sandboxInstancesNotFoundResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: "Sandbox instance cannot be resumed from its current state.",
+      content: {
+        "application/json": {
+          schema: conflictResponseSchema,
         },
       },
     },

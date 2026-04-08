@@ -172,6 +172,9 @@ describe("sandbox tunnel connect endpoint integration", () => {
         keepalive: {
           active: false,
         },
+        runtime: {
+          ready: false,
+        },
       });
     },
     IntegrationTestTimeoutMs,

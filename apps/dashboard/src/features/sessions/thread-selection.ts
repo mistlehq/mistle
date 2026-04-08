@@ -66,9 +66,11 @@ export function selectPreferredThreadId(input: {
   }
 
   if (input.loadedThreadIds.length > 0) {
-    return selectionPolicy === "most_recently_updated"
-      ? (input.loadedThreadIds[input.loadedThreadIds.length - 1] ?? null)
-      : (input.loadedThreadIds[0] ?? null);
+    if (selectionPolicy === "most_recently_updated") {
+      return null;
+    }
+
+    return input.loadedThreadIds[0] ?? null;
   }
 
   if (input.availableThreads.length === 0) {

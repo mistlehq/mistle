@@ -14,9 +14,11 @@ import { registerPublishedTargetRoutes } from "../publishing/register-published-
 import { InMemorySandboxKeepaliveStore } from "../runtime-state/adapters/in-memory-sandbox-keepalive-store.js";
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
+import { InMemorySandboxRuntimeReadinessStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-readiness-store.js";
 import { ValkeySandboxKeepaliveStore } from "../runtime-state/adapters/valkey-sandbox-keepalive-store.js";
 import { ValkeySandboxPresenceStore } from "../runtime-state/adapters/valkey-sandbox-presence-store.js";
 import { ValkeySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
+import { ValkeySandboxRuntimeReadinessStore } from "../runtime-state/adapters/valkey-sandbox-runtime-readiness-store.js";
 import {
   BOOTSTRAP_DISCONNECT_GRACE_MS,
   IDLE_TIMEOUT_MS,
@@ -82,6 +84,9 @@ export function createDataPlaneGatewayRuntime(
   let sandboxOwnerStore: InMemorySandboxOwnerStore | ValkeySandboxOwnerStore;
   let sandboxKeepaliveStore: InMemorySandboxKeepaliveStore | ValkeySandboxKeepaliveStore;
   let sandboxPresenceStore: InMemorySandboxPresenceStore | ValkeySandboxPresenceStore;
+  let sandboxRuntimeReadinessStore:
+    | InMemorySandboxRuntimeReadinessStore
+    | ValkeySandboxRuntimeReadinessStore;
   let sandboxRuntimeAttachmentStore:
     | InMemorySandboxRuntimeAttachmentStore
     | ValkeySandboxRuntimeAttachmentStore;
@@ -90,6 +95,7 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
     sandboxKeepaliveStore = new InMemorySandboxKeepaliveStore(systemClock);
     sandboxPresenceStore = new InMemorySandboxPresenceStore(systemClock);
+    sandboxRuntimeReadinessStore = new InMemorySandboxRuntimeReadinessStore();
     sandboxRuntimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
   } else {
     const valkeyConfig = config.app.runtimeState.valkey;
@@ -107,6 +113,10 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerStore = new ValkeySandboxOwnerStore(valkeyClient, valkeyConfig.keyPrefix);
     sandboxKeepaliveStore = new ValkeySandboxKeepaliveStore(valkeyClient, valkeyConfig.keyPrefix);
     sandboxPresenceStore = new ValkeySandboxPresenceStore(valkeyClient, valkeyConfig.keyPrefix);
+    sandboxRuntimeReadinessStore = new ValkeySandboxRuntimeReadinessStore(
+      valkeyClient,
+      valkeyConfig.keyPrefix,
+    );
     sandboxRuntimeAttachmentStore = new ValkeySandboxRuntimeAttachmentStore(
       valkeyClient,
       valkeyConfig.keyPrefix,
@@ -166,6 +176,7 @@ export function createDataPlaneGatewayRuntime(
     internalAuthServiceToken: config.internalAuth.serviceToken,
     sandboxKeepaliveStore,
     sandboxPresenceStore,
+    sandboxRuntimeReadinessStore,
     sandboxRuntimeAttachmentStore,
     sandboxOwnerStore,
   });
@@ -194,6 +205,7 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerResolver,
     sandboxOwnerLeaseHeartbeat,
     sandboxKeepaliveStore,
+    sandboxRuntimeReadinessStore,
     sandboxPresenceStore,
     sandboxRuntimeAttachmentStore,
     sandboxIdleControllerRegistry,

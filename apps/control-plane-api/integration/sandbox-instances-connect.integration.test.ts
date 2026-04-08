@@ -1,6 +1,4 @@
 import { sandboxInstances } from "@mistle/db/data-plane";
-import { systemSleeper } from "@mistle/time";
-import { eq } from "drizzle-orm";
 import { afterEach, describe, expect } from "vitest";
 
 import { createControlPlaneApiRuntime } from "../src/main.js";
@@ -16,19 +14,10 @@ import {
 } from "./helpers/disposable-data-plane-runtime.js";
 import {
   destroyDockerSandboxContainer,
-  resumeDockerSandboxContainer,
   startDockerSandboxContainer,
   stopDockerSandboxContainer,
 } from "./helpers/docker-sandbox-runtime.js";
 import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
-
-type WorkflowRunRow = {
-  id: string;
-};
-
-const ResumeWorkflowName = "data-plane.sandbox-instances.resume";
-const WorkflowQueuePollIntervalMs = 100;
-const WorkflowQueueWaitTimeoutMs = 10_000;
 
 const startedDataPlaneFixtures: DisposableDataPlaneRuntime[] = [];
 const startedSandboxContainerIds: string[] = [];
@@ -100,64 +89,8 @@ async function insertSandboxInstance(input: {
   });
 }
 
-async function updateSandboxInstanceStatus(input: {
-  dataPlaneFixture: DisposableDataPlaneRuntime;
-  sandboxInstanceId: string;
-  status: "running" | "failed";
-  providerSandboxId?: string | null;
-  failureCode?: string | null;
-  failureMessage?: string | null;
-}) {
-  await input.dataPlaneFixture.db
-    .update(sandboxInstances)
-    .set({
-      status: input.status,
-      ...(input.providerSandboxId === undefined
-        ? {}
-        : { providerSandboxId: input.providerSandboxId }),
-      failureCode: input.failureCode ?? null,
-      failureMessage: input.failureMessage ?? null,
-    })
-    .where(eq(sandboxInstances.id, input.sandboxInstanceId));
-}
-
-async function waitForResumeWorkflowRun(input: {
-  dataPlaneFixture: DisposableDataPlaneRuntime;
-  workflowNamespaceId: string;
-  sandboxInstanceId: string;
-}): Promise<WorkflowRunRow> {
-  const deadline = Date.now() + WorkflowQueueWaitTimeoutMs;
-
-  while (Date.now() < deadline) {
-    const result = await input.dataPlaneFixture.dbPool.query<WorkflowRunRow>(
-      `
-        select id
-        from data_plane_openworkflow.workflow_runs
-        where
-          namespace_id = $1
-          and workflow_name = $2
-          and input->>'sandboxInstanceId' = $3
-        order by created_at asc
-        limit 1
-      `,
-      [input.workflowNamespaceId, ResumeWorkflowName, input.sandboxInstanceId],
-    );
-
-    const row = result.rows[0];
-    if (row !== undefined) {
-      return row;
-    }
-
-    await systemSleeper.sleep(WorkflowQueuePollIntervalMs);
-  }
-
-  throw new Error(
-    `Timed out waiting for queued resume workflow run for sandbox instance '${input.sandboxInstanceId}'.`,
-  );
-}
-
 describe("sandbox instance connect integration", () => {
-  it("mints a connection token immediately for running instances", async ({ fixture }) => {
+  it("mints a connection token immediately for connectable instances", async ({ fixture }) => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
@@ -203,6 +136,7 @@ describe("sandbox instance connect integration", () => {
       });
       await dataPlaneFixture.attachSandboxRuntime({
         sandboxInstanceId: "sbi_cp_connect_running_001",
+        runtimeReady: true,
       });
 
       const response = await controlPlaneRuntime.request(
@@ -294,9 +228,7 @@ describe("sandbox instance connect integration", () => {
     }
   });
 
-  it("waits for pending instances to become running before minting a connection token", async ({
-    fixture,
-  }) => {
+  it("returns INSTANCE_NOT_RESUMABLE for pending instances", async ({ fixture }) => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
@@ -339,7 +271,7 @@ describe("sandbox instance connect integration", () => {
         providerSandboxId: null,
       });
 
-      const responsePromise = controlPlaneRuntime.request(
+      const response = await controlPlaneRuntime.request(
         "/v1/sandbox/instances/sbi_cp_connect_starting_001/connection-tokens",
         {
           method: "POST",
@@ -349,31 +281,16 @@ describe("sandbox instance connect integration", () => {
         },
       );
 
-      await systemSleeper.sleep(300);
-      const providerSandboxId = await startDockerSandboxContainer();
-      startedSandboxContainerIds.push(providerSandboxId);
-      await updateSandboxInstanceStatus({
-        dataPlaneFixture,
-        sandboxInstanceId: "sbi_cp_connect_starting_001",
-        status: "running",
-        providerSandboxId,
-      });
-      await dataPlaneFixture.attachSandboxRuntime({
-        sandboxInstanceId: "sbi_cp_connect_starting_001",
-      });
-
-      const response = await responsePromise;
-      expect(response.status).toBe(201);
-      const body = SandboxInstanceConnectionTokenSchema.parse(await response.json());
-      expect(body.instanceId).toBe("sbi_cp_connect_starting_001");
+      expect(response.status).toBe(409);
+      const body = SandboxInstancesConflictResponseSchema.parse(await response.json());
+      expect(body.code).toBe("INSTANCE_NOT_RESUMABLE");
+      expect(body.message).toContain("is 'pending' and is not connectable");
     } finally {
       await controlPlaneRuntime.stop();
     }
   });
 
-  it("resumes stopped instances through data-plane before minting a connection token", async ({
-    fixture,
-  }) => {
+  it("returns INSTANCE_NOT_RESUMABLE for stopped instances", async ({ fixture }) => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
@@ -419,7 +336,7 @@ describe("sandbox instance connect integration", () => {
         providerSandboxId,
       });
 
-      const responsePromise = controlPlaneRuntime.request(
+      const response = await controlPlaneRuntime.request(
         "/v1/sandbox/instances/sbi_cp_connect_stopped_001/connection-tokens",
         {
           method: "POST",
@@ -429,31 +346,14 @@ describe("sandbox instance connect integration", () => {
         },
       );
 
-      await waitForResumeWorkflowRun({
-        dataPlaneFixture,
-        workflowNamespaceId: fixture.config.workflow.namespaceId,
-        sandboxInstanceId: "sbi_cp_connect_stopped_001",
-      });
-
-      await resumeDockerSandboxContainer(providerSandboxId);
-      await updateSandboxInstanceStatus({
-        dataPlaneFixture,
-        sandboxInstanceId: "sbi_cp_connect_stopped_001",
-        status: "running",
-        providerSandboxId,
-      });
-      await dataPlaneFixture.attachSandboxRuntime({
-        sandboxInstanceId: "sbi_cp_connect_stopped_001",
-      });
-
-      const response = await responsePromise;
-      expect(response.status).toBe(201);
-      const body = SandboxInstanceConnectionTokenSchema.parse(await response.json());
-      expect(body.instanceId).toBe("sbi_cp_connect_stopped_001");
+      expect(response.status).toBe(409);
+      const body = SandboxInstancesConflictResponseSchema.parse(await response.json());
+      expect(body.code).toBe("INSTANCE_NOT_RESUMABLE");
+      expect(body.message).toContain("is 'stopped' and is not connectable");
     } finally {
       await controlPlaneRuntime.stop();
     }
-  }, 60_000);
+  });
 
   it("returns INSTANCE_FAILED for failed instances", async ({ fixture }) => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({

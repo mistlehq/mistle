@@ -8,6 +8,7 @@ import {
 } from "./protocol/tunnel-protocol-translator.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
 import { SandboxKeepaliveRepository } from "./sandbox-keepalive-repository.js";
+import { SandboxRuntimeReadinessRepository } from "./sandbox-runtime-readiness-repository.js";
 import { notifyBootstrapPeerOfReleasedInteractiveStreams } from "./tunnel-peer-notifier.js";
 import type { RelayPeerSide } from "./types.js";
 
@@ -47,6 +48,7 @@ export async function handleTunnelWebSocketMessage(input: {
   clientSessionId: string;
   currentSocket: Pick<WSContext, "send">;
   sandboxKeepaliveRepository: SandboxKeepaliveRepository;
+  sandboxRuntimeReadinessRepository: SandboxRuntimeReadinessRepository;
   handleTelemetryDelivery?: ((delivery: TelemetryDelivery) => Promise<void>) | undefined;
   interactiveStreamRouter: InteractiveStreamRouter;
   payload: string | ArrayBuffer;
@@ -71,6 +73,20 @@ export async function handleTunnelWebSocketMessage(input: {
 
     await input.sandboxKeepaliveRepository.applyControlMessage({
       message: translation.keepaliveControlMessage,
+      sandboxInstanceId: input.sandboxInstanceId,
+      ownerLeaseId: input.bootstrapOwnerLeaseId,
+    });
+  }
+
+  if (translation.runtimeReadyControlMessage !== undefined) {
+    if (input.bootstrapOwnerLeaseId === undefined) {
+      throw new Error(
+        "Bootstrap owner lease id is required when applying runtime readiness control messages.",
+      );
+    }
+
+    await input.sandboxRuntimeReadinessRepository.applyControlMessage({
+      message: translation.runtimeReadyControlMessage,
       sandboxInstanceId: input.sandboxInstanceId,
       ownerLeaseId: input.bootstrapOwnerLeaseId,
     });

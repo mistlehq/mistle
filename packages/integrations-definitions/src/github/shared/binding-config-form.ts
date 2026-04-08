@@ -35,13 +35,10 @@ export function resolveGitHubBindingConfigForm(
           title: "Tools",
           default: [],
           items: {
-            oneOf: [
-              {
-                const: GitHubToolIds.GITHUB_CLI,
-                title: "GitHub CLI (gh)",
-              },
-            ],
+            type: "string",
+            enum: [GitHubToolIds.GITHUB_CLI],
           },
+          type: "array",
           uniqueItems: true,
         },
       },
@@ -72,6 +69,7 @@ export function resolveGitHubBindingConfigForm(
         },
       },
       tools: {
+        "ui:enumNames": ["GitHub CLI"],
         "ui:widget": "checkboxes",
         "ui:options": {
           inline: false,

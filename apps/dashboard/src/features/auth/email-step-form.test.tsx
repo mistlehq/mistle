@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+
+import { render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -21,6 +24,19 @@ describe("EmailStepForm", () => {
     expect(markup).toContain('type="email"');
   });
 
+  it("autofocuses the editable email input", () => {
+    render(
+      <EmailStepForm
+        email=""
+        isSendingOtp={false}
+        onEmailChange={() => {}}
+        onSubmit={async () => {}}
+      />,
+    );
+
+    expect(screen.getByLabelText("Email address")).toBe(document.activeElement);
+  });
+
   it("renders invited email as static text when email editing is disabled", () => {
     const markup = renderToStaticMarkup(
       <EmailStepForm
@@ -36,5 +52,19 @@ describe("EmailStepForm", () => {
     expect(markup).toContain('role="note"');
     expect(markup).toContain(">invitee@example.com<");
     expect(markup).not.toContain('type="email"');
+  });
+
+  it("does not render an editable email input when email editing is disabled", () => {
+    render(
+      <EmailStepForm
+        email="invitee@example.com"
+        isEmailEditable={false}
+        isSendingOtp={false}
+        onEmailChange={() => {}}
+        onSubmit={async () => {}}
+      />,
+    );
+
+    expect(screen.queryByRole("textbox", { name: "Email address" })).toBeNull();
   });
 });

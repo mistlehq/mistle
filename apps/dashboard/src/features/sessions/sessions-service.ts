@@ -18,7 +18,9 @@ const StartSandboxProfileInstanceResponseSchema = z
 const SandboxInstanceStatusResponseSchema = z
   .object({
     id: z.string().min(1),
+    title: z.string().min(1).nullable(),
     status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+    connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
     runtimePlan: CompiledRuntimePlanSchema.nullable(),
@@ -41,6 +43,13 @@ const SandboxInstanceConnectionTokenSchema = z
   })
   .strict();
 
+const PatchSandboxInstanceTitleResponseSchema = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+  })
+  .strict();
+
 export type StartSandboxInstanceResult = {
   workflowRunId: string;
   sandboxInstanceId: string;
@@ -48,7 +57,9 @@ export type StartSandboxInstanceResult = {
 
 export type SandboxInstanceStatusResult = {
   id: string;
+  title: string | null;
   status: "pending" | "starting" | "running" | "stopped" | "failed";
+  connectable: boolean;
   failureCode: string | null;
   failureMessage: string | null;
   runtimePlan: z.output<typeof CompiledRuntimePlanSchema> | null;
@@ -67,6 +78,11 @@ export type MintSandboxConnectionTokenResult = {
 };
 
 export type ResumeSandboxInstanceResult = SandboxInstanceStatusResult;
+
+export type PatchSandboxInstanceTitleResult = {
+  id: string;
+  title: string;
+};
 
 export async function listSandboxInstances(input: {
   limit: number;
@@ -229,6 +245,46 @@ export async function mintSandboxInstanceConnectionToken(input: {
         operation: "mintSandboxInstanceConnectionToken",
         error,
         fallbackMessage: "Could not establish sandbox session.",
+      }),
+    );
+  }
+}
+
+export async function patchSandboxInstanceTitle(input: {
+  instanceId: string;
+  title: string;
+  signal?: AbortSignal;
+}): Promise<PatchSandboxInstanceTitleResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "patchSandboxInstanceTitle",
+      method: "PATCH",
+      pathname: `/v1/sandbox/instances/${encodeURIComponent(input.instanceId)}/title`,
+      body: {
+        title: input.title,
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not update sandbox session title.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = PatchSandboxInstanceTitleResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "patchSandboxInstanceTitle",
+        status: 500,
+        body: responseBody,
+        message: "Patch sandbox instance title response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "patchSandboxInstanceTitle",
+        error,
+        fallbackMessage: "Could not update sandbox session title.",
       }),
     );
   }

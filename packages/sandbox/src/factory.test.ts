@@ -61,7 +61,7 @@ describe("createSandboxRuntimeControl", () => {
       },
     });
 
-    expect(typeof runtimeControl.applyStartup).toBe("function");
+    expect(typeof runtimeControl.init).toBe("function");
     expect(typeof runtimeControl.close).toBe("function");
   });
 
@@ -81,7 +81,7 @@ describe("createSandboxRuntimeControl", () => {
       },
     });
 
-    expect(typeof runtimeControl.applyStartup).toBe("function");
+    expect(typeof runtimeControl.init).toBe("function");
     expect(typeof runtimeControl.close).toBe("function");
   });
 

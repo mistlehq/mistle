@@ -1,8 +1,8 @@
 //! Local Unix-socket control plane for a running `sandboxd` process.
 //!
-//! This module starts the `/run/.../control.sock` listener used by
-//! `apply-startup` to trigger manifest reloads, and it owns the small request /
-//! response protocol that flows across that socket.
+//! The daemon listens on `/run/.../control.sock` for one-shot local requests
+//! from helper commands such as `sandboxd init`. The control socket is the
+//! only boundary that accepts startup input once the daemon is running.
 
 use std::fmt;
 use std::fs;
@@ -17,11 +17,8 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::apply_startup::ApplyStartupError;
-use crate::apply_startup::manifest;
-use crate::process;
 use crate::protocol::startup::StartupInput;
-use crate::runtime;
+use crate::sandboxd_state::SandboxdState;
 use crate::security;
 use crate::time::{Sleeper, SystemClock, ThreadSleeper};
 
@@ -29,6 +26,15 @@ use crate::time::{Sleeper, SystemClock, ThreadSleeper};
 pub const DEFAULT_CONTROL_SOCKET_PATH: &str = "/run/mistle/sandboxd/control.sock";
 /// Poll interval for checking shutdown while the nonblocking listener is idle.
 pub const DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
+
+/// Tracks whether this daemon has already accepted startup input.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InitPhase {
+    Uninitialized,
+    Initializing,
+    Initialized,
+    Failed(String),
+}
 
 /// Describes why the local control socket server or client path failed.
 #[derive(Debug)]
@@ -61,19 +67,19 @@ pub enum ControlError {
     InvalidRequest(serde_json::Error),
     InvalidResponse(serde_json::Error),
     VerifyPeer(String),
-    LoadManifest(String),
-    ApplyRuntimePlan(String),
-    StartProcessManager(String),
-    StopProcessManager(String),
-    ResponseError(String),
+    InitRejected(String),
+    InitializeSandboxdState(String),
+    CloseSandboxdState(String),
     SerializeResponse(serde_json::Error),
     WriteResponse(std::io::Error),
+    ResponseError(String),
     ConnectSocket {
         path: PathBuf,
         error: std::io::Error,
     },
     ShutdownSend,
     ServerPanicked,
+    InitPanicked,
 }
 
 impl fmt::Display for ControlError {
@@ -131,23 +137,20 @@ impl fmt::Display for ControlError {
             Self::VerifyPeer(error) => {
                 write!(f, "control socket peer verification failed: {error}")
             }
-            Self::LoadManifest(error) => write!(f, "failed to reload startup manifest: {error}"),
-            Self::ApplyRuntimePlan(error) => {
-                write!(f, "failed to apply startup manifest runtime plan: {error}")
+            Self::InitRejected(error) => write!(f, "sandbox init request was rejected: {error}"),
+            Self::InitializeSandboxdState(error) => {
+                write!(f, "failed to initialize sandboxd state: {error}")
             }
-            Self::StartProcessManager(error) => {
-                write!(f, "failed to start runtime client processes: {error}")
+            Self::CloseSandboxdState(error) => {
+                write!(f, "failed to close sandboxd state: {error}")
             }
-            Self::StopProcessManager(error) => {
-                write!(f, "failed to stop runtime client processes: {error}")
-            }
-            Self::ResponseError(error) => write!(f, "control socket returned an error: {error}"),
             Self::SerializeResponse(error) => {
                 write!(f, "failed to serialize control socket response: {error}")
             }
             Self::WriteResponse(error) => {
                 write!(f, "failed to write control socket response: {error}")
             }
+            Self::ResponseError(error) => write!(f, "control socket returned an error: {error}"),
             Self::ConnectSocket { path, error } => {
                 write!(
                     f,
@@ -157,6 +160,7 @@ impl fmt::Display for ControlError {
             }
             Self::ShutdownSend => write!(f, "failed to signal control socket shutdown"),
             Self::ServerPanicked => write!(f, "control socket server panicked"),
+            Self::InitPanicked => write!(f, "sandbox init worker panicked"),
         }
     }
 }
@@ -167,8 +171,8 @@ impl std::error::Error for ControlError {}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 enum ControlRequest {
-    #[serde(rename = "reload.startup")]
-    ReloadStartup,
+    #[serde(rename = "init")]
+    Init { startup_input: StartupInput },
 }
 
 /// Carries one JSON response back to a local control socket client.
@@ -179,36 +183,40 @@ struct ControlResponse {
     error: Option<String>,
 }
 
-/// Tracks observable control-server state for tests and later supervisor wiring.
-#[derive(Debug)]
+/// Tracks observable daemon state for tests and daemon lifecycle control.
 struct ControlServerState {
-    reload_count: usize,
-    latest_manifest: Option<StartupInput>,
-    process_manager: Option<process::RuntimeClientProcessManager>,
+    init_phase: InitPhase,
+    startup_input: Option<StartupInput>,
+    sandboxd_state: Option<SandboxdState>,
 }
+
+type InitThread = JoinHandle<Result<(), ControlError>>;
+type SharedInitThread = Arc<Mutex<Option<InitThread>>>;
 
 /// Owns one running control socket server thread and its observable state.
 pub struct ControlServer {
     state: Arc<Mutex<ControlServerState>>,
     shutdown_sender: mpsc::Sender<()>,
     thread: Option<JoinHandle<Result<(), ControlError>>>,
+    init_thread: SharedInitThread,
 }
 
 impl ControlServer {
-    /// Returns how many successful reload requests this server has processed.
-    pub fn reload_count(&self) -> usize {
+    /// Returns the current init phase for this daemon.
+    pub fn init_phase(&self) -> InitPhase {
         self.state
             .lock()
             .expect("control server state lock should not be poisoned")
-            .reload_count
+            .init_phase
+            .clone()
     }
 
-    /// Returns the most recently loaded manifest after a successful reload request.
-    pub fn latest_manifest(&self) -> Option<StartupInput> {
+    /// Returns the startup input accepted by this daemon, if any.
+    pub fn startup_input(&self) -> Option<StartupInput> {
         self.state
             .lock()
             .expect("control server state lock should not be poisoned")
-            .latest_manifest
+            .startup_input
             .clone()
     }
 
@@ -226,13 +234,15 @@ impl ControlServer {
             Ok(result) => result,
             Err(_) => Err(ControlError::ServerPanicked),
         };
-        let stop_result = stop_managed_processes(&self.state);
+        let init_result = join_init_thread(&self.init_thread);
+        let stop_result = close_sandboxd_state(&self.state);
 
         thread_result?;
+        init_result?;
         stop_result
     }
 
-    /// Waits for the control server thread to exit without sending a shutdown signal first.
+    /// Waits for the control server thread to exit without sending shutdown first.
     pub fn wait(mut self) -> Result<(), ControlError> {
         let thread = self
             .thread
@@ -242,17 +252,18 @@ impl ControlServer {
             Ok(result) => result,
             Err(_) => Err(ControlError::ServerPanicked),
         };
-        let stop_result = stop_managed_processes(&self.state);
+        let init_result = join_init_thread(&self.init_thread);
+        let stop_result = close_sandboxd_state(&self.state);
 
         thread_result?;
+        init_result?;
         stop_result
     }
 }
 
-/// Starts the local control socket server that accepts startup-manifest reload requests.
+/// Starts the local control socket server that accepts one startup submission.
 pub fn start_control_server<S>(
     socket_path: &Path,
-    manifest_path: &Path,
     sleeper: S,
     accept_poll_interval: Duration,
 ) -> Result<ControlServer, ControlError>
@@ -282,21 +293,21 @@ where
         })?;
 
     let state = Arc::new(Mutex::new(ControlServerState {
-        reload_count: 0,
-        latest_manifest: None,
-        process_manager: None,
+        init_phase: InitPhase::Uninitialized,
+        startup_input: None,
+        sandboxd_state: None,
     }));
-    load_persisted_manifest_if_present(manifest_path, &state)?;
+    let init_thread: SharedInitThread = Arc::new(Mutex::new(None));
     let (shutdown_sender, shutdown_receiver) = mpsc::channel::<()>();
     let state_for_thread = state.clone();
+    let init_thread_for_loop = init_thread.clone();
     let socket_path_for_thread = socket_path.to_path_buf();
-    let manifest_path_for_thread = manifest_path.to_path_buf();
 
     let thread = thread::spawn(move || {
         let result = run_control_server_loop(
             listener,
-            &manifest_path_for_thread,
             &state_for_thread,
+            &init_thread_for_loop,
             &shutdown_receiver,
             &sleeper,
             accept_poll_interval,
@@ -309,31 +320,22 @@ where
         state,
         shutdown_sender,
         thread: Some(thread),
+        init_thread,
     })
 }
 
-/// Notifies a running `sandboxd serve` process that it should reload the persisted manifest.
-pub fn notify_reload(socket_path: &Path) -> Result<(), ControlError> {
-    let mut stream = match UnixStream::connect(socket_path) {
-        Ok(stream) => stream,
-        Err(error)
-            if matches!(
-                error.kind(),
-                std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused
-            ) =>
-        {
-            return Ok(());
-        }
-        Err(error) => {
-            return Err(ControlError::ConnectSocket {
-                path: socket_path.to_path_buf(),
-                error,
-            });
-        }
-    };
+/// Submits one startup payload to the running daemon over the local control socket.
+pub fn submit_init(socket_path: &Path, startup_input: &StartupInput) -> Result<(), ControlError> {
+    let mut stream =
+        UnixStream::connect(socket_path).map_err(|error| ControlError::ConnectSocket {
+            path: socket_path.to_path_buf(),
+            error,
+        })?;
 
-    let request = serde_json::to_vec(&ControlRequest::ReloadStartup)
-        .map_err(ControlError::SerializeResponse)?;
+    let request = serde_json::to_vec(&ControlRequest::Init {
+        startup_input: startup_input.clone(),
+    })
+    .map_err(ControlError::SerializeResponse)?;
     stream
         .write_all(&request)
         .map_err(ControlError::WriteResponse)?;
@@ -357,11 +359,10 @@ pub fn notify_reload(socket_path: &Path) -> Result<(), ControlError> {
     )))
 }
 
-/// Runs the blocking accept loop for the local control socket server.
 fn run_control_server_loop(
     listener: UnixListener,
-    manifest_path: &Path,
     state: &Arc<Mutex<ControlServerState>>,
+    init_thread: &SharedInitThread,
     shutdown_receiver: &mpsc::Receiver<()>,
     sleeper: &impl Sleeper,
     accept_poll_interval: Duration,
@@ -373,13 +374,10 @@ fn run_control_server_loop(
 
         match listener.accept() {
             Ok((mut stream, _)) => {
-                // The listener is nonblocking so the accept loop can observe shutdowns.
-                // Each accepted control connection should switch back to blocking mode so
-                // request/response reads wait for the peer to finish writing.
                 stream
                     .set_nonblocking(false)
                     .map_err(ControlError::ConfigureConnection)?;
-                let response = match handle_connection(&mut stream, manifest_path, state) {
+                let response = match handle_connection(&mut stream, state, init_thread) {
                     Ok(()) => ControlResponse {
                         ok: true,
                         error: None,
@@ -405,11 +403,10 @@ fn run_control_server_loop(
     }
 }
 
-/// Handles one accepted control socket connection from request read through response state update.
 fn handle_connection(
     stream: &mut UnixStream,
-    manifest_path: &Path,
     state: &Arc<Mutex<ControlServerState>>,
+    init_thread: &SharedInitThread,
 ) -> Result<(), ControlError> {
     security::ensure_unix_socket_peer_matches_current_process_uid(stream)
         .map_err(|error| ControlError::VerifyPeer(error.to_string()))?;
@@ -422,89 +419,112 @@ fn handle_connection(
         serde_json::from_slice(&raw_request).map_err(ControlError::InvalidRequest)?;
 
     match request {
-        ControlRequest::ReloadStartup => {
-            let manifest = manifest::load_manifest(manifest_path)
-                .map_err(|error| ControlError::LoadManifest(error.to_string()))?;
-            apply_loaded_manifest(manifest, state, true)
-        }
+        ControlRequest::Init { startup_input } => begin_init(startup_input, state, init_thread),
     }
 }
 
-fn load_persisted_manifest_if_present(
-    manifest_path: &Path,
+fn begin_init(
+    startup_input: StartupInput,
     state: &Arc<Mutex<ControlServerState>>,
+    init_thread: &SharedInitThread,
 ) -> Result<(), ControlError> {
-    match manifest::load_manifest(manifest_path) {
-        Ok(manifest) => apply_loaded_manifest(manifest, state, false),
-        Err(ApplyStartupError::ReadManifest { error, .. })
-            if error.kind() == std::io::ErrorKind::NotFound =>
-        {
-            Ok(())
+    {
+        let mut state_guard = state
+            .lock()
+            .expect("control server state lock should not be poisoned");
+        match &state_guard.init_phase {
+            InitPhase::Uninitialized => {
+                state_guard.init_phase = InitPhase::Initializing;
+                state_guard.startup_input = Some(startup_input.clone());
+            }
+            InitPhase::Initializing => {
+                return Err(ControlError::InitRejected(
+                    "sandboxd is already initializing".to_string(),
+                ));
+            }
+            InitPhase::Initialized => {
+                return Err(ControlError::InitRejected(
+                    "sandboxd has already completed initialization".to_string(),
+                ));
+            }
+            InitPhase::Failed(error) => {
+                return Err(ControlError::InitRejected(format!(
+                    "sandboxd initialization already failed: {error}"
+                )));
+            }
         }
-        Err(error) => Err(ControlError::LoadManifest(error.to_string())),
     }
-}
 
-fn apply_loaded_manifest(
-    manifest: StartupInput,
-    state: &Arc<Mutex<ControlServerState>>,
-    increment_reload_count: bool,
-) -> Result<(), ControlError> {
-    // Use the same apply path for initial startup and later reloads so setup work
-    // stays driven by the persisted manifest rather than ad hoc in-memory state.
-    take_process_manager(state)
-        .map(|process_manager| process_manager.stop(&SystemClock, &ThreadSleeper))
-        .transpose()
-        .map_err(|error| ControlError::StopProcessManager(error.to_string()))?;
-    runtime::apply_runtime_plan(&manifest)
-        .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
-    let runtime_plan: runtime::CompiledRuntimePlan =
-        serde_json::from_value(manifest.runtime_plan.clone())
-            .map_err(|error| ControlError::ApplyRuntimePlan(error.to_string()))?;
-    let process_specs = process::flatten_runtime_client_processes(&runtime_plan.runtime_clients);
-    let process_manager = if process_specs.is_empty() {
-        None
-    } else {
-        Some(
-            process::start_runtime_client_process_manager(
-                &process_specs,
-                &SystemClock,
-                &ThreadSleeper,
-            )
-            .map_err(|error| ControlError::StartProcessManager(error.to_string()))?,
-        )
-    };
-
-    let mut state = state
+    let mut init_thread_guard = init_thread
         .lock()
-        .expect("control server state lock should not be poisoned");
-    if increment_reload_count {
-        state.reload_count += 1;
+        .expect("control init thread lock should not be poisoned");
+    if init_thread_guard.is_some() {
+        return Err(ControlError::InitRejected(
+            "sandboxd init worker is already running".to_string(),
+        ));
     }
-    state.latest_manifest = Some(manifest);
-    state.process_manager = process_manager;
+
+    let state_for_thread = state.clone();
+    *init_thread_guard = Some(thread::spawn(move || {
+        let result = SandboxdState::initialize(
+            &startup_input,
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        );
+
+        match result {
+            Ok(sandboxd_state) => {
+                let mut state_guard = state_for_thread
+                    .lock()
+                    .expect("control server state lock should not be poisoned");
+                state_guard.sandboxd_state = Some(sandboxd_state);
+                state_guard.init_phase = InitPhase::Initialized;
+                Ok(())
+            }
+            Err(error) => {
+                let error_text = error.to_string();
+                state_for_thread
+                    .lock()
+                    .expect("control server state lock should not be poisoned")
+                    .init_phase = InitPhase::Failed(error_text.clone());
+                Err(ControlError::InitializeSandboxdState(error_text))
+            }
+        }
+    }));
     Ok(())
 }
 
-fn take_process_manager(
-    state: &Arc<Mutex<ControlServerState>>,
-) -> Option<process::RuntimeClientProcessManager> {
+fn join_init_thread(init_thread: &SharedInitThread) -> Result<(), ControlError> {
+    let Some(thread) = init_thread
+        .lock()
+        .expect("control init thread lock should not be poisoned")
+        .take()
+    else {
+        return Ok(());
+    };
+
+    match thread.join() {
+        Ok(result) => result,
+        Err(_) => Err(ControlError::InitPanicked),
+    }
+}
+
+fn take_sandboxd_state(state: &Arc<Mutex<ControlServerState>>) -> Option<SandboxdState> {
     state
         .lock()
         .expect("control server state lock should not be poisoned")
-        .process_manager
+        .sandboxd_state
         .take()
 }
 
-fn stop_managed_processes(state: &Arc<Mutex<ControlServerState>>) -> Result<(), ControlError> {
-    take_process_manager(state)
-        .map(|process_manager| process_manager.stop(&SystemClock, &ThreadSleeper))
+fn close_sandboxd_state(state: &Arc<Mutex<ControlServerState>>) -> Result<(), ControlError> {
+    take_sandboxd_state(state)
+        .map(SandboxdState::close)
         .transpose()
-        .map_err(|error| ControlError::StopProcessManager(error.to_string()))?;
+        .map_err(|error| ControlError::CloseSandboxdState(error.to_string()))?;
     Ok(())
 }
 
-/// Removes an existing socket file only when it is actually a stale Unix socket.
 fn remove_stale_socket(socket_path: &Path) -> Result<(), ControlError> {
     match fs::symlink_metadata(socket_path) {
         Ok(metadata) => {
@@ -528,52 +548,85 @@ fn remove_stale_socket(socket_path: &Path) -> Result<(), ControlError> {
 
 #[cfg(test)]
 mod tests {
+    use std::net::TcpListener;
+    use std::ffi::OsString;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{LazyLock, Mutex, mpsc};
+    use std::thread;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-    use crate::apply_startup::manifest::persist_manifest;
+    use tungstenite::{Message, accept};
+
     use crate::control::{
-        DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, notify_reload, start_control_server,
+        DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, InitPhase, start_control_server, submit_init,
     };
     use crate::protocol::startup::{StartupInput, StartupMode};
-    use crate::time::ThreadSleeper;
     use crate::time::testing::ManualSleeper;
+    use crate::time::{Sleeper, ThreadSleeper};
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+    static ENV_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+    const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str =
+        "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 
     #[test]
-    fn reloads_manifest_from_control_socket() {
-        let test_dir = create_temp_test_dir("control_reload");
+    fn accepts_one_init_request_from_the_control_socket() {
+        let _env_guard =
+            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let test_dir = create_temp_test_dir("control_init");
         let socket_path = test_dir.join("control.sock");
-        let manifest_path = test_dir.join("manifest.json");
-        let startup_input = valid_startup_input("bootstrap-token-value");
-
-        persist_manifest(&manifest_path, &startup_input)
-            .expect("manifest should persist before reload");
+        let gateway = start_bootstrap_gateway();
+        let startup_input = valid_startup_input("bootstrap-token-value", &gateway.ws_url);
         let server = start_control_server(
             &socket_path,
-            &manifest_path,
             ThreadSleeper,
             DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
         )
         .expect("control server should start");
 
-        notify_reload(&socket_path).expect("reload notification should succeed");
+        submit_init(&socket_path, &startup_input).expect("init submission should succeed");
 
-        assert_eq!(server.reload_count(), 1);
-        assert_eq!(server.latest_manifest(), Some(startup_input));
+        wait_for_init_phase(&server, InitPhase::Initialized);
+        assert_eq!(server.startup_input(), Some(startup_input));
 
         server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
     #[test]
-    fn ignores_missing_control_socket() {
-        let test_dir = create_temp_test_dir("control_missing_socket");
-        let socket_path = test_dir.join("missing.sock");
+    fn rejects_second_init_requests_after_initialization_begins() {
+        let _env_guard =
+            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let test_dir = create_temp_test_dir("control_second_init");
+        let socket_path = test_dir.join("control.sock");
+        let gateway = start_bootstrap_gateway();
+        let startup_input = valid_startup_input("bootstrap-token-value", &gateway.ws_url);
+        let server = start_control_server(
+            &socket_path,
+            ThreadSleeper,
+            DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
+        )
+        .expect("control server should start");
 
-        notify_reload(&socket_path).expect("missing control socket should be ignored");
+        submit_init(&socket_path, &startup_input).expect("first init should succeed");
+        let error = submit_init(&socket_path, &startup_input).expect_err("second init should fail");
 
+        assert!(
+            error
+                .to_string()
+                .contains("sandboxd has already completed initialization")
+                || error
+                    .to_string()
+                    .contains("sandboxd is already initializing")
+        );
+
+        server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
@@ -581,15 +634,9 @@ mod tests {
     fn records_control_loop_sleep_requests_with_manual_sleeper() {
         let test_dir = create_temp_test_dir("control_manual_sleeper");
         let socket_path = test_dir.join("control.sock");
-        let manifest_path = test_dir.join("manifest.json");
         let sleeper = ManualSleeper::default();
-        let server = start_control_server(
-            &socket_path,
-            &manifest_path,
-            sleeper.clone(),
-            Duration::from_millis(7),
-        )
-        .expect("control server should start");
+        let server = start_control_server(&socket_path, sleeper.clone(), Duration::from_millis(7))
+            .expect("control server should start");
 
         assert!(
             sleeper.wait_for_sleep_requests(1, Duration::from_millis(100)),
@@ -608,12 +655,24 @@ mod tests {
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
-    fn valid_startup_input(bootstrap_token: &str) -> StartupInput {
+    fn wait_for_init_phase(server: &crate::control::ControlServer, expected: InitPhase) {
+        for _ in 0..100 {
+            if server.init_phase() == expected {
+                return;
+            }
+
+            ThreadSleeper.sleep(Duration::from_millis(10));
+        }
+
+        panic!("timed out waiting for init phase");
+    }
+
+    fn valid_startup_input(bootstrap_token: &str, tunnel_gateway_ws_url: &str) -> StartupInput {
         StartupInput {
             startup_mode: StartupMode::New,
             bootstrap_token: bootstrap_token.to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
-            tunnel_gateway_ws_url: "wss://gateway.example.test".to_string(),
+            tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -647,5 +706,128 @@ mod tests {
         std::fs::create_dir_all(&path).expect("temp test dir should be creatable");
 
         path
+    }
+
+    struct BootstrapGateway {
+        ws_url: String,
+        shutdown_sender: mpsc::Sender<()>,
+        thread: Option<thread::JoinHandle<()>>,
+    }
+
+    struct TestEnvVarGuard {
+        _lock: std::sync::MutexGuard<'static, ()>,
+        name: &'static str,
+        previous: Option<OsString>,
+    }
+
+    impl TestEnvVarGuard {
+        fn set(name: &'static str, value: &str) -> Self {
+            let lock = ENV_MUTEX
+                .lock()
+                .expect("test env mutex should not be poisoned");
+            let previous = std::env::var_os(name);
+            // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+            unsafe {
+                std::env::set_var(name, value);
+            }
+            Self {
+                _lock: lock,
+                name,
+                previous,
+            }
+        }
+    }
+
+    impl Drop for TestEnvVarGuard {
+        fn drop(&mut self) {
+            match &self.previous {
+                Some(previous) => {
+                    // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+                    unsafe {
+                        std::env::set_var(self.name, previous);
+                    }
+                }
+                None => {
+                    // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+                    unsafe {
+                        std::env::remove_var(self.name);
+                    }
+                }
+            }
+        }
+    }
+
+    impl BootstrapGateway {
+        fn close(mut self) -> Result<(), String> {
+            let _ = self.shutdown_sender.send(());
+            let thread = self
+                .thread
+                .take()
+                .expect("bootstrap gateway thread should exist");
+            thread
+                .join()
+                .map_err(|_| "bootstrap gateway thread panicked".to_string())
+        }
+    }
+
+    fn start_bootstrap_gateway() -> BootstrapGateway {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bootstrap gateway should bind");
+        listener
+            .set_nonblocking(true)
+            .expect("bootstrap gateway listener should become nonblocking");
+        let ws_url = format!(
+            "ws://127.0.0.1:{}/bootstrap",
+            listener
+                .local_addr()
+                .expect("bootstrap gateway should expose its address")
+                .port()
+        );
+        let (shutdown_sender, shutdown_receiver) = mpsc::channel();
+
+        let thread = thread::spawn(move || {
+            loop {
+                if shutdown_receiver.try_recv().is_ok() {
+                    return;
+                }
+
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        stream
+                            .set_nonblocking(false)
+                            .expect("bootstrap gateway stream should become blocking");
+                        let mut websocket =
+                            accept(stream).expect("bootstrap gateway handshake should succeed");
+                        loop {
+                            match websocket.read() {
+                                Ok(Message::Close(_)) => return,
+                                Ok(
+                                    Message::Text(_)
+                                    | Message::Binary(_)
+                                    | Message::Ping(_)
+                                    | Message::Pong(_)
+                                    | Message::Frame(_),
+                                ) => {}
+                                Err(tungstenite::Error::Protocol(
+                                    tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
+                                )) => return,
+                                Err(error) => {
+                                    panic!("bootstrap gateway should read frames: {error}")
+                                }
+                            }
+                        }
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        ThreadSleeper.sleep(Duration::from_millis(10));
+                    }
+                    Err(error) => panic!("bootstrap gateway accept should succeed: {error}"),
+                }
+            }
+        });
+
+        BootstrapGateway {
+            ws_url,
+            shutdown_sender,
+            thread: Some(thread),
+        }
     }
 }

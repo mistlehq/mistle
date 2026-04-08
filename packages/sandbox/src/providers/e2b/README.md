@@ -34,7 +34,7 @@ const adapter = createSandboxAdapter({
 - `resume({ id })` reconnects to the same E2B sandbox id.
 - `stop({ id })` pauses the sandbox.
 - `destroy({ id })` kills the sandbox permanently.
-- `createSandboxRuntimeControl(...).applyStartup({ id, payload })` first ensures `sandboxd serve` is running as `root`, then runs `sandboxd apply-startup` through the E2B commands API.
+- `createSandboxRuntimeControl(...).init({ id, payload })` first ensures `sandboxd` is running as `root`, then runs `sandboxd init` through the E2B commands API.
 
 ## Error Surface
 

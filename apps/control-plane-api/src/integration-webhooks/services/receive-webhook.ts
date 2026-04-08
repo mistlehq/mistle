@@ -406,28 +406,23 @@ export async function receiveIntegrationWebhook(
     );
   }
 
-  if (webhookSource === undefined) {
-    if (webhookSourceCapability.ownerScope !== IntegrationWebhookSourceOwnerScopes.CONNECTION) {
-      throw new Error(
-        `Payload-routed webhook source for '${input.targetKey}' could not be resolved before persistence.`,
-      );
-    }
-
-    webhookSource = await ensureImplicitConnectionWebhookSource({
-      db,
-      organizationId: resolvedConnection.organizationId,
-      connectionId: resolvedConnection.id,
-      targetKey: input.targetKey,
-      routingStrategy: webhookSourceCapability.routingStrategy,
-    });
-  }
+  const persistedWebhookSource =
+    webhookSource?.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION
+      ? webhookSource
+      : await ensureImplicitConnectionWebhookSource({
+          db,
+          organizationId: resolvedConnection.organizationId,
+          connectionId: resolvedConnection.id,
+          targetKey: input.targetKey,
+          routingStrategy: webhookSourceCapability.routingStrategy,
+        });
 
   const insertedRows = await db
     .insert(integrationWebhookEvents)
     .values({
       organizationId: resolvedConnection.organizationId,
       integrationConnectionId: resolvedConnection.id,
-      integrationWebhookSourceId: webhookSource.id,
+      integrationWebhookSourceId: persistedWebhookSource.id,
       targetKey: input.targetKey,
       externalEventId: resolvedWebhookRequest.event.externalEventId,
       externalDeliveryId: resolvedWebhookRequest.event.externalDeliveryId,

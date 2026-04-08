@@ -1,14 +1,8 @@
 import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-import {
-  uploadSandboxImage,
-  type UploadedSandboxImage,
-  type UploadSandboxImageInput,
-} from "@mistle/sandbox-session-client";
-import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
+import { UploadStreamClient, type SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useCallback, useState } from "react";
 
 import { resolveTurnRepresentation } from "../../session-agents/codex/session-state/codex-attachment-presentation.js";
-import { mintSandboxInstanceConnectionToken } from "../../sessions/sessions-service.js";
 import { resolveUploadErrorMessage } from "./session-composer-upload-errors.js";
 
 export type PreparedComposerAttachments = {
@@ -28,14 +22,14 @@ export type SessionComposerAttachmentControl = {
 };
 
 export type SessionComposerAttachmentControlDependencies = {
-  mintSandboxInstanceConnectionToken: typeof mintSandboxInstanceConnectionToken;
-  uploadSandboxImage: (input: UploadSandboxImageInput) => Promise<UploadedSandboxImage>;
+  createUploadStreamClient: (
+    transport: SandboxSessionTransport,
+  ) => Pick<UploadStreamClient, "uploadImage">;
 };
 
 const DefaultSessionComposerAttachmentControlDependencies: SessionComposerAttachmentControlDependencies =
   {
-    mintSandboxInstanceConnectionToken,
-    uploadSandboxImage,
+    createUploadStreamClient: (transport) => new UploadStreamClient({ transport }),
   };
 
 export function useSessionComposerAttachmentControl(input: {
@@ -43,6 +37,10 @@ export function useSessionComposerAttachmentControl(input: {
     sandboxInstanceId: string;
     threadId: string;
   } | null;
+  ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
+    sandboxInstanceId: string;
+    transport: SandboxSessionTransport;
+  }>;
   dependencies?: SessionComposerAttachmentControlDependencies;
 }): SessionComposerAttachmentControl {
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
@@ -69,20 +67,18 @@ export function useSessionComposerAttachmentControl(input: {
 
       setIsUploadingAttachments(true);
       try {
-        const runtime = createBrowserSandboxSessionRuntime();
+        const transportConnection = await input.ensureTransportConnected({
+          sandboxInstanceId: input.attachmentTarget.sandboxInstanceId,
+        });
+        const uploadClient = dependencies.createUploadStreamClient(transportConnection.transport);
         const uploadedImages = [];
         // Uploads are intentionally serialized in the supported composer flow.
         // Parallel attachment uploads are not part of the current product contract.
         for (const attachment of prepareInput.files) {
-          const mintedConnection = await dependencies.mintSandboxInstanceConnectionToken({
-            instanceId: input.attachmentTarget.sandboxInstanceId,
-          });
           uploadedImages.push(
-            await dependencies.uploadSandboxImage({
-              connectionUrl: mintedConnection.connectionUrl,
-              file: attachment,
-              runtime,
+            await uploadClient.uploadImage({
               threadId: input.attachmentTarget.threadId,
+              file: attachment,
             }),
           );
         }
@@ -104,7 +100,7 @@ export function useSessionComposerAttachmentControl(input: {
         setIsUploadingAttachments(false);
       }
     },
-    [dependencies, input.attachmentTarget],
+    [dependencies, input.attachmentTarget, input.ensureTransportConnected],
   );
 
   return {

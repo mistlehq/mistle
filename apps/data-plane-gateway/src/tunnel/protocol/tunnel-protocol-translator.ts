@@ -7,6 +7,7 @@ import {
   parseTelemetryControlMessage,
   type BootstrapControlMessage,
   type KeepaliveControlMessage,
+  type RuntimeReadyControlMessage,
   type StreamControlMessage,
   type TelemetryClose,
   type TelemetryOpen,
@@ -15,7 +16,6 @@ import {
 import { BootstrapTunnelNotConnectedError } from "../bootstrap-tunnel-not-connected-error.js";
 import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
 import {
-  ClientSessionActiveStreamError,
   TunnelSessionBindingLimitExceededError,
   type ClientStreamBinding,
 } from "../tunnel-session/index.js";
@@ -62,6 +62,7 @@ export type TunnelProtocolDelivery =
 export type TunnelProtocolTranslation = {
   delivery: TunnelProtocolDelivery;
   keepaliveControlMessage?: KeepaliveControlMessage;
+  runtimeReadyControlMessage?: RuntimeReadyControlMessage;
   notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding;
   releaseInteractiveStream?: ReleaseInteractiveStream;
 };
@@ -202,13 +203,6 @@ function toStreamOpenErrorPayload(input: { error: Error; streamId: number }): st
       streamId: input.streamId,
     });
   }
-  if (input.error instanceof ClientSessionActiveStreamError) {
-    return createStreamOpenErrorPayload({
-      code: "client_session_already_open",
-      message: input.error.message,
-      streamId: input.streamId,
-    });
-  }
   if (input.error instanceof TunnelSessionBindingLimitExceededError) {
     return createStreamOpenErrorPayload({
       code: "max_active_streams_exceeded",
@@ -294,6 +288,10 @@ function assertBootstrapControlMessageAllowed(message: BootstrapControlMessage):
     return;
   }
 
+  if (message.type === "runtime.ready") {
+    return;
+  }
+
   if (isBootstrapStreamControlMessageAllowed(message)) {
     return;
   }
@@ -353,6 +351,7 @@ function createRespondDelivery(payload: RelayPayload): TunnelProtocolDelivery {
 function createTranslation(input: {
   delivery: TunnelProtocolDelivery;
   keepaliveControlMessage?: KeepaliveControlMessage | undefined;
+  runtimeReadyControlMessage?: RuntimeReadyControlMessage | undefined;
   notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding | undefined;
   releaseInteractiveStream?: ReleaseInteractiveStream | undefined;
 }): TunnelProtocolTranslation {
@@ -362,6 +361,11 @@ function createTranslation(input: {
       ? {}
       : {
           keepaliveControlMessage: input.keepaliveControlMessage,
+        }),
+    ...(input.runtimeReadyControlMessage === undefined
+      ? {}
+      : {
+          runtimeReadyControlMessage: input.runtimeReadyControlMessage,
         }),
     ...(input.notifyBootstrapPeerOfReleasedStream === undefined
       ? {}
@@ -571,6 +575,15 @@ export class TunnelProtocolTranslator {
       });
     }
 
+    if (controlMessage.type === "runtime.ready") {
+      return createTranslation({
+        delivery: {
+          kind: "drop",
+        },
+        runtimeReadyControlMessage: controlMessage,
+      });
+    }
+
     if (controlMessage.type === "telemetry.open") {
       return createTranslation({
         delivery: {
@@ -594,23 +607,10 @@ export class TunnelProtocolTranslator {
       tunnelStreamId: controlMessage.streamId,
     });
     if (route === undefined) {
-      if (
-        controlMessage.type === "stream.complete" ||
-        (controlMessage.type === "stream.event" &&
-          (controlMessage.event.type === "pty.exit" ||
-            controlMessage.event.type === "fileUpload.completed"))
-      ) {
-        return createTranslation({
-          delivery: {
-            kind: "drop",
-          },
-        });
-      }
-
       return createTranslation({
-        delivery: createRespondDelivery(
-          createUnboundInteractiveStreamResetPayload(controlMessage.streamId),
-        ),
+        delivery: {
+          kind: "drop",
+        },
       });
     }
 

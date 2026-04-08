@@ -13,14 +13,6 @@ function toClientBindingKey(input: { clientSessionId: string; clientStreamId: nu
   return `${input.clientSessionId}:${String(input.clientStreamId)}`;
 }
 
-export class ClientSessionActiveStreamError extends Error {
-  public constructor(clientSessionId: string) {
-    super(
-      `Client session '${clientSessionId}' already has an active interactive stream bound to the bootstrap tunnel.`,
-    );
-  }
-}
-
 export class TunnelSessionBindingLimitExceededError extends Error {
   public constructor(maxBindingCount: number) {
     super(
@@ -41,8 +33,7 @@ export class SandboxTunnelSession {
    * This class is intentionally a local implementation detail behind
    * `TunnelSessionRegistryAdapter`. The default binding configuration allows the
    * owner-local bootstrap tunnel to carry multiple active interactive streams at
-   * once across different client websocket sessions while still enforcing one
-   * active interactive stream per individual client websocket session.
+   * once, including multiple streams from the same client websocket session.
    */
   public constructor(
     public readonly bootstrapTarget: RelayTarget,
@@ -56,9 +47,6 @@ export class SandboxTunnelSession {
   }): ClientStreamBinding {
     if (!Number.isInteger(input.clientStreamId) || input.clientStreamId <= 0) {
       throw new Error("Client stream id must be a positive integer.");
-    }
-    if ((this.#bindingCountsByClientSessionId.get(input.clientSessionId) ?? 0) > 0) {
-      throw new ClientSessionActiveStreamError(input.clientSessionId);
     }
     if (
       this.maxBindingCount !== undefined &&
@@ -84,7 +72,10 @@ export class SandboxTunnelSession {
 
     this.#bindingsByClientKey.set(clientBindingKey, binding);
     this.#bindingsByTunnelStreamId.set(binding.tunnelStreamId, binding);
-    this.#bindingCountsByClientSessionId.set(input.clientSessionId, 1);
+    this.#bindingCountsByClientSessionId.set(
+      input.clientSessionId,
+      (this.#bindingCountsByClientSessionId.get(input.clientSessionId) ?? 0) + 1,
+    );
 
     return binding;
   }
@@ -112,7 +103,13 @@ export class SandboxTunnelSession {
 
     this.#bindingsByClientKey.delete(clientBindingKey);
     this.#bindingsByTunnelStreamId.delete(binding.tunnelStreamId);
-    this.#bindingCountsByClientSessionId.delete(binding.clientSessionId);
+    const nextBindingCount =
+      (this.#bindingCountsByClientSessionId.get(binding.clientSessionId) ?? 1) - 1;
+    if (nextBindingCount <= 0) {
+      this.#bindingCountsByClientSessionId.delete(binding.clientSessionId);
+    } else {
+      this.#bindingCountsByClientSessionId.set(binding.clientSessionId, nextBindingCount);
+    }
     return binding;
   }
 
@@ -145,7 +142,10 @@ export class SandboxTunnelSession {
         }),
       );
       this.#bindingsByTunnelStreamId.delete(binding.tunnelStreamId);
-      this.#bindingCountsByClientSessionId.delete(binding.clientSessionId);
+    }
+
+    if (releasedBindings.length > 0) {
+      this.#bindingCountsByClientSessionId.delete(input.clientSessionId);
     }
 
     return releasedBindings;

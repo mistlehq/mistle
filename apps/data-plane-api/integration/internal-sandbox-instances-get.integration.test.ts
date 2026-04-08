@@ -26,6 +26,9 @@ type RuntimeStateSnapshot = {
     sandboxInstanceId: string;
     ownerLeaseId: string;
   } | null;
+  runtime: {
+    ready: boolean;
+  };
 };
 
 function isRuntimeStateSnapshot(value: unknown): value is RuntimeStateSnapshot {
@@ -35,7 +38,15 @@ function isRuntimeStateSnapshot(value: unknown): value is RuntimeStateSnapshot {
 
   const ownerLeaseId = Object.getOwnPropertyDescriptor(value, "ownerLeaseId")?.value;
   const attachment = Object.getOwnPropertyDescriptor(value, "attachment")?.value;
+  const runtime = Object.getOwnPropertyDescriptor(value, "runtime")?.value;
   if (ownerLeaseId !== null && typeof ownerLeaseId !== "string") {
+    return false;
+  }
+  if (typeof runtime !== "object" || runtime === null) {
+    return false;
+  }
+  const runtimeReady = Object.getOwnPropertyDescriptor(runtime, "ready")?.value;
+  if (typeof runtimeReady !== "boolean") {
     return false;
   }
   if (attachment === null) {
@@ -60,7 +71,7 @@ async function startGatewayForFixture(input: { fixture: DataPlaneApiIntegrationF
   });
 }
 
-async function waitForRuntimeAttachment(input: {
+async function waitForRuntimeReadiness(input: {
   fixture: DataPlaneApiIntegrationFixture;
   gatewayBaseUrl: string;
   sandboxInstanceId: string;
@@ -93,7 +104,8 @@ async function waitForRuntimeAttachment(input: {
     if (
       payload.ownerLeaseId !== null &&
       payload.attachment?.sandboxInstanceId === input.sandboxInstanceId &&
-      payload.attachment.ownerLeaseId === payload.ownerLeaseId
+      payload.attachment.ownerLeaseId === payload.ownerLeaseId &&
+      payload.runtime.ready
     ) {
       return;
     }
@@ -102,7 +114,7 @@ async function waitForRuntimeAttachment(input: {
   }
 
   throw new Error(
-    `Timed out waiting for runtime attachment for sandbox '${input.sandboxInstanceId}'.`,
+    `Timed out waiting for runtime readiness for sandbox '${input.sandboxInstanceId}'.`,
   );
 }
 
@@ -112,6 +124,7 @@ describe("internal sandbox instances get integration", () => {
       id: "sbi_conventional_get_pending",
       organizationId: "org_dp_api_conventional_get",
       sandboxProfileId: "sbp_conventional_get",
+      title: null,
       sandboxProfileVersion: 0,
       runtimeProvider: "docker",
       providerSandboxId: null,
@@ -136,7 +149,9 @@ describe("internal sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       id: "sbi_conventional_get_pending",
+      title: null,
       status: "pending",
+      connectable: false,
       failureCode: null,
       failureMessage: null,
       runtimePlan: null,
@@ -168,6 +183,7 @@ describe("internal sandbox instances get integration", () => {
         id: "sbi_conventional_get_running",
         organizationId: "org_dp_api_conventional_get",
         sandboxProfileId: "sbp_conventional_get",
+        title: "Investigate runtime attach",
         sandboxProfileVersion: 1,
         runtimeProvider: "docker",
         providerSandboxId: sandbox.id,
@@ -192,7 +208,9 @@ describe("internal sandbox instances get integration", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         id: "sbi_conventional_get_running",
+        title: "Investigate runtime attach",
         status: "starting",
+        connectable: false,
         failureCode: null,
         failureMessage: null,
         runtimePlan: null,
@@ -224,6 +242,7 @@ describe("internal sandbox instances get integration", () => {
       id: "sbi_conventional_get_starting_missing",
       organizationId: "org_dp_api_conventional_get",
       sandboxProfileId: "sbp_conventional_get",
+      title: null,
       sandboxProfileVersion: 4,
       runtimeProvider: "docker",
       providerSandboxId: sandbox.id,
@@ -250,7 +269,9 @@ describe("internal sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       id: "sbi_conventional_get_starting_missing",
+      title: null,
       status: "failed",
+      connectable: false,
       failureCode: "provider_runtime_missing",
       failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
       runtimePlan: null,
@@ -298,6 +319,7 @@ describe("internal sandbox instances get integration", () => {
         id: "sbi_conventional_get_starting",
         organizationId: "org_dp_api_conventional_get",
         sandboxProfileId: "sbp_conventional_get",
+        title: null,
         sandboxProfileVersion: 2,
         runtimeProvider: "docker",
         providerSandboxId: sandbox.id,
@@ -322,7 +344,9 @@ describe("internal sandbox instances get integration", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         id: "sbi_conventional_get_starting",
+        title: null,
         status: "starting",
+        connectable: false,
         failureCode: null,
         failureMessage: null,
         runtimePlan: null,
@@ -367,6 +391,7 @@ describe("internal sandbox instances get integration", () => {
         id: "sbi_conventional_get_running_attached",
         organizationId: "org_dp_api_conventional_get",
         sandboxProfileId: "sbp_conventional_get",
+        title: null,
         sandboxProfileVersion: 5,
         runtimeProvider: "docker",
         providerSandboxId: sandbox.id,
@@ -384,7 +409,13 @@ describe("internal sandbox instances get integration", () => {
         sandboxInstanceId: "sbi_conventional_get_running_attached",
         token: bootstrapToken,
       });
-      await waitForRuntimeAttachment({
+      bootstrapSocket.send(
+        JSON.stringify({
+          type: "runtime.ready",
+          ready: true,
+        }),
+      );
+      await waitForRuntimeReadiness({
         fixture,
         gatewayBaseUrl: gateway.baseUrl,
         sandboxInstanceId: "sbi_conventional_get_running_attached",
@@ -405,7 +436,9 @@ describe("internal sandbox instances get integration", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         id: "sbi_conventional_get_running_attached",
+        title: null,
         status: "running",
+        connectable: true,
         failureCode: null,
         failureMessage: null,
         runtimePlan: null,
@@ -440,6 +473,7 @@ describe("internal sandbox instances get integration", () => {
       id: "sbi_conventional_get_missing",
       organizationId: "org_dp_api_conventional_get",
       sandboxProfileId: "sbp_conventional_get",
+      title: null,
       sandboxProfileVersion: 3,
       runtimeProvider: "docker",
       providerSandboxId: sandbox.id,
@@ -466,7 +500,9 @@ describe("internal sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       id: "sbi_conventional_get_missing",
+      title: null,
       status: "failed",
+      connectable: false,
       failureCode: "provider_runtime_missing",
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
       runtimePlan: null,
@@ -480,6 +516,156 @@ describe("internal sandbox instances get integration", () => {
         failureMessage: true,
       },
       where: (table, { eq }) => eq(table.id, "sbi_conventional_get_missing"),
+    });
+    expect(persistedRow).toEqual({
+      status: SandboxInstanceStatuses.FAILED,
+      stopReason: SandboxStopReasons.FAILED,
+      failureCode: "provider_runtime_missing",
+      failureMessage: "Sandbox runtime was not found at the provider during inspection.",
+    });
+  }, 60_000);
+
+  it("preserves stopped sandboxes when the provider still reports them as resumable", async ({
+    fixture,
+  }) => {
+    const adapter = createSandboxAdapter({
+      provider: SandboxProvider.DOCKER,
+      docker: {
+        socketPath: fixture.config.sandbox.docker?.socketPath ?? "/var/run/docker.sock",
+      },
+    });
+    const sandbox = await adapter.start({
+      image: {
+        provider: SandboxProvider.DOCKER,
+        imageId: "registry:3",
+        createdAt: "2026-03-27T00:00:00.000Z",
+      },
+    });
+
+    try {
+      await adapter.stop({ id: sandbox.id });
+      await fixture.db.insert(sandboxInstances).values({
+        id: "sbi_conventional_get_stopped_resumable",
+        organizationId: "org_dp_api_conventional_get",
+        sandboxProfileId: "sbp_conventional_get",
+        title: null,
+        sandboxProfileVersion: 6,
+        runtimeProvider: "docker",
+        providerSandboxId: sandbox.id,
+        status: SandboxInstanceStatuses.STOPPED,
+        startedByKind: "user",
+        startedById: "usr_conventional_get",
+        source: "dashboard",
+      });
+
+      const response = await fetch(
+        new URL(
+          `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_conventional_get_stopped_resumable?organizationId=org_dp_api_conventional_get`,
+          fixture.baseUrl,
+        ),
+        {
+          headers: {
+            [DATA_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+          },
+        },
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        id: "sbi_conventional_get_stopped_resumable",
+        title: null,
+        status: "stopped",
+        connectable: false,
+        failureCode: null,
+        failureMessage: null,
+        runtimePlan: null,
+      });
+
+      const persistedRow = await fixture.db.query.sandboxInstances.findFirst({
+        columns: {
+          status: true,
+          stopReason: true,
+          failureCode: true,
+          failureMessage: true,
+        },
+        where: (table, { eq }) => eq(table.id, "sbi_conventional_get_stopped_resumable"),
+      });
+      expect(persistedRow).toEqual({
+        status: SandboxInstanceStatuses.STOPPED,
+        stopReason: null,
+        failureCode: null,
+        failureMessage: null,
+      });
+    } finally {
+      await adapter.destroy({ id: sandbox.id }).catch(() => undefined);
+    }
+  }, 60_000);
+
+  it("marks stopped sandboxes failed when provider inspection reports the runtime missing", async ({
+    fixture,
+  }) => {
+    const adapter = createSandboxAdapter({
+      provider: SandboxProvider.DOCKER,
+      docker: {
+        socketPath: fixture.config.sandbox.docker?.socketPath ?? "/var/run/docker.sock",
+      },
+    });
+    const sandbox = await adapter.start({
+      image: {
+        provider: SandboxProvider.DOCKER,
+        imageId: "registry:3",
+        createdAt: "2026-03-27T00:00:00.000Z",
+      },
+    });
+
+    await adapter.stop({ id: sandbox.id });
+    await fixture.db.insert(sandboxInstances).values({
+      id: "sbi_conventional_get_stopped_missing",
+      organizationId: "org_dp_api_conventional_get",
+      sandboxProfileId: "sbp_conventional_get",
+      title: null,
+      sandboxProfileVersion: 7,
+      runtimeProvider: "docker",
+      providerSandboxId: sandbox.id,
+      status: SandboxInstanceStatuses.STOPPED,
+      startedByKind: "user",
+      startedById: "usr_conventional_get",
+      source: "dashboard",
+    });
+
+    await adapter.destroy({ id: sandbox.id });
+
+    const response = await fetch(
+      new URL(
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_conventional_get_stopped_missing?organizationId=org_dp_api_conventional_get`,
+        fixture.baseUrl,
+      ),
+      {
+        headers: {
+          [DATA_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      id: "sbi_conventional_get_stopped_missing",
+      title: null,
+      status: "failed",
+      connectable: false,
+      failureCode: "provider_runtime_missing",
+      failureMessage: "Sandbox runtime was not found at the provider during inspection.",
+      runtimePlan: null,
+    });
+
+    const persistedRow = await fixture.db.query.sandboxInstances.findFirst({
+      columns: {
+        status: true,
+        stopReason: true,
+        failureCode: true,
+        failureMessage: true,
+      },
+      where: (table, { eq }) => eq(table.id, "sbi_conventional_get_stopped_missing"),
     });
     expect(persistedRow).toEqual({
       status: SandboxInstanceStatuses.FAILED,

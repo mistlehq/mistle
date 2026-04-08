@@ -12,10 +12,71 @@ use serde::Deserialize;
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompiledRuntimePlan {
+    pub egress_routes: Vec<CompiledEgressRoute>,
     pub artifacts: Vec<CompiledRuntimeArtifact>,
     pub workspace_sources: Vec<CompiledWorkspaceSource>,
     pub runtime_clients: Vec<RuntimeClient>,
     pub agent_runtimes: Vec<CompiledAgentRuntime>,
+}
+
+/// One outbound route that the sandbox runtime may mediate through tokenizer-proxy.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompiledEgressRoute {
+    pub egress_rule_id: String,
+    pub binding_id: String,
+    pub r#match: CompiledEgressRouteMatch,
+    pub upstream: CompiledEgressRouteUpstream,
+    pub auth_injection: CompiledEgressRouteAuthInjection,
+    pub credential_resolver: CompiledEgressRouteCredentialResolver,
+}
+
+/// The request match constraints that select one egress route.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompiledEgressRouteMatch {
+    pub hosts: Vec<String>,
+    pub path_prefixes: Option<Vec<String>>,
+    pub methods: Option<Vec<String>>,
+}
+
+/// The upstream origin for one mediated egress route.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompiledEgressRouteUpstream {
+    pub base_url: String,
+}
+
+/// The auth-injection policy that tokenizer-proxy applies for one egress route.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompiledEgressRouteAuthInjection {
+    pub r#type: CompiledEgressRouteAuthInjectionType,
+    pub target: String,
+    pub username: Option<String>,
+}
+
+/// The auth-injection strategies the runtime plan can request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum CompiledEgressRouteAuthInjectionType {
+    #[serde(rename = "bearer")]
+    Bearer,
+    #[serde(rename = "basic")]
+    Basic,
+    #[serde(rename = "header")]
+    Header,
+    #[serde(rename = "query")]
+    Query,
+}
+
+/// The credential source that backs one mediated egress route.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompiledEgressRouteCredentialResolver {
+    pub connection_id: String,
+    pub secret_type: String,
+    pub purpose: Option<String>,
+    pub resolver_key: Option<String>,
 }
 
 /// One artifact lifecycle command or runtime client process command.
@@ -192,6 +253,10 @@ pub enum CompiledWorkspaceSource {
         path: String,
         #[serde(rename = "originUrl")]
         origin_url: String,
+        #[serde(default)]
+        clone_url: Option<String>,
+        #[serde(default)]
+        egress_grant_token: Option<String>,
     },
 }
 

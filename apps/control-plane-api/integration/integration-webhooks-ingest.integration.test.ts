@@ -275,13 +275,14 @@ describe("integration webhooks ingest integration", () => {
       where: (table, { and, eq }) =>
         and(
           eq(table.targetKey, targetKey),
-          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.TARGET),
+          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
+          eq(table.integrationConnectionId, connectionId),
         ),
     });
 
     expect(persistedSource).toBeDefined();
     if (persistedSource === undefined) {
-      throw new Error("Expected implicit target webhook source to be created.");
+      throw new Error("Expected implicit connection-owned webhook source to be created.");
     }
 
     expect(persistedEvent.integrationWebhookSourceId).toBe(persistedSource.id);
@@ -418,6 +419,7 @@ describe("integration webhooks ingest integration", () => {
     fixture,
   }) => {
     const targetKey = "github-cloud-webhook-ingest-duplicate";
+    const connectionId = "icn_webhook_ingest_duplicate";
     const webhookSecret = "whsec_duplicate_secret";
     const externalDeliveryId = "delivery_duplicate_1";
     const authenticatedSession = await fixture.authSession({
@@ -448,7 +450,7 @@ describe("integration webhooks ingest integration", () => {
     });
 
     await fixture.db.insert(integrationConnections).values({
-      id: "icn_webhook_ingest_duplicate",
+      id: connectionId,
       organizationId: authenticatedSession.organizationId,
       targetKey,
       displayName: "Duplicate webhook connection",
@@ -504,7 +506,8 @@ describe("integration webhooks ingest integration", () => {
       where: (table, { and, eq }) =>
         and(
           eq(table.targetKey, targetKey),
-          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.TARGET),
+          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
+          eq(table.integrationConnectionId, connectionId),
         ),
     });
     expect(persistedSources).toHaveLength(1);
@@ -634,6 +637,8 @@ describe("integration webhooks ingest integration", () => {
     expect(persistedEvent.eventType).toBe("jira:issue_created");
     expect(persistedEvent.providerEventType).toBe("jira:issue_created");
     expect(persistedEvent.payload).toEqual(payloadObject);
-    expect(persistedEvent.sourceOccurredAt).toBe("2026-04-02T17:42:43.000Z");
+    expect(new Date(String(persistedEvent.sourceOccurredAt)).toISOString()).toBe(
+      "2026-04-02T17:42:43.000Z",
+    );
   });
 });

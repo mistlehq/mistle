@@ -874,9 +874,7 @@ fn validate_telemetry_open_ok(message: &TelemetryOpenOk) -> Result<(), TunnelPro
     Ok(())
 }
 
-fn validate_telemetry_open_error(
-    message: &TelemetryOpenError,
-) -> Result<(), TunnelProtocolError> {
+fn validate_telemetry_open_error(message: &TelemetryOpenError) -> Result<(), TunnelProtocolError> {
     if message.message_type != "telemetry.open.error" {
         return Err(TunnelProtocolError::new(
             "telemetry.open.error response type must be 'telemetry.open.error'",
@@ -935,8 +933,8 @@ mod tests {
         BootstrapTelemetryControlMessage, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
         PtyControlMessage, StreamControlMessage, StreamSendWindow, decode_stream_data_frame,
         encode_stream_data_frame, file_upload_completed_event,
-        parse_bootstrap_telemetry_control_message, parse_stream_control_message,
-        parse_pty_control_message, pty_exit_event, stream_complete, stream_open_error,
+        parse_bootstrap_telemetry_control_message, parse_pty_control_message,
+        parse_stream_control_message, pty_exit_event, stream_complete, stream_open_error,
         stream_open_ok, stream_reset, stream_window, telemetry_close, telemetry_open,
     };
 
@@ -973,8 +971,8 @@ mod tests {
 
     #[test]
     fn round_trips_data_frames() {
-        let encoded =
-            encode_stream_data_frame(9, PAYLOAD_KIND_WEBSOCKET_TEXT, b"hello").expect("frame should encode");
+        let encoded = encode_stream_data_frame(9, PAYLOAD_KIND_WEBSOCKET_TEXT, b"hello")
+            .expect("frame should encode");
         let decoded = decode_stream_data_frame(&encoded).expect("frame should decode");
 
         assert_eq!(decoded.stream_id, 9);
@@ -1065,14 +1063,15 @@ mod tests {
         assert_eq!(error.to_string(), "payloadKind is not supported: 9");
 
         let encoded = vec![1, 0, 0, 0, 1, 9, b'x'];
-        let error = decode_stream_data_frame(&encoded).expect_err("payload kind should be rejected");
+        let error =
+            decode_stream_data_frame(&encoded).expect_err("payload kind should be rejected");
         assert_eq!(error.to_string(), "payloadKind is not supported: 9");
     }
 
     #[test]
     fn preserves_raw_bytes_payload_kind() {
-        let encoded =
-            encode_stream_data_frame(2, PAYLOAD_KIND_RAW_BYTES, b"bytes").expect("frame should encode");
+        let encoded = encode_stream_data_frame(2, PAYLOAD_KIND_RAW_BYTES, b"bytes")
+            .expect("frame should encode");
         let decoded = decode_stream_data_frame(&encoded).expect("frame should decode");
 
         assert_eq!(decoded.payload_kind, PAYLOAD_KIND_RAW_BYTES);

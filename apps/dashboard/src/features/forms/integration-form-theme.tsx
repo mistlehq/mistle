@@ -61,6 +61,7 @@ function resolveSelectWidgetOptions(input: {
 }
 
 export const IntegrationHorizontalFieldGroupClassName = "gap-6 flex flex-col";
+const IntegrationVerticalFieldGroupClassName = "gap-6 flex flex-col";
 export const IntegrationSelectContentClassName =
   "w-max min-w-(--anchor-width) max-w-[min(32rem,calc(100vw-2rem))]";
 
@@ -124,6 +125,39 @@ function resolveTextInputValue(value: unknown): string {
   return "";
 }
 
+function resolveCheckboxOptionLabel(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+  option: { label: string; value: unknown },
+): string {
+  if (option.label !== String(option.value)) {
+    return option.label;
+  }
+
+  const uiEnumNames = props.uiSchema?.["ui:enumNames"];
+  const itemsSchema = isRecord(props.schema.items) ? props.schema.items : null;
+  if (Array.isArray(uiEnumNames) && itemsSchema !== null && Array.isArray(itemsSchema.enum)) {
+    const optionIndex = itemsSchema.enum.findIndex((candidate) => candidate === option.value);
+    const optionLabel = uiEnumNames[optionIndex];
+    if (typeof optionLabel === "string") {
+      return optionLabel;
+    }
+  }
+
+  if (itemsSchema !== null && Array.isArray(itemsSchema.oneOf)) {
+    for (const candidate of itemsSchema.oneOf) {
+      if (!isRecord(candidate)) {
+        continue;
+      }
+
+      if (candidate.const === option.value && typeof candidate.title === "string") {
+        return candidate.title;
+      }
+    }
+  }
+
+  return option.label;
+}
+
 function TextWidget(
   props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
@@ -148,6 +182,64 @@ function TextWidget(
       }}
       placeholder={props.placeholder}
       type="text"
+      value={value}
+    />
+  );
+}
+
+function EmailWidget(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element {
+  const value = resolveTextInputValue(props.value);
+
+  return (
+    <Input
+      aria-label={props.label}
+      autoFocus={props.autofocus}
+      className="w-full"
+      disabled={props.disabled || props.readonly}
+      id={props.id}
+      onBlur={(event) => {
+        props.onBlur(props.id, event.currentTarget.value);
+      }}
+      onChange={(event) => {
+        const nextValue = event.currentTarget.value;
+        props.onChange(nextValue.length === 0 ? undefined : nextValue);
+      }}
+      onFocus={(event) => {
+        props.onFocus(props.id, event.currentTarget.value);
+      }}
+      placeholder={props.placeholder}
+      type="email"
+      value={value}
+    />
+  );
+}
+
+function URLWidget(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element {
+  const value = resolveTextInputValue(props.value);
+
+  return (
+    <Input
+      aria-label={props.label}
+      autoFocus={props.autofocus}
+      className="w-full"
+      disabled={props.disabled || props.readonly}
+      id={props.id}
+      onBlur={(event) => {
+        props.onBlur(props.id, event.currentTarget.value);
+      }}
+      onChange={(event) => {
+        const nextValue = event.currentTarget.value;
+        props.onChange(nextValue.length === 0 ? undefined : nextValue);
+      }}
+      onFocus={(event) => {
+        props.onFocus(props.id, event.currentTarget.value);
+      }}
+      placeholder={props.placeholder}
+      type="url"
       value={value}
     />
   );
@@ -254,6 +346,7 @@ function CheckboxesWidget(
 
   return (
     <div
+      data-slot="checkbox-group"
       className={cn(
         "gap-3 flex flex-col",
         inline ? "sm:flex-row sm:flex-wrap sm:gap-4" : undefined,
@@ -266,6 +359,10 @@ function CheckboxesWidget(
             const itemDisabled = Array.isArray(enumDisabled) && enumDisabled.includes(option.value);
             const itemId = optionId(id, index);
             const describedBy = ariaDescribedByIds(id);
+            const optionLabel = resolveCheckboxOptionLabel(props, {
+              label: String(option.label),
+              value: option.value,
+            });
 
             return (
               <label
@@ -277,7 +374,7 @@ function CheckboxesWidget(
               >
                 <Checkbox
                   aria-describedby={describedBy}
-                  aria-label={String(option.label)}
+                  aria-label={optionLabel}
                   autoFocus={autofocus && index === 0}
                   checked={checked}
                   disabled={disabled || itemDisabled || readonly}
@@ -299,7 +396,7 @@ function CheckboxesWidget(
                   }}
                   value={String(index)}
                 />
-                <span className="text-sm">{option.label}</span>
+                <span className="text-sm">{optionLabel}</span>
               </label>
             );
           })
@@ -417,12 +514,67 @@ function resolveFieldLayout(
   return options.layout === "stacked" ? "vertical" : "horizontal";
 }
 
+function isObjectSchema(schema: RJSFSchema): boolean {
+  if (schema.type === "object") {
+    return true;
+  }
+
+  return isRecord(schema.properties);
+}
+
+function resolveSchemaProperties(schema: unknown): Record<string, unknown> {
+  if (!isRecord(schema)) {
+    return {};
+  }
+
+  const properties = schema.properties;
+  return isRecord(properties) ? properties : {};
+}
+
+function resolveObjectPropertyUiSchema(uiSchema: unknown, propertyName: string): unknown {
+  if (!isRecord(uiSchema)) {
+    return undefined;
+  }
+
+  return uiSchema[propertyName];
+}
+
+function hasRenderableSchemaContent(input: { schema: unknown; uiSchema: unknown }): boolean {
+  if (isRecord(input.uiSchema) && input.uiSchema["ui:widget"] === "hidden") {
+    return false;
+  }
+
+  if (!isRecord(input.schema)) {
+    return true;
+  }
+
+  const propertySchemas = resolveSchemaProperties(input.schema);
+  const propertyNames = Object.keys(propertySchemas);
+  if (propertyNames.length === 0) {
+    return true;
+  }
+
+  return propertyNames.some((propertyName) =>
+    hasRenderableSchemaContent({
+      schema: propertySchemas[propertyName],
+      uiSchema: resolveObjectPropertyUiSchema(input.uiSchema, propertyName),
+    }),
+  );
+}
+
 function IntegrationFieldTemplate(
   props: FieldTemplateProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
   if (props.hidden) {
     return props.children;
   }
+
+  // Let object nodes render through the object template directly so structural
+  // containers with only hidden descendants do not leave behind empty field shells.
+  if (isObjectSchema(props.schema)) {
+    return props.children;
+  }
+
   const layout = resolveFieldLayout(props);
   const hasErrors = (props.rawErrors ?? []).length > 0;
 
@@ -436,10 +588,7 @@ function IntegrationFieldTemplate(
     >
       {props.displayLabel && props.label.length > 0 ? (
         <FieldHeader>
-          <FieldLabel htmlFor={props.id}>
-            {props.label}
-            {props.required ? <span className="text-destructive">*</span> : null}
-          </FieldLabel>
+          <FieldLabel htmlFor={props.id}>{props.label}</FieldLabel>
           {props.description}
         </FieldHeader>
       ) : null}
@@ -458,30 +607,59 @@ function IntegrationObjectFieldTemplate(
   const layout = resolveFormLayout(props.registry.formContext);
   const visibleProperties = props.properties.filter((property) => !property.hidden);
   const hiddenProperties = props.properties.filter((property) => property.hidden);
+  const schemaProperties = resolveSchemaProperties(props.schema);
+  const title =
+    typeof props.schema.title === "string" && props.schema.title.length > 0
+      ? props.schema.title
+      : "";
+  const description =
+    typeof props.schema.description === "string" && props.schema.description.length > 0
+      ? props.schema.description
+      : undefined;
+  const visibleRenderableProperties = visibleProperties.filter((property) =>
+    hasRenderableSchemaContent({
+      schema: schemaProperties[property.name],
+      uiSchema: resolveObjectPropertyUiSchema(props.uiSchema, property.name),
+    }),
+  );
+  const hiddenOnlyVisibleProperties = visibleProperties.filter(
+    (property) =>
+      !hasRenderableSchemaContent({
+        schema: schemaProperties[property.name],
+        uiSchema: resolveObjectPropertyUiSchema(props.uiSchema, property.name),
+      }),
+  );
+
+  if (
+    visibleRenderableProperties.length === 0 &&
+    hiddenOnlyVisibleProperties.length === 0 &&
+    description === undefined &&
+    title.length === 0
+  ) {
+    return <>{hiddenProperties.map((property) => property.content)}</>;
+  }
 
   return (
     <>
       <div
         className={cn(
           props.className,
+          IntegrationVerticalFieldGroupClassName,
           layout === "horizontal" ? IntegrationHorizontalFieldGroupClassName : undefined,
         )}
       >
-        {props.title.length > 0 || typeof props.description === "string" ? (
+        {title.length > 0 || description !== undefined ? (
           <FieldHeader>
-            {props.title.length > 0 ? <FieldTitle>{props.title}</FieldTitle> : null}
-            {typeof props.description === "string" ? (
-              <FieldDescription>{props.description}</FieldDescription>
-            ) : null}
+            {title.length > 0 ? <FieldTitle>{title}</FieldTitle> : null}
+            {description !== undefined ? <FieldDescription>{description}</FieldDescription> : null}
           </FieldHeader>
-        ) : props.description ? (
-          props.description
         ) : null}
-        {visibleProperties.map((property) => (
+        {visibleRenderableProperties.map((property) => (
           <div key={property.name}>{property.content}</div>
         ))}
         {props.optionalDataControl}
       </div>
+      {hiddenOnlyVisibleProperties.map((property) => property.content)}
       {hiddenProperties.map((property) => property.content)}
     </>
   );
@@ -497,6 +675,8 @@ export const IntegrationFormTemplates = {
 
 export const IntegrationFormWidgets = {
   TextWidget,
+  EmailWidget,
+  URLWidget,
   PasswordWidget,
   SelectWidget,
   CheckboxesWidget,

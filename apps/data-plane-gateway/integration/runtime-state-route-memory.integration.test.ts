@@ -64,6 +64,9 @@ describe("runtime state route integration (memory backend)", () => {
         keepalive: {
           active: false,
         },
+        runtime: {
+          ready: false,
+        },
       });
     },
     RuntimeStateRouteTestTimeoutMs,

@@ -32,13 +32,14 @@ export function buildStoryLaunchableSandboxProfile(
   };
 }
 
-export function buildStorySandboxInstanceListItem(
+export function buildSandboxInstanceListItemFixture(
   overrides: Partial<SandboxInstanceListItem> & Pick<SandboxInstanceListItem, "id">,
 ): SandboxInstanceListItem {
   const { id, ...restOverrides } = overrides;
 
   return {
     id,
+    title: null,
     sandboxProfileId: "sbp_profile_alpha",
     sandboxProfileDisplayName: "Alpha Profile",
     sandboxProfileVersion: 3,

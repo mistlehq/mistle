@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 
 import { createControlPlaneDatabase } from "@mistle/db/control-plane";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import { Pool } from "pg";
 
 import { logger } from "../src/logger.js";

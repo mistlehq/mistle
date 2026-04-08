@@ -1,4 +1,4 @@
-import { Button, SectionHeader } from "@mistle/ui";
+import { Button, SectionHeader, Tooltip, TooltipContent, TooltipTrigger } from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -11,12 +11,29 @@ import type {
 
 function formatBindingSectionTitle(kind: SandboxIntegrationBindingKind): string {
   if (kind === "agent") {
-    return "Agent Bindings";
+    return "Agent Harness";
   }
   if (kind === "git") {
-    return "Git Bindings";
+    return "Git Providers";
   }
-  return "Connector Bindings";
+  return "Connectors";
+}
+
+function formatBindingSectionEmptyState(kind: SandboxIntegrationBindingKind): string {
+  if (kind === "agent") {
+    return "Assign the agent harness for this sandbox profile.";
+  }
+  if (kind === "git") {
+    return "Add Git providers to give the agent access to resources like repositories.";
+  }
+  return "Add connectors to give the agent access to external tools and their resources, like Linear or Slack.";
+}
+
+function formatBindingSectionConstraint(kind: SandboxIntegrationBindingKind): string | null {
+  if (kind === "agent") {
+    return "Only one agent harness can be assigned to a sandbox profile.";
+  }
+  return null;
 }
 
 export function SandboxProfileBindingSection(input: {
@@ -30,25 +47,35 @@ export function SandboxProfileBindingSection(input: {
   onEdit: (row: SandboxProfileBindingEditorRow) => void;
   onRemove: (clientId: string) => void;
 }): React.JSX.Element {
+  const addConstraintMessage =
+    input.rows.length > 0 && input.addDisabled ? formatBindingSectionConstraint(input.kind) : null;
+  const addButton = (
+    <Button disabled={input.addDisabled} onClick={input.onAdd} type="button" variant="outline">
+      <PlusIcon />
+      Add
+    </Button>
+  );
+
   return (
     <div className="gap-3 flex flex-col">
       <SectionHeader
         action={
-          <Button
-            disabled={input.addDisabled}
-            onClick={input.onAdd}
-            type="button"
-            variant="outline"
-          >
-            <PlusIcon />
-            Add
-          </Button>
+          addConstraintMessage === null ? (
+            addButton
+          ) : (
+            <Tooltip>
+              <TooltipTrigger render={<span className="inline-flex" />}>{addButton}</TooltipTrigger>
+              <TooltipContent side="top">{addConstraintMessage}</TooltipContent>
+            </Tooltip>
+          )
         }
         title={formatBindingSectionTitle(input.kind)}
       />
 
       {input.rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No bindings configured.</p>
+        <p className="text-muted-foreground text-sm">
+          {formatBindingSectionEmptyState(input.kind)}
+        </p>
       ) : null}
 
       {input.rows.map((row) => (

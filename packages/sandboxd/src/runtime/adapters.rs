@@ -17,9 +17,10 @@ use crate::runtime::plan::{
     CompiledAgentRuntime, CompiledRuntimePlan, RuntimeClientConnectionMode,
     RuntimeClientEndpointTransport, RuntimeClientProcessReadiness,
 };
+use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::time::Sleeper;
 
-/// Starts the runtime-specific platform-activity adapters declared by one startup manifest.
+/// Starts the runtime-specific platform-activity adapters declared by one startup input.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RuntimeAdapterRegistry;
 
@@ -153,14 +154,14 @@ impl RuntimeAdapter {
     }
 }
 
-/// Groups the runtime adapters started for one manifest application.
+/// Groups the runtime adapters started for one accepted startup input.
 #[derive(Default)]
 pub struct RuntimeAdapters {
     adapters: Vec<RuntimeAdapter>,
 }
 
 impl RuntimeAdapters {
-    /// Returns the started adapters in manifest order.
+    /// Returns the started adapters in runtime-plan order.
     pub fn adapters(&self) -> &[RuntimeAdapter] {
         &self.adapters
     }
@@ -176,11 +177,12 @@ impl RuntimeAdapters {
 }
 
 impl RuntimeAdapterRegistry {
-    /// Starts all runtime-specific adapters declared by one startup manifest.
+    /// Starts all runtime-specific adapters declared by one startup input.
     pub fn start(
         &self,
         startup_input: &StartupInput,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+        runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
         sleeper: Arc<dyn Sleeper>,
     ) -> Result<RuntimeAdapters, RuntimeAdapterRegistryError> {
         let runtime_plan: CompiledRuntimePlan =
@@ -201,6 +203,7 @@ impl RuntimeAdapterRegistry {
                     agent_runtime,
                     &runtime_plan,
                     keepalive_manager.clone(),
+                    runtime_readiness_manager.clone(),
                     sleeper.clone(),
                 )?),
                 _ => {
@@ -221,6 +224,7 @@ fn start_codex_runtime_adapter(
     agent_runtime: &CompiledAgentRuntime,
     runtime_plan: &CompiledRuntimePlan,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     sleeper: Arc<dyn Sleeper>,
 ) -> Result<RuntimeAdapter, RuntimeAdapterRegistryError> {
     let runtime_client = runtime_plan
@@ -272,8 +276,14 @@ fn start_codex_runtime_adapter(
         );
     };
 
-    let proxy = start_codex_proxy(listen_url, raw_app_server_url, keepalive_manager, sleeper)
-        .map_err(RuntimeAdapterRegistryError::StartCodexProxy)?;
+    let proxy = start_codex_proxy(
+        listen_url,
+        raw_app_server_url,
+        keepalive_manager,
+        runtime_readiness_manager,
+        sleeper,
+    )
+    .map_err(RuntimeAdapterRegistryError::StartCodexProxy)?;
 
     Ok(RuntimeAdapter::Codex {
         runtime_id: agent_runtime.runtime_id.clone(),
@@ -289,6 +299,7 @@ mod tests {
     use crate::keepalive::KeepaliveManager;
     use crate::protocol::startup::{StartupInput, StartupMode};
     use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapterRegistryError};
+    use crate::runtime::readiness::RuntimeReadinessManager;
     use crate::time::ThreadSleeper;
 
     #[test]
@@ -326,6 +337,7 @@ mod tests {
         match RuntimeAdapterRegistry.start(
             &startup_input,
             Arc::new(Mutex::new(KeepaliveManager::default())),
+            Arc::new(Mutex::new(RuntimeReadinessManager::default())),
             Arc::new(ThreadSleeper),
         ) {
             Ok(_) => panic!("unknown runtime ids should be rejected"),

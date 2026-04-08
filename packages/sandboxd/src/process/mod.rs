@@ -2,7 +2,7 @@
 //!
 //! This module turns compiled runtime-plan process entries into child
 //! processes, waits for their declared readiness checks, and applies the stop
-//! policies used during manifest reloads and shutdown.
+//! policies used during daemon shutdown.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -35,7 +35,7 @@ pub struct RuntimeClientProcessSpec {
     pub stop: RuntimeClientProcessStopPolicy,
 }
 
-/// Owns the set of runtime client processes started for the current manifest.
+/// Owns the set of runtime client processes started for the current startup input.
 #[derive(Debug)]
 pub struct RuntimeClientProcessManager {
     processes: Vec<RunningRuntimeClientProcess>,
@@ -95,12 +95,14 @@ impl std::error::Error for ProcessManagerError {}
 /// Flattens runtime clients into the concrete process specs that need supervision.
 pub fn flatten_runtime_client_processes(
     runtime_clients: &[RuntimeClient],
+    runtime_env: &BTreeMap<String, String>,
 ) -> Vec<RuntimeClientProcessSpec> {
     let mut processes = Vec::new();
 
     for runtime_client in runtime_clients {
         for process in &runtime_client.processes {
             let merged_env = merge_runtime_client_process_env(
+                runtime_env,
                 &runtime_client.setup.env,
                 process.command.env.as_ref(),
             );
@@ -171,14 +173,21 @@ impl RuntimeClientProcessManager {
 
 /// Merges client-wide environment variables with any process-local overrides.
 fn merge_runtime_client_process_env(
+    runtime_env: &BTreeMap<String, String>,
     runtime_client_env: &BTreeMap<String, String>,
     process_command_env: Option<&BTreeMap<String, String>>,
 ) -> Option<BTreeMap<String, String>> {
-    if runtime_client_env.is_empty() && process_command_env.is_none_or(BTreeMap::is_empty) {
+    if runtime_env.is_empty()
+        && runtime_client_env.is_empty()
+        && process_command_env.is_none_or(BTreeMap::is_empty)
+    {
         return None;
     }
 
-    let mut merged_env = runtime_client_env.clone();
+    let mut merged_env = runtime_env.clone();
+    for (key, value) in runtime_client_env {
+        merged_env.insert(key.clone(), value.clone());
+    }
     if let Some(process_command_env) = process_command_env {
         for (key, value) in process_command_env {
             merged_env.insert(key.clone(), value.clone());
@@ -443,7 +452,7 @@ fn readiness_probe_request(url: &str, expected_upgrade: Option<&str>) -> Result<
         .map_err(|error| format!("failed to configure readiness request timeout: {error}"))?;
 
     let mut request = format!(
-        "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n",
+        "GET {} HTTP/1.1\r\nHost: {}\r\n",
         parsed_url.path, parsed_url.host
     );
     if let Some(expected_upgrade) = expected_upgrade {
@@ -451,6 +460,8 @@ fn readiness_probe_request(url: &str, expected_upgrade: Option<&str>) -> Result<
         request.push_str(&format!("Upgrade: {expected_upgrade}\r\n"));
         request.push_str("Sec-WebSocket-Key: c2FuZGJveGQtcHJvY2Vzcw==\r\n");
         request.push_str("Sec-WebSocket-Version: 13\r\n");
+    } else {
+        request.push_str("Connection: close\r\n");
     }
     request.push_str("\r\n");
 

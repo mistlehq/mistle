@@ -50,6 +50,8 @@ type RunInput = {
   stdio?: "inherit" | "pipe";
 };
 
+type SandboxProvider = "docker" | "e2b";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -105,6 +107,29 @@ function readTokenizerProxyLocalPort(configPath: string): number {
     ["apps", "tokenizer_proxy", "server", "port"],
     "apps.tokenizer_proxy.server.port",
   );
+}
+
+function readSandboxProvider(configPath: string): SandboxProvider {
+  const configuredProvider = process.env.MISTLE_GLOBAL_SANDBOX_PROVIDER?.trim();
+
+  if (configuredProvider === "docker" || configuredProvider === "e2b") {
+    return configuredProvider;
+  }
+
+  if (configuredProvider !== undefined && configuredProvider.length > 0) {
+    throw new Error(
+      `Unsupported sandbox provider '${configuredProvider}' in MISTLE_GLOBAL_SANDBOX_PROVIDER.`,
+    );
+  }
+
+  const parsed = parseToml(readFileSync(configPath, "utf8"));
+  const resolvedValue = getValueAtPath(parsed, ["global", "sandbox", "provider"]);
+
+  if (resolvedValue === "docker" || resolvedValue === "e2b") {
+    return resolvedValue;
+  }
+
+  throw new Error("Missing or invalid global.sandbox.provider in config/config.development.toml.");
 }
 
 function readRequiredEnv(envVarName: string): string {
@@ -347,9 +372,12 @@ function dockerImageExists(imageTag: string): boolean {
 }
 
 function start(): void {
-  console.log(
-    "Starting local infra dependencies (Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM, tokenizer relay, gateway relay)...",
-  );
+  const sandboxProvider = readSandboxProvider(DEV_CONFIG_PATH);
+  const infraSummary =
+    sandboxProvider === "docker"
+      ? "SeaweedFS, Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM, tokenizer relay, gateway relay"
+      : "SeaweedFS, Postgres 18, PgBouncer, Mailpit, OTel LGTM";
+  console.log(`Starting local infra dependencies (${infraSummary})...`);
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const dataPlaneGatewayLocalPort = readDataPlaneGatewayLocalPort(DEV_CONFIG_PATH);
   const tokenizerProxyLocalPort = readTokenizerProxyLocalPort(DEV_CONFIG_PATH);
@@ -379,67 +407,82 @@ function start(): void {
   localInfraEnv = sharedDevEnv;
   localInfraStartAttempted = true;
 
-  runOrThrow({
-    command: "docker",
-    args: [
-      "compose",
-      "-f",
-      DEV_COMPOSE_PATH,
-      "up",
-      "-d",
-      "--wait",
-      "postgres",
-      "pgbouncer",
-      "mailpit",
-      "registry",
-      "otel-lgtm",
-      "valkey",
-      "tokenizer-proxy-relay",
-      "data-plane-gateway-relay",
-    ],
-    env: sharedDevEnv,
-  });
+  const infraServiceNames = [
+    "seaweedfs",
+    "postgres",
+    "pgbouncer",
+    "mailpit",
+    "otel-lgtm",
+    "valkey",
+  ];
 
-  console.log("Checking sandbox base image cache...");
-  const { hit: sandboxBaseCacheHit, cacheKey: sandboxBaseCacheKey } = checkSandboxBaseBuildCache();
-
-  if (!sandboxBaseCacheHit || !dockerImageExists(SANDBOX_BASE_IMAGE_TAG)) {
-    if (sandboxBaseCacheHit) {
-      console.log("Sandbox base cache is valid but the Docker image is missing, rebuilding it...");
-    }
-    console.log("Building sandbox base image...");
-    runOrThrow({
-      command: "docker",
-      args: [
-        "build",
-        "--target",
-        "sandbox-base",
-        "-f",
-        SANDBOX_BASE_DOCKERFILE_PATH,
-        "-t",
-        SANDBOX_BASE_IMAGE_TAG,
-        ".",
-      ],
-      env: sharedDevEnv,
-    });
-  } else {
-    console.log("Sandbox base image is up to date.");
+  if (sandboxProvider === "docker") {
+    infraServiceNames.splice(4, 0, "registry");
+    infraServiceNames.push("tokenizer-proxy-relay", "data-plane-gateway-relay");
   }
 
-  console.log("Pushing sandbox base image to the local registry...");
   runOrThrow({
     command: "docker",
-    args: ["tag", SANDBOX_BASE_IMAGE_TAG, SANDBOX_BASE_IMAGE_REGISTRY_TAG],
-    env: sharedDevEnv,
-  });
-  runOrThrow({
-    command: "docker",
-    args: ["push", SANDBOX_BASE_IMAGE_REGISTRY_TAG],
+    args: ["compose", "-f", DEV_COMPOSE_PATH, "up", "-d", "--wait", ...infraServiceNames],
     env: sharedDevEnv,
   });
 
-  if (!sandboxBaseCacheHit) {
-    writeSandboxBaseBuildCacheKey(sandboxBaseCacheKey);
+  console.log("Ensuring control-plane object-store bucket exists...");
+  runOrThrow({
+    command: "docker",
+    args: ["compose", "-f", DEV_COMPOSE_PATH, "run", "--rm", "seaweedfs-init"],
+    env: sharedDevEnv,
+  });
+
+  if (sandboxProvider === "docker") {
+    console.log("Checking sandbox base image cache...");
+    const { hit: sandboxBaseCacheHit, cacheKey: sandboxBaseCacheKey } =
+      checkSandboxBaseBuildCache();
+
+    if (!sandboxBaseCacheHit || !dockerImageExists(SANDBOX_BASE_IMAGE_TAG)) {
+      if (sandboxBaseCacheHit) {
+        console.log(
+          "Sandbox base cache is valid but the Docker image is missing, rebuilding it...",
+        );
+      }
+      console.log("Building sandbox base image...");
+      runOrThrow({
+        command: "docker",
+        args: [
+          "build",
+          "--target",
+          "sandbox-base",
+          "-f",
+          SANDBOX_BASE_DOCKERFILE_PATH,
+          "-t",
+          SANDBOX_BASE_IMAGE_TAG,
+          ".",
+        ],
+        env: sharedDevEnv,
+      });
+    } else {
+      console.log("Sandbox base image is up to date.");
+    }
+
+    console.log("Pushing sandbox base image to the local registry...");
+    runOrThrow({
+      command: "docker",
+      args: ["tag", SANDBOX_BASE_IMAGE_TAG, SANDBOX_BASE_IMAGE_REGISTRY_TAG],
+      env: sharedDevEnv,
+    });
+    runOrThrow({
+      command: "docker",
+      args: ["push", SANDBOX_BASE_IMAGE_REGISTRY_TAG],
+      env: sharedDevEnv,
+    });
+
+    if (!sandboxBaseCacheHit) {
+      writeSandboxBaseBuildCacheKey(sandboxBaseCacheKey);
+    }
+  } else {
+    console.log(
+      `Skipping local sandbox image build and registry push because sandbox provider is '${sandboxProvider}'.`,
+    );
   }
 
   console.log("Building migration dependencies...");
@@ -492,7 +535,9 @@ function start(): void {
   console.log(`- tokenizer-proxy: ${tokenizerProxyPublicUrl}`);
   console.log("- mailpit ui: http://127.0.0.1:8025");
   console.log("- grafana (otel-lgtm): http://127.0.0.1:3000");
-  console.log(`- local registry: http://${LOCAL_REGISTRY_HOST}`);
+  if (sandboxProvider === "docker") {
+    console.log(`- local registry: http://${LOCAL_REGISTRY_HOST}`);
+  }
   console.log("");
 
   appDevProcess = spawn("pnpm", ["dev:workspace"], {

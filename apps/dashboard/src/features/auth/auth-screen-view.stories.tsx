@@ -1,10 +1,26 @@
 import { Separator } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { expect, within } from "storybook/test";
 
 import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybook/decorators.js";
 import { AuthScreenView } from "./auth-screen-view.js";
 import { GoogleSignInButton } from "./google-sign-in-button.js";
+
+const DefaultAuthScreenViewProps = {
+  authError: null,
+  authStep: "email",
+  email: "dev@mistle.so",
+  footerError: null,
+  isSendingOtp: false,
+  isVerifyingOtp: false,
+  onEmailChange: () => {},
+  onOtpChange: () => {},
+  onSendOtp: async () => {},
+  onUseDifferentEmail: () => {},
+  onVerifyOtp: async () => {},
+  otp: "",
+} satisfies React.ComponentProps<typeof AuthScreenView>;
 
 const meta = {
   title: "Dashboard/Auth/ScreenView",
@@ -13,20 +29,7 @@ const meta = {
   parameters: {
     layout: "fullscreen",
   },
-  args: {
-    authError: null,
-    authStep: "email",
-    email: "dev@mistle.so",
-    footerError: null,
-    isSendingOtp: false,
-    isVerifyingOtp: false,
-    onEmailChange: () => {},
-    onOtpChange: () => {},
-    onSendOtp: async () => {},
-    onUseDifferentEmail: () => {},
-    onVerifyOtp: async () => {},
-    otp: "",
-  },
+  args: DefaultAuthScreenViewProps,
 } satisfies Meta<typeof AuthScreenView>;
 
 export default meta;
@@ -34,14 +37,22 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 function InteractiveOtpStory(args: Story["args"]): React.JSX.Element {
-  const [otp, setOtp] = useState(args?.otp ?? "");
+  const resolvedArgs = {
+    ...DefaultAuthScreenViewProps,
+    ...args,
+  };
+  const [otp, setOtp] = useState(resolvedArgs.otp);
 
-  return <AuthScreenView {...args} onOtpChange={setOtp} otp={otp} />;
+  return <AuthScreenView {...resolvedArgs} onOtpChange={setOtp} otp={otp} />;
 }
 
 export const EmailEntry: Story = {
   args: {
     email: "",
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText("Email address")).toHaveFocus();
   },
 };
 
@@ -118,6 +129,10 @@ export const OtpEntry: Story = {
     authStep: "otp",
   },
   render: InteractiveOtpStory,
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText("One-time code")).toHaveFocus();
+  },
 };
 
 export const OtpPartialEntry: Story = {

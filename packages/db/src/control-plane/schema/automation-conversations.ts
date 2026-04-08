@@ -51,8 +51,6 @@ export const automationConversations = controlPlaneSchema.table(
     integrationFamilyId: text("integration_family_id").notNull(),
     runtimeId: text("runtime_id").notNull(),
     conversationKey: text("conversation_key").notNull(),
-    title: text("title"),
-    preview: text("preview"),
     status: text("status").notNull().$type<AutomationConversationStatus>(),
     lastProcessedSourceOrderKey: text("last_processed_source_order_key"),
     lastProcessedWebhookEventId: text("last_processed_webhook_event_id").references(

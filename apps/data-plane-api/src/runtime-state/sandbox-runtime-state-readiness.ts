@@ -1,13 +1,17 @@
 import type { SandboxRuntimeStateSnapshot } from "./sandbox-runtime-state-reader.js";
 
 /**
- * Returns `true` when runtime state shows a live bootstrap owner and a
- * matching fenced attachment for the same sandbox.
+ * Returns `true` when runtime state shows both a fenced bootstrap attachment
+ * and a runtime session that has finished adapter-level initialization.
  */
 export function isSandboxRuntimeReady(snapshot: SandboxRuntimeStateSnapshot): boolean {
   if (snapshot.ownerLeaseId === null) {
     return false;
   }
 
-  return snapshot.attachment?.ownerLeaseId === snapshot.ownerLeaseId;
+  if (snapshot.attachment?.ownerLeaseId !== snapshot.ownerLeaseId) {
+    return false;
+  }
+
+  return snapshot.runtime.ready;
 }

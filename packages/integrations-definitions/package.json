@@ -9,6 +9,12 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./server": {
+      "types": "./src/server.ts",
+      "node": "./dist/server.js",
+      "import": "./src/server.ts",
+      "default": "./src/server.ts"
+    },
     "./agent-runtimes/server": {
       "types": "./src/agent-runtimes/server.ts",
       "node": "./dist/agent-runtimes/server.js",

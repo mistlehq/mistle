@@ -68,6 +68,7 @@ function resolveScalarSummaryValue(input: {
 
 function resolveArraySummaryValue(input: {
   schema: Record<string, unknown>;
+  uiSchema: Record<string, unknown>;
   propertyKey: string;
   value: ReadonlyArray<unknown>;
 }): string {
@@ -84,6 +85,24 @@ function resolveArraySummaryValue(input: {
   const propertySchema = properties[input.propertyKey];
   if (!isRecord(propertySchema)) {
     return stringEntries.join(", ");
+  }
+
+  const propertyUiSchema = input.uiSchema[input.propertyKey];
+  if (isRecord(propertyUiSchema)) {
+    const enumNames = propertyUiSchema["ui:enumNames"];
+    const itemsSchema = propertySchema.items;
+    if (Array.isArray(enumNames) && isRecord(itemsSchema) && Array.isArray(itemsSchema.enum)) {
+      const labelByValue = new Map<string, string>();
+
+      for (const [index, itemValue] of itemsSchema.enum.entries()) {
+        const itemLabel = enumNames[index];
+        if (typeof itemValue === "string" && typeof itemLabel === "string") {
+          labelByValue.set(itemValue, itemLabel);
+        }
+      }
+
+      return stringEntries.map((entry) => labelByValue.get(entry) ?? entry).join(", ");
+    }
   }
 
   const items = propertySchema.items;
@@ -139,6 +158,7 @@ export function formatSandboxProfileBindingSummaryItems(input: {
           label,
           value: resolveArraySummaryValue({
             schema: configUiModel.schema,
+            uiSchema: configUiModel.uiSchema,
             propertyKey,
             value,
           }),
@@ -162,12 +182,7 @@ export function formatSandboxProfileBindingSummaryItems(input: {
   }
 
   if (configUiModel.mode === "no-config") {
-    return [
-      {
-        label: "Config",
-        value: "No additional config required.",
-      },
-    ];
+    return [];
   }
 
   if (configUiModel.mode === "unsupported") {

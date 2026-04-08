@@ -103,8 +103,8 @@ describe("internal sandbox instances auth integration", () => {
       sandboxProfileId: "sbp_dp_api_integration_auth_valid",
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
-      providerSandboxId: "provider-sandbox-auth-valid",
-      status: SandboxInstanceStatuses.STOPPED,
+      providerSandboxId: null,
+      status: SandboxInstanceStatuses.PENDING,
       startedByKind: "user",
       startedById: "usr_dp_api_integration_auth_valid",
       source: "dashboard",
@@ -115,11 +115,13 @@ describe("internal sandbox instances auth integration", () => {
       instanceId: sandboxInstanceId,
     });
     expect(response).toEqual({
+      connectable: false,
       failureCode: null,
       failureMessage: null,
       id: sandboxInstanceId,
       runtimePlan: null,
-      status: "stopped",
+      status: "pending",
+      title: null,
     });
   }, 60_000);
 

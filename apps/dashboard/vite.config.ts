@@ -11,6 +11,12 @@ const SandboxSessionClientIndexPath = fileURLToPath(
 const SandboxSessionClientBrowserPath = fileURLToPath(
   new URL("../../packages/sandbox-session-client/src/browser.ts", import.meta.url),
 );
+const IntegrationsDefinitionsSrcPath = fileURLToPath(
+  new URL("../../packages/integrations-definitions/src", import.meta.url),
+);
+const IntegrationsDefinitionsIndexPath = fileURLToPath(
+  new URL("../../packages/integrations-definitions/src/index.ts", import.meta.url),
+);
 
 export default defineConfig({
   plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss()],
@@ -23,6 +29,20 @@ export default defineConfig({
       {
         find: /^@mistle\/sandbox-session-client\/browser$/,
         replacement: SandboxSessionClientBrowserPath,
+      },
+      {
+        find: /^@mistle\/integrations-definitions$/,
+        replacement: IntegrationsDefinitionsIndexPath,
+      },
+      {
+        find: /^@mistle\/integrations-definitions\/forms$/,
+        replacement: fileURLToPath(
+          new URL("../../packages/integrations-definitions/src/forms/index.ts", import.meta.url),
+        ),
+      },
+      {
+        find: /^@mistle\/integrations-definitions\/(.+)$/,
+        replacement: `${IntegrationsDefinitionsSrcPath}/$1.ts`,
       },
     ],
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],

@@ -12,7 +12,6 @@ export const AutomationConversationPersistenceErrorCodes = {
   CONVERSATION_ROUTE_CLOSED: "conversation_route_closed",
   CONVERSATION_ROUTE_NOT_FOUND: "conversation_route_not_found",
   CONVERSATION_ROUTE_CONVERSATION_MISMATCH: "conversation_route_conversation_mismatch",
-  CONVERSATION_TITLE_MUST_BE_NULL: "conversation_title_must_be_null",
 } as const;
 
 export type AutomationConversationPersistenceErrorCode =

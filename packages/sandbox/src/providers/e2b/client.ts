@@ -15,14 +15,14 @@ import {
   createE2BSandboxCreateOptions,
 } from "./sandbox-options.js";
 import {
-  E2BApplyStartupRequestSchema,
   E2BDestroySandboxRequestSchema,
+  E2BInitRequestSchema,
   E2BInspectSandboxRequestSchema,
   E2BResumeSandboxRequestSchema,
   E2BStartSandboxRequestSchema,
   E2BStopSandboxRequestSchema,
-  type E2BApplyStartupRequest,
   type E2BDestroySandboxRequest,
+  type E2BInitRequest,
   type E2BInspectSandboxRequest,
   type E2BResumeSandboxRequest,
   type E2BStartSandboxRequest,
@@ -31,12 +31,11 @@ import {
 import { E2BApiTemplateRegistry, type E2BTemplateRegistry } from "./template-registry.js";
 import type { E2BSandboxInspectResult } from "./types.js";
 
-const ApplyStartupCommand = "/usr/local/bin/sandboxd apply-startup";
-const StartSupervisorCommand = "/usr/bin/tini -s -- /usr/local/bin/sandboxd serve";
-const SupervisorSocketPath = "/run/mistle/startup-config.sock";
-const SupervisorTokenPath = "/run/mistle/startup-config.token";
-const SupervisorReadinessPollIntervalMs = 100;
-const SupervisorReadinessPollAttempts = 100;
+const InitCommand = "/usr/local/bin/sandboxd init";
+const StartDaemonCommand = "/usr/bin/tini -s -- /usr/local/bin/sandboxd";
+const DaemonSocketPath = "/run/mistle/sandboxd/control.sock";
+const DaemonReadinessPollIntervalMs = 100;
+const DaemonReadinessPollAttempts = 100;
 export type E2BStartSandboxResponse = {
   sandboxId: string;
 };
@@ -47,7 +46,7 @@ export interface E2BClient {
   resumeSandbox(request: E2BResumeSandboxRequest): Promise<E2BStartSandboxResponse>;
   stopSandbox(request: E2BStopSandboxRequest): Promise<void>;
   destroySandbox(request: E2BDestroySandboxRequest): Promise<void>;
-  applyStartup(request: E2BApplyStartupRequest): Promise<void>;
+  init(request: E2BInitRequest): Promise<void>;
 }
 
 function createE2BConnectionOptions(config: E2BSandboxConfig): ConnectionOpts {
@@ -223,13 +222,13 @@ export class E2BApiClient implements E2BClient {
     }
   }
 
-  async applyStartup(request: E2BApplyStartupRequest): Promise<void> {
-    const parsedRequest = E2BApplyStartupRequestSchema.parse(request);
+  async init(request: E2BInitRequest): Promise<void> {
+    const parsedRequest = E2BInitRequestSchema.parse(request);
 
     try {
       const sandbox = await Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions);
-      await this.#ensureSupervisorReady(sandbox);
-      const handle = await sandbox.commands.run(ApplyStartupCommand, {
+      await this.#ensureDaemonReady(sandbox);
+      const handle = await sandbox.commands.run(InitCommand, {
         background: true,
         stdin: true,
         user: "root",
@@ -241,23 +240,23 @@ export class E2BApiClient implements E2BClient {
     } catch (error) {
       if (error instanceof CommandExitError) {
         throw createCommandExitError({
-          operation: E2BClientOperationIds.APPLY_STARTUP,
+          operation: E2BClientOperationIds.INIT,
           error,
-          commandDescription: "E2B startup apply command",
+          commandDescription: "E2B sandbox init command",
         });
       }
 
-      throw mapE2BClientError(E2BClientOperationIds.APPLY_STARTUP, error);
+      throw mapE2BClientError(E2BClientOperationIds.INIT, error);
     }
   }
 
-  async #ensureSupervisorReady(sandbox: Sandbox): Promise<void> {
-    if (await this.#isSupervisorReady(sandbox)) {
+  async #ensureDaemonReady(sandbox: Sandbox): Promise<void> {
+    if (await this.#isDaemonReady(sandbox)) {
       return;
     }
 
     try {
-      const handle = await sandbox.commands.run(StartSupervisorCommand, {
+      const handle = await sandbox.commands.run(StartDaemonCommand, {
         background: true,
         user: "root",
       });
@@ -265,28 +264,28 @@ export class E2BApiClient implements E2BClient {
         .wait()
         .then(() => {
           throw createUnknownClientError({
-            operation: E2BClientOperationIds.ENSURE_SUPERVISOR_READY,
-            message: "sandbox supervisor exited before becoming ready",
-            cause: new Error("sandbox supervisor exited before becoming ready"),
+            operation: E2BClientOperationIds.ENSURE_DAEMON_READY,
+            message: "sandbox daemon exited before becoming ready",
+            cause: new Error("sandbox daemon exited before becoming ready"),
           });
         })
         .catch((error: unknown) => {
           if (error instanceof CommandExitError) {
             throw createCommandExitError({
-              operation: E2BClientOperationIds.ENSURE_SUPERVISOR_READY,
+              operation: E2BClientOperationIds.ENSURE_DAEMON_READY,
               error,
-              commandDescription: "E2B sandbox supervisor command",
+              commandDescription: "E2B sandbox daemon command",
             });
           }
 
-          throw mapE2BClientError(E2BClientOperationIds.ENSURE_SUPERVISOR_READY, error);
+          throw mapE2BClientError(E2BClientOperationIds.ENSURE_DAEMON_READY, error);
         });
       void exitPromise.catch(() => undefined);
 
       try {
-        for (let attempt = 0; attempt < SupervisorReadinessPollAttempts; attempt += 1) {
+        for (let attempt = 0; attempt < DaemonReadinessPollAttempts; attempt += 1) {
           const readinessResult = await Promise.race([
-            this.#checkSupervisorReady(sandbox),
+            this.#checkDaemonReady(sandbox),
             exitPromise,
           ]);
 
@@ -294,7 +293,7 @@ export class E2BApiClient implements E2BClient {
             return;
           }
 
-          await sleep(SupervisorReadinessPollIntervalMs);
+          await sleep(DaemonReadinessPollIntervalMs);
         }
       } finally {
         await handle.disconnect().catch(() => undefined);
@@ -304,27 +303,27 @@ export class E2BApiClient implements E2BClient {
         throw error;
       }
 
-      throw mapE2BClientError(E2BClientOperationIds.ENSURE_SUPERVISOR_READY, error);
+      throw mapE2BClientError(E2BClientOperationIds.ENSURE_DAEMON_READY, error);
     }
 
     throw createUnknownClientError({
-      operation: E2BClientOperationIds.ENSURE_SUPERVISOR_READY,
-      message: `sandbox supervisor did not become ready within ${String(SupervisorReadinessPollIntervalMs * SupervisorReadinessPollAttempts)}ms`,
-      cause: new Error("sandbox supervisor readiness timed out"),
+      operation: E2BClientOperationIds.ENSURE_DAEMON_READY,
+      message: `sandbox daemon did not become ready within ${String(DaemonReadinessPollIntervalMs * DaemonReadinessPollAttempts)}ms`,
+      cause: new Error("sandbox daemon readiness timed out"),
     });
   }
 
-  async #isSupervisorReady(sandbox: Sandbox): Promise<boolean> {
+  async #isDaemonReady(sandbox: Sandbox): Promise<boolean> {
     try {
-      return await this.#checkSupervisorReady(sandbox);
+      return await this.#checkDaemonReady(sandbox);
     } catch (error) {
-      throw mapE2BClientError(E2BClientOperationIds.ENSURE_SUPERVISOR_READY, error);
+      throw mapE2BClientError(E2BClientOperationIds.ENSURE_DAEMON_READY, error);
     }
   }
 
-  async #checkSupervisorReady(sandbox: Sandbox): Promise<boolean> {
+  async #checkDaemonReady(sandbox: Sandbox): Promise<boolean> {
     const result = await sandbox.commands.run(
-      `if test -S '${SupervisorSocketPath}' && test -f '${SupervisorTokenPath}'; then printf ready; else printf not-ready; fi`,
+      `if test -S '${DaemonSocketPath}'; then printf ready; else printf not-ready; fi`,
       {
         user: "root",
       },

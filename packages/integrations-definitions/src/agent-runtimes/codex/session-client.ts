@@ -3,7 +3,7 @@ export * from "./codex-json-rpc.js";
 export * from "./thread-items.js";
 export { createBrowserSandboxSessionRuntime as createBrowserCodexSessionRuntime } from "@mistle/sandbox-session-client/browser";
 export {
-  SandboxSessionClient as CodexSessionClient,
+  AgentStreamClient,
   SandboxSessionSendGuarantees as CodexSessionSendGuarantees,
   parseJsonRpcErrorResponse,
   parseJsonRpcNotification,
@@ -12,7 +12,7 @@ export {
   parseStreamOpenControlMessage,
 } from "@mistle/sandbox-session-client";
 export type {
-  SandboxSessionClientInput as CodexSessionClientInput,
+  AgentStreamClientInput,
   SandboxSessionSendGuarantee as CodexSessionSendGuarantee,
 } from "@mistle/sandbox-session-client";
 export type * from "./session-types.js";

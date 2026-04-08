@@ -321,6 +321,7 @@ describe("IntegrationConnectionDetailView", () => {
         onDeleteWebhookSource={({ connectionId, webhookSourceId }) => {
           deletedWebhookSource = { connectionId, webhookSourceId };
         }}
+        showCreateWebhookSource={true}
         showWebhookSources={true}
         webhookSourceStateByConnectionId={
           new Map([
@@ -427,5 +428,62 @@ describe("IntegrationConnectionDetailView", () => {
     expect(
       screen.queryByRole("button", { name: "Delete webhook source GitHub App webhook" }),
     ).toBeNull();
+  });
+
+  it("hides create webhook when the target only supports implicit webhook sources", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "GitHub Production",
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [],
+          },
+        ]}
+        onCreateWebhookSource={() => {
+          throw new Error("Create webhook should not be available for implicit sources.");
+        }}
+        showCreateWebhookSource={false}
+        showWebhookSources={true}
+        webhookSourceStateByConnectionId={
+          new Map([
+            [
+              "icn_github_primary",
+              {
+                createErrorMessage: null,
+                deleteErrorMessage: null,
+                deletingWebhookSourceId: null,
+                isCreating: false,
+                isLoading: false,
+                items: [
+                  {
+                    id: "iws_github_123",
+                    targetKey: "github-cloud",
+                    ownerScope: "target",
+                    displayName: "GitHub App webhook",
+                    callbackUrl:
+                      "https://control-plane.example.com/v1/integration/webhooks/github-cloud",
+                    status: "active",
+                    providerMetadata: {},
+                    createdAt: "2026-04-03T00:00:00.000Z",
+                    updatedAt: "2026-04-03T00:00:00.000Z",
+                  },
+                ],
+                loadErrorMessage: null,
+                revealedWebhookSecret: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Create webhook" })).toBeNull();
+    expect(screen.getByText("GitHub App webhook")).toBeTruthy();
   });
 });

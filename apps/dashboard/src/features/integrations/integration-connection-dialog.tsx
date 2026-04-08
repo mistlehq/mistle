@@ -6,10 +6,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldHeader,
+  FieldLabel,
   Input,
   Notice,
-  RadioGroup,
-  RadioGroupItem,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@mistle/ui";
 import type { IChangeEvent } from "@rjsf/core";
 import type { RJSFSchema } from "@rjsf/utils";
@@ -116,6 +124,9 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
           methodId: props.methodId,
         });
   const showsSecretInput = selectedMethod?.kind === "form";
+  const selectedMethodLabel = selectedMethod
+    ? formatIntegrationConnectionMethodLabel(selectedMethod)
+    : undefined;
 
   return (
     <Dialog
@@ -136,100 +147,113 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
             </DialogTitle>
           </DialogHeader>
 
-          <div className="gap-2 flex flex-col">
-            <p className="text-sm font-medium">Name</p>
-            <Input
-              autoComplete="off"
-              onChange={(event) => {
-                props.onConnectionDisplayNameChange(event.currentTarget.value);
-              }}
-              placeholder={props.connectionDisplayNamePlaceholder}
-              type="text"
-              value={props.connectionDisplayNameValue}
-            />
-          </div>
+          <Field contentWidth="fill" orientation="vertical">
+            <FieldHeader>
+              <FieldLabel htmlFor={`connection-display-name-${dialog.targetKey}`}>Name</FieldLabel>
+            </FieldHeader>
+            <FieldContent>
+              <Input
+                autoComplete="off"
+                id={`connection-display-name-${dialog.targetKey}`}
+                onChange={(event) => {
+                  props.onConnectionDisplayNameChange(event.currentTarget.value);
+                }}
+                placeholder={props.connectionDisplayNamePlaceholder}
+                type="text"
+                value={props.connectionDisplayNameValue}
+              />
+            </FieldContent>
+          </Field>
 
           {showMethodPicker ? (
-            <div className="gap-2 flex flex-col">
-              <p className="text-sm font-medium">Authentication method</p>
-              <RadioGroup
-                className="gap-2"
-                name={`connect-auth-method-${dialog.targetKey}`}
-                onValueChange={(nextValue) => {
-                  props.onMethodChange(nextValue);
-                }}
-                value={props.methodId}
-              >
-                {dialog.methods.map((method) => (
-                  <label
-                    className="inline-flex items-center gap-2 text-sm"
-                    htmlFor={`connect-auth-method-${dialog.targetKey}-${method.id}`}
-                    key={method.id}
-                  >
-                    <RadioGroupItem
-                      aria-label={formatIntegrationConnectionMethodLabel(method)}
-                      id={`connect-auth-method-${dialog.targetKey}-${method.id}`}
-                      value={method.id}
-                    />
-                    <span>{formatIntegrationConnectionMethodLabel(method)}</span>
-                  </label>
-                ))}
-              </RadioGroup>
-            </div>
+            <Field contentWidth="fill" orientation="vertical">
+              <FieldHeader>
+                <FieldLabel htmlFor={`connect-auth-method-${dialog.targetKey}`}>
+                  Authentication method
+                </FieldLabel>
+              </FieldHeader>
+              <FieldContent>
+                <Select
+                  onValueChange={(nextValue) => {
+                    props.onMethodChange(nextValue ?? "");
+                  }}
+                  value={props.methodId.length === 0 ? "" : props.methodId}
+                >
+                  <SelectTrigger className="w-full" id={`connect-auth-method-${dialog.targetKey}`}>
+                    <SelectValue placeholder="Select authentication method">
+                      {selectedMethodLabel}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    {dialog.methods.map((method) => (
+                      <SelectItem key={method.id} value={method.id}>
+                        {formatIntegrationConnectionMethodLabel(method)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FieldContent>
+            </Field>
           ) : null}
 
           {props.configForm.mode === "form" && props.configForm.visiblePropertyKeys.length > 0 ? (
-            <div className="gap-2 flex flex-col">
-              <p className="text-sm font-medium">Configuration</p>
-              <IntegrationFormWithoutSubmit
-                formData={props.configValue}
-                noHtml5Validate
-                onChange={(event: IChangeEvent<Record<string, unknown>, RJSFSchema>) => {
-                  const nextValue = event.formData;
-                  props.onConfigChange(
-                    typeof nextValue === "object" && nextValue !== null && !Array.isArray(nextValue)
-                      ? nextValue
-                      : {},
-                  );
-                }}
-                schema={props.configForm.schema}
-                showErrorList={false}
-                uiSchema={props.configForm.uiSchema}
-                validator={validator}
-              />
-            </div>
+            <IntegrationFormWithoutSubmit
+              formData={props.configValue}
+              noHtml5Validate
+              onChange={(event: IChangeEvent<Record<string, unknown>, RJSFSchema>) => {
+                const nextValue = event.formData;
+                props.onConfigChange(
+                  typeof nextValue === "object" && nextValue !== null && !Array.isArray(nextValue)
+                    ? nextValue
+                    : {},
+                );
+              }}
+              schema={props.configForm.schema}
+              showErrorList={false}
+              uiSchema={props.configForm.uiSchema}
+              validator={validator}
+            />
           ) : null}
 
           {showsSecretInput && selectedMethod !== null ? (
-            <div className="gap-2 flex flex-col">
+            <>
               {selectedMethod.secretFields.map((secretField) => (
-                <div className="gap-2 flex flex-col" key={secretField.name}>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium">{secretField.label}</p>
-                    {isUpdateMode && props.isSecretChanged ? (
-                      <span className="text-muted-foreground text-xs">Will update</span>
+                <Field contentWidth="fill" key={secretField.name} orientation="vertical">
+                  <FieldHeader>
+                    <div className="flex items-center justify-between gap-3">
+                      <FieldLabel
+                        htmlFor={`connection-secret-${dialog.targetKey}-${secretField.name}`}
+                      >
+                        {secretField.label}
+                      </FieldLabel>
+                      {isUpdateMode && props.isSecretChanged ? (
+                        <span className="text-muted-foreground text-xs">Will update</span>
+                      ) : null}
+                    </div>
+                    {secretField.description ? (
+                      <FieldDescription>{secretField.description}</FieldDescription>
                     ) : null}
-                  </div>
-                  {secretField.description ? (
-                    <p className="text-muted-foreground text-sm">{secretField.description}</p>
-                  ) : null}
-                  <Input
-                    autoComplete="off"
-                    data-1p-ignore="true"
-                    onChange={(event) => {
-                      props.onSecretChange(secretField.name, event.currentTarget.value);
-                    }}
-                    placeholder={
-                      isUpdateMode
-                        ? `Leave blank to keep existing ${secretField.label.toLowerCase()}`
-                        : (secretField.placeholder ?? `Enter ${secretField.label.toLowerCase()}`)
-                    }
-                    type={secretField.inputType}
-                    value={props.secrets[secretField.name] ?? ""}
-                  />
-                </div>
+                  </FieldHeader>
+                  <FieldContent>
+                    <Input
+                      autoComplete="off"
+                      data-1p-ignore="true"
+                      id={`connection-secret-${dialog.targetKey}-${secretField.name}`}
+                      onChange={(event) => {
+                        props.onSecretChange(secretField.name, event.currentTarget.value);
+                      }}
+                      placeholder={
+                        isUpdateMode
+                          ? `Leave blank to keep existing ${secretField.label.toLowerCase()}`
+                          : (secretField.placeholder ?? `Enter ${secretField.label.toLowerCase()}`)
+                      }
+                      type={secretField.inputType}
+                      value={props.secrets[secretField.name] ?? ""}
+                    />
+                  </FieldContent>
+                </Field>
               ))}
-            </div>
+            </>
           ) : props.configForm.mode === "unsupported" ? (
             <p className="text-destructive text-sm">{props.configForm.message}</p>
           ) : !isUpdateMode ? (

@@ -12,6 +12,7 @@ export function createAppContextMiddleware(
     ctx.set("sandboxConfig", appContext.sandboxConfig);
     ctx.set("internalAuthServiceToken", appContext.internalAuthServiceToken);
     ctx.set("db", appContext.db);
+    ctx.set("objectStore", appContext.objectStore);
     ctx.set("integrationRegistry", appContext.integrationRegistry);
     ctx.set("dataPlaneClient", appContext.dataPlaneClient);
     ctx.set("connectionTokenConfig", appContext.connectionTokenConfig);

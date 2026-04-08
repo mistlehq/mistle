@@ -137,6 +137,7 @@ describe("internal sandbox instance runtime status integration", () => {
         ).resolves.toMatchObject({
           id: sandboxInstanceId,
           status: "starting",
+          connectable: false,
         });
 
         const bootstrapToken = await mintValidBootstrapToken({
@@ -149,6 +150,12 @@ describe("internal sandbox instance runtime status integration", () => {
         });
 
         try {
+          bootstrapSocket.send(
+            JSON.stringify({
+              type: "runtime.ready",
+              ready: true,
+            }),
+          );
           await waitForGetSandboxStatus({
             fixture,
             organizationId,
@@ -164,6 +171,7 @@ describe("internal sandbox instance runtime status integration", () => {
           ).resolves.toMatchObject({
             id: sandboxInstanceId,
             status: "running",
+            connectable: true,
           });
 
           await adapter.destroy({
@@ -178,6 +186,7 @@ describe("internal sandbox instance runtime status integration", () => {
           ).resolves.toMatchObject({
             id: sandboxInstanceId,
             status: "failed",
+            connectable: false,
             failureCode: "provider_runtime_missing",
             failureMessage: "Sandbox runtime was not found at the provider during inspection.",
           });
@@ -227,6 +236,7 @@ describe("internal sandbox instance runtime status integration", () => {
     ).resolves.toMatchObject({
       id: sandboxInstanceId,
       status: "pending",
+      connectable: false,
       failureCode: null,
       failureMessage: null,
     });
@@ -373,6 +383,12 @@ describe("internal sandbox instance runtime status integration", () => {
           }),
         });
 
+        bootstrapSocket.send(
+          JSON.stringify({
+            type: "runtime.ready",
+            ready: true,
+          }),
+        );
         await waitForListedSandboxStatus({
           fixture,
           organizationId,

@@ -25,7 +25,10 @@ export type DisposableDataPlaneRuntime = {
   baseUrl: string;
   db: DataPlaneDatabase;
   dbPool: Pool;
-  attachSandboxRuntime: (input: { sandboxInstanceId: string }) => Promise<void>;
+  attachSandboxRuntime: (input: {
+    sandboxInstanceId: string;
+    runtimeReady?: boolean;
+  }) => Promise<void>;
   stop: () => Promise<void>;
 };
 
@@ -38,6 +41,9 @@ type RuntimeStateSnapshot = {
     sandboxInstanceId: string;
     ownerLeaseId: string;
   } | null;
+  runtime: {
+    ready: boolean;
+  };
 };
 
 function isRuntimeStateSnapshot(value: unknown): value is RuntimeStateSnapshot {
@@ -47,7 +53,15 @@ function isRuntimeStateSnapshot(value: unknown): value is RuntimeStateSnapshot {
 
   const ownerLeaseId = Object.getOwnPropertyDescriptor(value, "ownerLeaseId")?.value;
   const attachment = Object.getOwnPropertyDescriptor(value, "attachment")?.value;
+  const runtime = Object.getOwnPropertyDescriptor(value, "runtime")?.value;
   if (ownerLeaseId !== null && typeof ownerLeaseId !== "string") {
+    return false;
+  }
+  if (typeof runtime !== "object" || runtime === null) {
+    return false;
+  }
+  const runtimeReady = Object.getOwnPropertyDescriptor(runtime, "ready")?.value;
+  if (typeof runtimeReady !== "boolean") {
     return false;
   }
   if (attachment === null) {
@@ -66,6 +80,7 @@ async function waitForRuntimeAttachment(input: {
   gateway: StartedGatewayProcess;
   internalAuthServiceToken: string;
   sandboxInstanceId: string;
+  requireRuntimeReady: boolean;
 }): Promise<void> {
   const deadline = Date.now() + RuntimeAttachmentReadyTimeoutMs;
 
@@ -95,7 +110,8 @@ async function waitForRuntimeAttachment(input: {
     if (
       payload.ownerLeaseId !== null &&
       payload.attachment?.sandboxInstanceId === input.sandboxInstanceId &&
-      payload.attachment.ownerLeaseId === payload.ownerLeaseId
+      payload.attachment.ownerLeaseId === payload.ownerLeaseId &&
+      (!input.requireRuntimeReady || payload.runtime.ready)
     ) {
       return;
     }
@@ -237,7 +253,7 @@ export async function createDisposableDataPlaneRuntime(input: {
       baseUrl: `${configuredBaseUrl.protocol}//${host}:${String(port)}`,
       db: createDataPlaneDatabase(dbPool),
       dbPool,
-      attachSandboxRuntime: async ({ sandboxInstanceId }) => {
+      attachSandboxRuntime: async ({ sandboxInstanceId, runtimeReady = false }) => {
         if (gateway === undefined) {
           throw new Error("Expected gateway to be started before attaching sandbox runtime.");
         }
@@ -255,11 +271,20 @@ export async function createDisposableDataPlaneRuntime(input: {
             await closeWebSocket(socket);
           },
         });
+        if (runtimeReady) {
+          socket.send(
+            JSON.stringify({
+              type: "runtime.ready",
+              ready: true,
+            }),
+          );
+        }
 
         await waitForRuntimeAttachment({
           gateway,
           internalAuthServiceToken: input.internalAuthServiceToken,
           sandboxInstanceId,
+          requireRuntimeReady: runtimeReady,
         });
       },
       stop: async () => {

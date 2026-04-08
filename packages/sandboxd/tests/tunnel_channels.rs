@@ -314,9 +314,12 @@ fn negotiates_telemetry_stream_and_flushes_buffered_logs() {
         let mut websocket = accept(stream).expect("tunnel websocket handshake should succeed");
         let mut relay = TelemetryRelay::default();
 
-        relay
-            .attach_tunnel_connection(&mut websocket)
-            .expect("telemetry relay should send telemetry.open");
+        for frame in relay
+            .attach_tunnel_connection()
+            .expect("telemetry relay should send telemetry.open")
+        {
+            send_telemetry_frame(&mut websocket, frame);
+        }
 
         let Message::Text(payload) = websocket
             .read()
@@ -324,17 +327,26 @@ fn negotiates_telemetry_stream_and_flushes_buffered_logs() {
         else {
             panic!("expected telemetry control text frame");
         };
-        let handled = relay
-            .handle_control_message(payload.as_str(), &mut websocket)
-            .expect("telemetry control response should be handled");
-        assert!(handled, "telemetry control response should be consumed");
+        let control_frames = relay
+            .handle_control_message(payload.as_str())
+            .expect("telemetry control response should be handled")
+            .expect("telemetry control response should be consumed");
+        for frame in control_frames {
+            send_telemetry_frame(&mut websocket, frame);
+        }
 
-        relay
-            .enqueue_log_line("sandboxd log line\n", &mut websocket)
-            .expect("telemetry relay should flush buffered logs");
-        relay
-            .detach_tunnel_connection(&mut websocket)
-            .expect("telemetry relay should send telemetry.close");
+        for frame in relay
+            .enqueue_log_line("sandboxd log line\n")
+            .expect("telemetry relay should flush buffered logs")
+        {
+            send_telemetry_frame(&mut websocket, frame);
+        }
+        for frame in relay
+            .detach_tunnel_connection()
+            .expect("telemetry relay should send telemetry.close")
+        {
+            send_telemetry_frame(&mut websocket, frame);
+        }
     });
 
     let (mut client_socket, _) = connect(format!(
@@ -413,6 +425,23 @@ where
     };
 
     decode_stream_data_frame(payload.as_ref()).expect("binary frame should decode")
+}
+
+fn send_telemetry_frame<S>(
+    socket: &mut WebSocket<S>,
+    frame: sandboxd::tunnel::telemetry::TelemetryRelayFrame,
+)
+where
+    S: io::Read + io::Write,
+{
+    match frame {
+        sandboxd::tunnel::telemetry::TelemetryRelayFrame::Text(payload) => socket
+            .send(Message::Text(payload.into()))
+            .expect("telemetry relay should send text frame"),
+        sandboxd::tunnel::telemetry::TelemetryRelayFrame::Binary(payload) => socket
+            .send(Message::Binary(payload.into()))
+            .expect("telemetry relay should send binary frame"),
+    }
 }
 
 fn create_temp_test_dir(prefix: &str) -> PathBuf {

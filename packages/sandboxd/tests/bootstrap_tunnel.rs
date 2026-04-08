@@ -30,7 +30,7 @@ fn connects_to_bootstrap_tunnel_with_bootstrap_token_query() {
         assert!(matches!(message, Message::Close(_)));
     });
 
-    let tunnel = sandboxd::tunnel::connect_bootstrap_tunnel(
+    let mut tunnel = sandboxd::tunnel::connect_bootstrap_tunnel(
         &format!("ws://127.0.0.1:{}/bootstrap", address.port()),
         " bootstrap-token ",
     )

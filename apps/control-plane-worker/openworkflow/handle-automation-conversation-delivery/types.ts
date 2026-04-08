@@ -41,4 +41,8 @@ export type ExecutedConversationProviderDelivery = {
   providerConversationId: string;
   providerExecutionId: string | null;
   providerState?: unknown;
+  conversationMetadata?: {
+    name: string | null;
+    preview: string | null;
+  };
 };

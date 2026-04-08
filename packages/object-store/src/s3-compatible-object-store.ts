@@ -11,6 +11,7 @@ import {
   S3Client,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export type S3CompatibleObjectStoreConfig = {
   bucketName: string;
@@ -24,6 +25,13 @@ export type PutObjectInput = {
   objectKey: string;
   Body: NonNullable<PutObjectCommandInput["Body"]>;
 } & Pick<PutObjectCommandInput, "ContentType" | "CacheControl">;
+
+export type CreatePresignedGetUrlInput = {
+  objectKey: string;
+  expiresInSeconds: number;
+};
+
+const MaxPresignedGetUrlExpiresInSeconds = 7 * 24 * 60 * 60;
 
 export class S3CompatibleObjectStore {
   readonly #bucketName: string;
@@ -75,6 +83,29 @@ export class S3CompatibleObjectStore {
         Bucket: this.#bucketName,
         Key: objectKey,
       }),
+    );
+  }
+
+  async createPresignedGetUrl(input: CreatePresignedGetUrlInput): Promise<string> {
+    if (!Number.isInteger(input.expiresInSeconds) || input.expiresInSeconds <= 0) {
+      throw new Error("expiresInSeconds must be a positive integer.");
+    }
+
+    if (input.expiresInSeconds > MaxPresignedGetUrlExpiresInSeconds) {
+      throw new Error(
+        `expiresInSeconds must be less than or equal to ${String(MaxPresignedGetUrlExpiresInSeconds)}.`,
+      );
+    }
+
+    return getSignedUrl(
+      this.#client,
+      new GetObjectCommand({
+        Bucket: this.#bucketName,
+        Key: input.objectKey,
+      }),
+      {
+        expiresIn: input.expiresInSeconds,
+      },
     );
   }
 

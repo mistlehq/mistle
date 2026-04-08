@@ -66,6 +66,10 @@ describe("SandboxProfileBindingConfigEditor", () => {
 
     expect(screen.getByLabelText("Default model")).toBeDefined();
     expect(screen.getByLabelText("Reasoning effort")).toBeDefined();
+    expect(screen.queryByText("runtime")).toBeNull();
+    expect(screen.queryByText("config")).toBeNull();
+    expect(screen.queryByText("model")).toBeNull();
+    expect(screen.queryByText("options")).toBeNull();
     const additionalInstructionsField = screen
       .getAllByRole("textbox", {
         name: "Additional instructions",
@@ -76,7 +80,6 @@ describe("SandboxProfileBindingConfigEditor", () => {
     }
 
     expect(container.querySelectorAll('[data-slot="select-trigger"]').length).toBe(2);
-    expect(screen.getAllByText("*").length).toBe(2);
     expect(container.querySelector("textarea")).toBe(additionalInstructionsField);
   });
 
@@ -300,5 +303,44 @@ describe("SandboxProfileBindingConfigEditor", () => {
         },
       },
     });
+  });
+
+  it("renders the Jira tool checkbox with the display label", () => {
+    const target: IntegrationTargetSummary = {
+      targetKey: "target-jira",
+      displayName: "Jira",
+      familyId: "jira",
+      variantId: "jira-default",
+      config: {},
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+    const connection: IntegrationConnectionSummary = {
+      id: "connection-jira",
+      displayName: "Jira Production",
+      targetKey: target.targetKey,
+      status: "active",
+      config: {
+        connection_method: "jira-personal-api-token",
+        site_url: "https://mistle.atlassian.net",
+        email: "user@example.com",
+      },
+    };
+    const row: SandboxProfileBindingEditorRow = {
+      clientId: "row-jira",
+      connectionId: connection.id,
+      kind: "connector",
+      config: {},
+    };
+
+    renderBindingEditor({
+      row,
+      connections: [connection],
+      targets: [target],
+    });
+
+    expect(screen.getByText("Jira CLI")).toBeDefined();
+    expect(screen.queryByText("jira-cli")).toBeNull();
   });
 });

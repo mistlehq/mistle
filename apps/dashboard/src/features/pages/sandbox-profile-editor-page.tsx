@@ -301,7 +301,8 @@ export function IntegrationsEditorSection(
         <SandboxProfileBindingSection
           addDisabled={
             props.integrationDirectoryQuery.isPending ||
-            availableConnectionsByKind[kind].length === 0
+            availableConnectionsByKind[kind].length === 0 ||
+            (kind === "agent" && integrationRowsByKind.agent.length > 0)
           }
           availableConnections={props.availableConnections}
           availableTargets={props.availableTargets}

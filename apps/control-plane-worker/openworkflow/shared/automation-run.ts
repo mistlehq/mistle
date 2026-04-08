@@ -523,7 +523,6 @@ export async function prepareAutomationRun(
         sandboxProfileId: automationTarget.sandboxProfileId,
         integrationFamilyId: bindingContext.integrationFamilyId,
         runtimeId: bindingContext.runtimeId,
-        preview: compiledTemplates.renderedInput,
       },
     );
 

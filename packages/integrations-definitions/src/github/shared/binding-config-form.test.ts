@@ -69,6 +69,7 @@ describe("github binding config forms", () => {
         },
       },
       tools: {
+        "ui:enumNames": ["GitHub CLI"],
         "ui:widget": "checkboxes",
         "ui:options": {
           inline: false,
@@ -85,13 +86,10 @@ describe("github binding config forms", () => {
           title: "Tools",
           default: [],
           items: {
-            oneOf: [
-              {
-                const: "github-cli",
-                title: "GitHub CLI (gh)",
-              },
-            ],
+            type: "string",
+            enum: ["github-cli"],
           },
+          type: "array",
           uniqueItems: true,
         },
       },

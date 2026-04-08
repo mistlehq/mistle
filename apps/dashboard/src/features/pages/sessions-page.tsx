@@ -168,6 +168,7 @@ export function buildOptimisticSessions(input: {
 
     items.push({
       id: session.sandboxInstanceId,
+      title: null,
       sandboxProfileId: session.profileId,
       sandboxProfileDisplayName: session.profileDisplayName,
       sandboxProfileVersion: session.profileVersion,
@@ -371,8 +372,6 @@ export function SessionsPage(): React.JSX.Element {
           optimisticSessionCount: optimisticSessions.length,
         });
 
-  const optimisticSessionIds = new Set(optimisticSessions.map((session) => session.id));
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-4">
@@ -489,11 +488,11 @@ export function SessionsPage(): React.JSX.Element {
                       <TableCell className="whitespace-normal">
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className="font-medium break-words">
+                            {session.title ?? "Untitled"}
+                          </span>
+                          <span className="text-muted-foreground text-xs break-words">
                             {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
                           </span>
-                          {optimisticSessionIds.has(session.id) ? (
-                            <span className="text-muted-foreground text-xs">Launching locally</span>
-                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell className="text-sm whitespace-normal">

@@ -41,7 +41,9 @@ export const sandboxInstanceConnectionTokenSchema = z
 export const sandboxInstanceStatusResponseSchema = z
   .object({
     id: z.string().min(1),
+    title: z.string().min(1).nullable(),
     status: sandboxInstanceStatusSchema,
+    connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
     runtimePlan: CompiledRuntimePlanSchema.nullable(),
@@ -63,6 +65,7 @@ export const sandboxInstanceListItemSchema = z
   .object({
     id: z.string().min(1),
     sandboxProfileId: z.string().min(1),
+    title: z.string().min(1).nullable(),
     sandboxProfileDisplayName: z.string().min(1).nullable(),
     sandboxProfileVersion: z.number().int().min(1),
     status: sandboxInstanceStatusSchema,

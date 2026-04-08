@@ -88,6 +88,7 @@ describe("sandbox instances list integration", () => {
         id: "sbi_cp_list_a_001",
         organizationId: firstOrgSession.organizationId,
         sandboxProfileId: "sbp_cp_list",
+        title: null,
         sandboxProfileVersion: 1,
         runtimeProvider: "docker",
         providerSandboxId: "provider-cp-list-a-001",
@@ -102,6 +103,7 @@ describe("sandbox instances list integration", () => {
         id: "sbi_cp_list_a_002",
         organizationId: firstOrgSession.organizationId,
         sandboxProfileId: "sbp_cp_list",
+        title: null,
         sandboxProfileVersion: 2,
         runtimeProvider: "docker",
         providerSandboxId: "provider-cp-list-a-002",
@@ -118,6 +120,7 @@ describe("sandbox instances list integration", () => {
         id: "sbi_cp_list_a_003",
         organizationId: firstOrgSession.organizationId,
         sandboxProfileId: "sbp_cp_list",
+        title: "Investigate build failure",
         sandboxProfileVersion: 3,
         runtimeProvider: "docker",
         providerSandboxId: "provider-cp-list-a-003",
@@ -132,6 +135,7 @@ describe("sandbox instances list integration", () => {
         id: "sbi_cp_list_b_001",
         organizationId: secondOrgSession.organizationId,
         sandboxProfileId: "sbp_cp_other_org",
+        title: "Other org title",
         sandboxProfileVersion: 1,
         runtimeProvider: "docker",
         providerSandboxId: "provider-cp-list-b-001",
@@ -157,7 +161,9 @@ describe("sandbox instances list integration", () => {
       "sbi_cp_list_a_003",
       "sbi_cp_list_a_002",
     ]);
+    expect(firstPage.items[0]?.title).toBe("Investigate build failure");
     expect(firstPage.items[1]).toMatchObject({
+      title: null,
       sandboxProfileId: "sbp_cp_list",
       sandboxProfileDisplayName: "Control Plane Profile",
       sandboxProfileVersion: 2,

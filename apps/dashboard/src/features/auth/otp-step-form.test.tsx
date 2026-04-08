@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -36,5 +38,20 @@ describe("OtpStepForm", () => {
     );
 
     expect(markup).not.toContain('data-slot="input-otp" class="sr-only');
+  });
+
+  it("autofocuses the OTP input", () => {
+    const markup = renderToStaticMarkup(
+      <OtpStepForm
+        email="user@example.com"
+        isVerifyingOtp={false}
+        onOtpChange={() => {}}
+        onSubmit={async () => {}}
+        onUseDifferentEmail={() => {}}
+        otp=""
+      />,
+    );
+
+    expect(markup).toContain("autofocus");
   });
 });

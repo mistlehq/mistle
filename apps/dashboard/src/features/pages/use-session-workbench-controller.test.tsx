@@ -265,7 +265,7 @@ describe("useSessionWorkbenchController", () => {
         previousSandboxInstanceId: "sbi_old",
         sandboxInstanceId: "sbi_new",
         sandboxStatus: "running",
-        transportState: "detached",
+        sessionConnectionState: "detached",
       }),
     ).toEqual({
       kind: "idle",
@@ -558,8 +558,10 @@ describe("useSessionWorkbenchController", () => {
       queryClient,
       sandboxInstanceId: "sbi_resume_001",
       sandboxStatus: {
+        title: null,
         id: "sbi_resume_001",
         status: "starting",
+        connectable: false,
         failureCode: null,
         failureMessage: null,
         runtimePlan: null,
@@ -568,8 +570,10 @@ describe("useSessionWorkbenchController", () => {
     });
 
     expect(queryClient.getQueryData(getSandboxInstanceStatusQueryKey("sbi_resume_001"))).toEqual({
+      title: null,
       id: "sbi_resume_001",
       status: "starting",
+      connectable: false,
       failureCode: null,
       failureMessage: null,
       runtimePlan: null,
@@ -776,12 +780,14 @@ describe("useSessionWorkbenchController", () => {
       queryClient,
       sandboxInstanceId: "sbi_resume_stable",
       sandboxStatus: {
+        title: null,
         failureCode: null,
         failureMessage: null,
         id: "sbi_resume_stable",
         runtimePlan: null,
         automationConversation: null,
         status: "stopped",
+        connectable: false,
       },
     });
 
@@ -851,8 +857,10 @@ describe("useSessionWorkbenchController", () => {
       queryClient,
       sandboxInstanceId,
       sandboxStatus: {
+        title: null,
         id: sandboxInstanceId,
         status: "stopped",
+        connectable: false,
         failureCode: null,
         failureMessage: null,
         runtimePlan: null,

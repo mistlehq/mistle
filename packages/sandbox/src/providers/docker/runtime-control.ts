@@ -17,7 +17,7 @@ import {
 } from "./client-errors.js";
 import type { DockerSandboxConfig } from "./config.js";
 
-const ApplyStartupCommand = ["/usr/local/bin/sandboxd", "apply-startup"];
+const InitCommand = ["/usr/local/bin/sandboxd", "init"];
 const DockerExecExitPollIntervalMs = 50;
 const DockerExecExitPollAttempts = 200;
 
@@ -74,7 +74,7 @@ async function waitForDockerExecExitCode(exec: DockerClient.Exec): Promise<numbe
     await sleep(DockerExecExitPollIntervalMs);
   }
 
-  throw new Error("Timed out waiting for Docker startup apply exec to report an exit code.");
+  throw new Error("Timed out waiting for Docker sandbox init exec to report an exit code.");
 }
 
 async function writePayloadToStream(
@@ -133,32 +133,30 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     });
   }
 
-  async applyStartup(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
+  async init(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
     if (input.id.trim().length === 0) {
       throw new SandboxConfigurationError("Sandbox id is required.");
     }
 
     try {
       const container = this.#docker.getContainer(input.id);
-      const exec = await this.#runDockerOperation(DockerClientOperationIds.APPLY_STARTUP, () =>
+      const exec = await this.#runDockerOperation(DockerClientOperationIds.INIT, () =>
         container.exec({
           AttachStdin: true,
           AttachStdout: true,
           AttachStderr: true,
-          Cmd: ApplyStartupCommand,
+          Cmd: InitCommand,
           Tty: false,
           User: "root",
         }),
       );
-      const execStream = await this.#runDockerOperation(
-        DockerClientOperationIds.APPLY_STARTUP,
-        () =>
-          exec.start({
-            hijack: true,
-            stdin: true,
-            Detach: false,
-            Tty: false,
-          }),
+      const execStream = await this.#runDockerOperation(DockerClientOperationIds.INIT, () =>
+        exec.start({
+          hijack: true,
+          stdin: true,
+          Detach: false,
+          Tty: false,
+        }),
       );
       const stdout = new PassThrough();
       const stderr = new PassThrough();
@@ -169,7 +167,7 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
       await writePayloadToStream(execStream, input.payload);
       await endWritableStream(execStream);
 
-      const exitCode = await this.#runDockerOperation(DockerClientOperationIds.APPLY_STARTUP, () =>
+      const exitCode = await this.#runDockerOperation(DockerClientOperationIds.INIT, () =>
         waitForDockerExecExitCode(exec),
       );
       const stdoutText = capturedStdout.read();
@@ -179,7 +177,7 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
 
       if (exitCode !== 0) {
         throw new Error(
-          `Docker startup apply command exited with code ${String(exitCode)}.${formatCommandOutput({
+          `Docker sandbox init command exited with code ${String(exitCode)}.${formatCommandOutput({
             stdout: stdoutText,
             stderr: stderrText,
           })}`,

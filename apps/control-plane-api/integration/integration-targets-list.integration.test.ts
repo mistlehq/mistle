@@ -176,6 +176,7 @@ describe("integration targets discovery integration", () => {
         },
       ],
       webhookSource: {
+        lifecycle: "implicit",
         ownerScope: "target",
         requiresSourceSelection: true,
       },

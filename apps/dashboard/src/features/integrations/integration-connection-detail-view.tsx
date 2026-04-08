@@ -64,6 +64,7 @@ export type IntegrationConnectionDetailViewProps = {
       }
     | undefined;
   showWebhookSources?: boolean;
+  showCreateWebhookSource?: boolean;
   webhookSourceStateByConnectionId?: ReadonlyMap<string, IntegrationWebhookSourceSectionState>;
 };
 
@@ -125,6 +126,9 @@ function ConnectionCardWithOptionalProps(input: {
       {...(input.props.showWebhookSources === undefined
         ? {}
         : { showWebhookSources: input.props.showWebhookSources })}
+      {...(input.props.showCreateWebhookSource === undefined
+        ? {}
+        : { showCreateWebhookSource: input.props.showCreateWebhookSource })}
       {...(input.props.titleEditor === undefined ? {} : { titleEditor: input.props.titleEditor })}
     />
   );
@@ -139,6 +143,7 @@ function ConnectionCard(input: {
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
   showWebhookSources?: boolean;
+  showCreateWebhookSource?: boolean;
   titleEditor?: IntegrationConnectionDetailViewProps["titleEditor"];
   webhookSourceState?: IntegrationWebhookSourceSectionState;
 }): React.JSX.Element {
@@ -220,7 +225,9 @@ function ConnectionCard(input: {
       {input.showWebhookSources === true && input.webhookSourceState !== undefined ? (
         <WebhookSourcesSection
           connectionId={input.connection.id}
-          onCreateWebhookSource={input.onCreateWebhookSource}
+          onCreateWebhookSource={
+            input.showCreateWebhookSource === true ? input.onCreateWebhookSource : undefined
+          }
           onDeleteWebhookSource={input.onDeleteWebhookSource}
           state={input.webhookSourceState}
         />

@@ -22,6 +22,7 @@ export async function getSandboxInstance(
   const [sandboxInstance] = await ctx.db
     .select({
       id: sandboxInstances.id,
+      title: sandboxInstances.title,
       status: sandboxInstances.status,
       failureCode: sandboxInstances.failureCode,
       failureMessage: sandboxInstances.failureMessage,
@@ -47,17 +48,21 @@ export async function getSandboxInstance(
     return null;
   }
 
+  const status = await readEffectiveSandboxStatus(
+    {
+      runtimeStateReader: ctx.runtimeStateReader,
+    },
+    {
+      sandboxInstanceId: sandboxInstance.id,
+      persistedStatus: sandboxInstance.status,
+    },
+  );
+
   return {
     id: sandboxInstance.id,
-    status: await readEffectiveSandboxStatus(
-      {
-        runtimeStateReader: ctx.runtimeStateReader,
-      },
-      {
-        sandboxInstanceId: sandboxInstance.id,
-        persistedStatus: sandboxInstance.status,
-      },
-    ),
+    title: sandboxInstance.title,
+    status,
+    connectable: status === "running",
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
     runtimePlan:

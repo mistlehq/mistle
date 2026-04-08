@@ -7,6 +7,7 @@ import {
   ControlPlaneApiDataPlaneApiConfigSchema,
   ControlPlaneApiDatabaseConfigSchema,
   ControlPlaneApiIntegrationsConfigSchema,
+  ControlPlaneApiObjectStoreConfigSchema,
   ControlPlaneApiServerConfigSchema,
   ControlPlaneApiWorkflowConfigSchema,
   PartialControlPlaneApiConfigSchema,
@@ -32,6 +33,34 @@ const loadDatabaseEnv = createEnvLoader<typeof ControlPlaneApiDatabaseConfigSche
   {
     key: "migrationUrl",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL",
+  },
+]);
+
+const loadObjectStoreEnv = createEnvLoader<typeof ControlPlaneApiObjectStoreConfigSchema>([
+  {
+    key: "bucketName",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_BUCKET_NAME",
+  },
+  {
+    key: "region",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_REGION",
+  },
+  {
+    key: "endpoint",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_ENDPOINT",
+  },
+  {
+    key: "forcePathStyle",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_FORCE_PATH_STYLE",
+    parse: (value) => value === "true",
+  },
+  {
+    key: "accessKeyId",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_ACCESS_KEY_ID",
+  },
+  {
+    key: "secretAccessKey",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_SECRET_ACCESS_KEY",
   },
 ]);
 
@@ -144,6 +173,11 @@ export function loadControlPlaneApiFromEnv(
   const database = loadDatabaseEnv(env);
   if (hasEntries(database)) {
     partialConfig.database = database;
+  }
+
+  const objectStore = loadObjectStoreEnv(env);
+  if (hasEntries(objectStore)) {
+    partialConfig.objectStore = objectStore;
   }
 
   const auth = loadAuthEnv(env);

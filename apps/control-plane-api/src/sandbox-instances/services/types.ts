@@ -27,7 +27,9 @@ export type SandboxInstanceAutomationConversation = {
 
 export type SandboxInstanceStatus = {
   id: string;
+  title: string | null;
   status: NonNullable<GetSandboxInstanceResponse>["status"];
+  connectable: boolean;
   failureCode: string | null;
   failureMessage: string | null;
   runtimePlan: NonNullable<GetSandboxInstanceResponse>["runtimePlan"];
@@ -37,6 +39,7 @@ export type SandboxInstanceStatus = {
 export type ListSandboxInstancesResult = Omit<ListSandboxInstancesResponse, "items"> & {
   items: Array<
     ListSandboxInstancesResponse["items"][number] & {
+      title: string | null;
       sandboxProfileDisplayName: string | null;
       startedBy: ListSandboxInstancesResponse["items"][number]["startedBy"] & {
         name: string | null;

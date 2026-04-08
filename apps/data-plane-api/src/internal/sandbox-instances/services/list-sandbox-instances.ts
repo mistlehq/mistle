@@ -37,6 +37,7 @@ type ListSandboxInstanceRow = Pick<
   SandboxInstance,
   | "id"
   | "sandboxProfileId"
+  | "title"
   | "sandboxProfileVersion"
   | "status"
   | "startedByKind"
@@ -103,6 +104,7 @@ export async function listSandboxInstances(
           columns: {
             id: true,
             sandboxProfileId: true,
+            title: true,
             sandboxProfileVersion: true,
             status: true,
             startedByKind: true,
@@ -160,6 +162,7 @@ export async function listSandboxInstances(
       response.items.map(async (item) => ({
         id: item.id,
         sandboxProfileId: item.sandboxProfileId,
+        title: item.title,
         sandboxProfileVersion: item.sandboxProfileVersion,
         status: await readEffectiveSandboxStatus(
           {

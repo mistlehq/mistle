@@ -7,8 +7,8 @@ import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbo
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import { SessionsPage } from "./sessions-page.js";
 import {
+  buildSandboxInstanceListItemFixture,
   buildStoryLaunchableSandboxProfile,
-  buildStorySandboxInstanceListItem,
   createSessionsPageStoryQueryClient,
 } from "./sessions-page.story-fixtures.js";
 
@@ -60,26 +60,30 @@ const meta = {
     ],
     sandboxInstancesList: {
       items: [
-        buildStorySandboxInstanceListItem({
+        buildSandboxInstanceListItemFixture({
           id: "sbi_running",
+          title: "Investigate flaky test run",
           sandboxProfileDisplayName: "Repo Maintainer",
           status: "running",
           createdAt: "2026-04-01T09:00:00.000Z",
         }),
-        buildStorySandboxInstanceListItem({
+        buildSandboxInstanceListItemFixture({
           id: "sbi_starting",
+          title: "Reconcile Q2 variance report",
           sandboxProfileDisplayName: "Finance Investigator",
           status: "starting",
           createdAt: "2026-04-01T08:55:00.000Z",
         }),
-        buildStorySandboxInstanceListItem({
+        buildSandboxInstanceListItemFixture({
           id: "sbi_stopped",
+          title: "Draft migration guide",
           sandboxProfileDisplayName: "Docs Maintainer",
           status: "stopped",
           createdAt: "2026-03-31T15:30:00.000Z",
         }),
-        buildStorySandboxInstanceListItem({
+        buildSandboxInstanceListItemFixture({
           id: "sbi_failed",
+          title: null,
           sandboxProfileDisplayName: "Webhook Debugger",
           status: "failed",
           createdAt: "2026-03-31T12:00:00.000Z",
@@ -118,14 +122,16 @@ export const PaginatedResults: Story = {
   args: {
     sandboxInstancesList: {
       items: [
-        buildStorySandboxInstanceListItem({
+        buildSandboxInstanceListItemFixture({
           id: "sbi_page_1",
+          title: "Investigate flaky test run",
           sandboxProfileDisplayName: "Repo Maintainer",
           status: "running",
           createdAt: "2026-04-01T09:00:00.000Z",
         }),
-        buildStorySandboxInstanceListItem({
+        buildSandboxInstanceListItemFixture({
           id: "sbi_page_2",
+          title: "Draft migration guide",
           sandboxProfileDisplayName: "Docs Maintainer",
           status: "stopped",
           createdAt: "2026-03-31T15:30:00.000Z",
@@ -148,16 +154,18 @@ export const FailedSessions: Story = {
   args: {
     sandboxInstancesList: {
       items: [
-        buildStorySandboxInstanceListItem({
+        buildSandboxInstanceListItemFixture({
           id: "sbi_failed_runtime",
+          title: null,
           sandboxProfileDisplayName: "Webhook Debugger",
           status: "failed",
           createdAt: "2026-03-31T12:00:00.000Z",
           failureCode: "sandbox_bootstrap_failed",
           failureMessage: "Could not start sandbox runtime because image pull failed.",
         }),
-        buildStorySandboxInstanceListItem({
+        buildSandboxInstanceListItemFixture({
           id: "sbi_failed_init",
+          title: "Reconcile Q2 variance report",
           sandboxProfileDisplayName: "Finance Investigator",
           status: "failed",
           createdAt: "2026-03-31T11:15:00.000Z",

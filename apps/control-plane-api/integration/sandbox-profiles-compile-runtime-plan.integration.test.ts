@@ -11,6 +11,10 @@ import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
+import {
+  CodexAppServerListenUrl,
+  CodexProxyListenUrl,
+} from "../../../packages/integrations-definitions/src/agent-runtimes/codex/app-server.js";
 import { compileProfileVersionRuntimePlan } from "../src/sandbox-profiles/compile-profile-version-runtime-plan.js";
 import {
   SandboxProfilesCompileError,
@@ -137,11 +141,11 @@ describe("sandbox profile compile runtime plan integration", () => {
         {
           processKey: "codex-app-server",
           command: {
-            args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
+            args: ["/usr/local/bin/codex", "app-server", "--listen", CodexAppServerListenUrl],
           },
           readiness: {
             type: "ws",
-            url: "ws://127.0.0.1:4500",
+            url: CodexAppServerListenUrl,
             timeoutMs: 5_000,
           },
           stop: {
@@ -157,7 +161,7 @@ describe("sandbox profile compile runtime plan integration", () => {
           processKey: "codex-app-server",
           transport: {
             type: "ws",
-            url: "ws://127.0.0.1:4500",
+            url: CodexProxyListenUrl,
           },
           connectionMode: "dedicated",
         },

@@ -68,7 +68,7 @@ export interface SandboxInspectResult<
 }
 
 export interface SandboxRuntimeControl {
-  applyStartup(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void>;
+  init(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void>;
   close(): Promise<void>;
 }
 

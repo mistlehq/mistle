@@ -178,6 +178,11 @@ const SandboxKeepaliveStateSchema = z.object({
   active: z.boolean(),
 });
 
+const SandboxRuntimeReadySchema = z.object({
+  type: z.literal("runtime.ready"),
+  ready: z.boolean(),
+});
+
 const LiveListenerOwnerSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("sandbox-runtime"),
@@ -342,6 +347,7 @@ const BootstrapControlMessageSchema = z.discriminatedUnion("type", [
   TelemetryOpenSchema,
   TelemetryCloseSchema,
   SandboxKeepaliveStateSchema,
+  SandboxRuntimeReadySchema,
 ]);
 
 const PublishControlMessageSchema = z.discriminatedUnion("type", [
@@ -393,7 +399,9 @@ export type TelemetryClose = z.infer<typeof TelemetryCloseSchema>;
 export type TelemetryReset = z.infer<typeof TelemetryResetSchema>;
 export type TelemetryControlMessage = z.infer<typeof TelemetryControlMessageSchema>;
 export type SandboxKeepaliveState = z.infer<typeof SandboxKeepaliveStateSchema>;
+export type SandboxRuntimeReady = z.infer<typeof SandboxRuntimeReadySchema>;
 export type KeepaliveControlMessage = SandboxKeepaliveState;
+export type RuntimeReadyControlMessage = SandboxRuntimeReady;
 export type BootstrapControlMessage = z.infer<typeof BootstrapControlMessageSchema>;
 export type LiveListenerOwner = z.infer<typeof LiveListenerOwnerSchema>;
 export type LiveListener = z.infer<typeof LiveListenerSchema>;
@@ -467,4 +475,5 @@ export type PublishControlMessage = z.infer<typeof PublishControlMessageSchema>;
 export type SandboxSessionControlMessage =
   | StreamControlMessage
   | TelemetryControlMessage
-  | KeepaliveControlMessage;
+  | KeepaliveControlMessage
+  | RuntimeReadyControlMessage;

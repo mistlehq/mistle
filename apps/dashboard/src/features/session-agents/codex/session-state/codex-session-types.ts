@@ -3,8 +3,6 @@ export type StartSessionStep = "idle" | "securing" | "connecting" | "connected";
 export type ConnectedCodexSession = {
   sandboxInstanceId: string;
   connectedAtIso: string;
-  expiresAtIso: string;
-  connectionUrl: string;
   providerThreadId: string | null;
   activeThreadId: string | null;
 };
@@ -18,6 +16,11 @@ export type CodexThreadLifecycleEvent = {
 export type CodexThreadTokenUsageSnapshot = {
   threadId: string;
   usageJson: string;
+};
+
+export type CodexThreadNameUpdate = {
+  threadId: string;
+  title: string;
 };
 
 export type CodexTurnDiffSnapshot = {

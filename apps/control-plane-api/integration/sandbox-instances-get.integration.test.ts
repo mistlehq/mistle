@@ -63,6 +63,7 @@ describe("sandbox instances get integration", () => {
       id: "sbi_cp_get_001",
       organizationId: session.organizationId,
       sandboxProfileId: "sbp_dp_get_001",
+      title: "Webhook investigation",
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
       providerSandboxId,
@@ -92,8 +93,6 @@ describe("sandbox instances get integration", () => {
       integrationFamilyId: "openai",
       runtimeId: "codex",
       conversationKey: "webhook-conversation-key",
-      title: null,
-      preview: null,
       status: AutomationConversationStatuses.ACTIVE,
     });
 
@@ -121,7 +120,9 @@ describe("sandbox instances get integration", () => {
 
     expect(body).toEqual({
       id: "sbi_cp_get_001",
-      status: "running",
+      title: "Webhook investigation",
+      status: "starting",
+      connectable: false,
       failureCode: null,
       failureMessage: null,
       runtimePlan: null,
@@ -155,6 +156,7 @@ describe("sandbox instances get integration", () => {
       id: "sbi_cp_get_pending_001",
       organizationId: session.organizationId,
       sandboxProfileId: "sbp_dp_get_pending_001",
+      title: null,
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
       providerSandboxId,
@@ -184,8 +186,6 @@ describe("sandbox instances get integration", () => {
       integrationFamilyId: "openai",
       runtimeId: "codex",
       conversationKey: "webhook-conversation-key-pending",
-      title: null,
-      preview: null,
       status: AutomationConversationStatuses.PENDING,
     });
 
@@ -213,7 +213,9 @@ describe("sandbox instances get integration", () => {
 
     expect(body).toEqual({
       id: "sbi_cp_get_pending_001",
-      status: "running",
+      title: null,
+      status: "starting",
+      connectable: false,
       failureCode: null,
       failureMessage: null,
       runtimePlan: null,
@@ -245,6 +247,7 @@ describe("sandbox instances get integration", () => {
       id: "sbi_cp_get_002",
       organizationId: session.organizationId,
       sandboxProfileId: "sbp_dp_get_002",
+      title: null,
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
       providerSandboxId: "provider-cp-get-002",
@@ -265,6 +268,8 @@ describe("sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
 
+    expect(body.title).toBeNull();
+    expect(body.connectable).toBe(false);
     expect(body.automationConversation).toBeNull();
   });
 
@@ -290,6 +295,7 @@ describe("sandbox instances get integration", () => {
       id: "sbi_cp_get_003",
       organizationId: session.organizationId,
       sandboxProfileId: "sbp_dp_get_003",
+      title: null,
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
       providerSandboxId,
@@ -320,8 +326,6 @@ describe("sandbox instances get integration", () => {
         integrationFamilyId: "openai",
         runtimeId: "codex",
         conversationKey: "webhook-conversation-key-003-a",
-        title: null,
-        preview: null,
         status: AutomationConversationStatuses.ACTIVE,
       },
       {
@@ -335,8 +339,6 @@ describe("sandbox instances get integration", () => {
         integrationFamilyId: "openai",
         runtimeId: "codex",
         conversationKey: "webhook-conversation-key-003-b",
-        title: null,
-        preview: null,
         status: AutomationConversationStatuses.ACTIVE,
       },
     ]);
@@ -380,7 +382,9 @@ describe("sandbox instances get integration", () => {
 
     expect(body).toEqual({
       id: "sbi_cp_get_003",
-      status: "running",
+      title: null,
+      status: "starting",
+      connectable: false,
       failureCode: null,
       failureMessage: null,
       runtimePlan: null,
@@ -414,6 +418,7 @@ describe("sandbox instances get integration", () => {
       id: "sbi_cp_get_004",
       organizationId: session.organizationId,
       sandboxProfileId: "sbp_dp_get_004",
+      title: null,
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
       providerSandboxId,
@@ -444,8 +449,6 @@ describe("sandbox instances get integration", () => {
         integrationFamilyId: "openai",
         runtimeId: "codex",
         conversationKey: "webhook-conversation-key-004-a",
-        title: null,
-        preview: null,
         status: AutomationConversationStatuses.ACTIVE,
       },
       {
@@ -459,8 +462,6 @@ describe("sandbox instances get integration", () => {
         integrationFamilyId: "openai",
         runtimeId: "codex",
         conversationKey: "webhook-conversation-key-004-b",
-        title: null,
-        preview: null,
         status: AutomationConversationStatuses.ACTIVE,
       },
     ]);
@@ -502,7 +503,9 @@ describe("sandbox instances get integration", () => {
 
     expect(body).toEqual({
       id: "sbi_cp_get_004",
-      status: "running",
+      title: null,
+      status: "starting",
+      connectable: false,
       failureCode: null,
       failureMessage: null,
       runtimePlan: null,

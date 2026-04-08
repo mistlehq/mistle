@@ -222,6 +222,13 @@ describe("IntegrationConnectionDialog", () => {
       hasChanges: false,
     });
 
+    expect(screen.queryByRole("combobox", { name: "Authentication method" })).toBeNull();
+  });
+
+  it("renders auth method selection as a select in create mode", () => {
+    renderDialog();
+
+    expect(screen.getByRole("combobox", { name: "Authentication method" })).toBeTruthy();
     expect(screen.queryByRole("radio")).toBeNull();
   });
 

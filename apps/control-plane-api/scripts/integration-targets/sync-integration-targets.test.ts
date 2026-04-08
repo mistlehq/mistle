@@ -1,4 +1,4 @@
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import { describe, expect, it } from "vitest";
 
 import { SyncIntegrationTargetsForTests } from "./sync-integration-targets.js";

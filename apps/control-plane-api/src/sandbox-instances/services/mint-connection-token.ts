@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import type { GetSandboxInstanceResponse } from "@mistle/data-plane-internal-client";
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { mintConnectionToken as mintGatewayConnectionToken } from "@mistle/gateway-connection-auth";
-import { systemClock, systemSleeper } from "@mistle/time";
 
 import {
   SandboxInstancesConflictCodes,
@@ -15,9 +14,6 @@ import type {
   MintSandboxInstanceConnectionTokenInput,
   SandboxInstanceConnectionToken,
 } from "./types.js";
-
-const ConnectionWaitTimeoutMs = 30_000;
-const ConnectionWaitPollIntervalMs = 250;
 
 type ExistingSandboxInstance = NonNullable<GetSandboxInstanceResponse>;
 
@@ -71,12 +67,12 @@ function createInstanceFailedError(
   );
 }
 
-function createInstanceNotResumableError(
-  sandboxInstance: Pick<ExistingSandboxInstance, "id">,
+function createInstanceNotConnectableError(
+  sandboxInstance: Pick<ExistingSandboxInstance, "id" | "status">,
 ): SandboxInstancesConflictError {
   return new SandboxInstancesConflictError(
     SandboxInstancesConflictCodes.INSTANCE_NOT_RESUMABLE,
-    `Sandbox instance '${sandboxInstance.id}' did not become running before the connect wait timed out.`,
+    `Sandbox instance '${sandboxInstance.id}' is '${sandboxInstance.status}' and is not connectable.`,
   );
 }
 
@@ -99,47 +95,15 @@ async function getExistingSandboxInstance(
   return sandboxInstance;
 }
 
-async function waitForRunningSandboxInstance(
-  dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">,
-  input: {
-    organizationId: string;
-    instanceId: string;
-  },
-): Promise<ExistingSandboxInstance> {
-  const deadlineMs = systemClock.nowMs() + ConnectionWaitTimeoutMs;
-
-  while (true) {
-    const sandboxInstance = await getExistingSandboxInstance(dataPlaneClient, input);
-
-    if (sandboxInstance.status === "running") {
-      return sandboxInstance;
-    }
-
-    if (sandboxInstance.status === "failed") {
-      throw createInstanceFailedError(sandboxInstance);
-    }
-
-    const remainingMs = deadlineMs - systemClock.nowMs();
-    if (remainingMs <= 0) {
-      throw createInstanceNotResumableError(sandboxInstance);
-    }
-
-    await systemSleeper.sleep(Math.min(remainingMs, ConnectionWaitPollIntervalMs));
-  }
-}
-
 export async function mintConnectionToken(
   {
     dataPlaneClient,
   }: {
-    dataPlaneClient: Pick<
-      DataPlaneSandboxInstancesClient,
-      "getSandboxInstance" | "resumeSandboxInstance"
-    >;
+    dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">;
   },
   input: MintSandboxInstanceConnectionTokenInput,
 ): Promise<SandboxInstanceConnectionToken> {
-  let sandboxInstance = await getExistingSandboxInstance(dataPlaneClient, {
+  const sandboxInstance = await getExistingSandboxInstance(dataPlaneClient, {
     organizationId: input.organizationId,
     instanceId: input.instanceId,
   });
@@ -148,20 +112,8 @@ export async function mintConnectionToken(
     throw createInstanceFailedError(sandboxInstance);
   }
 
-  if (sandboxInstance.status === "pending" || sandboxInstance.status === "starting") {
-    sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
-      organizationId: input.organizationId,
-      instanceId: input.instanceId,
-    });
-  } else if (sandboxInstance.status === "stopped") {
-    await dataPlaneClient.resumeSandboxInstance({
-      organizationId: input.organizationId,
-      instanceId: input.instanceId,
-    });
-    sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
-      organizationId: input.organizationId,
-      instanceId: input.instanceId,
-    });
+  if (!sandboxInstance.connectable) {
+    throw createInstanceNotConnectableError(sandboxInstance);
   }
 
   const token = await mintGatewayConnectionToken({

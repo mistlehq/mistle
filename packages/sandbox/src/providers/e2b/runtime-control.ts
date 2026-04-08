@@ -28,11 +28,11 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
     this.#client = client;
   }
 
-  async applyStartup(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
+  async init(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
     requireSandboxId(input.id);
 
     try {
-      await this.#client.applyStartup({
+      await this.#client.init({
         sandboxId: input.id,
         payload: input.payload,
       });

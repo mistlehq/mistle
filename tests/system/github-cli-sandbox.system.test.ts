@@ -15,8 +15,11 @@ import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
+import { resolveGitHubAppInstallationId } from "./helpers/github-app-installation.js";
 import { it } from "./system-test-context.js";
 
+const OpenAiTargetKey = "openai-default";
+const OpenAiConnectionMethodId = "api-key";
 const GitHubTargetKey = "github-cloud";
 const TestTimeoutMs = 10 * 60_000;
 const PollIntervalMs = 2_000;
@@ -31,8 +34,8 @@ const TerminalControlSequencePattern = new RegExp(
 );
 
 const RequiredEnvNames = [
+  "MISTLE_TEST_OPENAI_API_KEY",
   "MISTLE_TEST_GITHUB_TEST_REPOSITORY",
-  "MISTLE_TEST_GITHUB_INSTALLATION_ID",
 ] as const;
 
 const StartRedirectConnectionResponseSchema = z
@@ -50,6 +53,10 @@ const RefreshIntegrationConnectionResourcesResponseSchema = z
   })
   .strict();
 
+const IntegrationConnectionResponseSchema = z.looseObject({
+  id: z.string().min(1),
+});
+
 const SandboxProfileResponseSchema = z.looseObject({
   id: z.string().min(1),
 });
@@ -65,9 +72,11 @@ const StartSandboxInstanceResponseSchema = z
 const SandboxInstanceStatusResponseSchema = z
   .object({
     id: z.string().min(1),
-    status: z.enum(["starting", "running", "stopped", "failed"]),
+    status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    runtimePlan: z.unknown().nullable().optional(),
+    automationConversation: z.unknown().nullable().optional(),
   })
   .strict();
 
@@ -213,6 +222,40 @@ async function waitForCondition<T>(input: {
   throw new Error(`Timed out waiting for ${input.description} after ${String(input.timeoutMs)}ms.`);
 }
 
+async function createOpenAiConnection(input: {
+  request: (path: string, init?: RequestInit) => Promise<Response>;
+  cookie: string;
+  apiKey: string;
+  displayName: string;
+}): Promise<string> {
+  const connection = await requestJsonOrThrow({
+    request: input.request,
+    path: `/v1/integration/connections/${encodeURIComponent(OpenAiTargetKey)}/form`,
+    expectedStatus: 201,
+    description: "OpenAI connection creation",
+    schema: IntegrationConnectionResponseSchema,
+    init: {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.cookie,
+      },
+      body: JSON.stringify({
+        displayName: input.displayName,
+        methodId: OpenAiConnectionMethodId,
+        config: {
+          connection_method: OpenAiConnectionMethodId,
+        },
+        secrets: {
+          apiKey: input.apiKey,
+        },
+      }),
+    },
+  });
+
+  return connection.id;
+}
+
 function resolveGatewayWebSocketUrl(input: { mintedUrl: string; gatewayBaseUrl: string }): string {
   const mintedUrl = new URL(input.mintedUrl);
   const gatewayBaseUrl = new URL(input.gatewayBaseUrl);
@@ -346,6 +389,13 @@ function createPtyFramePump(socket: WebSocket): PtyFramePump {
         }
 
         const dataFrame = decodeDataFrame(await websocketDataToUint8Array(event.data));
+        if (socket.readyState === WebSocket.OPEN) {
+          sendJson(socket, {
+            type: "stream.window",
+            streamId: dataFrame.streamId,
+            bytes: dataFrame.payload.length,
+          });
+        }
         enqueue({
           kind: "binary",
           text: Buffer.from(dataFrame.payload).toString("utf8"),
@@ -478,6 +528,7 @@ async function connectPtyChannel(input: {
     channel: {
       kind: "pty",
       session: "create",
+      ptySessionId: "terminal",
       cols: 120,
       rows: 40,
       cwd: input.cwd,
@@ -560,8 +611,9 @@ async function runPtyCommand(input: {
       continue;
     }
 
-    aggregatedOutput += frame.text.replaceAll("\r", "");
-    const match = aggregatedOutput.match(outputPattern);
+    aggregatedOutput += frame.text;
+    const normalizedOutput = stripTerminalControlSequences(aggregatedOutput).replaceAll("\r", "");
+    const match = normalizedOutput.match(outputPattern);
     if (match === null) {
       continue;
     }
@@ -579,7 +631,7 @@ async function runPtyCommand(input: {
 
     return {
       exitCode,
-      output: stripTerminalControlSequences(capturedOutput).trim(),
+      output: capturedOutput.trim(),
     };
   }
 
@@ -666,8 +718,13 @@ describeIf("system github cli sandbox", () => {
   it(
     "runs gh and git against a bound GitHub repository from a real sandbox PTY session",
     async ({ fixture }) => {
+      const openAiApiKey = requireEnv("MISTLE_TEST_OPENAI_API_KEY");
       const repository = parseGitHubRepository(requireEnv("MISTLE_TEST_GITHUB_TEST_REPOSITORY"));
-      const githubInstallationId = requireEnv("MISTLE_TEST_GITHUB_INSTALLATION_ID");
+      const githubInstallationId = await resolveGitHubAppInstallationId({
+        owner: repository.owner,
+        repo: repository.repo,
+        targetKey: GitHubTargetKey,
+      });
       const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
       const session = await fixture.authSession();
 
@@ -782,6 +839,12 @@ describeIf("system github cli sandbox", () => {
           return resource === undefined ? null : resource;
         },
       });
+      const openAiConnectionId = await createOpenAiConnection({
+        request: fixture.request,
+        cookie: session.cookie,
+        apiKey: openAiApiKey,
+        displayName: `GitHub CLI Sandbox OpenAI ${randomUUID()}`,
+      });
       const sandboxProfile = await requestJsonOrThrow({
         request: fixture.request,
         path: "/v1/sandbox/profiles",
@@ -815,6 +878,22 @@ describeIf("system github cli sandbox", () => {
           },
           body: JSON.stringify({
             bindings: [
+              {
+                connectionId: openAiConnectionId,
+                kind: "agent",
+                config: {
+                  runtime: {
+                    runtimeId: "codex",
+                    config: {},
+                  },
+                  model: {
+                    defaultModel: "gpt-5.3-codex",
+                    options: {
+                      reasoningEffort: "medium",
+                    },
+                  },
+                },
+              },
               {
                 connectionId: githubConnection.id,
                 kind: "git",

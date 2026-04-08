@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { createControlPlaneApiRuntime } from "../src/main.js";
 import {
+  SandboxInstancesConflictResponseSchema,
   SandboxInstanceStatusResponseSchema,
   SandboxInstancesNotFoundResponseSchema,
 } from "../src/sandbox-instances/index.js";
@@ -111,6 +112,7 @@ async function insertResumableSandboxInstance(input: {
     id: input.sandboxInstanceId,
     organizationId: input.organizationId,
     sandboxProfileId: "sbp_resume_integration",
+    title: null,
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
     providerSandboxId: input.providerSandboxId,
@@ -168,6 +170,26 @@ async function waitForResumeWorkflowRun(input: {
   throw new Error(
     `Timed out waiting for queued resume workflow run for sandbox instance '${input.sandboxInstanceId}'.`,
   );
+}
+
+async function countResumeWorkflowRuns(input: {
+  dataPlaneFixture: DisposableDataPlaneRuntime;
+  workflowNamespaceId: string;
+  sandboxInstanceId: string;
+}): Promise<string> {
+  const result = await input.dataPlaneFixture.dbPool.query<{ count: string }>(
+    `
+      select count(*)::text as count
+      from data_plane_openworkflow.workflow_runs
+      where
+        namespace_id = $1
+        and workflow_name = $2
+        and input->>'sandboxInstanceId' = $3
+    `,
+    [input.workflowNamespaceId, ResumeWorkflowName, input.sandboxInstanceId],
+  );
+
+  return result.rows[0]?.count ?? "0";
 }
 
 describe("sandbox instance resume integration", () => {
@@ -232,7 +254,9 @@ describe("sandbox instance resume integration", () => {
       const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
       expect(body).toEqual({
         id: sandboxInstanceId,
+        title: null,
         status: "starting",
+        connectable: false,
         failureCode: null,
         failureMessage: null,
         runtimePlan: null,
@@ -254,9 +278,7 @@ describe("sandbox instance resume integration", () => {
     }
   });
 
-  it("retries a failed sandbox by returning starting and queueing a resume workflow", async ({
-    fixture,
-  }) => {
+  it("returns INSTANCE_FAILED for failed sandboxes", async ({ fixture }) => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
@@ -313,33 +335,23 @@ describe("sandbox instance resume integration", () => {
         },
       );
 
-      expect(response.status).toBe(200);
-      const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
-      expect(body).toEqual({
-        id: sandboxInstanceId,
-        status: "starting",
-        failureCode: null,
-        failureMessage: null,
-        runtimePlan: null,
-        automationConversation: null,
-      });
-
-      const queuedRun = await waitForResumeWorkflowRun({
-        dataPlaneFixture,
-        workflowNamespaceId: fixture.config.workflow.namespaceId,
-        sandboxInstanceId,
-      });
-      expect(queuedRun.workflow_name).toBe(ResumeWorkflowName);
-      expect(queuedRun.status).toBe("pending");
-      expect(WorkflowRunInputSchema.parse(queuedRun.input).sandboxInstanceId).toBe(
-        sandboxInstanceId,
-      );
+      expect(response.status).toBe(409);
+      const body = SandboxInstancesConflictResponseSchema.parse(await response.json());
+      expect(body.code).toBe("INSTANCE_FAILED");
+      expect(body.message).toContain("Initial start failed.");
+      expect(
+        await countResumeWorkflowRuns({
+          dataPlaneFixture,
+          workflowNamespaceId: fixture.config.workflow.namespaceId,
+          sandboxInstanceId,
+        }),
+      ).toBe("0");
     } finally {
       await controlPlaneRuntime.stop();
     }
   });
 
-  it("returns the current running status without queueing a resume workflow", async ({
+  it("returns the current effective status without queueing a resume workflow", async ({
     fixture,
   }) => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
@@ -404,25 +416,199 @@ describe("sandbox instance resume integration", () => {
       const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
       expect(body).toEqual({
         id: sandboxInstanceId,
-        status: "running",
+        title: null,
+        status: "starting",
+        connectable: false,
         failureCode: null,
         failureMessage: null,
         runtimePlan: null,
         automationConversation: null,
       });
 
-      const result = await dataPlaneFixture.dbPool.query<{ count: string }>(
-        `
-          select count(*)::text as count
-          from data_plane_openworkflow.workflow_runs
-          where
-            namespace_id = $1
-            and workflow_name = $2
-            and input->>'sandboxInstanceId' = $3
-        `,
-        [fixture.config.workflow.namespaceId, ResumeWorkflowName, sandboxInstanceId],
+      expect(
+        await countResumeWorkflowRuns({
+          dataPlaneFixture,
+          workflowNamespaceId: fixture.config.workflow.namespaceId,
+          sandboxInstanceId,
+        }),
+      ).toBe("0");
+    } finally {
+      await controlPlaneRuntime.stop();
+    }
+  });
+
+  it("returns INSTANCE_NOT_RESUMABLE for pending sandboxes", async ({ fixture }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_resume",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
+    const controlPlaneRuntime = await createControlPlaneApiRuntime({
+      app: createControlPlaneConfig({
+        baseConfig: fixture.config,
+        dataPlaneBaseUrl: dataPlaneFixture.baseUrl,
+      }),
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      connectionToken: {
+        secret: "integration-connection-secret",
+        issuer: "integration-issuer",
+        audience: "integration-audience",
+      },
+      sandbox: {
+        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+      },
+    });
+
+    try {
+      const authSession = await createAuthenticatedControlPlaneSession({
+        fixture,
+        request: controlPlaneRuntime.request,
+        db: controlPlaneRuntime.db,
+        email: "integration-sandbox-resume-pending@example.com",
+      });
+
+      const sandboxInstanceId = "sbi_cp_resume_pending_001";
+      await dataPlaneFixture.db.insert(sandboxInstances).values({
+        id: sandboxInstanceId,
+        organizationId: authSession.organizationId,
+        sandboxProfileId: "sbp_resume_integration",
+        title: null,
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: null,
+        status: "pending",
+        startedByKind: "user",
+        startedById: "usr_resume_integration",
+        source: "dashboard",
+      });
+
+      const response = await controlPlaneRuntime.request(
+        `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}/resume`,
+        {
+          method: "POST",
+          headers: {
+            cookie: authSession.cookie,
+          },
+        },
       );
-      expect(result.rows[0]?.count).toBe("0");
+
+      expect(response.status).toBe(409);
+      const body = SandboxInstancesConflictResponseSchema.parse(await response.json());
+      expect(body.code).toBe("INSTANCE_NOT_RESUMABLE");
+      expect(body.message).toContain("is 'pending' and cannot be resumed");
+      expect(
+        await countResumeWorkflowRuns({
+          dataPlaneFixture,
+          workflowNamespaceId: fixture.config.workflow.namespaceId,
+          sandboxInstanceId,
+        }),
+      ).toBe("0");
+    } finally {
+      await controlPlaneRuntime.stop();
+    }
+  });
+
+  it("deduplicates repeated stopped-sandbox resume requests when the same idempotency key is reused", async ({
+    fixture,
+  }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_resume",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
+    const controlPlaneRuntime = await createControlPlaneApiRuntime({
+      app: createControlPlaneConfig({
+        baseConfig: fixture.config,
+        dataPlaneBaseUrl: dataPlaneFixture.baseUrl,
+      }),
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      connectionToken: {
+        secret: "integration-connection-secret",
+        issuer: "integration-issuer",
+        audience: "integration-audience",
+      },
+      sandbox: {
+        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+      },
+    });
+
+    try {
+      const authSession = await createAuthenticatedControlPlaneSession({
+        fixture,
+        request: controlPlaneRuntime.request,
+        db: controlPlaneRuntime.db,
+        email: "integration-sandbox-resume-idempotent@example.com",
+      });
+
+      const sandboxInstanceId = "sbi_cp_resume_stopped_idempotent_001";
+      const providerSandboxId = await startDockerSandboxContainer();
+      startedSandboxContainerIds.push(providerSandboxId);
+      await stopDockerSandboxContainer(providerSandboxId);
+      await insertResumableSandboxInstance({
+        dataPlaneFixture,
+        organizationId: authSession.organizationId,
+        sandboxInstanceId,
+        status: "stopped",
+        providerSandboxId,
+      });
+
+      const resumeBody = JSON.stringify({
+        idempotencyKey: "resume-stopped-idempotent-001",
+      });
+      const firstResponse = await controlPlaneRuntime.request(
+        `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}/resume`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: authSession.cookie,
+          },
+          body: resumeBody,
+        },
+      );
+      const secondResponse = await controlPlaneRuntime.request(
+        `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}/resume`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: authSession.cookie,
+          },
+          body: resumeBody,
+        },
+      );
+
+      expect(firstResponse.status).toBe(200);
+      expect(secondResponse.status).toBe(200);
+      SandboxInstanceStatusResponseSchema.parse(await firstResponse.json());
+      SandboxInstanceStatusResponseSchema.parse(await secondResponse.json());
+      const queuedRun = await waitForResumeWorkflowRun({
+        dataPlaneFixture,
+        workflowNamespaceId: fixture.config.workflow.namespaceId,
+        sandboxInstanceId,
+      });
+      expect(queuedRun.workflow_name).toBe(ResumeWorkflowName);
+      expect(queuedRun.status).toBe("pending");
+      expect(WorkflowRunInputSchema.parse(queuedRun.input).sandboxInstanceId).toBe(
+        sandboxInstanceId,
+      );
+      expect(
+        await countResumeWorkflowRuns({
+          dataPlaneFixture,
+          workflowNamespaceId: fixture.config.workflow.namespaceId,
+          sandboxInstanceId,
+        }),
+      ).toBe("1");
     } finally {
       await controlPlaneRuntime.stop();
     }

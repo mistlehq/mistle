@@ -1,4 +1,4 @@
-//! Codex app-server proxying and keepalive monitoring for `sandboxd`.
+//! Codex app-server proxying, keepalive monitoring, and readiness tracking for `sandboxd`.
 //!
 //! Codex app-server keeps turn execution in one long-lived daemon process, so
 //! process-level supervision alone cannot tell `sandboxd` whether Codex work is
@@ -8,6 +8,7 @@
 //! - one internal monitor connection that rebuilds active thread state from
 //!   `thread/loaded/list` and `thread/read`
 //! - incremental keepalive updates driven only by `thread/status/changed`
+//! - runtime-readiness updates driven by the monitor's real protocol bootstrap
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -25,6 +26,7 @@ use tungstenite::{Error as WebSocketError, Message, WebSocket, accept, connect};
 use url::Url;
 
 use crate::keepalive::KeepaliveManager;
+use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::time::{Duration, Sleeper};
 
 /// Default public listener URL for the Codex proxy endpoint.
@@ -265,6 +267,7 @@ pub fn start_codex_proxy(
     proxy_listen_url: &str,
     raw_app_server_url: &str,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     sleeper: Arc<dyn Sleeper>,
 ) -> Result<CodexProxy, CodexProxyError> {
     let listen_url = Url::parse(proxy_listen_url)
@@ -334,12 +337,14 @@ pub fn start_codex_proxy(
 
     let monitor_shutdown = shutdown_requested.clone();
     let monitor_keepalive = keepalive_manager.clone();
+    let monitor_runtime_readiness = runtime_readiness_manager.clone();
     let monitor_raw_url = raw_app_server_url.to_string();
     let monitor_sleeper = sleeper;
     let monitor_thread = thread::spawn(move || {
         run_codex_monitor_loop(
             &monitor_raw_url,
             &monitor_keepalive,
+            &monitor_runtime_readiness,
             &monitor_shutdown,
             monitor_sleeper.as_ref(),
         );
@@ -392,6 +397,7 @@ fn run_codex_proxy_listener(
 fn run_codex_monitor_loop(
     raw_app_server_url: &str,
     keepalive_manager: &Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
     shutdown_requested: &Arc<AtomicBool>,
     sleeper: &dyn Sleeper,
 ) {
@@ -402,11 +408,15 @@ fn run_codex_monitor_loop(
             raw_app_server_url,
             &mut monitor,
             keepalive_manager,
+            runtime_readiness_manager,
             DEFAULT_CODEX_PROXY_SOCKET_POLL_INTERVAL,
         );
 
         if let Ok(mut keepalive_manager) = keepalive_manager.lock() {
             monitor.clear(&mut keepalive_manager);
+        }
+        if let Ok(mut runtime_readiness_manager) = runtime_readiness_manager.lock() {
+            runtime_readiness_manager.set_ready(false);
         }
 
         if shutdown_requested.load(Ordering::Relaxed) {
@@ -425,6 +435,7 @@ pub fn run_codex_monitor_session(
     raw_app_server_url: &str,
     monitor: &mut CodexMonitor,
     keepalive_manager: &Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
     socket_poll_interval: Duration,
 ) -> Result<(), CodexProxyError> {
     let (mut socket, _) = connect(raw_app_server_url).map_err(CodexProxyError::ConnectRaw)?;
@@ -502,6 +513,10 @@ pub fn run_codex_monitor_session(
             monitor.apply_thread_status(&thread_id, &status, &mut keepalive_manager);
         }
     }
+    runtime_readiness_manager
+        .lock()
+        .expect("Codex runtime readiness manager lock should not be poisoned")
+        .set_ready(true);
 
     loop {
         match socket.read() {

@@ -14,19 +14,17 @@ export function resolveJiraBindingConfigForm(
           title: "Tools",
           default: [],
           items: {
-            oneOf: [
-              {
-                const: JiraToolIds.JIRA_CLI,
-                title: "Jira CLI (jira)",
-              },
-            ],
+            type: "string",
+            enum: [JiraToolIds.JIRA_CLI],
           },
+          type: "array",
           uniqueItems: true,
         },
       },
     },
     uiSchema: {
       tools: {
+        "ui:enumNames": ["Jira CLI"],
         "ui:widget": "checkboxes",
         "ui:options": {
           inline: false,

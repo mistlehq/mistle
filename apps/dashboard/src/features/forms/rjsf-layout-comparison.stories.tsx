@@ -127,6 +127,34 @@ function ManualTextAndPasswordFields(): React.JSX.Element {
           <Input defaultValue="ghp_storybook_example" id="comparison-api-token" type="password" />
         </FieldContent>
       </Field>
+
+      <Field orientation="horizontal">
+        <FieldHeader>
+          <FieldLabel htmlFor="comparison-alert-email">Alert email</FieldLabel>
+          <FieldDescription>
+            Contact email used for operator notifications and escalation routing.
+          </FieldDescription>
+        </FieldHeader>
+        <FieldContent>
+          <Input defaultValue="ops@mistle.dev" id="comparison-alert-email" type="email" />
+        </FieldContent>
+      </Field>
+
+      <Field orientation="horizontal">
+        <FieldHeader>
+          <FieldLabel htmlFor="comparison-webhook-url">Webhook URL</FieldLabel>
+          <FieldDescription>
+            Destination endpoint that receives status updates for this connection.
+          </FieldDescription>
+        </FieldHeader>
+        <FieldContent>
+          <Input
+            defaultValue="https://hooks.mistle.dev/integrations/github"
+            id="comparison-webhook-url"
+            type="url"
+          />
+        </FieldContent>
+      </Field>
     </div>
   );
 }
@@ -274,6 +302,18 @@ function RjsfTextAndPasswordFields(): React.JSX.Element {
             title: "API token",
             description: "Stored as a secret and used to authorize API requests.",
           },
+          alertEmail: {
+            type: "string",
+            format: "email",
+            title: "Alert email",
+            description: "Contact email used for operator notifications and escalation routing.",
+          },
+          webhookUrl: {
+            type: "string",
+            format: "uri",
+            title: "Webhook URL",
+            description: "Destination endpoint that receives status updates for this connection.",
+          },
         },
       }}
       uiSchema={{
@@ -286,6 +326,12 @@ function RjsfTextAndPasswordFields(): React.JSX.Element {
         apiToken: {
           "ui:widget": "PasswordWidget",
           "ui:placeholder": "ghp_xxxxxxxxxxxx",
+        },
+        alertEmail: {
+          "ui:placeholder": "ops@mistle.dev",
+        },
+        webhookUrl: {
+          "ui:placeholder": "https://hooks.mistle.dev/integrations/github",
         },
       }}
     />
@@ -485,10 +531,10 @@ function RjsfLayoutComparisonStory(input: { caseItem?: ComparisonCase }): React.
       ? [
           {
             description:
-              "Hidden schema-only fields should stay invisible while visible text and password rows match the hand-built field system.",
+              "Hidden schema-only fields should stay invisible while visible text, password, email, and URL rows match the hand-built field system.",
             manual: <ManualTextAndPasswordFields />,
             rjsf: <RjsfTextAndPasswordFields />,
-            caseTitle: "Text, Password, and Hidden Fields",
+            caseTitle: "Text, Password, Email, URL, and Hidden Fields",
           },
           {
             description:
@@ -575,10 +621,10 @@ export const TextPasswordAndHiddenFields: Story = {
       <RjsfLayoutComparisonStory
         caseItem={{
           description:
-            "Hidden schema-only fields should stay invisible while visible text and password rows match the hand-built field system.",
+            "Hidden schema-only fields should stay invisible while visible text, password, email, and URL rows match the hand-built field system.",
           manual: <ManualTextAndPasswordFields />,
           rjsf: <RjsfTextAndPasswordFields />,
-          caseTitle: "Text, Password, and Hidden Fields",
+          caseTitle: "Text, Password, Email, URL, and Hidden Fields",
         }}
       />
     );

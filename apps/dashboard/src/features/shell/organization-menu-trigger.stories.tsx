@@ -12,6 +12,7 @@ const meta = {
   },
   args: {
     organizationName: "Mistle Labs",
+    organizationImageUrl: null,
     organizationErrorMessage: null,
     isSigningOut: false,
     onNavigateToSettings: function onNavigateToSettings() {},
@@ -36,6 +37,12 @@ export const Default: Story = {
 export const WithError: Story = {
   args: {
     organizationErrorMessage: "Organization details could not be loaded.",
+  },
+};
+
+export const WithLogo: Story = {
+  args: {
+    organizationImageUrl: "https://images.example.com/mistle-logo.webp",
   },
 };
 

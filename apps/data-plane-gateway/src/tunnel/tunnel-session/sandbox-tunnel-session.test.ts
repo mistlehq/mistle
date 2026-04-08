@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ClientSessionActiveStreamError,
   SandboxTunnelSession,
   TunnelSessionBindingLimitExceededError,
 } from "./sandbox-tunnel-session.js";
@@ -123,7 +122,36 @@ describe("SandboxTunnelSession", () => {
     expect(session.bindingCount).toBe(1);
   });
 
-  it("rejects opening a second active stream for the same client session", () => {
+  it("allows multiple active streams for the same client session", () => {
+    const session = new SandboxTunnelSession({
+      sandboxInstanceId: "sbi_test",
+      side: "bootstrap",
+      nodeId: "dpg_test",
+      sessionId: "sess_bootstrap",
+    });
+
+    session.bindClientStream({
+      channelKind: "pty",
+      clientSessionId: "conn_1",
+      clientStreamId: 7,
+    });
+
+    const secondBinding = session.bindClientStream({
+      channelKind: "agent",
+      clientSessionId: "conn_1",
+      clientStreamId: 8,
+    });
+
+    expect(secondBinding).toEqual({
+      channelKind: "agent",
+      clientSessionId: "conn_1",
+      clientStreamId: 8,
+      tunnelStreamId: 2,
+    });
+    expect(session.bindingCount).toBe(2);
+  });
+
+  it("still rejects duplicate client stream bindings within the same client session", () => {
     const session = new SandboxTunnelSession({
       sandboxInstanceId: "sbi_test",
       side: "bootstrap",
@@ -141,9 +169,9 @@ describe("SandboxTunnelSession", () => {
       session.bindClientStream({
         channelKind: "agent",
         clientSessionId: "conn_1",
-        clientStreamId: 8,
+        clientStreamId: 7,
       }),
-    ).toThrow(ClientSessionActiveStreamError);
+    ).toThrow("Client stream binding already exists for session 'conn_1' stream 7.");
   });
 
   it("allows multiple active streams by default across different client sessions", () => {

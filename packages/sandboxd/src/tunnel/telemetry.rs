@@ -7,9 +7,6 @@
 //! lines over the existing bootstrap websocket.
 
 use std::fmt::{self, Display};
-use std::io;
-
-use tungstenite::{Message, WebSocket};
 
 use crate::tunnel::protocol::{
     BootstrapTelemetryControlMessage, MAX_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES,
@@ -44,6 +41,13 @@ impl Display for TelemetryRelayError {
 
 impl std::error::Error for TelemetryRelayError {}
 
+/// One serialized bootstrap-tunnel frame produced by the telemetry relay.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TelemetryRelayFrame {
+    Text(String),
+    Binary(Vec<u8>),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TelemetryRelayState {
     Disconnected,
@@ -73,87 +77,69 @@ impl Default for TelemetryRelay {
 
 impl TelemetryRelay {
     /// Starts telemetry negotiation on the current tunnel connection.
-    pub fn attach_tunnel_connection<S>(
-        &mut self,
-        socket: &mut WebSocket<S>,
-    ) -> Result<(), TelemetryRelayError>
-    where
-        S: io::Read + io::Write,
-    {
+    pub fn attach_tunnel_connection(&mut self) -> Result<Vec<TelemetryRelayFrame>, TelemetryRelayError> {
         self.state = TelemetryRelayState::Opening;
         self.send_window = StreamSendWindow::new(0);
         self.buffered_lines.clear();
         self.buffered_bytes = 0;
-        write_text_frame(
-            socket,
-            telemetry_open(
-                SANDBOX_TELEMETRY_LOG_STREAM_ID,
-                TELEMETRY_LOGS_SIGNAL,
-                TELEMETRY_LOGS_FORMAT,
-            ),
-        )
+        Ok(vec![TelemetryRelayFrame::Text(telemetry_open(
+            SANDBOX_TELEMETRY_LOG_STREAM_ID,
+            TELEMETRY_LOGS_SIGNAL,
+            TELEMETRY_LOGS_FORMAT,
+        ))])
     }
 
     /// Stops telemetry publication on the current tunnel connection.
-    pub fn detach_tunnel_connection<S>(
-        &mut self,
-        socket: &mut WebSocket<S>,
-    ) -> Result<(), TelemetryRelayError>
-    where
-        S: io::Read + io::Write,
-    {
+    pub fn detach_tunnel_connection(&mut self) -> Result<Vec<TelemetryRelayFrame>, TelemetryRelayError> {
+        let mut frames = Vec::new();
         if matches!(
             self.state,
             TelemetryRelayState::Opening | TelemetryRelayState::Open
         ) {
-            write_text_frame(socket, telemetry_close(SANDBOX_TELEMETRY_LOG_STREAM_ID))?;
+            frames.push(TelemetryRelayFrame::Text(telemetry_close(
+                SANDBOX_TELEMETRY_LOG_STREAM_ID,
+            )));
         }
 
         self.state = TelemetryRelayState::Disconnected;
         self.send_window = StreamSendWindow::new(0);
         self.buffered_lines.clear();
         self.buffered_bytes = 0;
-        Ok(())
+        Ok(frames)
     }
 
     /// Applies one telemetry control response from the gateway.
-    pub fn handle_control_message<S>(
+    pub fn handle_control_message(
         &mut self,
         payload: &str,
-        socket: &mut WebSocket<S>,
-    ) -> Result<bool, TelemetryRelayError>
-    where
-        S: io::Read + io::Write,
-    {
+    ) -> Result<Option<Vec<TelemetryRelayFrame>>, TelemetryRelayError> {
         let Some(message) = parse_bootstrap_telemetry_control_message(payload)
             .map_err(|error| TelemetryRelayError::new(error.to_string()))?
         else {
-            return Ok(false);
+            return Ok(None);
         };
 
         match message {
             BootstrapTelemetryControlMessage::OpenOk(message) => {
                 if message.stream_id != SANDBOX_TELEMETRY_LOG_STREAM_ID {
-                    return Ok(false);
+                    return Ok(None);
                 }
                 self.send_window = StreamSendWindow::new(message.initial_window_bytes);
                 self.state = TelemetryRelayState::Open;
-                self.flush(socket)?;
-                Ok(true)
+                Ok(Some(self.flush()?))
             }
             BootstrapTelemetryControlMessage::Window(message) => {
                 if message.stream_id != SANDBOX_TELEMETRY_LOG_STREAM_ID {
-                    return Ok(false);
+                    return Ok(None);
                 }
                 self.send_window
                     .add(message.bytes)
                     .map_err(|error| TelemetryRelayError::new(error.to_string()))?;
-                self.flush(socket)?;
-                Ok(true)
+                Ok(Some(self.flush()?))
             }
             BootstrapTelemetryControlMessage::OpenError(message) => {
                 if message.stream_id != SANDBOX_TELEMETRY_LOG_STREAM_ID {
-                    return Ok(false);
+                    return Ok(None);
                 }
                 Err(TelemetryRelayError::new(format!(
                     "gateway rejected telemetry stream: {} ({})",
@@ -162,7 +148,7 @@ impl TelemetryRelay {
             }
             BootstrapTelemetryControlMessage::Reset(message) => {
                 if message.stream_id != SANDBOX_TELEMETRY_LOG_STREAM_ID {
-                    return Ok(false);
+                    return Ok(None);
                 }
                 Err(TelemetryRelayError::new(format!(
                     "gateway reset telemetry stream: {} ({})",
@@ -173,14 +159,10 @@ impl TelemetryRelay {
     }
 
     /// Queues one telemetry log line for transmission.
-    pub fn enqueue_log_line<S>(
+    pub fn enqueue_log_line(
         &mut self,
         line: &str,
-        socket: &mut WebSocket<S>,
-    ) -> Result<(), TelemetryRelayError>
-    where
-        S: io::Read + io::Write,
-    {
+    ) -> Result<Vec<TelemetryRelayFrame>, TelemetryRelayError> {
         if self.buffered_bytes.saturating_add(line.len()) > MAX_STREAM_WINDOW_BYTES {
             return Err(TelemetryRelayError::new(
                 "telemetry buffer exceeded the configured capacity",
@@ -189,20 +171,18 @@ impl TelemetryRelay {
 
         self.buffered_bytes = self.buffered_bytes.saturating_add(line.len());
         self.buffered_lines.push(line.as_bytes().to_vec());
-        self.flush(socket)
+        self.flush()
     }
 
-    fn flush<S>(&mut self, socket: &mut WebSocket<S>) -> Result<(), TelemetryRelayError>
-    where
-        S: io::Read + io::Write,
-    {
+    fn flush(&mut self) -> Result<Vec<TelemetryRelayFrame>, TelemetryRelayError> {
         if self.state != TelemetryRelayState::Open {
-            return Ok(());
+            return Ok(Vec::new());
         }
 
+        let mut frames = Vec::new();
         while let Some(next_line) = self.buffered_lines.first() {
             if !self.send_window.try_consume(next_line.len()) {
-                return Ok(());
+                return Ok(frames);
             }
 
             let line = self.buffered_lines.remove(0);
@@ -213,30 +193,15 @@ impl TelemetryRelay {
                 &line,
             )
             .map_err(|error| TelemetryRelayError::new(error.to_string()))?;
-            socket.send(Message::Binary(encoded.into())).map_err(|error| {
-                TelemetryRelayError::new(format!(
-                    "failed to write telemetry binary frame: {error}"
-                ))
-            })?;
+            frames.push(TelemetryRelayFrame::Binary(encoded));
         }
 
-        Ok(())
+        Ok(frames)
     }
 }
 
-fn write_text_frame<S>(socket: &mut WebSocket<S>, payload: String) -> Result<(), TelemetryRelayError>
-where
-    S: io::Read + io::Write,
-{
-    socket.send(Message::Text(payload.into())).map_err(|error| {
-        TelemetryRelayError::new(format!("failed to write telemetry control frame: {error}"))
-    })
-}
-
 /// Decodes one telemetry data frame routed back from the tunnel.
-pub fn decode_telemetry_data_frame(
-    payload: &[u8],
-) -> Result<Vec<u8>, TelemetryRelayError> {
+pub fn decode_telemetry_data_frame(payload: &[u8]) -> Result<Vec<u8>, TelemetryRelayError> {
     let frame = decode_stream_data_frame(payload)
         .map_err(|error| TelemetryRelayError::new(error.to_string()))?;
     if frame.stream_id != SANDBOX_TELEMETRY_LOG_STREAM_ID {

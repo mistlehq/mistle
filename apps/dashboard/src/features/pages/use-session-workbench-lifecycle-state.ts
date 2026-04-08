@@ -9,6 +9,7 @@ import {
 } from "../sessions/session-connect-policy.js";
 import { getSandboxInstanceStatus } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
+import { TopLoadingBarQueryMeta } from "../shell/top-loading-bar-query-meta.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import {
   hasAutomationSessionPreparationTimedOut,
@@ -43,14 +44,14 @@ export function useSessionWorkbenchLifecycleState(input: {
     ReturnType<typeof useCodexSessionState>["lifecycle"],
     | "clearLifecycleErrorMessage"
     | "connectSession"
-    | "detachSessionTransport"
+    | "detachSessionConnection"
     | "disconnectSession"
     | "isStartingSession"
     | "lifecycleErrorMessage"
     | "recoverSession"
     | "recoverableDisconnect"
     | "sessionSnapshot"
-    | "transportState"
+    | "sessionConnectionState"
   >;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   queryClient: QueryClient;
@@ -74,7 +75,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     lifecycleErrorMessage,
     recoverSession,
     recoverableDisconnect,
-    transportState,
+    sessionConnectionState,
   } = input.lifecycle;
   const { disconnectPty } = input.ptyState.actions;
   const handleResumeSucceeded = useCallback(() => {
@@ -98,6 +99,9 @@ export function useSessionWorkbenchLifecycleState(input: {
 
   const sandboxStatusQuery = useQuery({
     queryKey: getSandboxInstanceStatusQueryKey(input.sandboxInstanceId),
+    meta: {
+      [TopLoadingBarQueryMeta.SUPPRESS]: true,
+    },
     queryFn: async ({ signal }) => {
       if (input.sandboxInstanceId === null) {
         throw new Error("Session id is required.");
@@ -112,6 +116,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     retry: false,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
+      const connectable = query.state.data?.connectable ?? null;
       const automationConversation = query.state.data?.automationConversation ?? null;
       if (
         shouldWaitForAutomationSessionThread({
@@ -133,7 +138,7 @@ export function useSessionWorkbenchLifecycleState(input: {
         return 1_000;
       }
 
-      return status === "running" || status === "failed" || status === "stopped" ? false : 1_000;
+      return connectable === true || status === "failed" || status === "stopped" ? false : 1_000;
     },
   });
   const markRecoveryBoundary = useCallback(() => {
@@ -193,6 +198,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   const connectionReadiness = resolveSessionConnectionReadiness({
     sandboxInstanceId: input.sandboxInstanceId,
     sandboxStatus: displaySandboxLifecycleStatus,
+    sandboxConnectable: sandboxStatusQuery.data?.connectable ?? null,
     isStatusPending: sandboxStatusQuery.isPending,
   });
   const stoppedSessionMessage = resolveStoppedSessionMessageForWorkbenchEntryPhase({
@@ -281,7 +287,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     refetchSandboxStatus: sandboxStatusQuery.refetch,
     sandboxInstanceId: input.sandboxInstanceId,
     sandboxStatus: displaySandboxLifecycleStatus,
-    transportState,
+    sessionConnectionState,
   });
 
   useEffect(() => {
@@ -297,7 +303,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       !shouldAutoConnectSession({
         sandboxInstanceId: input.sandboxInstanceId,
         canConnect: connectionReadiness.canConnect,
-        connected: transportState === "connected",
+        connected: sessionConnectionState === "connected",
         isStartingSession,
         hasAttemptedAutoConnect,
         hasStartError: resolvedLifecycleErrorMessage !== null,
@@ -311,11 +317,19 @@ export function useSessionWorkbenchLifecycleState(input: {
     }
 
     setHasAttemptedAutoConnect(true);
-    connectSession({
-      sandboxInstanceId: input.sandboxInstanceId,
-      targetThreadId: automationConversation?.providerConversationId ?? null,
-      providerThreadId: automationConversation?.providerConversationId ?? null,
-    });
+    const providerThreadId = automationConversation?.providerConversationId ?? null;
+    connectSession(
+      providerThreadId === null
+        ? {
+            sandboxInstanceId: input.sandboxInstanceId,
+            targetThreadId: null,
+          }
+        : {
+            sandboxInstanceId: input.sandboxInstanceId,
+            targetThreadId: providerThreadId,
+            providerThreadId,
+          },
+    );
   }, [
     automationConversation,
     connectSession,
@@ -326,7 +340,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     isStartingSession,
     isWaitingForAutomationThread,
     resolvedLifecycleErrorMessage,
-    transportState,
+    sessionConnectionState,
   ]);
 
   useEffect(() => {

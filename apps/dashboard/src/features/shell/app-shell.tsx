@@ -10,6 +10,7 @@ import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { SidebarNavGroups } from "../navigation/sidebar-nav-groups.js";
 import type { SidebarNavGroup } from "../navigation/sidebar-nav-model.js";
+import { useOrganizationLogoQuery } from "../organizations/organization-logo-query.js";
 import {
   isSettingsPath,
   resolveSettingsBackDestination,
@@ -17,6 +18,10 @@ import {
 } from "../settings/model.js";
 import { SettingsBackButton } from "../settings/settings-back-button.js";
 import { SettingsSectionNav } from "../settings/settings-section-nav.js";
+import {
+  createOrganizationLogoContentPath,
+  createSingletonImageContentUrl,
+} from "../shared/singleton-image.js";
 import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
 import { AppShellView } from "./app-shell-view.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
@@ -75,6 +80,7 @@ type AppShellFrame = Pick<
 
 export function AppShell(): React.JSX.Element {
   const organizationSummary = useOrganizationSummary();
+  const organizationLogoQuery = useOrganizationLogoQuery(organizationSummary.activeOrganizationId);
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -143,6 +149,11 @@ export function AppShell(): React.JSX.Element {
     isSigningOut,
     locationPathname: location.pathname,
     organizationErrorMessage: organizationSummary.organizationErrorMessage,
+    organizationImageUrl: createSingletonImageContentUrl({
+      resourceName: "Organization logo",
+      path: createOrganizationLogoContentPath(organizationSummary.activeOrganizationId),
+      image: organizationLogoQuery.data,
+    }),
     organizationName: organizationSummary.organizationName ?? "",
     pageMeta,
     signOutError,
@@ -168,6 +179,7 @@ function resolveAppShellFrame(input: {
   isSigningOut: boolean;
   locationPathname: string;
   organizationErrorMessage: string | null;
+  organizationImageUrl: string | null;
   organizationName: string;
   pageMeta: ReturnType<typeof useAppPageMeta>;
   signOutError: string | null;
@@ -211,6 +223,7 @@ function resolveAppShellFrame(input: {
         onNavigateToSettings={input.handleNavigateToSettings}
         onSignOut={input.handleSignOut}
         organizationErrorMessage={input.organizationErrorMessage}
+        organizationImageUrl={input.organizationImageUrl}
         organizationName={input.organizationName}
       />
     ),

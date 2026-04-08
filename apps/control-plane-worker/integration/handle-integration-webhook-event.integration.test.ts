@@ -27,7 +27,7 @@ import {
   createOpenAiRawBindingCapabilities,
   OpenAiApiKeyDefinition,
   OpenAiReasoningEfforts,
-} from "@mistle/integrations-definitions";
+} from "@mistle/integrations-definitions/server";
 import {
   HandleAutomationRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,

@@ -1,23 +1,28 @@
-//! `sandboxd` is the Rust sandbox supervisor binary that is gradually absorbing
-//! startup application, local control, process supervision, and tunnel logic
-//! from the legacy JavaScript runtime.
+//! `sandboxd` is the long-lived sandbox supervisor daemon.
+//!
+//! The default entrypoint runs the daemon behind the local Unix control socket.
+//! The only supported subcommand, `init`, is a thin local client that reads one
+//! startup payload from stdin, submits it to the running daemon, prints the
+//! daemon response, and exits.
 
 use std::fmt;
 use std::io;
 use std::path::Path;
 
-pub mod apply_startup;
 pub mod bootstrap;
 pub mod cgroups;
 pub mod codex_proxy;
 pub mod command;
 pub mod control;
+pub mod egress_proxy;
+pub mod init;
 pub mod keepalive;
 pub mod process;
 pub mod protocol;
 pub mod proxy_ca;
 pub mod pty;
 pub mod runtime;
+pub mod sandboxd_state;
 pub mod security;
 pub mod time;
 pub mod tunnel;
@@ -27,14 +32,13 @@ use crate::time::ThreadSleeper;
 /// Enumerates the top-level `sandboxd` subcommands the CLI currently supports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SandboxdCommand {
-    Serve,
-    ApplyStartup,
+    Daemon,
+    Init,
 }
 
 /// Describes why CLI argument parsing failed before any command-specific work ran.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseSandboxdCommandError {
-    MissingCommand,
     UnexpectedArgument(String),
     UnknownCommand(String),
 }
@@ -42,16 +46,12 @@ pub enum ParseSandboxdCommandError {
 impl fmt::Display for ParseSandboxdCommandError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::MissingCommand => write!(
-                f,
-                "missing sandboxd subcommand (expected one of: serve, apply-startup)"
-            ),
             Self::UnexpectedArgument(argument) => {
                 write!(f, "unexpected sandboxd argument: {argument}")
             }
             Self::UnknownCommand(command) => write!(
                 f,
-                "unknown sandboxd subcommand '{command}' (expected one of: serve, apply-startup)"
+                "unknown sandboxd subcommand '{command}' (expected 'init')"
             ),
         }
     }
@@ -67,12 +67,11 @@ where
 {
     let mut parsed_args = args.into_iter().map(Into::into);
     let Some(command) = parsed_args.next() else {
-        return Err(ParseSandboxdCommandError::MissingCommand);
+        return Ok(SandboxdCommand::Daemon);
     };
 
     let command = match command.as_str() {
-        "serve" => SandboxdCommand::Serve,
-        "apply-startup" => SandboxdCommand::ApplyStartup,
+        "init" => SandboxdCommand::Init,
         _ => {
             return Err(ParseSandboxdCommandError::UnknownCommand(command));
         }
@@ -105,7 +104,7 @@ where
     };
 
     match command {
-        SandboxdCommand::Serve => {
+        SandboxdCommand::Daemon => {
             if let Err(error) = security::apply_current_process_security() {
                 let _ = writeln!(stderr, "{error}");
                 return 1;
@@ -113,7 +112,6 @@ where
 
             let server = match control::start_control_server(
                 Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
-                Path::new(apply_startup::DEFAULT_MANIFEST_PATH),
                 ThreadSleeper,
                 control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
             ) {
@@ -132,10 +130,9 @@ where
                 }
             }
         }
-        SandboxdCommand::ApplyStartup => match apply_startup::run_apply_startup(
+        SandboxdCommand::Init => match init::run_init(
             stdin,
             stdout,
-            Path::new(apply_startup::DEFAULT_MANIFEST_PATH),
             Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
         ) {
             Ok(()) => 0,
@@ -149,24 +146,17 @@ mod tests {
     use crate::{ParseSandboxdCommandError, SandboxdCommand, parse_sandboxd_command};
 
     #[test]
-    fn parses_serve() {
-        let command = parse_sandboxd_command(["serve"]);
-
-        assert_eq!(command, Ok(SandboxdCommand::Serve));
-    }
-
-    #[test]
-    fn parses_apply_startup() {
-        let command = parse_sandboxd_command(["apply-startup"]);
-
-        assert_eq!(command, Ok(SandboxdCommand::ApplyStartup));
-    }
-
-    #[test]
-    fn rejects_missing_subcommand() {
+    fn defaults_to_daemon_without_args() {
         let command = parse_sandboxd_command(Vec::<String>::new());
 
-        assert_eq!(command, Err(ParseSandboxdCommandError::MissingCommand));
+        assert_eq!(command, Ok(SandboxdCommand::Daemon));
+    }
+
+    #[test]
+    fn parses_init() {
+        let command = parse_sandboxd_command(["init"]);
+
+        assert_eq!(command, Ok(SandboxdCommand::Init));
     }
 
     #[test]
@@ -183,7 +173,7 @@ mod tests {
 
     #[test]
     fn rejects_extra_arguments() {
-        let command = parse_sandboxd_command(["serve", "--verbose"]);
+        let command = parse_sandboxd_command(["init", "--verbose"]);
 
         assert_eq!(
             command,

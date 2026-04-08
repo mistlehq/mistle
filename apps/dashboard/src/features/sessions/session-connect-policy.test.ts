@@ -17,11 +17,42 @@ describe("session connect policy", () => {
   });
 
   it("treats only running sandboxes as ready for connections", () => {
-    expect(isSandboxReadyForConnections("running")).toBe(true);
-    expect(isSandboxReadyForConnections("starting")).toBe(false);
-    expect(isSandboxReadyForConnections("stopped")).toBe(false);
-    expect(isSandboxReadyForConnections("failed")).toBe(false);
-    expect(isSandboxReadyForConnections(null)).toBe(false);
+    expect(
+      isSandboxReadyForConnections({
+        sandboxStatus: "running",
+        sandboxConnectable: true,
+      }),
+    ).toBe(true);
+    expect(
+      isSandboxReadyForConnections({
+        sandboxStatus: "running",
+        sandboxConnectable: false,
+      }),
+    ).toBe(false);
+    expect(
+      isSandboxReadyForConnections({
+        sandboxStatus: "starting",
+        sandboxConnectable: false,
+      }),
+    ).toBe(false);
+    expect(
+      isSandboxReadyForConnections({
+        sandboxStatus: "stopped",
+        sandboxConnectable: false,
+      }),
+    ).toBe(false);
+    expect(
+      isSandboxReadyForConnections({
+        sandboxStatus: "failed",
+        sandboxConnectable: false,
+      }),
+    ).toBe(false);
+    expect(
+      isSandboxReadyForConnections({
+        sandboxStatus: null,
+        sandboxConnectable: null,
+      }),
+    ).toBe(false);
   });
 
   it("resolves page-level connection readiness and keeps stopped sessions disconnected until resume is requested", () => {
@@ -29,6 +60,7 @@ describe("session connect policy", () => {
       resolveSessionConnectionReadiness({
         sandboxInstanceId: null,
         sandboxStatus: null,
+        sandboxConnectable: null,
         isStatusPending: false,
       }),
     ).toEqual({
@@ -40,6 +72,7 @@ describe("session connect policy", () => {
       resolveSessionConnectionReadiness({
         sandboxInstanceId: "sbi_123",
         sandboxStatus: null,
+        sandboxConnectable: null,
         isStatusPending: true,
       }),
     ).toEqual({
@@ -51,6 +84,7 @@ describe("session connect policy", () => {
       resolveSessionConnectionReadiness({
         sandboxInstanceId: "sbi_123",
         sandboxStatus: "running",
+        sandboxConnectable: true,
         isStatusPending: false,
       }),
     ).toEqual({
@@ -61,7 +95,20 @@ describe("session connect policy", () => {
     expect(
       resolveSessionConnectionReadiness({
         sandboxInstanceId: "sbi_123",
+        sandboxStatus: "running",
+        sandboxConnectable: false,
+        isStatusPending: false,
+      }),
+    ).toEqual({
+      canConnect: false,
+      reason: "starting",
+    });
+
+    expect(
+      resolveSessionConnectionReadiness({
+        sandboxInstanceId: "sbi_123",
         sandboxStatus: "stopped",
+        sandboxConnectable: false,
         isStatusPending: false,
       }),
     ).toEqual({

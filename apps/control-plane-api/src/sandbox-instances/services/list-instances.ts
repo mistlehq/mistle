@@ -150,11 +150,11 @@ export async function listInstances(
       organizationId: input.organizationId,
       items: sandboxInstances.items,
     });
-
     return {
       ...sandboxInstances,
       items: sandboxInstances.items.map((item) => ({
         ...item,
+        title: item.title,
         sandboxProfileDisplayName: sandboxProfileDisplayNames.get(item.sandboxProfileId) ?? null,
         startedBy: {
           ...item.startedBy,

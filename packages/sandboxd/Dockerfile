@@ -72,4 +72,4 @@ COPY --from=sandboxd-build /app/packages/sandboxd/target/debug/sandboxd /usr/loc
 
 RUN chmod +x /usr/local/bin/sandboxd
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandboxd", "serve"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandboxd"]

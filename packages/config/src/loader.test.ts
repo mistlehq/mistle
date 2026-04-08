@@ -68,6 +68,14 @@ describe("parseConfigRecord", () => {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
             migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
           },
+          objectStore: {
+            bucketName: "mistle-assets",
+            region: "us-east-1",
+            endpoint: "http://127.0.0.1:8333",
+            forcePathStyle: true,
+            accessKeyId: "mistle-access-key",
+            secretAccessKey: "mistle-secret-key",
+          },
           auth: {
             baseUrl: "http://127.0.0.1:5000",
             secret: "test-secret",
@@ -262,6 +270,14 @@ describe("parseConfigRecord", () => {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
             migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
           },
+          objectStore: {
+            bucketName: "mistle-assets",
+            region: "us-east-1",
+            endpoint: "http://127.0.0.1:8333",
+            forcePathStyle: true,
+            accessKeyId: "mistle-access-key",
+            secretAccessKey: "mistle-secret-key",
+          },
           auth: {
             baseUrl: "http://127.0.0.1:5000",
             secret: "test-secret",
@@ -455,6 +471,14 @@ describe("parseConfigRecord", () => {
           database: {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
             migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+          },
+          objectStore: {
+            bucketName: "mistle-assets",
+            region: "us-east-1",
+            endpoint: "http://127.0.0.1:8333",
+            forcePathStyle: true,
+            accessKeyId: "mistle-access-key",
+            secretAccessKey: "mistle-secret-key",
           },
           auth: {
             baseUrl: "http://127.0.0.1:5000",

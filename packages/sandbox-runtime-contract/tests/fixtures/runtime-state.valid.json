@@ -12,5 +12,8 @@
   },
   "keepalive": {
     "active": true
+  },
+  "runtime": {
+    "ready": true
   }
 }

@@ -7,36 +7,39 @@ import { randomUUID } from "node:crypto";
 import { AutomationRunStatuses } from "@mistle/db/control-plane";
 import {
   CodexJsonRpcClient,
-  CodexSessionClient,
+  AgentStreamClient,
   readCodexThread,
   resumeCodexThread,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
-import { createNodeCodexSessionRuntime } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
 import { systemSleeper } from "@mistle/time";
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { z } from "zod";
 
+import { createNodeSandboxSessionRuntime } from "../../packages/sandbox-session-client/src/node.js";
+import { SandboxSessionTransport } from "../../packages/sandbox-session-client/src/transport.js";
 import {
   startCloudflaredTunnel,
   type StartedCloudflaredTunnel,
 } from "./helpers/cloudflared-tunnel.js";
+import { resolveGitHubAppInstallationId } from "./helpers/github-app-installation.js";
 import { it, readSystemTestContext } from "./system-test-context.js";
 
 const OpenAiTargetKey = "openai-default";
 const GitHubTargetKey = "github-cloud";
+const OpenAiConnectionMethodId = "api-key";
 const TestTimeoutMs = 10 * 60_000;
 const TunnelStartupTimeoutMs = 60_000;
 const PollIntervalMs = 2_000;
 const SandboxReadyTimeoutMs = 3 * 60_000;
 const WebhookDeliveryTimeoutMs = 3 * 60_000;
 const AutomationRunTimeoutMs = 3 * 60_000;
+const ResourceSyncTimeoutMs = 2 * 60_000;
 const ThreadReadTimeoutMs = 90_000;
 
 const RequiredEnvNames = [
   "MISTLE_TEST_OPENAI_API_KEY",
   "MISTLE_TEST_GITHUB_TOKEN",
   "MISTLE_TEST_GITHUB_TEST_REPOSITORY",
-  "MISTLE_TEST_GITHUB_INSTALLATION_ID",
   "CLOUDFLARE_TUNNEL_TOKEN",
   "CONTROL_PLANE_API_TUNNEL_HOSTNAME",
 ] as const;
@@ -47,6 +50,8 @@ const IntegrationConnectionResponseSchema = z.looseObject({
 
 const IntegrationWebhookSourceResponseSchema = z.looseObject({
   id: z.string().min(1),
+  targetKey: z.string().min(1),
+  ownerScope: z.enum(["target", "connection"]),
   integrationConnectionId: z.string().min(1).optional(),
 });
 
@@ -64,14 +69,23 @@ const StartRedirectConnectionResponseSchema = z
   })
   .strict();
 
-const SandboxInstanceStatusResponseSchema = z
+const RefreshIntegrationConnectionResourcesResponseSchema = z
   .object({
-    id: z.string().min(1),
-    status: z.enum(["starting", "running", "stopped", "failed"]),
-    failureCode: z.string().nullable(),
-    failureMessage: z.string().nullable(),
+    connectionId: z.string().min(1),
+    familyId: z.string().min(1),
+    kind: z.literal("repository"),
+    syncState: z.enum(["syncing", "ready", "error"]),
   })
   .strict();
+
+const SandboxInstanceStatusResponseSchema = z.looseObject({
+  id: z.string().min(1),
+  status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+  failureCode: z.string().nullable(),
+  failureMessage: z.string().nullable(),
+  runtimePlan: z.unknown().nullable().optional(),
+  automationConversation: z.unknown().nullable().optional(),
+});
 
 const SandboxInstanceConnectionTokenResponseSchema = z
   .object({
@@ -342,7 +356,11 @@ describeIf("system GitHub webhook automation", () => {
     async ({ fixture }) => {
       const repository = parseGitHubRepository(requireEnv("MISTLE_TEST_GITHUB_TEST_REPOSITORY"));
       const githubToken = requireEnv("MISTLE_TEST_GITHUB_TOKEN");
-      const githubInstallationId = requireEnv("MISTLE_TEST_GITHUB_INSTALLATION_ID");
+      const githubInstallationId = await resolveGitHubAppInstallationId({
+        owner: repository.owner,
+        repo: repository.repo,
+        targetKey: GitHubTargetKey,
+      });
       const openAiApiKey = requireEnv("MISTLE_TEST_OPENAI_API_KEY");
       const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
 
@@ -351,7 +369,7 @@ describeIf("system GitHub webhook automation", () => {
       const session = await fixture.authSession();
       const openAiConnection = await requestJsonOrThrow({
         request: fixture.request,
-        path: `/v1/integration/connections/${encodeURIComponent(OpenAiTargetKey)}/api-key`,
+        path: `/v1/integration/connections/${encodeURIComponent(OpenAiTargetKey)}/form`,
         expectedStatus: 201,
         description: "OpenAI connection creation",
         schema: IntegrationConnectionResponseSchema,
@@ -362,8 +380,14 @@ describeIf("system GitHub webhook automation", () => {
             cookie: session.cookie,
           },
           body: JSON.stringify({
-            apiKey: openAiApiKey,
             displayName: `GitHub Webhook Test OpenAI ${randomUUID()}`,
+            methodId: OpenAiConnectionMethodId,
+            config: {
+              connection_method: OpenAiConnectionMethodId,
+            },
+            secrets: {
+              apiKey: openAiApiKey,
+            },
           }),
         },
       });
@@ -486,6 +510,55 @@ describeIf("system GitHub webhook automation", () => {
           );
         },
       });
+      await requestJsonOrThrow({
+        request: fixture.request,
+        path: `/v1/integration/connections/${encodeURIComponent(githubConnection.id)}/resources/repository/refresh`,
+        expectedStatus: 202,
+        description: "GitHub repository resource refresh",
+        schema: RefreshIntegrationConnectionResourcesResponseSchema,
+        init: {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+          },
+        },
+      });
+      await waitForCondition({
+        description: "GitHub repository resource sync to reach ready",
+        timeoutMs: ResourceSyncTimeoutMs,
+        evaluate: async () => {
+          const resourceState =
+            await fixture.db.query.integrationConnectionResourceStates.findFirst({
+              where: (table, { and, eq }) =>
+                and(eq(table.connectionId, githubConnection.id), eq(table.kind, "repository")),
+            });
+
+          if (resourceState === undefined) {
+            return null;
+          }
+
+          if (resourceState.syncState === "error") {
+            throw new Error(
+              `GitHub resource sync failed: ${resourceState.lastErrorCode ?? "unknown"} ${resourceState.lastErrorMessage ?? ""}`,
+            );
+          }
+
+          if (resourceState.syncState !== "ready") {
+            return null;
+          }
+
+          const resource = await fixture.db.query.integrationConnectionResources.findFirst({
+            where: (table, { and, eq }) =>
+              and(
+                eq(table.connectionId, githubConnection.id),
+                eq(table.kind, "repository"),
+                eq(table.handle, `${repository.owner}/${repository.repo}`),
+              ),
+          });
+
+          return resource === undefined ? null : resource;
+        },
+      });
       const githubWebhookSources = await requestJsonOrThrow({
         request: fixture.request,
         path: `/v1/integration/connections/${encodeURIComponent(githubConnection.id)}/webhook-sources`,
@@ -500,13 +573,61 @@ describeIf("system GitHub webhook automation", () => {
         },
       });
       const githubWebhookSource = githubWebhookSources.find(
-        (source) => source.integrationConnectionId === githubConnection.id,
+        (source) =>
+          source.targetKey === GitHubTargetKey &&
+          source.ownerScope === "connection" &&
+          source.integrationConnectionId === githubConnection.id,
       );
       if (githubWebhookSource === undefined) {
         throw new Error(
-          `Expected an implicit GitHub webhook source for connection '${githubConnection.id}'.`,
+          `Expected an implicit connection-owned GitHub webhook source for connection '${githubConnection.id}'. Sources: ${JSON.stringify(githubWebhookSources)}`,
         );
       }
+
+      await requestJsonOrThrow({
+        request: fixture.request,
+        path: `/v1/sandbox/profiles/${encodeURIComponent(sandboxProfile.id)}/versions/1/integration-bindings`,
+        expectedStatus: 200,
+        description: "sandbox profile integration binding update after GitHub connection",
+        schema: z.object({
+          bindings: z.array(z.unknown()),
+        }),
+        init: {
+          method: "PUT",
+          headers: {
+            "content-type": "application/json",
+            cookie: session.cookie,
+          },
+          body: JSON.stringify({
+            bindings: [
+              {
+                connectionId: openAiConnection.id,
+                kind: "agent",
+                config: {
+                  runtime: {
+                    runtimeId: "codex",
+                    config: {},
+                  },
+                  model: {
+                    defaultModel: "gpt-5.1-codex-mini",
+                    options: {
+                      reasoningEffort: "medium",
+                    },
+                  },
+                },
+              },
+              {
+                connectionId: githubConnection.id,
+                kind: "git",
+                config: {
+                  repositories: [`${repository.owner}/${repository.repo}`],
+                  tools: ["github-cli"],
+                },
+              },
+            ],
+          }),
+        },
+      });
 
       const automation = await requestJsonOrThrow({
         request: fixture.request,
@@ -543,7 +664,8 @@ describeIf("system GitHub webhook automation", () => {
       expect(automation.id.length).toBeGreaterThan(0);
 
       let issueNumber: number | null = null;
-      let sessionClient: CodexSessionClient | null = null;
+      let sessionClient: AgentStreamClient | null = null;
+      let sessionTransport: SandboxSessionTransport | null = null;
       let rpcClient: CodexJsonRpcClient | null = null;
 
       try {
@@ -618,8 +740,31 @@ describeIf("system GitHub webhook automation", () => {
             }
 
             if (run.status === AutomationRunStatuses.FAILED) {
+              const conversationId = run.conversationId;
+              const route =
+                conversationId === null
+                  ? null
+                  : await fixture.db.query.automationConversationRoutes.findFirst({
+                      where: (table, { eq }) => eq(table.conversationId, conversationId),
+                    });
+              const sandboxInstance =
+                route?.sandboxInstanceId === null || route?.sandboxInstanceId === undefined
+                  ? null
+                  : await requestJsonOrThrow({
+                      request: fixture.request,
+                      path: `/v1/sandbox/instances/${encodeURIComponent(route.sandboxInstanceId)}`,
+                      expectedStatus: 200,
+                      description: "sandbox instance lookup after automation failure",
+                      schema: SandboxInstanceStatusResponseSchema,
+                      init: {
+                        method: "GET",
+                        headers: {
+                          cookie: session.cookie,
+                        },
+                      },
+                    });
               throw new Error(
-                `Automation run failed: ${run.failureCode ?? "unknown"} ${run.failureMessage ?? ""}`,
+                `Automation run failed: ${run.failureCode ?? "unknown"} ${run.failureMessage ?? ""}. route=${JSON.stringify(route)} sandbox=${JSON.stringify(sandboxInstance)}`,
               );
             }
 
@@ -711,16 +856,22 @@ describeIf("system GitHub webhook automation", () => {
           },
         });
 
-        sessionClient = new CodexSessionClient({
+        sessionTransport = new SandboxSessionTransport({
+          runtime: createNodeSandboxSessionRuntime(),
+        });
+        await sessionTransport.connect({
           connectionUrl: resolveGatewayWebSocketUrl({
             mintedUrl: mintedConnectionToken.url,
             gatewayBaseUrl: dataPlaneGatewayBaseUrl,
           }),
-          runtime: createNodeCodexSessionRuntime(),
         });
-        await sessionClient.connect();
+        const connectedSessionClient = new AgentStreamClient({
+          transport: sessionTransport,
+        });
+        await connectedSessionClient.connect();
+        sessionClient = connectedSessionClient;
 
-        const codexRpcClient = new CodexJsonRpcClient(sessionClient);
+        const codexRpcClient = new CodexJsonRpcClient(connectedSessionClient);
         rpcClient = codexRpcClient;
         await codexRpcClient.initialize({
           clientInfo: {
@@ -756,6 +907,7 @@ describeIf("system GitHub webhook automation", () => {
       } finally {
         rpcClient?.dispose();
         sessionClient?.disconnect();
+        sessionTransport?.disconnect(1000, "System test cleanup.");
 
         if (issueNumber !== null) {
           await closeGitHubIssue({

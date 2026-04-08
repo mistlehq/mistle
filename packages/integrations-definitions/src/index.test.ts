@@ -7,7 +7,7 @@ import {
 } from "./index.js";
 
 describe("integrations-definitions index", () => {
-  it("registers built-in integration definitions in a registry", () => {
+  it("registers built-in browser-safe integration definitions in a registry", () => {
     const registry = createIntegrationRegistry();
     const jiraDefinition = registry.getDefinition({
       familyId: "jira",
@@ -64,11 +64,8 @@ describe("integrations-definitions index", () => {
         },
       ],
     });
-    expect(jiraDefinition?.webhookSource).toMatchObject({
-      ownerScope: "connection",
-      routingStrategy: "path",
-      lifecycle: "managed",
-    });
+    expect(jiraDefinition?.webhookSource).toBeUndefined();
+    expect(jiraDefinition?.webhookHandler).toBeUndefined();
     expect(jiraDefinition?.supportedWebhookEvents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -111,12 +108,9 @@ describe("integrations-definitions index", () => {
         },
       ],
     });
-    expect(githubCloudDefinition?.redirectHandler).toBeDefined();
-    expect(githubCloudDefinition?.webhookSource).toMatchObject({
-      ownerScope: "target",
-      routingStrategy: "payload",
-      lifecycle: "implicit",
-    });
+    expect(githubCloudDefinition?.redirectHandler).toBeUndefined();
+    expect(githubCloudDefinition?.webhookHandler).toBeUndefined();
+    expect(githubCloudDefinition?.webhookSource).toBeUndefined();
     expect(githubCloudDefinition?.supportedWebhookEvents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -155,9 +149,7 @@ describe("integrations-definitions index", () => {
         }),
       ]),
     );
-    expect(
-      githubCloudDefinition?.credentialResolvers?.custom?.github_app_installation_token,
-    ).toBeDefined();
+    expect(githubCloudDefinition?.credentialResolvers).toBeUndefined();
     expect(githubEnterpriseServerDefinition).toMatchObject({
       familyId: "github",
       variantId: "github-enterprise-server",
@@ -184,12 +176,9 @@ describe("integrations-definitions index", () => {
         },
       ],
     });
-    expect(githubEnterpriseServerDefinition?.redirectHandler).toBeDefined();
-    expect(githubEnterpriseServerDefinition?.webhookSource).toMatchObject({
-      ownerScope: "target",
-      routingStrategy: "payload",
-      lifecycle: "implicit",
-    });
+    expect(githubEnterpriseServerDefinition?.redirectHandler).toBeUndefined();
+    expect(githubEnterpriseServerDefinition?.webhookHandler).toBeUndefined();
+    expect(githubEnterpriseServerDefinition?.webhookSource).toBeUndefined();
     expect(githubEnterpriseServerDefinition?.supportedWebhookEvents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -200,9 +189,7 @@ describe("integrations-definitions index", () => {
         }),
       ]),
     );
-    expect(
-      githubEnterpriseServerDefinition?.credentialResolvers?.custom?.github_app_installation_token,
-    ).toBeDefined();
+    expect(githubEnterpriseServerDefinition?.credentialResolvers).toBeUndefined();
     expect(linearDefinition).toMatchObject({
       familyId: "linear",
       variantId: "linear-default",

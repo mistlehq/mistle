@@ -66,6 +66,7 @@ export const sandboxInstances = dataPlaneSchema.table(
     startedByKind: text("started_by_kind").notNull().$type<SandboxInstanceStarterKind>(),
     startedById: text("started_by_id").notNull(),
     source: text("source").notNull().$type<SandboxInstanceSource>(),
+    title: text("title"),
     startedAt: timestamp("started_at", { withTimezone: true, mode: "string" }),
     stoppedAt: timestamp("stopped_at", { withTimezone: true, mode: "string" }),
     stopReason: text("stop_reason").$type<SandboxStopReason>(),

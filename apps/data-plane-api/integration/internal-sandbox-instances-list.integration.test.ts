@@ -20,6 +20,7 @@ describe("internal sandbox instances list integration", () => {
         id: "sbi_list_org_a_001",
         organizationId: "org_dp_list_a",
         sandboxProfileId: "sbp_list",
+        title: null,
         sandboxProfileVersion: 1,
         runtimeProvider: "docker",
         providerSandboxId: "provider-list-a-001",
@@ -34,6 +35,7 @@ describe("internal sandbox instances list integration", () => {
         id: "sbi_list_org_a_002",
         organizationId: "org_dp_list_a",
         sandboxProfileId: "sbp_list",
+        title: "Backfill customer export",
         sandboxProfileVersion: 2,
         runtimeProvider: "docker",
         providerSandboxId: "provider-list-a-002",
@@ -48,6 +50,7 @@ describe("internal sandbox instances list integration", () => {
         id: "sbi_list_org_a_003",
         organizationId: "org_dp_list_a",
         sandboxProfileId: "sbp_list",
+        title: "Investigate failed webhook run",
         sandboxProfileVersion: 3,
         runtimeProvider: "docker",
         providerSandboxId: "provider-list-a-003",
@@ -64,6 +67,7 @@ describe("internal sandbox instances list integration", () => {
         id: "sbi_list_org_b_001",
         organizationId: "org_dp_list_b",
         sandboxProfileId: "sbp_other_org",
+        title: "Other org sandbox",
         sandboxProfileVersion: 1,
         runtimeProvider: "docker",
         providerSandboxId: "provider-list-b-001",
@@ -88,6 +92,7 @@ describe("internal sandbox instances list integration", () => {
     ]);
     expect(firstPage.items[0]).toMatchObject({
       sandboxProfileId: "sbp_list",
+      title: "Investigate failed webhook run",
       sandboxProfileVersion: 3,
       status: "failed",
       startedBy: {
@@ -119,6 +124,7 @@ describe("internal sandbox instances list integration", () => {
 
     expect(secondPage.totalResults).toBe(3);
     expect(secondPage.items.map((item) => item.id)).toEqual(["sbi_list_org_a_001"]);
+    expect(secondPage.items[0]?.title).toBeNull();
     expect(secondPage.nextPage).toBeNull();
     expect(secondPage.previousPage).not.toBeNull();
   }, 60_000);
