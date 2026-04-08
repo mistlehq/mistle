@@ -1,8 +1,7 @@
 import type {
   CodexJsonRpcClient,
-  CodexSessionClient,
+  AgentStreamClient,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 
@@ -41,6 +40,7 @@ import {
   isActiveResumeRequest,
   seedSandboxInstanceStatusQuery,
 } from "./use-session-workbench-stopped-resume.js";
+import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
 
 type SessionWorkbenchState = {
   sandboxStatusReadState: ReturnType<
@@ -143,18 +143,24 @@ export function useSessionWorkbenchController(input: {
   sandboxInstanceId: string | null;
 }): UseSessionWorkbenchControllerResult {
   const queryClient = useQueryClient();
-  const transportRef = useRef<SandboxSessionTransport | null>(null);
-  const sessionClientRef = useRef<CodexSessionClient | null>(null);
+  const transportManager = useSessionWorkbenchTransport({
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  const sessionClientRef = useRef<AgentStreamClient | null>(null);
   const rpcClientRef = useRef<CodexJsonRpcClient | null>(null);
   const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
   const sessionState = useCodexSessionState({
-    transportRef,
+    ensureTransportConnected: transportManager.ensureTransportConnected,
     sessionClientRef,
     rpcClientRef,
     sessionEventUnsubscribersRef,
   });
-  const ptyState = useSandboxPtyState();
-  const cliPtyState = useSandboxPtyState();
+  const ptyState = useSandboxPtyState({
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+  });
+  const cliPtyState = useSandboxPtyState({
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+  });
   const terminalPanelState = useSessionTerminalWorkbenchState({
     sandboxInstanceId: input.sandboxInstanceId,
   });
@@ -207,6 +213,7 @@ export function useSessionWorkbenchController(input: {
             threadId: sessionSnapshot.activeThreadId,
           }
         : null,
+    ensureTransportConnected: transportManager.ensureTransportConnected,
   });
 
   return {

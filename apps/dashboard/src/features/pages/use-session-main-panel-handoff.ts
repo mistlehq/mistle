@@ -18,10 +18,10 @@ type UseSessionMainPanelHandoffInput = {
     ReturnType<typeof useCodexSessionState>["lifecycle"],
     | "clearLifecycleErrorMessage"
     | "connectSession"
-    | "detachSessionTransport"
+    | "detachSessionConnection"
     | "lifecycleErrorMessage"
     | "sessionSnapshot"
-    | "transportState"
+    | "sessionConnectionState"
   >;
   sandboxInstanceId: string | null;
   serverRequests: Pick<
@@ -200,7 +200,7 @@ export function useSessionMainPanelHandoff(
         return;
       }
 
-      input.lifecycle.detachSessionTransport();
+      input.lifecycle.detachSessionConnection();
       input.serverRequests.resetServerRequests();
 
       let cliOpened = false;
@@ -291,7 +291,7 @@ export function useSessionMainPanelHandoff(
       return;
     }
 
-    if (input.lifecycle.transportState !== "connected") {
+    if (input.lifecycle.sessionConnectionState !== "connected") {
       return;
     }
 
@@ -326,7 +326,7 @@ export function useSessionMainPanelHandoff(
     failRestore,
     input.chat,
     input.lifecycle.sessionSnapshot?.activeThreadId,
-    input.lifecycle.transportState,
+    input.lifecycle.sessionConnectionState,
     isCurrentGeneration,
     resetToStableChat,
     state.transitionState,

@@ -6,7 +6,6 @@ import {
   type CodexThreadSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
-import type { MintSandboxConnectionTokenResult } from "../../../../sessions/sessions-service.js";
 import type { ThreadSelectionPolicy } from "../../../../sessions/thread-selection.js";
 import type { ConnectedCodexSession } from "../codex-session-types.js";
 import { describeCodexSessionStepError } from "./codex-session-errors.js";
@@ -61,7 +60,6 @@ export function resolveReconnectResumeFailureAction(input: {
 export type CodexConnectionBootstrapResult = {
   generation: number;
   sandboxInstanceId: string;
-  mintedConnection: MintSandboxConnectionTokenResult;
   resolvedThreadId: string | null;
   threadId: string;
 };
@@ -177,29 +175,20 @@ export async function establishInitialCodexThread(input: {
   selectionPolicy?: ThreadSelectionPolicy;
   generation: number;
   sandboxInstanceId: string;
-  mintedConnection: MintSandboxConnectionTokenResult;
   ensureCurrentGeneration: (generation: number) => void;
 }): Promise<CodexConnectionBootstrapResult> {
-  const establishedThread = await establishCodexThread(input);
-
-  return {
-    ...establishedThread,
-    mintedConnection: input.mintedConnection,
-  };
+  return await establishCodexThread(input);
 }
 
 export function createConnectedCodexSession(input: {
   sandboxInstanceId: string;
   connectedAtIso: string;
-  mintedConnection: MintSandboxConnectionTokenResult;
   providerThreadId: string | null;
   activeThreadId: string;
 }): ConnectedCodexSession {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     connectedAtIso: input.connectedAtIso,
-    expiresAtIso: input.mintedConnection.connectionExpiresAt,
-    connectionUrl: input.mintedConnection.connectionUrl,
     providerThreadId: input.providerThreadId,
     activeThreadId: input.activeThreadId,
   };
