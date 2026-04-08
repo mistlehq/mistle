@@ -23,9 +23,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import { listLaunchableSandboxProfiles } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import { listSandboxInstances } from "../sessions/sessions-service.js";
@@ -225,10 +224,7 @@ export function SessionsPage(): React.JSX.Element {
   const sandboxInstancesBefore =
     sandboxInstancesAfter === null ? parseCursor(searchParams.get("before")) : null;
 
-  const selectableProfilesQuery = useQuery({
-    queryKey: launchableSandboxProfilesQueryKey(),
-    queryFn: async ({ signal }) => listLaunchableSandboxProfiles({ signal }),
-  });
+  const selectableProfilesQuery = useLaunchableSandboxProfiles();
   const sandboxInstancesQuery = useQuery({
     queryKey: sandboxInstancesListQueryKey({
       limit: sandboxInstanceListLimit,

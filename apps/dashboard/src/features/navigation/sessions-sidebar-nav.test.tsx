@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { SidebarProvider } from "@mistle/ui";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
@@ -42,12 +43,22 @@ const groups: SessionsSidebarNavGroup[] = [
 ];
 
 function renderSidebarNav(): void {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
   render(
-    <SidebarProvider>
-      <MemoryRouter initialEntries={["/sessions"]}>
-        <SessionsSidebarNav groups={groups} />
-      </MemoryRouter>
-    </SidebarProvider>,
+    <QueryClientProvider client={queryClient}>
+      <SidebarProvider>
+        <MemoryRouter initialEntries={["/sessions"]}>
+          <SessionsSidebarNav groups={groups} />
+        </MemoryRouter>
+      </SidebarProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -121,12 +132,22 @@ describe("SessionsSidebarNav", () => {
   });
 
   it("keeps the new session action visible when there are no groups", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
     render(
-      <SidebarProvider>
-        <MemoryRouter initialEntries={["/sessions"]}>
-          <SessionsSidebarNav groups={[]} />
-        </MemoryRouter>
-      </SidebarProvider>,
+      <QueryClientProvider client={queryClient}>
+        <SidebarProvider>
+          <MemoryRouter initialEntries={["/sessions"]}>
+            <SessionsSidebarNav groups={[]} />
+          </MemoryRouter>
+        </SidebarProvider>
+      </QueryClientProvider>,
     );
 
     expect(screen.getByRole("button", { name: "Create a new session" })).toBeDefined();

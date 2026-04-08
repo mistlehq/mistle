@@ -1,8 +1,24 @@
 import {
+  Button,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Field,
+  FieldContent,
+  FieldError,
+  FieldLabel,
   Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
@@ -16,9 +32,17 @@ import {
   TooltipTrigger,
 } from "@mistle/ui";
 import { CaretRightIcon, MagnifyingGlassIcon, PlusIcon } from "@phosphor-icons/react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router";
+import { NavLink, useLocation } from "react-router";
 
+import { resolveApiErrorMessage } from "../api/error-message.js";
+import type {
+  LaunchableSandboxProfile,
+  LaunchableSandboxProfilesResult,
+} from "../sandbox-profiles/sandbox-profiles-types.js";
+import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
+import { startSandboxInstanceFromProfileVersion } from "../sessions/sessions-service.js";
 import type {
   SessionsSidebarAttentionState,
   SessionsSidebarNavGroup,
@@ -48,11 +72,18 @@ function resolveAttentionUi(input: SessionsSidebarAttentionState): {
 export function SessionsSidebarNav(input: {
   groups: readonly SessionsSidebarNavGroup[];
   emptyMessage?: string;
+  loadLaunchableProfiles?: (input: {
+    signal?: AbortSignal;
+  }) => Promise<LaunchableSandboxProfilesResult>;
+  startSession?: (input: { profile: LaunchableSandboxProfile }) => Promise<void>;
 }): React.JSX.Element {
   const location = useLocation();
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const emptyMessage = input.emptyMessage ?? "No openable sessions yet.";
   const [searchQuery, setSearchQuery] = useState("");
+  const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [startErrorMessage, setStartErrorMessage] = useState<string | null>(null);
   const [expandedProfileIds, setExpandedProfileIds] = useState(
     () => new Set(input.groups.map((group) => group.profileId)),
   );
@@ -63,6 +94,65 @@ export function SessionsSidebarNav(input: {
     },
   });
   const hasActiveSearch = searchQuery.trim().length > 0;
+  const selectableProfilesQuery = useLaunchableSandboxProfiles({
+    enabled: isNewSessionDialogOpen,
+    ...(input.loadLaunchableProfiles === undefined
+      ? {}
+      : { loadLaunchableProfiles: input.loadLaunchableProfiles }),
+  });
+  const selectableProfiles = selectableProfilesQuery.data?.items ?? [];
+  const selectedProfile =
+    selectedProfileId === null
+      ? null
+      : (selectableProfiles.find((profile) => profile.id === selectedProfileId) ?? null);
+  const startSessionMutation = useMutation({
+    mutationFn: async (profile: LaunchableSandboxProfile) => {
+      const startSession =
+        input.startSession ??
+        (async (startInput: { profile: LaunchableSandboxProfile }) => {
+          await startSandboxInstanceFromProfileVersion({
+            profileId: startInput.profile.id,
+            profileVersion: startInput.profile.latestVersion,
+            idempotencyKey: crypto.randomUUID(),
+          });
+        });
+
+      try {
+        await startSession({
+          profile,
+        });
+      } catch (error) {
+        if (error instanceof Error && error.message.trim().length > 0) {
+          throw new Error(`Starting sandbox instance failed: ${error.message}`);
+        }
+
+        throw new Error("Starting sandbox instance failed.");
+      }
+    },
+    onSuccess: async () => {
+      setStartErrorMessage(null);
+      setSelectedProfileId(null);
+      setIsNewSessionDialogOpen(false);
+      await queryClient.invalidateQueries({
+        queryKey: ["sandbox-instances", "list"],
+      });
+    },
+    onError: (error) => {
+      setStartErrorMessage(
+        error instanceof Error ? error.message : "Could not start sandbox session.",
+      );
+    },
+  });
+  const canStartSession =
+    selectedProfile !== null &&
+    !selectableProfilesQuery.isPending &&
+    !startSessionMutation.isPending;
+  const selectableProfilesErrorMessage = selectableProfilesQuery.isError
+    ? resolveApiErrorMessage({
+        error: selectableProfilesQuery.error,
+        fallbackMessage: "Could not load sandbox profiles.",
+      })
+    : null;
 
   useEffect(() => {
     setExpandedProfileIds((currentExpandedProfileIds) => {
@@ -82,6 +172,30 @@ export function SessionsSidebarNav(input: {
     });
   }, [input.groups]);
 
+  useEffect(() => {
+    if (selectedProfileId === null || selectableProfilesQuery.isPending) {
+      return;
+    }
+
+    if (selectableProfiles.some((profile) => profile.id === selectedProfileId)) {
+      return;
+    }
+
+    setSelectedProfileId(null);
+  }, [selectableProfiles, selectableProfilesQuery.isPending, selectedProfileId]);
+
+  function handleNewSessionDialogOpenChange(nextOpen: boolean): void {
+    setIsNewSessionDialogOpen(nextOpen);
+
+    if (nextOpen) {
+      setStartErrorMessage(null);
+      return;
+    }
+
+    setSelectedProfileId(null);
+    setStartErrorMessage(null);
+  }
+
   return (
     <>
       <SidebarGroup>
@@ -92,7 +206,7 @@ export function SessionsSidebarNav(input: {
                 aria-label="Create a new session"
                 className=""
                 onClick={() => {
-                  void navigate("/sessions");
+                  handleNewSessionDialogOpenChange(true);
                 }}
                 type="button"
               >
@@ -113,6 +227,99 @@ export function SessionsSidebarNav(input: {
           {input.groups.length === 0 ? emptyMessage : "No sessions match your search."}
         </div>
       ) : null}
+      <Dialog
+        isBusy={startSessionMutation.isPending}
+        isDismissible={!startSessionMutation.isPending}
+        onOpenChange={handleNewSessionDialogOpenChange}
+        open={isNewSessionDialogOpen}
+      >
+        {isNewSessionDialogOpen ? (
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>New session</DialogTitle>
+              <DialogDescription>
+                Select a sandbox profile to start a new session.
+              </DialogDescription>
+            </DialogHeader>
+
+            <Field>
+              <FieldLabel htmlFor="new-session-profile-select">Sandbox profile</FieldLabel>
+              <FieldContent>
+                <Select
+                  disabled={
+                    selectableProfilesQuery.isPending ||
+                    selectableProfiles.length === 0 ||
+                    startSessionMutation.isPending
+                  }
+                  onValueChange={(value) => {
+                    setStartErrorMessage(null);
+                    if (value === null || value.length === 0) {
+                      setSelectedProfileId(null);
+                      return;
+                    }
+
+                    setSelectedProfileId(value);
+                  }}
+                  value={selectedProfileId ?? ""}
+                >
+                  <SelectTrigger className="w-full" id="new-session-profile-select">
+                    <SelectValue placeholder="Select sandbox profile">
+                      {selectedProfile?.displayName ?? "Select sandbox profile"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectableProfiles.map((profile) => (
+                      <SelectItem key={profile.id} value={profile.id}>
+                        {profile.displayName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FieldContent>
+            </Field>
+
+            {selectableProfilesQuery.isPending ? (
+              <p className="text-muted-foreground text-sm">Loading sandbox profiles...</p>
+            ) : null}
+            {selectableProfilesErrorMessage ? (
+              <FieldError errors={[{ message: selectableProfilesErrorMessage }]} />
+            ) : null}
+            {!selectableProfilesQuery.isPending &&
+            !selectableProfilesQuery.isError &&
+            selectableProfiles.length === 0 ? (
+              <FieldError errors={[{ message: "No launchable sandbox profiles are available." }]} />
+            ) : null}
+            {startErrorMessage ? <FieldError errors={[{ message: startErrorMessage }]} /> : null}
+
+            <DialogFooter>
+              <Button
+                disabled={startSessionMutation.isPending}
+                onClick={() => {
+                  handleNewSessionDialogOpenChange(false);
+                }}
+                type="button"
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!canStartSession}
+                onClick={() => {
+                  if (selectedProfile === null) {
+                    return;
+                  }
+
+                  setStartErrorMessage(null);
+                  startSessionMutation.mutate(selectedProfile);
+                }}
+                type="button"
+              >
+                {startSessionMutation.isPending ? "Starting sandbox..." : "Start session"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        ) : null}
+      </Dialog>
       {visibleGroups.map((group) => (
         <SidebarGroup className="gap-1 pb-1" key={group.profileId}>
           <Collapsible
