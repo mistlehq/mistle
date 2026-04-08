@@ -8,7 +8,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import { type RawData, WebSocket, WebSocketServer } from "ws";
 
 import { createBrowserSandboxSessionRuntime } from "./browser.js";
-import { FileUploadRejectedError, uploadSandboxImage } from "./file-upload-client.js";
+import {
+  FileUploadRejectedError,
+  UploadStreamClient,
+  uploadSandboxImage,
+} from "./file-upload-client.js";
+import { createNodeSandboxSessionRuntime } from "./node.js";
+import { SandboxSessionTransport } from "./transport.js";
 
 function toUint8Array(data: RawData): Uint8Array {
   if (typeof data === "string") {
@@ -96,6 +102,16 @@ function createUploadRequest(input: { connectionUrl: string; file: File }) {
     runtime: createBrowserSandboxSessionRuntime(),
     threadId: "thread_123",
   } as const;
+}
+
+async function connectTransport(connectionUrl: string): Promise<SandboxSessionTransport> {
+  const transport = new SandboxSessionTransport({
+    runtime: createNodeSandboxSessionRuntime(),
+  });
+  await transport.connect({
+    connectionUrl,
+  });
+  return transport;
 }
 
 function sendControlMessage(socket: WebSocket, message: object): void {
@@ -460,5 +476,62 @@ describe("uploadSandboxImage", () => {
     await expect(
       uploadSandboxImage(createUploadRequest({ connectionUrl: server.url, file })),
     ).rejects.toThrow("Received stream.complete before file upload completion event.");
+  });
+});
+
+describe("UploadStreamClient", () => {
+  it("uploads file bytes over a shared transport and resolves with the completed upload result", async () => {
+    const server = await startUploadTestServer();
+    openServers.add(server);
+    const transport = await connectTransport(server.url);
+    const file = createImageFile();
+    const client = new UploadStreamClient({
+      transport,
+    });
+
+    await expect(
+      client.uploadImage({
+        file,
+        threadId: "thread_123",
+      }),
+    ).resolves.toEqual({
+      attachmentId: "att_123",
+      threadId: "thread_123",
+      originalFilename: "screenshot.png",
+      mimeType: "image/png",
+      sizeBytes: 4,
+      path: "/tmp/attachments/thread_123/upload.png",
+    });
+    expect(Array.from(server.receivedBytes())).toEqual([1, 2, 3, 4]);
+
+    transport.disconnect(1000, "Test completed.");
+  });
+
+  it("preserves reset codes when the shared upload stream is rejected", async () => {
+    const server = await startUploadTestServer({
+      behavior: {
+        kind: "reset_after_close",
+        code: FileUploadResetCodes.INVALID_FILE_TYPE,
+        message: "Uploaded file is not a supported image.",
+      },
+    });
+    openServers.add(server);
+    const transport = await connectTransport(server.url);
+    const client = new UploadStreamClient({
+      transport,
+    });
+
+    await expect(
+      client.uploadImage({
+        file: createImageFile(),
+        threadId: "thread_123",
+      }),
+    ).rejects.toMatchObject({
+      name: "FileUploadRejectedError",
+      code: FileUploadResetCodes.INVALID_FILE_TYPE,
+      message: "Uploaded file is not a supported image.",
+    } satisfies Pick<FileUploadRejectedError, "code" | "message" | "name">);
+
+    transport.disconnect(1000, "Test completed.");
   });
 });

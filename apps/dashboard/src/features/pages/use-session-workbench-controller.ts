@@ -214,6 +214,7 @@ export function useSessionWorkbenchController(input: {
             threadId: sessionSnapshot.activeThreadId,
           }
         : null,
+    ensureTransportConnected: transportManager.ensureTransportConnected,
   });
 
   return {
