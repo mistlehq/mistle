@@ -14,6 +14,7 @@ const routeHandler = async (
 ) => {
   const db = ctx.get("db");
   const { organizationId } = ctx.req.valid("param");
+  const { v: requestedImageVersion } = ctx.req.valid("query");
 
   await getActiveOrganizationRole({
     db,
@@ -27,7 +28,11 @@ const routeHandler = async (
     organizationId,
   });
 
-  if (organizationLogo.logoObjectKey === null) {
+  if (
+    organizationLogo.logoObjectKey === null ||
+    requestedImageVersion === undefined ||
+    requestedImageVersion !== organizationLogo.logoObjectKey
+  ) {
     throw new NotFoundError("NOT_FOUND", "Organization logo was not found.");
   }
 

@@ -11,12 +11,17 @@ const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
   { user }: AppSession,
 ) => {
+  const { v: requestedImageVersion } = ctx.req.valid("query");
   const profileImage = await getUserAvatar({
     db: ctx.get("db"),
     userId: user.id,
   });
 
-  if (profileImage.imageObjectKey === null) {
+  if (
+    profileImage.imageObjectKey === null ||
+    requestedImageVersion === undefined ||
+    requestedImageVersion !== profileImage.imageObjectKey
+  ) {
     throw new NotFoundError("NOT_FOUND", "Profile image was not found.");
   }
 

@@ -181,6 +181,109 @@ describe("user avatar endpoints integration", () => {
     }
   });
 
+  it("returns not found from the authenticated content endpoint when the requested profile image version is missing", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-user-avatar-endpoint-content-version-missing@example.com",
+    });
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "mistle-assets",
+    });
+    const runtime = await createRuntimeWithObjectStore({
+      config: fixture.config,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      seaweedfs,
+    });
+    const objectStore = createTestObjectStore(seaweedfs);
+    const objectKey = `avatars/users/${authenticatedSession.userId}/img_existing.webp`;
+
+    try {
+      await objectStore.putObject({
+        Body: await getStoredWebpFixtureBytes(),
+        ContentType: "image/webp",
+        objectKey,
+      });
+      await runtime.db
+        .update(users)
+        .set({
+          imageObjectKey: objectKey,
+        })
+        .where(eq(users.id, authenticatedSession.userId));
+
+      const response = await runtime.request("/v1/me/profile-image/content", {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+        redirect: "manual",
+      });
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({
+        code: "NOT_FOUND",
+        message: "Profile image was not found.",
+      });
+    } finally {
+      objectStore.destroy();
+      await runtime.stop();
+      await seaweedfs.stop();
+    }
+  });
+
+  it("returns not found from the authenticated content endpoint when the requested profile image version is stale", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-user-avatar-endpoint-content-version-stale@example.com",
+    });
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "mistle-assets",
+    });
+    const runtime = await createRuntimeWithObjectStore({
+      config: fixture.config,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      seaweedfs,
+    });
+    const objectStore = createTestObjectStore(seaweedfs);
+    const objectKey = `avatars/users/${authenticatedSession.userId}/img_existing.webp`;
+
+    try {
+      await objectStore.putObject({
+        Body: await getStoredWebpFixtureBytes(),
+        ContentType: "image/webp",
+        objectKey,
+      });
+      await runtime.db
+        .update(users)
+        .set({
+          imageObjectKey: objectKey,
+        })
+        .where(eq(users.id, authenticatedSession.userId));
+
+      const response = await runtime.request(
+        `/v1/me/profile-image/content?v=${encodeURIComponent(`avatars/users/${authenticatedSession.userId}/img_stale.webp`)}`,
+        {
+          method: "GET",
+          headers: {
+            cookie: authenticatedSession.cookie,
+          },
+          redirect: "manual",
+        },
+      );
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({
+        code: "NOT_FOUND",
+        message: "Profile image was not found.",
+      });
+    } finally {
+      objectStore.destroy();
+      await runtime.stop();
+      await seaweedfs.stop();
+    }
+  });
+
   it("returns a validation error when the multipart body is missing the file field", async ({
     fixture,
   }) => {
