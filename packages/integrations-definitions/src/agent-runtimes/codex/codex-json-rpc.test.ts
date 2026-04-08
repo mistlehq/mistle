@@ -13,7 +13,7 @@ import {
   createBrowserCodexSessionRuntime,
   CodexJsonRpcClient,
   CodexJsonRpcRequestError,
-  CodexSessionClient,
+  AgentStreamClient,
 } from "./session-client.js";
 
 type Deferred<T> = {
@@ -361,14 +361,14 @@ const openServers = new Set<TestServer>();
 async function connectSessionClient(input: {
   connectionUrl: string;
   runtime: ReturnType<typeof createNodeSandboxSessionRuntime>;
-}): Promise<CodexSessionClient> {
+}): Promise<AgentStreamClient> {
   const transport = new SandboxSessionTransport({
     runtime: input.runtime,
   });
   await transport.connect({
     connectionUrl: input.connectionUrl,
   });
-  const sessionClient = new CodexSessionClient({
+  const sessionClient = new AgentStreamClient({
     transport,
   });
   await sessionClient.connect();
