@@ -21,6 +21,10 @@ describe("integrations-definitions server", () => {
       familyId: "github",
       variantId: "github-enterprise-server",
     });
+    const slackDefinition = registry.getDefinition({
+      familyId: "slack",
+      variantId: "slack-default",
+    });
 
     expect(jiraDefinition?.webhookSource).toMatchObject({
       ownerScope: "connection",
@@ -64,12 +68,18 @@ describe("integrations-definitions server", () => {
         }),
       ]),
     );
+    expect(slackDefinition?.webhookHandler).toBeDefined();
+    expect(slackDefinition?.webhookSource).toMatchObject({
+      ownerScope: "connection",
+      routingStrategy: "path",
+      lifecycle: "implicit",
+    });
   });
 
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(5);
+    expect(definitions).toHaveLength(6);
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

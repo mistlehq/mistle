@@ -29,6 +29,10 @@ describe("integrations-definitions index", () => {
       familyId: "linear",
       variantId: "linear-default",
     });
+    const slackDefinition = registry.getDefinition({
+      familyId: "slack",
+      variantId: "slack-default",
+    });
 
     expect(jiraDefinition).toMatchObject({
       familyId: "jira",
@@ -240,12 +244,57 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(linearDefinition?.mcp).toBeDefined();
+    expect(slackDefinition).toMatchObject({
+      familyId: "slack",
+      variantId: "slack-default",
+      kind: "connector",
+      displayName: "Slack",
+      connectionMethods: [
+        {
+          id: "slack-bot-token",
+          label: "Bot token",
+          kind: "form",
+          secretFields: [
+            {
+              name: "botToken",
+              label: "Bot token",
+              inputType: "password",
+              slotKey: "slack.slack-default.slack-bot-token.bot-token",
+            },
+            {
+              name: "signingSecret",
+              label: "Signing secret",
+              inputType: "password",
+              slotKey: "slack.slack-default.slack-bot-token.signing-secret",
+            },
+          ],
+        },
+      ],
+    });
+    expect(slackDefinition?.webhookSource).toBeUndefined();
+    expect(slackDefinition?.webhookHandler).toBeUndefined();
+    expect(slackDefinition?.supportedWebhookEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "slack:message",
+          providerEventType: "message",
+          displayName: "Message",
+          category: "Messages",
+        }),
+        expect.objectContaining({
+          eventType: "slack:reaction_added",
+          providerEventType: "reaction_added",
+          displayName: "Reaction added",
+          category: "Reactions",
+        }),
+      ]),
+    );
   });
 
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(5);
+    expect(definitions).toHaveLength(6);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -254,6 +303,7 @@ describe("integrations-definitions index", () => {
       "github::github-enterprise-server",
       "linear::linear-default",
       "openai::openai-default",
+      "slack::slack-default",
     ]);
   });
 
