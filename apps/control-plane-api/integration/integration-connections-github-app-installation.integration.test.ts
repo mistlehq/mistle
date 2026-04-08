@@ -179,7 +179,6 @@ describe("integration connections GitHub App installation integration", () => {
       webBaseUrl: "https://github.com",
       appSlug: "mistle-github-app",
     });
-    expect(persistedConnection.secrets).toBeNull();
 
     const redirectSession = await fixture.db.query.integrationConnectionRedirectSessions.findFirst({
       where: (table, { and, eq }) =>

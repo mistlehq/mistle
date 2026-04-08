@@ -1803,12 +1803,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "secrets": {
-          "name": "secrets",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "target_snapshot_config": {
           "name": "target_snapshot_config",
           "type": "jsonb",

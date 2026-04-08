@@ -14,12 +14,6 @@ export const IntegrationConnectionStatuses = {
 export type IntegrationConnectionStatus =
   (typeof IntegrationConnectionStatuses)[keyof typeof IntegrationConnectionStatuses];
 
-export type IntegrationConnectionEncryptedSecrets = {
-  ciphertext: string;
-  nonce: string;
-  masterKeyVersion: number;
-};
-
 export const integrationConnections = controlPlaneSchema.table(
   "integration_connections",
   {
@@ -39,7 +33,6 @@ export const integrationConnections = controlPlaneSchema.table(
       .default(IntegrationConnectionStatuses.ACTIVE),
     externalSubjectId: text("external_subject_id"),
     config: jsonb("config").$type<Record<string, unknown>>(),
-    secrets: jsonb("secrets").$type<IntegrationConnectionEncryptedSecrets>(),
     targetSnapshotConfig: jsonb("target_snapshot_config").$type<Record<string, unknown>>(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .notNull()

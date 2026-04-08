@@ -4,11 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   decryptCredentialUtf8,
-  decryptIntegrationConnectionSecrets,
   decryptRedirectSessionSecretUtf8,
   decryptIntegrationTargetSecrets,
   encryptCredentialUtf8,
-  encryptIntegrationConnectionSecrets,
   encryptRedirectSessionSecretUtf8,
   encryptIntegrationTargetSecrets,
   resolveMasterEncryptionKeyMaterial,
@@ -137,56 +135,6 @@ describe("integration credential crypto", () => {
         masterEncryptionKeyMaterial: "wrong-master-key",
       }),
     ).toThrow("Failed to decrypt integration target secrets.");
-  });
-
-  it("encrypts and decrypts integration connection secrets with master key material", () => {
-    const encrypted = encryptIntegrationConnectionSecrets({
-      secrets: {
-        webhook_secret: "github-webhook-secret",
-      },
-      masterKeyVersion: 4,
-      masterEncryptionKeyMaterial: "master-key-version-4",
-    });
-
-    expect(encrypted.masterKeyVersion).toBe(4);
-
-    const decrypted = decryptIntegrationConnectionSecrets({
-      nonce: encrypted.nonce,
-      ciphertext: encrypted.ciphertext,
-      masterEncryptionKeyMaterial: "master-key-version-4",
-    });
-
-    expect(decrypted).toEqual({
-      webhook_secret: "github-webhook-secret",
-    });
-  });
-
-  it("throws for invalid integration connection secrets ciphertext format", () => {
-    expect(() =>
-      decryptIntegrationConnectionSecrets({
-        nonce: "invalid",
-        ciphertext: "invalid-format",
-        masterEncryptionKeyMaterial: "master-key-version-1",
-      }),
-    ).toThrow("Encrypted integration connection secrets ciphertext format is invalid.");
-  });
-
-  it("throws when decrypting integration connection secrets with the wrong key", () => {
-    const encrypted = encryptIntegrationConnectionSecrets({
-      secrets: {
-        webhook_secret: "github-webhook-secret",
-      },
-      masterKeyVersion: 1,
-      masterEncryptionKeyMaterial: "master-key-version-1",
-    });
-
-    expect(() =>
-      decryptIntegrationConnectionSecrets({
-        nonce: encrypted.nonce,
-        ciphertext: encrypted.ciphertext,
-        masterEncryptionKeyMaterial: "wrong-master-key",
-      }),
-    ).toThrow("Failed to decrypt integration connection secrets.");
   });
 
   it("encrypts and decrypts redirect session secrets with master key material", () => {

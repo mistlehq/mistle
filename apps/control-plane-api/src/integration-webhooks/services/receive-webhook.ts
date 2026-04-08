@@ -26,7 +26,6 @@ import { ensureImplicitTargetWebhookSource } from "../../integration-webhook-sou
 import {
   decryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
-  type IntegrationConnectionSecrets,
   unwrapOrganizationCredentialKey,
 } from "../../lib/crypto.js";
 import { resolveIntegrationTargetSecrets } from "../../lib/integration-target-secrets.js";
@@ -100,7 +99,7 @@ async function resolveWebhookSourceSecretOrThrow(input: {
   db: AppContext["var"]["db"];
   source: IntegrationWebhookSource;
   integrationsConfig: AppContext["var"]["config"]["integrations"];
-}): Promise<IntegrationConnectionSecrets> {
+}): Promise<Record<string, string>> {
   const webhookSecretCredentialId = input.source.webhookSecretCredentialId;
   if (webhookSecretCredentialId == null) {
     return {};

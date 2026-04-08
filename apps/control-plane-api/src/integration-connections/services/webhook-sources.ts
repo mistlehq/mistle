@@ -56,11 +56,6 @@ type ConnectionWithTarget = {
   targetKey: string;
   displayName: string;
   config: Record<string, unknown> | null;
-  secrets: {
-    ciphertext: string;
-    nonce: string;
-    masterKeyVersion: number;
-  } | null;
   target: {
     targetKey: string;
     familyId: string;
@@ -127,7 +122,6 @@ export async function resolveConnectionWithTargetOrThrow(input: {
     targetKey: connection.targetKey,
     displayName: connection.displayName,
     config: connection.config,
-    secrets: connection.secrets,
     target: connection.target,
   };
 }
