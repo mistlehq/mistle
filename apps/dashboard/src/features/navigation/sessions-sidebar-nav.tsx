@@ -1,13 +1,18 @@
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
   Input,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@mistle/ui";
-import { MagnifyingGlassIcon } from "@phosphor-icons/react";
+import { CaretRightIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router";
 
@@ -44,12 +49,34 @@ export function SessionsSidebarNav(input: {
   const location = useLocation();
   const emptyMessage = input.emptyMessage ?? "No openable sessions yet.";
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedProfileIds, setExpandedProfileIds] = useState(
+    () => new Set(input.groups.map((group) => group.profileId)),
+  );
   const visibleGroups = filterSessionsSidebarNavGroups({
     groups: input.groups,
     searchFilter: {
       searchQuery,
     },
   });
+  const hasActiveSearch = searchQuery.trim().length > 0;
+
+  useEffect(() => {
+    setExpandedProfileIds((currentExpandedProfileIds) => {
+      let hasAddedProfile = false;
+      const nextExpandedProfileIds = new Set(currentExpandedProfileIds);
+
+      for (const group of input.groups) {
+        if (nextExpandedProfileIds.has(group.profileId)) {
+          continue;
+        }
+
+        nextExpandedProfileIds.add(group.profileId);
+        hasAddedProfile = true;
+      }
+
+      return hasAddedProfile ? nextExpandedProfileIds : currentExpandedProfileIds;
+    });
+  }, [input.groups]);
 
   if (input.groups.length === 0) {
     return <div className="px-4 py-3 text-muted-foreground text-sm">{emptyMessage}</div>;
@@ -78,35 +105,65 @@ export function SessionsSidebarNav(input: {
       ) : null}
       {visibleGroups.map((group) => (
         <SidebarGroup className="gap-1 pb-1" key={group.profileId}>
-          <SidebarGroupLabel className="h-7 px-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
-            {group.profileName}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenuSub className="mx-0 gap-1 border-l-0 px-0 py-0">
-              {group.items.map((item) => {
-                const attentionUi = resolveAttentionUi(item.attentionState);
-                const isActive = location.pathname === item.to;
+          <Collapsible
+            onOpenChange={(open) => {
+              setExpandedProfileIds((currentExpandedProfileIds) => {
+                const nextExpandedProfileIds = new Set(currentExpandedProfileIds);
 
-                return (
-                  <SidebarMenuSubItem className="w-full" key={item.id}>
-                    <SidebarMenuSubButton
-                      className="h-auto min-h-9 cursor-default items-center px-2 py-2"
-                      isActive={isActive}
-                      render={<NavLink to={item.to} />}
-                    >
-                      <div className="flex min-w-0 flex-1 items-center gap-3">
-                        <span
-                          aria-hidden
-                          className={`size-2.5 shrink-0 rounded-full ${attentionUi.indicatorClassName}`}
-                        />
-                        <SessionsSidebarItemLabel label={item.label} />
-                      </div>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                );
-              })}
-            </SidebarMenuSub>
-          </SidebarGroupContent>
+                if (open) {
+                  nextExpandedProfileIds.add(group.profileId);
+                } else {
+                  nextExpandedProfileIds.delete(group.profileId);
+                }
+
+                return nextExpandedProfileIds;
+              });
+            }}
+            open={hasActiveSearch || expandedProfileIds.has(group.profileId)}
+          >
+            <CollapsibleTrigger
+              aria-label={`Toggle ${group.profileName} sessions`}
+              className="text-sidebar-foreground/70 hover:text-sidebar-foreground flex h-7 w-full items-center rounded-md px-2 text-[11px] font-semibold tracking-[0.08em] uppercase outline-hidden transition-colors"
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                <CaretRightIcon
+                  aria-hidden
+                  className={`size-3 shrink-0 transition-transform ${
+                    hasActiveSearch || expandedProfileIds.has(group.profileId) ? "rotate-90" : ""
+                  }`}
+                />
+                <span className="truncate">{group.profileName}</span>
+              </span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <SidebarGroupContent>
+                <SidebarMenuSub className="mx-0 gap-1 border-l-0 px-0 py-0">
+                  {group.items.map((item) => {
+                    const attentionUi = resolveAttentionUi(item.attentionState);
+                    const isActive = location.pathname === item.to;
+
+                    return (
+                      <SidebarMenuSubItem className="w-full" key={item.id}>
+                        <SidebarMenuSubButton
+                          className="h-auto min-h-9 cursor-default items-center px-2 py-2"
+                          isActive={isActive}
+                          render={<NavLink to={item.to} />}
+                        >
+                          <div className="flex min-w-0 flex-1 items-center gap-3">
+                            <span
+                              aria-hidden
+                              className={`size-2.5 shrink-0 rounded-full ${attentionUi.indicatorClassName}`}
+                            />
+                            <SessionsSidebarItemLabel label={item.label} />
+                          </div>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    );
+                  })}
+                </SidebarMenuSub>
+              </SidebarGroupContent>
+            </CollapsibleContent>
+          </Collapsible>
         </SidebarGroup>
       ))}
     </>
@@ -129,6 +186,10 @@ function SessionsSidebarItemLabel(input: { label: string }): React.JSX.Element {
 
     updateTruncation();
 
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
     const resizeObserver = new ResizeObserver(updateTruncation);
     resizeObserver.observe(element);
 
@@ -139,9 +200,26 @@ function SessionsSidebarItemLabel(input: { label: string }): React.JSX.Element {
 
   const labelClassName = "block min-w-0 flex-1 truncate text-sm";
 
+  if (!isTruncated) {
+    return (
+      <span className={labelClassName} ref={labelRef}>
+        {input.label}
+      </span>
+    );
+  }
+
   return (
-    <span className={labelClassName} ref={labelRef} title={isTruncated ? input.label : undefined}>
-      {input.label}
-    </span>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span className={labelClassName} ref={labelRef}>
+            {input.label}
+          </span>
+        }
+      />
+      <TooltipContent colorScheme="light" side="top">
+        {input.label}
+      </TooltipContent>
+    </Tooltip>
   );
 }
