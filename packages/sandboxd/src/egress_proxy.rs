@@ -149,8 +149,7 @@ impl EgressProxy {
         )
         .map_err(|error| {
             EgressProxyError::new(format!(
-                "failed to write local egress proxy certificate '{}': {error}",
-                RUNTIME_PROXY_CA_CERT_PATH
+                "failed to write local egress proxy certificate '{RUNTIME_PROXY_CA_CERT_PATH}': {error}"
             ))
         })?;
 
