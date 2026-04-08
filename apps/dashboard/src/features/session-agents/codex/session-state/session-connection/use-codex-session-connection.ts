@@ -88,17 +88,10 @@ export function useCodexSessionConnection(input: {
     generation?: number;
   }) => Promise<CodexThreadCollectionsRefreshResult>;
   ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
-    mintedConnection: {
-      connectionExpiresAt: string;
-      connectionUrl: string;
-      connectionToken: string;
-      instanceId: string;
-    };
     sandboxInstanceId: string;
     transport: SandboxSessionTransport;
   }>;
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
-  transportRef: RefObject<SandboxSessionTransport | null>;
   sessionClientRef: RefObject<AgentStreamClient | null>;
   sessionEventUnsubscribersRef: RefObject<(() => void)[]>;
   lifecycleErrorMessage: string | null;
@@ -333,8 +326,6 @@ export function useCodexSessionConnection(input: {
       } catch (error) {
         throw describeCodexSessionStepError("Connecting shared sandbox transport", error);
       }
-
-      input.transportRef.current = transportConnection.transport;
       const sessionClient = new AgentStreamClientConstructor({
         transport: transportConnection.transport,
       });
@@ -376,7 +367,6 @@ export function useCodexSessionConnection(input: {
           : { selectionPolicy: connectInput.selectionPolicy }),
         generation,
         sandboxInstanceId: connectInput.sandboxInstanceId,
-        mintedConnection: transportConnection.mintedConnection,
         ensureCurrentGeneration: input.ensureCurrentGeneration,
       });
       reconnectTargetThreadIdRef.current = establishedThread.resolvedThreadId;
@@ -395,7 +385,6 @@ export function useCodexSessionConnection(input: {
       const nextConnectedSession = createConnectedCodexSession({
         sandboxInstanceId: result.sandboxInstanceId,
         connectedAtIso: new Date().toISOString(),
-        mintedConnection: result.mintedConnection,
         providerThreadId: result.providerThreadId,
         activeThreadId: result.threadId,
       });
