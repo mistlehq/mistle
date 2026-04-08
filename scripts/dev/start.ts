@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 
 import { parse as parseToml } from "smol-toml";
 
+import { ensureDevObjectStoreBucketExists } from "./ensure-object-store-bucket.ts";
+
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
 const DEV_CONFIG_PATH = resolve(REPO_ROOT, "config", "config.development.toml");
@@ -371,7 +373,7 @@ function dockerImageExists(imageTag: string): boolean {
   return result.status === 0;
 }
 
-function start(): void {
+async function start(): Promise<void> {
   const sandboxProvider = readSandboxProvider(DEV_CONFIG_PATH);
   const infraSummary =
     sandboxProvider === "docker"
@@ -428,9 +430,7 @@ function start(): void {
   });
 
   console.log("Ensuring control-plane object-store bucket exists...");
-  runOrThrow({
-    command: "docker",
-    args: ["compose", "-f", DEV_COMPOSE_PATH, "run", "--rm", "seaweedfs-init"],
+  await ensureDevObjectStoreBucketExists({
     env: sharedDevEnv,
   });
 
@@ -563,7 +563,7 @@ function start(): void {
 }
 
 try {
-  start();
+  await start();
 } catch (error) {
   if (error instanceof Error) {
     console.error(error.message);
