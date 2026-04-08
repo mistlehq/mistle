@@ -84,35 +84,41 @@ export function SessionsSidebarNav(input: {
 
   return (
     <>
-      <div className="px-2 pt-2 pb-1">
-        <div className="relative">
-          <MagnifyingGlassIcon
-            aria-hidden
-            className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
-          />
-          <Input
-            aria-label="Search sessions"
-            className="h-8 border-border/70 bg-background pl-9 text-sm shadow-none"
-            onChange={(event) => setSearchQuery(event.target.value)}
-            value={searchQuery}
-          />
-        </div>
-      </div>
-      <SidebarGroup className="pt-0 pb-0">
+      <SidebarGroup>
         <SidebarGroupContent>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
+                aria-label="Create a new session"
+                className=""
                 onClick={() => {
                   void navigate("/sessions");
                 }}
                 type="button"
               >
-                <PlusIcon aria-hidden className="size-4" />
+                <PlusIcon aria-hidden />
                 <span>New</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
+          <div className="pt-1 pb-1">
+            <div
+              className={`border-1 flex h-8 items-center gap-2 rounded-md px-2 transition-colors ${
+                hasActiveSearch
+                  ? "border-border bg-white text-sidebar-accent-foreground"
+                  : "border-transparent hover:border-border hover:bg-white hover:text-sidebar-accent-foreground"
+              }`}
+            >
+              <MagnifyingGlassIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
+              <Input
+                aria-label="Search"
+                className="h-full border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search"
+                value={searchQuery}
+              />
+            </div>
+          </div>
         </SidebarGroupContent>
       </SidebarGroup>
       {visibleGroups.length === 0 ? (
