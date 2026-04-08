@@ -8,6 +8,9 @@
 
 use std::fmt::{self, Display};
 
+use serde_json::{Map, Value};
+
+use crate::time::Clock;
 use crate::tunnel::protocol::{
     BootstrapTelemetryControlMessage, MAX_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES,
     StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
@@ -18,6 +21,25 @@ use crate::tunnel::protocol::{
 pub const SANDBOX_TELEMETRY_LOG_STREAM_ID: u32 = 0xffff_fffe;
 const TELEMETRY_LOGS_SIGNAL: &str = "logs";
 const TELEMETRY_LOGS_FORMAT: &str = "mistle.sandbox-runtime.log.v1";
+const RESERVED_LOG_FIELDS: [&str; 3] = ["timestamp", "level", "event"];
+
+/// Supported log severities for sandbox telemetry log lines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SandboxTelemetryLogLevel {
+    Info,
+    Warn,
+    Error,
+}
+
+impl SandboxTelemetryLogLevel {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Info => "info",
+            Self::Warn => "warn",
+            Self::Error => "error",
+        }
+    }
+}
 
 /// Describes why one telemetry relay step failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -174,6 +196,18 @@ impl TelemetryRelay {
         self.flush()
     }
 
+    /// Serializes one structured telemetry log record and queues it for transmission.
+    pub fn enqueue_log_record(
+        &mut self,
+        clock: &dyn Clock,
+        level: SandboxTelemetryLogLevel,
+        event: &str,
+        extra_fields: &[(&str, Value)],
+    ) -> Result<Vec<TelemetryRelayFrame>, TelemetryRelayError> {
+        let line = encode_sandbox_telemetry_log_line(clock, level, event, extra_fields)?;
+        self.enqueue_log_line(&line)
+    }
+
     fn flush(&mut self) -> Result<Vec<TelemetryRelayFrame>, TelemetryRelayError> {
         if self.state != TelemetryRelayState::Open {
             return Ok(Vec::new());
@@ -216,4 +250,99 @@ pub fn decode_telemetry_data_frame(payload: &[u8]) -> Result<Vec<u8>, TelemetryR
         ));
     }
     Ok(frame.payload)
+}
+
+/// Serializes one newline-delimited `mistle.sandbox-runtime.log.v1` log line.
+pub fn encode_sandbox_telemetry_log_line(
+    clock: &dyn Clock,
+    level: SandboxTelemetryLogLevel,
+    event: &str,
+    extra_fields: &[(&str, Value)],
+) -> Result<String, TelemetryRelayError> {
+    if event.trim().is_empty() {
+        return Err(TelemetryRelayError::new(
+            "sandbox telemetry log event must not be empty",
+        ));
+    }
+
+    let mut payload = Map::new();
+    payload.insert(
+        "timestamp".to_string(),
+        Value::String(format_timestamp_millis(clock.now_ms())?),
+    );
+    payload.insert(
+        "level".to_string(),
+        Value::String(level.as_str().to_string()),
+    );
+    payload.insert("event".to_string(), Value::String(event.to_string()));
+
+    for (field_name, field_value) in extra_fields {
+        if field_name.trim().is_empty() {
+            return Err(TelemetryRelayError::new(
+                "sandbox telemetry log field name must not be empty",
+            ));
+        }
+        if RESERVED_LOG_FIELDS.contains(field_name) {
+            return Err(TelemetryRelayError::new(format!(
+                "sandbox telemetry log field '{field_name}' is reserved",
+            )));
+        }
+        if !matches!(
+            field_value,
+            Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_)
+        ) {
+            return Err(TelemetryRelayError::new(format!(
+                "sandbox telemetry log field '{field_name}' must be scalar",
+            )));
+        }
+
+        payload.insert((*field_name).to_string(), field_value.clone());
+    }
+
+    let mut line = serde_json::to_string(&Value::Object(payload))
+        .map_err(|error| TelemetryRelayError::new(error.to_string()))?;
+    line.push('\n');
+    Ok(line)
+}
+
+fn format_timestamp_millis(epoch_ms: u64) -> Result<String, TelemetryRelayError> {
+    let epoch_seconds = epoch_ms / 1_000;
+    let milliseconds = epoch_ms % 1_000;
+    let days_since_epoch = epoch_seconds / 86_400;
+    let seconds_of_day = epoch_seconds % 86_400;
+
+    let days_since_epoch = i64::try_from(days_since_epoch).map_err(|_| {
+        TelemetryRelayError::new("sandbox telemetry timestamp is out of range")
+    })?;
+    let seconds_of_day = u32::try_from(seconds_of_day).map_err(|_| {
+        TelemetryRelayError::new("sandbox telemetry timestamp is out of range")
+    })?;
+
+    let (year, month, day) = civil_from_days(days_since_epoch);
+    let hour = seconds_of_day / 3_600;
+    let minute = (seconds_of_day % 3_600) / 60;
+    let second = seconds_of_day % 60;
+
+    Ok(format!(
+        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{milliseconds:03}Z"
+    ))
+}
+
+fn civil_from_days(days_since_epoch: i64) -> (i64, u32, u32) {
+    let z = days_since_epoch + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = mp + if mp < 10 { 3 } else { -9 };
+    let year = y + if month <= 2 { 1 } else { 0 };
+
+    (
+        year,
+        u32::try_from(month).expect("month should fit in u32"),
+        u32::try_from(day).expect("day should fit in u32"),
+    )
 }

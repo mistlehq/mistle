@@ -17,6 +17,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
 use futures_util::{SinkExt, StreamExt};
+use serde_json::Value;
 use tokio::runtime::Builder;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle as TokioJoinHandle;
@@ -48,7 +49,7 @@ use crate::tunnel::protocol::{
     parse_stream_control_message, pty_exit_event, stream_complete, stream_open_error,
     stream_open_ok, stream_reset, stream_window,
 };
-use crate::tunnel::telemetry::{TelemetryRelay, TelemetryRelayFrame};
+use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
 
 /// Default attachment root for file uploads received over the bootstrap tunnel.
 pub const DEFAULT_ATTACHMENT_ROOT: &str = "/tmp/attachments";
@@ -849,6 +850,7 @@ async fn handle_tunnel_session_event(
                         report_dropped_bootstrap_text_message(
                             tunnel_writer_sender,
                             &mut session_state.telemetry_relay,
+                            context.clock,
                             format!("telemetry control rejected: {error}"),
                         );
                         return Ok(());
@@ -861,6 +863,7 @@ async fn handle_tunnel_session_event(
                         report_dropped_bootstrap_text_message(
                             tunnel_writer_sender,
                             &mut session_state.telemetry_relay,
+                            context.clock,
                             error.to_string(),
                         );
                         return Ok(());
@@ -882,6 +885,7 @@ async fn handle_tunnel_session_event(
                         report_dropped_bootstrap_binary_frame(
                             tunnel_writer_sender,
                             &mut session_state.telemetry_relay,
+                            context.clock,
                             error.to_string(),
                         );
                         return Ok(());
@@ -991,35 +995,54 @@ async fn handle_tunnel_session_event(
 fn report_dropped_bootstrap_text_message(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     telemetry_relay: &mut TelemetryRelay,
+    clock: &dyn Clock,
     reason: impl Display,
 ) {
     report_dropped_bootstrap_message(
         tunnel_writer_sender,
         telemetry_relay,
+        clock,
+        "bootstrap_control_message_dropped",
         format!("sandboxd dropped bootstrap control message: {reason}"),
+        reason.to_string(),
     );
 }
 
 fn report_dropped_bootstrap_binary_frame(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     telemetry_relay: &mut TelemetryRelay,
+    clock: &dyn Clock,
     reason: impl Display,
 ) {
     report_dropped_bootstrap_message(
         tunnel_writer_sender,
         telemetry_relay,
+        clock,
+        "bootstrap_data_frame_dropped",
         format!("sandboxd dropped bootstrap data frame: {reason}"),
+        reason.to_string(),
     );
 }
 
 fn report_dropped_bootstrap_message(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     telemetry_relay: &mut TelemetryRelay,
+    clock: &dyn Clock,
+    event: &str,
     message: String,
+    reason: String,
 ) {
     eprintln!("{message}");
 
-    match telemetry_relay.enqueue_log_line(&message) {
+    match telemetry_relay.enqueue_log_record(
+        clock,
+        SandboxTelemetryLogLevel::Warn,
+        event,
+        &[
+            ("message", Value::String(message.clone())),
+            ("reason", Value::String(reason)),
+        ],
+    ) {
         Ok(frames) => {
             if let Err(error) = send_telemetry_frames(tunnel_writer_sender, frames) {
                 eprintln!(
@@ -2326,16 +2349,33 @@ mod tests {
                     .into(),
                 ))
                 .expect("gateway should send an unsupported bootstrap control message");
+            let dropped_control_message = read_telemetry_log_line(&mut websocket);
             assert_eq!(
-                read_telemetry_log_line(&mut websocket),
+                dropped_control_message["event"],
+                "bootstrap_control_message_dropped"
+            );
+            assert_eq!(dropped_control_message["level"], "warn");
+            assert_eq!(
+                dropped_control_message["message"],
                 "sandboxd dropped bootstrap control message: unsupported control message type 'stream.reset'"
+            );
+            assert_eq!(
+                dropped_control_message["reason"],
+                "unsupported control message type 'stream.reset'"
             );
             websocket
                 .send(Message::Binary(vec![0x01, 0x02, 0x03].into()))
                 .expect("gateway should send an invalid bootstrap data frame");
+            let dropped_data_frame = read_telemetry_log_line(&mut websocket);
+            assert_eq!(dropped_data_frame["event"], "bootstrap_data_frame_dropped");
+            assert_eq!(dropped_data_frame["level"], "warn");
             assert_eq!(
-                read_telemetry_log_line(&mut websocket),
+                dropped_data_frame["message"],
                 "sandboxd dropped bootstrap data frame: data frame must be at least 6 bytes long"
+            );
+            assert_eq!(
+                dropped_data_frame["reason"],
+                "data frame must be at least 6 bytes long"
             );
 
             websocket
@@ -2809,7 +2849,7 @@ mod tests {
         decode_stream_data_frame(payload.as_ref()).expect("binary frame should decode")
     }
 
-    fn read_telemetry_log_line<S>(socket: &mut WebSocket<S>) -> String
+    fn read_telemetry_log_line<S>(socket: &mut WebSocket<S>) -> Value
     where
         S: std::io::Read + std::io::Write,
     {
@@ -2827,11 +2867,10 @@ mod tests {
                     }
                 }
                 Message::Binary(payload) => {
-                    return String::from_utf8(
-                        decode_telemetry_data_frame(payload.as_ref())
-                            .expect("telemetry frame should decode"),
-                    )
-                    .expect("telemetry frame should contain utf-8 log text");
+                    let telemetry_payload = decode_telemetry_data_frame(payload.as_ref())
+                        .expect("telemetry frame should decode");
+                    return serde_json::from_slice(&telemetry_payload)
+                        .expect("telemetry frame should contain one json log line");
                 }
                 _ => panic!("expected websocket binary telemetry frame"),
             }

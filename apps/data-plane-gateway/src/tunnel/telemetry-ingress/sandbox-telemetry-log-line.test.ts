@@ -24,6 +24,23 @@ describe("parseSandboxTelemetryLogLine", () => {
     });
   });
 
+  it("parses structured bootstrap warning log lines emitted by sandboxd", () => {
+    expect(
+      parseSandboxTelemetryLogLine(
+        `{"timestamp":"1970-01-01T00:00:00.000Z","level":"warn","event":"bootstrap_control_message_dropped","message":"sandboxd dropped bootstrap control message: unsupported control message type 'stream.reset'","reason":"unsupported control message type 'stream.reset'"}`,
+      ),
+    ).toEqual({
+      timestamp: new Date("1970-01-01T00:00:00.000Z"),
+      level: "warn",
+      event: "bootstrap_control_message_dropped",
+      extraFields: {
+        message:
+          "sandboxd dropped bootstrap control message: unsupported control message type 'stream.reset'",
+        reason: "unsupported control message type 'stream.reset'",
+      },
+    });
+  });
+
   it("rejects non-scalar extra fields", () => {
     expect(() =>
       parseSandboxTelemetryLogLine(

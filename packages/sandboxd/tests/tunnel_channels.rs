@@ -8,6 +8,8 @@ use std::thread;
 use serde_json::Value;
 use tungstenite::{Message, WebSocket, accept, connect};
 
+use serde_json::json;
+
 use sandboxd::time::{Clock, SystemClock, ThreadSleeper};
 use sandboxd::tunnel::agent_stream::{DEFAULT_AGENT_STREAM_POLL_INTERVAL, relay_agent_stream};
 use sandboxd::tunnel::file_upload::relay_file_upload_stream;
@@ -16,10 +18,22 @@ use sandboxd::tunnel::protocol::{
     encode_stream_data_frame,
 };
 use sandboxd::tunnel::telemetry::{
-    SANDBOX_TELEMETRY_LOG_STREAM_ID, TelemetryRelay, decode_telemetry_data_frame,
+    SANDBOX_TELEMETRY_LOG_STREAM_ID, SandboxTelemetryLogLevel, TelemetryRelay,
+    decode_telemetry_data_frame,
 };
 
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Debug, Clone, Copy)]
+struct FixedClock {
+    now_ms: u64,
+}
+
+impl Clock for FixedClock {
+    fn now_ms(&self) -> u64 {
+        self.now_ms
+    }
+}
 
 #[test]
 fn relays_agent_channel_frames_between_tunnel_and_runtime_endpoint() {
@@ -313,6 +327,7 @@ fn negotiates_telemetry_stream_and_flushes_buffered_logs() {
             .expect("telemetry relay should accept a client");
         let mut websocket = accept(stream).expect("tunnel websocket handshake should succeed");
         let mut relay = TelemetryRelay::default();
+        let clock = FixedClock { now_ms: 0 };
 
         for frame in relay
             .attach_tunnel_connection()
@@ -336,7 +351,18 @@ fn negotiates_telemetry_stream_and_flushes_buffered_logs() {
         }
 
         for frame in relay
-            .enqueue_log_line("sandboxd log line\n")
+            .enqueue_log_record(
+                &clock,
+                SandboxTelemetryLogLevel::Warn,
+                "bootstrap_control_message_dropped",
+                &[
+                    (
+                        "message",
+                        json!("sandboxd dropped bootstrap control message: sandboxd log line"),
+                    ),
+                    ("reason", json!("sandboxd log line")),
+                ],
+            )
             .expect("telemetry relay should flush buffered logs")
         {
             send_telemetry_frame(&mut websocket, frame);
@@ -377,10 +403,16 @@ fn negotiates_telemetry_stream_and_flushes_buffered_logs() {
     };
     let telemetry_bytes =
         decode_telemetry_data_frame(payload.as_ref()).expect("telemetry data frame should decode");
+    let telemetry_log_line: Value =
+        serde_json::from_slice(&telemetry_bytes).expect("telemetry bytes should contain json");
+    assert_eq!(telemetry_log_line["timestamp"], "1970-01-01T00:00:00.000Z");
+    assert_eq!(telemetry_log_line["level"], "warn");
+    assert_eq!(telemetry_log_line["event"], "bootstrap_control_message_dropped");
     assert_eq!(
-        String::from_utf8(telemetry_bytes).expect("telemetry bytes should be utf8"),
-        "sandboxd log line\n"
+        telemetry_log_line["message"],
+        "sandboxd dropped bootstrap control message: sandboxd log line"
     );
+    assert_eq!(telemetry_log_line["reason"], "sandboxd log line");
 
     let close_message = parse_json_text_message(&mut client_socket);
     assert_eq!(close_message["type"], "telemetry.close");
