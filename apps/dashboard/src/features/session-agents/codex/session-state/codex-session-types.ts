@@ -3,8 +3,6 @@ export type StartSessionStep = "idle" | "securing" | "connecting" | "connected";
 export type ConnectedCodexSession = {
   sandboxInstanceId: string;
   connectedAtIso: string;
-  expiresAtIso: string;
-  connectionUrl: string;
   providerThreadId: string | null;
   activeThreadId: string | null;
 };

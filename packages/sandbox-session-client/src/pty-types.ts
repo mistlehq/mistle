@@ -1,4 +1,3 @@
-import type { SandboxSessionRuntime } from "./runtime.js";
 import type { SandboxSessionTransport } from "./transport.js";
 
 export const SandboxPtyStates = {
@@ -31,13 +30,6 @@ export type SandboxPtyExitInfo = {
 export type SandboxPtyResetInfo = {
   code: string;
   message: string;
-};
-
-export type SandboxPtyClientInput = {
-  connectionUrl: string;
-  runtime: SandboxSessionRuntime;
-  connectTimeoutMs?: number;
-  closeTimeoutMs?: number;
 };
 
 export type PtyStreamClientInput = {
