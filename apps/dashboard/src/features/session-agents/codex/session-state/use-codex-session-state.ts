@@ -136,6 +136,16 @@ export type UseCodexSessionStateResult = {
 
 export function useCodexSessionState(input: {
   transportRef: RefObject<SandboxSessionTransport | null>;
+  ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
+    mintedConnection: {
+      connectionExpiresAt: string;
+      connectionUrl: string;
+      connectionToken: string;
+      instanceId: string;
+    };
+    sandboxInstanceId: string;
+    transport: SandboxSessionTransport;
+  }>;
   sessionClientRef: RefObject<CodexSessionClient | null>;
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
   sessionEventUnsubscribersRef: RefObject<(() => void)[]>;
@@ -276,6 +286,7 @@ export function useCodexSessionState(input: {
     onServerRequestNotification: handleServerRequestNotification,
     onServerRequestReceived: handleServerRequestReceived,
     refreshThreadCollections,
+    ensureTransportConnected: input.ensureTransportConnected,
     rpcClientRef: input.rpcClientRef,
     transportRef: input.transportRef,
     sessionClientRef: input.sessionClientRef,

@@ -2,7 +2,6 @@ import type {
   CodexJsonRpcClient,
   CodexSessionClient,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 
@@ -41,6 +40,7 @@ import {
   isActiveResumeRequest,
   seedSandboxInstanceStatusQuery,
 } from "./use-session-workbench-stopped-resume.js";
+import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
 
 type SessionWorkbenchState = {
   sandboxStatusReadState: ReturnType<
@@ -143,12 +143,15 @@ export function useSessionWorkbenchController(input: {
   sandboxInstanceId: string | null;
 }): UseSessionWorkbenchControllerResult {
   const queryClient = useQueryClient();
-  const transportRef = useRef<SandboxSessionTransport | null>(null);
+  const transportManager = useSessionWorkbenchTransport({
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
   const sessionClientRef = useRef<CodexSessionClient | null>(null);
   const rpcClientRef = useRef<CodexJsonRpcClient | null>(null);
   const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
   const sessionState = useCodexSessionState({
-    transportRef,
+    transportRef: transportManager.transportRef,
+    ensureTransportConnected: transportManager.ensureTransportConnected,
     sessionClientRef,
     rpcClientRef,
     sessionEventUnsubscribersRef,
