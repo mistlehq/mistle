@@ -22,6 +22,7 @@ import {
 } from "../shared/singleton-image.js";
 import { resolveAppShellFrame } from "./app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
+import { shouldNavigateToNewSessionOnSidebarModeEnable } from "./app-shell-sessions-sidebar-mode.js";
 import { AppShellView } from "./app-shell-view.js";
 import { clearAuthenticatedSessionCache } from "./session-cache.js";
 import { useOrganizationSummary } from "./use-organization-summary.js";
@@ -87,6 +88,20 @@ export function AppShell(): React.JSX.Element {
     await navigate(SETTINGS_DEFAULT_PATH);
   }
 
+  async function handleSessionsSidebarModeChange(nextChecked: boolean): Promise<void> {
+    setShowSessionsSidebar(nextChecked);
+
+    if (!nextChecked) {
+      return;
+    }
+
+    if (!shouldNavigateToNewSessionOnSidebarModeEnable(location.pathname)) {
+      return;
+    }
+
+    await navigate("/sessions/new");
+  }
+
   const appShellFrame = resolveAppShellFrame({
     handleBackToApp: () => {
       void handleBackToApp();
@@ -115,7 +130,9 @@ export function AppShell(): React.JSX.Element {
     pageMeta,
     signOutError,
     showSessionsSidebar,
-    setShowSessionsSidebar,
+    onShowSessionsSidebarChange: (checked) => {
+      void handleSessionsSidebarModeChange(checked);
+    },
   });
 
   return (

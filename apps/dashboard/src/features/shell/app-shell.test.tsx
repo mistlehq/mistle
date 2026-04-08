@@ -30,7 +30,7 @@ describe("resolveAppShellFrame", () => {
       },
       signOutError: null,
       showSessionsSidebar: true,
-      setShowSessionsSidebar: () => {},
+      onShowSessionsSidebarChange: () => {},
     });
 
     expect(isValidElement<{ children: ReactNode[] }>(frame.sidebarContent)).toBe(true);
@@ -73,7 +73,7 @@ describe("resolveAppShellFrame", () => {
       },
       signOutError: null,
       showSessionsSidebar: false,
-      setShowSessionsSidebar: () => {},
+      onShowSessionsSidebarChange: () => {},
     });
 
     expect(isValidElement(frame.sidebarContent)).toBe(true);

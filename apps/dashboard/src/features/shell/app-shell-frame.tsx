@@ -69,7 +69,7 @@ export function resolveAppShellFrame(input: {
   pageMeta: AppPageMeta;
   signOutError: string | null;
   showSessionsSidebar: boolean;
-  setShowSessionsSidebar: (checked: boolean) => void;
+  onShowSessionsSidebarChange: (checked: boolean) => void;
 }): AppShellFrame {
   const showBreadcrumbs =
     input.inSettings ||
@@ -102,7 +102,7 @@ export function resolveAppShellFrame(input: {
       <>
         <SessionsSidebarModeControl
           checked={input.showSessionsSidebar}
-          onCheckedChange={input.setShowSessionsSidebar}
+          onCheckedChange={input.onShowSessionsSidebarChange}
         />
         <SessionsShellSidebar />
       </>
@@ -110,7 +110,7 @@ export function resolveAppShellFrame(input: {
       <MainSidebarContent
         locationPathname={input.locationPathname}
         showSessionsSidebar={input.showSessionsSidebar}
-        onShowSessionsSidebarChange={input.setShowSessionsSidebar}
+        onShowSessionsSidebarChange={input.onShowSessionsSidebarChange}
       />
     ),
     sidebarFooterContent: <ErrorNotice message={input.signOutError} />,
