@@ -17,37 +17,6 @@ const RuntimeStatusTestTimeoutMs = 60_000;
 const StatusPollTimeoutMs = 10_000;
 const StatusPollIntervalMs = 50;
 
-async function waitForListedSandboxStatus(input: {
-  fixture: DataPlaneApiIntegrationFixture;
-  organizationId: string;
-  sandboxInstanceId: string;
-  expectedStatus: string;
-}): Promise<void> {
-  const client = createDataPlaneSandboxInstancesClient({
-    baseUrl: input.fixture.baseUrl,
-    serviceToken: input.fixture.internalAuthServiceToken,
-  });
-  const deadlineMs = systemClock.nowMs() + StatusPollTimeoutMs;
-
-  while (systemClock.nowMs() < deadlineMs) {
-    const response = await client.listSandboxInstances({
-      organizationId: input.organizationId,
-      limit: 100,
-    });
-    const sandboxInstance = response.items.find((item) => item.id === input.sandboxInstanceId);
-
-    if (sandboxInstance?.status === input.expectedStatus) {
-      return;
-    }
-
-    await systemSleeper.sleep(StatusPollIntervalMs);
-  }
-
-  throw new Error(
-    `Timed out waiting for sandbox '${input.sandboxInstanceId}' to reach status '${input.expectedStatus}'.`,
-  );
-}
-
 async function waitForGetSandboxStatus(input: {
   fixture: DataPlaneApiIntegrationFixture;
   organizationId: string;
@@ -298,7 +267,7 @@ describe("internal sandbox instance runtime status integration", () => {
   );
 
   it(
-    "lists effective runtime-composed statuses for attached and unattached sandboxes",
+    "lists persisted statuses and only decorates running sandboxes with live keepalive state",
     async ({ fixture }) => {
       const client = createDataPlaneSandboxInstancesClient({
         baseUrl: fixture.baseUrl,
@@ -322,7 +291,7 @@ describe("internal sandbox instance runtime status integration", () => {
             sandboxProfileVersion: 1,
             runtimeProvider: "docker",
             providerSandboxId: "provider-runtime-status-connected",
-            status: SandboxInstanceStatuses.STARTING,
+            status: SandboxInstanceStatuses.RUNNING,
             startedByKind: "user",
             startedById: "usr_runtime_status",
             source: "dashboard",
@@ -336,7 +305,7 @@ describe("internal sandbox instance runtime status integration", () => {
             sandboxProfileVersion: 2,
             runtimeProvider: "docker",
             providerSandboxId: "provider-runtime-status-disconnected",
-            status: SandboxInstanceStatuses.RUNNING,
+            status: SandboxInstanceStatuses.STARTING,
             startedByKind: "user",
             startedById: "usr_runtime_status",
             source: "dashboard",
@@ -396,13 +365,6 @@ describe("internal sandbox instance runtime status integration", () => {
             ttlMs: 30_000,
           }),
         );
-        await waitForListedSandboxStatus({
-          fixture,
-          organizationId,
-          sandboxInstanceId: connectedSandboxInstanceId,
-          expectedStatus: "running",
-        });
-
         const response = await client.listSandboxInstances({
           organizationId,
         });

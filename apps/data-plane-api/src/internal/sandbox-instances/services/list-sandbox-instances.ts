@@ -1,6 +1,7 @@
 import {
   sandboxInstances,
   type DataPlaneDatabase,
+  SandboxInstanceStatuses,
   type SandboxInstance,
 } from "@mistle/db/data-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
@@ -17,7 +18,6 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppRuntimeResources } from "../../../resources.js";
-import { resolveEffectiveSandboxInstanceStatus } from "../effective-sandbox-instance-status.js";
 import type { ListSandboxInstancesInput } from "../list-sandbox-instances/schema.js";
 import type { ListSandboxInstancesResponse } from "../schemas.js";
 
@@ -64,16 +64,20 @@ async function resolveListedSandboxRuntimeState(
   status: ListSandboxInstancesResponse["items"][number]["status"];
   keepaliveActive: boolean;
 }> {
+  if (input.persistedStatus !== SandboxInstanceStatuses.RUNNING) {
+    return {
+      status: input.persistedStatus,
+      keepaliveActive: false,
+    };
+  }
+
   const runtimeStateSnapshot = await ctx.runtimeStateReader.readSnapshot({
     sandboxInstanceId: input.sandboxInstanceId,
     nowMs: Date.now(),
   });
 
   return {
-    status: resolveEffectiveSandboxInstanceStatus({
-      persistedStatus: input.persistedStatus,
-      runtimeStateSnapshot,
-    }),
+    status: input.persistedStatus,
     keepaliveActive: runtimeStateSnapshot.keepalive.active,
   };
 }
