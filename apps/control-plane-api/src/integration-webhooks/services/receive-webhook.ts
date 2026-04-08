@@ -22,6 +22,10 @@ import type {
 import { and, eq, isNull } from "drizzle-orm";
 
 import { ensureImplicitConnectionWebhookSource } from "../../integration-connections/services/webhook-sources.js";
+import {
+  resolveConnectionSecretsOrThrow,
+  resolveConnectionWithTargetOrThrow,
+} from "../../integration-connections/services/webhook-sources.js";
 import { ensureImplicitTargetWebhookSource } from "../../integration-webhook-sources/services/ensure-implicit-target-webhook-source.js";
 import {
   decryptCredentialUtf8,
@@ -229,6 +233,53 @@ function resolveSourceConnectionIdOrThrow(input: { source: IntegrationWebhookSou
   return input.source.integrationConnectionId;
 }
 
+async function resolveConnectionOwnedWebhookSecrets(input: {
+  db: AppContext["var"]["db"];
+  integrationRegistry: AppContext["var"]["integrationRegistry"];
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+  organizationId: string;
+  connectionId: string;
+}): Promise<Record<string, string>> {
+  const connectionWithTarget = await resolveConnectionWithTargetOrThrow({
+    db: input.db,
+    organizationId: input.organizationId,
+    connectionId: input.connectionId,
+  });
+  const connectionConfig = connectionWithTarget.config;
+  if (connectionConfig === null) {
+    return {};
+  }
+
+  const connectionMethodId = connectionConfig["connection_method"];
+  if (typeof connectionMethodId !== "string" || connectionMethodId.length === 0) {
+    return {};
+  }
+
+  const definition = input.integrationRegistry.getDefinition({
+    familyId: connectionWithTarget.target.familyId,
+    variantId: connectionWithTarget.target.variantId,
+  });
+  if (definition === undefined) {
+    throw new Error(
+      `Integration definition '${connectionWithTarget.target.familyId}/${connectionWithTarget.target.variantId}' is not registered.`,
+    );
+  }
+
+  const connectionMethod = definition.connectionMethods.find(
+    (method) => method.id === connectionMethodId,
+  );
+  if (connectionMethod === undefined || connectionMethod.kind !== "form") {
+    return {};
+  }
+
+  return resolveConnectionSecretsOrThrow({
+    db: input.db,
+    integrationRegistry: input.integrationRegistry,
+    connection: connectionWithTarget,
+    integrationsConfig: input.integrationsConfig,
+  });
+}
+
 export async function receiveIntegrationWebhook(
   {
     db,
@@ -335,15 +386,32 @@ export async function receiveIntegrationWebhook(
         secrets: parsedTargetSecrets,
       },
       connections: webhookConnections,
-      resolveConnectionSecrets: ({ connectionId }) => {
-        assertConnectionCandidateExistsOrThrow({
+      resolveConnectionSecrets: async ({ connectionId }) => {
+        const activeConnection = activeConnectionsById.get(connectionId);
+        if (activeConnection === undefined) {
+          assertConnectionCandidateExistsOrThrow({
+            connectionId,
+            connectionsById: activeConnectionsById,
+          });
+          throw new Error(`Expected active webhook connection '${connectionId}' to exist.`);
+        }
+
+        if (Object.keys(webhookSourceSecrets).length > 0) {
+          return webhookSourceSecrets;
+        }
+
+        const connectionSecrets = await resolveConnectionOwnedWebhookSecrets({
+          db,
+          integrationRegistry,
+          integrationsConfig,
+          organizationId: activeConnection.organizationId,
           connectionId,
-          connectionsById: activeConnectionsById,
         });
 
-        return Promise.resolve({
+        return {
+          ...connectionSecrets,
           ...webhookSourceSecrets,
-        });
+        };
       },
       headers: normalizeWebhookHeaders(input.headers),
       rawBody: input.rawBody,

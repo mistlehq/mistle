@@ -135,8 +135,11 @@ export async function verifyAndResolveWebhookRequestOrThrow<
     rawBody: input.rawBody,
   });
 
-  if (webhookRequest.kind === "response") {
-    return webhookRequest;
+  if (webhookRequest.kind === "response" && webhookRequest.verification === "skip") {
+    return {
+      kind: "response",
+      response: webhookRequest.response,
+    };
   }
 
   const webhookEvent = webhookRequest.event;
@@ -187,6 +190,13 @@ export async function verifyAndResolveWebhookRequestOrThrow<
       WebhookErrorCodes.WEBHOOK_VERIFY_FAILED,
       `Webhook verification failed (${verifyResult.code}): ${verifyResult.message}`,
     );
+  }
+
+  if (webhookRequest.kind === "response") {
+    return {
+      kind: "response",
+      response: webhookRequest.response,
+    };
   }
 
   return {

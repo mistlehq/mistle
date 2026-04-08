@@ -784,6 +784,13 @@ export type IntegrationWebhookRequestResolution =
     }
   | {
       kind: "response";
+      verification: "skip";
+      response: IntegrationWebhookImmediateResponse;
+    }
+  | {
+      kind: "response";
+      verification: "required";
+      event: IntegrationWebhookEvent;
       response: IntegrationWebhookImmediateResponse;
     };
 

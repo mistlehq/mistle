@@ -34,6 +34,23 @@ function createWebhookHandler(input?: {
       }
     | {
         kind: "response";
+        verification: "skip";
+        response: {
+          status: number;
+          contentType?: string;
+          body?: string | Record<string, unknown>;
+        };
+      }
+    | {
+        kind: "response";
+        verification: "required";
+        event: {
+          externalEventId: string;
+          externalDeliveryId: string;
+          providerEventType: string;
+          eventType: string;
+          payload: Record<string, unknown>;
+        };
         response: {
           status: number;
           contentType?: string;
@@ -340,6 +357,7 @@ describe("webhook helpers", () => {
         webhookHandler: createWebhookHandler({
           resolveWebhookRequestResult: {
             kind: "response",
+            verification: "skip",
             response: {
               status: 200,
               contentType: "text/plain",
@@ -372,5 +390,119 @@ describe("webhook helpers", () => {
         body: "challenge-value",
       },
     });
+  });
+
+  it("verifies response requests marked as required before returning the response", async () => {
+    let resolvedConnectionId: string | undefined;
+    let verifiedConnectionId: string | undefined;
+
+    const resolvedWebhook = await verifyAndResolveWebhookRequestOrThrow({
+      definition: {
+        familyId: "slack",
+        variantId: "slack-default",
+        webhookHandler: createWebhookHandler({
+          resolveWebhookRequestResult: {
+            kind: "response",
+            verification: "required",
+            event: {
+              externalEventId: "evt_required",
+              externalDeliveryId: "delivery_required",
+              providerEventType: "url_verification",
+              eventType: "slack:url_verification",
+              payload: {
+                challenge: "challenge-value",
+              },
+            },
+            response: {
+              status: 200,
+              contentType: "text/plain",
+              body: "challenge-value",
+            },
+          },
+        }),
+      },
+      targetKey: "slack_default",
+      target: {
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      connections: [CandidateConnection],
+      resolveConnectionSecrets: ({ connectionId }) => {
+        resolvedConnectionId = connectionId;
+        return {
+          signingSecret: "slack-signing-secret",
+        };
+      },
+      headers: {},
+      rawBody: new Uint8Array(),
+    });
+
+    expect(resolvedConnectionId).toBe(CandidateConnection.id);
+    expect(resolvedWebhook).toEqual({
+      kind: "response",
+      response: {
+        status: 200,
+        contentType: "text/plain",
+        body: "challenge-value",
+      },
+    });
+
+    await verifyAndResolveWebhookRequestOrThrow({
+      definition: {
+        familyId: "slack",
+        variantId: "slack-default",
+        webhookHandler: {
+          resolveWebhookRequest: () => ({
+            kind: "response",
+            verification: "required",
+            event: {
+              externalEventId: "evt_required_again",
+              externalDeliveryId: "delivery_required_again",
+              providerEventType: "url_verification",
+              eventType: "slack:url_verification",
+              payload: {
+                challenge: "challenge-value",
+              },
+            },
+            response: {
+              status: 200,
+              contentType: "text/plain",
+              body: "challenge-value",
+            },
+          }),
+          resolveConnection: () => ({
+            ok: true,
+            connectionId: CandidateConnection.id,
+          }),
+          verify: (input) => {
+            verifiedConnectionId = input.connection.id;
+            expect(input.connectionSecrets).toEqual({
+              signingSecret: "slack-signing-secret",
+            });
+            expect(input.event.eventType).toBe("slack:url_verification");
+            return { ok: true };
+          },
+        },
+      },
+      targetKey: "slack_default",
+      target: {
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      connections: [CandidateConnection],
+      resolveConnectionSecrets: () => ({
+        signingSecret: "slack-signing-secret",
+      }),
+      headers: {},
+      rawBody: new Uint8Array(),
+    });
+
+    expect(verifiedConnectionId).toBe(CandidateConnection.id);
   });
 });
