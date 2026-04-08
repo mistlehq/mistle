@@ -4,7 +4,7 @@ import type {
 } from "@mistle/db/control-plane";
 import { sandboxProfileVersionIntegrationBindings } from "@mistle/db/control-plane";
 import { IntegrationKinds, runDefinitionBindingWriteValidation } from "@mistle/integrations-core";
-import { createDefinitionsBundle } from "@mistle/integrations-definitions";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import {

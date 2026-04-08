@@ -38,6 +38,14 @@ describe("integrations-definitions server", () => {
     expect(
       githubCloudDefinition?.credentialResolvers?.custom?.github_app_installation_token,
     ).toBeDefined();
+    expect(githubCloudDefinition?.resourceDefinitions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "repository",
+          bindingField: "repositories",
+        }),
+      ]),
+    );
     expect(githubEnterpriseServerDefinition?.redirectHandler).toBeDefined();
     expect(githubEnterpriseServerDefinition?.webhookHandler).toBeDefined();
     expect(githubEnterpriseServerDefinition?.webhookSource).toMatchObject({
@@ -48,6 +56,14 @@ describe("integrations-definitions server", () => {
     expect(
       githubEnterpriseServerDefinition?.credentialResolvers?.custom?.github_app_installation_token,
     ).toBeDefined();
+    expect(githubEnterpriseServerDefinition?.resourceDefinitions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "repository",
+          bindingField: "repositories",
+        }),
+      ]),
+    );
   });
 
   it("lists registered server definitions", () => {

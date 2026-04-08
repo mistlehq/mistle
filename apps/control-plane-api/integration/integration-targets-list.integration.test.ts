@@ -425,6 +425,7 @@ describe("integration targets discovery integration", () => {
             label: "API key",
             placeholder: "Enter API key",
             inputType: "password",
+            slotKey: "openai.openai-default.api-key.api-key",
           },
         ],
       },

@@ -1,5 +1,5 @@
 import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
-import { createDefinitionsBundle } from "@mistle/integrations-definitions";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 
 import { resolveIntegrationTargetSecrets } from "../lib/integration-target-secrets.js";
 import {
