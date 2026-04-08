@@ -16,6 +16,10 @@ import {
   uploadOrganizationLogo,
 } from "../settings/organization/organization-logo-service.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import {
+  createOrganizationLogoContentPath,
+  createSingletonImageContentUrl,
+} from "../shared/singleton-image.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { OrganizationGeneralSettingsPageView } from "./organization-general-settings-page-view.js";
@@ -103,9 +107,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
       setOrganizationLogoOperationErrorMessage(null);
     },
     onSuccess: async (result) => {
-      queryClient.setQueryData(organizationLogoQueryKey(organizationId), {
-        imageUrl: result.imageUrl,
-      });
+      queryClient.setQueryData(organizationLogoQueryKey(organizationId), result);
       setOrganizationLogoOperationErrorMessage(null);
     },
     onError: (error) => {
@@ -127,7 +129,8 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
     },
     onSuccess: async () => {
       queryClient.setQueryData(organizationLogoQueryKey(organizationId), {
-        imageUrl: null,
+        hasImage: false,
+        imageVersion: null,
       });
       setOrganizationLogoOperationErrorMessage(null);
     },
@@ -164,7 +167,11 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
           uploadOrganizationLogoMutation.isPending || deleteOrganizationLogoMutation.isPending
         }
         logoErrorMessage={logoErrorMessage}
-        logoUrl={organizationLogoQuery.data?.imageUrl ?? null}
+        logoUrl={createSingletonImageContentUrl({
+          resourceName: "Organization logo",
+          path: createOrganizationLogoContentPath(organizationId),
+          image: organizationLogoQuery.data,
+        })}
         loadErrorMessage={
           organizationQuery.isError
             ? resolveApiErrorMessage({

@@ -1,46 +1,30 @@
 import { getDashboardConfig } from "../../../config.js";
+import {
+  assertSingletonImageHasVersion,
+  readSingletonImageMetadataResponse,
+  type SingletonImageMetadata,
+} from "../../shared/singleton-image.js";
 import { executeMembersOperation } from "../members/members-api-errors.js";
 
-function parseOrganizationLogoPayload(payload: unknown): { imageUrl: string | null } {
-  if (typeof payload !== "object" || payload === null) {
-    throw new Error("Organization logo response was invalid.");
-  }
-
-  if (!("imageUrl" in payload)) {
-    throw new Error("Organization logo response was missing imageUrl.");
-  }
-
-  if (payload.imageUrl !== null && typeof payload.imageUrl !== "string") {
-    throw new Error("Organization logo response imageUrl was invalid.");
-  }
-
-  return {
-    imageUrl: payload.imageUrl,
-  };
-}
-
-function createOrganizationLogoUrl(input: { organizationId: string }): URL {
+function createOrganizationLogoUrl(organizationId: string): URL {
   const config = getDashboardConfig();
   return new URL(
-    `/v1/organizations/${encodeURIComponent(input.organizationId)}/logo`,
+    `/v1/organizations/${encodeURIComponent(organizationId)}/logo`,
     config.controlPlaneApiOrigin,
   );
 }
 
 export async function getOrganizationLogo(input: {
   organizationId: string;
-}): Promise<{ imageUrl: string | null }> {
+}): Promise<SingletonImageMetadata> {
   return executeMembersOperation("getOrganizationLogo", async () => {
-    const response = await fetch(
-      createOrganizationLogoUrl({ organizationId: input.organizationId }),
-      {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          accept: "application/json",
-        },
+    const response = await fetch(createOrganizationLogoUrl(input.organizationId), {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        accept: "application/json",
       },
-    );
+    });
 
     if (!response.ok) {
       const payload: unknown = await response.json().catch(() => null);
@@ -54,29 +38,29 @@ export async function getOrganizationLogo(input: {
       );
     }
 
-    return parseOrganizationLogoPayload(await response.json());
+    return readSingletonImageMetadataResponse({
+      response,
+      resourceName: "Organization logo",
+    });
   });
 }
 
 export async function uploadOrganizationLogo(input: {
   organizationId: string;
   file: File;
-}): Promise<{ imageUrl: string }> {
+}): Promise<SingletonImageMetadata> {
   return executeMembersOperation("uploadOrganizationLogo", async () => {
     const formData = new FormData();
     formData.set("file", input.file);
 
-    const response = await fetch(
-      createOrganizationLogoUrl({ organizationId: input.organizationId }),
-      {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          accept: "application/json",
-        },
-        body: formData,
+    const response = await fetch(createOrganizationLogoUrl(input.organizationId), {
+      method: "PUT",
+      credentials: "include",
+      headers: {
+        accept: "application/json",
       },
-    );
+      body: formData,
+    });
 
     if (!response.ok) {
       const payload: unknown = await response.json().catch(() => null);
@@ -90,29 +74,28 @@ export async function uploadOrganizationLogo(input: {
       );
     }
 
-    const result = parseOrganizationLogoPayload(await response.json());
-    if (result.imageUrl === null) {
-      throw new Error("Organization logo upload response did not include imageUrl.");
-    }
+    const result = await readSingletonImageMetadataResponse({
+      response,
+      resourceName: "Organization logo",
+    });
+    assertSingletonImageHasVersion({
+      image: result,
+      resourceName: "Organization logo",
+    });
 
-    return {
-      imageUrl: result.imageUrl,
-    };
+    return result;
   });
 }
 
 export async function deleteOrganizationLogo(input: { organizationId: string }): Promise<void> {
   return executeMembersOperation("deleteOrganizationLogo", async () => {
-    const response = await fetch(
-      createOrganizationLogoUrl({ organizationId: input.organizationId }),
-      {
-        method: "DELETE",
-        credentials: "include",
-        headers: {
-          accept: "application/json",
-        },
+    const response = await fetch(createOrganizationLogoUrl(input.organizationId), {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        accept: "application/json",
       },
-    );
+    });
 
     if (!response.ok) {
       const payload: unknown = await response.json().catch(() => null);
