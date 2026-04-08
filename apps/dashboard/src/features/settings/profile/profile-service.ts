@@ -2,7 +2,9 @@ import { getDashboardConfig } from "../../../config.js";
 import { authClient } from "../../../lib/auth/client.js";
 import { requestControlPlane } from "../../api/request-control-plane.js";
 import {
-  parseSingletonImageMetadata,
+  assertSingletonImageHasVersion,
+  readSingletonImageMetadataResponse,
+  throwSingletonImageResponseError,
   type SingletonImageMetadata,
 } from "../../shared/singleton-image.js";
 import { executeMembersOperation } from "../members/members-api-errors.js";
@@ -21,8 +23,8 @@ export async function getProfileImage(): Promise<SingletonImageMetadata> {
       fallbackMessage: "Could not load profile image.",
     });
 
-    return parseSingletonImageMetadata({
-      payload: await response.json(),
+    return readSingletonImageMetadataResponse({
+      response,
       resourceName: "Profile image",
     });
   });
@@ -43,24 +45,20 @@ export async function uploadProfileImage(input: { file: File }): Promise<Singlet
     });
 
     if (!response.ok) {
-      const payload: unknown = await response.json().catch(() => null);
-      throw new Error(
-        typeof payload === "object" &&
-          payload !== null &&
-          "message" in payload &&
-          typeof payload.message === "string"
-          ? payload.message
-          : "Could not upload profile image.",
-      );
+      return throwSingletonImageResponseError({
+        fallbackMessage: "Could not upload profile image.",
+        response,
+      });
     }
 
-    const result = parseSingletonImageMetadata({
-      payload: await response.json(),
+    const result = await readSingletonImageMetadataResponse({
+      response,
       resourceName: "Profile image",
     });
-    if (!result.hasImage || result.imageVersion === null) {
-      throw new Error("Profile image upload response did not include image metadata.");
-    }
+    assertSingletonImageHasVersion({
+      image: result,
+      resourceName: "Profile image",
+    });
 
     return result;
   });

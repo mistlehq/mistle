@@ -21,7 +21,6 @@ import { SettingsSectionNav } from "../settings/settings-section-nav.js";
 import {
   createOrganizationLogoContentPath,
   createSingletonImageContentUrl,
-  createSingletonImageMissingVersionMessage,
 } from "../shared/singleton-image.js";
 import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
 import { AppShellView } from "./app-shell-view.js";
@@ -151,9 +150,9 @@ export function AppShell(): React.JSX.Element {
     locationPathname: location.pathname,
     organizationErrorMessage: organizationSummary.organizationErrorMessage,
     organizationImageUrl: createSingletonImageContentUrl({
+      resourceName: "Organization logo",
       path: createOrganizationLogoContentPath(organizationSummary.activeOrganizationId),
       image: organizationLogoQuery.data,
-      missingVersionMessage: createSingletonImageMissingVersionMessage("Organization logo"),
     }),
     organizationName: organizationSummary.organizationName ?? "",
     pageMeta,

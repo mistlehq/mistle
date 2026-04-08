@@ -1,6 +1,8 @@
 import { getDashboardConfig } from "../../../config.js";
 import {
-  parseSingletonImageMetadata,
+  assertSingletonImageHasVersion,
+  readSingletonImageMetadataResponse,
+  throwSingletonImageResponseError,
   type SingletonImageMetadata,
 } from "../../shared/singleton-image.js";
 import { executeMembersOperation } from "../members/members-api-errors.js";
@@ -29,19 +31,14 @@ export async function getOrganizationLogo(input: {
     );
 
     if (!response.ok) {
-      const payload: unknown = await response.json().catch(() => null);
-      throw new Error(
-        typeof payload === "object" &&
-          payload !== null &&
-          "message" in payload &&
-          typeof payload.message === "string"
-          ? payload.message
-          : "Could not load organization logo.",
-      );
+      return throwSingletonImageResponseError({
+        fallbackMessage: "Could not load organization logo.",
+        response,
+      });
     }
 
-    return parseSingletonImageMetadata({
-      payload: await response.json(),
+    return readSingletonImageMetadataResponse({
+      response,
       resourceName: "Organization logo",
     });
   });
@@ -68,24 +65,20 @@ export async function uploadOrganizationLogo(input: {
     );
 
     if (!response.ok) {
-      const payload: unknown = await response.json().catch(() => null);
-      throw new Error(
-        typeof payload === "object" &&
-          payload !== null &&
-          "message" in payload &&
-          typeof payload.message === "string"
-          ? payload.message
-          : "Could not upload organization logo.",
-      );
+      return throwSingletonImageResponseError({
+        fallbackMessage: "Could not upload organization logo.",
+        response,
+      });
     }
 
-    const result = parseSingletonImageMetadata({
-      payload: await response.json(),
+    const result = await readSingletonImageMetadataResponse({
+      response,
       resourceName: "Organization logo",
     });
-    if (!result.hasImage || result.imageVersion === null) {
-      throw new Error("Organization logo upload response did not include image metadata.");
-    }
+    assertSingletonImageHasVersion({
+      image: result,
+      resourceName: "Organization logo",
+    });
 
     return result;
   });
@@ -105,15 +98,10 @@ export async function deleteOrganizationLogo(input: { organizationId: string }):
     );
 
     if (!response.ok) {
-      const payload: unknown = await response.json().catch(() => null);
-      throw new Error(
-        typeof payload === "object" &&
-          payload !== null &&
-          "message" in payload &&
-          typeof payload.message === "string"
-          ? payload.message
-          : "Could not delete organization logo.",
-      );
+      return throwSingletonImageResponseError({
+        fallbackMessage: "Could not delete organization logo.",
+        response,
+      });
     }
 
     await response.text();

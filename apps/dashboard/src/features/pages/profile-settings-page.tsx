@@ -12,7 +12,6 @@ import {
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import {
   createSingletonImageContentUrl,
-  createSingletonImageMissingVersionMessage,
   ProfileImageContentPath,
 } from "../shared/singleton-image.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
@@ -59,9 +58,9 @@ export function ProfileSettingsPage(): React.JSX.Element {
         updateSessionUserImage(
           currentSession ?? null,
           createSingletonImageContentUrl({
+            resourceName: "Profile image",
             path: ProfileImageContentPath,
             image: result,
-            missingVersionMessage: createSingletonImageMissingVersionMessage("Profile image"),
           }),
         ),
       );
@@ -103,9 +102,9 @@ export function ProfileSettingsPage(): React.JSX.Element {
 
   const persistedDisplayName = resolveUserDisplayName(session.user);
   const imageUrl = createSingletonImageContentUrl({
+    resourceName: "Profile image",
     path: ProfileImageContentPath,
     image: profileImageQuery.data,
-    missingVersionMessage: createSingletonImageMissingVersionMessage("Profile image"),
   });
   const profileImageErrorMessage =
     profileImageOperationErrorMessage ??

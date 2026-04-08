@@ -19,7 +19,6 @@ import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import {
   createOrganizationLogoContentPath,
   createSingletonImageContentUrl,
-  createSingletonImageMissingVersionMessage,
 } from "../shared/singleton-image.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
@@ -169,9 +168,9 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         }
         logoErrorMessage={logoErrorMessage}
         logoUrl={createSingletonImageContentUrl({
+          resourceName: "Organization logo",
           path: createOrganizationLogoContentPath(organizationId),
           image: organizationLogoQuery.data,
-          missingVersionMessage: createSingletonImageMissingVersionMessage("Organization logo"),
         })}
         loadErrorMessage={
           organizationQuery.isError
