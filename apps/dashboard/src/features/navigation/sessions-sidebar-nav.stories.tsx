@@ -205,68 +205,7 @@ type Story = StoryObj<typeof meta>;
 
 export const MixedOpenableStates: Story = {};
 
-export const WorkingAndReadyOnly: Story = {
-  args: {
-    items: [
-      {
-        id: "sbi_working_only",
-        title:
-          "Long-running refactor of session navigation state across dashboard shell and grouped sidebar views",
-        sandboxProfileId: "sbp_engineering",
-        sandboxProfileDisplayName: "Engineering",
-        status: "running",
-        createdAt: "2026-04-08T09:00:00.000Z",
-        keepaliveActive: true,
-      },
-      {
-        id: "sbi_ready_only",
-        title: "Patch release notes",
-        sandboxProfileId: "sbp_engineering",
-        sandboxProfileDisplayName: "Engineering",
-        status: "running",
-        createdAt: "2026-04-08T08:00:00.000Z",
-        keepaliveActive: false,
-      },
-    ],
-  },
-};
-
-export const TitleVariations: Story = {
-  args: {
-    items: [
-      {
-        id: "sbi_title_short",
-        title: "Fix auth bug",
-        sandboxProfileId: "sbp_variations",
-        sandboxProfileDisplayName: "Title Variations",
-        status: "running",
-        createdAt: "2026-04-08T09:30:00.000Z",
-        keepaliveActive: true,
-      },
-      {
-        id: "sbi_title_precise",
-        title:
-          "Audit control-plane list response shaping for keepalive-aware sessions sidebar affordances",
-        sandboxProfileId: "sbp_variations",
-        sandboxProfileDisplayName: "Title Variations",
-        status: "running",
-        createdAt: "2026-04-08T09:20:00.000Z",
-        keepaliveActive: false,
-      },
-      {
-        id: "sbi_title_untitled",
-        title: null,
-        sandboxProfileId: "sbp_variations",
-        sandboxProfileDisplayName: "Title Variations",
-        status: "stopped",
-        createdAt: "2026-04-08T09:10:00.000Z",
-        keepaliveActive: false,
-      },
-    ],
-  },
-};
-
-export const EmptyAfterFiltering: Story = {
+export const EmptyState: Story = {
   args: {
     items: [
       {
