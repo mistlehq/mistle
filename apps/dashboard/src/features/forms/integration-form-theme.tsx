@@ -124,6 +124,39 @@ function resolveTextInputValue(value: unknown): string {
   return "";
 }
 
+function resolveCheckboxOptionLabel(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+  option: { label: string; value: unknown },
+): string {
+  if (option.label !== String(option.value)) {
+    return option.label;
+  }
+
+  const uiEnumNames = props.uiSchema["ui:enumNames"];
+  const itemsSchema = isRecord(props.schema.items) ? props.schema.items : null;
+  if (Array.isArray(uiEnumNames) && itemsSchema !== null && Array.isArray(itemsSchema.enum)) {
+    const optionIndex = itemsSchema.enum.findIndex((candidate) => candidate === option.value);
+    const optionLabel = uiEnumNames[optionIndex];
+    if (typeof optionLabel === "string") {
+      return optionLabel;
+    }
+  }
+
+  if (itemsSchema !== null && Array.isArray(itemsSchema.oneOf)) {
+    for (const candidate of itemsSchema.oneOf) {
+      if (!isRecord(candidate)) {
+        continue;
+      }
+
+      if (candidate.const === option.value && typeof candidate.title === "string") {
+        return candidate.title;
+      }
+    }
+  }
+
+  return option.label;
+}
+
 function TextWidget(
   props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
@@ -267,6 +300,10 @@ function CheckboxesWidget(
             const itemDisabled = Array.isArray(enumDisabled) && enumDisabled.includes(option.value);
             const itemId = optionId(id, index);
             const describedBy = ariaDescribedByIds(id);
+            const optionLabel = resolveCheckboxOptionLabel(props, {
+              label: String(option.label),
+              value: option.value,
+            });
 
             return (
               <label
@@ -278,7 +315,7 @@ function CheckboxesWidget(
               >
                 <Checkbox
                   aria-describedby={describedBy}
-                  aria-label={String(option.label)}
+                  aria-label={optionLabel}
                   autoFocus={autofocus && index === 0}
                   checked={checked}
                   disabled={disabled || itemDisabled || readonly}
@@ -300,7 +337,7 @@ function CheckboxesWidget(
                   }}
                   value={String(index)}
                 />
-                <span className="text-sm">{option.label}</span>
+                <span className="text-sm">{optionLabel}</span>
               </label>
             );
           })

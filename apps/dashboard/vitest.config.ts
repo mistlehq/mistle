@@ -51,6 +51,12 @@ export default defineConfig({
         ),
       },
       {
+        find: /^@mistle\/integrations-definitions\/(.+)$/,
+        replacement: fileURLToPath(
+          new URL("../../packages/integrations-definitions/src/$1.ts", import.meta.url),
+        ),
+      },
+      {
         find: /^@mistle\/sandbox-session-client$/,
         replacement: fileURLToPath(
           new URL("../../packages/sandbox-session-client/src/index.ts", import.meta.url),

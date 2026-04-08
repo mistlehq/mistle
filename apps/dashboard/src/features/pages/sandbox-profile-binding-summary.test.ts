@@ -66,7 +66,7 @@ describe("formatSandboxProfileBindingSummaryItems", () => {
       },
       {
         label: "Tools",
-        value: "GitHub CLI (gh)",
+        value: "GitHub CLI",
       },
     ]);
   });
@@ -111,7 +111,7 @@ describe("formatSandboxProfileBindingSummaryItems", () => {
     ).toEqual([
       {
         label: "Tools",
-        value: "Jira CLI (jira)",
+        value: "Jira CLI",
       },
     ]);
   });

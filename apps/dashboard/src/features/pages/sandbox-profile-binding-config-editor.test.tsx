@@ -305,4 +305,43 @@ describe("SandboxProfileBindingConfigEditor", () => {
       },
     });
   });
+
+  it("renders the Jira tool checkbox with the display label", () => {
+    const target: IntegrationTargetSummary = {
+      targetKey: "target-jira",
+      displayName: "Jira",
+      familyId: "jira",
+      variantId: "jira-default",
+      config: {},
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+    const connection: IntegrationConnectionSummary = {
+      id: "connection-jira",
+      displayName: "Jira Production",
+      targetKey: target.targetKey,
+      status: "active",
+      config: {
+        connection_method: "jira-personal-api-token",
+        site_url: "https://mistle.atlassian.net",
+        email: "user@example.com",
+      },
+    };
+    const row: SandboxProfileBindingEditorRow = {
+      clientId: "row-jira",
+      connectionId: connection.id,
+      kind: "connector",
+      config: {},
+    };
+
+    renderBindingEditor({
+      row,
+      connections: [connection],
+      targets: [target],
+    });
+
+    expect(screen.getByText("Jira CLI")).toBeDefined();
+    expect(screen.queryByText("jira-cli")).toBeNull();
+  });
 });

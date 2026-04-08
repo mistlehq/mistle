@@ -22,19 +22,17 @@ describe("jira binding config forms", () => {
           title: "Tools",
           default: [],
           items: {
-            oneOf: [
-              {
-                const: "jira-cli",
-                title: "Jira CLI (jira)",
-              },
-            ],
+            type: "string",
+            enum: ["jira-cli"],
           },
+          type: "array",
           uniqueItems: true,
         },
       },
     });
     expect(resolvedForm.uiSchema).toEqual({
       tools: {
+        "ui:enumNames": ["Jira CLI"],
         "ui:widget": "checkboxes",
         "ui:options": {
           inline: false,
