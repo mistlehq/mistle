@@ -4,6 +4,7 @@ import {
   createAuthenticatedSessionFixture,
   seedAuthenticatedSession,
 } from "../../test-support/auth-session.js";
+import { organizationLogoQueryKey } from "../organizations/organization-logo-query.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type {
   LaunchableSandboxProfile,
@@ -14,6 +15,7 @@ import type {
   SandboxInstanceListItem,
   SandboxInstancesListResult,
 } from "../sessions/sessions-types.js";
+import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 
 export function buildStoryLaunchableSandboxProfile(
   overrides: Partial<LaunchableSandboxProfile> & Pick<LaunchableSandboxProfile, "id">,
@@ -73,6 +75,10 @@ export function createSessionsPageStoryQueryClient(input?: {
   });
 
   seedAuthenticatedSession(queryClient);
+  queryClient.setQueryData(organizationSummaryQueryKey("org_123"), {
+    name: "Mistle Labs",
+  });
+  queryClient.setQueryData(organizationLogoQueryKey("org_123"), null);
   queryClient.setQueryData(launchableSandboxProfilesQueryKey(), {
     items: input?.launchableProfiles ?? [
       buildStoryLaunchableSandboxProfile({ id: "sbp_profile_alpha" }),

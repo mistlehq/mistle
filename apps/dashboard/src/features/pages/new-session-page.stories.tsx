@@ -1,35 +1,20 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
 
-import {
-  createDashboardMemoryRouterDecorator,
-  withDashboardPageStory,
-} from "../../storybook/decorators.js";
+import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { NewSessionPage } from "./new-session-page.js";
-import {
-  buildStoryLaunchableSandboxProfile,
-  createSessionsPageStoryQueryClient,
-} from "./sessions-page.story-fixtures.js";
+import { buildStoryLaunchableSandboxProfile } from "./sessions-page.story-fixtures.js";
+import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
 type NewSessionPageStoryArgs = {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
 };
 
 function NewSessionPageStory(input: NewSessionPageStoryArgs): React.JSX.Element {
-  const [queryClient] = useState(() =>
-    createSessionsPageStoryQueryClient({
-      ...(input.launchableProfiles !== undefined
-        ? { launchableProfiles: input.launchableProfiles }
-        : {}),
-    }),
-  );
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <NewSessionPage />
-    </QueryClientProvider>
+    <SessionsStoryHarness
+      initialEntries={["/sessions/new"]}
+      launchableProfiles={input.launchableProfiles}
+    />
   );
 }
 
@@ -37,7 +22,7 @@ const meta = {
   title: "Dashboard/Sessions/NewPage",
   component: NewSessionPageStory,
   tags: ["autodocs"],
-  decorators: [withDashboardPageStory, createDashboardMemoryRouterDecorator(["/sessions/new"])],
+  decorators: [withDashboardPageStory],
   parameters: {
     layout: "fullscreen",
   },

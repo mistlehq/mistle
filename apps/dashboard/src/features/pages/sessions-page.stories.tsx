@@ -1,16 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
 
-import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybook/decorators.js";
+import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
-import { SessionsPage } from "./sessions-page.js";
 import {
   buildSandboxInstanceListItemFixture,
   buildStoryLaunchableSandboxProfile,
-  createSessionsPageStoryQueryClient,
 } from "./sessions-page.story-fixtures.js";
+import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
 type SessionsPageStoryArgs = {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
@@ -18,23 +15,12 @@ type SessionsPageStoryArgs = {
 };
 
 function SessionsPageStory(input: SessionsPageStoryArgs): React.JSX.Element {
-  const [queryClient] = useState(() => {
-    const storyData = {
-      ...(input.launchableProfiles !== undefined
-        ? { launchableProfiles: input.launchableProfiles }
-        : {}),
-      ...(input.sandboxInstancesList !== undefined
-        ? { sandboxInstancesList: input.sandboxInstancesList }
-        : {}),
-    };
-
-    return createSessionsPageStoryQueryClient(storyData);
-  });
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <SessionsPage />
-    </QueryClientProvider>
+    <SessionsStoryHarness
+      initialEntries={["/sessions"]}
+      launchableProfiles={input.launchableProfiles}
+      sandboxInstancesList={input.sandboxInstancesList}
+    />
   );
 }
 
@@ -45,7 +31,7 @@ const meta = {
   parameters: {
     layout: "fullscreen",
   },
-  decorators: [withDashboardPageStory, withDashboardMemoryRouter],
+  decorators: [withDashboardPageStory],
   args: {
     launchableProfiles: [
       buildStoryLaunchableSandboxProfile({
