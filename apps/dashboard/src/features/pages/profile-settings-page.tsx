@@ -17,7 +17,6 @@ import {
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
-import { updateSessionUserImage } from "../shell/session-user-image.js";
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
 const PROFILE_IMAGE_QUERY_KEY: readonly ["settings", "profile-image"] = [
@@ -54,16 +53,6 @@ export function ProfileSettingsPage(): React.JSX.Element {
     },
     onSuccess: async (result) => {
       queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, result);
-      queryClient.setQueryData(SESSION_QUERY_KEY, (currentSession) =>
-        updateSessionUserImage(
-          currentSession ?? null,
-          createSingletonImageContentUrl({
-            resourceName: "Profile image",
-            path: ProfileImageContentPath,
-            image: result,
-          }),
-        ),
-      );
       setProfileImageOperationErrorMessage(null);
     },
     onError: (error) => {
@@ -85,9 +74,6 @@ export function ProfileSettingsPage(): React.JSX.Element {
         hasImage: false,
         imageVersion: null,
       });
-      queryClient.setQueryData(SESSION_QUERY_KEY, (currentSession) =>
-        updateSessionUserImage(currentSession ?? null, null),
-      );
       setProfileImageOperationErrorMessage(null);
     },
     onError: (error) => {
