@@ -474,7 +474,7 @@ export function SessionsPage(): React.JSX.Element {
               {!isLoadingSessions && !hasSessions ? (
                 <TableRow>
                   <TableCell className="text-muted-foreground" colSpan={5}>
-                    No sandbox instances yet.
+                    No sessions yet.
                   </TableCell>
                 </TableRow>
               ) : (
