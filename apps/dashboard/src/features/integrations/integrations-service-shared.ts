@@ -43,6 +43,7 @@ export const IntegrationTargetSchema = z
                       placeholder: z.string().min(1).optional(),
                       description: z.string().min(1).optional(),
                       inputType: z.enum(["password", "text"]),
+                      slotKey: z.string().min(1).optional(),
                     })
                     .strict(),
                 )
