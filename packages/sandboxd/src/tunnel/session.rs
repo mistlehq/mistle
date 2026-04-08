@@ -163,6 +163,10 @@ enum TunnelSessionEvent {
     BootstrapClosed {
         reason: Option<String>,
     },
+    AgentDialed {
+        stream_id: u32,
+        result: Box<Result<TunnelWebSocket, String>>,
+    },
     AgentMessage {
         stream_id: u32,
         message: Message,
@@ -177,6 +181,10 @@ enum TunnelSessionEvent {
 struct AgentStreamState {
     sender: mpsc::UnboundedSender<Message>,
     send_window: StreamSendWindow,
+}
+
+struct PendingAgentOpenState {
+    task: TokioJoinHandle<()>,
 }
 
 impl TunnelSession {
@@ -276,7 +284,13 @@ impl TunnelSession {
             .expect("tunnel session thread should exist");
 
         match thread.join() {
-            Ok(result) => result,
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(TunnelSessionError::ReadTunnel(reason)))
+                if reason == "bootstrap tunnel closed" =>
+            {
+                Ok(())
+            }
+            Ok(Err(error)) => Err(error),
             Err(_) => Err(TunnelSessionError::SessionPanicked),
         }
     }
@@ -324,6 +338,7 @@ struct TunnelSessionLoopContext<'a> {
 
 struct TunnelSessionMutableState {
     telemetry_relay: TelemetryRelay,
+    pending_agent_opens: BTreeMap<u32, PendingAgentOpenState>,
     agent_streams: BTreeMap<u32, AgentStreamState>,
     pty_sessions: BTreeMap<String, PtySessionState>,
     file_uploads: BTreeMap<u32, FileUploadState>,
@@ -370,6 +385,7 @@ async fn run_tunnel_session(
 
     let mut session_state = TunnelSessionMutableState {
         telemetry_relay: TelemetryRelay::default(),
+        pending_agent_opens: BTreeMap::new(),
         agent_streams: BTreeMap::new(),
         pty_sessions: BTreeMap::new(),
         file_uploads: BTreeMap::new(),
@@ -433,6 +449,9 @@ async fn run_tunnel_session(
         };
 
         if runtime.shutdown_requested.load(Ordering::Relaxed) {
+            for pending_agent_open in session_state.pending_agent_opens.values() {
+                pending_agent_open.task.abort();
+            }
             for pty_session in session_state.pty_sessions.values() {
                 let _ = pty_session.session.terminate(
                     loop_context.clock,
@@ -629,6 +648,23 @@ fn spawn_agent_stream_task(
     sender
 }
 
+fn spawn_agent_dial_task(
+    stream_id: u32,
+    runtime_endpoint_url: String,
+    event_sender: mpsc::UnboundedSender<TunnelSessionEvent>,
+) -> TokioJoinHandle<()> {
+    tokio::spawn(async move {
+        let result = match connect_async(&runtime_endpoint_url).await {
+            Ok((runtime_socket, _)) => Ok(runtime_socket),
+            Err(error) => Err(error.to_string()),
+        };
+        let _ = event_sender.send(TunnelSessionEvent::AgentDialed {
+            stream_id,
+            result: Box::new(result),
+        });
+    })
+}
+
 fn poll_pty_sessions(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     pty_sessions: &mut BTreeMap<String, PtySessionState>,
@@ -762,6 +798,42 @@ async fn handle_tunnel_session_event(
             )?;
             Ok(())
         }
+        TunnelSessionEvent::AgentDialed { stream_id, result } => {
+            let result = *result;
+            if session_state
+                .pending_agent_opens
+                .remove(&stream_id)
+                .is_none()
+            {
+                if let Ok(runtime_socket) = result {
+                    drop(runtime_socket);
+                }
+                return Ok(());
+            }
+
+            match result {
+                Ok(runtime_socket) => {
+                    let sender =
+                        spawn_agent_stream_task(stream_id, runtime_socket, event_sender.clone());
+                    session_state.agent_streams.insert(
+                        stream_id,
+                        AgentStreamState {
+                            sender,
+                            send_window: StreamSendWindow::default(),
+                        },
+                    );
+                    write_tunnel_text(tunnel_writer_sender, stream_open_ok(stream_id))
+                }
+                Err(error) => write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_open_error(
+                        stream_id,
+                        CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
+                        format!("failed to connect agent endpoint: {error}"),
+                    ),
+                ),
+            }
+        }
         TunnelSessionEvent::BootstrapMessage(message) => match message {
             Message::Text(payload) => {
                 match session_state
@@ -799,9 +871,7 @@ async fn handle_tunnel_session_event(
                     event_sender,
                     control_message,
                     context,
-                    &mut session_state.agent_streams,
-                    &mut session_state.pty_sessions,
-                    &mut session_state.file_uploads,
+                    session_state,
                 )
                 .await
             }
@@ -978,9 +1048,7 @@ async fn handle_tunnel_control_message(
     event_sender: &mpsc::UnboundedSender<TunnelSessionEvent>,
     control_message: StreamControlMessage,
     context: &TunnelSessionLoopContext<'_>,
-    agent_streams: &mut BTreeMap<u32, AgentStreamState>,
-    pty_sessions: &mut BTreeMap<String, PtySessionState>,
-    file_uploads: &mut BTreeMap<u32, FileUploadState>,
+    session_state: &mut TunnelSessionMutableState,
 ) -> Result<(), TunnelSessionError> {
     match control_message {
         StreamControlMessage::OpenAgent(message) => {
@@ -995,27 +1063,23 @@ async fn handle_tunnel_control_message(
                 )?;
                 return Ok(());
             };
-
-            let (runtime_socket, _) = connect_async(runtime_endpoint_url)
-                .await
-                .map_err(|error| TunnelSessionError::AgentDial(error.to_string()))?;
-            let sender =
-                spawn_agent_stream_task(message.stream_id, runtime_socket, event_sender.clone());
-            agent_streams.insert(
+            session_state.pending_agent_opens.insert(
                 message.stream_id,
-                AgentStreamState {
-                    sender,
-                    send_window: StreamSendWindow::default(),
+                PendingAgentOpenState {
+                    task: spawn_agent_dial_task(
+                        message.stream_id,
+                        runtime_endpoint_url.to_string(),
+                        event_sender.clone(),
+                    ),
                 },
             );
-            write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
         StreamControlMessage::OpenPty(message) => {
             let mut pty_open_context = PtyOpenContext {
                 cgroup_root: context.cgroup_root,
                 runtime_env: context.runtime_env,
                 sandbox_instance_id: context.sandbox_instance_id,
-                pty_sessions,
+                pty_sessions: &mut session_state.pty_sessions,
                 clock: context.clock,
                 sleeper: context.sleeper,
             };
@@ -1025,11 +1089,14 @@ async fn handle_tunnel_control_message(
             let upload_state =
                 create_file_upload_state(&message, context.attachment_root, context.clock)
                     .map_err(TunnelSessionError::FileUpload)?;
-            file_uploads.insert(message.stream_id, upload_state);
+            session_state
+                .file_uploads
+                .insert(message.stream_id, upload_state);
             write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
         StreamControlMessage::Signal(message) => {
-            let Some(pty_state) = pty_sessions
+            let Some(pty_state) = session_state
+                .pty_sessions
                 .values_mut()
                 .find(|pty_state| pty_state.attached_stream_ids.contains(&message.stream_id))
             else {
@@ -1053,11 +1120,18 @@ async fn handle_tunnel_control_message(
                 .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
         }
         StreamControlMessage::Close(message) => {
-            if let Some(agent_stream) = agent_streams.remove(&message.stream_id) {
+            if let Some(pending_agent_open) =
+                session_state.pending_agent_opens.remove(&message.stream_id)
+            {
+                pending_agent_open.task.abort();
+                return Ok(());
+            }
+            if let Some(agent_stream) = session_state.agent_streams.remove(&message.stream_id) {
                 let _ = agent_stream.sender.send(Message::Close(None));
                 return Ok(());
             }
-            if let Some(pty_session_id) = pty_sessions
+            if let Some(pty_session_id) = session_state
+                .pty_sessions
                 .iter()
                 .find(|(_, pty_state)| pty_state.attached_stream_ids.contains(&message.stream_id))
                 .map(|(session_id, _)| session_id.clone())
@@ -1066,13 +1140,13 @@ async fn handle_tunnel_control_message(
                     tunnel_writer_sender,
                     &pty_session_id,
                     message.stream_id,
-                    pty_sessions,
+                    &mut session_state.pty_sessions,
                     context.clock,
                     context.sleeper,
                 )?;
                 return Ok(());
             }
-            if let Some(upload_state) = file_uploads.remove(&message.stream_id) {
+            if let Some(upload_state) = session_state.file_uploads.remove(&message.stream_id) {
                 finalize_file_upload(tunnel_writer_sender, message.stream_id, upload_state)?;
                 return Ok(());
             }
@@ -1090,14 +1164,21 @@ async fn handle_tunnel_control_message(
             )?;
         }
         StreamControlMessage::Window(message) => {
-            if let Some(agent_stream) = agent_streams.get_mut(&message.stream_id) {
+            if let Some(agent_stream) = session_state.agent_streams.get_mut(&message.stream_id) {
                 agent_stream
                     .send_window
                     .add(message.bytes)
                     .map_err(|error| TunnelSessionError::ParseControl(error.to_string()))?;
                 return Ok(());
             }
-            if let Some(pty_state) = pty_sessions
+            if session_state
+                .pending_agent_opens
+                .contains_key(&message.stream_id)
+            {
+                return Ok(());
+            }
+            if let Some(pty_state) = session_state
+                .pty_sessions
                 .values_mut()
                 .find(|pty_state| pty_state.attached_stream_ids.contains(&message.stream_id))
             {
@@ -2336,6 +2417,357 @@ mod tests {
             .expect("gateway thread should exit cleanly");
     }
 
+    #[test]
+    fn refresh_style_agent_open_cancels_slow_prior_dial() {
+        let agent_listener =
+            TcpListener::bind("127.0.0.1:0").expect("agent runtime listener should bind");
+        let agent_url = format!(
+            "ws://127.0.0.1:{}/agent",
+            agent_listener
+                .local_addr()
+                .expect("agent listener should expose an address")
+                .port()
+        );
+        let (first_accept_sender, first_accept_receiver) = mpsc::channel();
+        let agent_server_thread = thread::spawn(move || {
+            let (first_stream, _) = agent_listener
+                .accept()
+                .expect("agent listener should accept the first hanging connection");
+            first_accept_sender
+                .send(())
+                .expect("agent listener should report the first accepted connection");
+            let first_connection_thread = thread::spawn(move || {
+                thread::sleep(std::time::Duration::from_millis(250));
+                drop(first_stream);
+            });
+
+            let (second_stream, _) = agent_listener
+                .accept()
+                .expect("agent listener should accept the second connection");
+            let mut second_socket =
+                accept(second_stream).expect("second agent websocket handshake should succeed");
+            match second_socket.read() {
+                Ok(Message::Close(_))
+                | Err(WebSocketError::ConnectionClosed)
+                | Err(WebSocketError::Protocol(
+                    tokio_tungstenite::tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
+                )) => {}
+                Ok(other_message) => panic!(
+                    "expected second agent websocket to close after stream shutdown, got {other_message:?}"
+                ),
+                Err(error) => panic!(
+                    "second agent websocket should only end because the tunnel stream closed: {error}"
+                ),
+            }
+            first_connection_thread
+                .join()
+                .expect("first hanging connection thread should exit cleanly");
+        });
+
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+            let telemetry_open = read_json_text_message(&mut websocket);
+            assert_eq!(telemetry_open["type"], "telemetry.open");
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "telemetry.open.ok",
+                        "streamId": telemetry_open["streamId"],
+                        "initialWindowBytes": 1024
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should acknowledge telemetry.open");
+
+            let mut saw_keepalive = false;
+            while !saw_keepalive {
+                let control_message = read_json_text_message(&mut websocket);
+                if control_message["type"] == Value::String("keepalive.state".to_string()) {
+                    saw_keepalive = true;
+                }
+            }
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.open",
+                        "streamId": 7,
+                        "channel": {
+                            "kind": "agent"
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should open the first agent stream");
+
+            first_accept_receiver
+                .recv_timeout(std::time::Duration::from_secs(1))
+                .expect("gateway should observe the first agent dial before simulating refresh");
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.close",
+                        "streamId": 7
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should close the first agent stream");
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.open",
+                        "streamId": 8,
+                        "channel": {
+                            "kind": "agent"
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should open the second agent stream");
+
+            websocket
+                .get_mut()
+                .set_read_timeout(Some(std::time::Duration::from_secs(1)))
+                .expect("gateway bootstrap socket should accept a read timeout");
+            assert_eq!(
+                read_stream_text_message(&mut websocket),
+                json!({
+                    "type": "stream.open.ok",
+                    "streamId": 8
+                })
+            );
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.close",
+                        "streamId": 8
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should close the second agent stream");
+
+            websocket
+                .close(None)
+                .expect("gateway websocket should close cleanly");
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal the tunnel session finished");
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "mistle/sandbox-base:dev"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: BTreeMap::new(),
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let tunnel_session = TunnelSession::start(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            Some(agent_url),
+            BTreeMap::new(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("tunnel session should start");
+
+        gateway_done_receiver
+            .recv()
+            .expect("gateway should complete the bootstrap interaction");
+
+        tunnel_session
+            .close()
+            .expect("tunnel session should stop cleanly");
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+        agent_server_thread
+            .join()
+            .expect("agent server thread should exit cleanly");
+    }
+
+    #[test]
+    fn agent_dial_failure_returns_stream_open_error_without_dropping_tunnel() {
+        let agent_listener =
+            TcpListener::bind("127.0.0.1:0").expect("agent runtime listener should bind");
+        let agent_url = format!(
+            "ws://127.0.0.1:{}/agent",
+            agent_listener
+                .local_addr()
+                .expect("agent listener should expose an address")
+                .port()
+        );
+        let agent_server_thread = thread::spawn(move || {
+            let (stream, _) = agent_listener
+                .accept()
+                .expect("agent listener should accept one failing connection");
+            drop(stream);
+        });
+
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+            let telemetry_open = read_json_text_message(&mut websocket);
+            assert_eq!(telemetry_open["type"], "telemetry.open");
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "telemetry.open.ok",
+                        "streamId": telemetry_open["streamId"],
+                        "initialWindowBytes": 1024
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should acknowledge telemetry.open");
+
+            let mut saw_keepalive = false;
+            while !saw_keepalive {
+                let control_message = read_json_text_message(&mut websocket);
+                if control_message["type"] == Value::String("keepalive.state".to_string()) {
+                    saw_keepalive = true;
+                }
+            }
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.open",
+                        "streamId": 7,
+                        "channel": {
+                            "kind": "agent"
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should open the agent stream");
+
+            let agent_open_error = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                agent_open_error["type"],
+                Value::String("stream.open.error".to_string())
+            );
+            assert_eq!(agent_open_error["streamId"], Value::Number(7.into()));
+            assert_eq!(
+                agent_open_error["code"],
+                Value::String("agent_endpoint_dial_failed".to_string())
+            );
+
+            send_websocket_ping_and_expect_pong(
+                &mut websocket,
+                b"bootstrap-still-open-after-agent-dial-failure",
+            );
+
+            websocket
+                .close(None)
+                .expect("gateway websocket should close cleanly");
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal the tunnel session finished");
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "mistle/sandbox-base:dev"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: BTreeMap::new(),
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let tunnel_session = TunnelSession::start(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            Some(agent_url),
+            BTreeMap::new(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("tunnel session should start");
+
+        gateway_done_receiver
+            .recv()
+            .expect("gateway should complete the bootstrap interaction");
+
+        tunnel_session
+            .close()
+            .expect("tunnel session should stop cleanly");
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+        agent_server_thread
+            .join()
+            .expect("agent server thread should exit cleanly");
+    }
+
     fn read_json_text_message<S>(socket: &mut WebSocket<S>) -> Value
     where
         S: std::io::Read + std::io::Write,
@@ -2404,5 +2836,23 @@ mod tests {
                 _ => panic!("expected websocket binary telemetry frame"),
             }
         }
+    }
+
+    fn send_websocket_ping_and_expect_pong<S>(socket: &mut WebSocket<S>, payload: &[u8])
+    where
+        S: std::io::Read + std::io::Write,
+    {
+        socket
+            .send(Message::Ping(payload.to_vec().into()))
+            .expect("websocket ping should send");
+
+        let Message::Pong(pong_payload) = socket
+            .read()
+            .expect("websocket should receive a pong response")
+        else {
+            panic!("expected websocket pong response");
+        };
+
+        assert_eq!(pong_payload.as_ref(), payload);
     }
 }
