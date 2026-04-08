@@ -101,24 +101,11 @@ export function SessionsSidebarNav(input: {
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
-          <div className="pt-1 pb-1">
-            <div
-              className={`border-1 flex h-8 items-center gap-2 rounded-md px-2 transition-colors ${
-                hasActiveSearch
-                  ? "border-border bg-white text-sidebar-accent-foreground"
-                  : "border-transparent hover:border-border hover:bg-white hover:text-sidebar-accent-foreground"
-              }`}
-            >
-              <MagnifyingGlassIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
-              <Input
-                aria-label="Search"
-                className="h-full border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search"
-                value={searchQuery}
-              />
-            </div>
-          </div>
+          <SessionsSidebarSearch
+            hasActiveSearch={hasActiveSearch}
+            onQueryChange={setSearchQuery}
+            query={searchQuery}
+          />
         </SidebarGroupContent>
       </SidebarGroup>
       {visibleGroups.length === 0 ? (
@@ -188,6 +175,38 @@ export function SessionsSidebarNav(input: {
         </SidebarGroup>
       ))}
     </>
+  );
+}
+
+function SessionsSidebarSearch(input: {
+  hasActiveSearch: boolean;
+  onQueryChange: (query: string) => void;
+  query: string;
+}): React.JSX.Element {
+  const isActiveSearch = input.hasActiveSearch;
+  const containerStateClass = isActiveSearch
+    ? "border-border bg-white text-sidebar-accent-foreground"
+    : "border-transparent text-foreground hover:border-border hover:bg-white hover:text-muted-foreground focus-within:text-muted-foreground";
+  const iconClass = isActiveSearch ? "text-muted-foreground" : "";
+  const placeholderClass = isActiveSearch
+    ? "placeholder:text-muted-foreground"
+    : "placeholder:text-current";
+
+  return (
+    <div className="pt-1 pb-1">
+      <div
+        className={`border-1 flex h-8 items-center gap-2 rounded-md px-2 transition-colors ${containerStateClass}`}
+      >
+        <MagnifyingGlassIcon aria-hidden className={`size-4 shrink-0 ${iconClass}`} />
+        <Input
+          aria-label="Search sessions"
+          className={`h-full border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 ${placeholderClass}`}
+          onChange={(event) => input.onQueryChange(event.target.value)}
+          placeholder="Search"
+          value={input.query}
+        />
+      </div>
+    </div>
   );
 }
 

@@ -77,7 +77,7 @@ describe("SessionsSidebarNav", () => {
   it("renders a new session action above the search field", () => {
     renderSidebarNav();
 
-    expect(screen.getByRole("button", { name: "New" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Create a new session" })).toBeDefined();
     expect(screen.getByRole("textbox", { name: "Search sessions" })).toBeDefined();
   });
 
@@ -129,7 +129,7 @@ describe("SessionsSidebarNav", () => {
       </SidebarProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "New" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Create a new session" })).toBeDefined();
     expect(screen.getByText("No openable sessions yet.")).toBeDefined();
   });
 });
