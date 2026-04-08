@@ -175,9 +175,9 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
               <FieldContent>
                 <Select
                   onValueChange={(nextValue) => {
-                    props.onMethodChange(nextValue);
+                    props.onMethodChange(nextValue ?? "");
                   }}
-                  value={props.methodId.length === 0 ? undefined : props.methodId}
+                  value={props.methodId.length === 0 ? "" : props.methodId}
                 >
                   <SelectTrigger className="w-full" id={`connect-auth-method-${dialog.targetKey}`}>
                     <SelectValue placeholder="Select authentication method">

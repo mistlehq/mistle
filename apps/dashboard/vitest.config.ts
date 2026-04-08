@@ -2,6 +2,10 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
 
+const IntegrationsDefinitionsSrcPath = fileURLToPath(
+  new URL("../../packages/integrations-definitions/src", import.meta.url),
+);
+
 export default defineConfig({
   resolve: {
     alias: [
@@ -52,9 +56,7 @@ export default defineConfig({
       },
       {
         find: /^@mistle\/integrations-definitions\/(.+)$/,
-        replacement: fileURLToPath(
-          new URL("../../packages/integrations-definitions/src/$1.ts", import.meta.url),
-        ),
+        replacement: `${IntegrationsDefinitionsSrcPath}/$1.ts`,
       },
       {
         find: /^@mistle\/sandbox-session-client$/,

@@ -133,7 +133,7 @@ function resolveCheckboxOptionLabel(
     return option.label;
   }
 
-  const uiEnumNames = props.uiSchema["ui:enumNames"];
+  const uiEnumNames = props.uiSchema?.["ui:enumNames"];
   const itemsSchema = isRecord(props.schema.items) ? props.schema.items : null;
   if (Array.isArray(uiEnumNames) && itemsSchema !== null && Array.isArray(itemsSchema.enum)) {
     const optionIndex = itemsSchema.enum.findIndex((candidate) => candidate === option.value);

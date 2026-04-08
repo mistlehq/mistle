@@ -35,6 +35,12 @@ export default defineConfig({
         replacement: IntegrationsDefinitionsIndexPath,
       },
       {
+        find: /^@mistle\/integrations-definitions\/forms$/,
+        replacement: fileURLToPath(
+          new URL("../../packages/integrations-definitions/src/forms/index.ts", import.meta.url),
+        ),
+      },
+      {
         find: /^@mistle\/integrations-definitions\/(.+)$/,
         replacement: `${IntegrationsDefinitionsSrcPath}/$1.ts`,
       },

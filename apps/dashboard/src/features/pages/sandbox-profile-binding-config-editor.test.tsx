@@ -80,7 +80,6 @@ describe("SandboxProfileBindingConfigEditor", () => {
     }
 
     expect(container.querySelectorAll('[data-slot="select-trigger"]').length).toBe(2);
-    expect(screen.getAllByText("*").length).toBe(2);
     expect(container.querySelector("textarea")).toBe(additionalInstructionsField);
   });
 

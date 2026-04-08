@@ -1,4 +1,4 @@
-import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions/openai";
+import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { QueryClient } from "@tanstack/react-query";
 
 import { createGithubRepositoryResources } from "../forms/integration-resource-string-array-widget-story-support.js";
