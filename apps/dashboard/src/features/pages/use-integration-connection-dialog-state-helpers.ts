@@ -105,6 +105,12 @@ export function resolveConnectionMethodFormUiModel(input: {
   methodId: IntegrationConnectionMethodId;
   currentValue: Record<string, unknown>;
 }): ConnectionMethodFormUiModel {
+  if (input.methodId.length === 0) {
+    return {
+      mode: "none",
+    };
+  }
+
   const definition =
     IntegrationRegistry.getDefinition({
       familyId: input.dialog.targetFamilyId,
@@ -240,12 +246,13 @@ export function createOpenIntegrationConnectionDialogState(input: {
     input.openInput.mode === "create"
       ? input.openInput.methods.map((method) => method.id)
       : [input.openInput.currentMethod.id];
-  const defaultMethod = supportedMethods[0];
-  if (defaultMethod === undefined) {
+  if (supportedMethods[0] === undefined) {
     throw new Error(
       `Integration target '${input.openInput.targetKey}' does not declare any supported connection methods.`,
     );
   }
+  const selectedMethodId =
+    input.openInput.mode === "create" ? input.defaultMethodId : input.openInput.currentMethod.id;
 
   const existingConnectionDisplayName =
     input.openInput.mode === "update" ? input.openInput.connectionDisplayName : undefined;
@@ -285,7 +292,7 @@ export function createOpenIntegrationConnectionDialogState(input: {
 
   const initialConfigValue = resolveInitialConfigValue({
     dialog,
-    methodId: defaultMethod ?? input.defaultMethodId,
+    methodId: selectedMethodId,
   });
 
   return {
@@ -296,7 +303,7 @@ export function createOpenIntegrationConnectionDialogState(input: {
       connectionDisplayNameValue: existingConnectionDisplayName ?? "",
       error: null,
       initialConfigValue,
-      methodId: defaultMethod ?? input.defaultMethodId,
+      methodId: selectedMethodId,
       secrets: {},
     },
   };
@@ -348,6 +355,10 @@ export function resolveIntegrationConnectionDialogValidationError(input: {
   connectionDisplayNameValue: string;
   secrets: Record<string, string>;
 }): string | null {
+  if (input.dialog.mode === "create" && input.methodId.length === 0) {
+    return "Authentication method is required.";
+  }
+
   const selectedMethod = resolveSelectedMethod({
     dialog: input.dialog,
     methodId: input.methodId,
@@ -383,10 +394,11 @@ export function resolveIntegrationConnectionDialogValidationError(input: {
 export function resolveDefaultMethodId(
   methods: readonly IntegrationConnectionMethod[],
 ): IntegrationConnectionMethodId {
-  const apiKeyMethod = methods.find(
-    (method) => method.id === IntegrationConnectionMethodIds.API_KEY,
-  );
-  return apiKeyMethod?.id ?? methods[0]?.id ?? IntegrationConnectionMethodIds.API_KEY;
+  if (methods.length > 1) {
+    return "";
+  }
+
+  return methods[0]?.id ?? IntegrationConnectionMethodIds.API_KEY;
 }
 
 export function resolveNextDraftForMethodChange(input: {

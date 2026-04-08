@@ -452,11 +452,7 @@ export function SandboxProfileBindingConfigEditor(input: {
   });
 
   if (configUiModel.mode === "missing-connection") {
-    return (
-      <p className="text-muted-foreground text-sm">
-        Select a connection to configure this binding.
-      </p>
-    );
+    return <></>;
   }
 
   if (configUiModel.mode === "unsupported") {
