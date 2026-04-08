@@ -1,6 +1,8 @@
+import { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { createNodeSandboxSessionRuntime } from "@mistle/sandbox-session-client/node";
 import {
   decodeDataFrame,
+  encodeDataFrame,
   parseStreamControlMessage,
   PayloadKindWebSocketText,
 } from "@mistle/sandbox-session-protocol";
@@ -11,7 +13,7 @@ import {
   createBrowserCodexSessionRuntime,
   CodexJsonRpcClient,
   CodexJsonRpcRequestError,
-  CodexSessionClient,
+  AgentStreamClient,
 } from "./session-client.js";
 
 type Deferred<T> = {
@@ -40,7 +42,7 @@ type TestServer = {
 
 type ConnectedSocket = {
   close: (code?: number, data?: string) => void;
-  send: (data: string) => void;
+  send: (data: string | Uint8Array) => void;
 };
 
 function createDeferred<T>(): Deferred<T> {
@@ -111,6 +113,14 @@ function decodeAgentTextPayload(data: RawData): string {
   return new TextDecoder().decode(dataFrame.payload);
 }
 
+function encodeAgentTextPayload(input: { payload: unknown; streamId: number }): Uint8Array {
+  return encodeDataFrame({
+    streamId: input.streamId,
+    payloadKind: PayloadKindWebSocketText,
+    payload: new TextEncoder().encode(JSON.stringify(input.payload)),
+  });
+}
+
 async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer> {
   const initializedNotificationDeferred = createDeferred<string>();
   const threadListRequestDeferred = createDeferred<string>();
@@ -162,7 +172,7 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
       }
 
       const controlMessage = parseStreamControlMessage(toText(message));
-      if (controlMessage?.type === "stream.window") {
+      if (controlMessage !== undefined) {
         return;
       }
 
@@ -178,11 +188,19 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
       }
 
       if (payload.method === "initialize") {
+        if (activeStreamId === null) {
+          initializedNotificationDeferred.reject(new Error("Expected active stream id."));
+          return;
+        }
+
         socket.send(
-          JSON.stringify({
-            id: "id" in payload ? payload.id : 0,
-            result: {
-              protocolVersion: "2026-03-14",
+          encodeAgentTextPayload({
+            streamId: activeStreamId,
+            payload: {
+              id: "id" in payload ? payload.id : 0,
+              result: {
+                protocolVersion: "2026-03-14",
+              },
             },
           }),
         );
@@ -207,14 +225,22 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
             ? payload.id
             : null;
         if (mode === "error_on_thread_list") {
+          if (activeStreamId === null) {
+            threadListRequestDeferred.reject(new Error("Expected active stream id."));
+            return;
+          }
+
           socket.send(
-            JSON.stringify({
-              id: "id" in payload ? payload.id : 0,
-              error: {
-                code: -32600,
-                message: "invalid thread id: thread_missing",
-                data: {
-                  threadId: "thread_missing",
+            encodeAgentTextPayload({
+              streamId: activeStreamId,
+              payload: {
+                id: "id" in payload ? payload.id : 0,
+                error: {
+                  code: -32600,
+                  message: "invalid thread id: thread_missing",
+                  data: {
+                    threadId: "thread_missing",
+                  },
                 },
               },
             }),
@@ -226,12 +252,19 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
         if (mode === "manual_thread_list") {
           return;
         }
+        if (activeStreamId === null) {
+          threadListRequestDeferred.reject(new Error("Expected active stream id."));
+          return;
+        }
         socket.send(
-          JSON.stringify({
-            id: "id" in payload ? payload.id : 0,
-            result: {
-              items: [],
-              nextCursor: null,
+          encodeAgentTextPayload({
+            streamId: activeStreamId,
+            payload: {
+              id: "id" in payload ? payload.id : 0,
+              result: {
+                items: [],
+                nextCursor: null,
+              },
             },
           }),
         );
@@ -290,11 +323,17 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
       if (latestThreadListRequestId === null) {
         throw new Error("Expected a thread/list request before sending a response.");
       }
+      if (activeStreamId === null) {
+        throw new Error("Expected stream.open handshake before sending a response.");
+      }
 
       connectedSocket.send(
-        JSON.stringify({
-          id: latestThreadListRequestId,
-          result,
+        encodeAgentTextPayload({
+          streamId: activeStreamId,
+          payload: {
+            id: latestThreadListRequestId,
+            result,
+          },
         }),
       );
     },
@@ -319,6 +358,23 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
 
 const openServers = new Set<TestServer>();
 
+async function connectSessionClient(input: {
+  connectionUrl: string;
+  runtime: ReturnType<typeof createNodeSandboxSessionRuntime>;
+}): Promise<AgentStreamClient> {
+  const transport = new SandboxSessionTransport({
+    runtime: input.runtime,
+  });
+  await transport.connect({
+    connectionUrl: input.connectionUrl,
+  });
+  const sessionClient = new AgentStreamClient({
+    transport,
+  });
+  await sessionClient.connect();
+  return sessionClient;
+}
+
 afterEach(async () => {
   await Promise.all(Array.from(openServers, (server) => server.close()));
   openServers.clear();
@@ -329,16 +385,15 @@ describe("openai codex json-rpc client", () => {
     const server = await startJsonRpcTestServer("close_before_initialized");
     openServers.add(server);
 
-    const sessionClient = new CodexSessionClient({
+    const sessionClient = await connectSessionClient({
       connectionUrl: server.url,
       runtime: createNodeSandboxSessionRuntime(),
     });
-    await sessionClient.connect();
 
     const rpcClient = new CodexJsonRpcClient(sessionClient);
 
     await expect(rpcClient.initialize()).rejects.toThrow(
-      /Sandbox websocket connection closed|Sandbox session socket is not open|initialization completed/,
+      /Sandbox websocket connection closed|Sandbox session socket is not open|initialization completed|close (before|after) initialized notification/,
     );
     expect(sessionClient.state).not.toBe("ready");
     await server.socketClosed;
@@ -348,11 +403,10 @@ describe("openai codex json-rpc client", () => {
     const server = await startJsonRpcTestServer("stay_open");
     openServers.add(server);
 
-    const sessionClient = new CodexSessionClient({
+    const sessionClient = await connectSessionClient({
       connectionUrl: server.url,
       runtime: createNodeSandboxSessionRuntime(),
     });
-    await sessionClient.connect();
 
     const rpcClient = new CodexJsonRpcClient(sessionClient);
 
@@ -368,11 +422,10 @@ describe("openai codex json-rpc client", () => {
     const server = await startJsonRpcTestServer("stay_open");
     openServers.add(server);
 
-    const sessionClient = new CodexSessionClient({
+    const sessionClient = await connectSessionClient({
       connectionUrl: server.url,
       runtime: createBrowserCodexSessionRuntime(),
     });
-    await sessionClient.connect();
 
     const rpcClient = new CodexJsonRpcClient(sessionClient);
 
@@ -394,11 +447,10 @@ describe("openai codex json-rpc client", () => {
     const server = await startJsonRpcTestServer("error_on_thread_list");
     openServers.add(server);
 
-    const sessionClient = new CodexSessionClient({
+    const sessionClient = await connectSessionClient({
       connectionUrl: server.url,
       runtime: createBrowserCodexSessionRuntime(),
     });
-    await sessionClient.connect();
 
     const rpcClient = new CodexJsonRpcClient(sessionClient);
 
@@ -414,11 +466,10 @@ describe("openai codex json-rpc client", () => {
     const server = await startJsonRpcTestServer("error_on_thread_list");
     openServers.add(server);
 
-    const sessionClient = new CodexSessionClient({
+    const sessionClient = await connectSessionClient({
       connectionUrl: server.url,
       runtime: createNodeSandboxSessionRuntime(),
     });
-    await sessionClient.connect();
 
     const rpcClient = new CodexJsonRpcClient(sessionClient);
 
@@ -436,11 +487,10 @@ describe("openai codex json-rpc client", () => {
     const server = await startJsonRpcTestServer("stay_open");
     openServers.add(server);
 
-    const sessionClient = new CodexSessionClient({
+    const sessionClient = await connectSessionClient({
       connectionUrl: server.url,
       runtime: createNodeSandboxSessionRuntime(),
     });
-    await sessionClient.connect();
 
     const rpcClient = new CodexJsonRpcClient(sessionClient);
     const requestHandle = rpcClient.callWithHandle("thread/list", {
@@ -467,11 +517,10 @@ describe("openai codex json-rpc client", () => {
     const server = await startJsonRpcTestServer("manual_thread_list");
     openServers.add(server);
 
-    const sessionClient = new CodexSessionClient({
+    const sessionClient = await connectSessionClient({
       connectionUrl: server.url,
       runtime: createNodeSandboxSessionRuntime(),
     });
-    await sessionClient.connect();
 
     const rpcClient = new CodexJsonRpcClient(sessionClient);
     const pendingCall = rpcClient.call("thread/list", { limit: 1 });
@@ -492,16 +541,15 @@ describe("openai codex json-rpc client", () => {
     const server = await startJsonRpcTestServer("close_after_initialized");
     openServers.add(server);
 
-    const sessionClient = new CodexSessionClient({
+    const sessionClient = await connectSessionClient({
       connectionUrl: server.url,
       runtime: createBrowserCodexSessionRuntime(),
     });
-    await sessionClient.connect();
 
     const rpcClient = new CodexJsonRpcClient(sessionClient);
 
     await expect(rpcClient.initialize()).rejects.toThrow(
-      /Sandbox websocket connection closed|Sandbox session socket is not open|initialization completed/,
+      /Sandbox websocket connection closed|Sandbox session socket is not open|initialization completed|close (before|after) initialized notification/,
     );
     expect(sessionClient.state).not.toBe("ready");
     await server.socketClosed;

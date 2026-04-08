@@ -10,10 +10,11 @@ import { systemSleeper } from "@mistle/time";
 import { afterEach, describe, expect, it } from "vitest";
 import { type RawData, WebSocketServer } from "ws";
 
+import { AgentStreamClient, parseStreamOpenControlMessage } from "./agent-stream-client.js";
 import { createBrowserSandboxSessionRuntime } from "./browser.js";
-import { SandboxSessionClient, parseStreamOpenControlMessage } from "./client.js";
 import { createNodeSandboxSessionRuntime } from "./node.js";
 import { SandboxSessionSendGuarantees } from "./runtime.js";
+import { SandboxSessionTransport } from "./transport.js";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -176,11 +177,13 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
       }
 
       const controlMessage = parseStreamControlMessage(messageText);
-      if (controlMessage?.type === "stream.window") {
-        windowUpdateDeferred.resolve({
-          bytes: controlMessage.bytes,
-          streamId: controlMessage.streamId,
-        });
+      if (controlMessage !== undefined) {
+        if (controlMessage.type === "stream.window") {
+          windowUpdateDeferred.resolve({
+            bytes: controlMessage.bytes,
+            streamId: controlMessage.streamId,
+          });
+        }
         return;
       }
 
@@ -319,18 +322,50 @@ async function createManagedTestServer(mode: TestServerMode): Promise<TestServer
   return server;
 }
 
-function createClient(connectionUrl: string): SandboxSessionClient {
-  return new SandboxSessionClient({
-    connectionUrl,
+const transportByClient = new WeakMap<AgentStreamClient, SandboxSessionTransport>();
+
+function createClient(connectionUrl: string): AgentStreamClient {
+  const transport = new SandboxSessionTransport({
     runtime: createNodeSandboxSessionRuntime(),
   });
+  const client = new AgentStreamClient({
+    transport,
+  });
+  transportByClient.set(client, transport);
+  connectionUrlByClient.set(client, connectionUrl);
+  return client;
 }
 
-function createBrowserClient(connectionUrl: string): SandboxSessionClient {
-  return new SandboxSessionClient({
-    connectionUrl,
+function createBrowserClient(connectionUrl: string): AgentStreamClient {
+  const transport = new SandboxSessionTransport({
     runtime: createBrowserSandboxSessionRuntime(),
   });
+  const client = new AgentStreamClient({
+    transport,
+  });
+  transportByClient.set(client, transport);
+  connectionUrlByClient.set(client, connectionUrl);
+  return client;
+}
+
+const connectionUrlByClient = new WeakMap<AgentStreamClient, string>();
+
+async function connectClient(client: AgentStreamClient): Promise<void> {
+  const transport = transportByClient.get(client);
+  const connectionUrl = connectionUrlByClient.get(client);
+  if (transport === undefined || connectionUrl === undefined) {
+    throw new Error("Expected test client transport metadata.");
+  }
+
+  await transport.connect({
+    connectionUrl,
+  });
+  await client.connect();
+}
+
+function disconnectClient(client: AgentStreamClient): void {
+  client.disconnect();
+  transportByClient.get(client)?.disconnect();
 }
 
 type RecordedEvent = {
@@ -340,7 +375,7 @@ type RecordedEvent = {
   resetInfo?: { code: string; message: string };
 };
 
-function recordConnectionAndNotificationEvents(client: SandboxSessionClient): Array<RecordedEvent> {
+function recordConnectionAndNotificationEvents(client: AgentStreamClient): Array<RecordedEvent> {
   const events: Array<RecordedEvent> = [];
 
   client.onEvent((event) => {
@@ -372,10 +407,10 @@ function recordConnectionAndNotificationEvents(client: SandboxSessionClient): Ar
 }
 
 async function expectClientToOpenAgentStream(input: {
-  client: SandboxSessionClient;
+  client: AgentStreamClient;
   server: TestServer;
 }): Promise<void> {
-  await input.client.connect();
+  await connectClient(input.client);
 
   expect(JSON.parse(await input.server.openRequest)).toEqual({
     type: "stream.open",
@@ -391,7 +426,7 @@ afterEach(async () => {
   openServers.clear();
 });
 
-describe("sandbox session client", () => {
+describe("agent stream client", () => {
   it("parses stream.open control messages and rejects invalid payloads", () => {
     expect(
       parseStreamOpenControlMessage(
@@ -460,10 +495,6 @@ describe("sandbox session client", () => {
 
     expect(events).toContainEqual({
       type: "connection_state_changed",
-      state: "connecting_socket",
-    });
-    expect(events).toContainEqual({
-      type: "connection_state_changed",
       state: "opening_agent_stream",
     });
     expect(events).toContainEqual({
@@ -475,7 +506,7 @@ describe("sandbox session client", () => {
       method: "turn/completed",
     });
 
-    client.disconnect();
+    disconnectClient(client);
     await server.socketClosed;
     expect(client.state).toBe("closed");
   });
@@ -581,7 +612,7 @@ describe("sandbox session client", () => {
     const server = await createManagedTestServer("reject");
     const client = createClient(server.url);
 
-    await expect(client.connect()).rejects.toThrow("agent endpoint unavailable");
+    await expect(connectClient(client)).rejects.toThrow("agent endpoint unavailable");
     expect(client.state).toBe("error");
     expect(client.errorMessage).toBe("agent endpoint unavailable");
   });

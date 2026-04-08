@@ -229,7 +229,9 @@ export function resolveCodexRecoveryStateForRender(input: {
   previousSandboxInstanceId: string | null;
   sandboxInstanceId: string | null;
   sandboxStatus: WorkbenchSandboxLifecycleStatus;
-  transportState: ReturnType<typeof useCodexSessionState>["lifecycle"]["transportState"];
+  sessionConnectionState: ReturnType<
+    typeof useCodexSessionState
+  >["lifecycle"]["sessionConnectionState"];
 }): CodexRecoveryState {
   const sandboxScopedState =
     input.previousSandboxInstanceId === input.sandboxInstanceId
@@ -238,7 +240,7 @@ export function resolveCodexRecoveryStateForRender(input: {
           type: "sandbox_changed",
         });
 
-  return input.transportState === "connected"
+  return input.sessionConnectionState === "connected"
     ? reduceCodexRecoveryState(sandboxScopedState, {
         type: "session_connected",
       })
@@ -272,7 +274,9 @@ export function useSessionWorkbenchCodexRecovery(input: {
   refetchSandboxStatus: () => Promise<unknown>;
   sandboxInstanceId: string | null;
   sandboxStatus: WorkbenchSandboxLifecycleStatus;
-  transportState: ReturnType<typeof useCodexSessionState>["lifecycle"]["transportState"];
+  sessionConnectionState: ReturnType<
+    typeof useCodexSessionState
+  >["lifecycle"]["sessionConnectionState"];
 }) {
   const [codexRecoveryBaseState, dispatchCodexRecoveryEvent] = useReducer(
     reduceCodexRecoveryState,
@@ -291,7 +295,7 @@ export function useSessionWorkbenchCodexRecovery(input: {
     previousSandboxInstanceId: previousSandboxInstanceIdRef.current,
     sandboxInstanceId: input.sandboxInstanceId,
     sandboxStatus: input.sandboxStatus,
-    transportState: input.transportState,
+    sessionConnectionState: input.sessionConnectionState,
   });
 
   useEffect(() => {
@@ -329,14 +333,14 @@ export function useSessionWorkbenchCodexRecovery(input: {
   }, [input.markRecoveryBoundary, input.ptyResetInfo, input.refetchSandboxStatus]);
 
   useEffect(() => {
-    if (input.transportState !== "connected") {
+    if (input.sessionConnectionState !== "connected") {
       return;
     }
 
     dispatchCodexRecoveryEvent({
       type: "session_connected",
     });
-  }, [input.transportState]);
+  }, [input.sessionConnectionState]);
 
   useEffect(() => {
     if (input.mainPanelTransitionState !== "stable_chat") {

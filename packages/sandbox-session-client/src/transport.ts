@@ -23,7 +23,7 @@ import {
 } from "./runtime.js";
 
 const DefaultConnectTimeoutMs = 15_000;
-const ProtocolViolationCloseCode = 1008;
+const ProtocolViolationCloseCode = 4008;
 
 export type SandboxSessionTransportEvent =
   | {
@@ -49,6 +49,18 @@ export type SandboxSessionTransportInput = {
   runtime: SandboxSessionRuntime;
   connectTimeoutMs?: number;
 };
+
+export class SandboxSessionStreamOpenError extends Error {
+  readonly openError: StreamOpenError;
+
+  constructor(openError: StreamOpenError) {
+    super(
+      `Sandbox session stream.open request was rejected (${openError.code}): ${openError.message}`,
+    );
+    this.name = "SandboxSessionStreamOpenError";
+    this.openError = openError;
+  }
+}
 
 export type SandboxSessionStreamState =
   | "opening"
@@ -633,15 +645,15 @@ export class SandboxSessionTransport {
 
     if (controlMessage.type === "stream.reset") {
       this.#activeStreamsByStreamId.delete(controlMessage.streamId);
-      streamRecord.stream.markReset(controlMessage);
       streamRecord.stream.emitControl(controlMessage);
+      streamRecord.stream.markReset(controlMessage);
       return;
     }
 
     if (controlMessage.type === "stream.complete") {
       this.#activeStreamsByStreamId.delete(controlMessage.streamId);
-      streamRecord.stream.markClosed(createStreamCompleteError(controlMessage.streamId).message);
       streamRecord.stream.emitControl(controlMessage);
+      streamRecord.stream.markClosed(createStreamCompleteError(controlMessage.streamId).message);
       return;
     }
 
@@ -660,11 +672,7 @@ export class SandboxSessionTransport {
 
     this.#pendingOpensByStreamId.delete(controlMessage.streamId);
     if (controlMessage.type === "stream.open.error") {
-      pendingOpen.reject(
-        new Error(
-          `Sandbox session stream.open request was rejected (${controlMessage.code}): ${controlMessage.message}`,
-        ),
-      );
+      pendingOpen.reject(new SandboxSessionStreamOpenError(controlMessage));
       return;
     }
 

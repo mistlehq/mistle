@@ -44,14 +44,14 @@ export function useSessionWorkbenchLifecycleState(input: {
     ReturnType<typeof useCodexSessionState>["lifecycle"],
     | "clearLifecycleErrorMessage"
     | "connectSession"
-    | "detachSessionTransport"
+    | "detachSessionConnection"
     | "disconnectSession"
     | "isStartingSession"
     | "lifecycleErrorMessage"
     | "recoverSession"
     | "recoverableDisconnect"
     | "sessionSnapshot"
-    | "transportState"
+    | "sessionConnectionState"
   >;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   queryClient: QueryClient;
@@ -75,7 +75,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     lifecycleErrorMessage,
     recoverSession,
     recoverableDisconnect,
-    transportState,
+    sessionConnectionState,
   } = input.lifecycle;
   const { disconnectPty } = input.ptyState.actions;
   const handleResumeSucceeded = useCallback(() => {
@@ -287,7 +287,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     refetchSandboxStatus: sandboxStatusQuery.refetch,
     sandboxInstanceId: input.sandboxInstanceId,
     sandboxStatus: displaySandboxLifecycleStatus,
-    transportState,
+    sessionConnectionState,
   });
 
   useEffect(() => {
@@ -303,7 +303,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       !shouldAutoConnectSession({
         sandboxInstanceId: input.sandboxInstanceId,
         canConnect: connectionReadiness.canConnect,
-        connected: transportState === "connected",
+        connected: sessionConnectionState === "connected",
         isStartingSession,
         hasAttemptedAutoConnect,
         hasStartError: resolvedLifecycleErrorMessage !== null,
@@ -340,7 +340,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     isStartingSession,
     isWaitingForAutomationThread,
     resolvedLifecycleErrorMessage,
-    transportState,
+    sessionConnectionState,
   ]);
 
   useEffect(() => {
