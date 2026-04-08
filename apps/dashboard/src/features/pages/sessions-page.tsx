@@ -458,7 +458,7 @@ export function SessionsPage(): React.JSX.Element {
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-                  Profile
+                  Sessions
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Started by
