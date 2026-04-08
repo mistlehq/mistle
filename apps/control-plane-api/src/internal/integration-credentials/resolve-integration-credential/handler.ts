@@ -39,7 +39,7 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
       ...(parsedInput.data.bindingId === undefined
         ? {}
         : { bindingId: parsedInput.data.bindingId }),
-      ...(parsedInput.data.purpose === undefined ? {} : { purpose: parsedInput.data.purpose }),
+      ...(parsedInput.data.slotKey === undefined ? {} : { slotKey: parsedInput.data.slotKey }),
       ...(parsedInput.data.resolverKey === undefined
         ? {}
         : { resolverKey: parsedInput.data.resolverKey }),

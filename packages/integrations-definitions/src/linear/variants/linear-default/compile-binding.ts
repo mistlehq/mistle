@@ -1,6 +1,6 @@
 import { type CompileBindingInput, type CompileBindingResult } from "@mistle/integrations-core";
 
-import { resolveLinearCredentialSecretType } from "./auth.js";
+import { LinearCredentialSlotKeys, resolveLinearCredentialSecretType } from "./auth.js";
 import type { LinearBindingConfig } from "./binding-config-schema.js";
 import type { LinearTargetConfig } from "./target-config-schema.js";
 
@@ -31,6 +31,7 @@ export function compileLinearBinding(input: LinearCompileBindingInput): CompileB
         credentialResolver: {
           connectionId: input.connection.id,
           secretType: credentialSecretType,
+          slotKey: LinearCredentialSlotKeys.API_KEY,
         },
       },
     ],

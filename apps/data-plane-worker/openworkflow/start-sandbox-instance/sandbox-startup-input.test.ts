@@ -45,7 +45,7 @@ const RuntimePlanSchema = z.object({
       credentialResolver: z.object({
         connectionId: z.string().min(1),
         secretType: z.string().min(1),
-        purpose: z.string().min(1).optional(),
+        slotKey: z.string().min(1).optional(),
         resolverKey: z.string().min(1).optional(),
       }),
     }),

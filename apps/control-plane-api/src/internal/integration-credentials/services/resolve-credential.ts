@@ -1,7 +1,5 @@
 import {
   integrationConnectionCredentials,
-  IntegrationConnectionCredentialPurposes,
-  type IntegrationConnectionCredentialPurpose,
   integrationConnections,
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
@@ -12,6 +10,7 @@ import {
   sandboxProfileVersionIntegrationBindings,
 } from "@mistle/db/control-plane";
 import {
+  createOAuth2AuthorizationCodeCredentialSlotKeys,
   IntegrationConnectionMethodIds,
   type IntegrationOAuth2AuthorizationCodeCapability,
   type IntegrationOAuth2ClientCredentialsCapability,
@@ -38,7 +37,7 @@ export type ResolveIntegrationCredentialInput = {
   connectionId: string;
   bindingId?: string;
   secretType: string;
-  purpose?: string | undefined;
+  slotKey?: string | undefined;
   resolverKey?: string | undefined;
 };
 
@@ -53,7 +52,7 @@ type ResolvePersistedCredentialInput = {
   organizationId: string;
   connectionId: string;
   secretType: string;
-  purpose?: string | undefined;
+  slotKey?: string | undefined;
 };
 
 type LinkedActiveCredential = {
@@ -232,32 +231,6 @@ function parsePersistedSecretType(secretType: string): IntegrationCredentialSecr
   return undefined;
 }
 
-function parsePersistedCredentialPurpose(
-  purpose: string | undefined,
-): IntegrationConnectionCredentialPurpose | undefined {
-  if (purpose === undefined) {
-    return undefined;
-  }
-
-  if (purpose === IntegrationConnectionCredentialPurposes.API_KEY) {
-    return IntegrationConnectionCredentialPurposes.API_KEY;
-  }
-
-  if (purpose === IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN) {
-    return IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN;
-  }
-
-  if (purpose === IntegrationConnectionCredentialPurposes.OAUTH2_CLIENT_SECRET) {
-    return IntegrationConnectionCredentialPurposes.OAUTH2_CLIENT_SECRET;
-  }
-
-  if (purpose === IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN) {
-    return IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN;
-  }
-
-  return undefined;
-}
-
 function normalizeCredentialExpiryOrThrow(expiresAt: string): string {
   const epochMilliseconds = Date.parse(expiresAt);
   if (Number.isNaN(epochMilliseconds)) {
@@ -280,7 +253,7 @@ async function resolveLinkedActiveCredential(
   db: AppContext["var"]["db"],
   input: {
     connectionId: string;
-    purpose: IntegrationConnectionCredentialPurpose;
+    slotKey: string;
     secretKind: IntegrationCredentialSecretKind;
   },
 ): Promise<LinkedActiveCredential | undefined> {
@@ -289,7 +262,7 @@ async function resolveLinkedActiveCredential(
       credentialId: true,
     },
     where: (table, { and, eq }) =>
-      and(eq(table.connectionId, input.connectionId), eq(table.purpose, input.purpose)),
+      and(eq(table.connectionId, input.connectionId), eq(table.slotKey, input.slotKey)),
   });
 
   if (linkedCredential === undefined) {
@@ -323,6 +296,18 @@ async function resolveLinkedActiveCredential(
     organizationCredentialKeyVersion: credential.organizationCredentialKeyVersion,
     expiresAt: credential.expiresAt,
   };
+}
+
+function resolvePersistedSlotKeyOrThrow(slotKey: string | undefined): string {
+  if (slotKey === undefined || slotKey.length === 0) {
+    throw new InternalIntegrationCredentialsError(
+      InternalIntegrationCredentialsErrorCodes.INVALID_RESOLVE_INPUT,
+      400,
+      "Persisted credential resolution requires `slotKey`.",
+    );
+  }
+
+  return slotKey;
 }
 
 async function decryptLinkedActiveCredential(
@@ -414,17 +399,10 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
     Record<string, unknown>
   >;
   secretType: string;
-  purpose?: string;
+  slotKey?: string;
+  accessTokenSlotKey: string;
+  refreshTokenSlotKey: string;
 }): Promise<ResolvedIntegrationCredential> {
-  const parsedPurpose = parsePersistedCredentialPurpose(input.purpose);
-  if (input.purpose !== undefined && parsedPurpose === undefined) {
-    throw new InternalIntegrationCredentialsError(
-      InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND,
-      404,
-      "No linked integration credential was found for this purpose.",
-    );
-  }
-
   if (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN) {
     return resolvePersistedCredential({
       db: input.db,
@@ -432,14 +410,13 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
       organizationId: input.connection.organizationId,
       connectionId: input.connection.id,
       secretType: input.secretType,
-      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+      ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
     });
   }
 
   if (
     input.secretType !== IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN ||
-    (parsedPurpose !== undefined &&
-      parsedPurpose !== IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN)
+    input.slotKey !== input.accessTokenSlotKey
   ) {
     return resolvePersistedCredential({
       db: input.db,
@@ -447,7 +424,7 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
       organizationId: input.connection.organizationId,
       connectionId: input.connection.id,
       secretType: input.secretType,
-      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+      ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
     });
   }
 
@@ -492,7 +469,7 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
 
       const accessCredential = await resolveLinkedActiveCredential(tx, {
         connectionId: lockedConnection.id,
-        purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+        slotKey: input.accessTokenSlotKey,
         secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
       });
 
@@ -509,7 +486,7 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
 
       const refreshCredential = await resolveLinkedActiveCredential(tx, {
         connectionId: lockedConnection.id,
-        purpose: IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN,
+        slotKey: input.refreshTokenSlotKey,
         secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
       });
 
@@ -617,12 +594,12 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
           .values({
             connectionId: lockedConnection.id,
             credentialId: createdAccessTokenCredential.id,
-            purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+            slotKey: input.accessTokenSlotKey,
           })
           .onConflictDoUpdate({
             target: [
               integrationConnectionCredentials.connectionId,
-              integrationConnectionCredentials.purpose,
+              integrationConnectionCredentials.slotKey,
             ],
             set: {
               credentialId: createdAccessTokenCredential.id,
@@ -682,12 +659,12 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
             .values({
               connectionId: lockedConnection.id,
               credentialId: createdRefreshTokenCredential.id,
-              purpose: IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN,
+              slotKey: input.refreshTokenSlotKey,
             })
             .onConflictDoUpdate({
               target: [
                 integrationConnectionCredentials.connectionId,
-                integrationConnectionCredentials.purpose,
+                integrationConnectionCredentials.slotKey,
               ],
               set: {
                 credentialId: createdRefreshTokenCredential.id,
@@ -758,21 +735,13 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
     Record<string, unknown>
   >;
   secretType: string;
-  purpose?: string;
+  slotKey?: string;
+  accessTokenSlotKey: string;
+  clientSecretSlotKey: string;
 }): Promise<ResolvedIntegrationCredential> {
-  const parsedPurpose = parsePersistedCredentialPurpose(input.purpose);
-  if (input.purpose !== undefined && parsedPurpose === undefined) {
-    throw new InternalIntegrationCredentialsError(
-      InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND,
-      404,
-      "No linked integration credential was found for this purpose.",
-    );
-  }
-
   if (
     input.secretType !== IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN ||
-    (parsedPurpose !== undefined &&
-      parsedPurpose !== IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN)
+    input.slotKey !== input.accessTokenSlotKey
   ) {
     return resolvePersistedCredential({
       db: input.db,
@@ -780,7 +749,7 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
       organizationId: input.connection.organizationId,
       connectionId: input.connection.id,
       secretType: input.secretType,
-      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+      ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
     });
   }
 
@@ -818,7 +787,7 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
 
       const accessCredential = await resolveLinkedActiveCredential(tx, {
         connectionId: lockedConnection.id,
-        purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+        slotKey: input.accessTokenSlotKey,
         secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
       });
       const accessCredentialIsExpired =
@@ -836,7 +805,7 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
 
       const clientSecretCredential = await resolveLinkedActiveCredential(tx, {
         connectionId: lockedConnection.id,
-        purpose: IntegrationConnectionCredentialPurposes.OAUTH2_CLIENT_SECRET,
+        slotKey: input.clientSecretSlotKey,
         secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
       });
 
@@ -933,12 +902,12 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
           .values({
             connectionId: lockedConnection.id,
             credentialId: createdAccessTokenCredential.id,
-            purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+            slotKey: input.accessTokenSlotKey,
           })
           .onConflictDoUpdate({
             target: [
               integrationConnectionCredentials.connectionId,
-              integrationConnectionCredentials.purpose,
+              integrationConnectionCredentials.slotKey,
             ],
             set: {
               credentialId: createdAccessTokenCredential.id,
@@ -983,45 +952,24 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
 async function resolvePersistedCredential(
   input: ResolvePersistedCredentialInput,
 ): Promise<ResolvedIntegrationCredential> {
-  const credentialPurpose = parsePersistedCredentialPurpose(input.purpose);
-  if (input.purpose !== undefined && credentialPurpose === undefined) {
-    throw new InternalIntegrationCredentialsError(
-      InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND,
-      404,
-      "No linked integration credential was found for this purpose.",
-    );
-  }
+  const slotKey = resolvePersistedSlotKeyOrThrow(input.slotKey);
 
-  const linkedCredentials = await input.db.query.integrationConnectionCredentials.findMany({
+  const linkedCredential = await input.db.query.integrationConnectionCredentials.findFirst({
     columns: {
       credentialId: true,
-      purpose: true,
     },
-    where: (table, { and, eq }) => {
-      const connectionFilter = eq(table.connectionId, input.connectionId);
-      if (credentialPurpose === undefined) {
-        return connectionFilter;
-      }
-
-      return and(connectionFilter, eq(table.purpose, credentialPurpose));
-    },
+    where: (table, { and, eq }) =>
+      and(eq(table.connectionId, input.connectionId), eq(table.slotKey, slotKey)),
   });
 
-  if (linkedCredentials.length === 0) {
+  if (linkedCredential === undefined) {
     throw new InternalIntegrationCredentialsError(
       InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND,
       404,
-      "No linked integration credential was found for this connection.",
+      "No linked integration credential was found for this slot.",
     );
   }
 
-  const matchedCredentials: Array<{
-    id: string;
-    ciphertext: string;
-    nonce: string;
-    organizationCredentialKeyVersion: number;
-    expiresAt: string | null;
-  }> = [];
   const persistedSecretType = parsePersistedSecretType(input.secretType);
   if (persistedSecretType === undefined) {
     throw new InternalIntegrationCredentialsError(
@@ -1031,47 +979,28 @@ async function resolvePersistedCredential(
     );
   }
 
-  for (const linkedCredential of linkedCredentials) {
-    const credential = await input.db.query.integrationCredentials.findFirst({
-      columns: {
-        id: true,
-        ciphertext: true,
-        nonce: true,
-        organizationCredentialKeyVersion: true,
-        expiresAt: true,
-      },
-      where: (table, { and, eq, isNull }) =>
-        and(
-          eq(table.id, linkedCredential.credentialId),
-          eq(table.secretKind, persistedSecretType),
-          isNull(table.revokedAt),
-        ),
-    });
+  const credential = await input.db.query.integrationCredentials.findFirst({
+    columns: {
+      id: true,
+      ciphertext: true,
+      nonce: true,
+      organizationCredentialKeyVersion: true,
+      expiresAt: true,
+    },
+    where: (table, { and, eq, isNull }) =>
+      and(
+        eq(table.id, linkedCredential.credentialId),
+        eq(table.secretKind, persistedSecretType),
+        isNull(table.revokedAt),
+      ),
+  });
 
-    if (credential !== undefined) {
-      matchedCredentials.push(credential);
-    }
-  }
-
-  if (matchedCredentials.length === 0) {
+  if (credential === undefined) {
     throw new InternalIntegrationCredentialsError(
       InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND,
       404,
       "No active integration credential was found for this secret type.",
     );
-  }
-
-  if (matchedCredentials.length > 1) {
-    throw new InternalIntegrationCredentialsError(
-      InternalIntegrationCredentialsErrorCodes.AMBIGUOUS_CREDENTIAL_MATCH,
-      400,
-      "Multiple credentials matched. Provide a specific purpose for credential resolution.",
-    );
-  }
-
-  const credential = matchedCredentials[0];
-  if (credential === undefined) {
-    throw new Error("Expected matched credential to exist.");
   }
 
   const organizationCredentialKey = await input.db.query.organizationCredentialKeys.findFirst({
@@ -1250,7 +1179,7 @@ export async function resolveIntegrationCredential(
       connection: connectionResolverContext,
       ...(bindingResolverContext === undefined ? {} : { binding: bindingResolverContext }),
       secretType: input.secretType,
-      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+      ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
     });
   }
 
@@ -1264,6 +1193,10 @@ export async function resolveIntegrationCredential(
       target,
       definition,
       integrationsConfig,
+    });
+    const oauth2AuthorizationCodeSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
+      familyId: target.familyId,
+      variantId: target.variantId,
     });
 
     return resolveOAuth2AuthorizationCodeManagedCredential({
@@ -1279,19 +1212,25 @@ export async function resolveIntegrationCredential(
       target: targetResolverContext,
       oauth2AuthorizationCode: definition.oauth2AuthorizationCode,
       secretType: input.secretType,
-      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+      ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
+      accessTokenSlotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
+      refreshTokenSlotKey: oauth2AuthorizationCodeSlotKeys.refreshToken,
     });
   }
 
   const connectionMethod = definition.connectionMethods.find(
     (method) => method.id === connectionMethodId,
   );
+  const oauth2ClientSecretField =
+    connectionMethod?.kind === "form"
+      ? connectionMethod.secretFields.find(
+          (secretField) =>
+            secretField.secretType === IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+        )
+      : undefined;
   if (
     connectionMethod?.kind === "form" &&
-    connectionMethod.secretFields.some(
-      (secretField) =>
-        secretField.secretType === IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
-    ) &&
+    oauth2ClientSecretField !== undefined &&
     definition.oauth2ClientCredentials !== undefined &&
     input.secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN
   ) {
@@ -1314,7 +1253,9 @@ export async function resolveIntegrationCredential(
       target: targetResolverContext,
       oauth2ClientCredentials: definition.oauth2ClientCredentials,
       secretType: input.secretType,
-      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+      ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
+      accessTokenSlotKey: resolvePersistedSlotKeyOrThrow(input.slotKey),
+      clientSecretSlotKey: oauth2ClientSecretField.slotKey,
     });
   }
 
@@ -1334,7 +1275,7 @@ export async function resolveIntegrationCredential(
       connection: connectionResolverContext,
       ...(bindingResolverContext === undefined ? {} : { binding: bindingResolverContext }),
       secretType: input.secretType,
-      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+      ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
     });
   }
 
@@ -1344,6 +1285,6 @@ export async function resolveIntegrationCredential(
     organizationId: connection.organizationId,
     connectionId: connection.id,
     secretType: input.secretType,
-    ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+    ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
   });
 }

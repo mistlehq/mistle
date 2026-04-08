@@ -19,4 +19,8 @@ export { GitHubAppInstallationRedirectHandler } from "./github-app-installation-
 export { listGitHubConnectionResources } from "./list-connection-resources.server.js";
 export { GitHubCredentialResolverKeys } from "./credential-resolver-keys.js";
 export { GitHubAppInstallationCredentialResolver } from "./credential-resolver.server.js";
-export { GitHubResourceDefinitions, GitHubResourceSyncTriggers } from "./resource-definitions.js";
+export { GitHubCredentialSlotKeys } from "./slot-keys.js";
+export {
+  createGitHubResourceDefinitions,
+  GitHubResourceSyncTriggers,
+} from "./resource-definitions.js";

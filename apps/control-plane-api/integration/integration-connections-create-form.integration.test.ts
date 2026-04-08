@@ -109,7 +109,10 @@ describe("integration connections create form integration", () => {
     const createdConnectionCredential =
       await fixture.db.query.integrationConnectionCredentials.findFirst({
         where: (table, { and, eq }) =>
-          and(eq(table.connectionId, createdConnection.id), eq(table.purpose, "api_key")),
+          and(
+            eq(table.connectionId, createdConnection.id),
+            eq(table.slotKey, "openai.openai-default.api-key.api-key"),
+          ),
       });
     expect(createdConnectionCredential).toBeDefined();
 
@@ -227,7 +230,10 @@ describe("integration connections create form integration", () => {
     const createdConnectionCredential =
       await fixture.db.query.integrationConnectionCredentials.findFirst({
         where: (table, { and, eq }) =>
-          and(eq(table.connectionId, responseBody.id), eq(table.purpose, "api_key")),
+          and(
+            eq(table.connectionId, responseBody.id),
+            eq(table.slotKey, "jira.jira-default.jira-personal-api-token.api-key"),
+          ),
       });
     expect(createdConnectionCredential).toBeDefined();
 
@@ -345,7 +351,13 @@ describe("integration connections create form integration", () => {
     const createdConnectionCredential =
       await fixture.db.query.integrationConnectionCredentials.findFirst({
         where: (table, { and, eq }) =>
-          and(eq(table.connectionId, responseBody.id), eq(table.purpose, "oauth2_client_secret")),
+          and(
+            eq(table.connectionId, responseBody.id),
+            eq(
+              table.slotKey,
+              "jira.jira-default.jira-service-account-oauth-client-credentials.client-secret",
+            ),
+          ),
       });
     expect(createdConnectionCredential).toBeDefined();
 

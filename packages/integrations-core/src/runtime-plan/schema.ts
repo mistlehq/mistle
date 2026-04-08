@@ -50,7 +50,7 @@ const EgressCredentialRouteSchema = z
       .object({
         connectionId: z.string().min(1),
         secretType: z.string().min(1),
-        purpose: z.string().min(1).optional(),
+        slotKey: z.string().min(1).optional(),
         resolverKey: z.string().min(1).optional(),
       })
       .strict(),
@@ -288,9 +288,9 @@ function normalizeRoute(route: z.output<typeof EgressCredentialRouteSchema>): Ru
     credentialResolver: {
       connectionId: route.credentialResolver.connectionId,
       secretType: route.credentialResolver.secretType,
-      ...(route.credentialResolver.purpose === undefined
+      ...(route.credentialResolver.slotKey === undefined
         ? {}
-        : { purpose: route.credentialResolver.purpose }),
+        : { slotKey: route.credentialResolver.slotKey }),
       ...(route.credentialResolver.resolverKey === undefined
         ? {}
         : { resolverKey: route.credentialResolver.resolverKey }),

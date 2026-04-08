@@ -11,6 +11,7 @@ import { GitHubConnectionConfigSchema, resolveGitHubCredentialSecretType } from 
 import type { GitHubBindingConfig } from "./binding-config-schema.js";
 import { GitHubApiMethods, GitHubGitHttpMethods } from "./constants.js";
 import { GitHubCredentialResolverKeys } from "./credential-resolver-keys.js";
+import { GitHubCredentialSlotKeys } from "./slot-keys.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
 import { GitHubToolIds } from "./tool-ids.js";
 
@@ -174,6 +175,14 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
   const credentialResolver = {
     connectionId: input.connection.id,
     secretType: credentialSecretType,
+    ...(parsedConnectionConfig.connection_method === IntegrationConnectionMethodIds.API_KEY
+      ? {
+          slotKey:
+            input.target.variantId === "github-cloud"
+              ? GitHubCredentialSlotKeys.GITHUB_CLOUD_API_KEY
+              : GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_API_KEY,
+        }
+      : {}),
     ...(parsedConnectionConfig.connection_method ===
     IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
       ? {

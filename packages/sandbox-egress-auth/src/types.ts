@@ -16,7 +16,7 @@ export type EgressGrantClaims = {
   authInjectionType: EgressGrantAuthInjectionType;
   authInjectionTarget: string;
   authInjectionUsername?: string;
-  purpose?: string;
+  slotKey?: string;
   resolverKey?: string;
   allowedMethods?: ReadonlyArray<string>;
   allowedPathPrefixes?: ReadonlyArray<string>;
@@ -32,7 +32,7 @@ export type EgressGrantClaimsInput = {
   authInjectionType: unknown;
   authInjectionTarget: string | undefined;
   authInjectionUsername?: string | undefined;
-  purpose?: string | undefined;
+  slotKey?: string | undefined;
   resolverKey?: string | undefined;
   allowedMethods?: ReadonlyArray<string> | undefined;
   allowedPathPrefixes?: ReadonlyArray<string> | undefined;

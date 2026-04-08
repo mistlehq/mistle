@@ -81,6 +81,7 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
           credentialResolver: {
             connectionId: input.connection.id,
             secretType: resolveOpenAiCredentialSecretType(input.connection.config),
+            slotKey: OpenAiCredentialSlotKeys.API_KEY,
           },
           allowedMethods: ["GET", "POST"],
           allowedPathPrefixes: ["/"],

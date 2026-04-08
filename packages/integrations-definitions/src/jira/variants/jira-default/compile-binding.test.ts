@@ -1,7 +1,7 @@
 import type { RuntimeArtifactCommand, RuntimeArtifactSpec } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { JiraConnectionMethodIds } from "./auth.js";
+import { JiraConnectionMethodIds, JiraCredentialSlotKeys } from "./auth.js";
 import { compileJiraBinding } from "./compile-binding.js";
 
 function artifactBinPath(name: string): string {
@@ -116,6 +116,7 @@ describe("compileJiraBinding", () => {
         credentialResolver: {
           connectionId: "icn_personal",
           secretType: "api_key",
+          slotKey: JiraCredentialSlotKeys.PERSONAL_API_TOKEN_API_KEY,
         },
       },
     ]);
@@ -189,6 +190,7 @@ describe("compileJiraBinding", () => {
         credentialResolver: {
           connectionId: "icn_service_account",
           secretType: "api_key",
+          slotKey: JiraCredentialSlotKeys.SERVICE_ACCOUNT_API_TOKEN_API_KEY,
         },
       },
     ]);
@@ -250,7 +252,7 @@ describe("compileJiraBinding", () => {
         credentialResolver: {
           connectionId: "icn_service_account_oauth",
           secretType: "oauth2_access_token",
-          purpose: "oauth2_access_token",
+          slotKey: JiraCredentialSlotKeys.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS_ACCESS_TOKEN,
         },
       },
     ]);

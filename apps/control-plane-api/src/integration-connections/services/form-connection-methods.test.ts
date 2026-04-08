@@ -1,7 +1,4 @@
-import {
-  IntegrationConnectionCredentialPurposes,
-  IntegrationCredentialSecretKinds,
-} from "@mistle/db/control-plane";
+import { IntegrationCredentialSecretKinds } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
@@ -161,27 +158,29 @@ describe("parseFormConnectionConfigOrThrow", () => {
 });
 
 describe("resolvePersistedSecretRefOrThrow", () => {
-  it("maps api_key to persisted secret kind and purpose", () => {
+  it("maps api_key to persisted secret kind and slot key", () => {
     expect(
       resolvePersistedSecretRefOrThrow({
+        slotKey: "test.api-key",
         secretType: IntegrationCredentialSecretKinds.API_KEY,
         invalidInputCode: "INVALID_CREATE_CONNECTION_INPUT",
       }),
     ).toEqual({
       secretKind: IntegrationCredentialSecretKinds.API_KEY,
-      purpose: IntegrationConnectionCredentialPurposes.API_KEY,
+      slotKey: "test.api-key",
     });
   });
 
-  it("maps oauth2_client_secret to persisted secret kind and purpose", () => {
+  it("maps oauth2_client_secret to persisted secret kind and slot key", () => {
     expect(
       resolvePersistedSecretRefOrThrow({
+        slotKey: "test.client-secret",
         secretType: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
         invalidInputCode: "INVALID_CREATE_CONNECTION_INPUT",
       }),
     ).toEqual({
       secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
-      purpose: IntegrationConnectionCredentialPurposes.OAUTH2_CLIENT_SECRET,
+      slotKey: "test.client-secret",
     });
   });
 
@@ -190,6 +189,7 @@ describe("resolvePersistedSecretRefOrThrow", () => {
 
     try {
       resolvePersistedSecretRefOrThrow({
+        slotKey: "test.github-installation",
         secretType: "github_app_installation_token",
         invalidInputCode: "INVALID_UPDATE_CONNECTION_INPUT",
       });
@@ -245,7 +245,7 @@ describe("parseCreateFormSecretsOrThrow", () => {
         normalizedValue: "sk-test-api-key",
         persistedSecretRef: {
           secretKind: IntegrationCredentialSecretKinds.API_KEY,
-          purpose: IntegrationConnectionCredentialPurposes.API_KEY,
+          slotKey: "test.api-key",
         },
       },
     ]);
@@ -289,7 +289,7 @@ describe("parseUpdateFormSecretsOrThrow", () => {
         normalizedValue: "sk-rotated-api-key",
         persistedSecretRef: {
           secretKind: IntegrationCredentialSecretKinds.API_KEY,
-          purpose: IntegrationConnectionCredentialPurposes.API_KEY,
+          slotKey: "test.api-key",
         },
       },
     ]);

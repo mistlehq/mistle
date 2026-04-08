@@ -56,7 +56,7 @@ export async function mintEgressGrant(input: {
       ...(claims.authInjectionUsername === undefined
         ? {}
         : { authInjectionUsername: claims.authInjectionUsername }),
-      ...(claims.purpose === undefined ? {} : { purpose: claims.purpose }),
+      ...(claims.slotKey === undefined ? {} : { slotKey: claims.slotKey }),
       ...(claims.resolverKey === undefined ? {} : { resolverKey: claims.resolverKey }),
       ...(claims.allowedMethods === undefined ? {} : { allowedMethods: claims.allowedMethods }),
       ...(claims.allowedPathPrefixes === undefined
@@ -131,8 +131,8 @@ export async function verifyEgressGrant(input: {
       ...(typeof verificationResult.payload.authInjectionUsername === "string"
         ? { authInjectionUsername: verificationResult.payload.authInjectionUsername }
         : {}),
-      ...(typeof verificationResult.payload.purpose === "string"
-        ? { purpose: verificationResult.payload.purpose }
+      ...(typeof verificationResult.payload.slotKey === "string"
+        ? { slotKey: verificationResult.payload.slotKey }
         : {}),
       ...(typeof verificationResult.payload.resolverKey === "string"
         ? { resolverKey: verificationResult.payload.resolverKey }

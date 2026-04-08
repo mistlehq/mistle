@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { LinearCredentialSlotKeys } from "./auth.js";
 import { compileLinearBinding } from "./compile-binding.js";
 
 describe("compileLinearBinding", () => {
@@ -55,6 +56,7 @@ describe("compileLinearBinding", () => {
         credentialResolver: {
           connectionId: "icn_123",
           secretType: "api_key",
+          slotKey: LinearCredentialSlotKeys.API_KEY,
         },
       },
     ]);

@@ -6,6 +6,7 @@ export type AgentProviderAccess = {
   credentialResolver: {
     connectionId: string;
     secretType: string;
+    slotKey?: string;
   };
   allowedMethods: readonly ("GET" | "POST")[];
   allowedPathPrefixes: readonly string[];

@@ -1,6 +1,7 @@
 import type { RuntimeArtifactCommand, RuntimeArtifactSpec } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
+import { GitHubCredentialSlotKeys } from "../../shared/slot-keys.js";
 import { compileGitHubCloudBinding } from "./compile-binding.js";
 
 function artifactBinPath(name: string): string {
@@ -119,6 +120,7 @@ describe("compileGitHubCloudBinding", () => {
         credentialResolver: {
           connectionId: "icn_123",
           secretType: "api_key",
+          slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_API_KEY,
         },
       },
       {
@@ -137,6 +139,7 @@ describe("compileGitHubCloudBinding", () => {
         credentialResolver: {
           connectionId: "icn_123",
           secretType: "api_key",
+          slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_API_KEY,
         },
       },
       {
@@ -155,6 +158,7 @@ describe("compileGitHubCloudBinding", () => {
         credentialResolver: {
           connectionId: "icn_123",
           secretType: "api_key",
+          slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_API_KEY,
         },
       },
     ]);

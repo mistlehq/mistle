@@ -165,7 +165,7 @@ export async function createFormConnection(
         await tx.insert(integrationConnectionCredentials).values({
           connectionId: createdConnection.id,
           credentialId: createdCredential.id,
-          purpose: parsedSecret.persistedSecretRef.purpose,
+          slotKey: parsedSecret.persistedSecretRef.slotKey,
         });
       }
 

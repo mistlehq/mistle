@@ -105,7 +105,7 @@ describe("createEgressGrantByRuleId", () => {
             credentialResolver: {
               connectionId: "icn_github",
               secretType: "github_app_installation_token",
-              purpose: "api",
+              slotKey: "github.github-cloud.github-app-installation.installation-token",
               resolverKey: "github_app_installation_token",
             },
           },
@@ -137,7 +137,7 @@ describe("createEgressGrantByRuleId", () => {
       upstreamBaseUrl: "https://api.github.com",
       authInjectionType: "bearer",
       authInjectionTarget: "authorization",
-      purpose: "api",
+      slotKey: "github.github-cloud.github-app-installation.installation-token",
       resolverKey: "github_app_installation_token",
       allowedMethods: ["GET"],
       allowedPathPrefixes: ["/repos"],

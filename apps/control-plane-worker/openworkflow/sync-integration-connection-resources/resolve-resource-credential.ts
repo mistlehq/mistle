@@ -32,9 +32,9 @@ export async function resolveResourceCredential(input: {
   return input.controlPlaneInternalClient.resolveIntegrationCredential({
     connectionId: input.connection.id,
     secretType: credentialRequirement.secretType,
-    ...(credentialRequirement.purpose === undefined
+    ...(credentialRequirement.slotKey === undefined
       ? {}
-      : { purpose: credentialRequirement.purpose }),
+      : { slotKey: credentialRequirement.slotKey }),
     ...(credentialRequirement.resolverKey === undefined
       ? {}
       : { resolverKey: credentialRequirement.resolverKey }),

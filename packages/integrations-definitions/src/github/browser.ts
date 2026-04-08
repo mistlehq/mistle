@@ -24,8 +24,9 @@ export {
 export { compileGitHubBinding, type GitHubCompileBindingInput } from "./shared/compile-binding.js";
 export { resolveGitHubBindingConfigForm } from "./shared/binding-config-form.js";
 export { GitHubCredentialResolverKeys } from "./shared/credential-resolver-keys.js";
+export { GitHubCredentialSlotKeys } from "./shared/slot-keys.js";
 export {
-  GitHubResourceDefinitions,
+  createGitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
 } from "./shared/resource-definitions.js";
 export {

@@ -20,10 +20,9 @@ export {
 } from "./automation-targets.js";
 export {
   integrationConnectionCredentials,
-  IntegrationConnectionCredentialPurposes,
   type InsertIntegrationConnectionCredential,
   type IntegrationConnectionCredential,
-  type IntegrationConnectionCredentialPurpose,
+  type IntegrationConnectionCredentialSlotKey,
 } from "./integration-connection-credentials.js";
 export {
   integrationConnectionResourcesRelations,

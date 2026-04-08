@@ -363,7 +363,7 @@ describe("integration connections list integration", () => {
     await fixture.db.insert(integrationConnectionCredentials).values({
       connectionId: "icn_delete_free",
       credentialId: "icr_delete_free",
-      purpose: "api_key",
+      slotKey: "github.github-cloud.api-key.api-key",
     });
     await fixture.db.insert(integrationCredentials).values({
       id: "icr_delete_free_webhook_secret",

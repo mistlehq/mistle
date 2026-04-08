@@ -25,7 +25,7 @@ const defaultClaims: EgressGrantClaims = {
   upstreamBaseUrl: "https://api.openai.com/v1",
   authInjectionType: "bearer",
   authInjectionTarget: "authorization",
-  purpose: "api_key",
+  slotKey: "openai.openai-default.api-key.api-key",
   resolverKey: "default",
   allowedMethods: ["GET", "POST"],
   allowedPathPrefixes: ["/v1"],

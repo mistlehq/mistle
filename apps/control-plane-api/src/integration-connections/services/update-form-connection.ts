@@ -173,12 +173,12 @@ export async function updateFormConnection(
           .values({
             connectionId: existingConnection.id,
             credentialId: createdCredential.id,
-            purpose: parsedSecret.persistedSecretRef.purpose,
+            slotKey: parsedSecret.persistedSecretRef.slotKey,
           })
           .onConflictDoUpdate({
             target: [
               integrationConnectionCredentials.connectionId,
-              integrationConnectionCredentials.purpose,
+              integrationConnectionCredentials.slotKey,
             ],
             set: {
               credentialId: createdCredential.id,

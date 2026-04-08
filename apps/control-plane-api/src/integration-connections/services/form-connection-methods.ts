@@ -1,6 +1,4 @@
 import {
-  IntegrationConnectionCredentialPurposes,
-  type IntegrationConnectionCredentialPurpose,
   IntegrationCredentialSecretKinds,
   type IntegrationCredentialSecretKind,
 } from "@mistle/db/control-plane";
@@ -19,7 +17,7 @@ type FormConnectionMethod = Extract<IntegrationConnectionMethodDefinition, { kin
 type FormConnectionSecretField = FormConnectionMethod["secretFields"][number];
 type PersistedSecretRef = {
   secretKind: IntegrationCredentialSecretKind;
-  purpose: IntegrationConnectionCredentialPurpose;
+  slotKey: string;
 };
 
 export type ParsedFormSecret = {
@@ -95,6 +93,7 @@ export function parseFormConnectionConfigOrThrow(input: {
 }
 
 export function resolvePersistedSecretRefOrThrow(input: {
+  slotKey: string;
   secretType: string;
   invalidInputCode:
     | typeof IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT
@@ -103,28 +102,28 @@ export function resolvePersistedSecretRefOrThrow(input: {
   if (input.secretType === IntegrationCredentialSecretKinds.API_KEY) {
     return {
       secretKind: IntegrationCredentialSecretKinds.API_KEY,
-      purpose: IntegrationConnectionCredentialPurposes.API_KEY,
+      slotKey: input.slotKey,
     };
   }
 
   if (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN) {
     return {
       secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-      purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+      slotKey: input.slotKey,
     };
   }
 
   if (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN) {
     return {
       secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
-      purpose: IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN,
+      slotKey: input.slotKey,
     };
   }
 
   if (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET) {
     return {
       secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
-      purpose: IntegrationConnectionCredentialPurposes.OAUTH2_CLIENT_SECRET,
+      slotKey: input.slotKey,
     };
   }
 
@@ -197,6 +196,7 @@ export function parseCreateFormSecretsOrThrow(input: {
       field,
       normalizedValue,
       persistedSecretRef: resolvePersistedSecretRefOrThrow({
+        slotKey: field.slotKey,
         secretType: field.secretType,
         invalidInputCode: input.invalidInputCode,
       }),
@@ -236,6 +236,7 @@ export function parseUpdateFormSecretsOrThrow(input: {
       field,
       normalizedValue,
       persistedSecretRef: resolvePersistedSecretRefOrThrow({
+        slotKey: field.slotKey,
         secretType: field.secretType,
         invalidInputCode: input.invalidInputCode,
       }),

@@ -128,9 +128,9 @@ export interface paths {
           "application/json": {
             bindingId?: string;
             connectionId: string;
-            purpose?: string;
             resolverKey?: string;
             secretType: string;
+            slotKey?: string;
           };
         };
       };

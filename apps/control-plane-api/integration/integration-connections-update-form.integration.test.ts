@@ -60,7 +60,10 @@ describe("integration connections update form integration", () => {
 
     const previousLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
       where: (table, { and, eq }) =>
-        and(eq(table.connectionId, createdConnection.id), eq(table.purpose, "api_key")),
+        and(
+          eq(table.connectionId, createdConnection.id),
+          eq(table.slotKey, "openai.openai-default.api-key.api-key"),
+        ),
     });
     expect(previousLink).toBeDefined();
 
@@ -99,7 +102,10 @@ describe("integration connections update form integration", () => {
 
     const updatedLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
       where: (table, { and, eq }) =>
-        and(eq(table.connectionId, createdConnection.id), eq(table.purpose, "api_key")),
+        and(
+          eq(table.connectionId, createdConnection.id),
+          eq(table.slotKey, "openai.openai-default.api-key.api-key"),
+        ),
     });
     expect(updatedLink).toBeDefined();
 
@@ -269,7 +275,10 @@ describe("integration connections update form integration", () => {
 
     const previousLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
       where: (table, { and, eq }) =>
-        and(eq(table.connectionId, createdConnection.id), eq(table.purpose, "api_key")),
+        and(
+          eq(table.connectionId, createdConnection.id),
+          eq(table.slotKey, "openai.openai-default.api-key.api-key"),
+        ),
     });
     expect(previousLink).toBeDefined();
 
@@ -300,7 +309,10 @@ describe("integration connections update form integration", () => {
 
     const updatedLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
       where: (table, { and, eq }) =>
-        and(eq(table.connectionId, createdConnection.id), eq(table.purpose, "api_key")),
+        and(
+          eq(table.connectionId, createdConnection.id),
+          eq(table.slotKey, "openai.openai-default.api-key.api-key"),
+        ),
     });
     expect(updatedLink).toBeDefined();
 
@@ -556,7 +568,10 @@ describe("integration connections update form integration", () => {
       where: (table, { and, eq }) =>
         and(
           eq(table.connectionId, createdConnection.id),
-          eq(table.purpose, "oauth2_client_secret"),
+          eq(
+            table.slotKey,
+            "jira.jira-default.jira-service-account-oauth-client-credentials.client-secret",
+          ),
         ),
     });
     expect(updatedLink).toBeDefined();

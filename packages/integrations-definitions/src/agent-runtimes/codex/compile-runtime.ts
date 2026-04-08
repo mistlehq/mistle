@@ -155,6 +155,9 @@ export function compileCodexRuntime(
         credentialResolver: {
           connectionId: input.providerAccess.credentialResolver.connectionId,
           secretType: input.providerAccess.credentialResolver.secretType,
+          ...(input.providerAccess.credentialResolver.slotKey === undefined
+            ? {}
+            : { slotKey: input.providerAccess.credentialResolver.slotKey }),
         },
       },
     ],

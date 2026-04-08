@@ -3,9 +3,10 @@ import { GitHubAppInstallationCredentialResolver } from "../../shared/credential
 import { GitHubAppInstallationRedirectHandler } from "../../shared/github-app-installation-handler.server.js";
 import { listGitHubConnectionResources } from "../../shared/list-connection-resources.server.js";
 import {
-  GitHubResourceDefinitions,
+  createGitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
 } from "../../shared/resource-definitions.js";
+import { GitHubCredentialSlotKeys } from "../../shared/slot-keys.js";
 import { GitHubWebhookSourceCapability } from "../../shared/webhook-source.server.js";
 import {
   GitHubEnterpriseServerBaseDefinition,
@@ -24,7 +25,9 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerBaseIntegra
   redirectHandler: GitHubAppInstallationRedirectHandler,
   webhookHandler: GitHubEnterpriseServerWebhookHandler,
   webhookSource: GitHubWebhookSourceCapability,
-  resourceDefinitions: GitHubResourceDefinitions,
+  resourceDefinitions: createGitHubResourceDefinitions({
+    apiKeySlotKey: GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_API_KEY,
+  }),
   resourceSyncTriggers: GitHubResourceSyncTriggers,
   listConnectionResources: listGitHubConnectionResources,
 };

@@ -240,7 +240,7 @@ This is the recommended workflow.
 6. Implement `compileBinding`.
 
 - Emit minimal scoped egress routes.
-- Set correct `credentialResolver` secret type/purpose/resolver key.
+- Set correct `credentialResolver` secret type/slot key/resolver key.
 - Add runtime artifacts and runtime clients only when required.
 - If the integration exposes its own MCP endpoint, define `mcp` with either a single server or an array of servers.
 - Prefer canonical upstream MCP URLs in definitions. Route-shaped sandbox URLs are runtime transport details, not definition-authored config.

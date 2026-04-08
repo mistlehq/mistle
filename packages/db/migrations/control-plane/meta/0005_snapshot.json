@@ -1312,8 +1312,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "purpose": {
-          "name": "purpose",
+        "slotKey": {
+          "name": "slot_key",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -1366,9 +1366,9 @@
         }
       },
       "compositePrimaryKeys": {
-        "integration_connection_credentials_connection_id_purpose_pk": {
-          "name": "integration_connection_credentials_connection_id_purpose_pk",
-          "columns": ["connection_id", "purpose"]
+        "integration_connection_credentials_connection_id_slot_key_pk": {
+          "name": "integration_connection_credentials_connection_id_slot_key_pk",
+          "columns": ["connection_id", "slot_key"]
         }
       },
       "uniqueConstraints": {},

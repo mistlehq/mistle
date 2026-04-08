@@ -2,7 +2,6 @@ import { generateKeyPairSync } from "node:crypto";
 
 import {
   IntegrationBindingKinds,
-  IntegrationConnectionCredentialPurposes,
   integrationConnectionCredentials,
   IntegrationConnectionStatuses,
   integrationConnections,
@@ -13,7 +12,11 @@ import {
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
-import { IntegrationRegistry, type IntegrationDefinition } from "@mistle/integrations-core";
+import {
+  createOAuth2AuthorizationCodeCredentialSlotKeys,
+  IntegrationRegistry,
+  type IntegrationDefinition,
+} from "@mistle/integrations-core";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
@@ -37,6 +40,10 @@ type ConnectionResponse = {
 
 const EmptyConfigSchema = z.object({});
 const ClientCredentialsConnectionMethodId = "oauth2-client-credentials-test";
+const ClientCredentialsClientSecretSlotKey =
+  "oauth2.client-credentials-test.oauth2-client-credentials-test.client-secret";
+const ClientCredentialsAccessTokenSlotKey =
+  "oauth2.client-credentials-test.oauth2-client-credentials-test.access-token";
 
 function createClientCredentialsRegistry(): IntegrationRegistry {
   const registry = new IntegrationRegistry();
@@ -64,7 +71,7 @@ function createClientCredentialsRegistry(): IntegrationRegistry {
             label: "Client secret",
             inputType: "password",
             secretType: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
-            slotKey: "oauth2.client-credentials-test.oauth2-client-credentials-test.client-secret",
+            slotKey: ClientCredentialsClientSecretSlotKey,
           },
         ],
         configSchema: z
@@ -220,7 +227,7 @@ describe("internal integration credentials resolve", () => {
         body: JSON.stringify({
           connectionId: connection.id,
           secretType: "api_key",
-          purpose: "api_key",
+          slotKey: "openai.openai-default.api-key.api-key",
         }),
       },
     );
@@ -233,6 +240,10 @@ describe("internal integration credentials resolve", () => {
 
   it("resolves persisted OAuth2 access tokens with structural expiry", async ({ fixture }) => {
     const authSession = await fixture.authSession();
+    const oauth2AuthorizationCodeSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
+      familyId: "openai",
+      variantId: "openai-default",
+    });
 
     await fixture.db.insert(integrationTargets).values({
       targetKey: "openai_oauth2_default",
@@ -295,7 +306,7 @@ describe("internal integration credentials resolve", () => {
     await fixture.db.insert(integrationConnectionCredentials).values({
       connectionId: "icn_oauth2_access",
       credentialId: "icr_oauth2_access",
-      purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+      slotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
     });
 
     const resolveResponse = await fixture.request(
@@ -309,7 +320,7 @@ describe("internal integration credentials resolve", () => {
         body: JSON.stringify({
           connectionId: "icn_oauth2_access",
           secretType: "oauth2_access_token",
-          purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+          slotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
         }),
       },
     );
@@ -382,7 +393,7 @@ describe("internal integration credentials resolve", () => {
     await fixture.db.insert(integrationConnectionCredentials).values({
       connectionId: "icn_oauth2_client_credentials",
       credentialId: "icr_oauth2_client_secret",
-      purpose: IntegrationConnectionCredentialPurposes.OAUTH2_CLIENT_SECRET,
+      slotKey: ClientCredentialsClientSecretSlotKey,
     });
 
     const integrationRegistry = createClientCredentialsRegistry();
@@ -396,7 +407,7 @@ describe("internal integration credentials resolve", () => {
       {
         connectionId: "icn_oauth2_client_credentials",
         secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-        purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+        slotKey: ClientCredentialsAccessTokenSlotKey,
       },
     );
 
@@ -438,7 +449,7 @@ describe("internal integration credentials resolve", () => {
       {
         connectionId: "icn_oauth2_client_credentials",
         secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-        purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+        slotKey: ClientCredentialsAccessTokenSlotKey,
       },
     );
 
@@ -467,7 +478,7 @@ describe("internal integration credentials resolve", () => {
         where: (table, { and, eq }) =>
           and(
             eq(table.connectionId, "icn_oauth2_client_credentials"),
-            eq(table.purpose, IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN),
+            eq(table.slotKey, ClientCredentialsAccessTokenSlotKey),
           ),
       });
 

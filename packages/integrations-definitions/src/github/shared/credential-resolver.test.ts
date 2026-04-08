@@ -56,7 +56,7 @@ function createResolverInput(
     target: overrides?.target ?? input.target,
     connection: overrides?.connection ?? input.connection,
     secretType: overrides?.secretType ?? input.secretType,
-    ...(overrides?.purpose === undefined ? {} : { purpose: overrides.purpose }),
+    ...(overrides?.slotKey === undefined ? {} : { slotKey: overrides.slotKey }),
     binding,
   };
 }

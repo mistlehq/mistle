@@ -89,7 +89,7 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
     });
   }
 
-  const purpose = toNonEmptyString(input.purpose);
+  const slotKey = toNonEmptyString(input.slotKey);
   const resolverKey = toNonEmptyString(input.resolverKey);
 
   return {
@@ -118,7 +118,7 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
       "authInjectionTarget",
     ),
     ...(authInjectionUsername === undefined ? {} : { authInjectionUsername }),
-    ...(purpose === undefined ? {} : { purpose }),
+    ...(slotKey === undefined ? {} : { slotKey }),
     ...(resolverKey === undefined ? {} : { resolverKey }),
     ...(allowedMethods === undefined ? {} : { allowedMethods }),
     ...(allowedPathPrefixes === undefined ? {} : { allowedPathPrefixes }),

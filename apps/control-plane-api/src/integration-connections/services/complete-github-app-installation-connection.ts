@@ -1,6 +1,5 @@
 import {
   integrationConnectionCredentials,
-  IntegrationConnectionCredentialPurposes,
   integrationConnections,
   IntegrationConnectionStatuses,
   integrationCredentials,
@@ -56,22 +55,6 @@ function resolveCredentialSecretKind(secretType: string) {
   }
 
   throw new Error(`Unsupported GitHub App installation credential secret type '${secretType}'.`);
-}
-
-function resolveCredentialPurpose(purpose: string) {
-  if (purpose === IntegrationConnectionCredentialPurposes.API_KEY) {
-    return IntegrationConnectionCredentialPurposes.API_KEY;
-  }
-
-  if (purpose === IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN) {
-    return IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN;
-  }
-
-  if (purpose === IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN) {
-    return IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN;
-  }
-
-  throw new Error(`Unsupported GitHub App installation credential purpose '${purpose}'.`);
 }
 
 export async function completeGitHubAppInstallationConnection(
@@ -230,6 +213,7 @@ export async function completeGitHubAppInstallationConnection(
               organizationCredentialKeyVersion: organizationCredentialKey.version,
               intendedFamilyId: resolved.target.familyId,
               ...(material.metadata === undefined ? {} : { metadata: material.metadata }),
+              ...(material.expiresAt === undefined ? {} : { expiresAt: material.expiresAt }),
             })
             .returning({
               id: integrationCredentials.id,
@@ -242,7 +226,7 @@ export async function completeGitHubAppInstallationConnection(
           await tx.insert(integrationConnectionCredentials).values({
             connectionId: createdConnection.id,
             credentialId: createdCredential.id,
-            purpose: resolveCredentialPurpose(material.purpose),
+            slotKey: material.slotKey,
           });
         }
       } finally {

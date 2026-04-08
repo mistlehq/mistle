@@ -1,6 +1,5 @@
 import {
   integrationConnectionCredentials,
-  IntegrationConnectionCredentialPurposes,
   integrationConnections,
   IntegrationConnectionStatuses,
   integrationCredentials,
@@ -9,7 +8,10 @@ import {
 } from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import {
+  createOAuth2AuthorizationCodeCredentialSlotKeys,
+  IntegrationConnectionMethodIds,
+} from "@mistle/integrations-core";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -231,6 +233,11 @@ export async function completeOAuth2AuthorizationCodeConnection(
     });
 
     try {
+      const oauth2AuthorizationCodeSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
+        familyId: resolved.target.familyId,
+        variantId: resolved.target.variantId,
+      });
+
       const encryptedAccessToken = encryptCredentialUtf8({
         plaintext: completedOAuth2AuthorizationCodeConnection.accessToken,
         organizationCredentialKey: unwrappedOrganizationCredentialKey,
@@ -264,7 +271,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
       await tx.insert(integrationConnectionCredentials).values({
         connectionId: createdConnection.id,
         credentialId: createdAccessTokenCredential.id,
-        purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+        slotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
       });
 
       if (completedOAuth2AuthorizationCodeConnection.refreshToken !== undefined) {
@@ -303,7 +310,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
         await tx.insert(integrationConnectionCredentials).values({
           connectionId: createdConnection.id,
           credentialId: createdRefreshTokenCredential.id,
-          purpose: IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN,
+          slotKey: oauth2AuthorizationCodeSlotKeys.refreshToken,
         });
       }
     } finally {

@@ -31,9 +31,9 @@ export async function createEgressGrantByRuleId(input: {
           ...(route.authInjection.username === undefined
             ? {}
             : { authInjectionUsername: route.authInjection.username }),
-          ...(route.credentialResolver.purpose === undefined
+          ...(route.credentialResolver.slotKey === undefined
             ? {}
-            : { purpose: route.credentialResolver.purpose }),
+            : { slotKey: route.credentialResolver.slotKey }),
           ...(route.credentialResolver.resolverKey === undefined
             ? {}
             : { resolverKey: route.credentialResolver.resolverKey }),

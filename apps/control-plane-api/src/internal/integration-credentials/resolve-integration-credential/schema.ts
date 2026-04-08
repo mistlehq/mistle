@@ -5,7 +5,7 @@ export const ResolveIntegrationCredentialRequestSchema = z
     connectionId: z.string().min(1),
     bindingId: z.string().min(1).optional(),
     secretType: z.string().min(1),
-    purpose: z.string().min(1).optional(),
+    slotKey: z.string().min(1).optional(),
     resolverKey: z.string().min(1).optional(),
   })
   .strict();
