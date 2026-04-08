@@ -10,7 +10,7 @@ use std::fmt::{self, Display};
 
 use serde_json::{Map, Value};
 
-use crate::time::Clock;
+use crate::time::{Clock, format_rfc3339_timestamp};
 use crate::tunnel::protocol::{
     BootstrapTelemetryControlMessage, MAX_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES,
     StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
@@ -268,7 +268,10 @@ pub fn encode_sandbox_telemetry_log_line(
     let mut payload = Map::new();
     payload.insert(
         "timestamp".to_string(),
-        Value::String(format_timestamp_millis(clock.now_ms())?),
+        Value::String(
+            format_rfc3339_timestamp(clock.now_system_time())
+                .map_err(|error| TelemetryRelayError::new(error.to_string()))?,
+        ),
     );
     payload.insert(
         "level".to_string(),
@@ -303,46 +306,4 @@ pub fn encode_sandbox_telemetry_log_line(
         .map_err(|error| TelemetryRelayError::new(error.to_string()))?;
     line.push('\n');
     Ok(line)
-}
-
-fn format_timestamp_millis(epoch_ms: u64) -> Result<String, TelemetryRelayError> {
-    let epoch_seconds = epoch_ms / 1_000;
-    let milliseconds = epoch_ms % 1_000;
-    let days_since_epoch = epoch_seconds / 86_400;
-    let seconds_of_day = epoch_seconds % 86_400;
-
-    let days_since_epoch = i64::try_from(days_since_epoch).map_err(|_| {
-        TelemetryRelayError::new("sandbox telemetry timestamp is out of range")
-    })?;
-    let seconds_of_day = u32::try_from(seconds_of_day).map_err(|_| {
-        TelemetryRelayError::new("sandbox telemetry timestamp is out of range")
-    })?;
-
-    let (year, month, day) = civil_from_days(days_since_epoch);
-    let hour = seconds_of_day / 3_600;
-    let minute = (seconds_of_day % 3_600) / 60;
-    let second = seconds_of_day % 60;
-
-    Ok(format!(
-        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{milliseconds:03}Z"
-    ))
-}
-
-fn civil_from_days(days_since_epoch: i64) -> (i64, u32, u32) {
-    let z = days_since_epoch + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let day = doy - (153 * mp + 2) / 5 + 1;
-    let month = mp + if mp < 10 { 3 } else { -9 };
-    let year = y + if month <= 2 { 1 } else { 0 };
-
-    (
-        year,
-        u32::try_from(month).expect("month should fit in u32"),
-        u32::try_from(day).expect("day should fit in u32"),
-    )
 }

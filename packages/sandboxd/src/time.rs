@@ -5,6 +5,8 @@
 
 pub use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
+use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 
 /// Provides access to the current time as epoch milliseconds.
 pub trait Clock: Send + Sync {
@@ -62,6 +64,11 @@ pub fn subtract_millis(base: SystemTime, duration_ms: u64) -> SystemTime {
 pub fn add_millis(base: SystemTime, duration_ms: u64) -> SystemTime {
     base.checked_add(Duration::from_millis(duration_ms))
         .unwrap_or(base + Duration::from_millis(duration_ms))
+}
+
+/// Formats a wall-clock timestamp as an RFC3339 UTC string.
+pub fn format_rfc3339_timestamp(system_time: SystemTime) -> Result<String, time::error::Format> {
+    OffsetDateTime::from(system_time).format(&Rfc3339)
 }
 
 #[cfg(test)]
@@ -158,7 +165,10 @@ mod tests {
     use std::time::Duration;
 
     use crate::time::testing::{ManualSleeper, MutableClock};
-    use crate::time::{Clock, Sleeper, SystemClock, ThreadSleeper, add_millis, subtract_millis};
+    use crate::time::{
+        Clock, Sleeper, SystemClock, ThreadSleeper, add_millis, format_rfc3339_timestamp,
+        subtract_millis,
+    };
     use std::time::UNIX_EPOCH;
 
     #[test]
@@ -214,5 +224,13 @@ mod tests {
             add_millis(base, 500),
             UNIX_EPOCH + Duration::from_millis(10_500)
         );
+    }
+
+    #[test]
+    fn formats_system_time_as_rfc3339() {
+        let timestamp = format_rfc3339_timestamp(UNIX_EPOCH + Duration::from_millis(104))
+            .expect("system time should format as RFC3339");
+
+        assert_eq!(timestamp, "1970-01-01T00:00:00.104Z");
     }
 }

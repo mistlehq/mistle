@@ -327,7 +327,7 @@ fn negotiates_telemetry_stream_and_flushes_buffered_logs() {
             .expect("telemetry relay should accept a client");
         let mut websocket = accept(stream).expect("tunnel websocket handshake should succeed");
         let mut relay = TelemetryRelay::default();
-        let clock = FixedClock { now_ms: 0 };
+        let clock = FixedClock { now_ms: 104 };
 
         for frame in relay
             .attach_tunnel_connection()
@@ -405,7 +405,7 @@ fn negotiates_telemetry_stream_and_flushes_buffered_logs() {
         decode_telemetry_data_frame(payload.as_ref()).expect("telemetry data frame should decode");
     let telemetry_log_line: Value =
         serde_json::from_slice(&telemetry_bytes).expect("telemetry bytes should contain json");
-    assert_eq!(telemetry_log_line["timestamp"], "1970-01-01T00:00:00.000Z");
+    assert_eq!(telemetry_log_line["timestamp"], "1970-01-01T00:00:00.104Z");
     assert_eq!(telemetry_log_line["level"], "warn");
     assert_eq!(telemetry_log_line["event"], "bootstrap_control_message_dropped");
     assert_eq!(
