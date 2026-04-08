@@ -13,7 +13,7 @@ import {
   TooltipTrigger,
 } from "@mistle/ui";
 import { CaretRightIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router";
 
 import type {
@@ -123,17 +123,15 @@ export function SessionsSidebarNav(input: {
           >
             <CollapsibleTrigger
               aria-label={`Toggle ${group.profileName} sessions`}
-              className="text-sidebar-foreground/70 hover:text-sidebar-foreground flex h-7 w-full items-center rounded-md px-2 text-[11px] font-semibold tracking-[0.08em] uppercase outline-hidden transition-colors"
+              className="text-sidebar-foreground/70 hover:text-sidebar-foreground peer flex h-7 w-full items-center justify-between rounded-md px-2 text-[11px] font-semibold tracking-[0.08em] uppercase outline-hidden transition-colors"
             >
-              <span className="flex min-w-0 items-center gap-1.5">
-                <CaretRightIcon
-                  aria-hidden
-                  className={`size-3 shrink-0 transition-transform ${
-                    hasActiveSearch || expandedProfileIds.has(group.profileId) ? "rotate-90" : ""
-                  }`}
-                />
-                <span className="truncate">{group.profileName}</span>
-              </span>
+              <span className="truncate">{group.profileName}</span>
+              <CaretRightIcon
+                aria-hidden
+                className={`pointer-events-none size-3 shrink-0 opacity-0 transition-[opacity,transform] peer-hover:opacity-100 ${
+                  hasActiveSearch || expandedProfileIds.has(group.profileId) ? "rotate-90" : ""
+                }`}
+              />
             </CollapsibleTrigger>
             <CollapsibleContent>
               <SidebarGroupContent>
@@ -171,17 +169,17 @@ export function SessionsSidebarNav(input: {
 }
 
 function SessionsSidebarItemLabel(input: { label: string }): React.JSX.Element {
-  const labelRef = useRef<HTMLSpanElement | null>(null);
+  const [labelElement, setLabelElement] = useState<HTMLSpanElement | null>(null);
   const [isTruncated, setIsTruncated] = useState(false);
 
   useEffect(() => {
-    const element = labelRef.current;
-    if (element === null) {
+    if (labelElement === null) {
+      setIsTruncated(false);
       return;
     }
 
     const updateTruncation = () => {
-      setIsTruncated(element.scrollWidth > element.clientWidth);
+      setIsTruncated(labelElement.scrollWidth > labelElement.clientWidth);
     };
 
     updateTruncation();
@@ -191,35 +189,29 @@ function SessionsSidebarItemLabel(input: { label: string }): React.JSX.Element {
     }
 
     const resizeObserver = new ResizeObserver(updateTruncation);
-    resizeObserver.observe(element);
+    resizeObserver.observe(labelElement);
 
     return () => {
       resizeObserver.disconnect();
     };
-  }, [input.label]);
+  }, [input.label, labelElement]);
 
   const labelClassName = "block min-w-0 flex-1 truncate text-sm";
 
-  if (!isTruncated) {
-    return (
-      <span className={labelClassName} ref={labelRef}>
-        {input.label}
-      </span>
-    );
+  function handleLabelRef(element: HTMLSpanElement | null): void {
+    setLabelElement(element);
   }
 
   return (
-    <Tooltip>
+    <Tooltip disabled={!isTruncated}>
       <TooltipTrigger
         render={
-          <span className={labelClassName} ref={labelRef}>
+          <span className={labelClassName} ref={handleLabelRef}>
             {input.label}
           </span>
         }
       />
-      <TooltipContent colorScheme="light" side="top">
-        {input.label}
-      </TooltipContent>
+      <TooltipContent side="top">{input.label}</TooltipContent>
     </Tooltip>
   );
 }
