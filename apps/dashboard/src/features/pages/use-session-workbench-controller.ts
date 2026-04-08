@@ -156,8 +156,12 @@ export function useSessionWorkbenchController(input: {
     rpcClientRef,
     sessionEventUnsubscribersRef,
   });
-  const ptyState = useSandboxPtyState();
-  const cliPtyState = useSandboxPtyState();
+  const ptyState = useSandboxPtyState({
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+  });
+  const cliPtyState = useSandboxPtyState({
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+  });
   const terminalPanelState = useSessionTerminalWorkbenchState({
     sandboxInstanceId: input.sandboxInstanceId,
   });

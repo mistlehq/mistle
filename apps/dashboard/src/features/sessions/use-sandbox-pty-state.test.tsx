@@ -5,9 +5,17 @@ import { describe, expect, it } from "vitest";
 
 import { useSandboxPtyState } from "./use-sandbox-pty-state.js";
 
+const ThrowingEnsureTransportConnected = async (): Promise<never> => {
+  throw new Error("ensureTransportConnected should not be called in this test.");
+};
+
 describe("useSandboxPtyState", () => {
   it("starts idle with no PTY output or connection", () => {
-    const { result } = renderHook(() => useSandboxPtyState());
+    const { result } = renderHook(() =>
+      useSandboxPtyState({
+        ensureTransportConnected: ThrowingEnsureTransportConnected,
+      }),
+    );
 
     expect(result.current.lifecycle.state).toBe("idle");
     expect(result.current.lifecycle.connectedSandboxInstanceId).toBeNull();
@@ -18,7 +26,11 @@ describe("useSandboxPtyState", () => {
   });
 
   it("fails fast when opening a PTY without a sandbox instance id", async () => {
-    const { result } = renderHook(() => useSandboxPtyState());
+    const { result } = renderHook(() =>
+      useSandboxPtyState({
+        ensureTransportConnected: ThrowingEnsureTransportConnected,
+      }),
+    );
 
     await expect(
       result.current.actions.openPty({
