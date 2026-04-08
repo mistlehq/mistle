@@ -1,4 +1,10 @@
+import type {
+  CodexJsonRpcClient,
+  CodexSessionClient,
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRef } from "react";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
@@ -137,7 +143,16 @@ export function useSessionWorkbenchController(input: {
   sandboxInstanceId: string | null;
 }): UseSessionWorkbenchControllerResult {
   const queryClient = useQueryClient();
-  const sessionState = useCodexSessionState();
+  const transportRef = useRef<SandboxSessionTransport | null>(null);
+  const sessionClientRef = useRef<CodexSessionClient | null>(null);
+  const rpcClientRef = useRef<CodexJsonRpcClient | null>(null);
+  const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
+  const sessionState = useCodexSessionState({
+    transportRef,
+    sessionClientRef,
+    rpcClientRef,
+    sessionEventUnsubscribersRef,
+  });
   const ptyState = useSandboxPtyState();
   const cliPtyState = useSandboxPtyState();
   const terminalPanelState = useSessionTerminalWorkbenchState({

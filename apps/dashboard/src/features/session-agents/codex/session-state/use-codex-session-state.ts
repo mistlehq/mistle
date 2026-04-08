@@ -16,7 +16,7 @@ import {
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useMemo, useReducer, useRef, useState, type RefObject } from "react";
 
 import { getSandboxInstanceStatusQueryKey } from "../../../pages/use-session-workbench-lifecycle-state.js";
 import { patchSandboxInstanceTitle } from "../../../sessions/sessions-service.js";
@@ -134,12 +134,14 @@ export type UseCodexSessionStateResult = {
   sessionMessage: CodexSessionMessageState;
 };
 
-export function useCodexSessionState(): UseCodexSessionStateResult {
+export function useCodexSessionState(input: {
+  transportRef: RefObject<SandboxSessionTransport | null>;
+  sessionClientRef: RefObject<CodexSessionClient | null>;
+  rpcClientRef: RefObject<CodexJsonRpcClient | null>;
+  sessionEventUnsubscribersRef: RefObject<(() => void)[]>;
+}): UseCodexSessionStateResult {
   const queryClient = useQueryClient();
-  const transportRef = useRef<SandboxSessionTransport | null>(null);
-  const sessionClientRef = useRef<CodexSessionClient | null>(null);
-  const rpcClientRef = useRef<CodexJsonRpcClient | null>(null);
-  const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
+  const rpcClientRef = input.rpcClientRef;
   const sessionSnapshotRef = useRef<ConnectedCodexSession | null>(null);
   const threadIdRef = useRef<string | null>(null);
   const connectionGenerationRef = useRef(0);
@@ -166,7 +168,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     refreshLoadedThreadList,
     refreshThreadCollections,
   } = useCodexThreadCollections({
-    rpcClientRef,
+    rpcClientRef: input.rpcClientRef,
     ensureCurrentGeneration,
   });
 
@@ -187,13 +189,13 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     interruptTurn,
     steerTurn,
   } = useCodexChatController({
-    rpcClientRef,
+    rpcClientRef: input.rpcClientRef,
     threadIdRef,
     setSessionErrorMessage,
   });
 
   const bootstrapDataState = useCodexSessionBootstrapData({
-    rpcClientRef,
+    rpcClientRef: input.rpcClientRef,
     setLifecycleErrorMessage,
   });
   const {
@@ -274,10 +276,10 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     onServerRequestNotification: handleServerRequestNotification,
     onServerRequestReceived: handleServerRequestReceived,
     refreshThreadCollections,
-    rpcClientRef,
-    transportRef,
-    sessionClientRef,
-    sessionEventUnsubscribersRef,
+    rpcClientRef: input.rpcClientRef,
+    transportRef: input.transportRef,
+    sessionClientRef: input.sessionClientRef,
+    sessionEventUnsubscribersRef: input.sessionEventUnsubscribersRef,
     lifecycleErrorMessage,
     setLifecycleErrorMessage,
     threadIdRef,
@@ -308,7 +310,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     hydrateInitialThread,
     loadModelsAsync,
     readConfigAsync,
-    rpcClientRef,
+    rpcClientRef: input.rpcClientRef,
   });
 
   const handleThreadMutationFailure = useCallback(
