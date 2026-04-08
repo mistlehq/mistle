@@ -16,14 +16,16 @@ const groups: SessionsSidebarNavGroup[] = [
       {
         id: "sbi_active",
         label: "Investigate flaky test run",
+        metadataLabel: "Working",
         to: "/sessions/sbi_active",
-        attentionState: "active",
+        showActivityIndicator: true,
       },
       {
         id: "sbi_idle",
         label: "Review migration draft",
+        metadataLabel: "Idle",
         to: "/sessions/sbi_idle",
-        attentionState: "idle",
+        showActivityIndicator: false,
       },
     ],
   },
@@ -34,8 +36,9 @@ const groups: SessionsSidebarNavGroup[] = [
       {
         id: "sbi_docs",
         label: "Draft onboarding guide",
+        metadataLabel: "1h",
         to: "/sessions/sbi_docs",
-        attentionState: "setup",
+        showActivityIndicator: false,
       },
     ],
   },
@@ -99,17 +102,17 @@ describe("SessionsSidebarNav", () => {
     const trigger = getRepoMaintainerTrigger();
 
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("link", { name: "Review migration draft" })).toBeDefined();
+    expect(screen.getByRole("link", { name: /Review migration draft/ })).toBeDefined();
 
     fireEvent.click(trigger);
 
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryByRole("link", { name: "Review migration draft" })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Review migration draft/ })).toBeNull();
 
     fireEvent.click(trigger);
 
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("link", { name: "Review migration draft" })).toBeDefined();
+    expect(screen.getByRole("link", { name: /Review migration draft/ })).toBeDefined();
   });
 
   it("expands matching groups while search is active", () => {
@@ -125,7 +128,15 @@ describe("SessionsSidebarNav", () => {
     });
 
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("link", { name: "Review migration draft" })).toBeDefined();
+    expect(screen.getByRole("link", { name: /Review migration draft/ })).toBeDefined();
+  });
+
+  it("shows working for active running sessions and idle for inactive running sessions", () => {
+    renderSidebarNav();
+
+    expect(screen.getByText("Working")).toBeDefined();
+    expect(screen.getAllByText("Working")).toHaveLength(1);
+    expect(screen.getByText("Idle")).toBeDefined();
   });
 
   it("keeps the new session action visible when there are no groups", () => {

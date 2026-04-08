@@ -38,15 +38,27 @@ function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
         sandboxProfileDisplayName: "Repo Maintainer",
         status: "running",
         createdAt: "2026-04-08T09:00:00.000Z",
+        updatedAt: "2026-04-08T09:00:00.000Z",
         keepaliveActive: true,
       }),
       buildSandboxInstanceListItemFixture({
-        id: "sbi_ready_alpha",
+        id: "sbi_recent_five_min",
         title: "Review migration draft",
         sandboxProfileId: "sbp_repo_maintainer",
         sandboxProfileDisplayName: "Repo Maintainer",
         status: "running",
         createdAt: "2026-04-08T08:50:00.000Z",
+        updatedAt: "2026-04-08T08:55:00.000Z",
+        keepaliveActive: false,
+      }),
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_recent_forty_five_min",
+        title: "Prepare release notes",
+        sandboxProfileId: "sbp_ops",
+        sandboxProfileDisplayName: "Ops Coordinator",
+        status: "running",
+        createdAt: "2026-04-08T08:20:00.000Z",
+        updatedAt: "2026-04-08T08:15:00.000Z",
         keepaliveActive: false,
       }),
       buildSandboxInstanceListItemFixture({
@@ -57,6 +69,17 @@ function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
         sandboxProfileDisplayName: "Docs Maintainer",
         status: "starting",
         createdAt: "2026-04-08T08:40:00.000Z",
+        updatedAt: "2026-04-08T06:00:00.000Z",
+        keepaliveActive: false,
+      }),
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_stopped_one_day",
+        title: "Reconcile billing export",
+        sandboxProfileId: "sbp_finance",
+        sandboxProfileDisplayName: "Finance Investigator",
+        status: "stopped",
+        createdAt: "2026-04-07T09:00:00.000Z",
+        updatedAt: "2026-04-07T09:00:00.000Z",
         keepaliveActive: false,
       }),
       buildSandboxInstanceListItemFixture({
@@ -66,21 +89,23 @@ function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
         sandboxProfileDisplayName: "Finance Investigator",
         status: "stopped",
         createdAt: "2026-04-08T07:30:00.000Z",
+        updatedAt: "2026-04-06T07:30:00.000Z",
         keepaliveActive: false,
       }),
       buildSandboxInstanceListItemFixture({
-        id: "sbi_failed_hidden",
-        title: "Hidden failed run",
-        sandboxProfileId: "sbp_hidden",
-        sandboxProfileDisplayName: "Hidden Profile",
-        status: "failed",
-        createdAt: "2026-04-08T06:30:00.000Z",
+        id: "sbi_stopped_four_day",
+        title: "Audit webhook retry behavior",
+        sandboxProfileId: "sbp_ops",
+        sandboxProfileDisplayName: "Ops Coordinator",
+        status: "stopped",
+        createdAt: "2026-04-04T06:30:00.000Z",
+        updatedAt: "2026-04-04T06:30:00.000Z",
         keepaliveActive: false,
       }),
     ],
     nextPage: null,
     previousPage: null,
-    totalResults: 5,
+    totalResults: 7,
   };
 }
 
@@ -144,7 +169,7 @@ export const NoLaunchableProfiles: Story = {
   },
 };
 
-export const MixedOpenableStates: Story = {};
+export const ActivityIndicatorOnly: Story = {};
 
 export const SessionSelected: Story = {
   args: {

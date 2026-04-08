@@ -19,31 +19,8 @@ import { CaretRightIcon, MagnifyingGlassIcon, PlusIcon } from "@phosphor-icons/r
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router";
 
-import type {
-  SessionsSidebarAttentionState,
-  SessionsSidebarNavGroup,
-} from "./sessions-sidebar-nav-model.js";
+import type { SessionsSidebarNavGroup } from "./sessions-sidebar-nav-model.js";
 import { filterSessionsSidebarNavGroups } from "./sessions-sidebar-nav-model.js";
-
-function resolveAttentionUi(input: SessionsSidebarAttentionState): {
-  indicatorClassName: string;
-} {
-  if (input === "active") {
-    return {
-      indicatorClassName: "bg-amber-500",
-    };
-  }
-
-  if (input === "idle") {
-    return {
-      indicatorClassName: "bg-emerald-600",
-    };
-  }
-
-  return {
-    indicatorClassName: "bg-muted-foreground/45",
-  };
-}
 
 export function SessionsSidebarNav(input: {
   groups: readonly SessionsSidebarNavGroup[];
@@ -142,7 +119,6 @@ export function SessionsSidebarNav(input: {
               <SidebarGroupContent>
                 <SidebarMenuSub className="mx-0 gap-1 border-l-0 px-0 py-0">
                   {group.items.map((item) => {
-                    const attentionUi = resolveAttentionUi(item.attentionState);
                     const isActive = location.pathname === item.to;
 
                     return (
@@ -152,12 +128,11 @@ export function SessionsSidebarNav(input: {
                           isActive={isActive}
                           render={<NavLink to={item.to} />}
                         >
-                          <div className="flex min-w-0 flex-1 items-center gap-3">
-                            <span
-                              aria-hidden
-                              className={`size-2.5 shrink-0 rounded-full ${attentionUi.indicatorClassName}`}
+                          <div className="flex min-w-0 flex-1 items-center">
+                            <SessionsSidebarItemLabel
+                              label={item.label}
+                              metadataLabel={item.metadataLabel}
                             />
-                            <SessionsSidebarItemLabel label={item.label} />
                           </div>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
@@ -205,7 +180,10 @@ function SessionsSidebarSearch(input: {
   );
 }
 
-function SessionsSidebarItemLabel(input: { label: string }): React.JSX.Element {
+function SessionsSidebarItemLabel(input: {
+  label: string;
+  metadataLabel: string;
+}): React.JSX.Element {
   const [labelElement, setLabelElement] = useState<HTMLSpanElement | null>(null);
   const [isTruncated, setIsTruncated] = useState(false);
 
@@ -240,17 +218,26 @@ function SessionsSidebarItemLabel(input: { label: string }): React.JSX.Element {
   }
 
   return (
-    <Tooltip disabled={!isTruncated}>
-      <TooltipTrigger
-        render={
-          <span className={labelClassName} ref={handleLabelRef}>
-            {input.label}
-          </span>
-        }
-      />
-      <TooltipContent showArrow={false} side="top" variant="light">
-        {input.label}
-      </TooltipContent>
-    </Tooltip>
+    <div className="min-w-0 flex-1">
+      <Tooltip disabled={!isTruncated}>
+        <TooltipTrigger
+          render={
+            <span className={labelClassName} ref={handleLabelRef}>
+              {input.label}
+            </span>
+          }
+        />
+        <TooltipContent showArrow={false} side="top" variant="light">
+          {input.label}
+        </TooltipContent>
+      </Tooltip>
+      <div
+        className={`pt-0.5 text-[11px] font-medium ${
+          input.metadataLabel === "Working" ? "text-sky-700" : "text-muted-foreground"
+        }`}
+      >
+        {input.metadataLabel}
+      </div>
+    </div>
   );
 }

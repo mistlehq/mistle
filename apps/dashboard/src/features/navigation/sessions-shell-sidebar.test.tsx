@@ -33,26 +33,31 @@ function buildSandboxInstanceListItem(
 describe("buildSessionsShellSidebarGroups", () => {
   it("maps listed sandbox instances into grouped session sidebar items", () => {
     expect(
-      buildSessionsShellSidebarGroups([
-        buildSandboxInstanceListItem({
-          id: "sbi_active",
-          title: "Investigate flaky test run",
-          keepaliveActive: true,
-        }),
-        buildSandboxInstanceListItem({
-          id: "sbi_setup",
-          sandboxProfileId: "sbp_docs",
-          sandboxProfileDisplayName: "Docs",
-          title: "Draft onboarding guide",
-          status: "starting",
-        }),
-        buildSandboxInstanceListItem({
-          id: "sbi_failed",
-          sandboxProfileId: "sbp_failed",
-          sandboxProfileDisplayName: "Broken",
-          status: "failed",
-        }),
-      ]),
+      buildSessionsShellSidebarGroups(
+        [
+          buildSandboxInstanceListItem({
+            id: "sbi_active",
+            title: "Investigate flaky test run",
+            keepaliveActive: true,
+          }),
+          buildSandboxInstanceListItem({
+            id: "sbi_setup",
+            sandboxProfileId: "sbp_docs",
+            sandboxProfileDisplayName: "Docs",
+            title: "Draft onboarding guide",
+            status: "starting",
+          }),
+          buildSandboxInstanceListItem({
+            id: "sbi_failed",
+            sandboxProfileId: "sbp_failed",
+            sandboxProfileDisplayName: "Broken",
+            status: "failed",
+          }),
+        ],
+        {
+          nowEpochMs: Date.parse("2026-04-10T00:00:00.000Z"),
+        },
+      ),
     ).toStrictEqual([
       {
         profileId: "sbp_default",
@@ -61,8 +66,9 @@ describe("buildSessionsShellSidebarGroups", () => {
           {
             id: "sbi_active",
             label: "Investigate flaky test run",
+            metadataLabel: "Working",
             to: "/sessions/sbi_active",
-            attentionState: "active",
+            showActivityIndicator: true,
           },
         ],
       },
@@ -73,8 +79,9 @@ describe("buildSessionsShellSidebarGroups", () => {
           {
             id: "sbi_setup",
             label: "Draft onboarding guide",
+            metadataLabel: "2d",
             to: "/sessions/sbi_setup",
-            attentionState: "setup",
+            showActivityIndicator: false,
           },
         ],
       },

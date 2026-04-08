@@ -69,6 +69,37 @@ function compactRelativeTimeFromMs(deltaMs: number): string {
     .replace(" year", " yr");
 }
 
+function compactUnitRelativeTimeFromMs(deltaMs: number): string {
+  const absDeltaMs = Math.abs(deltaMs);
+
+  if (absDeltaMs < 60_000) {
+    return "now";
+  }
+
+  const minuteDelta = Math.round(absDeltaMs / 60_000);
+  if (minuteDelta < 60) {
+    return `${String(minuteDelta)}m`;
+  }
+
+  const hourDelta = Math.round(absDeltaMs / 3_600_000);
+  if (hourDelta < 24) {
+    return `${String(hourDelta)}h`;
+  }
+
+  const dayDelta = Math.round(absDeltaMs / 86_400_000);
+  if (dayDelta < 30) {
+    return `${String(dayDelta)}d`;
+  }
+
+  const monthDelta = Math.round(absDeltaMs / 2_592_000_000);
+  if (monthDelta < 12) {
+    return `${String(monthDelta)}mo`;
+  }
+
+  const yearDelta = Math.round(absDeltaMs / 31_536_000_000);
+  return `${String(yearDelta)}y`;
+}
+
 export function formatDate(isoDateTime: string): string {
   const parsedDate = parseDate(isoDateTime);
   if (parsedDate === null) {
@@ -109,4 +140,21 @@ export function formatRelativeOrDate(
   }
 
   return formatDate(isoDateTime);
+}
+
+export function formatCompactRelativeOrDate(
+  isoDateTime: string,
+  input?: {
+    nowEpochMs?: number;
+  },
+): string {
+  const epochMs = parseEpochMs(isoDateTime);
+  if (epochMs === null) {
+    return "Unknown";
+  }
+
+  const nowEpochMs = input?.nowEpochMs ?? Date.now();
+  const deltaMs = epochMs - nowEpochMs;
+
+  return compactUnitRelativeTimeFromMs(deltaMs);
 }

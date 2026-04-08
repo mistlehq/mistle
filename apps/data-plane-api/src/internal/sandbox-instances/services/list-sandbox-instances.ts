@@ -18,6 +18,7 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppRuntimeResources } from "../../../resources.js";
+import { resolveEffectiveSandboxInstanceStatus } from "../effective-sandbox-instance-status.js";
 import type { ListSandboxInstancesInput } from "../list-sandbox-instances/schema.js";
 import type { ListSandboxInstancesResponse } from "../schemas.js";
 
@@ -64,7 +65,10 @@ async function resolveListedSandboxRuntimeState(
   status: ListSandboxInstancesResponse["items"][number]["status"];
   keepaliveActive: boolean;
 }> {
-  if (input.persistedStatus !== SandboxInstanceStatuses.RUNNING) {
+  if (
+    input.persistedStatus !== SandboxInstanceStatuses.STARTING &&
+    input.persistedStatus !== SandboxInstanceStatuses.RUNNING
+  ) {
     return {
       status: input.persistedStatus,
       keepaliveActive: false,
@@ -76,9 +80,14 @@ async function resolveListedSandboxRuntimeState(
     nowMs: Date.now(),
   });
 
+  const status = resolveEffectiveSandboxInstanceStatus({
+    persistedStatus: input.persistedStatus,
+    runtimeStateSnapshot,
+  });
+
   return {
-    status: input.persistedStatus,
-    keepaliveActive: runtimeStateSnapshot.keepalive.active,
+    status,
+    keepaliveActive: status === "running" && runtimeStateSnapshot.keepalive.active,
   };
 }
 

@@ -16,6 +16,9 @@ const SESSIONS_SIDEBAR_LIST_LIMIT = 100;
 
 export function buildSessionsShellSidebarGroups(
   items: readonly SandboxInstanceListItem[],
+  input?: {
+    nowEpochMs?: number;
+  },
 ): SessionsSidebarNavGroup[] {
   const sourceItems: SessionsSidebarSourceItem[] = items.map((item) => ({
     id: item.id,
@@ -24,10 +27,13 @@ export function buildSessionsShellSidebarGroups(
     sandboxProfileDisplayName: item.sandboxProfileDisplayName,
     status: item.status,
     createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
     keepaliveActive: item.keepaliveActive,
   }));
 
-  return buildSessionsSidebarNavGroups(sourceItems);
+  return buildSessionsSidebarNavGroups(sourceItems, {
+    ...(input?.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
+  });
 }
 
 export function SessionsShellSidebar(): React.JSX.Element {

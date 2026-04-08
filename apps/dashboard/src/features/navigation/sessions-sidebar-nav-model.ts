@@ -1,6 +1,5 @@
 import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
-
-export type SessionsSidebarAttentionState = "active" | "idle" | "setup";
+import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 
 export type SessionsSidebarSourceItem = {
   id: string;
@@ -9,14 +8,16 @@ export type SessionsSidebarSourceItem = {
   sandboxProfileDisplayName: string | null;
   status: "pending" | "starting" | "running" | "stopped" | "failed";
   createdAt: string;
+  updatedAt: string;
   keepaliveActive: boolean;
 };
 
 export type SessionsSidebarNavItem = {
   id: string;
   label: string;
+  metadataLabel: string;
   to: string;
-  attentionState: SessionsSidebarAttentionState;
+  showActivityIndicator: boolean;
 };
 
 export type SessionsSidebarNavGroup = {
@@ -29,23 +30,15 @@ export type SessionsSidebarSearchFilter = {
   searchQuery: string;
 };
 
-export function resolveSessionsSidebarAttentionState(input: {
+export function resolveSessionsSidebarShowActivityIndicator(input: {
   status: SessionsSidebarSourceItem["status"];
   keepaliveActive: boolean;
-}): SessionsSidebarAttentionState | null {
+}): boolean | null {
   if (!isSessionPageNavigableSandboxStatus(input.status)) {
     return null;
   }
 
-  if (input.status === "running") {
-    return input.keepaliveActive ? "active" : "idle";
-  }
-
-  if (input.status === "stopped") {
-    return "idle";
-  }
-
-  return "setup";
+  return input.status === "running" && input.keepaliveActive;
 }
 
 function resolveProfileName(input: SessionsSidebarSourceItem): string {
@@ -56,29 +49,46 @@ function resolveInstanceLabel(input: SessionsSidebarSourceItem): string {
   return input.title ?? "Untitled";
 }
 
-function resolveAttentionRank(input: SessionsSidebarAttentionState): number {
-  if (input === "active") {
+function resolveMetadataLabel(
+  input: Pick<SessionsSidebarSourceItem, "keepaliveActive" | "status" | "updatedAt"> & {
+    nowEpochMs?: number;
+  },
+): string {
+  if (input.status === "running" && input.keepaliveActive) {
+    return "Working";
+  }
+
+  if (input.status === "running") {
+    return "Idle";
+  }
+
+  return formatCompactRelativeOrDate(input.updatedAt, {
+    ...(input.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
+  });
+}
+
+function resolveActivityRank(input: boolean): number {
+  if (input) {
     return 0;
   }
 
-  if (input === "idle") {
-    return 1;
-  }
-
-  return 2;
+  return 1;
 }
 
 export function buildSessionsSidebarNavGroups(
   items: readonly SessionsSidebarSourceItem[],
+  input?: {
+    nowEpochMs?: number;
+  },
 ): SessionsSidebarNavGroup[] {
   const groupsByProfileId = new Map<string, SessionsSidebarNavGroup>();
 
   for (const item of items) {
-    const attentionState = resolveSessionsSidebarAttentionState({
+    const showActivityIndicator = resolveSessionsSidebarShowActivityIndicator({
       status: item.status,
       keepaliveActive: item.keepaliveActive,
     });
-    if (attentionState === null) {
+    if (showActivityIndicator === null) {
       continue;
     }
 
@@ -94,8 +104,14 @@ export function buildSessionsSidebarNavGroups(
     group.items.push({
       id: item.id,
       label: resolveInstanceLabel(item),
+      metadataLabel: resolveMetadataLabel({
+        status: item.status,
+        keepaliveActive: item.keepaliveActive,
+        updatedAt: item.updatedAt,
+        nowEpochMs: input?.nowEpochMs,
+      }),
       to: `/sessions/${encodeURIComponent(item.id)}`,
-      attentionState,
+      showActivityIndicator,
     });
 
     if (existingGroup === undefined) {
@@ -107,10 +123,11 @@ export function buildSessionsSidebarNavGroups(
     .map((group) => ({
       ...group,
       items: [...group.items].sort((left, right) => {
-        const attentionDifference =
-          resolveAttentionRank(left.attentionState) - resolveAttentionRank(right.attentionState);
-        if (attentionDifference !== 0) {
-          return attentionDifference;
+        const activityDifference =
+          resolveActivityRank(left.showActivityIndicator) -
+          resolveActivityRank(right.showActivityIndicator);
+        if (activityDifference !== 0) {
+          return activityDifference;
         }
 
         return left.label.localeCompare(right.label);
