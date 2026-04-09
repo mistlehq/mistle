@@ -195,6 +195,7 @@ export const IntegrationConnectionSchema = z
           .strict(),
       )
       .optional(),
+    supportsWebhookSources: z.boolean().optional(),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),
   })

@@ -35,8 +35,8 @@ describe("integrations-definitions server", () => {
     expect(githubCloudDefinition?.redirectHandler).toBeDefined();
     expect(githubCloudDefinition?.webhookHandler).toBeDefined();
     expect(githubCloudDefinition?.webhookSource).toMatchObject({
-      ownerScope: "target",
-      routingStrategy: "payload",
+      ownerScope: "connection",
+      routingStrategy: "path",
       lifecycle: "implicit",
     });
     expect(
@@ -53,8 +53,8 @@ describe("integrations-definitions server", () => {
     expect(githubEnterpriseServerDefinition?.redirectHandler).toBeDefined();
     expect(githubEnterpriseServerDefinition?.webhookHandler).toBeDefined();
     expect(githubEnterpriseServerDefinition?.webhookSource).toMatchObject({
-      ownerScope: "target",
-      routingStrategy: "payload",
+      ownerScope: "connection",
+      routingStrategy: "path",
       lifecycle: "implicit",
     });
     expect(

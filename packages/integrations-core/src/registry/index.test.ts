@@ -36,13 +36,32 @@ const GitHubAppInstallationConnectionMethods = [
   {
     id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
     label: "GitHub App installation",
-    kind: "redirect",
-    ui: {
-      create: {
-        submitLabel: "Install GitHub App",
-        helperText: "Continue to GitHub to install the app and finish connecting this account.",
+    kind: "form",
+    secretFields: [
+      {
+        name: "appPrivateKeyPem",
+        label: "App private key PEM",
+        inputType: "password",
+        secretType: "api_key",
+        slotKey: "github.github-cloud.github-app-installation.app-private-key-pem",
       },
-    },
+      {
+        name: "webhookSecret",
+        label: "Webhook secret",
+        inputType: "password",
+        secretType: "api_key",
+        slotKey: "github.github-cloud.github-app-installation.webhook-secret",
+      },
+    ],
+    configSchema: z
+      .object({
+        connection_method: z.literal(IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION),
+        app_id: z.string(),
+        app_slug: z.string(),
+        installation_id: z.string().optional(),
+        setup_action: z.string().optional(),
+      })
+      .strict(),
   },
 ] as const;
 const GitHubConnectionMethods = [

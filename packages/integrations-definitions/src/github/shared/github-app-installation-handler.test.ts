@@ -15,6 +15,7 @@ describe("GitHubAppInstallationRedirectHandler", () => {
         config: {
           apiBaseUrl: "https://api.github.com/",
           webBaseUrl: "https://github.com/",
+          appId: "123",
           appSlug: "mistle-app",
         },
       },
@@ -38,6 +39,7 @@ describe("GitHubAppInstallationRedirectHandler", () => {
         config: {
           apiBaseUrl: "https://ghe.example.com/api/v3",
           webBaseUrl: "https://ghe.example.com/",
+          appId: "456",
           appSlug: "mistle-app-enterprise",
         },
       },
@@ -81,6 +83,7 @@ describe("GitHubAppInstallationRedirectHandler", () => {
         config: {
           apiBaseUrl: "https://api.github.com/",
           webBaseUrl: "https://github.com/",
+          appId: "123",
           appSlug: "mistle-app",
         },
       },
@@ -94,6 +97,8 @@ describe("GitHubAppInstallationRedirectHandler", () => {
       externalSubjectId: "98765",
       connectionConfig: {
         connection_method: "github-app-installation",
+        app_id: "123",
+        app_slug: "mistle-app",
         installation_id: "98765",
         setup_action: "install",
       },
@@ -114,6 +119,7 @@ describe("GitHubAppInstallationRedirectHandler", () => {
           config: {
             apiBaseUrl: "https://api.github.com/",
             webBaseUrl: "https://github.com/",
+            appId: "123",
             appSlug: "mistle-app",
           },
         },

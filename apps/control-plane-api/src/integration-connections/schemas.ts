@@ -44,6 +44,7 @@ export const IntegrationConnectionSchema = z
     config: z.record(z.string(), z.unknown()).optional(),
     targetSnapshotConfig: z.record(z.string(), z.unknown()).optional(),
     resources: z.array(IntegrationConnectionResourceSummarySchema).optional(),
+    supportsWebhookSources: z.boolean().optional(),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),
   })

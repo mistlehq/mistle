@@ -177,7 +177,18 @@ export async function createFormConnection(
       const webhookSourceCapability = definition.webhookSource;
       if (
         webhookSourceCapability?.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT &&
-        webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION
+        webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION &&
+        ((await webhookSourceCapability.supportsConnection?.({
+          connection: {
+            id: createdConnection.id,
+            status: createdConnection.status,
+            config: {
+              ...parsedConfig,
+              connection_method: input.methodId,
+            },
+          },
+        })) ??
+          true)
       ) {
         await ensureImplicitConnectionWebhookSource({
           db: tx,

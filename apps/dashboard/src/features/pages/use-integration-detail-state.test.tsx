@@ -170,14 +170,19 @@ function createCard(input: {
         {
           id: "github-app-installation",
           label: "GitHub App installation",
-          kind: "redirect",
-          ui: {
-            create: {
-              submitLabel: "Install GitHub App",
-              helperText:
-                "Continue to GitHub to install the app and finish connecting this account.",
+          kind: "form",
+          secretFields: [
+            {
+              name: "appPrivateKeyPem",
+              label: "App private key PEM",
+              inputType: "password",
             },
-          },
+            {
+              name: "webhookSecret",
+              label: "Webhook secret",
+              inputType: "password",
+            },
+          ],
         },
       ],
       targetHealth: {

@@ -30,6 +30,7 @@ async function ensureGithubCloudTarget(fixture: ControlPlaneApiIntegrationFixtur
       config: {
         api_base_url: "https://api.github.com",
         web_base_url: "https://github.com",
+        app_id: "123",
         app_slug: "mistle-github-app",
       },
     })
@@ -42,6 +43,7 @@ async function ensureGithubCloudTarget(fixture: ControlPlaneApiIntegrationFixtur
         config: {
           api_base_url: "https://api.github.com",
           web_base_url: "https://github.com",
+          app_id: "123",
           app_slug: "mistle-github-app",
         },
       },
@@ -171,12 +173,15 @@ describe("integration connections GitHub App installation integration", () => {
     expect(persistedConnection.externalSubjectId).toBe("12345");
     expect(persistedConnection.config).toEqual({
       connection_method: "github-app-installation",
+      app_id: "123",
+      app_slug: "mistle-github-app",
       installation_id: "12345",
       setup_action: "install",
     });
     expect(persistedConnection.targetSnapshotConfig).toEqual({
       apiBaseUrl: "https://api.github.com",
       webBaseUrl: "https://github.com",
+      appId: "123",
       appSlug: "mistle-github-app",
     });
 

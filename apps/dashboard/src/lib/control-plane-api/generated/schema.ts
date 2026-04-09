@@ -583,6 +583,7 @@ export interface paths {
                 }[];
                 /** @enum {string} */
                 status: "active" | "error" | "revoked";
+                supportsWebhookSources?: boolean;
                 targetKey: string;
                 targetSnapshotConfig?: {
                   [key: string]: unknown;
@@ -708,6 +709,7 @@ export interface paths {
               }[];
               /** @enum {string} */
               status: "active" | "error" | "revoked";
+              supportsWebhookSources?: boolean;
               targetKey: string;
               targetSnapshotConfig?: {
                 [key: string]: unknown;
@@ -922,6 +924,7 @@ export interface paths {
               }[];
               /** @enum {string} */
               status: "active" | "error" | "revoked";
+              supportsWebhookSources?: boolean;
               targetKey: string;
               targetSnapshotConfig?: {
                 [key: string]: unknown;
@@ -1735,6 +1738,7 @@ export interface paths {
               }[];
               /** @enum {string} */
               status: "active" | "error" | "revoked";
+              supportsWebhookSources?: boolean;
               targetKey: string;
               targetSnapshotConfig?: {
                 [key: string]: unknown;

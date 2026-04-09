@@ -1387,6 +1387,15 @@ export type IntegrationWebhookSourceCapability<
   routingStrategy: IntegrationWebhookSourceRoutingStrategy;
   /** Whether provider registration is implicit or managed. */
   lifecycle: IntegrationWebhookSourceLifecycle;
+  /**
+   * Optional connection-level support gate. When omitted, the source is
+   * treated as supported for every connection of the definition.
+   */
+  supportsConnection?(input: {
+    connection: IntegrationConnection & {
+      config: TConnectionConfig;
+    };
+  }): MaybePromise<boolean>;
   /** Returns the UI/API-facing description of a persisted source row. */
   describeSource(
     input: IntegrationWebhookSourceDescribeInput<TTargetConfig, TTargetSecrets, TConnectionConfig>,

@@ -84,9 +84,13 @@ describe("integration forms helpers", () => {
         connection: {
           rawConfig: {
             connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle-github-app",
           },
           config: {
             connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle-github-app",
           },
         },
       },

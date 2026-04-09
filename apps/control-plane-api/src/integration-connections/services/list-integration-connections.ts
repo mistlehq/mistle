@@ -58,6 +58,7 @@ type IntegrationConnectionListItem = {
   externalSubjectId?: string;
   config?: Record<string, unknown>;
   targetSnapshotConfig?: Record<string, unknown>;
+  supportsWebhookSources?: boolean;
   resources?: Array<{
     kind: string;
     selectionMode: "single" | "multi";
@@ -184,26 +185,49 @@ export async function listIntegrationConnections(
 
     return {
       ...result,
-      items: result.items.map((connection) => ({
-        ...buildResourceSummary(connection, {
-          integrationRegistry,
+      items: await Promise.all(
+        result.items.map(async (connection) => {
+          const definition =
+            connection.target === null
+              ? undefined
+              : integrationRegistry.getDefinition({
+                  familyId: connection.target.familyId,
+                  variantId: connection.target.variantId,
+                });
+          const supportsWebhookSources =
+            connection.config === null || definition?.webhookSource === undefined
+              ? undefined
+              : await definition.webhookSource.supportsConnection?.({
+                  connection: {
+                    id: connection.id,
+                    status: connection.status,
+                    config: connection.config,
+                  },
+                });
+
+          return {
+            ...buildResourceSummary(connection, {
+              integrationRegistry,
+            }),
+            id: connection.id,
+            targetKey: connection.targetKey,
+            displayName: connection.displayName,
+            status: connection.status,
+            bindingCount: bindingCountsByConnectionId.get(connection.id) ?? 0,
+            automationCount: automationCountsByConnectionId.get(connection.id) ?? 0,
+            ...(connection.externalSubjectId === null
+              ? {}
+              : { externalSubjectId: connection.externalSubjectId }),
+            ...(connection.config === null ? {} : { config: connection.config }),
+            ...(connection.targetSnapshotConfig === null
+              ? {}
+              : { targetSnapshotConfig: connection.targetSnapshotConfig }),
+            ...(supportsWebhookSources === undefined ? {} : { supportsWebhookSources }),
+            createdAt: normalizeTimestamp(connection.createdAt),
+            updatedAt: normalizeTimestamp(connection.updatedAt),
+          };
         }),
-        id: connection.id,
-        targetKey: connection.targetKey,
-        displayName: connection.displayName,
-        status: connection.status,
-        bindingCount: bindingCountsByConnectionId.get(connection.id) ?? 0,
-        automationCount: automationCountsByConnectionId.get(connection.id) ?? 0,
-        ...(connection.externalSubjectId === null
-          ? {}
-          : { externalSubjectId: connection.externalSubjectId }),
-        ...(connection.config === null ? {} : { config: connection.config }),
-        ...(connection.targetSnapshotConfig === null
-          ? {}
-          : { targetSnapshotConfig: connection.targetSnapshotConfig }),
-        createdAt: normalizeTimestamp(connection.createdAt),
-        updatedAt: normalizeTimestamp(connection.updatedAt),
-      })),
+      ),
     };
   } catch (error) {
     if (

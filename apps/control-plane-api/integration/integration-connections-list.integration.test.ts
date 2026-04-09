@@ -16,6 +16,7 @@ import {
   webhookAutomations,
 } from "@mistle/db/control-plane";
 import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { describe, expect } from "vitest";
 
 import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
@@ -283,6 +284,72 @@ describe("integration connections list integration", () => {
 
     const bodyText = await response.text();
     expect(bodyText).toContain('"code":"INVALID_PAGINATION_CURSOR"');
+  });
+
+  it("reports webhook-source support per connection for mixed GitHub auth methods", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-list-github-webhook-support@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "github-cloud-webhook-support",
+      familyId: "github",
+      variantId: "github-cloud",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+    });
+
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_github_app_support",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "github-cloud-webhook-support",
+        displayName: "GitHub App",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          app_id: "123",
+          app_slug: "mistle-github-app",
+        },
+      },
+      {
+        id: "icn_github_api_key_no_support",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "github-cloud-webhook-support",
+        displayName: "GitHub API key",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      },
+    ]);
+
+    const response = await fixture.request("/v1/integration/connections", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = ListIntegrationConnectionsResponseSchema.parse(await response.json());
+
+    expect(body.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "icn_github_app_support",
+          supportsWebhookSources: true,
+        }),
+        expect.objectContaining({
+          id: "icn_github_api_key_no_support",
+          supportsWebhookSources: false,
+        }),
+      ]),
+    );
   });
 
   it("returns 400 for invalid list query payload", async ({ fixture }) => {

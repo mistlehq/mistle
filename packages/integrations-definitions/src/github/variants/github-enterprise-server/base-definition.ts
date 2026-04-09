@@ -10,7 +10,10 @@ import {
   GitHubAppInstallationConnectionConfigSchema,
 } from "../../shared/auth.js";
 import { resolveGitHubBindingConfigForm } from "../../shared/binding-config-form.js";
-import { GitHubApiKeyConnectionConfigForm } from "../../shared/connection-config-form.js";
+import {
+  GitHubApiKeyConnectionConfigForm,
+  GitHubAppInstallationConnectionConfigForm,
+} from "../../shared/connection-config-form.js";
 import { GitHubFamilyId } from "../../shared/constants.js";
 import { GitHubCredentialSlotKeys } from "../../shared/slot-keys.js";
 import { GitHubSupportedWebhookEvents } from "../../shared/supported-webhook-events.js";
@@ -59,14 +62,29 @@ export const GitHubEnterpriseServerBaseDefinition: GitHubEnterpriseServerBaseInt
       {
         id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         label: "GitHub App installation",
-        kind: "redirect",
-        ui: {
-          create: {
-            submitLabel: "Install GitHub App",
-            helperText: "Continue to GitHub to install the app and finish connecting this account.",
+        kind: "form",
+        secretFields: [
+          {
+            name: "appPrivateKeyPem",
+            label: "App private key PEM",
+            placeholder: "-----BEGIN PRIVATE KEY-----",
+            description: "Private key from your GitHub App settings.",
+            inputType: "password",
+            secretType: "api_key",
+            slotKey: GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM,
           },
-        },
+          {
+            name: "webhookSecret",
+            label: "Webhook secret",
+            placeholder: "Enter webhook secret",
+            description: "Webhook secret configured on your GitHub App.",
+            inputType: "password",
+            secretType: "api_key",
+            slotKey: GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_WEBHOOK_SECRET,
+          },
+        ],
         configSchema: GitHubAppInstallationConnectionConfigSchema,
+        configForm: GitHubAppInstallationConnectionConfigForm,
       },
     ],
     supportedWebhookEvents: GitHubSupportedWebhookEvents,

@@ -35,6 +35,8 @@ function createResolverInput(
       status: "active",
       config: {
         connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        app_id: "123",
+        app_slug: "mistle-github-app",
         installation_id: "12345",
       },
     },

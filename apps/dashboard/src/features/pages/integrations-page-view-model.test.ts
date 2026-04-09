@@ -27,14 +27,19 @@ describe("integrations page view model", () => {
         {
           id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
           label: "GitHub App installation",
-          kind: "redirect",
-          ui: {
-            create: {
-              submitLabel: "Install GitHub App",
-              helperText:
-                "Continue to GitHub to install the app and finish connecting this account.",
+          kind: "form",
+          secretFields: [
+            {
+              name: "appPrivateKeyPem",
+              label: "App private key PEM",
+              inputType: "password",
             },
-          },
+            {
+              name: "webhookSecret",
+              label: "Webhook secret",
+              inputType: "password",
+            },
+          ],
         },
         {
           id: IntegrationConnectionMethodIds.API_KEY,
@@ -53,13 +58,19 @@ describe("integrations page view model", () => {
       {
         id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         label: "GitHub App installation",
-        kind: "redirect",
-        ui: {
-          create: {
-            submitLabel: "Install GitHub App",
-            helperText: "Continue to GitHub to install the app and finish connecting this account.",
+        kind: "form",
+        secretFields: [
+          {
+            name: "appPrivateKeyPem",
+            label: "App private key PEM",
+            inputType: "password",
           },
-        },
+          {
+            name: "webhookSecret",
+            label: "Webhook secret",
+            inputType: "password",
+          },
+        ],
       },
       {
         id: IntegrationConnectionMethodIds.API_KEY,
@@ -147,7 +158,11 @@ describe("integrations page view model", () => {
           targetKey: "github",
           displayName: "Engineering GitHub",
           status: "active",
-          config: { connection_method: "github-app-installation" },
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle-github-app",
+          },
           externalSubjectId: "mistle-labs",
           resources: [
             {

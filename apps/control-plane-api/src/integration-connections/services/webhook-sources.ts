@@ -55,6 +55,7 @@ type ConnectionWithTarget = {
   organizationId: string;
   targetKey: string;
   displayName: string;
+  status: "active" | "error" | "revoked";
   config: Record<string, unknown> | null;
   target: {
     targetKey: string;
@@ -121,6 +122,7 @@ export async function resolveConnectionWithTargetOrThrow(input: {
     organizationId: connection.organizationId,
     targetKey: connection.targetKey,
     displayName: connection.displayName,
+    status: connection.status,
     config: connection.config,
     target: connection.target,
   };
@@ -236,6 +238,26 @@ export function resolveWebhookSourceCapabilityOrThrow(input: {
     parsedTargetConfig,
     parsedTargetSecrets,
   };
+}
+
+async function supportsWebhookSourceForConnection(input: {
+  webhookSourceCapability: NonNullable<AnyIntegrationDefinition["webhookSource"]>;
+  connection: ConnectionWithTarget;
+}): Promise<boolean> {
+  if (input.webhookSourceCapability.supportsConnection === undefined) {
+    return true;
+  }
+
+  return input.webhookSourceCapability.supportsConnection({
+    connection: {
+      id: input.connection.id,
+      status: input.connection.status,
+      config: resolveConnectionConfigOrThrow({
+        connectionId: input.connection.id,
+        config: input.connection.config,
+      }),
+    },
+  });
 }
 
 export async function ensureImplicitConnectionWebhookSource(input: {
@@ -502,6 +524,16 @@ export async function listIntegrationWebhookSources(
     });
 
   if (
+    webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION &&
+    !(await supportsWebhookSourceForConnection({
+      webhookSourceCapability,
+      connection,
+    }))
+  ) {
+    return [];
+  }
+
+  if (
     webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT &&
     webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.TARGET
   ) {
@@ -597,6 +629,18 @@ export async function getIntegrationWebhookSource(
       integrationsConfig: ctx.integrationsConfig,
       target: connection.target,
     });
+  if (
+    webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION &&
+    !(await supportsWebhookSourceForConnection({
+      webhookSourceCapability,
+      connection,
+    }))
+  ) {
+    throw new NotFoundError(
+      IntegrationConnectionsNotFoundCodes.WEBHOOK_SOURCE_NOT_FOUND,
+      `Webhook source '${input.webhookSourceId}' was not found for connection '${connection.id}'.`,
+    );
+  }
   const source = await resolveAccessibleWebhookSourceOrThrow({
     db: ctx.db,
     connection,
@@ -638,6 +682,18 @@ export async function createIntegrationWebhookSource(
       integrationsConfig: ctx.integrationsConfig,
       target: connection.target,
     });
+
+  if (
+    !(await supportsWebhookSourceForConnection({
+      webhookSourceCapability,
+      connection,
+    }))
+  ) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.WEBHOOK_SOURCE_NOT_SUPPORTED,
+      `Integration connection '${connection.id}' does not support webhook sources.`,
+    );
+  }
 
   if (webhookSourceCapability.ownerScope !== IntegrationWebhookSourceOwnerScopes.CONNECTION) {
     throw new BadRequestError(
@@ -809,6 +865,18 @@ export async function deleteIntegrationWebhookSource(
       integrationsConfig: ctx.integrationsConfig,
       target: connection.target,
     });
+  if (
+    webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION &&
+    !(await supportsWebhookSourceForConnection({
+      webhookSourceCapability,
+      connection,
+    }))
+  ) {
+    throw new NotFoundError(
+      IntegrationConnectionsNotFoundCodes.WEBHOOK_SOURCE_NOT_FOUND,
+      `Webhook source '${input.webhookSourceId}' was not found for connection '${connection.id}'.`,
+    );
+  }
   const source = await resolveAccessibleWebhookSourceOrThrow({
     db: ctx.db,
     connection,

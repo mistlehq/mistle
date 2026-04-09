@@ -14,6 +14,14 @@ function resolveGitHubAppSlug(targetConfig: GitHubTargetConfig): string {
   return targetConfig.appSlug;
 }
 
+function resolveGitHubAppId(targetConfig: GitHubTargetConfig): string {
+  if (targetConfig.appId === undefined || targetConfig.appId.length === 0) {
+    throw new Error("GitHub App installation flow requires `app_id` in target config.");
+  }
+
+  return targetConfig.appId;
+}
+
 function createGitHubAppInstallUrl(input: {
   webBaseUrl: string;
   appSlug: string;
@@ -52,11 +60,15 @@ export const GitHubAppInstallationRedirectHandler: IntegrationRedirectHandler<
   complete(input) {
     const installationId = resolveInstallationId(input.query);
     const setupAction = input.query.get("setup_action");
+    const appId = resolveGitHubAppId(input.target.config);
+    const appSlug = resolveGitHubAppSlug(input.target.config);
 
     return {
       externalSubjectId: installationId,
       connectionConfig: {
         connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        app_id: appId,
+        app_slug: appSlug,
         installation_id: installationId,
         ...(setupAction === null ? {} : { setup_action: setupAction }),
       },
