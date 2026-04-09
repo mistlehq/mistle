@@ -56,11 +56,6 @@ export const APP_ROUTES = createRoutesFromElements(
         >
           <Route element={<SandboxProfilesPage />} index />
           <Route
-            element={<SandboxProfilesPage />}
-            handle={ROUTE_HANDLES.sandboxProfilesNew}
-            path="new"
-          />
-          <Route
             element={<SandboxProfileEditorPage mode="edit" />}
             handle={ROUTE_HANDLES.sandboxProfilesDetail}
             path=":profileId"

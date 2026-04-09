@@ -81,7 +81,7 @@ function createBaseSteps(): HomeOnboardingStep[] {
       description:
         "A profile defines the setup an agent starts with, including its tools, permissions, and environment.",
       status: "upcoming",
-      href: "/sandbox-profiles/new",
+      href: "/sandbox-profiles",
       actionLabel: "Set up a profile",
     },
     {

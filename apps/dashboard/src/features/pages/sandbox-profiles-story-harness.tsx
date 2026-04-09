@@ -48,9 +48,7 @@ export function SandboxProfilesStoryHarness(
             element={<SandboxProfilesPage />}
             handle={ROUTE_HANDLES.sandboxProfiles}
             path="/sandbox-profiles"
-          >
-            <Route handle={ROUTE_HANDLES.sandboxProfilesNew} path="new" />
-          </Route>
+          />
         </Route>,
       ),
       {

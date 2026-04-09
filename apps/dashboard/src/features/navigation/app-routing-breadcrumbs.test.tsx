@@ -65,7 +65,6 @@ describe("app routing breadcrumb integration", () => {
     <Route element={<Outlet />} path="/">
       <Route element={<Outlet />} handle={ROUTE_HANDLES.sandboxProfiles} path="sandbox-profiles">
         <Route element={<PageHarness />} index />
-        <Route element={<PageHarness />} handle={ROUTE_HANDLES.sandboxProfilesNew} path="new" />
         <Route
           element={<PageHarness />}
           handle={ROUTE_HANDLES.sandboxProfilesDetail}
@@ -153,17 +152,16 @@ describe("app routing breadcrumb integration", () => {
     }
   });
 
-  it("renders sandbox profile breadcrumbs for list, create, and detail routes", async () => {
+  it("renders sandbox profile breadcrumbs for list and detail routes", async () => {
     const router = createMemoryRouter(sandboxProfileRoutes, {
-      initialEntries: ["/sandbox-profiles/new"],
+      initialEntries: ["/sandbox-profiles"],
     });
     let markup = renderToStaticMarkup(<RouterProvider router={router} />);
 
-    expect(markup).toContain('href="/sandbox-profiles"');
     expect(markup).toContain("Sandbox Profiles");
-    expect(markup).toContain("Create");
-    expect(markup).toContain('data-slot="meta-title">Create');
-    expect(markup).toContain("Create a sandbox profile.");
+    expect(markup).toContain('aria-current="page"');
+    expect(markup).toContain('data-slot="meta-title">Sandbox Profiles');
+    expect(markup).toContain("Manage sandbox-backed agent profiles.");
 
     await router.navigate("/sandbox-profiles/sbp_abc");
     markup = renderToStaticMarkup(<RouterProvider router={router} />);

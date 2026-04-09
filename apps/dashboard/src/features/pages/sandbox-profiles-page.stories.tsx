@@ -41,9 +41,3 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const List: Story = {};
-
-export const CreateDialogFromRoute: Story = {
-  args: {
-    initialEntries: ["/sandbox-profiles/new"],
-  },
-};

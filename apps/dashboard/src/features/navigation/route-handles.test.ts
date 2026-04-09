@@ -24,9 +24,6 @@ describe("route handles", () => {
 
     expect(ROUTE_HANDLES.sandboxProfiles.title).toBe("Sandbox Profiles");
     expect(ROUTE_HANDLES.sandboxProfiles.description).toBe("Manage sandbox profile configuration.");
-    expect(ROUTE_HANDLES.sandboxProfilesNew.title).toBe("Create");
-    expect(ROUTE_HANDLES.sandboxProfilesNew.description).toBe("Create a sandbox profile.");
-    expect(ROUTE_HANDLES.sandboxProfilesNew.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.sandboxProfilesDetail.title).toBe("Edit profile");
     expect(ROUTE_HANDLES.sandboxProfilesDetail.description).toBe(
       "Edit sandbox profile configuration.",
