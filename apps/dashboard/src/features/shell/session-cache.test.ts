@@ -93,7 +93,7 @@ describe("clearAuthenticatedSessionCache", () => {
     expect(queryClient.getQueryData(SESSION_QUERY_KEY)).toEqual(refreshedSession);
   });
 
-  it("clears the cached session when the refreshed session request fails", async () => {
+  it("preserves the cached session when the refreshed session request fails", async () => {
     const queryClient = new QueryClient();
     const previousSession = createAuthenticatedSessionForOrganization("org_123");
     const refreshError = new Error("Unable to refresh session.");
@@ -110,6 +110,6 @@ describe("clearAuthenticatedSessionCache", () => {
 
     await expect(refreshPromise).rejects.toThrow("Unable to refresh session.");
     expect(queryClient.getQueryData(["settings", "members", "org_123"])).toBeUndefined();
-    expect(queryClient.getQueryData(SESSION_QUERY_KEY)).toBeNull();
+    expect(queryClient.getQueryData(SESSION_QUERY_KEY)).toEqual(previousSession);
   });
 });

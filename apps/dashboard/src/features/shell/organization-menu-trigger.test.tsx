@@ -102,4 +102,25 @@ describe("OrganizationMenuTrigger", () => {
     expect(screen.getByText("Organization details could not be loaded.")).toBeTruthy();
     expect(screen.getByText("Switch organization")).toBeTruthy();
   });
+
+  it("switches organizations through radio-group selection", () => {
+    let selectedOrganizationId: string | null = null;
+
+    renderOrganizationMenuTrigger({
+      activeOrganizationId: "org_1",
+      onSwitchOrganization: (organizationId) => {
+        selectedOrganizationId = organizationId;
+      },
+      organizations: [
+        { id: "org_1", name: "Acme Corp" },
+        { id: "org_2", name: "Mistle Labs" },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Organization menu" }));
+    fireEvent.click(screen.getByText("Switch organization"));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Mistle Labs" }));
+
+    expect(selectedOrganizationId).toBe("org_2");
+  });
 });

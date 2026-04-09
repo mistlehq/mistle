@@ -98,14 +98,16 @@ export function OrganizationMenuTrigger(input: {
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 {organizations.length > 0 ? (
-                  <DropdownMenuRadioGroup value={input.activeOrganizationId ?? undefined}>
+                  <DropdownMenuRadioGroup
+                    onValueChange={(organizationId) => {
+                      input.onSwitchOrganization?.(organizationId);
+                    }}
+                    value={input.activeOrganizationId ?? undefined}
+                  >
                     {organizations.map((organization) => (
                       <DropdownMenuRadioItem
                         disabled={input.isSwitchingOrganization}
                         key={organization.id}
-                        onClick={() => {
-                          input.onSwitchOrganization?.(organization.id);
-                        }}
                         value={organization.id}
                       >
                         {organization.name}
