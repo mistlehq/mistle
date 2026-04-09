@@ -1,6 +1,5 @@
 import {
   decodeDataFrame,
-  DefaultStreamWindowBytes,
   encodeDataFrame,
   MaxStreamWindowBytes,
   parseStreamControlMessage,
