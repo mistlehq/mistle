@@ -3,6 +3,7 @@ export type HomeOnboardingState =
   | "profile_not_launchable"
   | "ready_for_first_session"
   | "ready_for_first_automation"
+  | "automation_requires_webhook_integration"
   | "activated";
 
 export type HomeOnboardingBlockerId =
@@ -287,6 +288,46 @@ export const HomePageStoryModels = {
       create_automation: "current",
     }),
   } satisfies HomeOnboardingViewModel,
+  automationRequiresWebhookIntegration: {
+    state: "automation_requires_webhook_integration",
+    headline: "Add a webhook integration",
+    supportingText:
+      "Core setup is complete. Add a webhook-capable integration before you can create an automation.",
+    primaryCta: {
+      href: "/settings/organization/integrations",
+      label: "Add integrations",
+    },
+    secondaryCta: {
+      href: "/automations",
+      label: "View automations",
+    },
+    blockers: [
+      {
+        id: "missing_webhook_capable_connection",
+        title: "No webhook-capable integration",
+        description:
+          "Automations respond to events from tools like GitHub, Slack, or Jira, so you need a webhook-capable integration before you can create one.",
+        href: "/settings/organization/integrations",
+        actionLabel: "Add integrations",
+      },
+    ],
+    steps: replaceStep(
+      withStepStatuses({
+        connect_integration: "complete",
+        create_profile: "complete",
+        launch_session: "complete",
+        create_automation: "current",
+      }),
+      "create_automation",
+      {
+        title: "Add a webhook integration",
+        description:
+          "Automations respond to events from tools like GitHub, Slack, or Jira, so you need a webhook-capable integration before you can create one.",
+        href: "/settings/organization/integrations",
+        actionLabel: "Add integrations",
+      },
+    ),
+  } satisfies HomeOnboardingViewModel,
   activated: {
     state: "activated",
     headline: "Workspace activated",
@@ -329,7 +370,11 @@ export function createHomeOnboardingViewModel(
     return HomePageStoryModels.readyForFirstSession;
   }
 
-  if (input.hasWebhookCapableIntegration && !input.hasAutomations) {
+  if (!input.hasWebhookCapableIntegration && !input.hasAutomations) {
+    return HomePageStoryModels.automationRequiresWebhookIntegration;
+  }
+
+  if (!input.hasAutomations) {
     return HomePageStoryModels.readyForFirstAutomation;
   }
 

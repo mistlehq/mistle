@@ -55,3 +55,9 @@ export const Activated: Story = {
     onboarding: HomePageStoryModels.activated,
   },
 };
+
+export const AddAWebhookIntegration: Story = {
+  args: {
+    onboarding: HomePageStoryModels.automationRequiresWebhookIntegration,
+  },
+};
