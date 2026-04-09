@@ -327,6 +327,94 @@ describe("internal integration credentials resolve", () => {
     });
   });
 
+  it("resolves persisted aws secret access keys for an active connection", async ({ fixture }) => {
+    const authSession = await fixture.authSession();
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai_aws_secret_default",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        base_url: "https://api.openai.com/v1",
+      },
+    });
+
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_aws_secret_access_key",
+      organizationId: authSession.organizationId,
+      targetKey: "openai_aws_secret_default",
+      displayName: "Stored AWS secret access key",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: "aws-assume-role",
+      },
+    });
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+      wrappedCiphertext: organizationCredentialKey.ciphertext,
+      masterEncryptionKeyMaterial,
+    });
+
+    try {
+      const encryptedAwsSecretAccessKey = encryptCredentialUtf8({
+        plaintext: "aws-secret-access-key-value",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+
+      await fixture.db.insert(integrationCredentials).values({
+        id: "icr_aws_secret_access_key",
+        organizationId: authSession.organizationId,
+        secretKind: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+        ciphertext: encryptedAwsSecretAccessKey.ciphertext,
+        nonce: encryptedAwsSecretAccessKey.nonce,
+        organizationCredentialKeyVersion: organizationCredentialKey.version,
+        intendedFamilyId: "openai",
+      });
+    } finally {
+      unwrappedOrganizationCredentialKey.fill(0);
+    }
+
+    await fixture.db.insert(integrationConnectionCredentials).values({
+      connectionId: "icn_aws_secret_access_key",
+      credentialId: "icr_aws_secret_access_key",
+      slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
+    });
+
+    const resolveResponse = await fixture.request(
+      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+        body: JSON.stringify({
+          connectionId: "icn_aws_secret_access_key",
+          secretType: "aws_secret_access_key",
+          slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
+        }),
+      },
+    );
+
+    expect(resolveResponse.status).toBe(200);
+    await expect(resolveResponse.json()).resolves.toEqual({
+      value: "aws-secret-access-key-value",
+    });
+  });
+
   it("resolves persisted OAuth2 access tokens with structural expiry", async ({ fixture }) => {
     const authSession = await fixture.authSession();
     const oauth2AuthorizationCodeSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
