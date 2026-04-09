@@ -207,7 +207,7 @@ export function useSessionBranchDiff(input: {
 
   return {
     errorMessage: query.isError ? normalizeBranchDiffError(query.error) : null,
-    isLoading: query.isLoading,
+    isLoading: query.isLoading || query.isFetching,
     patch: query.data?.patch ?? "",
   };
 }
