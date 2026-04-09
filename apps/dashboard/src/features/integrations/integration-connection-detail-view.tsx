@@ -35,6 +35,7 @@ export type IntegrationConnectionDetailItem = {
   displayName: string;
   id: string;
   installActionLabel?: string;
+  postInstallationSetupUrl?: string;
   resources: readonly IntegrationConnectionDetailResourceSummary[];
   setupDescription?: string;
   setupErrorMessage?: string;
@@ -207,6 +208,17 @@ function ConnectionCard(input: {
           setupActionLabel={input.connection.installActionLabel}
           setupIsPending={input.connection.setupIsPending ?? false}
         />
+        <GitHubAppSetupSection
+          {...(input.webhookSourceState?.items[0]?.callbackUrl === undefined
+            ? {}
+            : { callbackUrl: input.webhookSourceState.items[0].callbackUrl })}
+          {...(input.connection.setupDescription === undefined
+            ? {}
+            : { description: input.connection.setupDescription })}
+          {...(input.connection.postInstallationSetupUrl === undefined
+            ? {}
+            : { postInstallationSetupUrl: input.connection.postInstallationSetupUrl })}
+        />
         {input.connection.setupDescription === undefined ? null : (
           <Notice title="Setup incomplete">{input.connection.setupDescription}</Notice>
         )}
@@ -375,9 +387,67 @@ function MetadataField(input: { label: string; value: string }): React.JSX.Eleme
   return (
     <div className="rounded-md border p-3">
       <p className="text-muted-foreground text-xs uppercase tracking-wide">{input.label}</p>
-      <p className="mt-1 text-sm">{input.value}</p>
+      <p className="mt-1 break-all text-sm">{input.value}</p>
     </div>
   );
+}
+
+function GitHubAppSetupSection(input: {
+  callbackUrl?: string;
+  description?: string;
+  postInstallationSetupUrl?: string;
+}): React.JSX.Element | null {
+  if (
+    input.description === undefined ||
+    (input.callbackUrl === undefined && input.postInstallationSetupUrl === undefined)
+  ) {
+    return null;
+  }
+
+  const resolvedPostInstallationSetupUrl = resolveGitHubPostInstallationSetupUrl({
+    ...(input.callbackUrl === undefined ? {} : { callbackUrl: input.callbackUrl }),
+    ...(input.postInstallationSetupUrl === undefined
+      ? {}
+      : { fallbackUrl: input.postInstallationSetupUrl }),
+  });
+
+  return (
+    <div className="gap-3 flex flex-col">
+      <div className="gap-1 flex flex-col">
+        <h3 className="font-medium text-sm">GitHub App setup</h3>
+        <p className="text-muted-foreground text-xs">{input.description}</p>
+      </div>
+      <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
+        {resolvedPostInstallationSetupUrl === undefined ? null : (
+          <MetadataField
+            label="Post-installation setup URL"
+            value={resolvedPostInstallationSetupUrl}
+          />
+        )}
+        {input.callbackUrl === undefined ? null : (
+          <MetadataField label="Webhook callback URL" value={input.callbackUrl} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function resolveGitHubPostInstallationSetupUrl(input: {
+  callbackUrl?: string;
+  fallbackUrl?: string;
+}): string | undefined {
+  if (input.callbackUrl !== undefined) {
+    try {
+      return new URL(
+        "/v1/integration/connections/github-app-installation/complete",
+        input.callbackUrl,
+      ).toString();
+    } catch {
+      return input.fallbackUrl;
+    }
+  }
+
+  return input.fallbackUrl;
 }
 
 function ResourceSection(input: {

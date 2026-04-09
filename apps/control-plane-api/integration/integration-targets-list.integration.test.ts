@@ -173,7 +173,7 @@ describe("integration targets discovery integration", () => {
               name: "appPrivateKeyPem",
               label: "App private key PEM",
               placeholder: "-----BEGIN PRIVATE KEY-----",
-              inputType: "password",
+              inputType: "textarea",
               slotKey: "github.github-cloud.github-app-installation.app-private-key-pem",
             },
             {
@@ -417,7 +417,7 @@ describe("integration targets discovery integration", () => {
             {
               name: "appPrivateKeyPem",
               label: "App private key PEM",
-              inputType: "password",
+              inputType: "textarea",
               slotKey: "github.github-cloud.github-app-installation.app-private-key-pem",
             },
             {

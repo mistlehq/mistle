@@ -4280,7 +4280,7 @@
                                           },
                                           "inputType": {
                                             "type": "string",
-                                            "enum": ["password", "text"]
+                                            "enum": ["password", "text", "textarea"]
                                           },
                                           "slotKey": {
                                             "type": "string",

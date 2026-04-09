@@ -88,7 +88,7 @@ export type ResolvedIntegrationTargetMetadata = {
           label: string;
           placeholder?: string;
           description?: string;
-          inputType: "password" | "text";
+          inputType: "password" | "text" | "textarea";
           slotKey: string;
         }[];
       }

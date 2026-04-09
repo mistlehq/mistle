@@ -32,7 +32,7 @@ describe("integrations page view model", () => {
             {
               name: "appPrivateKeyPem",
               label: "App private key PEM",
-              inputType: "password",
+              inputType: "textarea",
             },
             {
               name: "webhookSecret",
@@ -63,7 +63,7 @@ describe("integrations page view model", () => {
           {
             name: "appPrivateKeyPem",
             label: "App private key PEM",
-            inputType: "password",
+            inputType: "textarea",
           },
           {
             name: "webhookSecret",
@@ -178,6 +178,7 @@ describe("integrations page view model", () => {
           updatedAt: "2026-03-11T04:30:00.000Z",
         } satisfies IntegrationConnection,
       ],
+      controlPlaneApiOrigin: "https://control-plane.example.com",
       refreshingResourceKeys: new Set([
         createRefreshingResourceKey({
           connectionId: "icn_123",
@@ -204,6 +205,8 @@ describe("integrations page view model", () => {
     ]);
     expect(item?.setupStatusLabel).toBeUndefined();
     expect(item?.setupDescription).toBeUndefined();
+    expect(item?.postInstallationSetupUrl).toBeUndefined();
+    expect(item?.installActionLabel).toBe("Manage installation");
     expect(item?.webhookInstructions).toBe(
       "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
     );
@@ -228,13 +231,17 @@ describe("integrations page view model", () => {
           updatedAt: "2026-03-11T04:30:00.000Z",
         } satisfies IntegrationConnection,
       ],
+      controlPlaneApiOrigin: "https://control-plane.example.com",
       refreshingResourceKeys: new Set<string>(),
     });
 
     expect(item?.setupStatusLabel).toBe("Setup incomplete");
     expect(item?.installActionLabel).toBe("Install GitHub App");
     expect(item?.setupDescription).toBe(
-      "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
+      "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
+    );
+    expect(item?.postInstallationSetupUrl).toBe(
+      "https://control-plane.example.com/v1/integration/connections/github-app-installation/complete",
     );
     expect(item?.contextItems).toEqual([
       {
@@ -269,6 +276,7 @@ describe("integrations page view model", () => {
           updatedAt: "2026-03-11T04:30:00.000Z",
         } satisfies IntegrationConnection,
       ],
+      controlPlaneApiOrigin: "https://control-plane.example.com",
       githubAppInstallationStateByConnectionId: new Map([
         [
           "icn_preinstall",

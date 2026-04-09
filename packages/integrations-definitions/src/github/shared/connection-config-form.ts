@@ -34,5 +34,11 @@ export const GitHubAppInstallationConnectionConfigForm: ResolvedIntegrationForm 
     connection_method: {
       "ui:widget": "hidden",
     },
+    installation_id: {
+      "ui:widget": "hidden",
+    },
+    setup_action: {
+      "ui:widget": "hidden",
+    },
   },
 };

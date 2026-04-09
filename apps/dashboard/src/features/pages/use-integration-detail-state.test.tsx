@@ -175,7 +175,7 @@ function createCard(input: {
             {
               name: "appPrivateKeyPem",
               label: "App private key PEM",
-              inputType: "password",
+              inputType: "textarea",
             },
             {
               name: "webhookSecret",

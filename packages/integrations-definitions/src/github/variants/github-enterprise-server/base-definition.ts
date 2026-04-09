@@ -69,7 +69,7 @@ export const GitHubEnterpriseServerBaseDefinition: GitHubEnterpriseServerBaseInt
             label: "App private key PEM",
             placeholder: "-----BEGIN PRIVATE KEY-----",
             description: "Private key from your GitHub App settings.",
-            inputType: "password",
+            inputType: "textarea",
             secretType: "api_key",
             slotKey: GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM,
           },

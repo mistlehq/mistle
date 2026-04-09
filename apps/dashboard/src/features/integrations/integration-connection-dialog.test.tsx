@@ -17,7 +17,7 @@ const GitHubAppInstallationSecretFields = [
     name: "appPrivateKeyPem",
     label: "App private key PEM",
     placeholder: "-----BEGIN PRIVATE KEY-----",
-    inputType: "password" as const,
+    inputType: "textarea" as const,
   },
   {
     name: "webhookSecret",
@@ -50,7 +50,10 @@ const createDialog: IntegrationConnectionDialogState = {
     },
   ],
   mode: "create",
-  targetConfig: {},
+  targetConfig: {
+    api_base_url: "https://api.github.com",
+    web_base_url: "https://github.com",
+  },
   targetDisplayName: "GitHub",
   targetFamilyId: "github",
   targetKey: "github-cloud",
@@ -108,7 +111,10 @@ function createUpdateFormDialog(
     },
     initialConnectionDisplayName: "Existing GitHub App installation connection",
     mode: "update",
-    targetConfig: {},
+    targetConfig: {
+      api_base_url: "https://api.github.com",
+      web_base_url: "https://github.com",
+    },
     targetDisplayName: "GitHub",
     targetFamilyId: "github",
     targetKey: "github-cloud",
@@ -418,9 +424,36 @@ describe("IntegrationConnectionDialog", () => {
 
     expect(screen.getByLabelText("App ID")).toBeTruthy();
     expect(screen.getByLabelText("App slug")).toBeTruthy();
-    expect(screen.getByPlaceholderText("-----BEGIN PRIVATE KEY-----")).toBeTruthy();
+    const privateKeyField = screen.getByPlaceholderText("-----BEGIN PRIVATE KEY-----");
+    expect(privateKeyField.tagName).toBe("TEXTAREA");
     expect(screen.getByPlaceholderText("Enter webhook secret")).toBeTruthy();
+    expect(screen.queryByLabelText("installation_id")).toBeNull();
+    expect(screen.queryByLabelText("setup_action")).toBeNull();
     expect(screen.getByRole("button", { name: "Create connection" })).toBeTruthy();
+  });
+
+  it("hides callback-managed GitHub App config fields from the form", () => {
+    const configForm = resolveConnectionMethodFormUiModel({
+      dialog: createDialog,
+      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      currentValue: {},
+    });
+
+    expect(configForm).toMatchObject({
+      mode: "form",
+      visiblePropertyKeys: ["app_id", "app_slug"],
+    });
+
+    if (configForm.mode !== "form") {
+      throw new Error("Expected GitHub App connection form.");
+    }
+
+    expect(configForm.uiSchema.installation_id).toMatchObject({
+      "ui:widget": "hidden",
+    });
+    expect(configForm.uiSchema.setup_action).toMatchObject({
+      "ui:widget": "hidden",
+    });
   });
 
   it("does not throw while resolving Jira personal token fields for an incomplete site url", () => {

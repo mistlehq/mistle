@@ -6,6 +6,8 @@ export {
   GitHubCredentialSecretTypes,
   type GitHubConnectionConfig,
   type GitHubCredentialSecretType,
+  parseGitHubAppInstallationConnectionConfig,
+  parseGitHubConnectionConfig,
   resolveGitHubCredentialSecretType,
 } from "./shared/auth.js";
 export { GitHubSupportedWebhookEvents } from "./shared/supported-webhook-events.js";

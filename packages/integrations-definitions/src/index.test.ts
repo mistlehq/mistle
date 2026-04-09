@@ -127,7 +127,7 @@ describe("integrations-definitions index", () => {
             {
               name: "appPrivateKeyPem",
               label: "App private key PEM",
-              inputType: "password",
+              inputType: "textarea",
               slotKey: "github.github-cloud.github-app-installation.app-private-key-pem",
             },
             {
@@ -209,7 +209,7 @@ describe("integrations-definitions index", () => {
             {
               name: "appPrivateKeyPem",
               label: "App private key PEM",
-              inputType: "password",
+              inputType: "textarea",
               slotKey:
                 "github.github-enterprise-server.github-app-installation.app-private-key-pem",
             },

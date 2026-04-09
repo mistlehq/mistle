@@ -13,6 +13,7 @@ describe("IntegrationConnectionDetailView", () => {
 
   it("renders stacked connections and exposes refresh actions", () => {
     let refreshedKind: string | null = null;
+    let startedGitHubAppInstallationConnectionId: string | null = null;
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -22,6 +23,7 @@ describe("IntegrationConnectionDetailView", () => {
             canDelete: false,
             displayName: "Engineering GitHub",
             status: "active",
+            installActionLabel: "Manage installation",
             authMethodLabel: "GitHub App installation",
             resources: [
               {
@@ -51,6 +53,9 @@ describe("IntegrationConnectionDetailView", () => {
         ]}
         onRefreshResource={({ kind }) => {
           refreshedKind = kind;
+        }}
+        onStartGitHubAppInstallation={(connectionId) => {
+          startedGitHubAppInstallationConnectionId = connectionId;
         }}
         resourceItemsByKey={
           new Map([
@@ -90,6 +95,8 @@ describe("IntegrationConnectionDetailView", () => {
     }
     fireEvent.click(refreshButton);
     expect(refreshedKind).toBe("repositories");
+    fireEvent.click(screen.getByRole("button", { name: "Manage installation" }));
+    expect(startedGitHubAppInstallationConnectionId).toBe("icn_github_primary");
   });
 
   it("renders an empty state when no connections are available", () => {
@@ -389,13 +396,15 @@ describe("IntegrationConnectionDetailView", () => {
             bindingCount: 0,
             canDelete: true,
             displayName: "GitHub Production",
+            postInstallationSetupUrl:
+              "http://localhost:5100/v1/integration/connections/github-app-installation/complete",
             installActionLabel: "Install GitHub App",
             authMethodId: "github-app-installation",
             authMethodLabel: "GitHub App installation",
             status: "active",
             resources: [],
             setupDescription:
-              "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
+              "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
             setupStatusLabel: "Setup incomplete",
             webhookInstructions:
               "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
@@ -441,13 +450,33 @@ describe("IntegrationConnectionDetailView", () => {
 
     expect(
       screen.getAllByText(
-        "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
+        "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
       ),
     ).toHaveLength(2);
     expect(screen.getAllByText("Setup incomplete")).toHaveLength(2);
+    expect(screen.getByText("GitHub App setup")).toBeTruthy();
+    expect(screen.getByText("Webhook callback URL")).toBeTruthy();
+    expect(screen.getByText("Post-installation setup URL")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "https://control-plane.example.com/v1/integration/connections/github-app-installation/complete",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByText(
+        "https://control-plane.example.com/v1/integration/webhooks/github-cloud/ep_github_123",
+      ),
+    ).toHaveLength(2);
     expect(
       screen.queryByRole("button", { name: "Delete webhook source GitHub App webhook" }),
     ).toBeNull();
+
+    const postInstallationSetupLabel = screen.getByText("Post-installation setup URL");
+    const webhookCallbackLabel = screen.getByText("Webhook callback URL");
+    expect(
+      postInstallationSetupLabel.compareDocumentPosition(webhookCallbackLabel) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Install GitHub App" }));
     expect(startedGitHubAppInstallationConnectionId).toBe("icn_github_primary");
