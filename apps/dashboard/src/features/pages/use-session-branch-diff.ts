@@ -13,6 +13,11 @@ type SessionBranchDiffState = {
   truncatedMessage: string | null;
 };
 
+type BranchDiffLoadResult = {
+  patch: string;
+  truncatedMessage: string | null;
+};
+
 async function runGitCommand(input: {
   args: string[];
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
@@ -42,10 +47,84 @@ function formatGitFailureDetails(result: ExecCommandResult): string {
   return details;
 }
 
+async function readMergeBase(input: {
+  ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
+  sandboxInstanceId: string;
+}): Promise<string> {
+  const mergeBaseResult = await runGitCommand({
+    args: ["merge-base", "main", "HEAD"],
+    ensureTransportConnected: input.ensureTransportConnected,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  if (mergeBaseResult.exitCode !== 0) {
+    throw new Error(formatGitFailureDetails(mergeBaseResult));
+  }
+
+  const mergeBase = mergeBaseResult.stdout.trim();
+  if (mergeBase.length === 0) {
+    throw new Error("Could not resolve the merge-base with `main`.");
+  }
+
+  return mergeBase;
+}
+
+async function readTrackedWorktreeDiff(input: {
+  ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
+  mergeBase: string;
+  sandboxInstanceId: string;
+}): Promise<ExecCommandResult> {
+  const diffResult = await runGitCommand({
+    args: ["diff", "--binary", input.mergeBase],
+    ensureTransportConnected: input.ensureTransportConnected,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  if (diffResult.exitCode !== 0) {
+    throw new Error(formatGitFailureDetails(diffResult));
+  }
+
+  return diffResult;
+}
+
+async function listUntrackedFiles(input: {
+  ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
+  sandboxInstanceId: string;
+}): Promise<string[]> {
+  const result = await runGitCommand({
+    args: ["ls-files", "--others", "--exclude-standard"],
+    ensureTransportConnected: input.ensureTransportConnected,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(formatGitFailureDetails(result));
+  }
+
+  return result.stdout
+    .split("\n")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
+async function readUntrackedFilePatch(input: {
+  ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
+  path: string;
+  sandboxInstanceId: string;
+}): Promise<ExecCommandResult> {
+  const result = await runGitCommand({
+    args: ["diff", "--binary", "--no-index", "--", "/dev/null", input.path],
+    ensureTransportConnected: input.ensureTransportConnected,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  if (result.exitCode !== 0 && result.exitCode !== 1) {
+    throw new Error(formatGitFailureDetails(result));
+  }
+
+  return result;
+}
+
 async function loadBranchDiff(input: {
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   sandboxInstanceId: string;
-}): Promise<{ patch: string; truncatedMessage: string | null }> {
+}): Promise<BranchDiffLoadResult> {
   const repoCheck = await runGitCommand({
     args: ["rev-parse", "--is-inside-work-tree"],
     ensureTransportConnected: input.ensureTransportConnected,
@@ -64,18 +143,46 @@ async function loadBranchDiff(input: {
     throw new Error("Local branch `main` does not exist.");
   }
 
-  const diffResult = await runGitCommand({
-    args: ["diff", "--merge-base", "main", "HEAD"],
+  const mergeBase = await readMergeBase({
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  if (diffResult.exitCode !== 0) {
-    throw new Error(formatGitFailureDetails(diffResult));
+
+  const trackedDiffResult = await readTrackedWorktreeDiff({
+    ensureTransportConnected: input.ensureTransportConnected,
+    mergeBase,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  const untrackedFiles = await listUntrackedFiles({
+    ensureTransportConnected: input.ensureTransportConnected,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  const untrackedDiffResults: ExecCommandResult[] = [];
+  for (const path of untrackedFiles) {
+    untrackedDiffResults.push(
+      await readUntrackedFilePatch({
+        ensureTransportConnected: input.ensureTransportConnected,
+        path,
+        sandboxInstanceId: input.sandboxInstanceId,
+      }),
+    );
+  }
+
+  const patch = [trackedDiffResult.stdout, ...untrackedDiffResults.map((result) => result.stdout)]
+    .filter((value) => value.length > 0)
+    .join("");
+  const wasTruncated =
+    trackedDiffResult.truncated || untrackedDiffResults.some((result) => result.truncated);
+  if (patch.length === 0) {
+    return {
+      patch,
+      truncatedMessage: null,
+    };
   }
 
   return {
-    patch: diffResult.stdout,
-    truncatedMessage: diffResult.truncated
+    patch,
+    truncatedMessage: wasTruncated
       ? `Diff output was truncated to ${String(BranchDiffMaxOutputBytes)} bytes.`
       : null,
   };

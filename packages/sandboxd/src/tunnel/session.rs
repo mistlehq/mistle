@@ -19,6 +19,9 @@ use std::thread::{self, JoinHandle};
 use std::time::Instant;
 
 use futures_util::{SinkExt, StreamExt};
+use nix::errno::Errno;
+use nix::sys::signal::{Signal, kill};
+use nix::unistd::Pid;
 use serde_json::Value;
 use tokio::net::{TcpStream, lookup_host};
 use tokio::runtime::Builder;
@@ -211,7 +214,8 @@ struct PendingAgentOpenState {
 }
 
 struct PendingExecOpenState {
-    task: TokioJoinHandle<()>,
+    cancel_requested: Arc<AtomicBool>,
+    child_pid: Arc<Mutex<Option<u32>>>,
 }
 
 struct ExecCommandResult {
@@ -488,7 +492,17 @@ async fn run_tunnel_session(
                 pending_agent_open.task.abort();
             }
             for pending_exec_open in session_state.pending_exec_opens.values() {
-                pending_exec_open.task.abort();
+                pending_exec_open
+                    .cancel_requested
+                    .store(true, Ordering::Relaxed);
+                let child_pid = pending_exec_open
+                    .child_pid
+                    .lock()
+                    .expect("exec child pid lock should not be poisoned")
+                    .to_owned();
+                if let Some(child_pid) = child_pid {
+                    let _ = kill_exec_child_process(child_pid);
+                }
             }
             for pty_session in session_state.pty_sessions.values() {
                 let _ = pty_session.session.terminate(
@@ -816,15 +830,18 @@ fn spawn_agent_dial_task(
 fn spawn_exec_task(
     message: crate::tunnel::protocol::ExecStreamOpen,
     runtime_env: BTreeMap<String, String>,
+    cancel_requested: Arc<AtomicBool>,
+    child_pid: Arc<Mutex<Option<u32>>>,
     event_sender: mpsc::UnboundedSender<TunnelSessionEvent>,
-) -> TokioJoinHandle<()> {
+) {
     tokio::task::spawn_blocking(move || {
-        let result = run_exec_command(&message, &runtime_env);
+        let result =
+            run_exec_command(&message, &runtime_env, &cancel_requested, Arc::clone(&child_pid));
         let _ = event_sender.send(TunnelSessionEvent::ExecCompleted {
             stream_id: message.stream_id,
             result: Box::new(result),
         });
-    })
+    });
 }
 
 struct BoundedOutput {
@@ -835,6 +852,8 @@ struct BoundedOutput {
 fn run_exec_command(
     message: &crate::tunnel::protocol::ExecStreamOpen,
     runtime_env: &BTreeMap<String, String>,
+    cancel_requested: &AtomicBool,
+    child_pid: Arc<Mutex<Option<u32>>>,
 ) -> Result<ExecCommandResult, String> {
     let max_output_bytes = message
         .channel
@@ -859,6 +878,15 @@ fn run_exec_command(
     let mut child = child_command
         .spawn()
         .map_err(|error| format!("failed to spawn command: {error}"))?;
+    {
+        let mut stored_pid = child_pid
+            .lock()
+            .expect("exec child pid lock should not be poisoned");
+        *stored_pid = Some(child.id());
+    }
+    if cancel_requested.load(Ordering::Relaxed) {
+        kill_exec_child_process(child.id())?;
+    }
     let stdout_reader = child
         .stdout
         .take()
@@ -872,7 +900,7 @@ fn run_exec_command(
     let stderr_budget = Arc::clone(&shared_budget);
     let stdout_thread = thread::spawn(move || read_bounded_output(stdout_reader, stdout_budget));
     let stderr_thread = thread::spawn(move || read_bounded_output(stderr_reader, stderr_budget));
-    let status = wait_for_exec_child(&mut child, timeout_ms)?;
+    let status = wait_for_exec_child(&mut child, timeout_ms, cancel_requested)?;
     let stdout = stdout_thread
         .join()
         .map_err(|_| "command stdout reader panicked".to_string())??;
@@ -891,6 +919,7 @@ fn run_exec_command(
 fn wait_for_exec_child(
     child: &mut std::process::Child,
     timeout_ms: u64,
+    cancel_requested: &AtomicBool,
 ) -> Result<std::process::ExitStatus, String> {
     let deadline = Instant::now() + std::time::Duration::from_millis(timeout_ms);
     loop {
@@ -899,10 +928,15 @@ fn wait_for_exec_child(
             .map_err(|error| format!("failed to poll command: {error}"))?
         {
             Some(status) => return Ok(status),
+            None if cancel_requested.load(Ordering::Relaxed) => {
+                kill_exec_child_process(child.id())?;
+                let _ = child
+                    .wait()
+                    .map_err(|error| format!("failed to wait for cancelled command: {error}"))?;
+                return Err("command was cancelled".to_string());
+            }
             None if Instant::now() >= deadline => {
-                child
-                    .kill()
-                    .map_err(|error| format!("failed to kill timed out command: {error}"))?;
+                kill_exec_child_process(child.id())?;
                 let _ = child
                     .wait()
                     .map_err(|error| format!("failed to wait for timed out command: {error}"))?;
@@ -910,6 +944,13 @@ fn wait_for_exec_child(
             }
             None => thread::sleep(std::time::Duration::from_millis(10)),
         }
+    }
+}
+
+fn kill_exec_child_process(child_pid: u32) -> Result<(), String> {
+    match kill(Pid::from_raw(child_pid as i32), Signal::SIGKILL) {
+        Ok(()) | Err(Errno::ESRCH) => Ok(()),
+        Err(error) => Err(format!("failed to kill exec command: {error}")),
     }
 }
 
@@ -949,9 +990,38 @@ where
         }
     }
 
-    let text = String::from_utf8(output)
-        .map_err(|error| format!("command output was not valid utf-8: {error}"))?;
-    Ok(BoundedOutput { text, truncated })
+    decode_bounded_output(output, truncated)
+}
+
+fn decode_bounded_output(output: Vec<u8>, truncated: bool) -> Result<BoundedOutput, String> {
+    match String::from_utf8(output) {
+        Ok(text) => Ok(BoundedOutput { text, truncated }),
+        Err(error) if truncated => {
+            let valid_up_to = error.utf8_error().valid_up_to();
+            let bytes = error.into_bytes();
+            let text = String::from_utf8(bytes[..valid_up_to].to_vec())
+                .map_err(|decode_error| format!("command output was not valid utf-8: {decode_error}"))?;
+            Ok(BoundedOutput {
+                text,
+                truncated: true,
+            })
+        }
+        Err(error) => Err(format!("command output was not valid utf-8: {error}")),
+    }
+}
+
+fn cancel_pending_exec_open(pending_exec_open: PendingExecOpenState) {
+    pending_exec_open
+        .cancel_requested
+        .store(true, Ordering::Relaxed);
+    let child_pid = pending_exec_open
+        .child_pid
+        .lock()
+        .expect("exec child pid lock should not be poisoned")
+        .to_owned();
+    if let Some(child_pid) = child_pid {
+        let _ = kill_exec_child_process(child_pid);
+    }
 }
 
 fn poll_pty_sessions(
@@ -1454,15 +1524,21 @@ async fn handle_tunnel_control_message(
                 return Ok(());
             }
 
+            let cancel_requested = Arc::new(AtomicBool::new(false));
+            let child_pid = Arc::new(Mutex::new(None));
             session_state.pending_exec_opens.insert(
                 message.stream_id,
                 PendingExecOpenState {
-                    task: spawn_exec_task(
-                        message.clone(),
-                        context.runtime_env.clone(),
-                        event_sender.clone(),
-                    ),
+                    cancel_requested: Arc::clone(&cancel_requested),
+                    child_pid: Arc::clone(&child_pid),
                 },
+            );
+            spawn_exec_task(
+                message.clone(),
+                context.runtime_env.clone(),
+                cancel_requested,
+                child_pid,
+                event_sender.clone(),
             );
             write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
@@ -1505,7 +1581,7 @@ async fn handle_tunnel_control_message(
             if let Some(pending_exec_open) =
                 session_state.pending_exec_opens.remove(&message.stream_id)
             {
-                pending_exec_open.task.abort();
+                cancel_pending_exec_open(pending_exec_open);
                 return Ok(());
             }
             if let Some(pty_session_id) = session_state
@@ -2237,10 +2313,11 @@ mod tests {
     use crate::runtime::readiness::RuntimeReadinessManager;
     use crate::time::{SystemClock, ThreadSleeper};
     use crate::tunnel::protocol::{
-        DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
-        decode_stream_data_frame, encode_stream_data_frame,
+        AGENT_STREAM_WINDOW_BYTES, DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES,
+        PAYLOAD_KIND_WEBSOCKET_TEXT, StreamSendWindow, decode_stream_data_frame,
+        encode_stream_data_frame,
     };
-    use crate::tunnel::session::TunnelSession;
+    use crate::tunnel::session::{TunnelSession, decode_bounded_output};
     use crate::tunnel::telemetry::{TelemetryRelay, decode_telemetry_data_frame};
 
     static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(900);
@@ -2305,6 +2382,18 @@ mod tests {
                 "bytes": 512
             })
         );
+    }
+
+    #[test]
+    fn trims_truncated_exec_output_to_a_valid_utf8_boundary() {
+        let mut truncated_output = b"prefix ".to_vec();
+        truncated_output.extend_from_slice(&"€".as_bytes()[..2]);
+
+        let decoded = decode_bounded_output(truncated_output, true)
+            .expect("truncated output should decode to the last valid utf-8 boundary");
+
+        assert_eq!(decoded.text, "prefix ");
+        assert!(decoded.truncated);
     }
 
     #[test]
@@ -2820,7 +2909,9 @@ mod tests {
                 ))
                 .expect("proxied response should send");
             match client_socket.read() {
-                Ok(Message::Close(_)) | Err(WebSocketError::ConnectionClosed) => {}
+                Ok(Message::Close(_))
+                | Err(WebSocketError::ConnectionClosed)
+                | Err(WebSocketError::Protocol(_)) => {}
                 Ok(other_message) => panic!(
                     "expected proxied client websocket to close after tunnel stream shutdown, got {other_message:?}"
                 ),
