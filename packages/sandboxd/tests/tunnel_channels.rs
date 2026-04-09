@@ -14,9 +14,8 @@ use sandboxd::time::{Clock, SystemClock, ThreadSleeper};
 use sandboxd::tunnel::agent_stream::{DEFAULT_AGENT_STREAM_POLL_INTERVAL, relay_agent_stream};
 use sandboxd::tunnel::file_upload::relay_file_upload_stream;
 use sandboxd::tunnel::protocol::{
-    DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
-    decode_stream_data_frame,
-    encode_stream_data_frame,
+    AGENT_STREAM_WINDOW_BYTES, DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES,
+    PAYLOAD_KIND_WEBSOCKET_TEXT, decode_stream_data_frame, encode_stream_data_frame,
 };
 use sandboxd::tunnel::telemetry::{
     SANDBOX_TELEMETRY_LOG_STREAM_ID, SandboxTelemetryLogLevel, TelemetryRelay,
@@ -204,7 +203,92 @@ fn relays_large_agent_websocket_messages_without_exhausting_the_send_window() {
     let output_frame = read_binary_frame(&mut client_socket);
     assert_eq!(output_frame.stream_id, 17);
     assert_eq!(output_frame.payload_kind, PAYLOAD_KIND_WEBSOCKET_TEXT);
-    assert_eq!(output_frame.payload.len(), DEFAULT_STREAM_WINDOW_BYTES + 1024);
+    assert_eq!(
+        output_frame.payload.len(),
+        DEFAULT_STREAM_WINDOW_BYTES + 1024
+    );
+
+    runtime_thread
+        .join()
+        .expect("runtime endpoint thread should exit cleanly");
+    tunnel_thread
+        .join()
+        .expect("tunnel relay thread should exit cleanly");
+}
+
+#[test]
+fn resets_agent_stream_when_runtime_message_exceeds_the_agent_window() {
+    let runtime_listener = TcpListener::bind("127.0.0.1:0").expect("runtime listener should bind");
+    let runtime_address = runtime_listener
+        .local_addr()
+        .expect("runtime listener should expose its address");
+    let runtime_url = format!("ws://127.0.0.1:{}/runtime", runtime_address.port());
+    let oversized_payload = "x".repeat(AGENT_STREAM_WINDOW_BYTES + 1);
+
+    let runtime_thread = thread::spawn(move || {
+        let (stream, _) = runtime_listener
+            .accept()
+            .expect("runtime endpoint should accept tunnel relay");
+        let mut websocket = accept(stream).expect("runtime websocket handshake should succeed");
+
+        websocket
+            .send(Message::Text(oversized_payload.into()))
+            .expect("runtime endpoint should send an oversized websocket text response");
+        websocket
+            .close(None)
+            .expect("runtime endpoint should close cleanly");
+    });
+
+    let tunnel_listener = TcpListener::bind("127.0.0.1:0").expect("tunnel listener should bind");
+    let tunnel_address = tunnel_listener
+        .local_addr()
+        .expect("tunnel listener should expose its address");
+    let runtime_url_for_server = runtime_url.clone();
+    let tunnel_thread = thread::spawn(move || {
+        let (stream, _) = tunnel_listener
+            .accept()
+            .expect("tunnel relay should accept a client");
+        let mut websocket = accept(stream).expect("tunnel websocket handshake should succeed");
+        let Message::Text(open_payload) = websocket
+            .read()
+            .expect("tunnel relay should receive the initial stream.open")
+        else {
+            panic!("expected initial text stream.open payload");
+        };
+
+        relay_agent_stream(
+            &mut websocket,
+            open_payload.as_str(),
+            &runtime_url_for_server,
+            &ThreadSleeper,
+            DEFAULT_AGENT_STREAM_POLL_INTERVAL,
+        )
+        .expect("agent relay should finish cleanly");
+    });
+
+    let (mut client_socket, _) = connect(format!("ws://127.0.0.1:{}/agent", tunnel_address.port()))
+        .expect("client should connect to tunnel relay");
+    client_socket
+        .send(Message::Text(
+            r#"{"type":"stream.open","streamId":23,"channel":{"kind":"agent"}}"#
+                .to_string()
+                .into(),
+        ))
+        .expect("client should send agent stream.open");
+
+    assert_eq!(
+        read_text_message(&mut client_socket),
+        r#"{"type":"stream.open.ok","streamId":23}"#
+    );
+
+    let reset_message = parse_json_text_message(&mut client_socket);
+    assert_eq!(reset_message["type"], "stream.reset");
+    assert_eq!(reset_message["streamId"], 23);
+    assert_eq!(reset_message["code"], "stream_window_exhausted");
+    assert_eq!(
+        reset_message["message"],
+        "agent stream send window is exhausted"
+    );
 
     runtime_thread
         .join()
@@ -486,7 +570,10 @@ fn negotiates_telemetry_stream_and_flushes_buffered_logs() {
         serde_json::from_slice(&telemetry_bytes).expect("telemetry bytes should contain json");
     assert_eq!(telemetry_log_line["timestamp"], "1970-01-01T00:00:00.104Z");
     assert_eq!(telemetry_log_line["level"], "warn");
-    assert_eq!(telemetry_log_line["event"], "bootstrap_control_message_dropped");
+    assert_eq!(
+        telemetry_log_line["event"],
+        "bootstrap_control_message_dropped"
+    );
     assert_eq!(
         telemetry_log_line["message"],
         "sandboxd dropped bootstrap control message: sandboxd log line"
@@ -541,8 +628,7 @@ where
 fn send_telemetry_frame<S>(
     socket: &mut WebSocket<S>,
     frame: sandboxd::tunnel::telemetry::TelemetryRelayFrame,
-)
-where
+) where
     S: io::Read + io::Write,
 {
     match frame {

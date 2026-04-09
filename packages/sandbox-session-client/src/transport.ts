@@ -127,6 +127,10 @@ type ActiveStreamRecord = {
   stream: SandboxSessionTransportStream;
 };
 
+function getInitialSendWindowBytes(channel: StreamChannel): number {
+  return channel.kind === "agent" ? MaxStreamWindowBytes : DefaultStreamWindowBytes;
+}
+
 function readMessageEventPayload(event: unknown): unknown {
   if (typeof event === "object" && event !== null && "data" in event) {
     return event.data;
@@ -487,7 +491,7 @@ export class SandboxSessionTransport {
     });
 
     this.#activeStreamsByStreamId.set(streamId, {
-      sendWindowBytes: DefaultStreamWindowBytes,
+      sendWindowBytes: getInitialSendWindowBytes(input.channel),
       stream,
     });
     stream.markOpen();
