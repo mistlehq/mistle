@@ -152,6 +152,9 @@ export function compileCodexRuntime(
           type: input.providerAccess.authScheme,
           target: "authorization",
         },
+        ...(input.providerAccess.additionalHeaders === undefined
+          ? {}
+          : { additionalHeaders: input.providerAccess.additionalHeaders }),
         credentialResolver: {
           connectionId: input.providerAccess.credentialResolver.connectionId,
           secretType: input.providerAccess.credentialResolver.secretType,

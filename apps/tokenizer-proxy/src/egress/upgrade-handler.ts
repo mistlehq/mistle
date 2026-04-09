@@ -157,6 +157,15 @@ function applyAuthInjection(input: {
   }
 }
 
+function applyAdditionalHeaders(input: {
+  outgoingHeaders: Headers;
+  additionalHeaders: Readonly<Record<string, string>>;
+}): void {
+  for (const [headerName, headerValue] of Object.entries(input.additionalHeaders)) {
+    input.outgoingHeaders.set(headerName, headerValue);
+  }
+}
+
 function appendHeader(headers: Headers, headerName: string, headerValue: string | string[]): void {
   if (Array.isArray(headerValue)) {
     for (const value of headerValue) {
@@ -372,6 +381,12 @@ export function createEgressProxyUpgradeHandler(input: CreateEgressProxyUpgradeH
       });
 
       const outgoingHeaders = buildOutgoingRequestHeaders(request.headers);
+      if (egressGrant.additionalHeaders !== undefined) {
+        applyAdditionalHeaders({
+          outgoingHeaders,
+          additionalHeaders: egressGrant.additionalHeaders,
+        });
+      }
       applyAuthInjection({
         upstreamUrl,
         outgoingHeaders,

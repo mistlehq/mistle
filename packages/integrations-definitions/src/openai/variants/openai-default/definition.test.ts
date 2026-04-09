@@ -83,5 +83,8 @@ describe("OpenAiApiKeyDefinition", () => {
     });
 
     expect(resolvedCapabilities.agentProviderAccess?.allowedModels).toEqual(["gpt-5.4"]);
+    expect(resolvedCapabilities.agentProviderAccess?.additionalHeaders).toEqual({
+      "ChatGPT-Account-ID": "acct_123",
+    });
   });
 });

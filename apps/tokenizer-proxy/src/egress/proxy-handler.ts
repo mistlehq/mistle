@@ -183,6 +183,15 @@ function applyAuthInjection(input: {
   }
 }
 
+function applyAdditionalHeaders(input: {
+  outgoingHeaders: Headers;
+  additionalHeaders: Readonly<Record<string, string>>;
+}): void {
+  for (const [headerName, headerValue] of Object.entries(input.additionalHeaders)) {
+    input.outgoingHeaders.set(headerName, headerValue);
+  }
+}
+
 function removeHopByHopHeaders(headers: Headers): void {
   const hopByHopHeaders = [
     "connection",
@@ -405,6 +414,13 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
         });
         span.setAttributes(createUpstreamTelemetryAttributes({ upstreamUrl }));
         const outgoingHeaders = buildOutgoingRequestHeaders(ctx);
+
+        if (egressGrant.additionalHeaders !== undefined) {
+          applyAdditionalHeaders({
+            outgoingHeaders,
+            additionalHeaders: egressGrant.additionalHeaders,
+          });
+        }
 
         applyAuthInjection({
           upstreamUrl,
