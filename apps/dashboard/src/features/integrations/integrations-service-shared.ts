@@ -16,6 +16,13 @@ const IntegrationConnectionMethodCreateUiSchema = z
   })
   .strict();
 
+const IntegrationConnectionMethodPendingUiSchema = z
+  .object({
+    title: z.string().min(1).optional(),
+    description: z.string().min(1).optional(),
+  })
+  .strict();
+
 export const IntegrationTargetSchema = z
   .object({
     targetKey: z.string().min(1),
@@ -58,6 +65,19 @@ export const IntegrationTargetSchema = z
               ui: z
                 .object({
                   create: IntegrationConnectionMethodCreateUiSchema,
+                })
+                .strict(),
+            })
+            .strict(),
+          z
+            .object({
+              id: z.string().min(1),
+              label: z.string().min(1),
+              kind: z.literal("device-authorization"),
+              ui: z
+                .object({
+                  create: IntegrationConnectionMethodCreateUiSchema,
+                  pending: IntegrationConnectionMethodPendingUiSchema.optional(),
                 })
                 .strict(),
             })

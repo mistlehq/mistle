@@ -43,6 +43,21 @@ function createAgentDefinition(): IntegrationDefinition<
           },
         ],
       },
+      {
+        id: "chatgpt-device-code",
+        label: "ChatGPT subscription",
+        kind: "device-authorization",
+        ui: {
+          create: {
+            submitLabel: "Start device authorization",
+            helperText: "Use ChatGPT device authorization to connect this account.",
+          },
+          pending: {
+            title: "Finish sign-in",
+            description: "Complete the device authorization in your browser.",
+          },
+        },
+      },
     ],
     compileBinding: () => ({
       egressRoutes: [],
@@ -126,11 +141,86 @@ describe("integration form registry", () => {
             },
           ],
         },
+        {
+          id: "chatgpt-device-code",
+          label: "ChatGPT subscription",
+          kind: "device-authorization",
+          ui: {
+            create: {
+              submitLabel: "Start device authorization",
+              helperText: "Use ChatGPT device authorization to connect this account.",
+            },
+            pending: {
+              title: "Finish sign-in",
+              description: "Complete the device authorization in your browser.",
+            },
+          },
+        },
       ],
       agentRuntimeOptions: [
         {
           runtimeId: "codex",
           displayName: "Codex",
+        },
+      ],
+    });
+  });
+
+  it("passes through device-authorization methods without leaking secret metadata", () => {
+    const integrationRegistry = new IntegrationRegistry();
+    integrationRegistry.register({
+      ...createAgentDefinition(),
+      connectionMethods: [
+        {
+          id: "chatgpt-device-code",
+          label: "ChatGPT subscription",
+          kind: "device-authorization",
+          ui: {
+            create: {
+              submitLabel: "Continue",
+              helperText: "Sign in with ChatGPT in a separate browser window.",
+            },
+            pending: {
+              title: "Waiting for approval",
+              description: "Finish the device authorization flow in your browser.",
+            },
+          },
+        },
+      ],
+    });
+
+    const agentRuntimeRegistry = new AgentRuntimeRegistry();
+    registerRuntime(agentRuntimeRegistry, {
+      runtimeId: "codex",
+      displayName: "Codex",
+    });
+
+    const registry = createIntegrationFormRegistry({
+      integrationRegistry,
+      agentRuntimeRegistry,
+    });
+
+    expect(
+      registry.getDefinition({
+        familyId: "openai",
+        variantId: "openai-default",
+      }),
+    ).toMatchObject({
+      connectionMethods: [
+        {
+          id: "chatgpt-device-code",
+          label: "ChatGPT subscription",
+          kind: "device-authorization",
+          ui: {
+            create: {
+              submitLabel: "Continue",
+              helperText: "Sign in with ChatGPT in a separate browser window.",
+            },
+            pending: {
+              title: "Waiting for approval",
+              description: "Finish the device authorization flow in your browser.",
+            },
+          },
         },
       ],
     });

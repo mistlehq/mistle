@@ -18,6 +18,13 @@ const IntegrationConnectionMethodCreateUiSchema = z
   })
   .strict();
 
+const IntegrationConnectionMethodPendingUiSchema = z
+  .object({
+    title: z.string().min(1).optional(),
+    description: z.string().min(1).optional(),
+  })
+  .strict();
+
 const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
   z
     .object({
@@ -35,6 +42,19 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
       ui: z
         .object({
           create: IntegrationConnectionMethodCreateUiSchema,
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      id: z.string().min(1),
+      label: z.string().min(1),
+      kind: z.literal("device-authorization"),
+      ui: z
+        .object({
+          create: IntegrationConnectionMethodCreateUiSchema,
+          pending: IntegrationConnectionMethodPendingUiSchema.optional(),
         })
         .strict(),
     })

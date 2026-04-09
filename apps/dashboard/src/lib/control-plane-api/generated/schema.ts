@@ -2232,6 +2232,22 @@ export interface paths {
                         };
                       };
                     }
+                  | {
+                      id: string;
+                      /** @enum {string} */
+                      kind: "device-authorization";
+                      label: string;
+                      ui: {
+                        create: {
+                          helperText: string;
+                          submitLabel: string;
+                        };
+                        pending?: {
+                          description?: string;
+                          title?: string;
+                        };
+                      };
+                    }
                 )[];
                 description: string;
                 descriptionOverride?: string;

@@ -4336,6 +4336,61 @@
                                   },
                                   "required": ["id", "label", "kind", "ui"],
                                   "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": ["device-authorization"]
+                                    },
+                                    "ui": {
+                                      "type": "object",
+                                      "properties": {
+                                        "create": {
+                                          "type": "object",
+                                          "properties": {
+                                            "submitLabel": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "helperText": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["submitLabel", "helperText"],
+                                          "additionalProperties": false
+                                        },
+                                        "pending": {
+                                          "type": "object",
+                                          "properties": {
+                                            "title": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": ["create"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["id", "label", "kind", "ui"],
+                                  "additionalProperties": false
                                 }
                               ]
                             },
