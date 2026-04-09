@@ -4,18 +4,15 @@ import { useQuery } from "@tanstack/react-query";
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
 
 const BranchDiffCommandTimeoutMs = 15_000;
-const BranchDiffMaxOutputBytes = 256 * 1024;
 
 type SessionBranchDiffState = {
   errorMessage: string | null;
   isLoading: boolean;
   patch: string;
-  truncatedMessage: string | null;
 };
 
 type BranchDiffLoadResult = {
   patch: string;
-  truncatedMessage: string | null;
 };
 
 async function runGitCommand(input: {
@@ -33,7 +30,6 @@ async function runGitCommand(input: {
   return await exec.run({
     command: "git",
     args: input.args,
-    maxOutputBytes: BranchDiffMaxOutputBytes,
     timeoutMs: BranchDiffCommandTimeoutMs,
   });
 }
@@ -98,10 +94,11 @@ async function listUntrackedFiles(input: {
     throw new Error(formatGitFailureDetails(result));
   }
 
-  return result.stdout
-    .split("\n")
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0);
+  const paths = result.stdout.split("\n");
+  if (paths.at(-1) === "") {
+    paths.pop();
+  }
+  return paths;
 }
 
 async function readUntrackedFilePatch(input: {
@@ -171,21 +168,7 @@ async function loadBranchDiff(input: {
   const patch = [trackedDiffResult.stdout, ...untrackedDiffResults.map((result) => result.stdout)]
     .filter((value) => value.length > 0)
     .join("");
-  const wasTruncated =
-    trackedDiffResult.truncated || untrackedDiffResults.some((result) => result.truncated);
-  if (patch.length === 0) {
-    return {
-      patch,
-      truncatedMessage: null,
-    };
-  }
-
-  return {
-    patch,
-    truncatedMessage: wasTruncated
-      ? `Diff output was truncated to ${String(BranchDiffMaxOutputBytes)} bytes.`
-      : null,
-  };
+  return { patch };
 }
 
 function normalizeBranchDiffError(error: unknown): string {
@@ -226,8 +209,7 @@ export function useSessionBranchDiff(input: {
     errorMessage: query.isError ? normalizeBranchDiffError(query.error) : null,
     isLoading: query.isLoading,
     patch: query.data?.patch ?? "",
-    truncatedMessage: query.data?.truncatedMessage ?? null,
   };
 }
 
-export { BranchDiffCommandTimeoutMs, BranchDiffMaxOutputBytes, normalizeBranchDiffError };
+export { BranchDiffCommandTimeoutMs, normalizeBranchDiffError };
