@@ -17,17 +17,23 @@ export class SandboxKeepaliveRepository {
     sandboxInstanceId: string;
     ownerLeaseId: string;
   }): Promise<void> {
+    const nowMs = this.clock.nowMs();
+
     await this.keepaliveStore.replaceStateForOwner({
       sandboxInstanceId: input.sandboxInstanceId,
       ownerLeaseId: input.ownerLeaseId,
       nodeId: this.gatewayNodeId,
       ttlMs: input.message.ttlMs,
-      nowMs: this.clock.nowMs(),
+      nowMs,
       active: input.message.active,
     });
 
+    if (!input.message.active) {
+      return;
+    }
+
     this.requireController(input.sandboxInstanceId).handleActivityTouch({
-      nowMs: this.clock.nowMs(),
+      nowMs,
     });
   }
 
