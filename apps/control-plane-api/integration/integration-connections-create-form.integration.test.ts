@@ -487,8 +487,7 @@ describe("integration connections create form integration", () => {
     }
 
     expect(webhookSource.endpointKey).toBeDefined();
-    expect(webhookSource.endpointKey?.length).toBeGreaterThan(0);
-    expect(webhookSource.routingStrategy).toBe("path");
+    expect(webhookSource.endpointKey.length).toBeGreaterThan(0);
   });
 
   it("creates GitHub App form connections and the implicit webhook source", async ({ fixture }) => {
@@ -574,8 +573,7 @@ describe("integration connections create form integration", () => {
     }
 
     expect(webhookSource.endpointKey).toBeDefined();
-    expect(webhookSource.endpointKey?.length).toBeGreaterThan(0);
-    expect(webhookSource.routingStrategy).toBe("path");
+    expect(webhookSource.endpointKey.length).toBeGreaterThan(0);
   });
 
   it("returns 400 when Jira personal token config is missing site_url", async ({ fixture }) => {

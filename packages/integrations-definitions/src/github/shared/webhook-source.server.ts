@@ -1,8 +1,6 @@
 import {
   IntegrationConnectionMethodIds,
   IntegrationWebhookSourceLifecycles,
-  IntegrationWebhookSourceOwnerScopes,
-  IntegrationWebhookSourceRoutingStrategies,
   type IntegrationWebhookSourceCapability,
 } from "@mistle/integrations-core";
 
@@ -27,8 +25,6 @@ export const GitHubWebhookSourceCapability: IntegrationWebhookSourceCapability<
   GitHubTargetSecrets,
   GitHubConnectionConfig
 > = {
-  ownerScope: IntegrationWebhookSourceOwnerScopes.CONNECTION,
-  routingStrategy: IntegrationWebhookSourceRoutingStrategies.PATH,
   lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
   supportsConnection(input) {
     return isGitHubAppInstallationConnection(input.connection.config);

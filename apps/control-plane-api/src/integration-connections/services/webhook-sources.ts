@@ -4,7 +4,6 @@ import {
   integrationCredentials,
   IntegrationCredentialSecretKinds,
   integrationWebhookSources,
-  IntegrationWebhookSourceOwnerScopes,
   IntegrationWebhookSourceStatuses,
   type ControlPlaneDatabase,
   type IntegrationWebhookSource,
@@ -34,10 +33,9 @@ import {
 type WebhookSourceListItem = {
   id: string;
   targetKey: string;
-  ownerScope: "target" | "connection";
-  integrationConnectionId?: string;
+  integrationConnectionId: string;
   displayName: string;
-  endpointKey?: string;
+  endpointKey: string;
   callbackUrl?: string;
   remoteRegistrationId?: string;
   status: "active" | "error" | "disabled";
@@ -265,7 +263,6 @@ export async function ensureImplicitConnectionWebhookSource(input: {
   organizationId: string;
   connectionId: string;
   targetKey: string;
-  routingStrategy: "payload" | "path";
 }): Promise<IntegrationWebhookSource> {
   const existingSource = await input.db.query.integrationWebhookSources.findFirst({
     where: (table, { and: whereAnd, eq: whereEq }) =>
@@ -273,32 +270,23 @@ export async function ensureImplicitConnectionWebhookSource(input: {
         whereEq(table.organizationId, input.organizationId),
         whereEq(table.integrationConnectionId, input.connectionId),
         whereEq(table.targetKey, input.targetKey),
-        whereEq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
         whereEq(table.status, IntegrationWebhookSourceStatuses.ACTIVE),
       ),
   });
 
   if (existingSource !== undefined) {
-    if (input.routingStrategy === "path" && existingSource.endpointKey == null) {
-      throw new Error(
-        `Implicit path-routed webhook source '${existingSource.id}' is missing endpointKey.`,
-      );
-    }
-
     return existingSource;
   }
 
-  const endpointKey = input.routingStrategy === "path" ? generateEndpointKey() : undefined;
+  const endpointKey = generateEndpointKey();
 
   const [createdSource] = await input.db
     .insert(integrationWebhookSources)
     .values({
-      ownerScope: IntegrationWebhookSourceOwnerScopes.CONNECTION,
       organizationId: input.organizationId,
       integrationConnectionId: input.connectionId,
       targetKey: input.targetKey,
-      routingStrategy: input.routingStrategy,
-      ...(endpointKey === undefined ? {} : { endpointKey }),
+      endpointKey,
       status: IntegrationWebhookSourceStatuses.ACTIVE,
     })
     .returning();
@@ -322,15 +310,9 @@ function toWebhookSourceListItem(input: {
   return {
     id: input.source.id,
     targetKey: input.source.targetKey ?? "",
-    ownerScope: input.source.ownerScope,
-    ...(input.source.integrationConnectionId === null ||
-    input.source.integrationConnectionId === undefined
-      ? {}
-      : { integrationConnectionId: input.source.integrationConnectionId }),
+    integrationConnectionId: input.source.integrationConnectionId,
     displayName: input.descriptor.displayName,
-    ...(input.source.endpointKey === null || input.source.endpointKey === undefined
-      ? {}
-      : { endpointKey: input.source.endpointKey }),
+    endpointKey: input.source.endpointKey,
     ...(input.descriptor.callbackUrl === undefined
       ? {}
       : { callbackUrl: input.descriptor.callbackUrl }),
@@ -375,20 +357,12 @@ async function resolveWebhookSourceDescriptor(input: {
     source: {
       id: input.source.id,
       targetKey: input.source.targetKey ?? input.connection.targetKey,
-      ownerScope: input.source.ownerScope,
-      ...(input.source.organizationId === null || input.source.organizationId === undefined
-        ? {}
-        : { organizationId: input.source.organizationId }),
-      ...(input.source.integrationConnectionId === null ||
-      input.source.integrationConnectionId === undefined
-        ? {}
-        : { integrationConnectionId: input.source.integrationConnectionId }),
+      organizationId: input.source.organizationId,
+      integrationConnectionId: input.source.integrationConnectionId,
       ...(input.source.displayName === null || input.source.displayName === undefined
         ? {}
         : { displayName: input.source.displayName }),
-      ...(input.source.endpointKey === null || input.source.endpointKey === undefined
-        ? {}
-        : { endpointKey: input.source.endpointKey }),
+      endpointKey: input.source.endpointKey,
       ...(input.source.remoteRegistrationId === null ||
       input.source.remoteRegistrationId === undefined
         ? {}
@@ -477,10 +451,7 @@ async function resolveAccessibleWebhookSourceOrThrow(input: {
     );
   }
 
-  if (
-    source.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION &&
-    source.integrationConnectionId !== input.connection.id
-  ) {
+  if (source.integrationConnectionId !== input.connection.id) {
     throw new NotFoundError(
       IntegrationConnectionsNotFoundCodes.WEBHOOK_SOURCE_NOT_FOUND,
       `Webhook source '${input.webhookSourceId}' was not found for connection '${input.connection.id}'.`,
@@ -524,7 +495,6 @@ export async function listIntegrationWebhookSources(
     });
 
   if (
-    webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION &&
     !(await supportsWebhookSourceForConnection({
       webhookSourceCapability,
       connection,
@@ -533,16 +503,12 @@ export async function listIntegrationWebhookSources(
     return [];
   }
 
-  if (
-    webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT &&
-    webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.TARGET
-  ) {
+  if (webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT) {
     const source = await ensureImplicitConnectionWebhookSource({
       db: ctx.db,
       organizationId: input.organizationId,
       connectionId: connection.id,
       targetKey: connection.targetKey,
-      routingStrategy: webhookSourceCapability.routingStrategy,
     });
     const descriptor = await resolveWebhookSourceDescriptor({
       controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
@@ -556,42 +522,8 @@ export async function listIntegrationWebhookSources(
     return [toWebhookSourceListItem({ source, descriptor })];
   }
 
-  if (
-    webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT &&
-    webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION
-  ) {
-    const sources = await ctx.db.query.integrationWebhookSources.findMany({
-      where: (table, { and: whereAnd, eq: whereEq }) =>
-        whereAnd(
-          whereEq(table.integrationConnectionId, connection.id),
-          whereEq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
-        ),
-      orderBy: (table, { asc }) => [asc(table.createdAt), asc(table.id)],
-    });
-
-    return Promise.all(
-      sources.map(async (source) =>
-        toWebhookSourceListItem({
-          source,
-          descriptor: await resolveWebhookSourceDescriptor({
-            controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
-            webhookSourceCapability,
-            parsedTargetConfig,
-            parsedTargetSecrets,
-            connection,
-            source,
-          }),
-        }),
-      ),
-    );
-  }
-
   const sources = await ctx.db.query.integrationWebhookSources.findMany({
-    where: (table, { and: whereAnd, eq: whereEq }) =>
-      whereAnd(
-        whereEq(table.integrationConnectionId, connection.id),
-        whereEq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
-      ),
+    where: (table, { eq: whereEq }) => whereEq(table.integrationConnectionId, connection.id),
     orderBy: (table, { asc }) => [asc(table.createdAt), asc(table.id)],
   });
 
@@ -637,7 +569,6 @@ export async function getIntegrationWebhookSource(
       target: connection.target,
     });
   if (
-    webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION &&
     !(await supportsWebhookSourceForConnection({
       webhookSourceCapability,
       connection,
@@ -702,13 +633,6 @@ export async function createIntegrationWebhookSource(
     );
   }
 
-  if (webhookSourceCapability.ownerScope !== IntegrationWebhookSourceOwnerScopes.CONNECTION) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.WEBHOOK_SOURCE_CONNECTION_SCOPE_REQUIRED,
-      `Integration target '${connection.targetKey}' does not support connection-owned webhook source creation.`,
-    );
-  }
-
   if (webhookSourceCapability.lifecycle !== IntegrationWebhookSourceLifecycles.MANAGED) {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.WEBHOOK_SOURCE_MANAGED_LIFECYCLE_REQUIRED,
@@ -726,8 +650,7 @@ export async function createIntegrationWebhookSource(
   }
 
   const webhookSecret = generateWebhookSecret();
-  const endpointKey =
-    webhookSourceCapability.routingStrategy === "path" ? generateEndpointKey() : undefined;
+  const endpointKey = generateEndpointKey();
   const connectionSecrets = await resolveConnectionSecretsOrThrow({
     db: ctx.db,
     integrationRegistry: ctx.integrationRegistry,
@@ -747,13 +670,11 @@ export async function createIntegrationWebhookSource(
     const [insertedSource] = await tx
       .insert(integrationWebhookSources)
       .values({
-        ownerScope: IntegrationWebhookSourceOwnerScopes.CONNECTION,
         organizationId: input.organizationId,
         integrationConnectionId: connection.id,
         targetKey: connection.targetKey,
         ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
-        routingStrategy: webhookSourceCapability.routingStrategy,
-        ...(endpointKey === undefined ? {} : { endpointKey }),
+        endpointKey,
         webhookSecretCredentialId,
         status: IntegrationWebhookSourceStatuses.ACTIVE,
       })
@@ -788,15 +709,12 @@ export async function createIntegrationWebhookSource(
         source: {
           id: insertedSource.id,
           targetKey: insertedSource.targetKey ?? connection.targetKey,
-          ownerScope: insertedSource.ownerScope,
           organizationId: input.organizationId,
           integrationConnectionId: connection.id,
           ...(insertedSource.displayName === null
             ? {}
             : { displayName: insertedSource.displayName }),
-          ...(insertedSource.endpointKey === null
-            ? {}
-            : { endpointKey: insertedSource.endpointKey }),
+          endpointKey: insertedSource.endpointKey,
           providerMetadata: insertedSource.providerMetadata,
         },
         webhookSecret,
@@ -873,7 +791,6 @@ export async function deleteIntegrationWebhookSource(
       target: connection.target,
     });
   if (
-    webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION &&
     !(await supportsWebhookSourceForConnection({
       webhookSourceCapability,
       connection,
@@ -889,13 +806,6 @@ export async function deleteIntegrationWebhookSource(
     connection,
     webhookSourceId: input.webhookSourceId,
   });
-
-  if (source.ownerScope !== IntegrationWebhookSourceOwnerScopes.CONNECTION) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.WEBHOOK_SOURCE_CONNECTION_SCOPE_REQUIRED,
-      `Webhook source '${input.webhookSourceId}' is not connection-owned.`,
-    );
-  }
 
   if (webhookSourceCapability.lifecycle !== IntegrationWebhookSourceLifecycles.MANAGED) {
     throw new BadRequestError(
@@ -951,13 +861,10 @@ export async function deleteIntegrationWebhookSource(
         source: {
           id: source.id,
           targetKey: source.targetKey ?? connection.targetKey,
-          ownerScope: source.ownerScope,
-          ...(source.organizationId === null ? {} : { organizationId: source.organizationId }),
-          ...(source.integrationConnectionId === null
-            ? {}
-            : { integrationConnectionId: source.integrationConnectionId }),
+          organizationId: source.organizationId,
+          integrationConnectionId: source.integrationConnectionId,
           ...(source.displayName === null ? {} : { displayName: source.displayName }),
-          ...(source.endpointKey === null ? {} : { endpointKey: source.endpointKey }),
+          endpointKey: source.endpointKey,
           ...(source.remoteRegistrationId === null
             ? {}
             : { remoteRegistrationId: source.remoteRegistrationId }),

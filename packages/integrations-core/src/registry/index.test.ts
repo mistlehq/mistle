@@ -9,8 +9,6 @@ import type { IntegrationDefinition } from "../types/index.js";
 import {
   IntegrationConnectionMethodIds,
   IntegrationWebhookSourceLifecycles,
-  IntegrationWebhookSourceOwnerScopes,
-  IntegrationWebhookSourceRoutingStrategies,
 } from "../types/index.js";
 import { IntegrationRegistry } from "./index.js";
 
@@ -345,8 +343,6 @@ describe("integration registry", () => {
       bindingConfigSchema: ConfigSchema,
       connectionMethods: GitHubConnectionMethods,
       webhookSource: {
-        ownerScope: IntegrationWebhookSourceOwnerScopes.TARGET,
-        routingStrategy: IntegrationWebhookSourceRoutingStrategies.PAYLOAD,
         lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
         async describeSource(input) {
           return {
@@ -369,8 +365,6 @@ describe("integration registry", () => {
         variantId: "github-cloud",
       })?.webhookSource,
     ).toMatchObject({
-      ownerScope: "target",
-      routingStrategy: "payload",
       lifecycle: "implicit",
     });
   });
@@ -388,8 +382,6 @@ describe("integration registry", () => {
       bindingConfigSchema: ConfigSchema,
       connectionMethods: GitHubConnectionMethods,
       webhookSource: {
-        ownerScope: IntegrationWebhookSourceOwnerScopes.TARGET,
-        routingStrategy: IntegrationWebhookSourceRoutingStrategies.PAYLOAD,
         lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
         async describeSource(input) {
           return {
@@ -410,7 +402,7 @@ describe("integration registry", () => {
       throw new Error("Expected webhookSource to be defined.");
     }
 
-    Reflect.set(definition.webhookSource, "ownerScope", "");
+    Reflect.set(definition.webhookSource, "lifecycle", "");
 
     expect(() => registry.register(definition)).toThrow(IntegrationDefinitionRegistryError);
   });

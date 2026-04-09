@@ -594,7 +594,6 @@ function WebhookSourceCard(input: {
         ) : null}
       </div>
       <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
-        <MetadataField label="Owner scope" value={input.source.ownerScope} />
         <MetadataField label="Target" value={input.source.targetKey} />
         {input.source.callbackUrl === undefined ? null : (
           <MetadataField label="Callback URL" value={input.source.callbackUrl} />

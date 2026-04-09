@@ -322,7 +322,7 @@ export const JiraWebhookHandler: IntegrationWebhookHandler<
       };
     }
 
-    const webhookSecret = input.connectionSecrets.webhookSecret;
+    const webhookSecret = input.webhookSourceSecrets.webhookSecret;
     if (webhookSecret === undefined || webhookSecret.length === 0) {
       return {
         ok: false,

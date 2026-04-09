@@ -2,7 +2,6 @@ import {
   integrationConnections,
   IntegrationConnectionStatuses,
   integrationTargets,
-  IntegrationWebhookSourceOwnerScopes,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
@@ -99,7 +98,6 @@ describe("integration connection webhook sources integration", () => {
     expect(body).toHaveLength(1);
     expect(body[0]).toMatchObject({
       targetKey,
-      ownerScope: "connection",
       integrationConnectionId: createdConnection.id,
     });
     expect(body[0]?.callbackUrl).toContain(`/v1/integration/webhooks/${targetKey}/`);
@@ -110,7 +108,6 @@ describe("integration connection webhook sources integration", () => {
         and(
           eq(table.organizationId, authenticatedSession.organizationId),
           eq(table.targetKey, targetKey),
-          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
           eq(table.integrationConnectionId, createdConnection.id),
         ),
     });
@@ -121,7 +118,6 @@ describe("integration connection webhook sources integration", () => {
     }
 
     expect(persistedSource.endpointKey).toBeTruthy();
-    expect(persistedSource.routingStrategy).toBe("path");
   });
 
   it("does not expose webhook sources for GitHub API key connections", async ({ fixture }) => {

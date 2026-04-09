@@ -3,7 +3,6 @@ import {
   IntegrationConnectionResourceStatuses,
   IntegrationConnectionResourceSyncStates,
   IntegrationConnectionStatuses,
-  IntegrationWebhookSourceOwnerScopes,
   IntegrationWebhookSourceStatuses,
 } from "@mistle/db/control-plane";
 import { IntegrationResourceSelectionModes } from "@mistle/integrations-core";
@@ -63,11 +62,6 @@ export const IntegrationConnectionResourceSchema = z
   })
   .strict();
 
-export const IntegrationWebhookSourceOwnerScopeSchema = z.enum([
-  IntegrationWebhookSourceOwnerScopes.TARGET,
-  IntegrationWebhookSourceOwnerScopes.CONNECTION,
-]);
-
 export const IntegrationWebhookSourceStatusSchema = z.enum([
   IntegrationWebhookSourceStatuses.ACTIVE,
   IntegrationWebhookSourceStatuses.ERROR,
@@ -78,10 +72,9 @@ export const IntegrationWebhookSourceSchema = z
   .object({
     id: z.string().min(1),
     targetKey: z.string().min(1),
-    ownerScope: IntegrationWebhookSourceOwnerScopeSchema,
-    integrationConnectionId: z.string().min(1).optional(),
+    integrationConnectionId: z.string().min(1),
     displayName: z.string().min(1),
-    endpointKey: z.string().min(1).optional(),
+    endpointKey: z.string().min(1),
     callbackUrl: z.string().min(1).optional(),
     remoteRegistrationId: z.string().min(1).optional(),
     status: IntegrationWebhookSourceStatusSchema,

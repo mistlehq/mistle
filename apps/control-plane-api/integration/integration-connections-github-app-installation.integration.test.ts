@@ -197,7 +197,6 @@ describe("integration connections GitHub App installation integration", () => {
       throw new Error("Expected GitHub App implicit webhook source.");
     }
     expect(persistedWebhookSource.endpointKey).toBeTruthy();
-    expect(persistedWebhookSource.routingStrategy).toBe("path");
   });
 
   it("preserves the existing connection display name when completing GitHub App installation", async ({

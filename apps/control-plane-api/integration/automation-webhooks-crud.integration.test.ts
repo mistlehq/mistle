@@ -611,11 +611,10 @@ describe("automation webhooks CRUD integration", () => {
       async () => {
         await fixture.db.insert(integrationWebhookSources).values({
           id: "iws_missing_connection_001",
-          ownerScope: "connection",
           organizationId: authenticatedSession.organizationId,
           integrationConnectionId: "icn_missing_connection_001",
           targetKey: GitHubTarget.targetKey,
-          routingStrategy: "payload",
+          endpointKey: "ep_missing_connection_001",
           status: "active",
         });
 
@@ -1309,11 +1308,10 @@ async function insertIntegrationWebhookSource(
 ) {
   await fixture.db.insert(integrationWebhookSources).values({
     id: input.id,
-    ownerScope: "connection",
     organizationId: input.organizationId,
     integrationConnectionId: input.connectionId,
     targetKey: input.targetKey,
-    routingStrategy: "payload",
+    endpointKey: `ep_${input.id}`,
     status: "active",
     createdAt: "2026-02-01T00:00:00.000Z",
     updatedAt: "2026-02-01T00:00:00.000Z",

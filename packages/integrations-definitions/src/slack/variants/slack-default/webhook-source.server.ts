@@ -1,7 +1,5 @@
 import {
   IntegrationWebhookSourceLifecycles,
-  IntegrationWebhookSourceOwnerScopes,
-  IntegrationWebhookSourceRoutingStrategies,
   type IntegrationWebhookSourceCapability,
 } from "@mistle/integrations-core";
 
@@ -22,8 +20,6 @@ export const SlackWebhookSourceCapability: IntegrationWebhookSourceCapability<
   SlackTargetSecrets,
   SlackConnectionConfig
 > = {
-  ownerScope: IntegrationWebhookSourceOwnerScopes.CONNECTION,
-  routingStrategy: IntegrationWebhookSourceRoutingStrategies.PATH,
   lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
   async describeSource(input) {
     const endpointKey = input.source.endpointKey;

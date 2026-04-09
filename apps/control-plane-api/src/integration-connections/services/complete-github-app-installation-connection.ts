@@ -8,10 +8,7 @@ import {
   IntegrationConnectionMethodIds,
   type IntegrationRegistry,
 } from "@mistle/integrations-core";
-import {
-  IntegrationWebhookSourceLifecycles,
-  IntegrationWebhookSourceOwnerScopes,
-} from "@mistle/integrations-core";
+import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
 import { GitHubAppInstallationConnectionConfigSchema } from "@mistle/integrations-definitions";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -253,7 +250,6 @@ export async function completeGitHubAppInstallationConnection(
     if (
       webhookSourceCapability !== undefined &&
       webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT &&
-      webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION &&
       ((await webhookSourceCapability.supportsConnection?.({
         connection: {
           id: updatedConnection.id,
@@ -268,7 +264,6 @@ export async function completeGitHubAppInstallationConnection(
         organizationId: redirectSession.organizationId,
         connectionId: updatedConnection.id,
         targetKey: updatedConnection.targetKey,
-        routingStrategy: webhookSourceCapability.routingStrategy,
       });
     }
 

@@ -109,11 +109,10 @@ async function seedConversationDeliveryScope(input: {
   });
   await input.db.insert(integrationWebhookSources).values({
     id: integrationWebhookSourceId,
-    ownerScope: "connection",
     organizationId,
     integrationConnectionId,
     targetKey,
-    routingStrategy: "payload",
+    endpointKey: `endpoint-${input.suffix}`,
     status: "active",
   });
   await input.db.insert(automations).values({

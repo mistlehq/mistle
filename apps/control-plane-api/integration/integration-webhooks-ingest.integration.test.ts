@@ -3,14 +3,13 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 
 import {
+  integrationConnectionCredentials,
   integrationConnections,
   integrationCredentials,
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
   integrationTargets,
   integrationWebhookSources,
-  IntegrationWebhookSourceOwnerScopes,
-  IntegrationWebhookSourceRoutingStrategies,
   IntegrationWebhookSourceStatuses,
 } from "@mistle/db/control-plane";
 import { reserveAvailablePort } from "@mistle/test-harness";
@@ -132,11 +131,7 @@ async function createGitHubWebhookConnection(input: {
 
   const persistedWebhookSource = await input.fixture.db.query.integrationWebhookSources.findFirst({
     where: (table, { and, eq }) =>
-      and(
-        eq(table.targetKey, input.targetKey),
-        eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
-        eq(table.integrationConnectionId, connection.id),
-      ),
+      and(eq(table.targetKey, input.targetKey), eq(table.integrationConnectionId, connection.id)),
   });
 
   if (
@@ -311,6 +306,66 @@ async function createWebhookSecretCredential(input: {
   }
 }
 
+async function createConnectionApiKeyCredential(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  organizationId: string;
+  familyId: string;
+  connectionId: string;
+  slotKey: string;
+  secret: string;
+}): Promise<void> {
+  const organizationCredentialKey =
+    await input.fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, input.organizationId),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+
+  if (organizationCredentialKey === undefined) {
+    throw new Error("Expected organization credential key.");
+  }
+
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+    masterEncryptionKeys: input.fixture.config.integrations.masterEncryptionKeys,
+  });
+  const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: organizationCredentialKey.ciphertext,
+    masterEncryptionKeyMaterial,
+  });
+
+  try {
+    const encryptedSecret = encryptCredentialUtf8({
+      plaintext: input.secret,
+      organizationCredentialKey: unwrappedOrganizationCredentialKey,
+    });
+    const [createdCredential] = await input.fixture.db
+      .insert(integrationCredentials)
+      .values({
+        organizationId: input.organizationId,
+        secretKind: IntegrationCredentialSecretKinds.API_KEY,
+        ciphertext: encryptedSecret.ciphertext,
+        nonce: encryptedSecret.nonce,
+        organizationCredentialKeyVersion: organizationCredentialKey.version,
+        intendedFamilyId: input.familyId,
+      })
+      .returning({
+        id: integrationCredentials.id,
+      });
+
+    if (createdCredential === undefined) {
+      throw new Error("Expected API key credential.");
+    }
+
+    await input.fixture.db.insert(integrationConnectionCredentials).values({
+      connectionId: input.connectionId,
+      credentialId: createdCredential.id,
+      slotKey: input.slotKey,
+    });
+  } finally {
+    unwrappedOrganizationCredentialKey.fill(0);
+  }
+}
+
 type PersistedWebhookWorkflowRun = {
   id: string;
   workflowName: string;
@@ -423,11 +478,7 @@ describe("integration webhooks ingest integration", () => {
 
     const persistedSource = await fixture.db.query.integrationWebhookSources.findFirst({
       where: (table, { and, eq }) =>
-        and(
-          eq(table.targetKey, targetKey),
-          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
-          eq(table.integrationConnectionId, connectionId),
-        ),
+        and(eq(table.targetKey, targetKey), eq(table.integrationConnectionId, connectionId)),
     });
 
     expect(persistedSource).toBeDefined();
@@ -609,11 +660,7 @@ describe("integration webhooks ingest integration", () => {
 
     const persistedSources = await fixture.db.query.integrationWebhookSources.findMany({
       where: (table, { and, eq }) =>
-        and(
-          eq(table.targetKey, targetKey),
-          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
-          eq(table.integrationConnectionId, connectionId),
-        ),
+        and(eq(table.targetKey, targetKey), eq(table.integrationConnectionId, connectionId)),
     });
     expect(persistedSources).toHaveLength(1);
     const [persistedSource] = persistedSources;
@@ -1187,6 +1234,14 @@ describe("integration webhooks ingest integration", () => {
         email: "jira@example.com",
       },
     });
+    await createConnectionApiKeyCredential({
+      fixture,
+      organizationId: authenticatedSession.organizationId,
+      familyId: "jira",
+      connectionId,
+      slotKey: "jira.jira-default.jira-personal-api-token.api-key",
+      secret: "jira-personal-token",
+    });
 
     const webhookSecretCredentialId = await createWebhookSecretCredential({
       fixture,
@@ -1198,12 +1253,10 @@ describe("integration webhooks ingest integration", () => {
     const [createdSource] = await fixture.db
       .insert(integrationWebhookSources)
       .values({
-        ownerScope: "connection",
         organizationId: authenticatedSession.organizationId,
         integrationConnectionId: connectionId,
         targetKey,
         displayName: "Jira admin webhook",
-        routingStrategy: IntegrationWebhookSourceRoutingStrategies.PATH,
         endpointKey,
         webhookSecretCredentialId,
         status: IntegrationWebhookSourceStatuses.ACTIVE,
@@ -1231,8 +1284,13 @@ describe("integration webhooks ingest integration", () => {
       body: payload,
     });
 
-    expect(response.status).toBe(202);
-    const responseBody = IngestIntegrationWebhookResponseSchema.parse(await response.json());
+    const responseBodyPayload = await response.json();
+    if (response.status !== 202) {
+      throw new Error(
+        `Unexpected status ${response.status}: ${JSON.stringify(responseBodyPayload)}`,
+      );
+    }
+    const responseBody = IngestIntegrationWebhookResponseSchema.parse(responseBodyPayload);
     expect(responseBody).toEqual({
       status: "received",
     });

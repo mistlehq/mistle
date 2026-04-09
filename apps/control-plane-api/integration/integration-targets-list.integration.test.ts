@@ -188,7 +188,6 @@ describe("integration targets discovery integration", () => {
       ],
       webhookSource: {
         lifecycle: "implicit",
-        ownerScope: "connection",
         requiresSourceSelection: true,
       },
       supportedWebhookEvents: expect.arrayContaining([

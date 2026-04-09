@@ -52,7 +52,8 @@ describe("integration connections list integration", () => {
           installation_id: "12345",
         },
         targetSnapshotConfig: {
-          base_url: "https://github.com",
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
         },
         createdAt: firstConnectionCreatedAt.toISOString(),
         updatedAt: firstConnectionCreatedAt.toISOString(),
@@ -151,7 +152,8 @@ describe("integration connections list integration", () => {
           installation_id: "12345",
         },
         targetSnapshotConfig: {
-          base_url: "https://github.com",
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
         },
         resources: [
           {
@@ -174,6 +176,7 @@ describe("integration connections list integration", () => {
             syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
           },
         ],
+        supportsWebhookSources: false,
         createdAt: firstConnectionCreatedAt.toISOString(),
         updatedAt: firstConnectionCreatedAt.toISOString(),
       },
@@ -447,11 +450,9 @@ describe("integration connections list integration", () => {
     });
     await fixture.db.insert(integrationWebhookSources).values({
       id: "iws_delete_free",
-      ownerScope: "connection",
       organizationId: session.organizationId,
       integrationConnectionId: "icn_delete_free",
       targetKey: "github_cloud",
-      routingStrategy: "path",
       endpointKey: "ep_delete_free",
       webhookSecretCredentialId: "icr_delete_free_webhook_secret",
       status: "active",
@@ -584,7 +585,8 @@ async function ensureListTargets(fixture: ControlPlaneApiIntegrationFixture): Pr
         variantId: "github-cloud",
         enabled: true,
         config: {
-          base_url: "https://github.com",
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
         },
       },
       {
@@ -609,7 +611,8 @@ async function ensureGitHubCloudTarget(fixture: ControlPlaneApiIntegrationFixtur
       variantId: "github-cloud",
       enabled: true,
       config: {
-        base_url: "https://github.com",
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
       },
     })
     .onConflictDoNothing();
@@ -665,11 +668,10 @@ async function insertWebhookAutomationUsage(
   });
   await fixture.db.insert(integrationWebhookSources).values({
     id: `iws_${input.automationId}`,
-    ownerScope: "connection",
     organizationId: input.organizationId,
     integrationConnectionId: input.connectionId,
     targetKey: input.targetKey,
-    routingStrategy: "payload",
+    endpointKey: `ep_${input.automationId}`,
     status: "active",
   });
   await fixture.db.insert(webhookAutomations).values({

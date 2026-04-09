@@ -50,7 +50,6 @@ function createDirectoryData(input?: {
       {
         id: LinearWebhookSourceId,
         targetKey: "linear-cloud",
-        ownerScope: "connection" as const,
         integrationConnectionId: LinearConnectionId,
         displayName: "Linear Workspace webhook",
         endpointKey: "ep_linear",

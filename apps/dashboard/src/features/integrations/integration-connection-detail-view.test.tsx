@@ -337,7 +337,6 @@ describe("IntegrationConnectionDetailView", () => {
                   {
                     id: "iws_jira_123",
                     targetKey: "jira-default",
-                    ownerScope: "connection",
                     integrationConnectionId: "icn_jira_primary",
                     displayName: "Primary Jira webhook",
                     endpointKey: "ep_jira_123",
@@ -420,7 +419,6 @@ describe("IntegrationConnectionDetailView", () => {
                   {
                     id: "iws_github_123",
                     targetKey: "github-cloud",
-                    ownerScope: "connection",
                     integrationConnectionId: "icn_github_primary",
                     displayName: "GitHub App webhook",
                     endpointKey: "ep_github_123",
@@ -489,10 +487,11 @@ describe("IntegrationConnectionDetailView", () => {
                   {
                     id: "iws_github_123",
                     targetKey: "github-cloud",
-                    ownerScope: "target",
+                    integrationConnectionId: "icn_github_primary",
                     displayName: "GitHub App webhook",
+                    endpointKey: "ep_github_123",
                     callbackUrl:
-                      "https://control-plane.example.com/v1/integration/webhooks/github-cloud",
+                      "https://control-plane.example.com/v1/integration/webhooks/github-cloud/ep_github_123",
                     status: "active",
                     providerMetadata: {},
                     createdAt: "2026-04-03T00:00:00.000Z",

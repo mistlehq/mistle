@@ -106,7 +106,6 @@ export type ResolvedIntegrationTargetMetadata = {
   )[];
   webhookSource?: {
     lifecycle: IntegrationWebhookSourceLifecycle;
-    ownerScope: "target" | "connection";
     requiresSourceSelection: boolean;
   };
   supportedWebhookEvents?: ResolvedWebhookEvent[];
@@ -258,7 +257,6 @@ export function resolveTargetMetadata(input: {
           : {
               webhookSource: {
                 lifecycle: definition.webhookSource.lifecycle,
-                ownerScope: definition.webhookSource.ownerScope,
                 requiresSourceSelection: true,
               },
             }),
@@ -287,7 +285,6 @@ export function resolveTargetMetadata(input: {
       : {
           webhookSource: {
             lifecycle: definition.webhookSource.lifecycle,
-            ownerScope: definition.webhookSource.ownerScope,
             requiresSourceSelection: true,
           },
         }),

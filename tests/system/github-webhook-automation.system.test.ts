@@ -51,8 +51,8 @@ const IntegrationConnectionResponseSchema = z.looseObject({
 const IntegrationWebhookSourceResponseSchema = z.looseObject({
   id: z.string().min(1),
   targetKey: z.string().min(1),
-  ownerScope: z.enum(["target", "connection"]),
-  integrationConnectionId: z.string().min(1).optional(),
+  integrationConnectionId: z.string().min(1),
+  endpointKey: z.string().min(1),
 });
 
 const SandboxProfileResponseSchema = z.looseObject({
@@ -575,7 +575,6 @@ describeIf("system GitHub webhook automation", () => {
       const githubWebhookSource = githubWebhookSources.find(
         (source) =>
           source.targetKey === GitHubTargetKey &&
-          source.ownerScope === "connection" &&
           source.integrationConnectionId === githubConnection.id,
       );
       if (githubWebhookSource === undefined) {

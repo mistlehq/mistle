@@ -145,11 +145,9 @@ export async function startGitHubAppInstallationConnection(
     config: connection.config,
     connectionId: input.connectionId,
   });
-  let parsedTargetConfig: z.infer<typeof GitHubTargetConfigSchema>;
+  let parsedTargetConfig: z.output<typeof GitHubTargetConfigSchema>;
   try {
-    parsedTargetConfig = GitHubTargetConfigSchema.parse(
-      definition.targetConfigSchema.parse(connection.target.config),
-    );
+    parsedTargetConfig = GitHubTargetConfigSchema.parse(connection.target.config);
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new BadRequestError(

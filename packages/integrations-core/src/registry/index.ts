@@ -167,20 +167,6 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
     return;
   }
 
-  if (webhookSource.ownerScope.trim().length === 0) {
-    throw new IntegrationDefinitionRegistryError(
-      DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-      "Integration definition webhookSource.ownerScope must be non-empty.",
-    );
-  }
-
-  if (webhookSource.routingStrategy.trim().length === 0) {
-    throw new IntegrationDefinitionRegistryError(
-      DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-      "Integration definition webhookSource.routingStrategy must be non-empty.",
-    );
-  }
-
   if (webhookSource.lifecycle.trim().length === 0) {
     throw new IntegrationDefinitionRegistryError(
       DefinitionRegistryErrorCodes.INVALID_DEFINITION,

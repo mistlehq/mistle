@@ -27,15 +27,11 @@ describe("integrations-definitions server", () => {
     });
 
     expect(jiraDefinition?.webhookSource).toMatchObject({
-      ownerScope: "connection",
-      routingStrategy: "path",
       lifecycle: "managed",
     });
     expect(jiraDefinition?.webhookHandler).toBeDefined();
     expect(githubCloudDefinition?.webhookHandler).toBeDefined();
     expect(githubCloudDefinition?.webhookSource).toMatchObject({
-      ownerScope: "connection",
-      routingStrategy: "path",
       lifecycle: "implicit",
     });
     expect(
@@ -51,8 +47,6 @@ describe("integrations-definitions server", () => {
     );
     expect(githubEnterpriseServerDefinition?.webhookHandler).toBeDefined();
     expect(githubEnterpriseServerDefinition?.webhookSource).toMatchObject({
-      ownerScope: "connection",
-      routingStrategy: "path",
       lifecycle: "implicit",
     });
     expect(
@@ -68,8 +62,6 @@ describe("integrations-definitions server", () => {
     );
     expect(slackDefinition?.webhookHandler).toBeDefined();
     expect(slackDefinition?.webhookSource).toMatchObject({
-      ownerScope: "connection",
-      routingStrategy: "path",
       lifecycle: "implicit",
     });
   });
