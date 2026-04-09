@@ -12,6 +12,10 @@ import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-r
 import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
 import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-reference-or-throw.js";
 import { loadWebhookAutomationAggregateOrThrow } from "./load-webhook-automation-aggregate-or-throw.js";
+import {
+  assertEventScopedWebhookPayloadFilterOrThrow,
+  normalizeWebhookPayloadFilter,
+} from "./webhook-payload-filter.js";
 
 export type CreateWebhookAutomationInput = {
   organizationId: string;
@@ -43,6 +47,12 @@ export async function createAutomationWebhook(
   },
   input: CreateWebhookAutomationInput,
 ) {
+  const normalizedPayloadFilter = normalizeWebhookPayloadFilter(input.payloadFilter);
+  assertEventScopedWebhookPayloadFilterOrThrow({
+    eventTypes: input.eventTypes ?? null,
+    payloadFilter: normalizedPayloadFilter ?? null,
+  });
+
   const resolvedWebhookSource = await assertWebhookSourceReferenceOrThrow(
     { db: ctx.db, integrationRegistry: ctx.integrationRegistry },
     {
@@ -69,6 +79,7 @@ export async function createAutomationWebhook(
   return ctx.db.transaction(async (tx) => {
     const automation = await createAutomationAggregate(tx, {
       ...input,
+      payloadFilter: normalizedPayloadFilter,
       target: {
         sandboxProfileId: input.target.sandboxProfileId,
         sandboxProfileVersion,

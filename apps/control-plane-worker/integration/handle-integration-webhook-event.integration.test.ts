@@ -481,9 +481,11 @@ describe("handleIntegrationWebhookEvent integration", () => {
           integrationWebhookSourceId: webhookSourceId,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: {
-            op: "contains_token",
-            path: ["comment", "body"],
-            value: "@mistlebot",
+            "github.issue_comment.created": {
+              op: "contains_token",
+              path: ["comment", "body"],
+              value: "@mistlebot",
+            },
           },
           inputTemplate: "Handle issue comment webhook",
           conversationKeyTemplate: "github/{{payload.installation.id}}",

@@ -1,9 +1,10 @@
-import { path } from "./path.js";
 import type {
   WebhookPayloadFilter,
   WebhookPayloadFilterPath,
   WebhookPayloadFilterScalar,
-} from "./types.js";
+} from "@mistle/webhooks";
+
+import { path } from "./path.js";
 
 type AndWebhookPayloadFilter = Extract<WebhookPayloadFilter, { op: "and" }>;
 type OrWebhookPayloadFilter = Extract<WebhookPayloadFilter, { op: "or" }>;

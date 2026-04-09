@@ -83,7 +83,11 @@ describe("automation webhooks CRUD integration", () => {
       integrationWebhookSourceId: "iws_webhook_create_001",
       eventTypes: ["issue_comment.created"],
       payloadFilter: {
-        action: "created",
+        "issue_comment.created": {
+          op: "eq",
+          path: ["action"],
+          value: "created",
+        },
       },
       inputTemplate: "Handle {{payload.comment.body}}",
       conversationKeyTemplate: "{{payload.issue.node_id}}",
@@ -110,7 +114,13 @@ describe("automation webhooks CRUD integration", () => {
     expect(body.enabled).toBe(true);
     expect(body.integrationWebhookSourceId).toBe("iws_webhook_create_001");
     expect(body.eventTypes).toEqual(["issue_comment.created"]);
-    expect(body.payloadFilter).toEqual({ action: "created" });
+    expect(body.payloadFilter).toEqual({
+      "issue_comment.created": {
+        op: "eq",
+        path: ["action"],
+        value: "created",
+      },
+    });
     expect(body.target.sandboxProfileId).toBe("sbp_webhook_create_001");
     expect(body.target.sandboxProfileVersion).toBe(3);
 
@@ -134,7 +144,13 @@ describe("automation webhooks CRUD integration", () => {
     }
     expect(persistedWebhook.integrationWebhookSourceId).toBe("iws_webhook_create_001");
     expect(persistedWebhook.eventTypes).toEqual(["issue_comment.created"]);
-    expect(persistedWebhook.payloadFilter).toEqual({ action: "created" });
+    expect(persistedWebhook.payloadFilter).toEqual({
+      "issue_comment.created": {
+        op: "eq",
+        path: ["action"],
+        value: "created",
+      },
+    });
 
     const persistedTargets = await fixture.db.query.automationTargets.findMany({
       where: (table, { eq }) => eq(table.automationId, body.id),
@@ -1031,6 +1047,152 @@ describe("automation webhooks CRUD integration", () => {
     expect(body.code).toBe("INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE");
   });
 
+  it("returns 400 when creating a webhook automation with a non-event-scoped payload filter", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-invalid-filter-create@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await insertIntegrationConnection(fixture, {
+      id: "icn_webhook_invalid_filter_create_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_webhook_invalid_filter_create_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_webhook_invalid_filter_create_001",
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertSandboxProfile(fixture, {
+      id: "sbp_webhook_invalid_filter_create_001",
+      organizationId: authenticatedSession.organizationId,
+    });
+    await insertSandboxProfileVersion(fixture, {
+      profileId: "sbp_webhook_invalid_filter_create_001",
+      version: 1,
+    });
+    await insertSandboxProfileBinding(fixture, {
+      profileId: "sbp_webhook_invalid_filter_create_001",
+      version: 1,
+      connectionId: "icn_webhook_invalid_filter_create_001",
+    });
+
+    const response = await fixture.request("/v1/automations/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        name: "GitHub invalid filter",
+        integrationWebhookSourceId: "iws_webhook_invalid_filter_create_001",
+        eventTypes: ["issue_comment.created"],
+        payloadFilter: {
+          op: "eq",
+          path: ["action"],
+          value: "created",
+        },
+        inputTemplate: "Handle payload",
+        conversationKeyTemplate: "{{payload.issue.node_id}}",
+        target: {
+          sandboxProfileId: "sbp_webhook_invalid_filter_create_001",
+          sandboxProfileVersion: 1,
+        },
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const body = ValidationErrorResponseSchema.parse(await response.json());
+    expect(body.code).toBe("VALIDATION_ERROR");
+    expect(body.message).toContain("Invalid payloadFilter");
+  });
+
+  it("returns 400 when updating a webhook automation with payloadFilter keys outside eventTypes", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-invalid-filter-update@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await insertIntegrationConnection(fixture, {
+      id: "icn_webhook_invalid_filter_update_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_webhook_invalid_filter_update_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_webhook_invalid_filter_update_001",
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertSandboxProfile(fixture, {
+      id: "sbp_webhook_invalid_filter_update_001",
+      organizationId: authenticatedSession.organizationId,
+    });
+    await insertSandboxProfileVersion(fixture, {
+      profileId: "sbp_webhook_invalid_filter_update_001",
+      version: 2,
+    });
+    await insertSandboxProfileBinding(fixture, {
+      profileId: "sbp_webhook_invalid_filter_update_001",
+      version: 2,
+      connectionId: "icn_webhook_invalid_filter_update_001",
+    });
+
+    await fixture.db.insert(automations).values({
+      id: "atm_webhook_invalid_filter_update_001",
+      organizationId: authenticatedSession.organizationId,
+      kind: AutomationKinds.WEBHOOK,
+      name: "Needs valid filter update",
+      enabled: true,
+    });
+    await fixture.db.insert(webhookAutomations).values({
+      automationId: "atm_webhook_invalid_filter_update_001",
+      integrationWebhookSourceId: "iws_webhook_invalid_filter_update_001",
+      eventTypes: ["issue_comment.created"],
+      payloadFilter: null,
+      inputTemplate: "Handle payload",
+      conversationKeyTemplate: "{{payload.issue.node_id}}",
+      idempotencyKeyTemplate: null,
+    });
+    await fixture.db.insert(automationTargets).values({
+      id: "atg_webhook_invalid_filter_update_001",
+      automationId: "atm_webhook_invalid_filter_update_001",
+      sandboxProfileId: "sbp_webhook_invalid_filter_update_001",
+      sandboxProfileVersion: 2,
+    });
+
+    const response = await fixture.request(
+      "/v1/automations/webhooks/atm_webhook_invalid_filter_update_001",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          eventTypes: ["issue_comment.created"],
+          payloadFilter: {
+            "pull_request.opened": {
+              op: "eq",
+              path: ["action"],
+              value: "opened",
+            },
+          },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = ValidationErrorResponseSchema.parse(await response.json());
+    expect(body.code).toBe("VALIDATION_ERROR");
+    expect(body.message).toContain("not selected");
+  });
+
   it("returns 404 for webhook automations outside the active organization and 400 for invalid payloads", async ({
     fixture,
   }) => {
@@ -1237,7 +1399,11 @@ function createPersistedWebhookAutomationConfig(
     integrationWebhookSourceId,
     eventTypes: ["issue_comment.created"],
     payloadFilter: {
-      action: "created",
+      "issue_comment.created": {
+        op: "eq",
+        path: ["action"],
+        value: "created",
+      },
     },
     inputTemplate: "Handle payload",
     conversationKeyTemplate: "{{payload.issue.node_id}}",

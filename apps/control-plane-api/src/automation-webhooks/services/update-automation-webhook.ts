@@ -12,6 +12,10 @@ import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-r
 import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
 import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-reference-or-throw.js";
 import { loadWebhookAutomationAggregateOrThrow } from "./load-webhook-automation-aggregate-or-throw.js";
+import {
+  assertEventScopedWebhookPayloadFilterOrThrow,
+  normalizeWebhookPayloadFilter,
+} from "./webhook-payload-filter.js";
 
 export type UpdateWebhookAutomationInput = {
   organizationId: string;
@@ -49,6 +53,12 @@ export async function updateAutomationWebhook(
 
   const integrationWebhookSourceId =
     input.integrationWebhookSourceId ?? existingAutomation.integrationWebhookSourceId;
+  const eventTypes = input.eventTypes ?? existingAutomation.eventTypes;
+  const normalizedPayloadFilter = normalizeWebhookPayloadFilter(input.payloadFilter);
+  const payloadFilter =
+    normalizedPayloadFilter === undefined
+      ? existingAutomation.payloadFilter
+      : normalizedPayloadFilter;
   const sandboxProfileId =
     input.target?.sandboxProfileId ?? existingAutomation.target.sandboxProfileId;
   const sandboxProfileVersion =
@@ -63,6 +73,10 @@ export async function updateAutomationWebhook(
       integrationWebhookSourceId,
     },
   );
+  assertEventScopedWebhookPayloadFilterOrThrow({
+    eventTypes,
+    payloadFilter,
+  });
   await assertSandboxProfileReferenceOrThrow(
     { db: ctx.db },
     {
@@ -81,7 +95,10 @@ export async function updateAutomationWebhook(
 
   return ctx.db.transaction(async (tx) => {
     await updateAutomationBaseRow(tx, input);
-    await updateWebhookConfigRow(tx, input);
+    await updateWebhookConfigRow(tx, {
+      ...input,
+      payloadFilter: normalizedPayloadFilter,
+    });
     await updateAutomationTargetRow(
       tx,
       existingAutomation.target.id,
