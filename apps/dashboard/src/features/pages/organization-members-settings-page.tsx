@@ -1,6 +1,5 @@
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { inviteMember } from "../settings/members/members-api.js";
-import { toMembersLoadErrorMessage } from "../settings/members/members-load-error-message.js";
 import { useOrganizationMembersSettingsState } from "../settings/members/use-organization-members-settings-state.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
@@ -13,24 +12,6 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
     organizationId,
   });
   const { title, description } = resolvePageFrameText(pageMeta, "Members");
-
-  const isPageLoading =
-    (membersState.activeListQuery.data === undefined && membersState.activeListQuery.isPending) ||
-    (membersState.capabilitiesQuery.data === undefined && membersState.capabilitiesQuery.isPending);
-  const loadErrorMessage =
-    membersState.activeListQuery.isError && membersState.activeListQuery.data === undefined
-      ? toMembersLoadErrorMessage({
-          activeFilter: membersState.activeFilter,
-          directoryError: membersState.activeListQuery.error,
-        })
-      : null;
-  const listErrorNoticeMessage =
-    membersState.activeListQuery.isError && membersState.activeListQuery.data !== undefined
-      ? toMembersLoadErrorMessage({
-          activeFilter: membersState.activeFilter,
-          directoryError: membersState.activeListQuery.error,
-        })
-      : null;
 
   return (
     <PageFrame description={description} title={title}>
@@ -46,12 +27,12 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
         inviteDialogOpen={membersState.inviteDialogOpen}
         inviteMemberRequest={inviteMember}
         inviteMembersDisabled={membersState.inviteMembersDisabled}
-        isLoading={isPageLoading}
-        isListFetching={membersState.activeListQuery.isFetching}
+        isLoading={membersState.isPageLoading}
+        isListFetching={membersState.isListFetching}
         isUpdatingRole={membersState.isUpdatingRole}
         limit={membersState.limit}
-        listErrorNoticeMessage={listErrorNoticeMessage}
-        loadErrorMessage={loadErrorMessage}
+        listErrorNoticeMessage={membersState.listErrorNoticeMessage}
+        loadErrorMessage={membersState.loadErrorMessage}
         activeFilter={membersState.activeFilter}
         hasNextPage={membersState.hasNextPage}
         hasPreviousPage={membersState.hasPreviousPage}

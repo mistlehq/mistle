@@ -35,6 +35,10 @@ type UseOrganizationMembersSettingsStateResult = {
   capabilities: MembershipCapabilities | null;
   members: SettingsMember[];
   invitations: SettingsInvitation[];
+  isListFetching: boolean;
+  isPageLoading: boolean;
+  listErrorNoticeMessage: string | null;
+  loadErrorMessage: string | null;
   memberAvatarsByUserId: ReadonlyMap<string, MemberAvatar>;
   activeFilter: MembersDirectoryFilter;
   searchValue: string;
@@ -62,6 +66,18 @@ type UseOrganizationMembersSettingsStateResult = {
   onRevokeInvite: (invitation: SettingsInvitation) => void;
   onInviteCompleted: () => Promise<void>;
 };
+
+export function resolvePostInviteDirectoryState(): {
+  activeFilter: MembersDirectoryFilter;
+  searchValue: string;
+  offset: number;
+} {
+  return {
+    activeFilter: "invitations",
+    searchValue: "",
+    offset: 0,
+  };
+}
 
 export function useOrganizationMembersSettingsState(
   input: UseOrganizationMembersSettingsState,
@@ -126,6 +142,10 @@ export function useOrganizationMembersSettingsState(
     capabilities: queries.capabilities,
     members: queries.members,
     invitations: queries.invitations,
+    isListFetching: queries.isListFetching,
+    isPageLoading: queries.isPageLoading,
+    listErrorNoticeMessage: queries.listErrorNoticeMessage,
+    loadErrorMessage: queries.loadErrorMessage,
     memberAvatarsByUserId: queries.memberAvatarsByUserId,
     activeFilter,
     searchValue,
@@ -196,8 +216,10 @@ export function useOrganizationMembersSettingsState(
     onResendInvite: mutations.onResendInvite,
     onRevokeInvite: mutations.onRevokeInvite,
     onInviteCompleted: async () => {
-      setActiveFilter("invitations");
-      setOffset(0);
+      const nextState = resolvePostInviteDirectoryState();
+      setActiveFilter(nextState.activeFilter);
+      setSearchValue(nextState.searchValue);
+      setOffset(nextState.offset);
       await mutations.onInviteCompleted();
     },
   };

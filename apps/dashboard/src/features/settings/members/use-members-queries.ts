@@ -9,6 +9,7 @@ import type {
   SettingsInvitation,
   SettingsMember,
 } from "./members-api.js";
+import { resolveMembersDirectoryQueryState } from "./members-directory-query-state.js";
 import type { MembersQueryKeys } from "./members-query-keys.js";
 import type { MembersSettingsApi } from "./members-settings-api.js";
 
@@ -28,6 +29,10 @@ export function useMembersQueries(input: {
     | ReturnType<typeof useQuery<MembersPage>>
     | ReturnType<typeof useQuery<InvitationsPage>>;
   capabilities: MembershipCapabilities | null;
+  isListFetching: boolean;
+  isPageLoading: boolean;
+  listErrorNoticeMessage: string | null;
+  loadErrorMessage: string | null;
   members: SettingsMember[];
   invitations: SettingsInvitation[];
   memberAvatarsByUserId: ReadonlyMap<string, MemberAvatar>;
@@ -70,27 +75,29 @@ export function useMembersQueries(input: {
   });
 
   const activeListQuery = input.filter === "members" ? membersQuery : invitationsQuery;
-  const capabilities = capabilitiesQuery.isError ? null : (capabilitiesQuery.data ?? null);
-  const members = input.filter === "members" ? (membersQuery.data?.members ?? []) : [];
-  const invitations =
-    input.filter === "invitations" ? (invitationsQuery.data?.invitations ?? []) : [];
-  const memberAvatarsByUserId =
-    input.filter === "members"
-      ? (membersQuery.data?.memberAvatarsByUserId ?? new Map())
-      : new Map();
+  const directoryQueryState = resolveMembersDirectoryQueryState({
+    activeFilter: input.filter,
+    capabilitiesQuery,
+    invitationsQuery,
+    membersQuery,
+  });
   const limit = input.limit;
   const offset = input.offset;
-  const total = activeListQuery.data?.total ?? 0;
+  const total = directoryQueryState.total;
 
   return {
     capabilitiesQuery,
     membersQuery,
     invitationsQuery,
     activeListQuery,
-    capabilities,
-    members,
-    invitations,
-    memberAvatarsByUserId,
+    capabilities: directoryQueryState.capabilities,
+    isListFetching: directoryQueryState.isListFetching,
+    isPageLoading: directoryQueryState.isPageLoading,
+    listErrorNoticeMessage: directoryQueryState.listErrorNoticeMessage,
+    loadErrorMessage: directoryQueryState.loadErrorMessage,
+    members: directoryQueryState.members,
+    invitations: directoryQueryState.invitations,
+    memberAvatarsByUserId: directoryQueryState.memberAvatarsByUserId,
     limit,
     offset,
     total,

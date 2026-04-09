@@ -3,6 +3,7 @@ import { startSeaweedfsS3 } from "@mistle/test-harness";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import { listMembers } from "../src/organizations/services/list-members.js";
 import { createRuntimeWithObjectStore } from "./helpers/control-plane-runtime-with-object-store.js";
 import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test-object-store.js";
 import { it } from "./test-context.js";
@@ -175,6 +176,177 @@ describe("organization members integration", () => {
       await runtime.stop();
       await seaweedfs.stop();
     }
+  });
+
+  it("returns members when avatar presigning fails", async ({ fixture }) => {
+    const ownerSession = await fixture.authSession({
+      email: "integration-org-members-avatar-failure-owner@example.com",
+    });
+    const memberSession = await fixture.authSession({
+      email: "members-avatar-failure@example.com",
+    });
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "mistle-assets-avatar-failure",
+    });
+    const objectStore = createTestObjectStore(seaweedfs);
+    const memberObjectKey = `avatars/users/${memberSession.userId}/members_avatar_failure.webp`;
+
+    try {
+      await fixture.db.insert(members).values({
+        organizationId: ownerSession.organizationId,
+        userId: memberSession.userId,
+        role: "member",
+        createdAt: new Date("2026-03-04T00:00:00.000Z"),
+      });
+      await fixture.db
+        .update(users)
+        .set({
+          name: "Avatar Failure Member",
+          imageObjectKey: memberObjectKey,
+        })
+        .where(eq(users.id, memberSession.userId));
+      await objectStore.putObject({
+        Body: await getStoredWebpFixtureBytes(),
+        ContentType: "image/webp",
+        objectKey: memberObjectKey,
+      });
+
+      await expect(
+        listMembers(
+          {
+            db: fixture.db,
+            objectStore,
+            presignedUrlTtlSeconds: 0,
+          },
+          {
+            organizationId: ownerSession.organizationId,
+            limit: 25,
+            offset: 0,
+            search: "",
+          },
+        ),
+      ).resolves.toEqual({
+        members: [
+          {
+            id: expect.any(String),
+            userId: memberSession.userId,
+            name: "Avatar Failure Member",
+            email: "members-avatar-failure@example.com",
+            role: "member",
+            joinedAt: "2026-03-04T00:00:00.000Z",
+            avatar: {
+              hasImage: true,
+              imageUrl: null,
+            },
+          },
+        ],
+        limit: 25,
+        offset: 0,
+        total: 1,
+      });
+    } finally {
+      objectStore.destroy();
+      await seaweedfs.stop();
+    }
+  });
+
+  it("paginates members by the normalized display name returned to clients", async ({
+    fixture,
+  }) => {
+    const ownerSession = await fixture.authSession({
+      email: "integration-org-members-sort-owner@example.com",
+    });
+    const blankNameSession = await fixture.authSession({
+      email: "alpha@example.com",
+    });
+    const namedSession = await fixture.authSession({
+      email: "zeta@example.com",
+    });
+
+    await fixture.db.insert(members).values([
+      {
+        organizationId: ownerSession.organizationId,
+        userId: blankNameSession.userId,
+        role: "member",
+        createdAt: new Date("2026-03-05T00:00:00.000Z"),
+      },
+      {
+        organizationId: ownerSession.organizationId,
+        userId: namedSession.userId,
+        role: "member",
+        createdAt: new Date("2026-03-05T00:00:00.000Z"),
+      },
+    ]);
+    await fixture.db
+      .update(users)
+      .set({
+        name: "   ",
+      })
+      .where(eq(users.id, blankNameSession.userId));
+    await fixture.db
+      .update(users)
+      .set({
+        name: "Beta Person",
+      })
+      .where(eq(users.id, namedSession.userId));
+
+    const firstPageResponse = await fixture.request(
+      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/members?limit=1&offset=0&search=`,
+      {
+        headers: {
+          cookie: ownerSession.cookie,
+        },
+      },
+    );
+    expect(firstPageResponse.status).toBe(200);
+    await expect(firstPageResponse.json()).resolves.toEqual({
+      members: [
+        {
+          id: expect.any(String),
+          userId: blankNameSession.userId,
+          name: "alpha@example.com",
+          email: "alpha@example.com",
+          role: "member",
+          joinedAt: "2026-03-05T00:00:00.000Z",
+          avatar: {
+            hasImage: false,
+            imageUrl: null,
+          },
+        },
+      ],
+      limit: 1,
+      offset: 0,
+      total: 2,
+    });
+
+    const secondPageResponse = await fixture.request(
+      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/members?limit=1&offset=1&search=`,
+      {
+        headers: {
+          cookie: ownerSession.cookie,
+        },
+      },
+    );
+    expect(secondPageResponse.status).toBe(200);
+    await expect(secondPageResponse.json()).resolves.toEqual({
+      members: [
+        {
+          id: expect.any(String),
+          userId: namedSession.userId,
+          name: "Beta Person",
+          email: "zeta@example.com",
+          role: "member",
+          joinedAt: "2026-03-05T00:00:00.000Z",
+          avatar: {
+            hasImage: false,
+            imageUrl: null,
+          },
+        },
+      ],
+      limit: 1,
+      offset: 1,
+      total: 2,
+    });
   });
 });
 

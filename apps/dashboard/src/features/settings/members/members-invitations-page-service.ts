@@ -1,5 +1,6 @@
 import { getControlPlaneApiClient } from "../../../lib/control-plane-api/client.js";
 import { normalizeHttpApiError } from "../../api/http-api-error.js";
+import { unwrapOpenApiFetchResponse } from "../../api/openapi-fetch-response.js";
 import { MembersApiError } from "./members-api-errors.js";
 import type { InvitationsPage } from "./members-api-types.js";
 import { parseInvitationsPage } from "./members-invitations-page-parser.js";
@@ -12,7 +13,7 @@ export async function listInvitationsPage(input: {
 }): Promise<InvitationsPage> {
   try {
     const client = getControlPlaneApiClient();
-    const { data } = await client.GET("/v1/organizations/{organizationId}/invitations", {
+    const response = await client.GET("/v1/organizations/{organizationId}/invitations", {
       credentials: "include",
       params: {
         path: {
@@ -26,7 +27,7 @@ export async function listInvitationsPage(input: {
       },
     });
 
-    return parseInvitationsPage(data);
+    return parseInvitationsPage(unwrapOpenApiFetchResponse(response));
   } catch (error) {
     throw new MembersApiError(
       normalizeHttpApiError({

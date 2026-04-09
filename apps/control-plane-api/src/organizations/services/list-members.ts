@@ -53,6 +53,13 @@ type MemberRow = {
   imageObjectKey: string | null;
 };
 
+function buildDirectoryMemberSortName() {
+  return sql<string>`case
+    when trim(${users.name}) = '' or trim(${users.name}) = ${users.email} then ${users.email}
+    else trim(${users.name})
+  end`;
+}
+
 export async function listMembers(
   ctx: ListMembersContext,
   input: ListMembersInput,
@@ -74,6 +81,7 @@ export async function listMembers(
     .from(members)
     .innerJoin(users, eq(users.id, members.userId))
     .where(whereClause);
+  const directoryMemberSortName = buildDirectoryMemberSortName();
   const rows = await ctx.db
     .select({
       id: members.id,
@@ -87,7 +95,7 @@ export async function listMembers(
     .from(members)
     .innerJoin(users, eq(users.id, members.userId))
     .where(whereClause)
-    .orderBy(desc(members.createdAt), asc(users.name), asc(users.email))
+    .orderBy(desc(members.createdAt), asc(directoryMemberSortName), asc(users.email))
     .limit(input.limit)
     .offset(input.offset);
 
@@ -101,8 +109,17 @@ export async function listMembers(
     imageObjectKey: row.imageObjectKey,
   }));
   const membersPageEntries = await Promise.all(
-    memberRows.map(
-      async (row): Promise<MembersPageEntry> => ({
+    memberRows.map(async (row): Promise<MembersPageEntry> => {
+      const avatar = await createMemberAvatar({
+        imageObjectKey: row.imageObjectKey,
+        objectStore: ctx.objectStore,
+        presignedUrlTtlSeconds: ctx.presignedUrlTtlSeconds,
+      }).catch(() => ({
+        hasImage: row.imageObjectKey !== null && row.imageObjectKey.length > 0,
+        imageUrl: null,
+      }));
+
+      return {
         id: row.id,
         userId: row.userId,
         name: resolveDirectoryMemberName({
@@ -112,13 +129,9 @@ export async function listMembers(
         email: row.email,
         role: row.role,
         joinedAt: row.joinedAt.toISOString(),
-        avatar: await createMemberAvatar({
-          imageObjectKey: row.imageObjectKey,
-          objectStore: ctx.objectStore,
-          presignedUrlTtlSeconds: ctx.presignedUrlTtlSeconds,
-        }),
-      }),
-    ),
+        avatar,
+      };
+    }),
   );
 
   return {
