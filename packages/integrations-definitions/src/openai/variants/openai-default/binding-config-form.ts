@@ -5,8 +5,13 @@ import {
 } from "@mistle/integrations-core";
 
 import { createStackedFieldUiOptions } from "../../../forms/ui-options.js";
+import { OpenAiConnectionConfigSchema } from "./auth.js";
 import { OpenAiAllowedRuntimeIds } from "./binding-config-schema.js";
-import { OpenAiReasoningEffortLabelByValue, type OpenAiModelId } from "./model-capabilities.js";
+import {
+  OpenAiReasoningEffortLabelByValue,
+  resolveOpenAiCapabilitySetForConnectionMethod,
+  type OpenAiModelId,
+} from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 
 type OpenAiBindingFormContext = IntegrationFormContext;
@@ -59,9 +64,17 @@ export function resolveOpenAiBindingConfigForm(
   if (target === undefined) {
     throw new Error("OpenAI binding form requires target config context.");
   }
+  const connection = input.connection;
+  if (connection === undefined) {
+    throw new Error("OpenAI binding form requires connection config context.");
+  }
 
   const parsedTargetConfig = OpenAiApiKeyTargetConfigSchema.parse(target.rawConfig);
-  const capabilitySet = parsedTargetConfig.bindingCapabilities;
+  const parsedConnectionConfig = OpenAiConnectionConfigSchema.parse(connection.rawConfig);
+  const capabilitySet = resolveOpenAiCapabilitySetForConnectionMethod({
+    bindingCapabilitiesByConnectionMethod: parsedTargetConfig.bindingCapabilitiesByConnectionMethod,
+    connectionMethod: parsedConnectionConfig.connection_method,
+  });
   const selectedModel = resolveSelectedModel({
     models: capabilitySet.models,
     currentValue: input.currentValue,

@@ -30,7 +30,7 @@ import {
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
 import {
-  createOpenAiRawBindingCapabilities,
+  createOpenAiRawBindingCapabilitiesByConnectionMethod,
   OpenAiApiKeyDefinition,
   OpenAiReasoningEfforts,
 } from "@mistle/integrations-definitions";
@@ -65,7 +65,7 @@ import { it } from "./test-context.js";
 const TestTimeoutMs = 120_000;
 const OpenAiAgentTargetConfig = {
   api_base_url: "https://api.openai.com/v1",
-  binding_capabilities: createOpenAiRawBindingCapabilities(),
+  binding_capabilities_by_connection_method: createOpenAiRawBindingCapabilitiesByConnectionMethod(),
 };
 
 async function createTestDatabase(input: { databaseUrl: string }) {

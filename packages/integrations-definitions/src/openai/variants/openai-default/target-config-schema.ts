@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { OpenAiCapabilitiesSchema, OpenAiModelIds } from "./model-capabilities.js";
+import {
+  OpenAiCapabilitiesSchema,
+  OpenAiConnectionMethodIds,
+  OpenAiModelIds,
+} from "./model-capabilities.js";
 
 const OpenAiApiBaseUrlSchema = z.url().transform((input) => {
   const parsedUrl = new URL(input);
@@ -38,15 +42,22 @@ const OpenAiRawBindingCapabilitiesSchema = OpenAiRawCapabilitySetSchema.transfor
   }),
 );
 
+const OpenAiBindingCapabilitiesByConnectionMethodSchema = z
+  .object({
+    [OpenAiConnectionMethodIds.API_KEY]: OpenAiRawBindingCapabilitiesSchema,
+    [OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE]: OpenAiRawBindingCapabilitiesSchema,
+  })
+  .strict();
+
 export const OpenAiApiKeyTargetConfigSchema = z
   .object({
     api_base_url: OpenAiApiBaseUrlSchema,
-    binding_capabilities: OpenAiRawBindingCapabilitiesSchema,
+    binding_capabilities_by_connection_method: OpenAiBindingCapabilitiesByConnectionMethodSchema,
   })
   .strict()
   .transform((input) => ({
     apiBaseUrl: input.api_base_url,
-    bindingCapabilities: input.binding_capabilities,
+    bindingCapabilitiesByConnectionMethod: input.binding_capabilities_by_connection_method,
   }));
 
 export type OpenAiApiKeyTargetConfig = z.output<typeof OpenAiApiKeyTargetConfigSchema>;

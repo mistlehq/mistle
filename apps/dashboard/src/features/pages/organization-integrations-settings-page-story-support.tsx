@@ -1,6 +1,6 @@
 import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
-import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions/openai";
+import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions/openai";
 import { useState } from "react";
 import type React from "react";
 
@@ -163,7 +163,8 @@ function createTargetConfig(variantId: BuiltInIntegrationVariantId): Record<stri
   if (variantId === "openai-default") {
     return {
       api_base_url: "https://api.openai.com/v1",
-      binding_capabilities: createOpenAiRawBindingCapabilities(),
+      binding_capabilities_by_connection_method:
+        createOpenAiRawBindingCapabilitiesByConnectionMethod(),
     };
   }
 

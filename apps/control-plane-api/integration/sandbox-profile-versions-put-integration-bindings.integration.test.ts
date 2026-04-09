@@ -6,7 +6,7 @@ import {
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
-import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
+import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import {
@@ -32,7 +32,8 @@ describe("sandbox profile version put integration bindings integration", () => {
       enabled: true,
       config: {
         api_base_url: "https://api.openai.com",
-        binding_capabilities: createOpenAiRawBindingCapabilities(),
+        binding_capabilities_by_connection_method:
+          createOpenAiRawBindingCapabilitiesByConnectionMethod(),
       },
     });
 
@@ -425,7 +426,8 @@ describe("sandbox profile version put integration bindings integration", () => {
       enabled: true,
       config: {
         api_base_url: "https://api.openai.com",
-        binding_capabilities: createOpenAiRawBindingCapabilities(),
+        binding_capabilities_by_connection_method:
+          createOpenAiRawBindingCapabilitiesByConnectionMethod(),
       },
     });
     await fixture.db.insert(sandboxProfiles).values({
@@ -553,7 +555,8 @@ describe("sandbox profile version put integration bindings integration", () => {
       enabled: true,
       config: {
         api_base_url: "https://api.openai.com",
-        binding_capabilities: createOpenAiRawBindingCapabilities(),
+        binding_capabilities_by_connection_method:
+          createOpenAiRawBindingCapabilitiesByConnectionMethod(),
       },
     });
     await fixture.db.insert(sandboxProfiles).values({

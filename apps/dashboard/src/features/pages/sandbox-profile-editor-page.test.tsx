@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
+import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
@@ -29,7 +29,8 @@ function createTarget(
       variantId: "openai-default",
       config: {
         api_base_url: "https://api.openai.com",
-        binding_capabilities: createOpenAiRawBindingCapabilities(),
+        binding_capabilities_by_connection_method:
+          createOpenAiRawBindingCapabilitiesByConnectionMethod(),
       },
       targetHealth: {
         configStatus: "valid",

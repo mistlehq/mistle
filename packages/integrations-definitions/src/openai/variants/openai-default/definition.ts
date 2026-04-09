@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import {
   OpenAiApiKeyConnectionConfigSchema,
+  OpenAiConnectionConfigSchema,
   OpenAiCredentialSlotKeys,
   resolveOpenAiCredentialSlotKey,
   resolveOpenAiCredentialSecretType,
@@ -25,7 +26,10 @@ import {
   OpenAiDeviceAuthorizationCapability,
   OpenAiDeviceAuthorizationOAuth2Capability,
 } from "./device-authorization.js";
-import { OpenAiConnectionMethodIds } from "./model-capabilities.js";
+import {
+  OpenAiConnectionMethodIds,
+  resolveOpenAiCapabilitySetForConnectionMethod,
+} from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 import { validateOpenAiBindingWriteContext } from "./validate-binding-write-context.js";
 
@@ -96,6 +100,13 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   oauth2AuthorizationCode: OpenAiDeviceAuthorizationOAuth2Capability,
   capabilities: {
     resolveCapabilities: (input) => {
+      const connectionConfig = OpenAiConnectionConfigSchema.parse(input.connection.config);
+      const capabilitySet = resolveOpenAiCapabilitySetForConnectionMethod({
+        bindingCapabilitiesByConnectionMethod:
+          input.target.config.bindingCapabilitiesByConnectionMethod,
+        connectionMethod: connectionConfig.connection_method,
+      });
+
       return {
         agentProviderAccess: {
           providerFamilyId: input.target.familyId,
@@ -114,7 +125,7 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
           allowedMethods: ["GET", "POST"],
           allowedPathPrefixes: ["/"],
           defaultModel: input.binding.config.model.defaultModel,
-          allowedModels: [...input.target.config.bindingCapabilities.models],
+          allowedModels: [...capabilitySet.models],
           providerMetadata: {
             reasoningEffort: input.binding.config.model.options.reasoningEffort,
             ...(input.binding.config.model.options.additionalInstructions === undefined

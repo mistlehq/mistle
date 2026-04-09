@@ -8,14 +8,18 @@ import {
   resolveOpenAiBindingConfigForm,
 } from "./binding-config-form.js";
 import { OpenAiApiKeyBindingConfigSchema } from "./binding-config-schema.js";
-import { createOpenAiRawBindingCapabilities } from "./model-capabilities.js";
+import {
+  createOpenAiRawBindingCapabilities,
+  createOpenAiRawBindingCapabilitiesByConnectionMethod,
+} from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 
 describe("openai binding config forms", () => {
   it("resolves binding config choices from target capabilities", () => {
     const targetConfig = OpenAiApiKeyTargetConfigSchema.parse({
       api_base_url: "https://api.openai.com",
-      binding_capabilities: createOpenAiRawBindingCapabilities(),
+      binding_capabilities_by_connection_method:
+        createOpenAiRawBindingCapabilitiesByConnectionMethod(),
     });
     const connectionConfig = OpenAiConnectionConfigSchema.parse({
       connection_method: "api-key",
@@ -31,7 +35,8 @@ describe("openai binding config forms", () => {
         target: {
           rawConfig: {
             api_base_url: "https://api.openai.com",
-            binding_capabilities: createOpenAiRawBindingCapabilities(),
+            binding_capabilities_by_connection_method:
+              createOpenAiRawBindingCapabilitiesByConnectionMethod(),
           },
           config: targetConfig,
         },
@@ -166,6 +171,116 @@ describe("openai binding config forms", () => {
     expect(resolvedForm.uiSchema).toEqual({
       connection_method: {
         "ui:widget": "hidden",
+      },
+    });
+  });
+
+  it("requires connection config context to resolve the OpenAI binding form", () => {
+    expect(() =>
+      resolveIntegrationForm({
+        schema: OpenAiApiKeyBindingConfigSchema,
+        form: resolveOpenAiBindingConfigForm,
+        context: {
+          familyId: "openai",
+          variantId: "openai-default",
+          kind: "agent",
+          target: {
+            rawConfig: {
+              api_base_url: "https://api.openai.com",
+              binding_capabilities_by_connection_method:
+                createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+            },
+            config: OpenAiApiKeyTargetConfigSchema.parse({
+              api_base_url: "https://api.openai.com",
+              binding_capabilities_by_connection_method:
+                createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+            }),
+          },
+        },
+      }),
+    ).toThrow(/requires connection config context/);
+  });
+
+  it("resolves binding config choices from the selected chatgpt-device-code capability set", () => {
+    const defaultCapabilities = createOpenAiRawBindingCapabilities();
+    const rawTargetConfig = {
+      api_base_url: "https://api.openai.com",
+      binding_capabilities_by_connection_method: {
+        ...createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+        "chatgpt-device-code": {
+          ...defaultCapabilities,
+          models: ["gpt-5.4"],
+          allowed_reasoning_by_model: {
+            ...defaultCapabilities.allowed_reasoning_by_model,
+            "gpt-5.4": ["high"],
+          },
+          default_reasoning_by_model: {
+            ...defaultCapabilities.default_reasoning_by_model,
+            "gpt-5.4": "high",
+          },
+        },
+      },
+    };
+
+    const resolvedForm = resolveIntegrationForm({
+      schema: OpenAiApiKeyBindingConfigSchema,
+      form: resolveOpenAiBindingConfigForm,
+      context: {
+        familyId: "openai",
+        variantId: "openai-default",
+        kind: "agent",
+        target: {
+          rawConfig: rawTargetConfig,
+          config: OpenAiApiKeyTargetConfigSchema.parse(rawTargetConfig),
+        },
+        connection: {
+          rawConfig: {
+            connection_method: "chatgpt-device-code",
+            auth_mode: "chatgpt",
+            chatgpt_account_id: "acct_123",
+          },
+          config: OpenAiConnectionConfigSchema.parse({
+            connection_method: "chatgpt-device-code",
+            auth_mode: "chatgpt",
+            chatgpt_account_id: "acct_123",
+          }),
+        },
+      },
+    });
+
+    expect(resolvedForm.schema).toMatchObject({
+      properties: {
+        model: {
+          default: {
+            defaultModel: "gpt-5.4",
+            options: {
+              reasoningEffort: "high",
+            },
+          },
+          properties: {
+            defaultModel: {
+              oneOf: [
+                {
+                  const: "gpt-5.4",
+                  title: "gpt-5.4",
+                },
+              ],
+            },
+            options: {
+              properties: {
+                reasoningEffort: {
+                  oneOf: [
+                    {
+                      const: "high",
+                      title: "High",
+                    },
+                  ],
+                  default: "high",
+                },
+              },
+            },
+          },
+        },
       },
     });
   });

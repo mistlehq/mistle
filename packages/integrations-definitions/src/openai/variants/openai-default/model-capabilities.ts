@@ -40,10 +40,22 @@ export const OpenAiConnectionMethodIds = {
 export type OpenAiConnectionMethodId =
   (typeof OpenAiConnectionMethodIds)[keyof typeof OpenAiConnectionMethodIds];
 
+const OpenAiConnectionMethodIdValues = [
+  OpenAiConnectionMethodIds.API_KEY,
+  OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE,
+] as const;
+
+const OpenAiConnectionMethodIdSchema = z.enum(OpenAiConnectionMethodIdValues);
+
 export type OpenAiCapabilitySet = {
   models: readonly OpenAiModelId[];
   allowedReasoningByModel: Record<OpenAiModelId, readonly OpenAiReasoningEffort[]>;
   defaultReasoningByModel: Record<OpenAiModelId, OpenAiReasoningEffort>;
+};
+
+export type OpenAiCapabilitySetByConnectionMethod = {
+  "api-key": OpenAiCapabilitySet;
+  "chatgpt-device-code": OpenAiCapabilitySet;
 };
 
 const OpenAiDefaultCapabilitySet: OpenAiCapabilitySet = {
@@ -127,12 +139,39 @@ export type OpenAiRawCapabilitySet = {
 
 export type OpenAiRawBindingCapabilities = OpenAiRawCapabilitySet;
 
+export type OpenAiRawBindingCapabilitiesByConnectionMethod = {
+  "api-key": OpenAiRawBindingCapabilities;
+  "chatgpt-device-code": OpenAiRawBindingCapabilities;
+};
+
 export function createOpenAiRawBindingCapabilities(): OpenAiRawBindingCapabilities {
   return {
     models: OpenAiCapabilities.models,
     allowed_reasoning_by_model: OpenAiCapabilities.allowedReasoningByModel,
     default_reasoning_by_model: OpenAiCapabilities.defaultReasoningByModel,
   };
+}
+
+export function createOpenAiRawBindingCapabilitiesByConnectionMethod(): OpenAiRawBindingCapabilitiesByConnectionMethod {
+  return {
+    "api-key": createOpenAiRawBindingCapabilities(),
+    "chatgpt-device-code": createOpenAiRawBindingCapabilities(),
+  };
+}
+
+export function isOpenAiConnectionMethodId(value: string): value is OpenAiConnectionMethodId {
+  return OpenAiConnectionMethodIdSchema.safeParse(value).success;
+}
+
+export function resolveOpenAiCapabilitySetForConnectionMethod(input: {
+  bindingCapabilitiesByConnectionMethod: OpenAiCapabilitySetByConnectionMethod;
+  connectionMethod: string;
+}): OpenAiCapabilitySet {
+  if (!isOpenAiConnectionMethodId(input.connectionMethod)) {
+    throw new Error(`Unsupported OpenAI connection method '${input.connectionMethod}'.`);
+  }
+
+  return input.bindingCapabilitiesByConnectionMethod[input.connectionMethod];
 }
 
 export function isOpenAiModelSupported(input: {
