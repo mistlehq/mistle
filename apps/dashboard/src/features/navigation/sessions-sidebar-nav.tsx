@@ -88,7 +88,7 @@ export function SessionsSidebarNav(input: {
         </div>
       ) : null}
       {visibleGroups.map((group) => (
-        <SidebarGroup className="gap-1 pb-1" key={group.profileId}>
+        <SidebarGroup className="gap-0.5 pb-0.5" key={group.profileId}>
           <Collapsible
             onOpenChange={(open) => {
               setExpandedProfileIds((currentExpandedProfileIds) => {
@@ -107,7 +107,7 @@ export function SessionsSidebarNav(input: {
           >
             <CollapsibleTrigger
               aria-label={`Toggle ${group.profileName} sessions`}
-              className="text-sidebar-foreground/70 hover:text-sidebar-foreground group/header flex h-7 w-full items-center justify-between rounded-md px-2 text-[11px] font-semibold tracking-[0.08em] uppercase outline-hidden transition-colors"
+              className="text-sidebar-foreground/70 hover:text-sidebar-foreground group/header flex h-6 w-full items-center justify-between rounded-md px-2 text-[10px] font-semibold tracking-[0.08em] uppercase outline-hidden transition-colors"
             >
               <span className="truncate">{group.profileName}</span>
               <CaretRightIcon
@@ -119,14 +119,14 @@ export function SessionsSidebarNav(input: {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <SidebarGroupContent>
-                <SidebarMenuSub className="mx-0 gap-1 border-l-0 px-0 py-0">
+                <SidebarMenuSub className="mx-0 gap-0.5 border-l-0 px-0 py-0">
                   {group.items.map((item) => {
                     const isActive = location.pathname === item.to;
 
                     return (
                       <SidebarMenuSubItem className="w-full" key={item.id}>
                         <SidebarMenuSubButton
-                          className="h-auto min-h-9 cursor-default items-center px-2 py-2"
+                          className="h-auto min-h-8 cursor-default items-center px-2 py-1.5"
                           isActive={isActive}
                           render={<NavLink to={item.to} />}
                         >
@@ -213,7 +213,7 @@ function SessionsSidebarItemLabel(input: {
     };
   }, [input.label, labelElement]);
 
-  const labelClassName = "block min-w-0 flex-1 truncate text-sm";
+  const labelClassName = "block min-w-0 flex-1 truncate text-[13px] leading-tight";
 
   function handleLabelRef(element: HTMLSpanElement | null): void {
     setLabelElement(element);
@@ -234,7 +234,7 @@ function SessionsSidebarItemLabel(input: {
         </TooltipContent>
       </Tooltip>
       <div
-        className={`pt-0.5 text-[11px] font-medium ${
+        className={`pt-px text-[10px] leading-tight font-medium ${
           input.metadataLabel === "Working" ? "text-sky-700" : "text-muted-foreground"
         }`}
       >
