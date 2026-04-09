@@ -1,7 +1,7 @@
 import { AutomationKinds, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { parseWebhookPayloadFilter } from "@mistle/webhooks";
 
 import { evaluateWebhookPayloadFilter } from "./evaluator.js";
-import { parseWebhookPayloadFilter } from "./schema.js";
 
 type ResolveWebhookAutomationTargetsInput = {
   organizationId: string;
@@ -33,7 +33,20 @@ function isWebhookAutomationMatched(input: {
     return true;
   }
 
-  const filter = parseWebhookPayloadFilter(payloadFilter);
+  const eventScopedPayloadFilter = payloadFilter[eventType];
+  if (eventScopedPayloadFilter === undefined) {
+    return true;
+  }
+
+  if (
+    typeof eventScopedPayloadFilter !== "object" ||
+    eventScopedPayloadFilter === null ||
+    Array.isArray(eventScopedPayloadFilter)
+  ) {
+    throw new Error(`Webhook payload filter for event type '${eventType}' must be an object.`);
+  }
+
+  const filter = parseWebhookPayloadFilter(eventScopedPayloadFilter);
   return evaluateWebhookPayloadFilter({
     filter,
     payload,

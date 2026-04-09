@@ -1,4 +1,4 @@
-import type { WebhookPayloadFilterPath, WebhookPayloadPathInput } from "./types.js";
+import type { WebhookPayloadFilterPath, WebhookPayloadPathInput } from "@mistle/webhooks";
 
 export function path(input: WebhookPayloadPathInput): WebhookPayloadFilterPath {
   if (typeof input === "string") {

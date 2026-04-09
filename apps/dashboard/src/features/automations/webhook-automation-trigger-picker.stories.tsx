@@ -502,7 +502,7 @@ export const WrongProfileSavedTrigger: Story = {
   },
 };
 
-export const SecondTriggerAttemptShowsDialog: Story = {
+export const AddSecondTrigger: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: GitHubConnectionId,
@@ -516,17 +516,16 @@ export const SecondTriggerAttemptShowsDialog: Story = {
   },
   play: async ({ canvasElement }): Promise<void> => {
     const canvas = within(canvasElement);
-    const page = within(canvasElement.ownerDocument.body);
     const addTriggerInput = canvas.getByPlaceholderText("Add trigger");
 
     await userEvent.click(addTriggerInput);
     await userEvent.click(await canvas.findByRole("option", { name: "Pull request opened" }));
 
-    await expect(page.getByText("Only one trigger is supported")).toBeVisible();
     await expect(
-      page.getByText(
-        "Automations currently support only one trigger. Remove the existing trigger before adding a different one.",
-      ),
+      canvas.getByRole("button", { name: "Remove Issue comment created trigger" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: "Remove Pull request opened trigger" }),
     ).toBeVisible();
   },
 };

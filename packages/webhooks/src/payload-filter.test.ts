@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { parseWebhookPayloadFilter, WebhookPayloadFilterSchema } from "./schema.js";
+import { parseWebhookPayloadFilter, WebhookPayloadFilterSchema } from "./payload-filter.js";
 
-describe("webhook filter schema", () => {
+describe("webhook payload filter schema", () => {
   it("parses valid nested filters", () => {
     const parsedFilter = parseWebhookPayloadFilter({
       op: "and",

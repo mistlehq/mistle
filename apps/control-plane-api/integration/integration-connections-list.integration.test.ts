@@ -113,7 +113,11 @@ describe("integration connections list integration", () => {
       targetKey: "openai-default",
       eventTypes: ["response.created"],
       payloadFilter: {
-        type: "response.created",
+        "response.created": {
+          op: "eq",
+          path: ["type"],
+          value: "response.created",
+        },
       },
     });
 
@@ -394,7 +398,11 @@ describe("integration connections list integration", () => {
       targetKey: "github_cloud",
       eventTypes: ["issue_comment.created"],
       payloadFilter: {
-        action: "created",
+        "issue_comment.created": {
+          op: "eq",
+          path: ["action"],
+          value: "created",
+        },
       },
     });
 

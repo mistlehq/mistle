@@ -7,12 +7,6 @@ import {
   ComboboxItem,
   ComboboxLabel,
   ComboboxList,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   Input,
   Select,
   SelectContent,
@@ -297,7 +291,6 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
     ...(input.disabledState === undefined ? {} : { disabledState: input.disabledState }),
   });
   const [isOpen, setIsOpen] = useState(false);
-  const [isSingleTriggerDialogOpen, setIsSingleTriggerDialogOpen] = useState(false);
   const anchorRef = useComboboxAnchor();
   const triggerPickerId = useId();
 
@@ -308,20 +301,6 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
       multiple
       onOpenChange={setIsOpen}
       onValueChange={(value) => {
-        const nextTriggerId = value.find(
-          (candidate) => !input.selectedTriggerIds.includes(candidate),
-        );
-
-        if (
-          input.selectedTriggerIds.length > 0 &&
-          nextTriggerId !== undefined &&
-          !input.selectedTriggerIds.includes(nextTriggerId)
-        ) {
-          setIsOpen(false);
-          setIsSingleTriggerDialogOpen(true);
-          return;
-        }
-
         input.onValueChange(value);
         setIsOpen(false);
       }}
@@ -398,29 +377,6 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
           ))}
         </ComboboxList>
       </ComboboxContent>
-
-      <Dialog onOpenChange={setIsSingleTriggerDialogOpen} open={isSingleTriggerDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader variant="sectioned">
-            <DialogTitle>Only one trigger is supported</DialogTitle>
-            <DialogDescription>
-              Automations currently support only one trigger. Remove the existing trigger before
-              adding a different one.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              onClick={() => {
-                setIsSingleTriggerDialogOpen(false);
-              }}
-              type="button"
-              variant="outline"
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Combobox>
   );
 }

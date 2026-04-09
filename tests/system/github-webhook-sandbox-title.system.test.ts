@@ -581,9 +581,11 @@ describeIf("system GitHub webhook sandbox title seeding", () => {
             integrationWebhookSourceId: githubWebhookSource.id,
             eventTypes: ["github.issue_comment.created"],
             payloadFilter: {
-              op: "contains",
-              path: ["comment", "body"],
-              value: payloadMarker,
+              "github.issue_comment.created": {
+                op: "contains",
+                path: ["comment", "body"],
+                value: payloadMarker,
+              },
             },
             inputTemplate: "GitHub issue comment webhook: {{payload.comment.body}}",
             conversationKeyTemplate: "github-issue-title-{{payload.issue.number}}",

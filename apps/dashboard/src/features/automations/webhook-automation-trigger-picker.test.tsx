@@ -511,7 +511,7 @@ describe("WebhookAutomationTriggerPicker", () => {
     ).toBeDefined();
   });
 
-  it("shows a dialog instead of adding a second trigger", async () => {
+  it("adds a second trigger when one is already selected", async () => {
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
@@ -533,38 +533,17 @@ describe("WebhookAutomationTriggerPicker", () => {
     fireEvent.click(addTriggerButton);
     fireEvent.click(screen.getByRole("option", { name: "Pull request opened" }));
 
-    expect(screen.getByText("Only one trigger is supported")).toBeDefined();
-    expect(
-      screen.getByText(
-        "Automations currently support only one trigger. Remove the existing trigger before adding a different one.",
-      ),
-    ).toBeDefined();
-    expect(
-      within(container).queryByRole("button", {
-        hidden: true,
-        name: "Remove Pull request opened trigger",
-      }),
-    ).toBeNull();
-    expect(
-      within(container).getByRole("button", {
-        hidden: true,
-        name: "Remove Issue comment created trigger",
-      }),
-    ).toBeDefined();
-
-    const closeButton = screen
-      .getAllByRole("button", { name: "Close" })
-      .find((element) => element.textContent === "Close");
-    if (closeButton === undefined) {
-      throw new Error("Expected dialog close button.");
-    }
-
-    fireEvent.click(closeButton);
     await waitFor(() => {
       expect(
         within(container).getByRole("button", {
           hidden: true,
           name: "Remove Issue comment created trigger",
+        }),
+      ).toBeDefined();
+      expect(
+        within(container).getByRole("button", {
+          hidden: true,
+          name: "Remove Pull request opened trigger",
         }),
       ).toBeDefined();
     });
