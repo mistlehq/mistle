@@ -1,8 +1,5 @@
 import { BadRequestError } from "@mistle/http/errors.js";
-import {
-  type EventScopedWebhookPayloadFilter,
-  parseEventScopedWebhookPayloadFilter,
-} from "@mistle/webhooks";
+import { parseEventScopedWebhookPayloadFilter } from "@mistle/webhooks";
 
 export function normalizeWebhookPayloadFilter(
   payloadFilter: Record<string, unknown> | null | undefined,
@@ -21,15 +18,12 @@ export function normalizeWebhookPayloadFilter(
 export function assertEventScopedWebhookPayloadFilterOrThrow(input: {
   eventTypes: readonly string[] | null;
   payloadFilter: Record<string, unknown> | null;
-}): asserts input is {
-  eventTypes: readonly string[] | null;
-  payloadFilter: EventScopedWebhookPayloadFilter | null;
-} {
+}): void {
   if (input.payloadFilter === null) {
     return;
   }
 
-  let parsedPayloadFilter: EventScopedWebhookPayloadFilter;
+  let parsedPayloadFilter: ReturnType<typeof parseEventScopedWebhookPayloadFilter>;
   try {
     parsedPayloadFilter = parseEventScopedWebhookPayloadFilter(input.payloadFilter);
   } catch (error) {

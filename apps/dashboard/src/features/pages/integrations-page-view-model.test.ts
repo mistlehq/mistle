@@ -27,14 +27,19 @@ describe("integrations page view model", () => {
         {
           id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
           label: "GitHub App installation",
-          kind: "redirect",
-          ui: {
-            create: {
-              submitLabel: "Install GitHub App",
-              helperText:
-                "Continue to GitHub to install the app and finish connecting this account.",
+          kind: "form",
+          secretFields: [
+            {
+              name: "appPrivateKeyPem",
+              label: "App private key PEM",
+              inputType: "password",
             },
-          },
+            {
+              name: "webhookSecret",
+              label: "Webhook secret",
+              inputType: "password",
+            },
+          ],
         },
         {
           id: IntegrationConnectionMethodIds.API_KEY,
@@ -53,13 +58,19 @@ describe("integrations page view model", () => {
       {
         id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         label: "GitHub App installation",
-        kind: "redirect",
-        ui: {
-          create: {
-            submitLabel: "Install GitHub App",
-            helperText: "Continue to GitHub to install the app and finish connecting this account.",
+        kind: "form",
+        secretFields: [
+          {
+            name: "appPrivateKeyPem",
+            label: "App private key PEM",
+            inputType: "password",
           },
-        },
+          {
+            name: "webhookSecret",
+            label: "Webhook secret",
+            inputType: "password",
+          },
+        ],
       },
       {
         id: IntegrationConnectionMethodIds.API_KEY,
@@ -147,7 +158,11 @@ describe("integrations page view model", () => {
           targetKey: "github",
           displayName: "Engineering GitHub",
           status: "active",
-          config: { connection_method: "github-app-installation" },
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle-github-app",
+          },
           externalSubjectId: "mistle-labs",
           resources: [
             {
@@ -173,8 +188,101 @@ describe("integrations page view model", () => {
 
     expect(item?.authMethodLabel).toBe("GitHub App installation");
     expect(item?.authMethodId).toBe("github-app-installation");
+    expect(item?.contextItems).toEqual([
+      {
+        label: "App ID",
+        value: "123",
+      },
+      {
+        label: "App slug",
+        value: "mistle-github-app",
+      },
+      {
+        label: "Installation",
+        value: "mistle-labs",
+      },
+    ]);
+    expect(item?.setupStatusLabel).toBeUndefined();
+    expect(item?.setupDescription).toBeUndefined();
+    expect(item?.webhookInstructions).toBe(
+      "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
+    );
     expect(item?.resources[0]?.isRefreshing).toBe(true);
     expect(item?.resources[0]?.lastErrorMessage).toBe("Resource sync failed.");
+  });
+
+  it("marks pre-install GitHub App connections as setup incomplete", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_preinstall",
+          targetKey: "github",
+          displayName: "Pre-install GitHub",
+          status: "active",
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle-github-app",
+          },
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.setupStatusLabel).toBe("Setup incomplete");
+    expect(item?.installActionLabel).toBe("Install GitHub App");
+    expect(item?.setupDescription).toBe(
+      "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
+    );
+    expect(item?.contextItems).toEqual([
+      {
+        label: "App ID",
+        value: "123",
+      },
+      {
+        label: "App slug",
+        value: "mistle-github-app",
+      },
+      {
+        label: "Installation",
+        value: "Pending",
+      },
+    ]);
+  });
+
+  it("includes GitHub App installation mutation state in detail items", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_preinstall",
+          targetKey: "github",
+          displayName: "Pre-install GitHub",
+          status: "active",
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle-github-app",
+          },
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      githubAppInstallationStateByConnectionId: new Map([
+        [
+          "icn_preinstall",
+          {
+            errorMessage: "Could not start GitHub App installation.",
+            isPending: true,
+          },
+        ],
+      ]),
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.setupIsPending).toBe(true);
+    expect(item?.setupErrorMessage).toBe("Could not start GitHub App installation.");
   });
 
   it("marks syncing resources as refreshing even without a local pending refresh", () => {

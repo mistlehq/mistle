@@ -16,17 +16,14 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
   const config = ctx.get("config");
   const db = ctx.get("db");
   const integrationRegistry = ctx.get("integrationRegistry");
-  const { targetKey } = ctx.req.valid("param");
   const query = ctx.req.valid("query");
 
   await completeGitHubAppInstallationConnection(
     {
       db,
       integrationRegistry,
-      integrationsConfig: config.integrations,
     },
     {
-      targetKey,
       query,
     },
   );

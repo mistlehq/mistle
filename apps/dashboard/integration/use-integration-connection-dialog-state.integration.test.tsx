@@ -70,13 +70,19 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
           {
             id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
             label: "GitHub App installation",
-            kind: "redirect",
-            ui: {
-              create: {
-                submitLabel: "Install GitHub App",
-                helperText: "Continue to GitHub to install the app and finish connecting.",
+            kind: "form",
+            secretFields: [
+              {
+                name: "appPrivateKeyPem",
+                label: "App private key PEM",
+                inputType: "password",
               },
-            },
+              {
+                name: "webhookSecret",
+                label: "Webhook secret",
+                inputType: "password",
+              },
+            ],
           },
         ],
         targetConfig: {},
@@ -122,13 +128,19 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
           {
             id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
             label: "GitHub App installation",
-            kind: "redirect",
-            ui: {
-              create: {
-                submitLabel: "Install GitHub App",
-                helperText: "Continue to GitHub to install the app and finish connecting.",
+            kind: "form",
+            secretFields: [
+              {
+                name: "appPrivateKeyPem",
+                label: "App private key PEM",
+                inputType: "password",
               },
-            },
+              {
+                name: "webhookSecret",
+                label: "Webhook secret",
+                inputType: "password",
+              },
+            ],
           },
         ],
         targetConfig: {},

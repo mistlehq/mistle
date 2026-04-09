@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createGitHubInstallationAuthInput,
+  resolveGitHubAppCredentialContext,
   resolveGitHubInstallationRepositoryNames,
 } from "./credential-resolver.server.js";
 
@@ -24,18 +25,20 @@ function createResolverInput(
       enabled: true,
       config: {
         apiBaseUrl: "https://api.github.com",
-        appId: "123",
       },
-      secrets: {
-        appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
-      },
+      secrets: {},
     },
     connection: {
       id: "icn_test",
       status: "active",
       config: {
         connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        app_id: "123",
+        app_slug: "mistle-github-app",
         installation_id: "12345",
+      },
+      secrets: {
+        appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
       },
     },
     secretType: "github_app_installation_token",
@@ -104,5 +107,35 @@ describe("github credential resolver helpers", () => {
       type: "installation",
       installationId: 12345,
     });
+  });
+
+  it("resolves app id and private key from the connection context", () => {
+    expect(resolveGitHubAppCredentialContext(createResolverInput())).toMatchObject({
+      apiBaseUrl: "https://api.github.com",
+      appId: "123",
+      appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
+      installationId: 12345,
+      repositoryNames: ["repo-a", "repo-b"],
+    });
+  });
+
+  it("fails fast when the connection secret is missing the app private key", () => {
+    expect(() =>
+      resolveGitHubAppCredentialContext(
+        createResolverInput({
+          connection: {
+            id: "icn_test",
+            status: "active",
+            config: {
+              connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+              app_id: "123",
+              app_slug: "mistle-github-app",
+              installation_id: "12345",
+            },
+            secrets: {},
+          },
+        }),
+      ),
+    ).toThrow("GitHub app installation resolver requires connection secret `appPrivateKeyPem`.");
   });
 });

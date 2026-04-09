@@ -69,7 +69,6 @@ export const IntegrationTargetSchema = z
     webhookSource: z
       .object({
         lifecycle: z.enum(["implicit", "managed"]),
-        ownerScope: z.enum(["target", "connection"]),
         requiresSourceSelection: z.boolean(),
       })
       .strict()
@@ -195,6 +194,7 @@ export const IntegrationConnectionSchema = z
           .strict(),
       )
       .optional(),
+    supportsWebhookSources: z.boolean().optional(),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),
   })
@@ -246,10 +246,9 @@ export const IntegrationWebhookSourceSchema = z
   .object({
     id: z.string().min(1),
     targetKey: z.string().min(1),
-    ownerScope: z.enum(["target", "connection"]),
-    integrationConnectionId: z.string().min(1).optional(),
+    integrationConnectionId: z.string().min(1),
     displayName: z.string().min(1),
-    endpointKey: z.string().min(1).optional(),
+    endpointKey: z.string().min(1),
     callbackUrl: z.string().min(1).optional(),
     remoteRegistrationId: z.string().min(1).optional(),
     status: z.enum(["active", "error", "disabled"]),

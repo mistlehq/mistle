@@ -127,7 +127,6 @@ export const IntegrationWebhookEventDefinitionSchema = z
 const IntegrationWebhookSourceMetadataSchema = z
   .object({
     lifecycle: z.enum(["implicit", "managed"]),
-    ownerScope: z.enum(["target", "connection"]),
     requiresSourceSelection: z.boolean(),
   })
   .strict();

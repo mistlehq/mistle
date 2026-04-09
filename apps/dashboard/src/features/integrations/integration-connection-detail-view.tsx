@@ -34,8 +34,14 @@ export type IntegrationConnectionDetailItem = {
   }[];
   displayName: string;
   id: string;
+  installActionLabel?: string;
   resources: readonly IntegrationConnectionDetailResourceSummary[];
+  setupDescription?: string;
+  setupErrorMessage?: string;
+  setupIsPending?: boolean;
+  setupStatusLabel?: string;
   status: "active" | "error" | "revoked";
+  webhookInstructions?: string;
 };
 
 export type IntegrationConnectionDetailViewProps = {
@@ -45,6 +51,7 @@ export type IntegrationConnectionDetailViewProps = {
   onDeleteConnection?: (connectionId: string) => void;
   onDeleteWebhookSource?: (input: { connectionId: string; webhookSourceId: string }) => void;
   onEditApiKey?: (connectionId: string) => void;
+  onStartGitHubAppInstallation?: (connectionId: string) => Promise<void> | void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: ReadonlyMap<
     string,
@@ -110,6 +117,9 @@ function ConnectionCardWithOptionalProps(input: {
       {...(input.props.onEditApiKey === undefined
         ? {}
         : { onEditApiKey: input.props.onEditApiKey })}
+      {...(input.props.onStartGitHubAppInstallation === undefined
+        ? {}
+        : { onStartGitHubAppInstallation: input.props.onStartGitHubAppInstallation })}
       {...(input.props.onRefreshResource === undefined
         ? {}
         : { onRefreshResource: input.props.onRefreshResource })}
@@ -140,6 +150,7 @@ function ConnectionCard(input: {
   onDeleteConnection?: (connectionId: string) => void;
   onDeleteWebhookSource?: (input: { connectionId: string; webhookSourceId: string }) => void;
   onEditApiKey?: (connectionId: string) => void;
+  onStartGitHubAppInstallation?: (connectionId: string) => Promise<void> | void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
   showWebhookSources?: boolean;
@@ -167,6 +178,9 @@ function ConnectionCard(input: {
                 {formatConnectionStatusLabel(input.connection.status)}
               </Badge>
             )}
+            {input.connection.setupStatusLabel === undefined ? null : (
+              <Badge variant="outline">{input.connection.setupStatusLabel}</Badge>
+            )}
           </div>
           {input.onDeleteConnection && input.connection.canDelete ? (
             <Button
@@ -189,7 +203,16 @@ function ConnectionCard(input: {
           authMethodLabel={input.connection.authMethodLabel}
           connectionId={input.connection.id}
           onEditApiKey={input.onEditApiKey}
+          onStartGitHubAppInstallation={input.onStartGitHubAppInstallation}
+          setupActionLabel={input.connection.installActionLabel}
+          setupIsPending={input.connection.setupIsPending ?? false}
         />
+        {input.connection.setupDescription === undefined ? null : (
+          <Notice title="Setup incomplete">{input.connection.setupDescription}</Notice>
+        )}
+        {input.connection.setupErrorMessage === undefined ? null : (
+          <Notice variant="alert">{input.connection.setupErrorMessage}</Notice>
+        )}
       </div>
 
       {input.connection.contextItems === undefined ||
@@ -225,6 +248,9 @@ function ConnectionCard(input: {
       {input.showWebhookSources === true && input.webhookSourceState !== undefined ? (
         <WebhookSourcesSection
           connectionId={input.connection.id}
+          {...(input.connection.webhookInstructions === undefined
+            ? {}
+            : { descriptionText: input.connection.webhookInstructions })}
           onCreateWebhookSource={
             input.showCreateWebhookSource === true ? input.onCreateWebhookSource : undefined
           }
@@ -276,6 +302,9 @@ function ConnectionAuthSection(input: {
   authMethodLabel: string | null | undefined;
   connectionId: string;
   onEditApiKey: ((connectionId: string) => void) | undefined;
+  onStartGitHubAppInstallation: ((connectionId: string) => Promise<void> | void) | undefined;
+  setupActionLabel: string | undefined;
+  setupIsPending: boolean;
 }): React.JSX.Element | null {
   if (input.authMethodLabel === undefined || input.authMethodLabel === null) {
     return null;
@@ -313,7 +342,25 @@ function ConnectionAuthSection(input: {
     );
   }
 
-  return <InlineField label="Auth method" value={input.authMethodLabel} />;
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <InlineField label="Auth method" value={input.authMethodLabel} />
+      {input.onStartGitHubAppInstallation === undefined ||
+      input.setupActionLabel === undefined ? null : (
+        <Button
+          disabled={input.setupIsPending}
+          onClick={() => {
+            void input.onStartGitHubAppInstallation?.(input.connectionId);
+          }}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {input.setupIsPending ? "Starting install..." : input.setupActionLabel}
+        </Button>
+      )}
+    </div>
+  );
 }
 
 function InlineField(input: { label: string; value: string }): React.JSX.Element {
@@ -432,6 +479,7 @@ function ResourceItemsPreview(input: {
 
 function WebhookSourcesSection(input: {
   connectionId: string;
+  descriptionText?: string;
   onCreateWebhookSource: ((input: { connectionId: string }) => void) | undefined;
   onDeleteWebhookSource:
     | ((input: { connectionId: string; webhookSourceId: string }) => void)
@@ -444,7 +492,8 @@ function WebhookSourcesSection(input: {
         <div className="gap-1 flex flex-col">
           <h3 className="font-medium text-sm">Webhooks</h3>
           <p className="text-muted-foreground text-xs">
-            Copy the callback URL into your provider's webhook configuration.
+            {input.descriptionText ??
+              "Copy the callback URL into your provider's webhook configuration."}
           </p>
         </div>
         {input.onCreateWebhookSource ? (
@@ -512,8 +561,7 @@ function WebhookSourceCard(input: {
 }): React.JSX.Element {
   const isDeleting = input.deletingWebhookSourceId === input.source.id;
   const isDeleteSupported =
-    input.onDeleteWebhookSource !== undefined &&
-    (input.source.endpointKey !== undefined || input.source.remoteRegistrationId !== undefined);
+    input.onDeleteWebhookSource !== undefined && input.source.remoteRegistrationId !== undefined;
 
   return (
     <div className="gap-3 flex flex-col rounded-md border p-3">
@@ -546,7 +594,6 @@ function WebhookSourceCard(input: {
         ) : null}
       </div>
       <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
-        <MetadataField label="Owner scope" value={input.source.ownerScope} />
         <MetadataField label="Target" value={input.source.targetKey} />
         {input.source.callbackUrl === undefined ? null : (
           <MetadataField label="Callback URL" value={input.source.callbackUrl} />

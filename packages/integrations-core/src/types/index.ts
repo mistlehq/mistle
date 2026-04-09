@@ -456,7 +456,9 @@ export type IntegrationCredentialResolverInput = {
   targetKey: string;
   connectionId: string;
   target: IntegrationResolvedTarget;
-  connection: IntegrationConnection;
+  connection: IntegrationConnection & {
+    secrets?: Record<string, string>;
+  };
   binding?: Pick<IntegrationBinding, "id" | "kind"> & { config: Record<string, unknown> };
   secretType: string;
   slotKey?: string;
@@ -1216,44 +1218,6 @@ export type IntegrationWebhookEventDefinition = {
 };
 
 /**
- * Declares which persisted object owns a webhook source row.
- *
- * `target` sources are shared across all connections under a target and fit
- * app-level webhook models such as GitHub or Slack Events API.
- *
- * `connection` sources belong to one integration connection and fit
- * tenant/site/workspace-scoped webhook models such as Jira admin webhooks.
- */
-export type IntegrationWebhookSourceOwnerScope = "target" | "connection";
-
-export const IntegrationWebhookSourceOwnerScopes: {
-  TARGET: IntegrationWebhookSourceOwnerScope;
-  CONNECTION: IntegrationWebhookSourceOwnerScope;
-} = {
-  TARGET: "target",
-  CONNECTION: "connection",
-};
-
-/**
- * Declares how inbound requests are matched to a webhook source row.
- *
- * `payload` means the source is inferred from provider identity inside the
- * webhook body.
- *
- * `path` means the source is resolved from a unique key embedded in the public
- * webhook URL path.
- */
-export type IntegrationWebhookSourceRoutingStrategy = "payload" | "path";
-
-export const IntegrationWebhookSourceRoutingStrategies: {
-  PAYLOAD: IntegrationWebhookSourceRoutingStrategy;
-  PATH: IntegrationWebhookSourceRoutingStrategy;
-} = {
-  PAYLOAD: "payload",
-  PATH: "path",
-};
-
-/**
  * Describes who creates and tears down the provider-side registration.
  *
  * `implicit` means no per-source provider API lifecycle is required at runtime.
@@ -1295,16 +1259,14 @@ export type IntegrationWebhookSource = {
   id: string;
   /** Integration target that owns the source. */
   targetKey: string;
-  /** Whether the source belongs to the target or a single connection. */
-  ownerScope: IntegrationWebhookSourceOwnerScope;
-  /** Organization that owns the source when it is scoped below the target. */
-  organizationId?: string | undefined;
-  /** Connection owner for `connection`-scoped sources. */
-  integrationConnectionId?: string | undefined;
+  /** Organization that owns the source. */
+  organizationId: string;
+  /** Connection owner for the source. */
+  integrationConnectionId: string;
   /** Optional persisted display name override chosen by Mistle or the provider. */
   displayName?: string | undefined;
-  /** Unique public path token used by `path` routing strategies. */
-  endpointKey?: string | undefined;
+  /** Unique public path token used by the public webhook URL. */
+  endpointKey: string;
   /** Remote provider registration identifier when the provider returns one. */
   remoteRegistrationId?: string | undefined;
   /** Provider-specific persisted reconciliation state. */
@@ -1324,11 +1286,9 @@ export type IntegrationWebhookSourceDescribeInput<
   targetKey: string;
   controlPlaneBaseUrl: string;
   target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
-  connection?:
-    | (IntegrationConnection & {
-        config: TConnectionConfig;
-      })
-    | undefined;
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
   source: IntegrationWebhookSource;
 };
 
@@ -1348,11 +1308,9 @@ export type IntegrationWebhookSourceRegistrationInput<
   targetKey: string;
   controlPlaneBaseUrl: string;
   target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
-  connection?:
-    | (IntegrationConnection & {
-        config: TConnectionConfig;
-      })
-    | undefined;
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
   connectionSecrets?: Record<string, string> | undefined;
   source: IntegrationWebhookSource;
   /** Decrypted webhook secret to register with the provider when required. */
@@ -1381,12 +1339,17 @@ export type IntegrationWebhookSourceCapability<
   TTargetSecrets = Record<string, string>,
   TConnectionConfig = Record<string, unknown>,
 > = {
-  /** Persisted owner boundary for all sources of this definition. */
-  ownerScope: IntegrationWebhookSourceOwnerScope;
-  /** How inbound requests should be routed to a source row. */
-  routingStrategy: IntegrationWebhookSourceRoutingStrategy;
   /** Whether provider registration is implicit or managed. */
   lifecycle: IntegrationWebhookSourceLifecycle;
+  /**
+   * Optional connection-level support gate. When omitted, the source is
+   * treated as supported for every connection of the definition.
+   */
+  supportsConnection?(input: {
+    connection: IntegrationConnection & {
+      config: TConnectionConfig;
+    };
+  }): MaybePromise<boolean>;
   /** Returns the UI/API-facing description of a persisted source row. */
   describeSource(
     input: IntegrationWebhookSourceDescribeInput<TTargetConfig, TTargetSecrets, TConnectionConfig>,

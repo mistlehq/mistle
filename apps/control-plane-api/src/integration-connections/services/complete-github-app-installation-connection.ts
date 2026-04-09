@@ -1,27 +1,30 @@
 import {
-  integrationConnectionCredentials,
-  integrationConnections,
-  IntegrationConnectionStatuses,
-  integrationCredentials,
-  IntegrationCredentialSecretKinds,
   integrationConnectionRedirectSessions,
+  integrationConnections,
+  type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
-import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { BadRequestError } from "@mistle/http/errors.js";
-import type { IntegrationRegistry } from "@mistle/integrations-core";
+import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
+import {
+  IntegrationConnectionMethodIds,
+  type IntegrationRegistry,
+} from "@mistle/integrations-core";
+import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
+import { GitHubAppInstallationConnectionConfigSchema } from "@mistle/integrations-definitions";
 import { and, eq, isNull } from "drizzle-orm";
+import { z } from "zod";
 
 import {
-  encryptCredentialUtf8,
-  resolveMasterEncryptionKeyMaterial,
-  unwrapOrganizationCredentialKey,
-} from "../../lib/crypto.js";
-import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
-import { createRedirectQueryParams, resolveRedirectDisplayName } from "./redirect-flow.js";
-import { resolveGitHubAppInstallationHandlerTargetOrThrow } from "./resolve-github-app-installation-handler.js";
+  IntegrationConnectionsBadRequestCodes,
+  IntegrationConnectionsNotFoundCodes,
+} from "../constants.js";
+import { createRedirectQueryParams } from "./redirect-flow.js";
+import { resolveGitHubAppInstallationConnectionId } from "./redirect-flow.js";
+import {
+  ensureImplicitConnectionWebhookSource,
+  resolveConnectionWithTargetOrThrow,
+} from "./webhook-sources.js";
 
 type CompleteGitHubAppInstallationConnectionInput = {
-  targetKey: string;
   query: Record<string, string>;
 };
 
@@ -37,6 +40,19 @@ type CompletedConnection = {
   updatedAt: string;
 };
 
+function toUnknownRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+
+  const record: Record<string, unknown> = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    record[key] = entryValue;
+  }
+
+  return record;
+}
+
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   const state = params.get("state");
   if (state === null || state.length === 0) {
@@ -49,46 +65,73 @@ function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   return state;
 }
 
-function resolveCredentialSecretKind(secretType: string) {
-  if (secretType === IntegrationCredentialSecretKinds.API_KEY) {
-    return IntegrationCredentialSecretKinds.API_KEY;
+function resolveInstallationIdOrThrow(params: URLSearchParams): string {
+  const installationId = params.get("installation_id");
+  if (installationId === null || installationId.length === 0) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
+      "GitHub App installation callback query must include `installation_id`.",
+    );
   }
 
-  throw new Error(`Unsupported GitHub App installation credential secret type '${secretType}'.`);
+  return installationId;
+}
+
+function resolveGitHubAppInstallationConnectionIdOrThrow(state: string): string {
+  try {
+    return resolveGitHubAppInstallationConnectionId(state);
+  } catch {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
+      "Redirect state is invalid.",
+    );
+  }
+}
+
+function resolveGitHubAppInstallationConnectionConfigOrThrow(input: {
+  config: unknown;
+  connectionId: string;
+}) {
+  const configRecord = toUnknownRecord(input.config);
+
+  if (
+    configRecord !== null &&
+    configRecord["connection_method"] !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+  ) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
+      `Integration connection '${input.connectionId}' does not use GitHub App installation auth.`,
+    );
+  }
+
+  try {
+    return GitHubAppInstallationConnectionConfigSchema.parse(input.config);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new BadRequestError(
+        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
+        `Integration connection '${input.connectionId}' has invalid GitHub App configuration.`,
+      );
+    }
+
+    throw error;
+  }
 }
 
 export async function completeGitHubAppInstallationConnection(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
-    integrationsConfig: {
-      activeMasterEncryptionKeyVersion: number;
-      masterEncryptionKeys: Record<string, string>;
-    };
   },
   input: CompleteGitHubAppInstallationConnectionInput,
 ): Promise<CompletedConnection> {
-  const { db, integrationRegistry, integrationsConfig } = ctx;
-
-  const resolved = await resolveGitHubAppInstallationHandlerTargetOrThrow(
-    {
-      db,
-      integrationRegistry,
-      integrationsConfig,
-    },
-    {
-      targetKey: input.targetKey,
-      invalidInputCode:
-        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
-    },
-  );
+  const { db, integrationRegistry } = ctx;
 
   const queryParams = createRedirectQueryParams(input.query);
   const state = resolveRedirectStateOrThrow(queryParams);
 
   const redirectSession = await db.query.integrationConnectionRedirectSessions.findFirst({
-    where: (table, { and, eq }) =>
-      and(eq(table.targetKey, input.targetKey), eq(table.state, state)),
+    where: (table, { eq }) => eq(table.state, state),
   });
 
   if (redirectSession === undefined) {
@@ -97,8 +140,6 @@ export async function completeGitHubAppInstallationConnection(
       "Redirect state is invalid.",
     );
   }
-
-  const requestedDisplayName = resolveRedirectDisplayName(redirectSession.state);
 
   if (redirectSession.usedAt !== null) {
     throw new BadRequestError(
@@ -120,11 +161,38 @@ export async function completeGitHubAppInstallationConnection(
     );
   }
 
-  const completedGitHubAppInstallationConnection = await resolved.redirectHandler.complete({
+  const connectionId = resolveGitHubAppInstallationConnectionIdOrThrow(state);
+  const installationId = resolveInstallationIdOrThrow(queryParams);
+  const setupAction = queryParams.get("setup_action");
+
+  const connection = await resolveConnectionWithTargetOrThrow({
+    db,
     organizationId: redirectSession.organizationId,
-    targetKey: input.targetKey,
-    target: resolved.target,
-    query: queryParams,
+    connectionId,
+  });
+
+  if (connection.targetKey !== redirectSession.targetKey) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
+      "Redirect state does not match the target for this connection.",
+    );
+  }
+
+  const definition = integrationRegistry.getDefinition({
+    familyId: connection.target.familyId,
+    variantId: connection.target.variantId,
+  });
+
+  if (definition === undefined) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
+      `Integration definition '${connection.target.familyId}/${connection.target.variantId}' is not registered.`,
+    );
+  }
+
+  const parsedConnectionConfig = resolveGitHubAppInstallationConnectionConfigOrThrow({
+    config: connection.config,
+    connectionId: connection.id,
   });
 
   return db.transaction(async (tx) => {
@@ -151,103 +219,68 @@ export async function completeGitHubAppInstallationConnection(
       );
     }
 
-    const [createdConnection] = await tx
-      .insert(integrationConnections)
-      .values({
-        organizationId: redirectSession.organizationId,
-        targetKey: input.targetKey,
-        displayName:
-          requestedDisplayName ??
-          completedGitHubAppInstallationConnection.externalSubjectId ??
-          input.targetKey,
-        status: IntegrationConnectionStatuses.ACTIVE,
-        ...(completedGitHubAppInstallationConnection.externalSubjectId === undefined
-          ? {}
-          : { externalSubjectId: completedGitHubAppInstallationConnection.externalSubjectId }),
-        config: completedGitHubAppInstallationConnection.connectionConfig,
-        targetSnapshotConfig: resolved.target.config,
+    const nextConfig = {
+      ...parsedConnectionConfig,
+      installation_id: installationId,
+      ...(setupAction === null ? {} : { setup_action: setupAction }),
+    };
+
+    const [updatedConnection] = await tx
+      .update(integrationConnections)
+      .set({
+        externalSubjectId: installationId,
+        config: nextConfig,
       })
+      .where(
+        and(
+          eq(integrationConnections.id, connection.id),
+          eq(integrationConnections.organizationId, redirectSession.organizationId),
+        ),
+      )
       .returning();
 
-    if (createdConnection === undefined) {
-      throw new Error(
-        "Failed to create integration connection from GitHub App installation callback.",
+    if (updatedConnection === undefined) {
+      throw new NotFoundError(
+        IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,
+        `Integration connection '${connection.id}' was not found.`,
       );
     }
 
-    if (completedGitHubAppInstallationConnection.credentialMaterials.length > 0) {
-      const organizationCredentialKey = await tx.query.organizationCredentialKeys.findFirst({
-        where: (table, { eq }) => eq(table.organizationId, redirectSession.organizationId),
-        orderBy: (table, { desc }) => [desc(table.version)],
+    const webhookSourceCapability = definition.webhookSource;
+    if (
+      webhookSourceCapability !== undefined &&
+      webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT &&
+      ((await webhookSourceCapability.supportsConnection?.({
+        connection: {
+          id: updatedConnection.id,
+          status: updatedConnection.status,
+          config: updatedConnection.config ?? {},
+        },
+      })) ??
+        true)
+    ) {
+      await ensureImplicitConnectionWebhookSource({
+        db: tx,
+        organizationId: redirectSession.organizationId,
+        connectionId: updatedConnection.id,
+        targetKey: updatedConnection.targetKey,
       });
-
-      if (organizationCredentialKey === undefined) {
-        throw new Error(
-          `Organization credential key is missing for '${redirectSession.organizationId}'.`,
-        );
-      }
-
-      const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-        masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-        masterEncryptionKeys: integrationsConfig.masterEncryptionKeys,
-      });
-      const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
-        wrappedCiphertext: organizationCredentialKey.ciphertext,
-        masterEncryptionKeyMaterial,
-      });
-
-      try {
-        for (const material of completedGitHubAppInstallationConnection.credentialMaterials) {
-          const encryptedCredential = encryptCredentialUtf8({
-            plaintext: material.plaintext,
-            organizationCredentialKey: unwrappedOrganizationCredentialKey,
-          });
-
-          const [createdCredential] = await tx
-            .insert(integrationCredentials)
-            .values({
-              organizationId: redirectSession.organizationId,
-              secretKind: resolveCredentialSecretKind(material.secretType),
-              ciphertext: encryptedCredential.ciphertext,
-              nonce: encryptedCredential.nonce,
-              organizationCredentialKeyVersion: organizationCredentialKey.version,
-              intendedFamilyId: resolved.target.familyId,
-              ...(material.metadata === undefined ? {} : { metadata: material.metadata }),
-              ...(material.expiresAt === undefined ? {} : { expiresAt: material.expiresAt }),
-            })
-            .returning({
-              id: integrationCredentials.id,
-            });
-
-          if (createdCredential === undefined) {
-            throw new Error("Failed to create integration credential.");
-          }
-
-          await tx.insert(integrationConnectionCredentials).values({
-            connectionId: createdConnection.id,
-            credentialId: createdCredential.id,
-            slotKey: material.slotKey,
-          });
-        }
-      } finally {
-        unwrappedOrganizationCredentialKey.fill(0);
-      }
     }
 
     return {
-      id: createdConnection.id,
-      targetKey: createdConnection.targetKey,
-      displayName: createdConnection.displayName,
-      status: createdConnection.status,
-      ...(createdConnection.externalSubjectId === null
+      id: updatedConnection.id,
+      targetKey: updatedConnection.targetKey,
+      displayName: updatedConnection.displayName,
+      status: updatedConnection.status,
+      ...(updatedConnection.externalSubjectId === null
         ? {}
-        : { externalSubjectId: createdConnection.externalSubjectId }),
-      ...(createdConnection.config === null ? {} : { config: createdConnection.config }),
-      ...(createdConnection.targetSnapshotConfig === null
+        : { externalSubjectId: updatedConnection.externalSubjectId }),
+      ...(updatedConnection.config === null ? {} : { config: updatedConnection.config }),
+      ...(updatedConnection.targetSnapshotConfig === null
         ? {}
-        : { targetSnapshotConfig: createdConnection.targetSnapshotConfig }),
-      createdAt: createdConnection.createdAt,
-      updatedAt: createdConnection.updatedAt,
+        : { targetSnapshotConfig: updatedConnection.targetSnapshotConfig }),
+      createdAt: updatedConnection.createdAt,
+      updatedAt: updatedConnection.updatedAt,
     };
   });
 }

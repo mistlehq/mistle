@@ -12,20 +12,16 @@ const routeHandler = async (
 ) => {
   const db = ctx.get("db");
   const integrationRegistry = ctx.get("integrationRegistry");
-  const integrationsConfig = ctx.get("config").integrations;
-  const { targetKey } = ctx.req.valid("param");
-  const { displayName } = ctx.req.valid("json");
+  const { connectionId } = ctx.req.valid("param");
 
   const startedConnection = await startGitHubAppInstallationConnection(
     {
       db,
       integrationRegistry,
-      integrationsConfig,
     },
     {
       organizationId: session.activeOrganizationId,
-      targetKey,
-      ...(displayName === undefined ? {} : { displayName }),
+      connectionId,
     },
   );
 

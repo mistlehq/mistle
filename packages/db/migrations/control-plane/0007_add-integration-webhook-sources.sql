@@ -1,12 +1,10 @@
 CREATE TABLE "control_plane"."integration_webhook_sources" (
 	"id" text PRIMARY KEY NOT NULL,
-	"owner_scope" text NOT NULL,
-	"organization_id" text,
-	"integration_connection_id" text,
-	"target_key" text,
+	"organization_id" text NOT NULL,
+	"integration_connection_id" text NOT NULL,
+	"target_key" text NOT NULL,
 	"display_name" text,
-	"routing_strategy" text NOT NULL,
-	"endpoint_key" text,
+	"endpoint_key" text NOT NULL,
 	"webhook_secret_credential_id" text,
 	"remote_registration_id" text,
 	"status" text DEFAULT 'active' NOT NULL,
@@ -23,7 +21,6 @@ CREATE UNIQUE INDEX "integration_webhook_sources_endpoint_key_uidx" ON "control_
 CREATE INDEX "integration_webhook_sources_organization_id_idx" ON "control_plane"."integration_webhook_sources" USING btree ("organization_id");--> statement-breakpoint
 CREATE INDEX "integration_webhook_sources_integration_connection_id_idx" ON "control_plane"."integration_webhook_sources" USING btree ("integration_connection_id");--> statement-breakpoint
 CREATE INDEX "integration_webhook_sources_target_key_idx" ON "control_plane"."integration_webhook_sources" USING btree ("target_key");--> statement-breakpoint
-CREATE INDEX "integration_webhook_sources_owner_scope_idx" ON "control_plane"."integration_webhook_sources" USING btree ("owner_scope");--> statement-breakpoint
 CREATE INDEX "integration_webhook_sources_status_idx" ON "control_plane"."integration_webhook_sources" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "integration_webhook_sources_webhook_secret_credential_id_idx" ON "control_plane"."integration_webhook_sources" USING btree ("webhook_secret_credential_id");--> statement-breakpoint
 ALTER TABLE "control_plane"."integration_webhook_events" ADD CONSTRAINT "integration_webhook_events_integration_webhook_source_id_integration_webhook_sources_id_fk" FOREIGN KEY ("integration_webhook_source_id") REFERENCES "control_plane"."integration_webhook_sources"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

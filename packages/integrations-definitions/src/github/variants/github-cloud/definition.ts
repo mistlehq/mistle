@@ -1,6 +1,5 @@
 import { GitHubCredentialResolverKeys } from "../../shared/credential-resolver-keys.js";
 import { GitHubAppInstallationCredentialResolver } from "../../shared/credential-resolver.server.js";
-import { GitHubAppInstallationRedirectHandler } from "../../shared/github-app-installation-handler.server.js";
 import { listGitHubConnectionResources } from "../../shared/list-connection-resources.server.js";
 import {
   createGitHubResourceDefinitions,
@@ -22,7 +21,6 @@ export const GitHubCloudDefinition: GitHubCloudBaseIntegrationDefinition = {
         GitHubAppInstallationCredentialResolver,
     },
   },
-  redirectHandler: GitHubAppInstallationRedirectHandler,
   webhookHandler: GitHubCloudWebhookHandler,
   webhookSource: GitHubWebhookSourceCapability,
   resourceDefinitions: createGitHubResourceDefinitions({

@@ -31,12 +31,15 @@ export function useIntegrationWebhookSourceState(input: {
   detailConnections: readonly IntegrationConnection[];
 }) {
   const queryClient = useQueryClient();
+  const supportedConnections = input.detailConnections.filter(
+    (connection) => connection.supportsWebhookSources === true,
+  );
   const [revealedWebhookSecretByConnectionId, setRevealedWebhookSecretByConnectionId] = useState(
     () => new Map<string, string>(),
   );
 
   const webhookSourceQueries = useQueries({
-    queries: input.detailConnections.map((connection) => ({
+    queries: supportedConnections.map((connection) => ({
       queryKey: [...SETTINGS_INTEGRATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX, connection.id] as const,
       queryFn: async ({ signal }) =>
         listIntegrationWebhookSources({
@@ -88,7 +91,7 @@ export function useIntegrationWebhookSourceState(input: {
   });
 
   const webhookSourceStateByConnectionId = new Map<string, IntegrationWebhookSourceSectionState>(
-    input.detailConnections.map((connection, index) => {
+    supportedConnections.map((connection, index) => {
       const query = webhookSourceQueries[index];
       const isCreating =
         createWebhookSourceMutation.isPending &&

@@ -487,8 +487,93 @@ describe("integration connections create form integration", () => {
     }
 
     expect(webhookSource.endpointKey).toBeDefined();
-    expect(webhookSource.endpointKey?.length).toBeGreaterThan(0);
-    expect(webhookSource.routingStrategy).toBe("path");
+    expect(webhookSource.endpointKey.length).toBeGreaterThan(0);
+  });
+
+  it("creates GitHub App form connections and the implicit webhook source", async ({ fixture }) => {
+    await upsertGitHubTarget({ fixture, targetKey: "github-cloud" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-create-github-app@example.com",
+    });
+
+    const response = await fixture.request("/v1/integration/connections/github-cloud/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "GitHub App installation",
+        methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          app_id: "123",
+          app_slug: "mistle-github-app",
+        },
+        secrets: {
+          appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
+          webhookSecret: "github-webhook-secret",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    expect(responseBody.config).toEqual({
+      connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      app_id: "123",
+      app_slug: "mistle-github-app",
+    });
+    expect(responseBody.targetSnapshotConfig).toEqual({
+      api_base_url: "https://api.github.com",
+      web_base_url: "https://github.com",
+    });
+
+    const createdLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
+      where: (table, { eq }) => eq(table.connectionId, responseBody.id),
+      orderBy: (table, { asc }) => [asc(table.slotKey)],
+    });
+
+    expect(createdLinks.map((link) => link.slotKey)).toEqual([
+      "github.github-cloud.github-app-installation.app-private-key-pem",
+      "github.github-cloud.github-app-installation.webhook-secret",
+    ]);
+
+    const createdCredentials = await fixture.db.query.integrationCredentials.findMany({
+      where: (table, { and, eq, inArray }) =>
+        and(
+          inArray(
+            table.id,
+            createdLinks.map((link) => link.credentialId),
+          ),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+      orderBy: (table, { asc }) => [asc(table.id)],
+    });
+
+    expect(createdCredentials).toHaveLength(2);
+    expect(createdCredentials.map((credential) => credential.secretKind)).toEqual([
+      IntegrationCredentialSecretKinds.API_KEY,
+      IntegrationCredentialSecretKinds.API_KEY,
+    ]);
+
+    const webhookSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.integrationConnectionId, responseBody.id),
+          eq(table.targetKey, "github-cloud"),
+        ),
+    });
+
+    expect(webhookSource).toBeDefined();
+    if (webhookSource === undefined) {
+      throw new Error("Expected GitHub App implicit webhook source.");
+    }
+
+    expect(webhookSource.endpointKey).toBeDefined();
+    expect(webhookSource.endpointKey.length).toBeGreaterThan(0);
   });
 
   it("returns 400 when Jira personal token config is missing site_url", async ({ fixture }) => {
@@ -777,6 +862,36 @@ async function upsertSlackTarget(input: {
         enabled: true,
         config: {
           api_base_url: "https://slack.com/api",
+        },
+      },
+    });
+}
+
+async function upsertGitHubTarget(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  targetKey: string;
+}) {
+  await input.fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "github",
+      variantId: "github-cloud",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
         },
       },
     });

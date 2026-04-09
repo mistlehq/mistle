@@ -1,6 +1,5 @@
 import {
   IntegrationConnectionStatuses,
-  IntegrationWebhookSourceOwnerScopes,
   IntegrationWebhookSourceStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
@@ -29,7 +28,6 @@ export async function assertWebhookSourceReferenceOrThrow(
     where: (table, { and, eq }) =>
       and(
         eq(table.id, input.integrationWebhookSourceId),
-        eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
         eq(table.organizationId, input.organizationId),
         eq(table.status, IntegrationWebhookSourceStatuses.ACTIVE),
       ),
@@ -39,15 +37,6 @@ export async function assertWebhookSourceReferenceOrThrow(
     throw new BadRequestError(
       AutomationWebhooksBadRequestCodes.INVALID_WEBHOOK_SOURCE_REFERENCE,
       "Webhook source must reference an active source in the active organization.",
-    );
-  }
-
-  if (
-    webhookSource.integrationConnectionId === null ||
-    webhookSource.integrationConnectionId === undefined
-  ) {
-    throw new Error(
-      `Connection-owned webhook source '${webhookSource.id}' is missing integrationConnectionId.`,
     );
   }
 

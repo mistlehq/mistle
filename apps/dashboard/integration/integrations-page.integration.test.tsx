@@ -39,13 +39,19 @@ function createGitHubTarget() {
       {
         id: "github-app-installation",
         label: "GitHub App installation",
-        kind: "redirect" as const,
-        ui: {
-          create: {
-            submitLabel: "Install GitHub App",
-            helperText: "Continue to GitHub to install the app and finish connecting this account.",
+        kind: "form" as const,
+        secretFields: [
+          {
+            name: "appPrivateKeyPem",
+            label: "App private key PEM",
+            inputType: "password" as const,
           },
-        },
+          {
+            name: "webhookSecret",
+            label: "Webhook secret",
+            inputType: "password" as const,
+          },
+        ],
       },
     ],
     targetHealth: {
@@ -125,6 +131,8 @@ describe("IntegrationsPage resource refresh concurrency", () => {
                   bindingCount: 0,
                   config: {
                     connection_method: "github-app-installation",
+                    app_id: "123",
+                    app_slug: "mistle-github-app",
                   },
                   resources: [
                     {
@@ -303,6 +311,8 @@ describe("IntegrationsPage resource refresh concurrency", () => {
                   bindingCount: 1,
                   config: {
                     connection_method: "github-app-installation",
+                    app_id: "123",
+                    app_slug: "mistle-github-app",
                   },
                   createdAt: "2026-03-03T00:00:00.000Z",
                   updatedAt: "2026-03-11T04:30:00.000Z",
@@ -315,6 +325,8 @@ describe("IntegrationsPage resource refresh concurrency", () => {
                   bindingCount: 0,
                   config: {
                     connection_method: "github-app-installation",
+                    app_id: "123",
+                    app_slug: "mistle-github-app",
                   },
                   createdAt: "2026-03-03T00:00:00.000Z",
                   updatedAt: "2026-03-11T04:30:00.000Z",

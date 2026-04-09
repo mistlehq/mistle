@@ -15,7 +15,6 @@ export { GitHubTargetConfigSchema, type GitHubTargetConfig } from "./target-conf
 export { GitHubTargetSecretSchema, type GitHubTargetSecrets } from "./target-secret-schema.js";
 export { compileGitHubBinding, type GitHubCompileBindingInput } from "./compile-binding.js";
 export { resolveGitHubBindingConfigForm } from "./binding-config-form.js";
-export { GitHubAppInstallationRedirectHandler } from "./github-app-installation-handler.server.js";
 export { listGitHubConnectionResources } from "./list-connection-resources.server.js";
 export { GitHubCredentialResolverKeys } from "./credential-resolver-keys.js";
 export { GitHubAppInstallationCredentialResolver } from "./credential-resolver.server.js";

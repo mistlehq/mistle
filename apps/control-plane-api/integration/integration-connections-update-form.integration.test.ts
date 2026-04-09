@@ -774,6 +774,107 @@ describe("integration connections update form integration", () => {
       IntegrationCredentialSecretKinds.API_KEY,
     ]);
   });
+
+  it("updates GitHub App form connections", async ({ fixture }) => {
+    await upsertGitHubTarget({ fixture, targetKey: "github-cloud" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-update-github-app@example.com",
+    });
+
+    const createResponse = await fixture.request("/v1/integration/connections/github-cloud/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "GitHub App installation",
+        methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          app_id: "123",
+          app_slug: "mistle-github-app",
+        },
+        secrets: {
+          appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\noriginal\n-----END PRIVATE KEY-----",
+          webhookSecret: "original-webhook-secret",
+        },
+      }),
+    });
+
+    expect(createResponse.status).toBe(201);
+    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+
+    const previousLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
+      where: (table, { eq }) => eq(table.connectionId, createdConnection.id),
+      orderBy: (table, { asc }) => [asc(table.slotKey)],
+    });
+    expect(previousLinks).toHaveLength(2);
+
+    const updateResponse = await fixture.request(
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/form`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "GitHub App installation updated",
+          config: {
+            connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+            app_id: "456",
+            app_slug: "updated-github-app",
+          },
+          secrets: {
+            appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nupdated\n-----END PRIVATE KEY-----",
+            webhookSecret: "updated-webhook-secret",
+          },
+        }),
+      },
+    );
+
+    expect(updateResponse.status).toBe(200);
+    const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
+    expect(updatedConnection.displayName).toBe("GitHub App installation updated");
+    expect(updatedConnection.config).toEqual({
+      connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      app_id: "456",
+      app_slug: "updated-github-app",
+    });
+
+    const updatedLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
+      where: (table, { eq }) => eq(table.connectionId, createdConnection.id),
+      orderBy: (table, { asc }) => [asc(table.slotKey)],
+    });
+
+    expect(updatedLinks).toHaveLength(2);
+    expect(updatedLinks.map((link) => link.slotKey)).toEqual([
+      "github.github-cloud.github-app-installation.app-private-key-pem",
+      "github.github-cloud.github-app-installation.webhook-secret",
+    ]);
+    expect(updatedLinks[0]?.credentialId).not.toBe(previousLinks[0]?.credentialId);
+    expect(updatedLinks[1]?.credentialId).not.toBe(previousLinks[1]?.credentialId);
+
+    const updatedCredentials = await fixture.db.query.integrationCredentials.findMany({
+      where: (table, { and, eq, inArray }) =>
+        and(
+          inArray(
+            table.id,
+            updatedLinks.map((link) => link.credentialId),
+          ),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+      orderBy: (table, { asc }) => [asc(table.id)],
+    });
+
+    expect(updatedCredentials).toHaveLength(2);
+    expect(updatedCredentials.map((credential) => credential.secretKind)).toEqual([
+      IntegrationCredentialSecretKinds.API_KEY,
+      IntegrationCredentialSecretKinds.API_KEY,
+    ]);
+  });
 });
 
 async function upsertOpenAiTarget(input: {
@@ -851,6 +952,36 @@ async function upsertSlackTarget(input: {
         enabled: true,
         config: {
           api_base_url: "https://slack.com/api",
+        },
+      },
+    });
+}
+
+async function upsertGitHubTarget(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  targetKey: string;
+}) {
+  await input.fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "github",
+      variantId: "github-cloud",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
         },
       },
     });

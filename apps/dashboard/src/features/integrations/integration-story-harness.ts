@@ -11,7 +11,12 @@ export const DemoIntegrationConnections: readonly IntegrationConnection[] = [
     targetKey: "github",
     displayName: "Engineering GitHub",
     status: "active",
-    config: { connection_method: "github-app-installation", installation_id: 12345 },
+    config: {
+      connection_method: "github-app-installation",
+      app_id: "123",
+      app_slug: "mistle-github-app",
+      installation_id: 12345,
+    },
     externalSubjectId: "mistle-labs",
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-11T04:30:00.000Z",

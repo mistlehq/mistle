@@ -235,7 +235,8 @@ This is the recommended workflow.
 
 5. Define target secrets.
 
-- Put operator-managed provider secrets in `targetSecretSchema` (for example webhook signing secrets and app private keys).
+- Put deployment-level operator-managed secrets in `targetSecretSchema`.
+- Keep connection-owned credentials (for example org-owned app private keys or webhook secrets) on the connection method secret fields instead.
 
 6. Implement `compileBinding`.
 

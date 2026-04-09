@@ -15,22 +15,14 @@ describe("GitHubCloudTargetConfigSchema", () => {
     });
   });
 
-  it("parses optional github app metadata", () => {
-    const parsed = GitHubCloudTargetConfigSchema.parse({
-      api_base_url: "https://api.github.com",
-      web_base_url: "https://github.com",
-      app_id: 12345,
-      app_slug: "mistle-app",
-      client_id: "Iv1.abc123",
-    });
-
-    expect(parsed).toEqual({
-      apiBaseUrl: "https://api.github.com",
-      webBaseUrl: "https://github.com",
-      appId: "12345",
-      appSlug: "mistle-app",
-      clientId: "Iv1.abc123",
-    });
+  it("rejects legacy github app metadata on the target", () => {
+    expect(() =>
+      GitHubCloudTargetConfigSchema.parse({
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+        app_id: 12345,
+      }),
+    ).toThrow(/Unrecognized key/u);
   });
 
   it("fails for invalid URL fields", () => {

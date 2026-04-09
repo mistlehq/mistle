@@ -39,8 +39,8 @@ describe("integration targets discovery integration", () => {
           variantId: "github-cloud",
           enabled: true,
           config: {
-            base_url: "https://github.com",
-            app_id: "123456",
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
           },
           displayNameOverride: "GitHub Cloud",
           descriptionOverride: "GitHub Cloud target",
@@ -143,8 +143,8 @@ describe("integration targets discovery integration", () => {
       variantId: "github-cloud",
       enabled: true,
       config: {
-        base_url: "https://github.com",
-        app_id: "123456",
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
       },
       displayName: "GitHub Cloud",
       description: "GitHub Cloud target",
@@ -167,19 +167,27 @@ describe("integration targets discovery integration", () => {
         {
           id: "github-app-installation",
           label: "GitHub App installation",
-          kind: "redirect",
-          ui: {
-            create: {
-              submitLabel: "Install GitHub App",
-              helperText:
-                "Continue to GitHub to install the app and finish connecting this account.",
+          kind: "form",
+          secretFields: [
+            {
+              name: "appPrivateKeyPem",
+              label: "App private key PEM",
+              placeholder: "-----BEGIN PRIVATE KEY-----",
+              inputType: "password",
+              slotKey: "github.github-cloud.github-app-installation.app-private-key-pem",
             },
-          },
+            {
+              name: "webhookSecret",
+              label: "Webhook secret",
+              placeholder: "Enter webhook secret",
+              inputType: "password",
+              slotKey: "github.github-cloud.github-app-installation.webhook-secret",
+            },
+          ],
         },
       ],
       webhookSource: {
         lifecycle: "implicit",
-        ownerScope: "target",
         requiresSourceSelection: true,
       },
       supportedWebhookEvents: expect.arrayContaining([
@@ -205,7 +213,7 @@ describe("integration targets discovery integration", () => {
       displayNameOverride: "GitHub Cloud",
       descriptionOverride: "GitHub Cloud target",
       targetHealth: {
-        configStatus: "invalid",
+        configStatus: "valid",
       },
     });
 
@@ -355,8 +363,8 @@ describe("integration targets discovery integration", () => {
         variantId: "github-cloud",
         enabled: true,
         config: {
-          base_url: "https://github.com",
-          app_id: "123456",
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
         },
         displayNameOverride: "GitHub Dashboard Contract",
         descriptionOverride: "GitHub contract target",
@@ -404,18 +412,25 @@ describe("integration targets discovery integration", () => {
         {
           id: "github-app-installation",
           label: "GitHub App installation",
-          kind: "redirect",
-          ui: {
-            create: {
-              submitLabel: "Install GitHub App",
-              helperText:
-                "Continue to GitHub to install the app and finish connecting this account.",
+          kind: "form",
+          secretFields: [
+            {
+              name: "appPrivateKeyPem",
+              label: "App private key PEM",
+              inputType: "password",
+              slotKey: "github.github-cloud.github-app-installation.app-private-key-pem",
             },
-          },
+            {
+              name: "webhookSecret",
+              label: "Webhook secret",
+              inputType: "password",
+              slotKey: "github.github-cloud.github-app-installation.webhook-secret",
+            },
+          ],
         },
       ],
       targetHealth: {
-        configStatus: "invalid",
+        configStatus: "valid",
       },
     });
   });

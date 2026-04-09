@@ -153,11 +153,10 @@ async function seedWebhookSource(input: {
 }) {
   await input.db.insert(integrationWebhookSources).values({
     id: input.sourceId,
-    ownerScope: "connection",
     organizationId: input.organizationId,
     integrationConnectionId: input.connectionId,
     targetKey: input.targetKey,
-    routingStrategy: "payload",
+    endpointKey: `${input.sourceId}-endpoint`,
     status: "active",
   });
 }

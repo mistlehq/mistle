@@ -3,7 +3,6 @@ import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/htt
 
 import {
   StartGitHubAppInstallationConnectionBadRequestResponseSchema,
-  StartGitHubAppInstallationConnectionBodySchema,
   StartGitHubAppInstallationConnectionNotFoundResponseSchema,
   StartGitHubAppInstallationConnectionParamsSchema,
   StartGitHubAppInstallationConnectionResponseSchema,
@@ -11,22 +10,15 @@ import {
 
 export const route = createRoute({
   method: "post",
-  path: "/:targetKey/github-app-installation/start",
+  path: "/:connectionId/github-app-installation/start",
   tags: ["Integrations"],
   request: {
     params: StartGitHubAppInstallationConnectionParamsSchema,
-    body: {
-      required: false,
-      content: {
-        "application/json": {
-          schema: StartGitHubAppInstallationConnectionBodySchema,
-        },
-      },
-    },
   },
   responses: {
     200: {
-      description: "Create a GitHub App installation authorization URL for an integration target.",
+      description:
+        "Create a GitHub App installation authorization URL for an existing integration connection.",
       content: {
         "application/json": {
           schema: StartGitHubAppInstallationConnectionResponseSchema,
@@ -58,7 +50,7 @@ export const route = createRoute({
       },
     },
     404: {
-      description: "Integration target was not found.",
+      description: "Integration connection was not found.",
       content: {
         "application/json": {
           schema: StartGitHubAppInstallationConnectionNotFoundResponseSchema,

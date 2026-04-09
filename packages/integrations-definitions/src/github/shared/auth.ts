@@ -18,10 +18,21 @@ export const GitHubApiKeyConnectionConfigSchema = z
 export const GitHubAppInstallationConnectionConfigSchema = z
   .object({
     connection_method: z.literal(IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION),
-    installation_id: z.union([z.string().min(1), z.number().int().nonnegative()]),
+    app_id: z.union([z.string().min(1), z.number().int().nonnegative()]),
+    app_slug: z.string().min(1),
+    installation_id: z.union([z.string().min(1), z.number().int().nonnegative()]).optional(),
     setup_action: z.string().min(1).optional(),
   })
-  .loose();
+  .strict()
+  .transform((input) => ({
+    connection_method: input.connection_method,
+    app_id: input.app_id.toString(),
+    app_slug: input.app_slug,
+    ...(input.installation_id === undefined
+      ? {}
+      : { installation_id: input.installation_id.toString() }),
+    ...(input.setup_action === undefined ? {} : { setup_action: input.setup_action }),
+  }));
 
 export const GitHubConnectionConfigSchema = z.union([
   GitHubApiKeyConnectionConfigSchema,

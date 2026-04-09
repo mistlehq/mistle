@@ -583,6 +583,7 @@ export interface paths {
                 }[];
                 /** @enum {string} */
                 status: "active" | "error" | "revoked";
+                supportsWebhookSources?: boolean;
                 targetKey: string;
                 targetSnapshotConfig?: {
                   [key: string]: unknown;
@@ -708,6 +709,7 @@ export interface paths {
               }[];
               /** @enum {string} */
               status: "active" | "error" | "revoked";
+              supportsWebhookSources?: boolean;
               targetKey: string;
               targetSnapshotConfig?: {
                 [key: string]: unknown;
@@ -922,6 +924,7 @@ export interface paths {
               }[];
               /** @enum {string} */
               status: "active" | "error" | "revoked";
+              supportsWebhookSources?: boolean;
               targetKey: string;
               targetSnapshotConfig?: {
                 [key: string]: unknown;
@@ -994,6 +997,106 @@ export interface paths {
       };
     };
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integration/connections/:connectionId/github-app-installation/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          connectionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Create a GitHub App installation authorization URL for an existing integration connection. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** Format: uri */
+              authorizationUrl: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
+                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;
@@ -1276,11 +1379,9 @@ export interface paths {
               callbackUrl?: string;
               createdAt: string;
               displayName: string;
-              endpointKey?: string;
+              endpointKey: string;
               id: string;
-              integrationConnectionId?: string;
-              /** @enum {string} */
-              ownerScope: "target" | "connection";
+              integrationConnectionId: string;
               providerMetadata: {
                 [key: string]: unknown;
               };
@@ -1380,11 +1481,9 @@ export interface paths {
               callbackUrl?: string;
               createdAt: string;
               displayName: string;
-              endpointKey?: string;
+              endpointKey: string;
               id: string;
-              integrationConnectionId?: string;
-              /** @enum {string} */
-              ownerScope: "target" | "connection";
+              integrationConnectionId: string;
               providerMetadata: {
                 [key: string]: unknown;
               };
@@ -1496,11 +1595,9 @@ export interface paths {
               callbackUrl?: string;
               createdAt: string;
               displayName: string;
-              endpointKey?: string;
+              endpointKey: string;
               id: string;
-              integrationConnectionId?: string;
-              /** @enum {string} */
-              ownerScope: "target" | "connection";
+              integrationConnectionId: string;
               providerMetadata: {
                 [key: string]: unknown;
               };
@@ -1735,6 +1832,7 @@ export interface paths {
               }[];
               /** @enum {string} */
               status: "active" | "error" | "revoked";
+              supportsWebhookSources?: boolean;
               targetKey: string;
               targetSnapshotConfig?: {
                 [key: string]: unknown;
@@ -1753,195 +1851,6 @@ export interface paths {
               | {
                   /** @enum {string} */
                   code: "INVALID_CREATE_CONNECTION_INPUT" | "FORM_CONNECTION_METHOD_NOT_SUPPORTED";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Integration target was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "TARGET_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/integration/connections/:targetKey/github-app-installation/complete": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: {
-          code?: string;
-          error?: string;
-          error_description?: string;
-          error_uri?: string;
-          installation_id?: string;
-          setup_action?: string;
-          state?: string;
-        };
-        header?: never;
-        path: {
-          targetKey: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Complete GitHub App installation connection creation and redirect to dashboard integrations. */
-        302: {
-          headers: {
-            Location: string;
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code:
-                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
-                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
-                    | "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED"
-                    | "REDIRECT_STATE_INVALID"
-                    | "REDIRECT_STATE_EXPIRED"
-                    | "REDIRECT_STATE_ALREADY_USED";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Integration target was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "TARGET_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/integration/connections/:targetKey/github-app-installation/start": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          targetKey: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            displayName?: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Create a GitHub App installation authorization URL for an integration target. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** Format: uri */
-              authorizationUrl: string;
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code:
-                    | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
-                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
-                    | "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED";
                   message: string;
                 }
               | {
@@ -2185,6 +2094,85 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/integration/connections/github-app-installation/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          code?: string;
+          error?: string;
+          error_description?: string;
+          error_uri?: string;
+          installation_id?: string;
+          setup_action?: string;
+          state?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Complete GitHub App installation on an existing connection and redirect to dashboard integrations. */
+        302: {
+          headers: {
+            Location: string;
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
+                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
+                    | "REDIRECT_STATE_INVALID"
+                    | "REDIRECT_STATE_EXPIRED"
+                    | "REDIRECT_STATE_ALREADY_USED";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Integration connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/integration/targets": {
     parameters: {
       query?: never;
@@ -2319,8 +2307,6 @@ export interface paths {
                 webhookSource?: {
                   /** @enum {string} */
                   lifecycle: "implicit" | "managed";
-                  /** @enum {string} */
-                  ownerScope: "target" | "connection";
                   requiresSourceSelection: boolean;
                 };
               }[];
@@ -2394,107 +2380,6 @@ export interface paths {
     };
     put?: never;
     post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/integration/webhooks/:targetKey": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          targetKey: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Immediate integration-defined webhook response. Status code, headers, content type, and body are integration-specific and may include empty responses. */
-        "2XX": {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "*/*":
-              | string
-              | {
-                  [key: string]: unknown;
-                };
-          };
-        };
-        /** @description Webhook event accepted for processing. */
-        202: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              status: "received" | "duplicate";
-            };
-          };
-        };
-        /** @description Immediate integration-defined webhook response with no body. */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Invalid webhook request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code: "INVALID_WEBHOOK_REQUEST";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Integration target or connection was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND" | "WEBHOOK_SOURCE_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal server error. */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-      };
-    };
     delete?: never;
     options?: never;
     head?: never;

@@ -1249,6 +1249,9 @@
                               "additionalProperties": false
                             }
                           },
+                          "supportsWebhookSources": {
+                            "type": "boolean"
+                          },
                           "createdAt": {
                             "type": "string",
                             "minLength": 1
@@ -1749,10 +1752,6 @@
                         "type": "string",
                         "minLength": 1
                       },
-                      "ownerScope": {
-                        "type": "string",
-                        "enum": ["target", "connection"]
-                      },
                       "integrationConnectionId": {
                         "type": "string",
                         "minLength": 1
@@ -1793,8 +1792,9 @@
                     "required": [
                       "id",
                       "targetKey",
-                      "ownerScope",
+                      "integrationConnectionId",
                       "displayName",
+                      "endpointKey",
                       "status",
                       "providerMetadata",
                       "createdAt",
@@ -1961,10 +1961,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "ownerScope": {
-                      "type": "string",
-                      "enum": ["target", "connection"]
-                    },
                     "integrationConnectionId": {
                       "type": "string",
                       "minLength": 1
@@ -2009,8 +2005,9 @@
                   "required": [
                     "id",
                     "targetKey",
-                    "ownerScope",
+                    "integrationConnectionId",
                     "displayName",
+                    "endpointKey",
                     "status",
                     "providerMetadata",
                     "createdAt",
@@ -2175,10 +2172,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "ownerScope": {
-                      "type": "string",
-                      "enum": ["target", "connection"]
-                    },
                     "integrationConnectionId": {
                       "type": "string",
                       "minLength": 1
@@ -2219,8 +2212,9 @@
                   "required": [
                     "id",
                     "targetKey",
-                    "ownerScope",
+                    "integrationConnectionId",
                     "displayName",
+                    "endpointKey",
                     "status",
                     "providerMetadata",
                     "createdAt",
@@ -2787,6 +2781,9 @@
                         "additionalProperties": false
                       }
                     },
+                    "supportsWebhookSources": {
+                      "type": "boolean"
+                    },
                     "createdAt": {
                       "type": "string",
                       "minLength": 1
@@ -3027,6 +3024,9 @@
                         "required": ["kind", "selectionMode", "count", "syncState"],
                         "additionalProperties": false
                       }
+                    },
+                    "supportsWebhookSources": {
+                      "type": "boolean"
                     },
                     "createdAt": {
                       "type": "string",
@@ -3409,6 +3409,9 @@
                         "additionalProperties": false
                       }
                     },
+                    "supportsWebhookSources": {
+                      "type": "boolean"
+                    },
                     "createdAt": {
                       "type": "string",
                       "minLength": 1
@@ -3545,7 +3548,7 @@
         }
       }
     },
-    "/v1/integration/connections/:targetKey/github-app-installation/start": {
+    "/v1/integration/connections/:connectionId/github-app-installation/start": {
       "post": {
         "tags": ["Integrations"],
         "parameters": [
@@ -3555,30 +3558,13 @@
               "minLength": 1
             },
             "required": true,
-            "name": "targetKey",
+            "name": "connectionId",
             "in": "path"
           }
         ],
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "displayName": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "additionalProperties": false
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
-            "description": "Create a GitHub App installation authorization URL for an integration target.",
+            "description": "Create a GitHub App installation authorization URL for an existing integration connection.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3608,8 +3594,7 @@
                           "type": "string",
                           "enum": [
                             "INVALID_GITHUB_APP_INSTALLATION_START_INPUT",
-                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
-                            "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED"
+                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
                           ]
                         },
                         "message": {
@@ -3685,7 +3670,7 @@
             }
           },
           "404": {
-            "description": "Integration target was not found.",
+            "description": "Integration connection was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3693,7 +3678,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND"]
+                      "enum": ["CONNECTION_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -3873,19 +3858,10 @@
         }
       }
     },
-    "/v1/integration/connections/:targetKey/github-app-installation/complete": {
+    "/v1/integration/connections/github-app-installation/complete": {
       "get": {
         "tags": ["Integrations"],
         "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "targetKey",
-            "in": "path"
-          },
           {
             "schema": {
               "type": "string",
@@ -3952,7 +3928,7 @@
         ],
         "responses": {
           "302": {
-            "description": "Complete GitHub App installation connection creation and redirect to dashboard integrations.",
+            "description": "Complete GitHub App installation on an existing connection and redirect to dashboard integrations.",
             "headers": {
               "Location": {
                 "schema": {
@@ -3977,7 +3953,6 @@
                           "enum": [
                             "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT",
                             "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
-                            "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED",
                             "REDIRECT_STATE_INVALID",
                             "REDIRECT_STATE_EXPIRED",
                             "REDIRECT_STATE_ALREADY_USED"
@@ -4012,7 +3987,7 @@
             }
           },
           "404": {
-            "description": "Integration target was not found.",
+            "description": "Integration connection was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4020,7 +3995,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND"]
+                      "enum": ["CONNECTION_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -4373,15 +4348,11 @@
                                 "type": "string",
                                 "enum": ["implicit", "managed"]
                               },
-                              "ownerScope": {
-                                "type": "string",
-                                "enum": ["target", "connection"]
-                              },
                               "requiresSourceSelection": {
                                 "type": "boolean"
                               }
                             },
-                            "required": ["lifecycle", "ownerScope", "requiresSourceSelection"],
+                            "required": ["lifecycle", "requiresSourceSelection"],
                             "additionalProperties": false
                           },
                           "supportedWebhookEvents": {
@@ -4789,141 +4760,6 @@
                 "schema": {
                   "type": "string",
                   "minLength": 1
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/integration/webhooks/:targetKey": {
-      "post": {
-        "tags": ["Integrations"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "targetKey",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Webhook event accepted for processing.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": ["received", "duplicate"]
-                    }
-                  },
-                  "required": ["status"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "204": {
-            "description": "Immediate integration-defined webhook response with no body."
-          },
-          "400": {
-            "description": "Invalid webhook request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": ["INVALID_WEBHOOK_REQUEST"]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": ["VALIDATION_ERROR"]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Integration target or connection was not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "TARGET_NOT_FOUND",
-                        "CONNECTION_NOT_FOUND",
-                        "WEBHOOK_SOURCE_NOT_FOUND"
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          },
-          "2XX": {
-            "description": "Immediate integration-defined webhook response. Status code, headers, content type, and body are integration-specific and may include empty responses.",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "object",
-                      "additionalProperties": {}
-                    }
-                  ]
                 }
               }
             }

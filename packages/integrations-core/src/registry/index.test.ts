@@ -9,8 +9,6 @@ import type { IntegrationDefinition } from "../types/index.js";
 import {
   IntegrationConnectionMethodIds,
   IntegrationWebhookSourceLifecycles,
-  IntegrationWebhookSourceOwnerScopes,
-  IntegrationWebhookSourceRoutingStrategies,
 } from "../types/index.js";
 import { IntegrationRegistry } from "./index.js";
 
@@ -36,13 +34,32 @@ const GitHubAppInstallationConnectionMethods = [
   {
     id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
     label: "GitHub App installation",
-    kind: "redirect",
-    ui: {
-      create: {
-        submitLabel: "Install GitHub App",
-        helperText: "Continue to GitHub to install the app and finish connecting this account.",
+    kind: "form",
+    secretFields: [
+      {
+        name: "appPrivateKeyPem",
+        label: "App private key PEM",
+        inputType: "password",
+        secretType: "api_key",
+        slotKey: "github.github-cloud.github-app-installation.app-private-key-pem",
       },
-    },
+      {
+        name: "webhookSecret",
+        label: "Webhook secret",
+        inputType: "password",
+        secretType: "api_key",
+        slotKey: "github.github-cloud.github-app-installation.webhook-secret",
+      },
+    ],
+    configSchema: z
+      .object({
+        connection_method: z.literal(IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION),
+        app_id: z.string(),
+        app_slug: z.string(),
+        installation_id: z.string().optional(),
+        setup_action: z.string().optional(),
+      })
+      .strict(),
   },
 ] as const;
 const GitHubConnectionMethods = [
@@ -326,8 +343,6 @@ describe("integration registry", () => {
       bindingConfigSchema: ConfigSchema,
       connectionMethods: GitHubConnectionMethods,
       webhookSource: {
-        ownerScope: IntegrationWebhookSourceOwnerScopes.TARGET,
-        routingStrategy: IntegrationWebhookSourceRoutingStrategies.PAYLOAD,
         lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
         async describeSource(input) {
           return {
@@ -350,8 +365,6 @@ describe("integration registry", () => {
         variantId: "github-cloud",
       })?.webhookSource,
     ).toMatchObject({
-      ownerScope: "target",
-      routingStrategy: "payload",
       lifecycle: "implicit",
     });
   });
@@ -369,8 +382,6 @@ describe("integration registry", () => {
       bindingConfigSchema: ConfigSchema,
       connectionMethods: GitHubConnectionMethods,
       webhookSource: {
-        ownerScope: IntegrationWebhookSourceOwnerScopes.TARGET,
-        routingStrategy: IntegrationWebhookSourceRoutingStrategies.PAYLOAD,
         lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
         async describeSource(input) {
           return {
@@ -391,7 +402,7 @@ describe("integration registry", () => {
       throw new Error("Expected webhookSource to be defined.");
     }
 
-    Reflect.set(definition.webhookSource, "ownerScope", "");
+    Reflect.set(definition.webhookSource, "lifecycle", "");
 
     expect(() => registry.register(definition)).toThrow(IntegrationDefinitionRegistryError);
   });

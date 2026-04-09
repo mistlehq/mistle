@@ -68,6 +68,7 @@ type ResolverContextConnection = {
   status: "active" | "error" | "revoked";
   externalSubjectId?: string;
   config: Record<string, unknown>;
+  secrets?: Record<string, string>;
 };
 
 type ResolverContextTarget = {
@@ -118,6 +119,7 @@ function resolveResolverContextConnection(input: {
   status: "active" | "error" | "revoked";
   externalSubjectId: string | null;
   config: unknown;
+  secrets?: Record<string, string>;
 }): ResolverContextConnection {
   const config = resolveConnectionConfigOrThrow({
     connectionId: input.id,
@@ -128,8 +130,45 @@ function resolveResolverContextConnection(input: {
     id: input.id,
     status: input.status,
     config,
+    ...(input.secrets === undefined ? {} : { secrets: input.secrets }),
     ...(input.externalSubjectId === null ? {} : { externalSubjectId: input.externalSubjectId }),
   };
+}
+
+async function resolveResolverContextConnectionSecrets(input: {
+  db: AppContext["var"]["db"];
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+  organizationId: string;
+  connectionId: string;
+  connectionMethod?: {
+    kind: "form";
+    secretFields: readonly {
+      name: string;
+      secretType: string;
+      slotKey: string;
+    }[];
+  };
+}): Promise<Record<string, string> | undefined> {
+  if (input.connectionMethod === undefined) {
+    return undefined;
+  }
+
+  const resolvedSecrets = await Promise.all(
+    input.connectionMethod.secretFields.map(async (field) => {
+      const credential = await resolvePersistedCredential({
+        db: input.db,
+        integrationsConfig: input.integrationsConfig,
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+        secretType: field.secretType,
+        slotKey: field.slotKey,
+      });
+
+      return [field.name, credential.value] as const;
+    }),
+  );
+
+  return Object.fromEntries(resolvedSecrets);
 }
 
 function resolveResolverContextTarget(input: {
@@ -1147,13 +1186,33 @@ export async function resolveIntegrationCredential(
     });
   }
 
-  const connectionResolverContext = resolveResolverContextConnection({
+  const initialConnectionResolverContext = resolveResolverContextConnection({
     id: connection.id,
     status: connection.status,
     externalSubjectId: connection.externalSubjectId,
     config: connection.config,
   });
-  const connectionMethodId = resolveConnectionMethodId(connectionResolverContext.config);
+  const connectionMethodId = resolveConnectionMethodId(initialConnectionResolverContext.config);
+  const connectionMethod = definition.connectionMethods.find(
+    (method) => method.id === connectionMethodId,
+  );
+  const resolvedConnectionSecrets =
+    connectionMethod?.kind === "form"
+      ? await resolveResolverContextConnectionSecrets({
+          db,
+          integrationsConfig,
+          organizationId: connection.organizationId,
+          connectionId: connection.id,
+          connectionMethod,
+        })
+      : undefined;
+  const connectionResolverContext = resolveResolverContextConnection({
+    id: connection.id,
+    status: connection.status,
+    externalSubjectId: connection.externalSubjectId,
+    config: connection.config,
+    ...(resolvedConnectionSecrets === undefined ? {} : { secrets: resolvedConnectionSecrets }),
+  });
 
   if (input.resolverKey !== undefined) {
     const customResolver = definition.credentialResolvers?.custom?.[input.resolverKey];
@@ -1218,9 +1277,6 @@ export async function resolveIntegrationCredential(
     });
   }
 
-  const connectionMethod = definition.connectionMethods.find(
-    (method) => method.id === connectionMethodId,
-  );
   const oauth2ClientSecretField =
     connectionMethod?.kind === "form"
       ? connectionMethod.secretFields.find(
