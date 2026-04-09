@@ -8,27 +8,14 @@ type HomePageViewProps = {
   onNavigate?: (href: string) => void;
 };
 
-export function HomePageView(input: HomePageViewProps): React.JSX.Element {
-  const completedStepCount = input.onboarding.steps.filter(
-    (step) => step.status === "complete",
-  ).length;
-
+export function HomePageView({ onboarding, onNavigate }: HomePageViewProps): React.JSX.Element {
   return (
     <div className="flex min-h-full items-center justify-center px-4 py-6">
       <div className="w-full max-w-4xl space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-3xl font-semibold tracking-tight">Get started</h1>
-          <p className="text-muted-foreground text-sm">
-            {String(completedStepCount)}/{String(input.onboarding.steps.length)} complete
-          </p>
-        </div>
+        <h1 className="text-3xl font-semibold tracking-tight">Get started</h1>
         <div className="space-y-3">
-          {input.onboarding.steps.map((step) => (
-            <SetupStepRow
-              key={step.id}
-              step={step}
-              {...(input.onNavigate === undefined ? {} : { onNavigate: input.onNavigate })}
-            />
+          {onboarding.steps.map((step) => (
+            <SetupStepRow key={step.id} onNavigate={onNavigate} step={step} />
           ))}
         </div>
       </div>
