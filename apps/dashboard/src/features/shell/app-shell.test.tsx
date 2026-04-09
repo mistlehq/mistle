@@ -9,14 +9,6 @@ describe("resolveAppShellFrame", () => {
   it("uses the dedicated sessions sidebar only when the toggle is enabled on sessions routes", () => {
     const frame = resolveAppShellFrame(
       createAppShellFrameInput({
-        routeState: {
-          inAutomations: false,
-          inDashboardRoot: false,
-          inSandboxProfiles: false,
-          inSessionDetail: true,
-          inSessions: true,
-          inSettings: false,
-        },
         locationPathname: "/sessions/sbi_123",
         pageMeta: {
           appShellInsetOwner: "app-shell",
@@ -54,14 +46,6 @@ describe("resolveAppShellFrame", () => {
   it("keeps the normal app sidebar when the sessions toggle is disabled", () => {
     const frame = resolveAppShellFrame(
       createAppShellFrameInput({
-        routeState: {
-          inAutomations: false,
-          inDashboardRoot: false,
-          inSandboxProfiles: false,
-          inSessionDetail: true,
-          inSessions: true,
-          inSettings: false,
-        },
         locationPathname: "/sessions/sbi_123",
         pageMeta: {
           appShellInsetOwner: "app-shell",

@@ -1,30 +1,31 @@
 import type { AppPageMeta } from "../navigation/route-meta.js";
 import type { resolveAppShellFrame } from "./app-shell-frame.js";
-import type { resolveAppShellRouteState } from "./app-shell-route-state.js";
+import { resolveAppShellRouteState } from "./app-shell-route-state.js";
 
 type AppShellFrameInput = Parameters<typeof resolveAppShellFrame>[0];
-type AppShellRouteState = ReturnType<typeof resolveAppShellRouteState>;
 
 export function createAppShellFrameInput(input: {
-  routeState: AppShellRouteState;
-  locationPathname: string;
+  locationPathname?: string;
   pageMeta?: AppPageMeta;
   overrides?: Partial<AppShellFrameInput>;
 }): AppShellFrameInput {
+  const locationPathname = input.locationPathname ?? "/sessions/sbi_123";
+  const routeState = resolveAppShellRouteState(locationPathname);
+
   return {
     handleBackToApp: () => {},
     handleNavigateToSettings: () => {},
     handleSignOut: () => {},
     handleSwitchOrganization: () => {},
-    inAutomations: input.routeState.inAutomations,
-    inDashboardRoot: input.routeState.inDashboardRoot,
-    inSandboxProfiles: input.routeState.inSandboxProfiles,
-    inSessionDetail: input.routeState.inSessionDetail,
-    inSessions: input.routeState.inSessions,
-    inSettings: input.routeState.inSettings,
+    inAutomations: routeState.inAutomations,
+    inDashboardRoot: routeState.inDashboardRoot,
+    inSandboxProfiles: routeState.inSandboxProfiles,
+    inSessionDetail: routeState.inSessionDetail,
+    inSessions: routeState.inSessions,
+    inSettings: routeState.inSettings,
     isSigningOut: false,
     isSwitchingOrganization: false,
-    locationPathname: input.locationPathname,
+    locationPathname,
     organizationOptions: [{ id: "org_123", name: "Mistle Labs" }],
     organizationErrorMessage: null,
     organizationImageUrl: null,

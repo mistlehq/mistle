@@ -18,7 +18,6 @@ import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import { createAppShellFrameInput } from "../shell/app-shell-frame-fixture.js";
 import { resolveAppShellFrame } from "../shell/app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
-import { resolveAppShellRouteState } from "../shell/app-shell-route-state.js";
 import {
   resolveLocationHref,
   resolveSidebarModeDisableNavigationTarget,
@@ -111,10 +110,8 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
   const [showSessionsSidebar, setShowSessionsSidebar] = useState(
     input.initialShowSessionsSidebar === true,
   );
-  const routeState = resolveAppShellRouteState(location.pathname);
   const appShellFrame = resolveAppShellFrame(
     createAppShellFrameInput({
-      routeState,
       locationPathname: location.pathname,
       pageMeta: {
         appShellInsetOwner: location.pathname === SessionsRoutes.NEW ? "child" : "app-shell",

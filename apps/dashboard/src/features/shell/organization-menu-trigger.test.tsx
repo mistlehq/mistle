@@ -10,6 +10,7 @@ import {
 
 function renderOrganizationMenuTrigger(input: {
   activeOrganizationId?: string | null;
+  organizationErrorMessage?: string | null;
   organizationImageUrl?: string | null;
   organizations?: OrganizationMenuOrganizationOption[];
 }) {
@@ -21,7 +22,7 @@ function renderOrganizationMenuTrigger(input: {
       onNavigateToSettings={() => {}}
       onSignOut={() => {}}
       onSwitchOrganization={() => {}}
-      organizationErrorMessage={null}
+      organizationErrorMessage={input.organizationErrorMessage ?? null}
       organizationImageUrl={input.organizationImageUrl ?? null}
       organizationName="Mistle Labs"
       organizations={input.organizations ?? []}
@@ -63,6 +64,34 @@ describe("OrganizationMenuTrigger", () => {
 
     expect(screen.getByRole("button", { name: "Organization menu" })).toBeTruthy();
     expect(screen.getByText("Mistle Labs")).toBeTruthy();
+    expect(screen.getByText("Switch organization")).toBeTruthy();
+  });
+
+  it("keeps organization choices visible when the switcher also has an error message", () => {
+    renderOrganizationMenuTrigger({
+      activeOrganizationId: "org_2",
+      organizationErrorMessage: "Unable to load organizations.",
+      organizations: [
+        { id: "org_1", name: "Acme Corp" },
+        { id: "org_2", name: "Mistle Labs" },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Organization menu" }));
+    fireEvent.click(screen.getByText("Switch organization"));
+
+    expect(screen.getByText("Acme Corp")).toBeTruthy();
+    expect(screen.getByText("Unable to load organizations.")).toBeTruthy();
+  });
+
+  it("renders the switcher when organization loading fails without any available options", () => {
+    renderOrganizationMenuTrigger({
+      organizationErrorMessage: "Unable to load organizations.",
+      organizations: [],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Organization menu" }));
+
     expect(screen.getByText("Switch organization")).toBeTruthy();
   });
 });

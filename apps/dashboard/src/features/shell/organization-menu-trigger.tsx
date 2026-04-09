@@ -38,8 +38,10 @@ export function OrganizationMenuTrigger(input: {
 }): React.JSX.Element {
   const organizationName = input.organizationName ?? "";
   const organizations = input.organizations ?? [];
+  const showOrganizationSwitcherError = input.organizationErrorMessage !== null;
   const showOrganizationSwitcher =
-    organizations.length > 0 && typeof input.onSwitchOrganization === "function";
+    (organizations.length > 0 || showOrganizationSwitcherError) &&
+    typeof input.onSwitchOrganization === "function";
 
   return (
     <DropdownMenu>
@@ -86,9 +88,7 @@ export function OrganizationMenuTrigger(input: {
                 Switch organization
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                {input.organizationErrorMessage !== null ? (
-                  <DropdownMenuItem disabled>{input.organizationErrorMessage}</DropdownMenuItem>
-                ) : (
+                {organizations.length > 0 ? (
                   <DropdownMenuRadioGroup value={input.activeOrganizationId ?? undefined}>
                     {organizations.map((organization) => (
                       <DropdownMenuRadioItem
@@ -103,7 +103,13 @@ export function OrganizationMenuTrigger(input: {
                       </DropdownMenuRadioItem>
                     ))}
                   </DropdownMenuRadioGroup>
-                )}
+                ) : null}
+                {showOrganizationSwitcherError ? (
+                  <>
+                    {organizations.length > 0 ? <DropdownMenuSeparator /> : null}
+                    <DropdownMenuItem disabled>{input.organizationErrorMessage}</DropdownMenuItem>
+                  </>
+                ) : null}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           ) : null}
