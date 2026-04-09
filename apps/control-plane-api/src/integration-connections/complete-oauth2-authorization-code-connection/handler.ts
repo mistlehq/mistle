@@ -6,7 +6,7 @@ import type { AppContextBindings } from "../../types.js";
 import { completeOAuth2AuthorizationCodeConnection } from "../services/complete-oauth2-authorization-code-connection.js";
 import { route } from "./route.js";
 
-const DashboardOrganizationIntegrationsPath = "/integrations";
+const DashboardOrganizationIntegrationsPath = "/settings/organization/integrations";
 
 function buildDashboardIntegrationsUrl(dashboardBaseUrl: string): string {
   return buildDashboardUrl(dashboardBaseUrl, DashboardOrganizationIntegrationsPath);
