@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { OrganizationMembersSettingsPageView } from "./organization-members-settings-page-view.js";
 import {
-  createOrganizationMembersSettingsPageStoryArgs,
+  createOrganizationMembersSettingsPageStoryViewModel,
   OrganizationMembersStoryInvitations,
 } from "./organization-members-settings-page-view.story-fixtures.js";
 
@@ -16,7 +16,9 @@ describe("OrganizationMembersSettingsPageView", () => {
 
   it("renders active and invited tabs with a shared invite action", () => {
     render(
-      <OrganizationMembersSettingsPageView {...createOrganizationMembersSettingsPageStoryArgs()} />,
+      <OrganizationMembersSettingsPageView
+        viewModel={createOrganizationMembersSettingsPageStoryViewModel()}
+      />,
     );
 
     expect(screen.getByRole("tab", { name: "Active" })).toBeTruthy();
@@ -29,10 +31,11 @@ describe("OrganizationMembersSettingsPageView", () => {
 
     render(
       <OrganizationMembersSettingsPageView
-        {...createOrganizationMembersSettingsPageStoryArgs()}
-        onFilterChange={(nextValue) => {
-          filterChanges.push(nextValue);
-        }}
+        viewModel={createOrganizationMembersSettingsPageStoryViewModel({
+          onFilterChange: (nextValue) => {
+            filterChanges.push(nextValue);
+          },
+        })}
       />,
     );
 
@@ -44,7 +47,7 @@ describe("OrganizationMembersSettingsPageView", () => {
   it("renders invitation rows when the invitations tab is active", () => {
     render(
       <OrganizationMembersSettingsPageView
-        {...createOrganizationMembersSettingsPageStoryArgs({
+        viewModel={createOrganizationMembersSettingsPageStoryViewModel({
           activeFilter: "invitations",
           invitations: OrganizationMembersStoryInvitations,
           members: [],
@@ -60,7 +63,7 @@ describe("OrganizationMembersSettingsPageView", () => {
   it("disables pagination controls while the active list is refetching", () => {
     render(
       <OrganizationMembersSettingsPageView
-        {...createOrganizationMembersSettingsPageStoryArgs({
+        viewModel={createOrganizationMembersSettingsPageStoryViewModel({
           hasNextPage: true,
           hasPreviousPage: true,
           isListFetching: true,
@@ -75,7 +78,7 @@ describe("OrganizationMembersSettingsPageView", () => {
   it("shows a non-blocking notice when a refetch fails after data has loaded", () => {
     render(
       <OrganizationMembersSettingsPageView
-        {...createOrganizationMembersSettingsPageStoryArgs({
+        viewModel={createOrganizationMembersSettingsPageStoryViewModel({
           listErrorNoticeMessage: "Failed to load members.",
         })}
       />,
@@ -89,7 +92,7 @@ describe("OrganizationMembersSettingsPageView", () => {
   it("renders the blocking load error state for the initial directory load failure", () => {
     render(
       <OrganizationMembersSettingsPageView
-        {...createOrganizationMembersSettingsPageStoryArgs({
+        viewModel={createOrganizationMembersSettingsPageStoryViewModel({
           members: [],
           total: 0,
           loadErrorMessage: "Failed to load members.",

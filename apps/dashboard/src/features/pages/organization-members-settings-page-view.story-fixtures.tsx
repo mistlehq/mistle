@@ -9,7 +9,7 @@ import type {
   MembersDirectoryInvitationActionState,
   MembersDirectoryPendingMemberOperation,
 } from "../settings/members/members-directory-model.js";
-import type { OrganizationMembersSettingsPageViewProps } from "./organization-members-settings-page-view.js";
+import type { OrganizationMembersSettingsPageViewModel } from "../settings/members/organization-members-settings-view-model.js";
 
 export const OrganizationMembersStoryCapabilities: MembershipCapabilities = {
   organizationId: "org_storybook",
@@ -114,9 +114,9 @@ export function createOrganizationMembersStoryRoleChangeDialog(
   };
 }
 
-export function createOrganizationMembersSettingsPageStoryArgs(
-  overrides: Partial<OrganizationMembersSettingsPageViewProps> = {},
-): OrganizationMembersSettingsPageViewProps {
+export function createOrganizationMembersSettingsPageStoryViewModel(
+  overrides: Partial<OrganizationMembersSettingsPageViewModel> = {},
+): OrganizationMembersSettingsPageViewModel {
   const invitationActionState: MembersDirectoryInvitationActionState =
     overrides.invitationActionState ?? null;
   const pendingMemberOperation: MembersDirectoryPendingMemberOperation =

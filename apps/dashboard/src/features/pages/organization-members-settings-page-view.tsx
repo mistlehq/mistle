@@ -2,82 +2,21 @@ import { Button, Notice, Tabs, TabsList, TabsTrigger } from "@mistle/ui";
 
 import { MemberInviteDialog } from "../settings/members/member-invite-dialog.js";
 import { MemberRoleChangeDialog } from "../settings/members/member-role-change-dialog.js";
-import type {
-  MemberAvatar,
-  MembersDirectoryFilter,
-  MembershipCapabilities,
-  SettingsInvitation,
-  SettingsMember,
-} from "../settings/members/members-api.js";
 import { canManageInvitations } from "../settings/members/members-capability-policy.js";
-import type { RoleChangeDialogState } from "../settings/members/members-capability-policy.js";
-import type {
-  MembersDirectoryInvitationActionState,
-  MembersDirectoryPendingMemberOperation,
-} from "../settings/members/members-directory-model.js";
 import { MembersDirectoryTable } from "../settings/members/members-directory-table.js";
 import { clampMembersDirectoryOffset } from "../settings/members/members-pagination.js";
 import {
   MembersLoadErrorState,
   MembersLoadingState,
 } from "../settings/members/members-query-states.js";
+import type { OrganizationMembersSettingsPageViewModel } from "../settings/members/organization-members-settings-view-model.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 
-export type OrganizationMembersSettingsPageViewProps = {
-  activeFilter: MembersDirectoryFilter;
-  capabilities: MembershipCapabilities | null;
-  capabilitiesErrorMessage: string | null;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-  invitationActionState: MembersDirectoryInvitationActionState;
-  invitations: SettingsInvitation[];
-  inviteDialogOpen: boolean;
-  inviteMemberRequest: (request: {
-    organizationId: string;
-    email: string;
-    role: MembershipCapabilities["actorRole"];
-  }) => Promise<{
-    status: string | null;
-    message: string | null;
-    code: string | null;
-    raw: unknown;
-  }>;
-  isLoading: boolean;
-  isListFetching: boolean;
-  isUpdatingRole: boolean;
-  listErrorNoticeMessage: string | null;
-  loadErrorMessage: string | null;
-  limit: number;
-  memberAvatarsByUserId: ReadonlyMap<string, MemberAvatar>;
-  members: SettingsMember[];
-  inviteMembersDisabled: boolean;
-  onChangeRole: (member: SettingsMember) => void;
-  onInviteCompleted: () => Promise<void>;
-  onInviteDialogOpenChange: (nextOpen: boolean) => void;
-  onFilterChange: (nextValue: MembersDirectoryFilter) => void;
-  onNextPage: () => void;
-  onPreviousPage: () => void;
-  onSearchValueChange: (nextValue: string) => void;
-  onRemoveMember: (member: SettingsMember) => void;
-  onResendInvite: (invitation: SettingsInvitation) => void;
-  onRevokeInvite: (invitation: SettingsInvitation) => void;
-  onRoleDialogCancel: () => void;
-  onRoleDialogOpenChange: (nextOpen: boolean) => void;
-  onRoleSelectValueChange: (nextRoleValue: string | null) => void;
-  onSaveRole: () => void;
-  organizationId: string;
-  offset: number;
-  pendingMemberOperation: MembersDirectoryPendingMemberOperation;
-  roleChangeDialog: RoleChangeDialogState | null;
-  roleUpdateErrorMessage: string | null;
-  searchValue: string;
-  total: number;
-};
-
-export function OrganizationMembersSettingsPageView(
-  props: OrganizationMembersSettingsPageViewProps,
-): React.JSX.Element {
+export function OrganizationMembersSettingsPageView(input: {
+  viewModel: OrganizationMembersSettingsPageViewModel;
+}): React.JSX.Element {
+  const props = input.viewModel;
   const visibleRowCount = props.members.length + props.invitations.length;
   const visibleOffset = clampMembersDirectoryOffset({
     limit: props.limit,

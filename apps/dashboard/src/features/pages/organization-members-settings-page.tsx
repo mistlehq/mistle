@@ -1,5 +1,4 @@
 import { useAppPageMeta } from "../navigation/route-meta.js";
-import { inviteMember } from "../settings/members/members-api.js";
 import { useOrganizationMembersSettingsState } from "../settings/members/use-organization-members-settings-state.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
@@ -15,51 +14,7 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
 
   return (
     <PageFrame description={description} title={title}>
-      <OrganizationMembersSettingsPageView
-        capabilities={membersState.capabilities}
-        capabilitiesErrorMessage={
-          membersState.capabilitiesQuery.isError
-            ? "Membership permissions could not be loaded."
-            : null
-        }
-        invitationActionState={membersState.invitationActionState}
-        invitations={membersState.invitations}
-        inviteDialogOpen={membersState.inviteDialogOpen}
-        inviteMemberRequest={inviteMember}
-        inviteMembersDisabled={membersState.inviteMembersDisabled}
-        isLoading={membersState.isPageLoading}
-        isListFetching={membersState.isListFetching}
-        isUpdatingRole={membersState.isUpdatingRole}
-        limit={membersState.limit}
-        listErrorNoticeMessage={membersState.listErrorNoticeMessage}
-        loadErrorMessage={membersState.loadErrorMessage}
-        activeFilter={membersState.activeFilter}
-        hasNextPage={membersState.hasNextPage}
-        hasPreviousPage={membersState.hasPreviousPage}
-        members={membersState.members}
-        memberAvatarsByUserId={membersState.memberAvatarsByUserId}
-        onChangeRole={membersState.onChangeRole}
-        onInviteCompleted={membersState.onInviteCompleted}
-        onInviteDialogOpenChange={membersState.setInviteDialogOpen}
-        onFilterChange={membersState.onFilterChange}
-        onNextPage={membersState.onNextPage}
-        onPreviousPage={membersState.onPreviousPage}
-        onSearchValueChange={membersState.onSearchValueChange}
-        onRemoveMember={membersState.onRemoveMember}
-        onResendInvite={membersState.onResendInvite}
-        onRevokeInvite={membersState.onRevokeInvite}
-        onRoleDialogCancel={() => membersState.onRoleDialogOpenChange(false)}
-        onRoleDialogOpenChange={membersState.onRoleDialogOpenChange}
-        onRoleSelectValueChange={membersState.onRoleSelectValueChange}
-        onSaveRole={membersState.onSaveRole}
-        organizationId={organizationId}
-        pendingMemberOperation={membersState.pendingMemberOperation}
-        roleChangeDialog={membersState.roleChangeDialog}
-        roleUpdateErrorMessage={membersState.roleUpdateErrorMessage}
-        searchValue={membersState.searchValue}
-        total={membersState.total}
-        offset={membersState.offset}
-      />
+      <OrganizationMembersSettingsPageView viewModel={membersState.viewModel} />
     </PageFrame>
   );
 }

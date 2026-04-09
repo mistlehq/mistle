@@ -10,9 +10,9 @@ import type { RoleChangeDialogState } from "../settings/members/members-capabili
 import type { MembersDirectoryInvitationActionState } from "../settings/members/members-directory-model.js";
 import { OrganizationMembersSettingsPageView } from "./organization-members-settings-page-view.js";
 import {
-  createOrganizationMembersSettingsPageStoryArgs,
-  OrganizationMembersStoryInvitations,
   createOrganizationMembersStoryRoleChangeDialog,
+  createOrganizationMembersSettingsPageStoryViewModel,
+  OrganizationMembersStoryInvitations,
 } from "./organization-members-settings-page-view.story-fixtures.js";
 
 const meta = {
@@ -34,7 +34,9 @@ const meta = {
       );
     },
   ],
-  args: createOrganizationMembersSettingsPageStoryArgs(),
+  args: {
+    viewModel: createOrganizationMembersSettingsPageStoryViewModel(),
+  },
 } satisfies Meta<typeof OrganizationMembersSettingsPageView>;
 
 export default meta;
@@ -43,13 +45,17 @@ type Story = StoryObj<typeof meta>;
 
 export const Loading: Story = {
   args: {
-    isLoading: true,
+    viewModel: createOrganizationMembersSettingsPageStoryViewModel({
+      isLoading: true,
+    }),
   },
 };
 
 export const LoadError: Story = {
   args: {
-    loadErrorMessage: "Failed to load members.",
+    viewModel: createOrganizationMembersSettingsPageStoryViewModel({
+      loadErrorMessage: "Failed to load members.",
+    }),
   },
 };
 
@@ -57,46 +63,56 @@ export const Default: Story = {};
 
 export const Invited: Story = {
   args: {
-    activeFilter: "invitations",
-    invitations: OrganizationMembersStoryInvitations,
-    members: [],
-    total: OrganizationMembersStoryInvitations.length,
+    viewModel: createOrganizationMembersSettingsPageStoryViewModel({
+      activeFilter: "invitations",
+      invitations: OrganizationMembersStoryInvitations,
+      members: [],
+      total: OrganizationMembersStoryInvitations.length,
+    }),
   },
 };
 
 export const CapabilitiesWarning: Story = {
   args: {
-    capabilities: null,
-    capabilitiesErrorMessage: "Membership permissions could not be loaded.",
+    viewModel: createOrganizationMembersSettingsPageStoryViewModel({
+      capabilities: null,
+      capabilitiesErrorMessage: "Membership permissions could not be loaded.",
+    }),
   },
 };
 
 export const InviteDialogOpen: Story = {
   args: {
-    inviteDialogOpen: true,
+    viewModel: createOrganizationMembersSettingsPageStoryViewModel({
+      inviteDialogOpen: true,
+    }),
   },
 };
 
 export const RoleDialogOpen: Story = {
   args: {
-    roleChangeDialog: createOrganizationMembersStoryRoleChangeDialog("mem_storybook", "admin"),
+    viewModel: createOrganizationMembersSettingsPageStoryViewModel({
+      roleChangeDialog: createOrganizationMembersStoryRoleChangeDialog("mem_storybook", "admin"),
+    }),
   },
 };
 
 export const PendingActions: Story = {
   args: {
-    activeFilter: "invitations",
-    invitationActionState: {
-      invitationId: "inv_pending",
-      action: "resend_invite",
-      phase: "pending",
-    },
-    invitations: OrganizationMembersStoryInvitations,
-    members: [],
-    pendingMemberOperation: {
-      kind: "change_role",
-      memberId: "mem_storybook",
-    },
+    viewModel: createOrganizationMembersSettingsPageStoryViewModel({
+      activeFilter: "invitations",
+      invitationActionState: {
+        invitationId: "inv_pending",
+        action: "resend_invite",
+        phase: "pending",
+      },
+      invitations: OrganizationMembersStoryInvitations,
+      members: [],
+      pendingMemberOperation: {
+        kind: "change_role",
+        memberId: "mem_storybook",
+      },
+    }),
   },
 };
 
@@ -109,7 +125,7 @@ export const InteractiveFiltering: Story = {
 
     return (
       <OrganizationMembersSettingsPageView
-        {...createOrganizationMembersSettingsPageStoryArgs({
+        viewModel={createOrganizationMembersSettingsPageStoryViewModel({
           invitationActionState,
           inviteDialogOpen,
           onChangeRole: (member) => {

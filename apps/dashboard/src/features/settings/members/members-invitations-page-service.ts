@@ -1,6 +1,5 @@
 import { getControlPlaneApiClient } from "../../../lib/control-plane-api/client.js";
 import { normalizeHttpApiError } from "../../api/http-api-error.js";
-import { unwrapOpenApiFetchResponse } from "../../api/openapi-fetch-response.js";
 import { MembersApiError } from "./members-api-errors.js";
 import type { InvitationsPage } from "./members-api-types.js";
 import { parseInvitationsPage } from "./members-invitations-page-parser.js";
@@ -26,8 +25,11 @@ export async function listInvitationsPage(input: {
         },
       },
     });
+    if (response.error !== undefined) {
+      throw response.error;
+    }
 
-    return parseInvitationsPage(unwrapOpenApiFetchResponse(response));
+    return parseInvitationsPage(response.data);
   } catch (error) {
     throw new MembersApiError(
       normalizeHttpApiError({
