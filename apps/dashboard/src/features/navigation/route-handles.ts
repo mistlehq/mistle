@@ -155,11 +155,13 @@ export const ROUTE_HANDLES = {
     description: "",
   },
   integrations: {
+    appShellInsetOwner: "child",
     breadcrumb: "Integrations",
     title: "Integrations",
     description: "",
   },
   integrationDetail: {
+    appShellInsetOwner: "child",
     breadcrumb: resolveIntegrationDetailBreadcrumb,
     title: resolveIntegrationDetailTitle,
     description: resolveIntegrationDetailSubtitle,
