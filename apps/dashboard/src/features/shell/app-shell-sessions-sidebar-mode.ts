@@ -36,9 +36,14 @@ export function resolveSidebarModeEnableNavigationTarget(pathname: string): stri
 
 export function resolveSidebarModeDisableNavigationTarget(input: {
   currentLocationHref: string;
+  currentPathname: string;
   previousLocationHref: string | null;
 }): string | null {
   if (input.previousLocationHref === null) {
+    return null;
+  }
+
+  if (!isSessionsPath(input.currentPathname)) {
     return null;
   }
 

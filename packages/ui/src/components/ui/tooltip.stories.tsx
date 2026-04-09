@@ -88,7 +88,12 @@ export const WrappedLongContent = {
           <TooltipTrigger render={<Button type="button" variant="outline" />}>
             Wrapped payload
           </TooltipTrigger>
-          <TooltipContent className="max-h-56" showArrow={false} side="top" variant="light">
+          <TooltipContent
+            className="[&_[data-slot=tooltip-scroll]]:max-h-56"
+            showArrow={false}
+            side="top"
+            variant="light"
+          >
             {WrappedPayloadText}
           </TooltipContent>
         </Tooltip>
@@ -105,7 +110,12 @@ export const ScrollableLongContent = {
           <TooltipTrigger render={<Button type="button" variant="outline" />}>
             Scrollable payload
           </TooltipTrigger>
-          <TooltipContent className="max-h-56" showArrow={false} side="top" variant="light">
+          <TooltipContent
+            className="[&_[data-slot=tooltip-scroll]]:max-h-56"
+            showArrow={false}
+            side="top"
+            variant="light"
+          >
             {ScrollablePayloadText}
           </TooltipContent>
         </Tooltip>

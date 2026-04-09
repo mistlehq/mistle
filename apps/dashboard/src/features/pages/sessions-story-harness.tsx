@@ -147,6 +147,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
       if (!checked) {
         const navigationTarget = resolveSidebarModeDisableNavigationTarget({
           currentLocationHref,
+          currentPathname: location.pathname,
           previousLocationHref: previousSessionsSidebarToggleUrlRef.current,
         });
         previousSessionsSidebarToggleUrlRef.current = null;

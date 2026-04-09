@@ -57,6 +57,12 @@ export function AppShell(): React.JSX.Element {
     persistSessionsSidebarEnabledPreference(showSessionsSidebar);
   }, [showSessionsSidebar]);
 
+  useEffect(() => {
+    if (showSessionsSidebar && !routeState.inSessions) {
+      previousSessionsSidebarToggleUrlRef.current = null;
+    }
+  }, [routeState.inSessions, showSessionsSidebar]);
+
   async function handleSignOut(): Promise<void> {
     setSignOutError(null);
     setIsSigningOut(true);
@@ -94,6 +100,7 @@ export function AppShell(): React.JSX.Element {
     if (!nextChecked) {
       const navigationTarget = resolveSidebarModeDisableNavigationTarget({
         currentLocationHref,
+        currentPathname: location.pathname,
         previousLocationHref: previousSessionsSidebarToggleUrlRef.current,
       });
       previousSessionsSidebarToggleUrlRef.current = null;

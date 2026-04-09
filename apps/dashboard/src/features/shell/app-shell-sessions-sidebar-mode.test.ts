@@ -59,6 +59,7 @@ describe("app shell sessions sidebar mode routing", () => {
     expect(
       resolveSidebarModeDisableNavigationTarget({
         currentLocationHref: SessionsRoutes.NEW,
+        currentPathname: SessionsRoutes.NEW,
         previousLocationHref: "/automations?tab=active#details",
       }),
     ).toBe("/automations?tab=active#details");
@@ -68,13 +69,25 @@ describe("app shell sessions sidebar mode routing", () => {
     expect(
       resolveSidebarModeDisableNavigationTarget({
         currentLocationHref: "/sessions/sbi_123",
+        currentPathname: "/sessions/sbi_123",
         previousLocationHref: "/sessions/sbi_123",
       }),
     ).toBeNull();
     expect(
       resolveSidebarModeDisableNavigationTarget({
         currentLocationHref: SessionsRoutes.NEW,
+        currentPathname: SessionsRoutes.NEW,
         previousLocationHref: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("skips disable navigation after the user has already left sessions", () => {
+    expect(
+      resolveSidebarModeDisableNavigationTarget({
+        currentLocationHref: "/automations",
+        currentPathname: "/automations",
+        previousLocationHref: "/dashboard",
       }),
     ).toBeNull();
   });
