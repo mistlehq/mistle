@@ -14,10 +14,15 @@ export async function refreshAuthenticatedSessionAfterOrganizationSwitch(input: 
 }): Promise<SessionData> {
   removeNonSessionQueries(input.queryClient);
 
-  return input.queryClient.fetchQuery({
-    queryKey: SESSION_QUERY_KEY,
-    queryFn: input.fetchSessionData,
-  });
+  try {
+    return await input.queryClient.fetchQuery({
+      queryKey: SESSION_QUERY_KEY,
+      queryFn: input.fetchSessionData,
+    });
+  } catch (error) {
+    input.queryClient.setQueryData(SESSION_QUERY_KEY, null);
+    throw error;
+  }
 }
 
 function removeNonSessionQueries(queryClient: QueryClient): void {

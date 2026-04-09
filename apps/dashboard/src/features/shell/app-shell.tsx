@@ -25,7 +25,6 @@ import {
   resolveSidebarModeEnableNavigationTarget,
 } from "./app-shell-sessions-sidebar-mode.js";
 import { AppShellView } from "./app-shell-view.js";
-import { resolveOrganizationSwitcherErrorMessage } from "./organization-switcher-error.js";
 import {
   fetchOrganizationSwitcherOptions,
   ORGANIZATION_SWITCHER_QUERY_KEY,
@@ -82,10 +81,11 @@ export function AppShell(): React.JSX.Element {
     retry: false,
     refetchOnWindowFocus: true,
   });
-  const organizationSwitcherErrorMessage = resolveOrganizationSwitcherErrorMessage({
-    organizationOptionsError: organizationOptionsQuery.error,
-    switchOrganizationError,
-  });
+  const organizationSwitcherErrorMessage =
+    switchOrganizationError ??
+    (organizationOptionsQuery.error instanceof Error
+      ? organizationOptionsQuery.error.message
+      : null);
 
   const switchOrganizationMutation = useMutation({
     mutationFn: async (organizationId: string) => {
@@ -204,7 +204,8 @@ export function AppShell(): React.JSX.Element {
     isSwitchingOrganization,
     locationPathname: location.pathname,
     organizationOptions: organizationOptionsQuery.data ?? [],
-    organizationErrorMessage: organizationSwitcherErrorMessage,
+    organizationSummaryErrorMessage: organizationSummary.organizationSummaryErrorMessage,
+    organizationSwitcherErrorMessage,
     organizationImageUrl: createSingletonImageContentUrl({
       resourceName: "Organization logo",
       path: createOrganizationLogoContentPath(organizationSummary.activeOrganizationId),

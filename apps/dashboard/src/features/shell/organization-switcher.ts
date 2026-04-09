@@ -1,5 +1,4 @@
 import { authClient } from "../../lib/auth/client.js";
-type UnknownRecord = Record<string, unknown>;
 
 export type OrganizationSwitcherOption = {
   id: string;
@@ -8,27 +7,17 @@ export type OrganizationSwitcherOption = {
 
 export const ORGANIZATION_SWITCHER_QUERY_KEY = ["auth", "organizations"] as const;
 
-function toRecord(value: unknown): UnknownRecord | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-
-  const record: UnknownRecord = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function parseOrganizationSwitcherOption(value: unknown): OrganizationSwitcherOption | null {
-  const record = toRecord(value);
-  if (record === null) {
+  if (!isRecord(value)) {
     return null;
   }
 
-  const id = record.id;
-  const name = record.name;
+  const id = value.id;
+  const name = value.name;
 
   if (typeof id !== "string" || id.length === 0) {
     return null;
@@ -45,12 +34,15 @@ function parseOrganizationSwitcherOption(value: unknown): OrganizationSwitcherOp
 }
 
 function resolveOrganizationSwitcherErrorMessage(error: unknown, fallback: string): string {
-  const record = toRecord(error);
-  if (record === null) {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  if (!isRecord(error)) {
     return fallback;
   }
 
-  const message = record.message;
+  const message = error.message;
   if (typeof message === "string" && message.trim().length > 0) {
     return message;
   }

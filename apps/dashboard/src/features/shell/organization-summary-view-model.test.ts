@@ -13,7 +13,7 @@ describe("resolveOrganizationSummaryViewModel", () => {
 
     expect(result).toEqual({
       organizationName: "",
-      organizationErrorMessage: null,
+      organizationSummaryErrorMessage: null,
     });
   });
 
@@ -27,7 +27,7 @@ describe("resolveOrganizationSummaryViewModel", () => {
 
     expect(result).toEqual({
       organizationName: "Organization unavailable",
-      organizationErrorMessage: "Session expired.",
+      organizationSummaryErrorMessage: "Session expired.",
     });
   });
 
@@ -41,7 +41,7 @@ describe("resolveOrganizationSummaryViewModel", () => {
 
     expect(result).toEqual({
       organizationName: "Organization unavailable",
-      organizationErrorMessage: "Could not load organization.",
+      organizationSummaryErrorMessage: "Could not load organization.",
     });
   });
 
@@ -55,7 +55,7 @@ describe("resolveOrganizationSummaryViewModel", () => {
 
     expect(result).toEqual({
       organizationName: "Acme",
-      organizationErrorMessage: null,
+      organizationSummaryErrorMessage: null,
     });
   });
 });

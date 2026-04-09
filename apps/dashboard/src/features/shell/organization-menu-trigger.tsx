@@ -27,7 +27,8 @@ export type OrganizationMenuOrganizationOption = {
 export function OrganizationMenuTrigger(input: {
   organizationName: string | null;
   organizationImageUrl?: string | null;
-  organizationErrorMessage: string | null;
+  organizationSummaryErrorMessage: string | null;
+  organizationSwitcherErrorMessage: string | null;
   organizations?: OrganizationMenuOrganizationOption[];
   activeOrganizationId?: string | null;
   isSwitchingOrganization?: boolean;
@@ -38,7 +39,7 @@ export function OrganizationMenuTrigger(input: {
 }): React.JSX.Element {
   const organizationName = input.organizationName ?? "";
   const organizations = input.organizations ?? [];
-  const showOrganizationSwitcherError = input.organizationErrorMessage !== null;
+  const showOrganizationSwitcherError = input.organizationSwitcherErrorMessage !== null;
   const showOrganizationSwitcher =
     (organizations.length > 0 || showOrganizationSwitcherError) &&
     typeof input.onSwitchOrganization === "function";
@@ -77,6 +78,14 @@ export function OrganizationMenuTrigger(input: {
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64" side="bottom" sideOffset={8}>
+        {input.organizationSummaryErrorMessage !== null ? (
+          <>
+            <DropdownMenuGroup>
+              <DropdownMenuItem disabled>{input.organizationSummaryErrorMessage}</DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <DropdownMenuGroup>
           <DropdownMenuItem onClick={input.onNavigateToSettings}>Settings</DropdownMenuItem>
         </DropdownMenuGroup>
@@ -107,7 +116,9 @@ export function OrganizationMenuTrigger(input: {
                 {showOrganizationSwitcherError ? (
                   <>
                     {organizations.length > 0 ? <DropdownMenuSeparator /> : null}
-                    <DropdownMenuItem disabled>{input.organizationErrorMessage}</DropdownMenuItem>
+                    <DropdownMenuItem disabled>
+                      {input.organizationSwitcherErrorMessage}
+                    </DropdownMenuItem>
                   </>
                 ) : null}
               </DropdownMenuSubContent>

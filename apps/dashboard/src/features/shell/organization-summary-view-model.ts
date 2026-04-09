@@ -1,6 +1,6 @@
 export type OrganizationSummaryViewModel = {
   organizationName: string;
-  organizationErrorMessage: string | null;
+  organizationSummaryErrorMessage: string | null;
 };
 
 export function resolveOrganizationSummaryViewModel(input: {
@@ -12,7 +12,7 @@ export function resolveOrganizationSummaryViewModel(input: {
   if (input.isPending) {
     return {
       organizationName: "",
-      organizationErrorMessage: null,
+      organizationSummaryErrorMessage: null,
     };
   }
 
@@ -23,12 +23,12 @@ export function resolveOrganizationSummaryViewModel(input: {
         : "Could not load organization.";
     return {
       organizationName: "Organization unavailable",
-      organizationErrorMessage: message,
+      organizationSummaryErrorMessage: message,
     };
   }
 
   return {
     organizationName: input.organizationName ?? "Organization unavailable",
-    organizationErrorMessage: null,
+    organizationSummaryErrorMessage: null,
   };
 }

@@ -1,33 +1,29 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  OrganizationMenuTrigger,
-  type OrganizationMenuOrganizationOption,
-} from "./organization-menu-trigger.js";
+import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 
-function renderOrganizationMenuTrigger(input: {
-  activeOrganizationId?: string | null;
-  organizationErrorMessage?: string | null;
-  organizationImageUrl?: string | null;
-  organizations?: OrganizationMenuOrganizationOption[];
-}) {
-  render(
-    <OrganizationMenuTrigger
-      activeOrganizationId={input.activeOrganizationId ?? null}
-      isSigningOut={false}
-      isSwitchingOrganization={false}
-      onNavigateToSettings={() => {}}
-      onSignOut={() => {}}
-      onSwitchOrganization={() => {}}
-      organizationErrorMessage={input.organizationErrorMessage ?? null}
-      organizationImageUrl={input.organizationImageUrl ?? null}
-      organizationName="Mistle Labs"
-      organizations={input.organizations ?? []}
-    />,
-  );
+const baseProps = {
+  activeOrganizationId: null,
+  isSigningOut: false,
+  isSwitchingOrganization: false,
+  onNavigateToSettings: () => {},
+  onSignOut: () => {},
+  onSwitchOrganization: () => {},
+  organizationSummaryErrorMessage: null,
+  organizationSwitcherErrorMessage: null,
+  organizationImageUrl: null,
+  organizationName: "Mistle Labs",
+  organizations: [],
+} satisfies ComponentProps<typeof OrganizationMenuTrigger>;
+
+function renderOrganizationMenuTrigger(
+  overrides: Partial<ComponentProps<typeof OrganizationMenuTrigger>>,
+) {
+  render(<OrganizationMenuTrigger {...baseProps} {...overrides} />);
 }
 
 describe("OrganizationMenuTrigger", () => {
@@ -70,7 +66,7 @@ describe("OrganizationMenuTrigger", () => {
   it("keeps organization choices visible when the switcher also has an error message", () => {
     renderOrganizationMenuTrigger({
       activeOrganizationId: "org_2",
-      organizationErrorMessage: "Unable to load organizations.",
+      organizationSwitcherErrorMessage: "Unable to load organizations.",
       organizations: [
         { id: "org_1", name: "Acme Corp" },
         { id: "org_2", name: "Mistle Labs" },
@@ -86,12 +82,24 @@ describe("OrganizationMenuTrigger", () => {
 
   it("renders the switcher when organization loading fails without any available options", () => {
     renderOrganizationMenuTrigger({
-      organizationErrorMessage: "Unable to load organizations.",
+      organizationSwitcherErrorMessage: "Unable to load organizations.",
       organizations: [],
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Organization menu" }));
 
+    expect(screen.getByText("Switch organization")).toBeTruthy();
+  });
+
+  it("renders summary errors in the top-level menu without blocking the switcher", () => {
+    renderOrganizationMenuTrigger({
+      organizationSummaryErrorMessage: "Organization details could not be loaded.",
+      organizations: [{ id: "org_2", name: "Mistle Labs" }],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Organization menu" }));
+
+    expect(screen.getByText("Organization details could not be loaded.")).toBeTruthy();
     expect(screen.getByText("Switch organization")).toBeTruthy();
   });
 });

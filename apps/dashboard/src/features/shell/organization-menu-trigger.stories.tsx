@@ -1,7 +1,22 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { ComponentProps } from "react";
 import { expect, userEvent, within } from "storybook/test";
 
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
+
+const baseArgs = {
+  activeOrganizationId: "org_mistle",
+  isSwitchingOrganization: false,
+  organizationName: "Mistle Labs",
+  organizationImageUrl: null,
+  organizationSummaryErrorMessage: null,
+  organizationSwitcherErrorMessage: null,
+  organizations: [],
+  isSigningOut: false,
+  onNavigateToSettings: function onNavigateToSettings() {},
+  onSignOut: function onSignOut() {},
+  onSwitchOrganization: function onSwitchOrganization() {},
+} satisfies ComponentProps<typeof OrganizationMenuTrigger>;
 
 const meta = {
   title: "Dashboard/Shell/OrganizationMenuTrigger",
@@ -10,18 +25,7 @@ const meta = {
   parameters: {
     layout: "padded",
   },
-  args: {
-    activeOrganizationId: "org_mistle",
-    isSwitchingOrganization: false,
-    organizationName: "Mistle Labs",
-    organizationImageUrl: null,
-    organizationErrorMessage: null,
-    organizations: [],
-    isSigningOut: false,
-    onNavigateToSettings: function onNavigateToSettings() {},
-    onSignOut: function onSignOut() {},
-    onSwitchOrganization: function onSwitchOrganization() {},
-  },
+  args: baseArgs,
 } satisfies Meta<typeof OrganizationMenuTrigger>;
 
 export default meta;
@@ -40,7 +44,7 @@ export const Default: Story = {
 
 export const WithError: Story = {
   args: {
-    organizationErrorMessage: "Organization details could not be loaded.",
+    organizationSummaryErrorMessage: "Organization details could not be loaded.",
   },
 };
 
@@ -67,7 +71,7 @@ export const MultiOrganizationSwitcher: Story = {
 
 export const OrganizationListFailureWithCachedOptions: Story = {
   args: {
-    organizationErrorMessage: "Unable to load organizations.",
+    organizationSwitcherErrorMessage: "Unable to load organizations.",
     organizations: [
       { id: "org_mistle", name: "Mistle Labs" },
       { id: "org_northstar", name: "Northstar Research" },
@@ -85,7 +89,7 @@ export const OrganizationListFailureWithCachedOptions: Story = {
 
 export const OrganizationListFailureWithoutOptions: Story = {
   args: {
-    organizationErrorMessage: "Unable to load organizations.",
+    organizationSwitcherErrorMessage: "Unable to load organizations.",
     organizations: [],
   },
   play: async ({ canvasElement }): Promise<void> => {

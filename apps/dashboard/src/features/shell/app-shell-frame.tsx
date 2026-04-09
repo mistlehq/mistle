@@ -67,7 +67,8 @@ export function resolveAppShellFrame(input: {
   isSwitchingOrganization: boolean;
   locationPathname: string;
   organizationOptions: OrganizationSwitcherOption[];
-  organizationErrorMessage: string | null;
+  organizationSummaryErrorMessage: string | null;
+  organizationSwitcherErrorMessage: string | null;
   organizationImageUrl: string | null;
   activeOrganizationId: string;
   organizationName: string;
@@ -127,7 +128,8 @@ export function resolveAppShellFrame(input: {
         onNavigateToSettings={input.handleNavigateToSettings}
         onSignOut={input.handleSignOut}
         onSwitchOrganization={input.handleSwitchOrganization}
-        organizationErrorMessage={input.organizationErrorMessage}
+        organizationSummaryErrorMessage={input.organizationSummaryErrorMessage}
+        organizationSwitcherErrorMessage={input.organizationSwitcherErrorMessage}
         organizationImageUrl={input.organizationImageUrl}
         organizationName={input.organizationName}
         organizations={input.organizationOptions}
