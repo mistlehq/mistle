@@ -33,6 +33,10 @@ export function OrganizationMenuTrigger(input: {
   activeOrganizationId?: string | null;
   isSwitchingOrganization?: boolean;
   isSigningOut: boolean;
+  isMenuOpen?: boolean;
+  onMenuOpenChange?: (open: boolean) => void;
+  isSwitchOrganizationSubmenuOpen?: boolean;
+  onSwitchOrganizationSubmenuOpenChange?: (open: boolean) => void;
   onNavigateToSettings: () => void;
   onSwitchOrganization?: (organizationId: string) => void;
   onSignOut: () => void;
@@ -45,7 +49,7 @@ export function OrganizationMenuTrigger(input: {
     typeof input.onSwitchOrganization === "function";
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={input.onMenuOpenChange} open={input.isMenuOpen}>
       <DropdownMenuTrigger
         render={
           <Button
@@ -92,7 +96,10 @@ export function OrganizationMenuTrigger(input: {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           {showOrganizationSwitcher ? (
-            <DropdownMenuSub>
+            <DropdownMenuSub
+              onOpenChange={input.onSwitchOrganizationSubmenuOpenChange}
+              open={input.isSwitchOrganizationSubmenuOpen}
+            >
               <DropdownMenuSubTrigger disabled={input.isSwitchingOrganization}>
                 Switch organization
               </DropdownMenuSubTrigger>

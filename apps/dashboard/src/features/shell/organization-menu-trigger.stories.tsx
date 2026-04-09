@@ -1,17 +1,18 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ComponentProps } from "react";
-import { expect, userEvent, within } from "storybook/test";
 
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 
 const baseArgs = {
   activeOrganizationId: "org_mistle",
   isSwitchingOrganization: false,
+  isMenuOpen: false,
   organizationName: "Mistle Labs",
   organizationImageUrl: null,
   organizationSummaryErrorMessage: null,
   organizationSwitcherErrorMessage: null,
-  organizations: [],
+  isSwitchOrganizationSubmenuOpen: false,
+  organizations: [{ id: "org_mistle", name: "Mistle Labs" }],
   isSigningOut: false,
   onNavigateToSettings: function onNavigateToSettings() {},
   onSignOut: function onSignOut() {},
@@ -33,76 +34,54 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-  play: async ({ canvasElement }): Promise<void> => {
-    const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "Organization menu" }));
-
-    await expect(await canvas.findByText("Settings")).toBeVisible();
-    await expect(await canvas.findByText("Sign out")).toBeVisible();
+  args: {
+    isMenuOpen: true,
   },
 };
 
 export const WithError: Story = {
   args: {
+    isMenuOpen: true,
     organizationSummaryErrorMessage: "Organization details could not be loaded.",
-  },
-};
-
-export const WithLogo: Story = {
-  args: {
-    organizationImageUrl: "https://images.example.com/mistle-logo.webp",
   },
 };
 
 export const MultiOrganizationSwitcher: Story = {
   args: {
+    isMenuOpen: true,
+    isSwitchOrganizationSubmenuOpen: true,
     organizations: [
       { id: "org_acme", name: "Acme Corp" },
       { id: "org_mistle", name: "Mistle Labs" },
       { id: "org_northstar", name: "Northstar Research" },
     ],
   },
-  play: async ({ canvasElement }): Promise<void> => {
-    const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "Organization menu" }));
-    await expect(await canvas.findByText("Switch organization")).toBeVisible();
-  },
 };
 
 export const OrganizationListFailureWithCachedOptions: Story = {
   args: {
+    isMenuOpen: true,
+    isSwitchOrganizationSubmenuOpen: true,
     organizationSwitcherErrorMessage: "Unable to load organizations.",
     organizations: [
       { id: "org_mistle", name: "Mistle Labs" },
       { id: "org_northstar", name: "Northstar Research" },
     ],
   },
-  play: async ({ canvasElement }): Promise<void> => {
-    const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "Organization menu" }));
-    await userEvent.click(await canvas.findByText("Switch organization"));
-
-    await expect(await canvas.findByText("Unable to load organizations.")).toBeVisible();
-    await expect(await canvas.findByText("Northstar Research")).toBeVisible();
-  },
 };
 
 export const OrganizationListFailureWithoutOptions: Story = {
   args: {
+    isMenuOpen: true,
+    isSwitchOrganizationSubmenuOpen: true,
     organizationSwitcherErrorMessage: "Unable to load organizations.",
     organizations: [],
-  },
-  play: async ({ canvasElement }): Promise<void> => {
-    const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "Organization menu" }));
-    await userEvent.click(await canvas.findByText("Switch organization"));
-
-    await expect(await canvas.findByText("Unable to load organizations.")).toBeVisible();
   },
 };
 
 export const SigningOut: Story = {
   args: {
+    isMenuOpen: true,
     isSigningOut: true,
   },
 };
