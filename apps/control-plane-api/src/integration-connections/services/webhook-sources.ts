@@ -69,6 +69,17 @@ type ConnectionWithTarget = {
   };
 };
 
+function resolveStringCredentialValueOrThrow(input: {
+  credential: Awaited<ReturnType<typeof resolveIntegrationCredential>>;
+  context: string;
+}): string {
+  if (input.credential.kind !== "value") {
+    throw new Error(`${input.context} requires a string credential value.`);
+  }
+
+  return input.credential.value;
+}
+
 function generateEndpointKey(): string {
   return randomBytes(16).toString("base64url");
 }
@@ -192,7 +203,13 @@ export async function resolveConnectionSecretsOrThrow(input: {
         },
       );
 
-      return [field.name, resolvedCredential.value] as const;
+      return [
+        field.name,
+        resolveStringCredentialValueOrThrow({
+          credential: resolvedCredential,
+          context: "Webhook source connection secret hydration",
+        }),
+      ] as const;
     }),
   );
 

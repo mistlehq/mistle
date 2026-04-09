@@ -10,9 +10,21 @@ export const ResolveIntegrationCredentialRequestSchema = z
   })
   .strict();
 
-export const ResolveIntegrationCredentialResponseSchema = z
-  .object({
-    value: z.string().min(1),
-    expiresAt: z.iso.datetime({ offset: true }).optional(),
-  })
-  .strict();
+export const ResolveIntegrationCredentialResponseSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("value"),
+      value: z.string().min(1),
+      expiresAt: z.iso.datetime({ offset: true }).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("aws_session"),
+      accessKeyId: z.string().min(1),
+      secretAccessKey: z.string().min(1),
+      sessionToken: z.string().min(1),
+      expiresAt: z.iso.datetime({ offset: true }),
+    })
+    .strict(),
+]);

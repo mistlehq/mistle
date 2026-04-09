@@ -4111,12 +4111,34 @@ export interface paths {
                   additionalHeaders?: {
                     [key: string]: string;
                   };
-                  authInjection: {
-                    target: string;
-                    /** @enum {string} */
-                    type: "bearer" | "basic" | "header" | "query";
-                    username?: string;
-                  };
+                  authInjection:
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "bearer";
+                      }
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "basic";
+                        username?: string;
+                      }
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "header";
+                      }
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "query";
+                      }
+                    | {
+                        region: string;
+                        service: string;
+                        /** @enum {string} */
+                        type: "aws_sigv4";
+                      };
                   bindingId: string;
                   credentialResolver: {
                     connectionId: string;
@@ -4542,12 +4564,34 @@ export interface paths {
                   additionalHeaders?: {
                     [key: string]: string;
                   };
-                  authInjection: {
-                    target: string;
-                    /** @enum {string} */
-                    type: "bearer" | "basic" | "header" | "query";
-                    username?: string;
-                  };
+                  authInjection:
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "bearer";
+                      }
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "basic";
+                        username?: string;
+                      }
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "header";
+                      }
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "query";
+                      }
+                    | {
+                        region: string;
+                        service: string;
+                        /** @enum {string} */
+                        type: "aws_sigv4";
+                      };
                   bindingId: string;
                   credentialResolver: {
                     connectionId: string;

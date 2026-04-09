@@ -37,11 +37,30 @@ const RuntimePlanSchema = z.object({
       upstream: z.object({
         baseUrl: z.string().min(1),
       }),
-      authInjection: z.object({
-        type: z.enum(["bearer", "basic", "header", "query"]),
-        target: z.string().min(1),
-        username: z.string().min(1).optional(),
-      }),
+      authInjection: z.discriminatedUnion("type", [
+        z.object({
+          type: z.literal("bearer"),
+          target: z.string().min(1),
+        }),
+        z.object({
+          type: z.literal("basic"),
+          target: z.string().min(1),
+          username: z.string().min(1).optional(),
+        }),
+        z.object({
+          type: z.literal("header"),
+          target: z.string().min(1),
+        }),
+        z.object({
+          type: z.literal("query"),
+          target: z.string().min(1),
+        }),
+        z.object({
+          type: z.literal("aws_sigv4"),
+          service: z.string().min(1),
+          region: z.string().min(1),
+        }),
+      ]),
       credentialResolver: z.object({
         connectionId: z.string().min(1),
         secretType: z.string().min(1),

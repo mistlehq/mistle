@@ -72,6 +72,40 @@ function createRoute(input: {
   };
 }
 
+function createAwsRoute(input: {
+  egressRuleId: string;
+  bindingId: string;
+  hosts: string[];
+  pathPrefixes?: string[];
+}): EgressCredentialRoute {
+  const match: EgressCredentialRoute["match"] = {
+    hosts: input.hosts,
+  };
+
+  if (input.pathPrefixes !== undefined) {
+    match.pathPrefixes = input.pathPrefixes;
+  }
+
+  return {
+    egressRuleId: input.egressRuleId,
+    bindingId: input.bindingId,
+    match,
+    upstream: {
+      baseUrl: "https://sts.us-east-1.amazonaws.com",
+    },
+    authInjection: {
+      type: "aws_sigv4",
+      service: "sts",
+      region: "us-east-1",
+    },
+    credentialResolver: {
+      connectionId: "conn_aws",
+      secretType: "aws_secret_access_key",
+      resolverKey: "assume-role-session",
+    },
+  };
+}
+
 function createCompiledBindingResult(input: {
   route: EgressCredentialRoute;
   artifactKey: string;
@@ -173,6 +207,24 @@ describe("validateCompiledBindingResults", () => {
     expect(() =>
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts aws sigv4 routes in compiled binding outputs", () => {
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [
+          createCompiledBindingResult({
+            route: createAwsRoute({
+              egressRuleId: "egress_rule_aws",
+              bindingId: "binding_aws",
+              hosts: ["sts.us-east-1.amazonaws.com"],
+              pathPrefixes: ["/"],
+            }),
+            artifactKey: "aws-cli",
+          }),
+        ],
       }),
     ).not.toThrow();
   });

@@ -6,11 +6,12 @@ import type { Context } from "hono";
 import { logger } from "../logger.js";
 import type { AppContextBindings } from "../types.js";
 import { EGRESS_BASE_PATH, EgressRequestHeaders } from "./constants.js";
-import { CredentialCache } from "./credential-cache.js";
+import { CredentialCache, type CachedCredential } from "./credential-cache.js";
 import {
   authorizeEgressGrant,
   EgressGrantRequestError,
   type AuthorizedEgressGrant,
+  type StaticAuthorizedEgressGrant,
 } from "./grant.js";
 import {
   createEgressTelemetryBaseAttributes,
@@ -144,6 +145,35 @@ function toBasicAuthorizationValue(input: { secretValue: string; username?: stri
 
 function toBearerAuthorizationValue(secretValue: string): string {
   return `Bearer ${secretValue}`;
+}
+
+function resolveStaticCredentialValueOrThrow(input: {
+  credential: CachedCredential;
+  context: string;
+}): string {
+  if (input.credential.kind !== "value") {
+    throw new Error(`${input.context} requires a string credential value.`);
+  }
+
+  return input.credential.value;
+}
+
+function resolveStaticAuthInjectionOrThrow(egressGrant: AuthorizedEgressGrant): {
+  authInjectionType: StaticAuthorizedEgressGrant["authInjectionType"];
+  authInjectionTarget: string;
+  authInjectionUsername?: string;
+} {
+  if (!("authInjectionTarget" in egressGrant)) {
+    throw new Error("HTTP egress auth injection requires a concrete injection target.");
+  }
+
+  return {
+    authInjectionType: egressGrant.authInjectionType,
+    authInjectionTarget: egressGrant.authInjectionTarget,
+    ...(egressGrant.authInjectionType !== "basic" || egressGrant.authInjectionUsername === undefined
+      ? {}
+      : { authInjectionUsername: egressGrant.authInjectionUsername }),
+  };
 }
 
 function applyAuthInjection(input: {
@@ -388,12 +418,12 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             : { resolverKey: egressGrant.resolverKey }),
         };
 
-        let resolvedCredentialValue = input.credentialCache.get(cacheKey);
-        span.setAttribute("mistle.credential.cache_hit", resolvedCredentialValue !== undefined);
+        let resolvedCredential = input.credentialCache.get(cacheKey);
+        span.setAttribute("mistle.credential.cache_hit", resolvedCredential !== undefined);
 
-        if (resolvedCredentialValue === undefined) {
+        if (resolvedCredential === undefined) {
           try {
-            const resolvedCredentialValueFromControlPlane = await EgressTracer.startActiveSpan(
+            const resolvedCredentialFromControlPlane = await EgressTracer.startActiveSpan(
               "tokenizer_proxy.egress.resolve_credential",
               async (credentialSpan) => {
                 credentialSpan.setAttributes(
@@ -420,7 +450,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                     });
 
                   input.credentialCache.set(cacheKey, resolvedCredential);
-                  return resolvedCredential.value;
+                  return resolvedCredential;
                 } catch (error) {
                   credentialSpan.recordException(
                     error instanceof Error ? error : new Error(String(error)),
@@ -435,7 +465,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                 }
               },
             );
-            resolvedCredentialValue = resolvedCredentialValueFromControlPlane;
+            resolvedCredential = resolvedCredentialFromControlPlane;
           } catch (error) {
             logger.error(
               {
@@ -459,6 +489,10 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           }
         }
 
+        if (resolvedCredential === undefined) {
+          throw new Error("Expected integration credential to be resolved.");
+        }
+
         const upstreamUrl = createUpstreamUrl({
           requestUrl: ctx.req.url,
           targetPath,
@@ -466,6 +500,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
         });
         span.setAttributes(createUpstreamTelemetryAttributes({ upstreamUrl }));
         const outgoingHeaders = buildOutgoingRequestHeaders(ctx);
+        const staticAuthInjection = resolveStaticAuthInjectionOrThrow(egressGrant);
 
         if (egressGrant.additionalHeaders !== undefined) {
           applyAdditionalHeaders({
@@ -477,12 +512,11 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
         applyAuthInjection({
           upstreamUrl,
           outgoingHeaders,
-          authInjectionType: egressGrant.authInjectionType,
-          authInjectionTarget: egressGrant.authInjectionTarget,
-          ...(egressGrant.authInjectionUsername === undefined
-            ? {}
-            : { authInjectionUsername: egressGrant.authInjectionUsername }),
-          secretValue: resolvedCredentialValue,
+          ...staticAuthInjection,
+          secretValue: resolveStaticCredentialValueOrThrow({
+            credential: resolvedCredential,
+            context: "HTTP egress auth injection",
+          }),
         });
 
         const outgoingBody = await readOutgoingRequestBody(ctx);

@@ -41,7 +41,7 @@ function mapClaimValidationErrorCode(
 
 export async function mintEgressGrant(input: {
   config: EgressGrantConfig;
-  claims: EgressGrantClaims;
+  claims: EgressGrantClaimsInput;
   ttlSeconds: number;
 }): Promise<string> {
   if (!Number.isInteger(input.ttlSeconds) || input.ttlSeconds < 1) {
@@ -61,10 +61,18 @@ export async function mintEgressGrant(input: {
       secretType: claims.secretType,
       upstreamBaseUrl: claims.upstreamBaseUrl,
       authInjectionType: claims.authInjectionType,
-      authInjectionTarget: claims.authInjectionTarget,
-      ...(claims.authInjectionUsername === undefined
-        ? {}
-        : { authInjectionUsername: claims.authInjectionUsername }),
+      ...("authInjectionTarget" in claims
+        ? { authInjectionTarget: claims.authInjectionTarget }
+        : {}),
+      ...("authInjectionUsername" in claims && claims.authInjectionUsername !== undefined
+        ? { authInjectionUsername: claims.authInjectionUsername }
+        : {}),
+      ...("authInjectionService" in claims
+        ? { authInjectionService: claims.authInjectionService }
+        : {}),
+      ...("authInjectionRegion" in claims
+        ? { authInjectionRegion: claims.authInjectionRegion }
+        : {}),
       ...(claims.additionalHeaders === undefined
         ? {}
         : { additionalHeaders: claims.additionalHeaders }),
@@ -136,15 +144,20 @@ export async function verifyEgressGrant(input: {
           ? verificationResult.payload.upstreamBaseUrl
           : "",
       authInjectionType: verificationResult.payload.authInjectionType,
-      authInjectionTarget:
-        typeof verificationResult.payload.authInjectionTarget === "string"
-          ? verificationResult.payload.authInjectionTarget
-          : "",
+      ...(typeof verificationResult.payload.authInjectionTarget === "string"
+        ? { authInjectionTarget: verificationResult.payload.authInjectionTarget }
+        : {}),
       ...(typeof verificationResult.payload.authInjectionUsername === "string"
         ? { authInjectionUsername: verificationResult.payload.authInjectionUsername }
         : {}),
       ...(isStringRecord(verificationResult.payload.additionalHeaders)
         ? { additionalHeaders: verificationResult.payload.additionalHeaders }
+        : {}),
+      ...(typeof verificationResult.payload.authInjectionService === "string"
+        ? { authInjectionService: verificationResult.payload.authInjectionService }
+        : {}),
+      ...(typeof verificationResult.payload.authInjectionRegion === "string"
+        ? { authInjectionRegion: verificationResult.payload.authInjectionRegion }
         : {}),
       ...(typeof verificationResult.payload.slotKey === "string"
         ? { slotKey: verificationResult.payload.slotKey }

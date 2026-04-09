@@ -12,6 +12,7 @@ import {
   authorizeEgressGrant,
   EgressGrantRequestError,
   type AuthorizedEgressGrant,
+  type StaticAuthorizedEgressGrant,
 } from "./grant.js";
 
 type CreateEgressProxyUpgradeHandlerInput = {
@@ -120,6 +121,35 @@ function toBasicAuthorizationValue(input: { secretValue: string; username?: stri
 
 function toBearerAuthorizationValue(secretValue: string): string {
   return `Bearer ${secretValue}`;
+}
+
+function resolveStaticCredentialValueOrThrow(input: {
+  credential: Awaited<ReturnType<ControlPlaneInternalClient["resolveIntegrationCredential"]>>;
+  context: string;
+}): string {
+  if (input.credential.kind !== "value") {
+    throw new Error(`${input.context} requires a string credential value.`);
+  }
+
+  return input.credential.value;
+}
+
+function resolveStaticAuthInjectionOrThrow(egressGrant: AuthorizedEgressGrant): {
+  authInjectionType: StaticAuthorizedEgressGrant["authInjectionType"];
+  authInjectionTarget: string;
+  authInjectionUsername?: string;
+} {
+  if (!("authInjectionTarget" in egressGrant)) {
+    throw new Error("Websocket egress auth injection requires a concrete injection target.");
+  }
+
+  return {
+    authInjectionType: egressGrant.authInjectionType,
+    authInjectionTarget: egressGrant.authInjectionTarget,
+    ...(egressGrant.authInjectionType !== "basic" || egressGrant.authInjectionUsername === undefined
+      ? {}
+      : { authInjectionUsername: egressGrant.authInjectionUsername }),
+  };
 }
 
 function applyAuthInjection(input: {
@@ -305,9 +335,12 @@ async function resolveCredentialValue(input: {
       : { resolverKey: input.egressGrant.resolverKey }),
   };
 
-  const cachedCredentialValue = input.credentialCache.get(cacheKey);
-  if (cachedCredentialValue !== undefined) {
-    return cachedCredentialValue;
+  const cachedCredential = input.credentialCache.get(cacheKey);
+  if (cachedCredential !== undefined) {
+    return resolveStaticCredentialValueOrThrow({
+      credential: cachedCredential,
+      context: "Websocket egress auth injection",
+    });
   }
 
   const resolvedCredential = await input.controlPlaneInternalClient.resolveIntegrationCredential({
@@ -321,7 +354,10 @@ async function resolveCredentialValue(input: {
   });
 
   input.credentialCache.set(cacheKey, resolvedCredential);
-  return resolvedCredential.value;
+  return resolveStaticCredentialValueOrThrow({
+    credential: resolvedCredential,
+    context: "Websocket egress auth injection",
+  });
 }
 
 export function createEgressProxyUpgradeHandler(input: CreateEgressProxyUpgradeHandlerInput) {
@@ -416,11 +452,7 @@ export function createEgressProxyUpgradeHandler(input: CreateEgressProxyUpgradeH
       applyAuthInjection({
         upstreamUrl,
         outgoingHeaders,
-        authInjectionType: egressGrant.authInjectionType,
-        authInjectionTarget: egressGrant.authInjectionTarget,
-        ...(egressGrant.authInjectionUsername === undefined
-          ? {}
-          : { authInjectionUsername: egressGrant.authInjectionUsername }),
+        ...resolveStaticAuthInjectionOrThrow(egressGrant),
         secretValue: credentialValue,
       });
 

@@ -39,13 +39,40 @@ const EgressCredentialRouteSchema = z
         baseUrl: z.string().min(1),
       })
       .strict(),
-    authInjection: z
-      .object({
-        type: z.enum(["bearer", "basic", "header", "query"]),
-        target: z.string().min(1),
-        username: z.string().min(1).optional(),
-      })
-      .strict(),
+    authInjection: z.discriminatedUnion("type", [
+      z
+        .object({
+          type: z.literal("bearer"),
+          target: z.string().min(1),
+        })
+        .strict(),
+      z
+        .object({
+          type: z.literal("basic"),
+          target: z.string().min(1),
+          username: z.string().min(1).optional(),
+        })
+        .strict(),
+      z
+        .object({
+          type: z.literal("header"),
+          target: z.string().min(1),
+        })
+        .strict(),
+      z
+        .object({
+          type: z.literal("query"),
+          target: z.string().min(1),
+        })
+        .strict(),
+      z
+        .object({
+          type: z.literal("aws_sigv4"),
+          service: z.string().min(1),
+          region: z.string().min(1),
+        })
+        .strict(),
+    ]),
     additionalHeaders: z.record(z.string(), z.string()).optional(),
     credentialResolver: z
       .object({
@@ -312,6 +339,20 @@ function normalizeRuntimeArtifactCommand(
 
 function normalizeRoute(route: z.output<typeof EgressCredentialRouteSchema>): RuntimePlanRoute {
   const additionalHeaders = normalizeAdditionalHeaders(route.additionalHeaders);
+  const authInjection =
+    route.authInjection.type === "aws_sigv4"
+      ? {
+          type: route.authInjection.type,
+          service: route.authInjection.service,
+          region: route.authInjection.region,
+        }
+      : {
+          type: route.authInjection.type,
+          target: route.authInjection.target,
+          ...(route.authInjection.type !== "basic" || route.authInjection.username === undefined
+            ? {}
+            : { username: route.authInjection.username }),
+        };
 
   return {
     egressRuleId: route.egressRuleId,
@@ -324,13 +365,7 @@ function normalizeRoute(route: z.output<typeof EgressCredentialRouteSchema>): Ru
     upstream: {
       baseUrl: route.upstream.baseUrl,
     },
-    authInjection: {
-      type: route.authInjection.type,
-      target: route.authInjection.target,
-      ...(route.authInjection.username === undefined
-        ? {}
-        : { username: route.authInjection.username }),
-    },
+    authInjection,
     ...(additionalHeaders === undefined ? {} : { additionalHeaders }),
     credentialResolver: {
       connectionId: route.credentialResolver.connectionId,

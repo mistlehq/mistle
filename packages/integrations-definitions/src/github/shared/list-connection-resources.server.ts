@@ -361,6 +361,10 @@ export async function listGitHubConnectionResources(
     throw new Error(`GitHub ${input.kind} resource listing requires a resolved credential.`);
   }
 
+  if (input.credential.kind !== "value") {
+    throw new Error(`GitHub ${input.kind} resource listing requires a string credential value.`);
+  }
+
   const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(input.connection.config);
   const repositories = await listGitHubRepositories({
     apiBaseUrl: input.target.config.apiBaseUrl,

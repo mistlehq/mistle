@@ -22,7 +22,18 @@ export type CreateControlPlaneInternalClientInput = {
 export type ResolveIntegrationCredentialInput =
   paths["/internal/integration-credentials/resolve"]["post"]["requestBody"]["content"]["application/json"];
 export type ResolveIntegrationCredentialOutput =
-  paths["/internal/integration-credentials/resolve"]["post"]["responses"]["200"]["content"]["application/json"];
+  | {
+      kind: "value";
+      value: string;
+      expiresAt?: string | undefined;
+    }
+  | {
+      kind: "aws_session";
+      accessKeyId: string;
+      secretAccessKey: string;
+      sessionToken: string;
+      expiresAt: string;
+    };
 
 export type ResolveIntegrationTargetSecretsInput =
   paths["/internal/integration-credentials/resolve-target-secrets"]["post"]["requestBody"]["content"]["application/json"];
@@ -46,6 +57,25 @@ export type RequestIntegrationConnectionResourceRefreshInput =
   paths["/internal/integration-connections/refresh-resource"]["post"]["requestBody"]["content"]["application/json"];
 export type RequestIntegrationConnectionResourceRefreshOutput =
   paths["/internal/integration-connections/refresh-resource"]["post"]["responses"]["202"]["content"]["application/json"];
+
+const ResolveIntegrationCredentialOutputSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("value"),
+      value: z.string().min(1),
+      expiresAt: z.string().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("aws_session"),
+      accessKeyId: z.string().min(1),
+      secretAccessKey: z.string().min(1),
+      sessionToken: z.string().min(1),
+      expiresAt: z.string().min(1),
+    })
+    .strict(),
+]);
 
 function extractErrorMessage(input: unknown): string {
   const parsedError = InternalErrorSchema.safeParse(input);
@@ -84,7 +114,7 @@ export class ControlPlaneInternalClient {
     });
 
     if (result.response.status === 200 && result.data !== undefined) {
-      return result.data;
+      return ResolveIntegrationCredentialOutputSchema.parse(result.data);
     }
 
     throw new Error(

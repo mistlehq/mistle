@@ -160,6 +160,7 @@ export const GitHubAppInstallationCredentialResolver: IntegrationCredentialResol
     });
 
     return {
+      kind: "value",
       value: installationAccessToken.token,
       ...(installationAccessToken.expiresAt === undefined
         ? {}

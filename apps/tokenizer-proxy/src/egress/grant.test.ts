@@ -33,6 +33,24 @@ async function createGrant(input?: {
   });
 }
 
+async function createAwsGrant(): Promise<string> {
+  return await mintEgressGrant({
+    config: TestGrantConfig,
+    claims: {
+      sub: "sandbox_aws_123",
+      jti: "egress_rule_aws",
+      bindingId: "ibd_aws",
+      connectionId: "icn_aws",
+      secretType: "aws_secret_access_key",
+      upstreamBaseUrl: "https://sts.us-east-1.amazonaws.com",
+      authInjectionType: "aws_sigv4",
+      authInjectionService: "sts",
+      authInjectionRegion: "us-east-1",
+    },
+    ttlSeconds: 60,
+  });
+}
+
 describe("authorizeEgressGrant", () => {
   it("returns the verified grant with egressRuleId", async () => {
     const grantToken = await createGrant({
@@ -103,5 +121,23 @@ describe("authorizeEgressGrant", () => {
       responseCode: "EGRESS_GRANT_SCOPE_VIOLATION",
       statusCode: 403,
     } satisfies Partial<EgressGrantRequestError>);
+  });
+
+  it("authorizes aws sigv4 grants with service and region metadata", async () => {
+    const grantToken = await createAwsGrant();
+
+    await expect(
+      authorizeEgressGrant({
+        grantToken,
+        config: TestGrantConfig,
+        method: "POST",
+        targetPath: "/",
+      }),
+    ).resolves.toMatchObject({
+      egressRuleId: "egress_rule_aws",
+      authInjectionType: "aws_sigv4",
+      authInjectionService: "sts",
+      authInjectionRegion: "us-east-1",
+    });
   });
 });
