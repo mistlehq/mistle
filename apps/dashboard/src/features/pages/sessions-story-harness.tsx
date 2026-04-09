@@ -15,6 +15,7 @@ import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
+import { createAppShellFrameInput } from "../shell/app-shell-frame-fixture.js";
 import { resolveAppShellFrame } from "../shell/app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
 import { resolveAppShellRouteState } from "../shell/app-shell-route-state.js";
@@ -111,67 +112,54 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     input.initialShowSessionsSidebar === true,
   );
   const routeState = resolveAppShellRouteState(location.pathname);
-  const appShellFrame = resolveAppShellFrame({
-    handleBackToApp: () => {},
-    handleNavigateToSettings: () => {},
-    handleSignOut: () => {},
-    handleSwitchOrganization: () => {},
-    inAutomations: routeState.inAutomations,
-    inDashboardRoot: routeState.inDashboardRoot,
-    inSandboxProfiles: routeState.inSandboxProfiles,
-    inSessionDetail: routeState.inSessionDetail,
-    inSessions: routeState.inSessions,
-    inSettings: routeState.inSettings,
-    isSigningOut: false,
-    isSwitchingOrganization: false,
-    locationPathname: location.pathname,
-    organizationOptions: [{ id: "org_123", name: "Mistle Labs" }],
-    organizationErrorMessage: null,
-    organizationImageUrl: null,
-    activeOrganizationId: "org_123",
-    organizationName: "Mistle Labs",
-    pageMeta: {
-      appShellInsetOwner: location.pathname === SessionsRoutes.NEW ? "child" : "app-shell",
-      appShellViewportMode: "document",
-      title: null,
-      headerIcon: null,
-      supportingText: null,
-    },
-    signOutError: null,
-    showSessionsSidebar,
-    onShowSessionsSidebarChange: (checked) => {
-      const currentLocationHref = resolveLocationHref({
-        pathname: location.pathname,
-        search: location.search,
-        hash: location.hash,
-      });
+  const appShellFrame = resolveAppShellFrame(
+    createAppShellFrameInput({
+      routeState,
+      locationPathname: location.pathname,
+      pageMeta: {
+        appShellInsetOwner: location.pathname === SessionsRoutes.NEW ? "child" : "app-shell",
+        appShellViewportMode: "document",
+        title: null,
+        headerIcon: null,
+        supportingText: null,
+      },
+      overrides: {
+        showSessionsSidebar,
+        onShowSessionsSidebarChange: (checked) => {
+          const currentLocationHref = resolveLocationHref({
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash,
+          });
 
-      setShowSessionsSidebar(checked);
+          setShowSessionsSidebar(checked);
 
-      if (!checked) {
-        const navigationTarget = resolveSidebarModeDisableNavigationTarget({
-          currentLocationHref,
-          currentPathname: location.pathname,
-          previousLocationHref: previousSessionsSidebarToggleUrlRef.current,
-        });
-        previousSessionsSidebarToggleUrlRef.current = null;
+          if (!checked) {
+            const navigationTarget = resolveSidebarModeDisableNavigationTarget({
+              currentLocationHref,
+              currentPathname: location.pathname,
+              previousLocationHref: previousSessionsSidebarToggleUrlRef.current,
+            });
+            previousSessionsSidebarToggleUrlRef.current = null;
 
-        if (navigationTarget !== null) {
-          void navigate(navigationTarget);
-        }
+            if (navigationTarget !== null) {
+              void navigate(navigationTarget);
+            }
 
-        return;
-      }
+            return;
+          }
 
-      previousSessionsSidebarToggleUrlRef.current = currentLocationHref;
+          previousSessionsSidebarToggleUrlRef.current = currentLocationHref;
 
-      const navigationTarget = resolveSidebarModeEnableNavigationTarget(location.pathname);
+          const navigationTarget = resolveSidebarModeEnableNavigationTarget(location.pathname);
 
-      if (navigationTarget !== null) {
-        void navigate(navigationTarget);
-      }
-    },
-  });
+          if (navigationTarget !== null) {
+            void navigate(navigationTarget);
+          }
+        },
+      },
+    }),
+  );
 
   return (
     <AppShellHeaderActionsContext.Provider value={setHeaderActions}>

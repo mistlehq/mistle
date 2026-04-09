@@ -2,40 +2,36 @@ import { isValidElement, type ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import { SessionsShellSidebar } from "../navigation/sessions-shell-sidebar.js";
+import { createAppShellFrameInput } from "./app-shell-frame-fixture.js";
 import { resolveAppShellFrame } from "./app-shell-frame.js";
 
 describe("resolveAppShellFrame", () => {
   it("uses the dedicated sessions sidebar only when the toggle is enabled on sessions routes", () => {
-    const frame = resolveAppShellFrame({
-      handleBackToApp: () => {},
-      handleNavigateToSettings: () => {},
-      handleSignOut: () => {},
-      handleSwitchOrganization: () => {},
-      inAutomations: false,
-      inDashboardRoot: false,
-      inSandboxProfiles: false,
-      inSessionDetail: true,
-      inSessions: true,
-      inSettings: false,
-      isSigningOut: false,
-      isSwitchingOrganization: false,
-      locationPathname: "/sessions/sbi_123",
-      organizationOptions: [],
-      organizationErrorMessage: null,
-      organizationImageUrl: null,
-      activeOrganizationId: "org_123",
-      organizationName: "Acme",
-      pageMeta: {
-        appShellInsetOwner: "app-shell",
-        appShellViewportMode: "document",
-        title: "Sessions",
-        headerIcon: null,
-        supportingText: null,
-      },
-      signOutError: null,
-      showSessionsSidebar: true,
-      onShowSessionsSidebarChange: () => {},
-    });
+    const frame = resolveAppShellFrame(
+      createAppShellFrameInput({
+        routeState: {
+          inAutomations: false,
+          inDashboardRoot: false,
+          inSandboxProfiles: false,
+          inSessionDetail: true,
+          inSessions: true,
+          inSettings: false,
+        },
+        locationPathname: "/sessions/sbi_123",
+        pageMeta: {
+          appShellInsetOwner: "app-shell",
+          appShellViewportMode: "document",
+          title: "Sessions",
+          headerIcon: null,
+          supportingText: null,
+        },
+        overrides: {
+          organizationOptions: [],
+          organizationName: "Acme",
+          showSessionsSidebar: true,
+        },
+      }),
+    );
 
     expect(isValidElement<{ children: ReactNode[]; className: string }>(frame.sidebarContent)).toBe(
       true,
@@ -56,36 +52,30 @@ describe("resolveAppShellFrame", () => {
   });
 
   it("keeps the normal app sidebar when the sessions toggle is disabled", () => {
-    const frame = resolveAppShellFrame({
-      handleBackToApp: () => {},
-      handleNavigateToSettings: () => {},
-      handleSignOut: () => {},
-      handleSwitchOrganization: () => {},
-      inAutomations: false,
-      inDashboardRoot: false,
-      inSandboxProfiles: false,
-      inSessionDetail: true,
-      inSessions: true,
-      inSettings: false,
-      isSigningOut: false,
-      isSwitchingOrganization: false,
-      locationPathname: "/sessions/sbi_123",
-      organizationOptions: [],
-      organizationErrorMessage: null,
-      organizationImageUrl: null,
-      activeOrganizationId: "org_123",
-      organizationName: "Acme",
-      pageMeta: {
-        appShellInsetOwner: "app-shell",
-        appShellViewportMode: "document",
-        title: "Sessions",
-        headerIcon: null,
-        supportingText: null,
-      },
-      signOutError: null,
-      showSessionsSidebar: false,
-      onShowSessionsSidebarChange: () => {},
-    });
+    const frame = resolveAppShellFrame(
+      createAppShellFrameInput({
+        routeState: {
+          inAutomations: false,
+          inDashboardRoot: false,
+          inSandboxProfiles: false,
+          inSessionDetail: true,
+          inSessions: true,
+          inSettings: false,
+        },
+        locationPathname: "/sessions/sbi_123",
+        pageMeta: {
+          appShellInsetOwner: "app-shell",
+          appShellViewportMode: "document",
+          title: "Sessions",
+          headerIcon: null,
+          supportingText: null,
+        },
+        overrides: {
+          organizationOptions: [],
+          organizationName: "Acme",
+        },
+      }),
+    );
 
     expect(isValidElement(frame.sidebarContent)).toBe(true);
     if (!isValidElement(frame.sidebarContent)) {
