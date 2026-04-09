@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type {
   MemberAvatar,
@@ -15,6 +15,7 @@ import type {
   MembersDirectoryPendingMemberOperation,
 } from "./members-directory-model.js";
 import { parseRoleSelectValue } from "./members-formatters.js";
+import { clampMembersDirectoryOffset } from "./members-pagination.js";
 import { buildMembersQueryKeys } from "./members-query-keys.js";
 import { defaultMembersSettingsApi, type MembersSettingsApi } from "./members-settings-api.js";
 import { toMembersErrorMessage } from "./members-status-messages.js";
@@ -106,6 +107,17 @@ export function useOrganizationMembersSettingsState(
 
   const inviteMembersDisabled =
     queries.capabilitiesQuery.isError || !canManageInvitations(queries.capabilities);
+
+  useEffect(() => {
+    const nextOffset = clampMembersDirectoryOffset({
+      limit: queries.limit,
+      offset: queries.offset,
+      total: queries.total,
+    });
+    if (nextOffset !== queries.offset) {
+      setOffset(nextOffset);
+    }
+  }, [queries.limit, queries.offset, queries.total]);
 
   return {
     inviteDialogOpen,

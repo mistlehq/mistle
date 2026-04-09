@@ -130,6 +130,7 @@ export function createOrganizationMembersSettingsFixtureContent(): React.JSX.Ele
       inviteMemberRequest={queueSettingsFixtureInviteMemberRequest}
       isLoading={false}
       isUpdatingRole={false}
+      limit={25}
       loadErrorMessage={null}
       memberAvatarsByUserId={new Map<string, MemberAvatar>()}
       members={SettingsFixtureMembers}

@@ -140,6 +140,7 @@ export function createOrganizationMembersSettingsPageStoryArgs(
     inviteMemberRequest: overrides.inviteMemberRequest ?? inviteOrganizationMemberStoryRequest,
     isLoading: overrides.isLoading ?? false,
     isUpdatingRole: overrides.isUpdatingRole ?? false,
+    limit: overrides.limit ?? 25,
     loadErrorMessage: overrides.loadErrorMessage ?? null,
     memberAvatarsByUserId: overrides.memberAvatarsByUserId ?? new Map<string, MemberAvatar>(),
     members: overrides.members ?? OrganizationMembersStoryMembers,

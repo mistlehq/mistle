@@ -16,6 +16,7 @@ import type {
   MembersDirectoryPendingMemberOperation,
 } from "../settings/members/members-directory-model.js";
 import { MembersDirectoryTable } from "../settings/members/members-directory-table.js";
+import { clampMembersDirectoryOffset } from "../settings/members/members-pagination.js";
 import {
   MembersLoadErrorState,
   MembersLoadingState,
@@ -45,6 +46,7 @@ export type OrganizationMembersSettingsPageViewProps = {
   isLoading: boolean;
   isUpdatingRole: boolean;
   loadErrorMessage: string | null;
+  limit: number;
   memberAvatarsByUserId: ReadonlyMap<string, MemberAvatar>;
   members: SettingsMember[];
   onChangeRole: (member: SettingsMember) => void;
@@ -74,6 +76,13 @@ export type OrganizationMembersSettingsPageViewProps = {
 export function OrganizationMembersSettingsPageView(
   props: OrganizationMembersSettingsPageViewProps,
 ): React.JSX.Element {
+  const visibleRowCount = props.members.length + props.invitations.length;
+  const visibleOffset = clampMembersDirectoryOffset({
+    limit: props.limit,
+    offset: props.offset,
+    total: props.total,
+  });
+
   if (props.isLoading) {
     return <MembersLoadingState />;
   }
@@ -126,8 +135,8 @@ export function OrganizationMembersSettingsPageView(
           <p className="text-muted-foreground text-sm">
             {props.total === 0
               ? "Showing 0 results"
-              : `Showing ${props.offset + 1}-${Math.min(
-                  props.offset + props.members.length + props.invitations.length,
+              : `Showing ${visibleOffset + 1}-${Math.min(
+                  visibleOffset + visibleRowCount,
                   props.total,
                 )} of ${props.total}`}
           </p>

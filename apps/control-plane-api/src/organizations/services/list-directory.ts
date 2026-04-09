@@ -1,7 +1,7 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { members, users } from "@mistle/db/control-plane";
 import type { S3CompatibleObjectStore } from "@mistle/object-store";
-import { and, asc, desc, eq, ilike } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, or } from "drizzle-orm";
 
 type DirectoryFilter = "all" | "members" | "invitations";
 type DirectoryInvitationStatus = "pending" | "accepted" | "canceled" | "rejected" | "revoked";
@@ -33,6 +33,28 @@ type DirectoryInvitationEntry = {
 };
 
 export type DirectoryEntry = DirectoryMemberEntry | DirectoryInvitationEntry;
+type DirectoryMemberRow = {
+  kind: "member";
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  role: DirectoryRole;
+  joinedAt: Date;
+  imageObjectKey: string | null;
+};
+type DirectoryInvitationRow = {
+  kind: "invitation";
+  id: string;
+  organizationId: string;
+  email: string;
+  role: string | null;
+  inviterId: string;
+  status: string;
+  expiresAt: Date;
+  createdAt: Date;
+};
+type DirectoryRow = DirectoryMemberRow | DirectoryInvitationRow;
 
 export type ListDirectoryContext = {
   db: ControlPlaneDatabase;
@@ -62,38 +84,49 @@ export async function listDirectory(
   input: ListDirectoryInput,
 ): Promise<ListDirectoryResult> {
   const normalizedSearch = input.search.trim();
-  const memberEntries =
+  const memberRows =
     input.filter === "invitations"
       ? []
-      : await readMemberEntries({
-          ctx,
+      : await readMemberRows({
+          db: ctx.db,
           organizationId: input.organizationId,
           search: normalizedSearch,
         });
-  const invitationEntries =
+  const invitationRows =
     input.filter === "members"
       ? []
-      : await readInvitationEntries({
+      : await readInvitationRows({
           db: ctx.db,
           organizationId: input.organizationId,
           search: normalizedSearch,
         });
 
-  const entries = [...memberEntries, ...invitationEntries].sort(compareDirectoryEntries);
+  const rows = [...memberRows, ...invitationRows].sort(compareDirectoryRows);
+  const pageRows = rows.slice(input.offset, input.offset + input.limit);
+  const entries = await Promise.all(
+    pageRows.map((row) =>
+      buildDirectoryEntry({
+        row,
+        objectStore: ctx.objectStore,
+        presignedUrlTtlSeconds: ctx.presignedUrlTtlSeconds,
+      }),
+    ),
+  );
+
   return {
-    entries: entries.slice(input.offset, input.offset + input.limit),
+    entries,
     limit: input.limit,
     offset: input.offset,
-    total: entries.length,
+    total: rows.length,
   };
 }
 
-async function readMemberEntries(input: {
-  ctx: ListDirectoryContext;
+async function readMemberRows(input: {
+  db: ControlPlaneDatabase;
   organizationId: string;
   search: string;
-}): Promise<DirectoryMemberEntry[]> {
-  const rows = await input.ctx.db
+}): Promise<DirectoryMemberRow[]> {
+  const rows = await input.db
     .select({
       id: members.id,
       userId: users.id,
@@ -110,57 +143,33 @@ async function readMemberEntries(input: {
         eq(members.organizationId, input.organizationId),
         input.search.length === 0
           ? undefined
-          : ilike(users.name, `%${escapeLikePattern(input.search)}%`),
+          : or(
+              ilike(users.name, `%${escapeLikePattern(input.search)}%`),
+              ilike(users.email, `%${escapeLikePattern(input.search)}%`),
+            ),
       ),
     )
     .orderBy(desc(members.createdAt), asc(users.name), asc(users.email));
 
-  const emailRows =
-    input.search.length === 0
-      ? rows
-      : rows.filter(
-          (row) =>
-            row.name.toLocaleLowerCase().includes(input.search.toLocaleLowerCase()) ||
-            row.email.toLocaleLowerCase().includes(input.search.toLocaleLowerCase()),
-        );
-
-  return Promise.all(
-    emailRows.map(async (row): Promise<DirectoryMemberEntry> => {
-      const imageObjectKey = row.imageObjectKey;
-      return {
-        kind: "member",
-        id: row.id,
-        userId: row.userId,
-        name: resolveDirectoryMemberName({
-          name: row.name,
-          email: row.email,
-        }),
-        email: row.email,
-        role: row.role,
-        joinedAt: row.joinedAt.toISOString(),
-        avatar:
-          imageObjectKey === null || imageObjectKey.length === 0
-            ? {
-                hasImage: false,
-                imageUrl: null,
-              }
-            : {
-                hasImage: true,
-                imageUrl: await input.ctx.objectStore.createPresignedGetUrl({
-                  objectKey: imageObjectKey,
-                  expiresInSeconds: input.ctx.presignedUrlTtlSeconds,
-                }),
-              },
-      };
+  return rows.map(
+    (row): DirectoryMemberRow => ({
+      kind: "member",
+      id: row.id,
+      userId: row.userId,
+      name: row.name,
+      email: row.email,
+      role: row.role,
+      joinedAt: row.joinedAt,
+      imageObjectKey: row.imageObjectKey,
     }),
   );
 }
 
-async function readInvitationEntries(input: {
+async function readInvitationRows(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
   search: string;
-}): Promise<DirectoryInvitationEntry[]> {
+}): Promise<DirectoryInvitationRow[]> {
   const rows = await input.db.query.invitations.findMany({
     columns: {
       id: true,
@@ -186,21 +195,68 @@ async function readInvitationEntries(input: {
     ],
   });
 
-  return rows.map((row): DirectoryInvitationEntry => {
-    const { status, rawStatus } = normalizeInvitationStatus(row.status);
-    return {
+  return rows.map(
+    (row): DirectoryInvitationRow => ({
       kind: "invitation",
       id: row.id,
       organizationId: row.organizationId,
       email: row.email,
-      role: normalizeDirectoryRole(row.role),
+      role: row.role,
       inviterId: row.inviterId,
-      status,
-      rawStatus,
-      expiresAt: row.expiresAt.toISOString(),
-      createdAt: row.createdAt.toISOString(),
+      status: row.status,
+      expiresAt: row.expiresAt,
+      createdAt: row.createdAt,
+    }),
+  );
+}
+
+async function buildDirectoryEntry(input: {
+  row: DirectoryRow;
+  objectStore: S3CompatibleObjectStore;
+  presignedUrlTtlSeconds: number;
+}): Promise<DirectoryEntry> {
+  if (input.row.kind === "member") {
+    const imageObjectKey = input.row.imageObjectKey;
+    return {
+      kind: "member",
+      id: input.row.id,
+      userId: input.row.userId,
+      name: resolveDirectoryMemberName({
+        name: input.row.name,
+        email: input.row.email,
+      }),
+      email: input.row.email,
+      role: input.row.role,
+      joinedAt: input.row.joinedAt.toISOString(),
+      avatar:
+        imageObjectKey === null || imageObjectKey.length === 0
+          ? {
+              hasImage: false,
+              imageUrl: null,
+            }
+          : {
+              hasImage: true,
+              imageUrl: await input.objectStore.createPresignedGetUrl({
+                objectKey: imageObjectKey,
+                expiresInSeconds: input.presignedUrlTtlSeconds,
+              }),
+            },
     };
-  });
+  }
+
+  const { status, rawStatus } = normalizeInvitationStatus(input.row.status);
+  return {
+    kind: "invitation",
+    id: input.row.id,
+    organizationId: input.row.organizationId,
+    email: input.row.email,
+    role: normalizeDirectoryRole(input.row.role),
+    inviterId: input.row.inviterId,
+    status,
+    rawStatus,
+    expiresAt: input.row.expiresAt.toISOString(),
+    createdAt: input.row.createdAt.toISOString(),
+  };
 }
 
 function resolveDirectoryMemberName(input: { name: string; email: string }): string {
@@ -243,14 +299,14 @@ function normalizeDirectoryRole(role: string | null): DirectoryRole {
   return "member";
 }
 
-function compareDirectoryEntries(left: DirectoryEntry, right: DirectoryEntry): number {
-  const byDate = compareDateDesc(resolveDirectoryEntryDate(left), resolveDirectoryEntryDate(right));
+function compareDirectoryRows(left: DirectoryRow, right: DirectoryRow): number {
+  const byDate = compareDateDesc(resolveDirectoryRowDate(left), resolveDirectoryRowDate(right));
   if (byDate !== 0) {
     return byDate;
   }
 
-  const byName = resolveDirectoryEntryName(left).localeCompare(
-    resolveDirectoryEntryName(right),
+  const byName = resolveDirectoryRowName(left).localeCompare(
+    resolveDirectoryRowName(right),
     undefined,
     {
       sensitivity: "base",
@@ -260,25 +316,26 @@ function compareDirectoryEntries(left: DirectoryEntry, right: DirectoryEntry): n
     return byName;
   }
 
-  return resolveDirectoryEntryEmail(left).localeCompare(
-    resolveDirectoryEntryEmail(right),
-    undefined,
-    {
-      sensitivity: "base",
-    },
-  );
+  return resolveDirectoryRowEmail(left).localeCompare(resolveDirectoryRowEmail(right), undefined, {
+    sensitivity: "base",
+  });
 }
 
-function resolveDirectoryEntryDate(entry: DirectoryEntry): string {
-  return entry.kind === "member" ? entry.joinedAt : entry.createdAt;
+function resolveDirectoryRowDate(row: DirectoryRow): string {
+  return row.kind === "member" ? row.joinedAt.toISOString() : row.createdAt.toISOString();
 }
 
-function resolveDirectoryEntryName(entry: DirectoryEntry): string {
-  return entry.kind === "member" ? entry.name : entry.email;
+function resolveDirectoryRowName(row: DirectoryRow): string {
+  return row.kind === "member"
+    ? resolveDirectoryMemberName({
+        name: row.name,
+        email: row.email,
+      })
+    : row.email;
 }
 
-function resolveDirectoryEntryEmail(entry: DirectoryEntry): string {
-  return entry.email;
+function resolveDirectoryRowEmail(row: DirectoryRow): string {
+  return row.email;
 }
 
 function compareDateDesc(leftIsoDate: string, rightIsoDate: string): number {

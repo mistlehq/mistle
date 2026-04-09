@@ -192,4 +192,71 @@ describe("organization directory integration", () => {
       await seaweedfs.stop();
     }
   });
+
+  it("matches members by email search as well as name", async ({ fixture }) => {
+    const searchedEmail = "directory-email-search-target@example.com";
+    const ownerSession = await fixture.authSession({
+      email: "integration-org-directory-email-search-owner@example.com",
+    });
+    const memberSession = await fixture.authSession({
+      email: searchedEmail,
+    });
+    const seaweedfs = await startSeaweedfsS3({
+      bucketName: "mistle-assets",
+    });
+    const runtime = await createRuntimeWithObjectStore({
+      config: fixture.config,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      seaweedfs,
+    });
+
+    try {
+      await runtime.db.insert(members).values({
+        organizationId: ownerSession.organizationId,
+        userId: memberSession.userId,
+        role: "member",
+        createdAt: new Date("2026-03-02T00:00:00.000Z"),
+      });
+      await runtime.db
+        .update(users)
+        .set({
+          name: "Completely Different Name",
+        })
+        .where(eq(users.id, memberSession.userId));
+
+      const response = await runtime.request(
+        `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/directory?limit=25&offset=0&filter=members&search=${encodeURIComponent(searchedEmail)}`,
+        {
+          headers: {
+            cookie: ownerSession.cookie,
+          },
+        },
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        entries: [
+          {
+            kind: "member",
+            id: expect.any(String),
+            userId: memberSession.userId,
+            name: "Completely Different Name",
+            email: searchedEmail,
+            role: "member",
+            joinedAt: "2026-03-02T00:00:00.000Z",
+            avatar: {
+              hasImage: false,
+              imageUrl: null,
+            },
+          },
+        ],
+        limit: 25,
+        offset: 0,
+        total: 1,
+      });
+    } finally {
+      await runtime.stop();
+      await seaweedfs.stop();
+    }
+  });
 });

@@ -49,6 +49,7 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
         inviteMemberRequest={inviteMember}
         isLoading={isPageLoading}
         isUpdatingRole={membersState.isUpdatingRole}
+        limit={membersState.limit}
         loadErrorMessage={
           membersState.directoryQuery.isError
             ? toMembersLoadErrorMessage({
