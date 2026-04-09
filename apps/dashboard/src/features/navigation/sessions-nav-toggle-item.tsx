@@ -6,9 +6,11 @@ export function SessionsNavToggleItem(input: {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
 }): React.JSX.Element {
+  const sessionsHref = input.checked ? "/sessions/new" : "/sessions";
+
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton className="pr-12" render={<NavLink to="/sessions" />}>
+      <SidebarMenuButton className="pr-12" render={<NavLink to={sessionsHref} />}>
         <TerminalIcon aria-hidden className="size-4 shrink-0" />
         <span>Sessions</span>
       </SidebarMenuButton>
