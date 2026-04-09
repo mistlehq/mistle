@@ -21,7 +21,10 @@ import {
   OpenAiAllowedRuntimeIds,
   OpenAiApiKeyBindingConfigSchema,
 } from "./binding-config-schema.js";
-import { OpenAiDeviceAuthorizationCapability } from "./device-authorization.js";
+import {
+  OpenAiDeviceAuthorizationCapability,
+  OpenAiDeviceAuthorizationOAuth2Capability,
+} from "./device-authorization.js";
 import { OpenAiConnectionMethodIds } from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 import { validateOpenAiBindingWriteContext } from "./validate-binding-write-context.js";
@@ -90,6 +93,7 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   ],
   validateBindingWriteContext: validateOpenAiBindingWriteContext,
   deviceAuthorization: OpenAiDeviceAuthorizationCapability,
+  oauth2AuthorizationCode: OpenAiDeviceAuthorizationOAuth2Capability,
   capabilities: {
     resolveCapabilities: (input) => {
       return {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  assertOpenAiChatGptDeviceCodeConnectionConfig,
   OpenAiConnectionConfigSchema,
   resolveOpenAiCredentialSecretType,
   resolveOpenAiCredentialSlotKey,
@@ -64,5 +65,27 @@ describe("OpenAI auth", () => {
         },
       }),
     ).toBe("openai.openai-default.oauth2-authorization-code.access-token");
+  });
+
+  it("asserts the ChatGPT device-code connection config shape", () => {
+    expect(
+      assertOpenAiChatGptDeviceCodeConnectionConfig({
+        connection_method: "chatgpt-device-code",
+        auth_mode: "chatgpt",
+        chatgpt_account_id: "acct_123",
+        chatgpt_plan_type: "pro",
+      }),
+    ).toEqual({
+      connection_method: "chatgpt-device-code",
+      auth_mode: "chatgpt",
+      chatgpt_account_id: "acct_123",
+      chatgpt_plan_type: "pro",
+    });
+
+    expect(() =>
+      assertOpenAiChatGptDeviceCodeConnectionConfig({
+        connection_method: "api-key",
+      }),
+    ).toThrow("Expected OpenAI ChatGPT device-code connection config");
   });
 });

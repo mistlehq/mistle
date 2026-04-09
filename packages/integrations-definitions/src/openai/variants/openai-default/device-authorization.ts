@@ -1,10 +1,20 @@
 import type {
   IntegrationDeviceAuthorizationCapability,
   IntegrationDeviceAuthorizationPollResult,
+  IntegrationOAuth2AuthorizationCodeCapability,
+  IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult,
+  IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification,
+} from "@mistle/integrations-core";
+import {
+  IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
+  IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
-import type { OpenAiConnectionConfig } from "./auth.js";
+import {
+  assertOpenAiChatGptDeviceCodeConnectionConfig,
+  type OpenAiConnectionConfig,
+} from "./auth.js";
 import { OpenAiConnectionMethodIds } from "./model-capabilities.js";
 import type { OpenAiApiKeyTargetConfig } from "./target-config-schema.js";
 
@@ -38,6 +48,14 @@ const OpenAiTokenExchangeResponseSchema = z
     id_token: z.string().min(1),
     access_token: z.string().min(1),
     refresh_token: z.string().min(1),
+  })
+  .strict();
+
+const OpenAiRefreshResponseSchema = z
+  .object({
+    id_token: z.string().min(1).optional(),
+    access_token: z.string().min(1).optional(),
+    refresh_token: z.string().min(1).optional(),
   })
   .strict();
 
@@ -94,6 +112,176 @@ function resolveIsoTimestampFromExpClaim(claims: OpenAiJwtClaims): string | unde
   }
 
   return new Date(exp * 1_000).toISOString();
+}
+
+type OpenAiRefreshFailure = {
+  classification: IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification;
+  message: string;
+  code?: string;
+};
+
+export function extractOpenAiRefreshFailureCode(body: string): string | undefined {
+  if (body.trim().length === 0) {
+    return undefined;
+  }
+
+  const parsedBody = JSON.parse(body);
+  if (typeof parsedBody !== "object" || parsedBody === null || Array.isArray(parsedBody)) {
+    return undefined;
+  }
+
+  const error = parsedBody["error"];
+  if (typeof error === "string" && error.length > 0) {
+    return error;
+  }
+
+  if (typeof error !== "object" || error === null || Array.isArray(error)) {
+    return undefined;
+  }
+
+  const nestedCode = error["code"];
+  if (typeof nestedCode === "string" && nestedCode.length > 0) {
+    return nestedCode;
+  }
+
+  return undefined;
+}
+
+function extractOpenAiRefreshFailureMessage(body: string): string | undefined {
+  if (body.trim().length === 0) {
+    return undefined;
+  }
+
+  const parsedBody = JSON.parse(body);
+  if (typeof parsedBody !== "object" || parsedBody === null || Array.isArray(parsedBody)) {
+    return undefined;
+  }
+
+  const errorDescription = parsedBody["error_description"];
+  if (typeof errorDescription === "string" && errorDescription.length > 0) {
+    return errorDescription;
+  }
+
+  const error = parsedBody["error"];
+  if (typeof error !== "object" || error === null || Array.isArray(error)) {
+    return undefined;
+  }
+
+  const nestedMessage = error["message"];
+  if (typeof nestedMessage === "string" && nestedMessage.length > 0) {
+    return nestedMessage;
+  }
+
+  return undefined;
+}
+
+export function classifyOpenAiRefreshFailure(input: {
+  status: number;
+  body: string;
+}): OpenAiRefreshFailure {
+  const code = (() => {
+    try {
+      return extractOpenAiRefreshFailureCode(input.body);
+    } catch {
+      return undefined;
+    }
+  })();
+  const messageFromBody = (() => {
+    try {
+      return extractOpenAiRefreshFailureMessage(input.body);
+    } catch {
+      return undefined;
+    }
+  })();
+
+  if (input.status === 401) {
+    if (code === "refresh_token_expired") {
+      return {
+        classification:
+          IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.PERMANENT,
+        message: messageFromBody ?? "OpenAI refresh token expired. Reconnect the integration.",
+        code,
+      };
+    }
+
+    if (code === "refresh_token_reused") {
+      return {
+        classification:
+          IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.PERMANENT,
+        message:
+          messageFromBody ?? "OpenAI refresh token was already used. Reconnect the integration.",
+        code,
+      };
+    }
+
+    if (code === "refresh_token_invalidated" || code === "invalid_grant") {
+      return {
+        classification:
+          IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.PERMANENT,
+        message: messageFromBody ?? "OpenAI refresh token was revoked. Reconnect the integration.",
+        code,
+      };
+    }
+
+    return {
+      classification:
+        IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.PERMANENT,
+      message:
+        messageFromBody ?? "OpenAI access token could not be refreshed. Reconnect the integration.",
+      ...(code === undefined ? {} : { code }),
+    };
+  }
+
+  return {
+    classification:
+      IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.TEMPORARY,
+    message:
+      messageFromBody ?? `OpenAI access token refresh failed with status ${String(input.status)}.`,
+    ...(code === undefined ? {} : { code }),
+  };
+}
+
+function resolveOpenAiRefreshResult(input: {
+  response: z.infer<typeof OpenAiRefreshResponseSchema>;
+}): IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult {
+  if (input.response.access_token === undefined) {
+    throw new Error("OpenAI refresh response is missing access_token.");
+  }
+
+  const accessTokenClaims = parseJwtClaimsOrThrow(input.response.access_token);
+  const idTokenClaims =
+    input.response.id_token === undefined
+      ? undefined
+      : parseJwtClaimsOrThrow(input.response.id_token);
+  const accessTokenExpiresAt = resolveIsoTimestampFromExpClaim(accessTokenClaims);
+  const refreshToken = input.response.refresh_token;
+  const refreshTokenExpiresAt =
+    refreshToken === undefined
+      ? undefined
+      : resolveIsoTimestampFromExpClaim(parseJwtClaimsOrThrow(refreshToken));
+  const chatGptAccountId =
+    idTokenClaims === undefined ? undefined : idTokenClaims[OpenAiAccountIdClaim];
+  const chatGptPlanType =
+    idTokenClaims !== undefined && typeof idTokenClaims[OpenAiPlanTypeClaim] === "string"
+      ? idTokenClaims[OpenAiPlanTypeClaim]
+      : undefined;
+
+  return {
+    accessToken: input.response.access_token,
+    ...(accessTokenExpiresAt === undefined ? {} : { accessTokenExpiresAt }),
+    ...(refreshToken === undefined ? {} : { refreshToken }),
+    ...(refreshTokenExpiresAt === undefined ? {} : { refreshTokenExpiresAt }),
+    ...(chatGptAccountId === undefined && chatGptPlanType === undefined
+      ? {}
+      : {
+          credentialMetadata: {
+            ...(typeof chatGptAccountId === "string" && chatGptAccountId.length > 0
+              ? { chatgpt_account_id: chatGptAccountId }
+              : {}),
+            ...(chatGptPlanType === undefined ? {} : { chatgpt_plan_type: chatGptPlanType }),
+          },
+        }),
+  };
 }
 
 export function resolveOpenAiDeviceAuthorizationCompletionFromTokens(input: {
@@ -218,6 +406,41 @@ async function exchangeAuthorizationCodeForTokens(input: {
   };
 }
 
+async function refreshOpenAiAccessToken(input: {
+  refreshToken: string;
+}): Promise<IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult> {
+  const response = await fetch(`${OpenAiAuthIssuer}/oauth/token`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      client_id: OpenAiDeviceAuthorizationClientId,
+      grant_type: "refresh_token",
+      refresh_token: input.refreshToken,
+    }),
+  });
+
+  if (!response.ok) {
+    const responseBody = await response.text();
+    const failure = classifyOpenAiRefreshFailure({
+      status: response.status,
+      body: responseBody,
+    });
+
+    throw new IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError({
+      message: failure.message,
+      classification: failure.classification,
+      ...(failure.code === undefined ? {} : { code: failure.code }),
+    });
+  }
+
+  const parsed = OpenAiRefreshResponseSchema.parse(await response.json());
+  return resolveOpenAiRefreshResult({
+    response: parsed,
+  });
+}
+
 async function pollOpenAiDeviceAuthorization(
   providerState: OpenAiDeviceAuthorizationProviderState,
 ): Promise<IntegrationDeviceAuthorizationPollResult<OpenAiConnectionConfig>> {
@@ -294,5 +517,30 @@ export const OpenAiDeviceAuthorizationCapability: IntegrationDeviceAuthorization
 
     const providerState = OpenAiDeviceAuthorizationProviderStateSchema.parse(input.providerState);
     return pollOpenAiDeviceAuthorization(providerState);
+  },
+};
+
+export const OpenAiDeviceAuthorizationOAuth2Capability: IntegrationOAuth2AuthorizationCodeCapability<
+  OpenAiApiKeyTargetConfig,
+  Record<string, string>,
+  OpenAiConnectionConfig
+> = {
+  async startAuthorization() {
+    throw new Error(
+      "OpenAI ChatGPT device-code connections do not support redirect-based authorization start.",
+    );
+  },
+
+  async completeAuthorizationCodeGrant() {
+    throw new Error(
+      "OpenAI ChatGPT device-code connections do not support redirect-based authorization completion.",
+    );
+  },
+
+  async refreshAccessToken(input) {
+    assertOpenAiChatGptDeviceCodeConnectionConfig(input.connection.config);
+    return refreshOpenAiAccessToken({
+      refreshToken: input.refreshToken,
+    });
   },
 };

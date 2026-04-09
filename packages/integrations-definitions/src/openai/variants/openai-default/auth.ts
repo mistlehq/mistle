@@ -38,6 +38,9 @@ export const OpenAiConnectionConfigSchema = z.discriminatedUnion("connection_met
 ]);
 
 export type OpenAiConnectionConfig = z.output<typeof OpenAiConnectionConfigSchema>;
+export type OpenAiChatGptDeviceCodeConnectionConfig = z.output<
+  typeof OpenAiChatGptDeviceCodeConnectionConfigSchema
+>;
 
 export function resolveOpenAiCredentialSecretType(
   input: unknown,
@@ -76,4 +79,17 @@ export function resolveOpenAiCredentialSlotKey(input: {
   }
 
   throw new Error(`Unsupported OpenAI connection method '${String(methodId)}'.`);
+}
+
+export function assertOpenAiChatGptDeviceCodeConnectionConfig(
+  input: unknown,
+): OpenAiChatGptDeviceCodeConnectionConfig {
+  const parsedConnectionConfig = OpenAiConnectionConfigSchema.parse(input);
+  if (parsedConnectionConfig.connection_method !== OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE) {
+    throw new Error(
+      `Expected OpenAI ChatGPT device-code connection config, received '${parsedConnectionConfig.connection_method}'.`,
+    );
+  }
+
+  return parsedConnectionConfig;
 }

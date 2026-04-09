@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  classifyOpenAiRefreshFailure,
+  extractOpenAiRefreshFailureCode,
   parseJwtClaimsOrThrow,
   resolveOpenAiDeviceAuthorizationCompletionFromTokens,
 } from "./device-authorization.js";
@@ -73,5 +75,55 @@ describe("OpenAI device authorization", () => {
         refreshToken: encodeJwt({}),
       }),
     ).toThrow("OpenAI id_token is missing https://api.openai.com/auth.chatgpt_account_id.");
+  });
+
+  it("extracts refresh-token failure codes from string and object error payloads", () => {
+    expect(
+      extractOpenAiRefreshFailureCode(
+        JSON.stringify({
+          error: "refresh_token_expired",
+        }),
+      ),
+    ).toBe("refresh_token_expired");
+
+    expect(
+      extractOpenAiRefreshFailureCode(
+        JSON.stringify({
+          error: {
+            code: "refresh_token_invalidated",
+          },
+        }),
+      ),
+    ).toBe("refresh_token_invalidated");
+  });
+
+  it("classifies permanent and temporary refresh failures", () => {
+    expect(
+      classifyOpenAiRefreshFailure({
+        status: 401,
+        body: JSON.stringify({
+          error: "refresh_token_reused",
+          error_description: "refresh token already used",
+        }),
+      }),
+    ).toEqual({
+      classification: "permanent",
+      code: "refresh_token_reused",
+      message: "refresh token already used",
+    });
+
+    expect(
+      classifyOpenAiRefreshFailure({
+        status: 500,
+        body: JSON.stringify({
+          error: "server_error",
+          error_description: "temporary outage",
+        }),
+      }),
+    ).toEqual({
+      classification: "temporary",
+      code: "server_error",
+      message: "temporary outage",
+    });
   });
 });
