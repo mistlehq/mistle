@@ -11,5 +11,6 @@ export * from "./network/start-docker-network.js";
 export * from "./network/expose-host-ports.js";
 export * from "./apps/index.js";
 export * from "./cleanup/index.js";
+export * from "./observability/index.js";
 export * from "./system/index.js";
 export * from "./test-context/index.js";

@@ -38,6 +38,9 @@ export type SystemTestFixture = {
   dataPlaneGatewayContainerId: string;
   tokenizerProxyBaseUrl: string;
   tokenizerProxyContainerId: string;
+  controlPlaneDatabaseUrl: string;
+  internalAuthServiceToken: string;
+  otlpTraceCaptureFilePath: string;
   controlPlaneApiClient: ControlPlaneApiClient;
   db: ControlPlaneDatabase;
   request: (path: string, init?: RequestInit) => Promise<Response>;
@@ -71,6 +74,8 @@ export const SystemTestContextSchema = z
     tokenizerProxyContainerId: z.string().min(1),
     mailpitHttpBaseUrl: z.url(),
     controlPlaneDatabaseUrl: z.string().min(1),
+    internalAuthServiceToken: z.string().min(1),
+    otlpTraceCaptureFilePath: z.string().min(1),
     sandboxNetworkName: z.string().min(1),
   })
   .strict();
@@ -262,6 +267,9 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
           dataPlaneGatewayContainerId: systemTestContext.dataPlaneGatewayContainerId,
           tokenizerProxyBaseUrl: systemTestContext.tokenizerProxyBaseUrl,
           tokenizerProxyContainerId: systemTestContext.tokenizerProxyContainerId,
+          controlPlaneDatabaseUrl: systemTestContext.controlPlaneDatabaseUrl,
+          internalAuthServiceToken: systemTestContext.internalAuthServiceToken,
+          otlpTraceCaptureFilePath: systemTestContext.otlpTraceCaptureFilePath,
           controlPlaneApiClient,
           db,
           request,
