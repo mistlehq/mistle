@@ -3,6 +3,5 @@ export { route } from "./route.js";
 export {
   CompleteGitHubAppInstallationConnectionBadRequestResponseSchema,
   CompleteGitHubAppInstallationConnectionNotFoundResponseSchema,
-  CompleteGitHubAppInstallationConnectionParamsSchema,
   CompleteGitHubAppInstallationConnectionQuerySchema,
 } from "./schema.js";

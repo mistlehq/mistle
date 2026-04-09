@@ -1,5 +1,6 @@
 import { useParams } from "react-router";
 
+import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { DeleteIntegrationConnectionDialog } from "../integrations/delete-integration-connection-dialog.js";
 import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-connection-api-key-dialog.js";
@@ -18,6 +19,7 @@ import {
 export function IntegrationsPage() {
   const params = useParams();
   const detailTargetKey = params["targetKey"] ?? null;
+  const dashboardConfig = getDashboardConfig();
 
   const connectionDialogState = useIntegrationConnectionDialogState({
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
@@ -37,6 +39,20 @@ export function IntegrationsPage() {
   const webhookSourceState = useIntegrationWebhookSourceState({
     detailConnections: directoryState.selectedDetailConnections,
   });
+  const githubAppInstallationStateByConnectionId = new Map(
+    directoryState.selectedDetailConnections.map((connection) => {
+      const errorMessage =
+        connectionEditors.githubAppInstallation.errorMessageByConnectionId[connection.id];
+
+      return [
+        connection.id,
+        {
+          ...(errorMessage === undefined ? {} : { errorMessage }),
+          isPending: connectionEditors.githubAppInstallation.pendingConnectionId === connection.id,
+        },
+      ] as const;
+    }),
+  );
 
   if (
     detailTargetKey !== null &&
@@ -52,10 +68,13 @@ export function IntegrationsPage() {
       <IntegrationConnectionDetailView
         connections={buildIntegrationConnectionDetailItems({
           connections: directoryState.selectedDetailConnections,
+          controlPlaneApiOrigin: dashboardConfig.controlPlaneApiOrigin,
+          githubAppInstallationStateByConnectionId,
           refreshingResourceKeys: directoryState.refreshingResourceKeys,
         })}
         onDeleteConnection={connectionEditors.onDeleteConnection}
         onEditApiKey={connectionEditors.onEditApiKey}
+        onStartGitHubAppInstallation={connectionEditors.githubAppInstallation.onStartInstallation}
         onRefreshResource={directoryState.onRefreshResource}
         resourceItemsByKey={directoryState.resourceItemsByKey}
         webhookSourceStateByConnectionId={webhookSourceState.webhookSourceStateByConnectionId}

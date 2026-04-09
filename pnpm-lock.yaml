@@ -116,6 +116,9 @@ importers:
       '@mistle/time':
         specifier: workspace:*
         version: link:../../packages/time
+      '@mistle/webhooks':
+        specifier: workspace:*
+        version: link:../../packages/webhooks
       '@mistle/workflow-registry':
         specifier: workspace:*
         version: link:../../packages/workflow-registry
@@ -195,6 +198,9 @@ importers:
       '@mistle/time':
         specifier: workspace:*
         version: link:../../packages/time
+      '@mistle/webhooks':
+        specifier: workspace:*
+        version: link:../../packages/webhooks
       '@mistle/workflow-registry':
         specifier: workspace:*
         version: link:../../packages/workflow-registry
@@ -1074,6 +1080,12 @@ importers:
       vitest:
         specifier: ^4.1.2
         version: 4.1.2(@opentelemetry/api@1.9.0)(@types/node@25.5.1)(jsdom@29.0.1(@noble/hashes@2.0.1))(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@25.5.1)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+
+  packages/webhooks:
+    dependencies:
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
 
   packages/workflow-registry:
     dependencies:

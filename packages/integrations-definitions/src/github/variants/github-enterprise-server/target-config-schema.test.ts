@@ -15,22 +15,14 @@ describe("GitHubEnterpriseServerTargetConfigSchema", () => {
     });
   });
 
-  it("parses optional github app metadata", () => {
-    const parsed = GitHubEnterpriseServerTargetConfigSchema.parse({
-      api_base_url: "https://ghe.example.com/api/v3",
-      web_base_url: "https://ghe.example.com",
-      app_id: "9999",
-      app_slug: "mistle-enterprise-app",
-      client_id: "Iv1.enterprise",
-    });
-
-    expect(parsed).toEqual({
-      apiBaseUrl: "https://ghe.example.com/api/v3",
-      webBaseUrl: "https://ghe.example.com",
-      appId: "9999",
-      appSlug: "mistle-enterprise-app",
-      clientId: "Iv1.enterprise",
-    });
+  it("rejects legacy github app metadata on the target", () => {
+    expect(() =>
+      GitHubEnterpriseServerTargetConfigSchema.parse({
+        api_base_url: "https://ghe.example.com/api/v3",
+        web_base_url: "https://ghe.example.com",
+        client_id: "Iv1.enterprise",
+      }),
+    ).toThrow(/Unrecognized key/u);
   });
 
   it("fails for invalid URL fields", () => {

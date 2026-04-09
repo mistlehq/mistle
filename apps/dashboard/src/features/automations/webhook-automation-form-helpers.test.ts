@@ -101,9 +101,11 @@ const SampleAutomation: WebhookAutomation = {
   idempotencyKeyTemplate: null,
   eventTypes: ["push", "pull_request"],
   payloadFilter: {
-    op: "eq",
-    path: ["action"],
-    value: "opened",
+    pull_request: {
+      op: "eq",
+      path: ["action"],
+      value: "opened",
+    },
   },
   target: {
     id: "target_123",
@@ -176,28 +178,25 @@ describe("toWebhookAutomationFormValues", () => {
           ...SampleAutomation,
           eventTypes: ["github.pull_request.opened", "github.issue_comment.created"],
           payloadFilter: {
-            op: "and",
-            filters: [
-              {
-                op: "eq",
-                path: ["repository", "full_name"],
-                value: "mistlehq/mistle",
-              },
-              {
-                op: "eq",
-                path: ["sender", "login"],
-                value: "octocat",
-              },
-              {
-                op: "exists",
-                path: ["issue", "pull_request"],
-              },
-              {
-                op: "eq",
-                path: ["action"],
-                value: "opened",
-              },
-            ],
+            "github.pull_request.opened": {
+              op: "and",
+              filters: [
+                {
+                  op: "eq",
+                  path: ["repository", "full_name"],
+                  value: "mistlehq/mistle",
+                },
+                {
+                  op: "eq",
+                  path: ["sender", "login"],
+                  value: "octocat",
+                },
+              ],
+            },
+            "github.issue_comment.created": {
+              op: "exists",
+              path: ["issue", "pull_request"],
+            },
           },
         },
         GitHubEventOptions,
@@ -223,9 +222,11 @@ describe("toWebhookAutomationFormValues", () => {
           ...SampleAutomation,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: {
-            op: "contains_token",
-            path: ["comment", "body"],
-            value: "@mistlebot",
+            "github.issue_comment.created": {
+              op: "contains_token",
+              path: ["comment", "body"],
+              value: "@mistlebot",
+            },
           },
         },
         GitHubEventOptions,
@@ -445,19 +446,21 @@ describe("automation payload transforms", () => {
       idempotencyKeyTemplate: null,
       eventTypes: ["github.pull_request.opened"],
       payloadFilter: {
-        op: "and",
-        filters: [
-          {
-            op: "eq",
-            path: ["repository", "full_name"],
-            value: "mistlehq/mistle",
-          },
-          {
-            op: "eq",
-            path: ["sender", "login"],
-            value: "octocat",
-          },
-        ],
+        "github.pull_request.opened": {
+          op: "and",
+          filters: [
+            {
+              op: "eq",
+              path: ["repository", "full_name"],
+              value: "mistlehq/mistle",
+            },
+            {
+              op: "eq",
+              path: ["sender", "login"],
+              value: "octocat",
+            },
+          ],
+        },
       },
       target: {
         sandboxProfileId: "sbp_repo",
@@ -488,8 +491,10 @@ describe("automation payload transforms", () => {
       idempotencyKeyTemplate: null,
       eventTypes: ["github.issue_comment.created"],
       payloadFilter: {
-        op: "exists",
-        path: ["issue", "pull_request"],
+        "github.issue_comment.created": {
+          op: "exists",
+          path: ["issue", "pull_request"],
+        },
       },
       target: {
         sandboxProfileId: "sbp_repo",
@@ -520,9 +525,11 @@ describe("automation payload transforms", () => {
       idempotencyKeyTemplate: null,
       eventTypes: ["github.issue_comment.created"],
       payloadFilter: {
-        op: "contains_token",
-        path: ["comment", "body"],
-        value: "@mistlebot",
+        "github.issue_comment.created": {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
       },
       target: {
         sandboxProfileId: "sbp_repo",

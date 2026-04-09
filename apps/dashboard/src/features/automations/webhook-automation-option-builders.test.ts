@@ -49,10 +49,11 @@ describe("buildWebhookAutomationEventOptions", () => {
           {
             id: GitHubWebhookSourceId,
             targetKey: "github-cloud",
-            ownerScope: "connection",
             integrationConnectionId: GitHubConnectionId,
             displayName: "GitHub App webhook",
-            callbackUrl: "https://control-plane.example.com/v1/integration/webhooks/github-cloud",
+            endpointKey: "ep_github",
+            callbackUrl:
+              "https://control-plane.example.com/v1/integration/webhooks/github-cloud/ep_github",
             status: "active",
             providerMetadata: {},
             createdAt: "2026-03-16T10:00:00.000Z",
@@ -61,7 +62,6 @@ describe("buildWebhookAutomationEventOptions", () => {
           {
             id: LinearWebhookSourceId,
             targetKey: "linear-cloud",
-            ownerScope: "connection",
             integrationConnectionId: LinearConnectionId,
             displayName: "Linear Workspace webhook",
             endpointKey: "ep_linear",
@@ -236,10 +236,11 @@ describe("buildWebhookAutomationEventOptions", () => {
           {
             id: GitHubWebhookSourceId,
             targetKey: "github-cloud",
-            ownerScope: "connection",
             integrationConnectionId: GitHubConnectionId,
             displayName: "GitHub App webhook",
-            callbackUrl: "https://control-plane.example.com/v1/integration/webhooks/github-cloud",
+            endpointKey: "ep_github",
+            callbackUrl:
+              "https://control-plane.example.com/v1/integration/webhooks/github-cloud/ep_github",
             status: "active",
             providerMetadata: {},
             createdAt: "2026-03-16T10:00:00.000Z",

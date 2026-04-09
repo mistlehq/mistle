@@ -4,6 +4,7 @@ import { useState } from "react";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
   deleteIntegrationConnection,
+  startGitHubAppInstallation,
   updateApiKeyIntegrationConnection,
   updateIntegrationConnection,
 } from "../integrations/integrations-service.js";
@@ -20,6 +21,9 @@ export function useIntegrationConnectionEditors(input: {
   const [editingApiKeyConnectionId, setEditingApiKeyConnectionId] = useState<string | null>(null);
   const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [apiKeyError, setApiKeyError] = useState<string | undefined>(undefined);
+  const [githubAppInstallErrorByConnectionId, setGitHubAppInstallErrorByConnectionId] = useState<
+    Readonly<Record<string, string | undefined>>
+  >({});
   const [deletingConnectionId, setDeletingConnectionId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -76,6 +80,13 @@ export function useIntegrationConnectionEditors(input: {
           fallbackMessage: "Could not delete connection.",
         }),
       );
+    },
+  });
+
+  const startGitHubAppInstallationMutation = useMutation({
+    mutationFn: async (payload: { connectionId: string }) => startGitHubAppInstallation(payload),
+    onSuccess: ({ authorizationUrl }) => {
+      globalThis.location.assign(authorizationUrl);
     },
   });
 
@@ -154,6 +165,34 @@ export function useIntegrationConnectionEditors(input: {
       setEditingApiKeyConnectionId(connectionId);
       setApiKeyDraft("");
       setApiKeyError(undefined);
+    },
+    githubAppInstallation: {
+      errorMessageByConnectionId: githubAppInstallErrorByConnectionId,
+      pendingConnectionId: startGitHubAppInstallationMutation.isPending
+        ? (startGitHubAppInstallationMutation.variables?.connectionId ?? null)
+        : null,
+      onStartInstallation: async (connectionId: string) => {
+        setGitHubAppInstallErrorByConnectionId((current) => ({
+          ...current,
+          [connectionId]: undefined,
+        }));
+
+        try {
+          await startGitHubAppInstallationMutation.mutateAsync({
+            connectionId,
+          });
+        } catch (error) {
+          const errorMessage = resolveApiErrorMessage({
+            error,
+            fallbackMessage: "Could not start GitHub App installation.",
+          });
+
+          setGitHubAppInstallErrorByConnectionId((current) => ({
+            ...current,
+            [connectionId]: errorMessage,
+          }));
+        }
+      },
     },
     titleEditor:
       input.connections.length === 0

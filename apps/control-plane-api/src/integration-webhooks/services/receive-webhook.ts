@@ -3,7 +3,6 @@ import {
   integrationCredentials,
   integrationWebhookEvents,
   IntegrationWebhookEventStatuses,
-  IntegrationWebhookSourceOwnerScopes,
   IntegrationWebhookSourceStatuses,
   organizationCredentialKeys,
   type IntegrationWebhookSource,
@@ -22,12 +21,10 @@ import type {
 } from "@mistle/integrations-core";
 import { and, eq, isNull } from "drizzle-orm";
 
-import { ensureImplicitConnectionWebhookSource } from "../../integration-connections/services/webhook-sources.js";
 import {
   resolveConnectionSecretsOrThrow,
   resolveConnectionWithTargetOrThrow,
 } from "../../integration-connections/services/webhook-sources.js";
-import { ensureImplicitTargetWebhookSource } from "../../integration-webhook-sources/services/ensure-implicit-target-webhook-source.js";
 import {
   decryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
@@ -42,7 +39,7 @@ import {
 
 export type ReceiveIntegrationWebhookInput = {
   targetKey: string;
-  endpointKey: string | undefined;
+  endpointKey: string;
   headers: Readonly<Record<string, string | string[] | undefined>>;
   rawBody: Uint8Array;
 };
@@ -175,63 +172,25 @@ async function resolveWebhookSourceSecretOrThrow(input: {
 async function resolveWebhookSourceForPreVerificationOrThrow(input: {
   db: AppContext["var"]["db"];
   targetKey: string;
-  endpointKey: string | undefined;
-  definition: NonNullable<ReturnType<AppContext["var"]["integrationRegistry"]["getDefinition"]>>;
-}): Promise<IntegrationWebhookSource | undefined> {
-  const webhookSourceCapability = input.definition.webhookSource;
-  if (webhookSourceCapability === undefined) {
-    throw new Error(
-      `Integration '${input.definition.familyId}/${input.definition.variantId}' does not define webhookSource capability.`,
-    );
-  }
+  endpointKey: string;
+}): Promise<IntegrationWebhookSource> {
+  const source = await input.db.query.integrationWebhookSources.findFirst({
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.targetKey, input.targetKey),
+        eq(table.endpointKey, input.endpointKey),
+        eq(table.status, IntegrationWebhookSourceStatuses.ACTIVE),
+      ),
+  });
 
-  const endpointKey = input.endpointKey;
-  if (endpointKey !== undefined) {
-    const source = await input.db.query.integrationWebhookSources.findFirst({
-      where: (table, { and, eq }) =>
-        and(
-          eq(table.targetKey, input.targetKey),
-          eq(table.endpointKey, endpointKey),
-          eq(table.status, IntegrationWebhookSourceStatuses.ACTIVE),
-        ),
-    });
-
-    if (source === undefined) {
-      throw new NotFoundError(
-        IntegrationWebhooksNotFoundCodes.WEBHOOK_SOURCE_NOT_FOUND,
-        `Active webhook source '${endpointKey}' was not found for target '${input.targetKey}'.`,
-      );
-    }
-
-    return source;
-  }
-
-  if (webhookSourceCapability.routingStrategy !== "payload") {
+  if (source === undefined) {
     throw new NotFoundError(
       IntegrationWebhooksNotFoundCodes.WEBHOOK_SOURCE_NOT_FOUND,
-      `Integration target '${input.targetKey}' does not expose a shared payload-routed webhook ingress.`,
+      `Active webhook source '${input.endpointKey}' was not found for target '${input.targetKey}'.`,
     );
   }
 
-  if (webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.TARGET) {
-    return ensureImplicitTargetWebhookSource({
-      db: input.db,
-      targetKey: input.targetKey,
-      routingStrategy: webhookSourceCapability.routingStrategy,
-    });
-  }
-
-  return undefined;
-}
-
-function resolveSourceConnectionIdOrThrow(input: { source: IntegrationWebhookSource }): string {
-  if (input.source.integrationConnectionId == null) {
-    throw new Error(
-      `Connection-owned webhook source '${input.source.id}' is missing integrationConnectionId.`,
-    );
-  }
-
-  return input.source.integrationConnectionId;
+  return source;
 }
 
 async function resolveConnectionOwnedWebhookSecrets(input: {
@@ -322,8 +281,7 @@ export async function receiveIntegrationWebhook(
     target,
   });
   const parsedTargetSecrets = definition.targetSecretSchema.parse(resolvedTargetSecrets);
-  const webhookSourceCapability = definition.webhookSource;
-  if (webhookSourceCapability === undefined) {
+  if (definition.webhookSource === undefined) {
     throw new Error(
       `Integration '${target.familyId}/${target.variantId}' does not define webhookSource capability.`,
     );
@@ -346,14 +304,11 @@ export async function receiveIntegrationWebhook(
   });
 
   if (webhookRequest.kind === "response" && webhookRequest.verification === "skip") {
-    if (input.endpointKey !== undefined || webhookSourceCapability.routingStrategy === "path") {
-      await resolveWebhookSourceForPreVerificationOrThrow({
-        db,
-        targetKey: input.targetKey,
-        endpointKey: input.endpointKey,
-        definition,
-      });
-    }
+    await resolveWebhookSourceForPreVerificationOrThrow({
+      db,
+      targetKey: input.targetKey,
+      endpointKey: input.endpointKey,
+    });
 
     return {
       kind: "response",
@@ -361,27 +316,21 @@ export async function receiveIntegrationWebhook(
     };
   }
 
-  let webhookSource = await resolveWebhookSourceForPreVerificationOrThrow({
+  const webhookSource = await resolveWebhookSourceForPreVerificationOrThrow({
     db,
     targetKey: input.targetKey,
     endpointKey: input.endpointKey,
-    definition,
   });
-  const webhookSourceSecrets =
-    webhookSource === undefined
-      ? {}
-      : await resolveWebhookSourceSecretOrThrow({
-          db,
-          source: webhookSource,
-          integrationsConfig,
-        });
+  const webhookSourceSecrets = await resolveWebhookSourceSecretOrThrow({
+    db,
+    source: webhookSource,
+    integrationsConfig,
+  });
   const activeConnections = await db.query.integrationConnections.findMany({
     where: (table, { and, eq }) =>
       and(
         eq(table.targetKey, input.targetKey),
-        ...(webhookSource?.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION
-          ? [eq(table.id, resolveSourceConnectionIdOrThrow({ source: webhookSource }))]
-          : []),
+        eq(table.id, webhookSource.integrationConnectionId),
         eq(table.status, IntegrationConnectionStatuses.ACTIVE),
       ),
     columns: {
@@ -469,23 +418,12 @@ export async function receiveIntegrationWebhook(
     );
   }
 
-  const persistedWebhookSource =
-    webhookSource?.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION
-      ? webhookSource
-      : await ensureImplicitConnectionWebhookSource({
-          db,
-          organizationId: resolvedConnection.organizationId,
-          connectionId: resolvedConnection.id,
-          targetKey: input.targetKey,
-          routingStrategy: webhookSourceCapability.routingStrategy,
-        });
-
   const insertedRows = await db
     .insert(integrationWebhookEvents)
     .values({
       organizationId: resolvedConnection.organizationId,
       integrationConnectionId: resolvedConnection.id,
-      integrationWebhookSourceId: persistedWebhookSource.id,
+      integrationWebhookSourceId: webhookSource.id,
       targetKey: input.targetKey,
       externalEventId: resolvedWebhookRequest.event.externalEventId,
       externalDeliveryId: resolvedWebhookRequest.event.externalDeliveryId,

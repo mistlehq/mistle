@@ -12,12 +12,20 @@ import {
   type IntegrationConnectionDialogState,
 } from "./integration-connection-dialog.js";
 
-const GitHubAppInstallationCreateUi = {
-  create: {
-    submitLabel: "Install GitHub App",
-    helperText: "Continue to GitHub to install the app and finish connecting this account.",
+const GitHubAppInstallationSecretFields = [
+  {
+    name: "appPrivateKeyPem",
+    label: "App private key PEM",
+    placeholder: "-----BEGIN PRIVATE KEY-----",
+    inputType: "textarea" as const,
   },
-} as const;
+  {
+    name: "webhookSecret",
+    label: "Webhook secret",
+    placeholder: "Enter webhook secret",
+    inputType: "password" as const,
+  },
+] as const;
 
 const createDialog: IntegrationConnectionDialogState = {
   methods: [
@@ -37,16 +45,19 @@ const createDialog: IntegrationConnectionDialogState = {
     {
       id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       label: "GitHub App installation",
-      kind: "redirect",
-      ui: GitHubAppInstallationCreateUi,
+      kind: "form",
+      secretFields: [...GitHubAppInstallationSecretFields],
     },
   ],
   mode: "create",
-  targetConfig: {},
-  targetDisplayName: "OpenAI",
-  targetFamilyId: "openai",
-  targetKey: "openai",
-  targetVariantId: "openai-default",
+  targetConfig: {
+    api_base_url: "https://api.github.com",
+    web_base_url: "https://github.com",
+  },
+  targetDisplayName: "GitHub",
+  targetFamilyId: "github",
+  targetKey: "github-cloud",
+  targetVariantId: "github-cloud",
 };
 
 function renderDialog(input: Partial<ComponentProps<typeof IntegrationConnectionDialog>> = {}) {
@@ -77,30 +88,37 @@ function renderDialog(input: Partial<ComponentProps<typeof IntegrationConnection
   render(<IntegrationConnectionDialog {...props} />);
 }
 
-function createUpdateRedirectDialog(
+function createUpdateFormDialog(
   input: Partial<Extract<IntegrationConnectionDialogState, { mode: "update" }>> = {},
 ): Extract<IntegrationConnectionDialogState, { mode: "update" }> {
   return {
     connectionConfig: {
       connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      app_id: "123",
+      app_slug: "mistle-github-app",
     },
     connectionId: "icn_456",
     currentConnectionConfig: {
       connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      app_id: "123",
+      app_slug: "mistle-github-app",
     },
     currentMethod: {
       id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       label: "GitHub App installation",
-      kind: "redirect",
-      ui: GitHubAppInstallationCreateUi,
+      kind: "form",
+      secretFields: [...GitHubAppInstallationSecretFields],
     },
     initialConnectionDisplayName: "Existing GitHub App installation connection",
     mode: "update",
-    targetConfig: {},
-    targetDisplayName: "OpenAI",
-    targetFamilyId: "openai",
-    targetKey: "openai",
-    targetVariantId: "openai-default",
+    targetConfig: {
+      api_base_url: "https://api.github.com",
+      web_base_url: "https://github.com",
+    },
+    targetDisplayName: "GitHub",
+    targetFamilyId: "github",
+    targetKey: "github-cloud",
+    targetVariantId: "github-cloud",
     ...input,
   };
 }
@@ -241,16 +259,12 @@ describe("IntegrationConnectionDialog", () => {
       screen.getByRole("combobox", { name: "Authentication method" }).textContent ?? "",
     ).toContain("Select authentication method");
     expect(screen.queryByPlaceholderText("Enter API key")).toBeNull();
-    expect(
-      screen.queryByText(
-        "Continue to GitHub to install the app and finish connecting this account.",
-      ),
-    ).toBeNull();
+    expect(screen.queryByPlaceholderText("-----BEGIN PRIVATE KEY-----")).toBeNull();
   });
 
   it.each([
     {
-      name: "renders Save for redirect connections in update mode",
+      name: "renders Save for GitHub App form connections in update mode",
       connectionDisplayNameValue: "Existing GitHub App installation connection",
       hasChanges: false,
       isConnectionDisplayNameChanged: false,
@@ -273,7 +287,7 @@ describe("IntegrationConnectionDialog", () => {
     }) => {
       renderDialog({
         connectionDisplayNameValue,
-        dialog: createUpdateRedirectDialog(),
+        dialog: createUpdateFormDialog(),
         hasChanges,
         isConnectionDisplayNameChanged,
         methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
@@ -373,17 +387,73 @@ describe("IntegrationConnectionDialog", () => {
     expect(screen.getByRole("button", { name: "Create connection" })).toBeTruthy();
   });
 
-  it("renders method-defined redirect create copy", () => {
+  it("renders GitHub App form fields in create mode", () => {
     renderDialog({
+      configForm: {
+        mode: "form",
+        schema: {
+          type: "object",
+          properties: {
+            connection_method: {
+              type: "string",
+              default: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+            },
+            app_id: {
+              type: "string",
+              title: "App ID",
+            },
+            app_slug: {
+              type: "string",
+              title: "App slug",
+            },
+          },
+        },
+        uiSchema: {
+          connection_method: {
+            "ui:widget": "hidden",
+          },
+        },
+        value: {
+          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        },
+        visiblePropertyKeys: ["app_id", "app_slug"],
+      },
       connectionDisplayNamePlaceholder: "GitHub connection",
       methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
     });
 
-    expect(
-      screen.getByText("Continue to GitHub to install the app and finish connecting this account."),
-    ).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Install GitHub App" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
+    expect(screen.getByLabelText("App ID")).toBeTruthy();
+    expect(screen.getByLabelText("App slug")).toBeTruthy();
+    const privateKeyField = screen.getByPlaceholderText("-----BEGIN PRIVATE KEY-----");
+    expect(privateKeyField.tagName).toBe("TEXTAREA");
+    expect(screen.getByPlaceholderText("Enter webhook secret")).toBeTruthy();
+    expect(screen.queryByLabelText("installation_id")).toBeNull();
+    expect(screen.queryByLabelText("setup_action")).toBeNull();
+    expect(screen.getByRole("button", { name: "Create connection" })).toBeTruthy();
+  });
+
+  it("hides callback-managed GitHub App config fields from the form", () => {
+    const configForm = resolveConnectionMethodFormUiModel({
+      dialog: createDialog,
+      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      currentValue: {},
+    });
+
+    expect(configForm).toMatchObject({
+      mode: "form",
+      visiblePropertyKeys: ["app_id", "app_slug"],
+    });
+
+    if (configForm.mode !== "form") {
+      throw new Error("Expected GitHub App connection form.");
+    }
+
+    expect(configForm.uiSchema.installation_id).toMatchObject({
+      "ui:widget": "hidden",
+    });
+    expect(configForm.uiSchema.setup_action).toMatchObject({
+      "ui:widget": "hidden",
+    });
   });
 
   it("does not throw while resolving Jira personal token fields for an incomplete site url", () => {

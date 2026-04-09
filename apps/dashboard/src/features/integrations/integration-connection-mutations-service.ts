@@ -172,19 +172,14 @@ export async function deleteIntegrationConnection(input: {
 
 export async function startRedirectIntegrationConnection(input: {
   targetKey: string;
-  methodId: "oauth2-authorization-code" | "github-app-installation";
+  methodId: "oauth2-authorization-code";
   displayName?: string;
 }): Promise<StartedRedirectConnection> {
-  const pathname =
-    input.methodId === "oauth2-authorization-code"
-      ? `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth2-authorization-code/start`
-      : `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/github-app-installation/start`;
-
   try {
     const response = await requestControlPlane({
       operation: "startRedirectIntegrationConnection",
       method: "POST",
-      pathname,
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth2-authorization-code/start`,
       ...(input.displayName === undefined ? {} : { body: { displayName: input.displayName } }),
       fallbackMessage: "Could not start integration connection.",
     });
@@ -199,6 +194,31 @@ export async function startRedirectIntegrationConnection(input: {
       operation: "startRedirectIntegrationConnection",
       error,
       fallbackMessage: "Could not start integration connection.",
+    });
+  }
+}
+
+export async function startGitHubAppInstallation(input: {
+  connectionId: string;
+}): Promise<StartedRedirectConnection> {
+  try {
+    const response = await requestControlPlane({
+      operation: "startGitHubAppInstallation",
+      method: "POST",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/github-app-installation/start`,
+      fallbackMessage: "Could not start GitHub App installation.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: StartedRedirectConnectionSchema,
+      operation: "startGitHubAppInstallation",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "startGitHubAppInstallation",
+      error,
+      fallbackMessage: "Could not start GitHub App installation.",
     });
   }
 }

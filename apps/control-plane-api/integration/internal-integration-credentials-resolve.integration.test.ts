@@ -102,7 +102,6 @@ function createClientCredentialsRegistry(): IntegrationRegistry {
 async function insertGitHubBindingFixture(input: {
   fixture: ControlPlaneApiIntegrationFixture;
   targetKey: string;
-  connectionId: string;
   bindingId: string;
 }) {
   const authSession = await input.fixture.authSession();
@@ -117,14 +116,6 @@ async function insertGitHubBindingFixture(input: {
       format: "pem",
     },
   });
-  const encryptedSecrets = encryptIntegrationTargetSecrets({
-    secrets: {
-      app_private_key_pem: privateKey,
-    },
-    masterKeyVersion: 1,
-    masterEncryptionKeyMaterial: "integration-master-key-testing",
-  });
-
   await input.fixture.db.insert(integrationTargets).values({
     targetKey: input.targetKey,
     familyId: "github",
@@ -133,22 +124,34 @@ async function insertGitHubBindingFixture(input: {
     config: {
       api_base_url: "https://api.github.com",
       web_base_url: "https://github.com",
-      app_id: "123",
-    },
-    secrets: encryptedSecrets,
-  });
-
-  await input.fixture.db.insert(integrationConnections).values({
-    id: input.connectionId,
-    organizationId: authSession.organizationId,
-    targetKey: input.targetKey,
-    displayName: "GitHub binding-aware connection",
-    status: IntegrationConnectionStatuses.ACTIVE,
-    config: {
-      connection_method: "github-app-installation",
-      installation_id: "12345",
     },
   });
+  const createConnectionResponse = await input.fixture.request(
+    `/v1/integration/connections/${input.targetKey}/form`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "GitHub binding-aware connection",
+        methodId: "github-app-installation",
+        config: {
+          connection_method: "github-app-installation",
+          app_id: "123",
+          app_slug: "mistle-github-app",
+          installation_id: "12345",
+        },
+        secrets: {
+          appPrivateKeyPem: privateKey,
+          webhookSecret: "github-webhook-secret",
+        },
+      }),
+    },
+  );
+  expect(createConnectionResponse.status).toBe(201);
+  const connection = (await createConnectionResponse.json()) as ConnectionResponse;
 
   await input.fixture.db.insert(sandboxProfiles).values({
     id: "sbp_github_binding_aware",
@@ -165,7 +168,7 @@ async function insertGitHubBindingFixture(input: {
     id: input.bindingId,
     sandboxProfileId: "sbp_github_binding_aware",
     sandboxProfileVersion: 1,
-    connectionId: input.connectionId,
+    connectionId: connection.id,
     kind: IntegrationBindingKinds.GIT,
     config: {
       repositories: ["mistlehq/mistle", "mistlehq/platform", "mistlehq/mistle"],
@@ -174,7 +177,7 @@ async function insertGitHubBindingFixture(input: {
 
   return {
     organizationId: authSession.organizationId,
-    connectionId: input.connectionId,
+    connectionId: connection.id,
     bindingId: input.bindingId,
   };
 }
@@ -616,7 +619,6 @@ describe("internal integration credentials resolve", () => {
     const githubFixture = await insertGitHubBindingFixture({
       fixture,
       targetKey: "github-cloud-binding-aware-mismatch",
-      connectionId: "icn_github_binding_aware_mismatch",
       bindingId: "ibd_github_binding_aware_mismatch",
     });
 
@@ -628,6 +630,8 @@ describe("internal integration credentials resolve", () => {
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
         connection_method: "github-app-installation",
+        app_id: "123",
+        app_slug: "mistle-github-app",
         installation_id: "67890",
       },
     });

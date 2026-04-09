@@ -24,7 +24,11 @@ describe("webhook automations types", () => {
       kind: "webhook",
       name: "GitHub pushes",
       payloadFilter: {
-        action: "push",
+        push: {
+          op: "eq",
+          path: ["action"],
+          value: "push",
+        },
       },
       target: {
         id: "target_123",

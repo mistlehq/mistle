@@ -4,22 +4,20 @@ import { RedirectLocationHeaderSchema } from "../schemas.js";
 import {
   CompleteGitHubAppInstallationConnectionBadRequestResponseSchema,
   CompleteGitHubAppInstallationConnectionNotFoundResponseSchema,
-  CompleteGitHubAppInstallationConnectionParamsSchema,
   CompleteGitHubAppInstallationConnectionQuerySchema,
 } from "./schema.js";
 
 export const route = createRoute({
   method: "get",
-  path: "/:targetKey/github-app-installation/complete",
+  path: "/github-app-installation/complete",
   tags: ["Integrations"],
   request: {
-    params: CompleteGitHubAppInstallationConnectionParamsSchema,
     query: CompleteGitHubAppInstallationConnectionQuerySchema,
   },
   responses: {
     302: {
       description:
-        "Complete GitHub App installation connection creation and redirect to dashboard integrations.",
+        "Complete GitHub App installation on an existing connection and redirect to dashboard integrations.",
       headers: RedirectLocationHeaderSchema,
     },
     400: {
@@ -31,7 +29,7 @@ export const route = createRoute({
       },
     },
     404: {
-      description: "Integration target was not found.",
+      description: "Integration connection was not found.",
       content: {
         "application/json": {
           schema: CompleteGitHubAppInstallationConnectionNotFoundResponseSchema,

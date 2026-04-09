@@ -21,11 +21,10 @@ type ResolvedGitHubAppCredentialContext = {
 const ResolvedGitHubTargetConfigSchema = z
   .object({
     apiBaseUrl: z.string().min(1),
-    appId: z.string().min(1).optional(),
   })
   .loose();
 
-const ResolvedGitHubTargetSecretsSchema = z
+const ResolvedGitHubConnectionSecretsSchema = z
   .object({
     appPrivateKeyPem: z.string().min(1).optional(),
   })
@@ -54,7 +53,7 @@ export function resolveGitHubInstallationRepositoryNames(
   return [...new Set(repositoryNames)].sort((left, right) => left.localeCompare(right));
 }
 
-function resolveGitHubAppCredentialContext(
+export function resolveGitHubAppCredentialContext(
   input: IntegrationCredentialResolverInput,
 ): ResolvedGitHubAppCredentialContext {
   if (input.secretType !== GitHubCredentialSecretTypes.GITHUB_APP_INSTALLATION_TOKEN) {
@@ -64,19 +63,6 @@ function resolveGitHubAppCredentialContext(
   }
 
   const parsedTargetConfig = ResolvedGitHubTargetConfigSchema.parse(input.target.config);
-  const appId = parsedTargetConfig.appId;
-  if (appId === undefined || appId.length === 0) {
-    throw new Error("GitHub app installation resolver requires target config `app_id`.");
-  }
-
-  const parsedTargetSecrets = ResolvedGitHubTargetSecretsSchema.parse(input.target.secrets);
-  const appPrivateKeyPem = parsedTargetSecrets.appPrivateKeyPem;
-  if (appPrivateKeyPem === undefined || appPrivateKeyPem.length === 0) {
-    throw new Error(
-      "GitHub app installation resolver requires target secret `app_private_key_pem`.",
-    );
-  }
-
   const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(input.connection.config);
   if (
     parsedConnectionConfig.connection_method !==
@@ -84,6 +70,21 @@ function resolveGitHubAppCredentialContext(
   ) {
     throw new Error(
       "GitHub app installation resolver requires a GitHub App installation connection config.",
+    );
+  }
+
+  const appId = parsedConnectionConfig.app_id;
+  if (typeof appId !== "string" || appId.length === 0) {
+    throw new Error("GitHub app installation resolver requires connection config `app_id`.");
+  }
+
+  const parsedConnectionSecrets = ResolvedGitHubConnectionSecretsSchema.parse(
+    input.connection.secrets ?? {},
+  );
+  const appPrivateKeyPem = parsedConnectionSecrets.appPrivateKeyPem;
+  if (typeof appPrivateKeyPem !== "string" || appPrivateKeyPem.length === 0) {
+    throw new Error(
+      "GitHub app installation resolver requires connection secret `appPrivateKeyPem`.",
     );
   }
 

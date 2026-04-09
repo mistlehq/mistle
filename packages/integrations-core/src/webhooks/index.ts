@@ -198,6 +198,20 @@ export async function verifyAndResolveWebhookRequestOrThrow<
     );
   }
 
+  const enrichedWebhookEvent =
+    webhookHandler.enrichEvent === undefined
+      ? webhookEvent
+      : await webhookHandler.enrichEvent({
+          targetKey: input.targetKey,
+          target: input.target,
+          event: webhookEvent,
+          connection,
+          connectionSecrets,
+          webhookSourceSecrets: input.webhookSourceSecrets ?? {},
+          headers: input.headers,
+          rawBody: input.rawBody,
+        });
+
   if (webhookRequest.kind === "response") {
     return {
       kind: "response",
@@ -207,7 +221,7 @@ export async function verifyAndResolveWebhookRequestOrThrow<
 
   return {
     kind: "event",
-    event: webhookEvent,
+    event: enrichedWebhookEvent,
     connectionId: connection.id,
   };
 }

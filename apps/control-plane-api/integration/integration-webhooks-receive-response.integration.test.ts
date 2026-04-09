@@ -2,15 +2,15 @@ import {
   integrationConnections,
   integrationCredentials,
   integrationTargets,
+  integrationWebhookSources,
   IntegrationConnectionStatuses,
+  IntegrationWebhookSourceStatuses,
 } from "@mistle/db/control-plane";
 import {
   IntegrationConnectionMethodIds,
   IntegrationKinds,
   IntegrationRegistry,
   IntegrationWebhookSourceLifecycles,
-  IntegrationWebhookSourceOwnerScopes,
-  IntegrationWebhookSourceRoutingStrategies,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
@@ -53,16 +53,19 @@ const ImmediateResponseWebhookDefinition: IntegrationDefinition<
           slotKey: "test-webhook.test-webhook-response.api-key.api-key",
         },
       ],
+      configSchema: z
+        .object({
+          connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),
+        })
+        .strict(),
     },
   ],
   webhookSource: {
-    ownerScope: IntegrationWebhookSourceOwnerScopes.TARGET,
-    routingStrategy: IntegrationWebhookSourceRoutingStrategies.PAYLOAD,
     lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
     async describeSource(input) {
       return {
         displayName: input.source.displayName ?? "Immediate response webhook",
-        callbackUrl: `/v1/integration/webhooks/${input.targetKey}`,
+        callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
         providerMetadata: input.source.providerMetadata,
       };
     },
@@ -131,8 +134,6 @@ const ImmediateManagedResponseWebhookDefinition: IntegrationDefinition<
     },
   ],
   webhookSource: {
-    ownerScope: IntegrationWebhookSourceOwnerScopes.CONNECTION,
-    routingStrategy: IntegrationWebhookSourceRoutingStrategies.PATH,
     lifecycle: IntegrationWebhookSourceLifecycles.MANAGED,
     async describeSource(input) {
       const endpointKey = input.source.endpointKey;
@@ -219,13 +220,11 @@ const VerifiedImmediateResponseWebhookDefinition: IntegrationDefinition<
     },
   ],
   webhookSource: {
-    ownerScope: IntegrationWebhookSourceOwnerScopes.TARGET,
-    routingStrategy: IntegrationWebhookSourceRoutingStrategies.PAYLOAD,
     lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
     async describeSource(input) {
       return {
         displayName: input.source.displayName ?? "Verified response webhook",
-        callbackUrl: `/v1/integration/webhooks/${input.targetKey}`,
+        callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
         providerMetadata: input.source.providerMetadata,
       };
     },
@@ -317,30 +316,18 @@ const VerifiedManagedResponseWebhookDefinition: IntegrationDefinition<
     },
   ],
   webhookSource: {
-    ownerScope: IntegrationWebhookSourceOwnerScopes.CONNECTION,
-    routingStrategy: IntegrationWebhookSourceRoutingStrategies.PATH,
     lifecycle: IntegrationWebhookSourceLifecycles.MANAGED,
     async describeSource(input) {
-      const endpointKey = input.source.endpointKey;
-      if (endpointKey === undefined) {
-        throw new Error(`Managed webhook source '${input.source.id}' is missing endpointKey.`);
-      }
-
       return {
         displayName: input.source.displayName ?? "Verified managed response webhook",
-        callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${endpointKey}`,
+        callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
         providerMetadata: input.source.providerMetadata,
       };
     },
     async createRegistration(input) {
-      const endpointKey = input.source.endpointKey;
-      if (endpointKey === undefined) {
-        throw new Error(`Managed webhook source '${input.source.id}' is missing endpointKey.`);
-      }
-
       return {
         providerMetadata: {
-          callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${endpointKey}`,
+          callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
         },
       };
     },
@@ -409,9 +396,12 @@ const VerifiedManagedResponseWebhookDefinition: IntegrationDefinition<
 };
 
 describe("receive integration webhook immediate response integration", () => {
-  it("returns an immediate response without persisting an event or requiring a connection", async ({
+  it("returns an immediate response without persisting an event or invoking connection resolution", async ({
     fixture,
   }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-webhooks-receive-response@example.com",
+    });
     const targetKey = "test-webhook-response-target";
     const registry = new IntegrationRegistry();
     registry.register(ImmediateResponseWebhookDefinition);
@@ -425,6 +415,36 @@ describe("receive integration webhook immediate response integration", () => {
       secrets: null,
     });
 
+    const createdConnection = await createFormConnection(
+      {
+        db: fixture.db,
+        integrationRegistry: registry,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        targetKey,
+        displayName: "Immediate response connection",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+        secrets: {
+          apiKey: "skip-verification-secret",
+        },
+      },
+    );
+    const persistedWebhookSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.targetKey, targetKey),
+          eq(table.integrationConnectionId, createdConnection.id),
+        ),
+    });
+    if (persistedWebhookSource === undefined) {
+      throw new Error("Expected implicit webhook source for immediate response.");
+    }
+
     const receivedWebhook = await receiveIntegrationWebhook(
       {
         db: fixture.db,
@@ -433,7 +453,7 @@ describe("receive integration webhook immediate response integration", () => {
       },
       {
         targetKey,
-        endpointKey: undefined,
+        endpointKey: persistedWebhookSource.endpointKey,
         headers: {
           "content-type": "text/plain",
         },
@@ -485,6 +505,14 @@ describe("receive integration webhook immediate response integration", () => {
       targetSnapshotConfig: {},
     });
 
+    await fixture.db.insert(integrationWebhookSources).values({
+      organizationId: authenticatedSession.organizationId,
+      integrationConnectionId: "icn_missing_config_connection",
+      targetKey,
+      endpointKey: "ep_missing_config_connection",
+      status: IntegrationWebhookSourceStatuses.ACTIVE,
+    });
+
     const receivedWebhook = await receiveIntegrationWebhook(
       {
         db: fixture.db,
@@ -493,7 +521,7 @@ describe("receive integration webhook immediate response integration", () => {
       },
       {
         targetKey,
-        endpointKey: undefined,
+        endpointKey: "ep_missing_config_connection",
         headers: {
           "content-type": "text/plain",
         },
@@ -648,6 +676,16 @@ describe("receive integration webhook immediate response integration", () => {
         },
       },
     );
+    const persistedWebhookSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.targetKey, targetKey),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+    });
+    if (persistedWebhookSource === undefined) {
+      throw new Error("Expected implicit webhook source for verified response.");
+    }
 
     const receivedWebhook = await receiveIntegrationWebhook(
       {
@@ -657,7 +695,7 @@ describe("receive integration webhook immediate response integration", () => {
       },
       {
         targetKey,
-        endpointKey: undefined,
+        endpointKey: persistedWebhookSource.endpointKey,
         headers: {
           "content-type": "text/plain",
         },

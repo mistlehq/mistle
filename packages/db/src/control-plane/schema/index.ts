@@ -116,13 +116,9 @@ export {
 } from "./integration-webhook-events.js";
 export {
   integrationWebhookSources,
-  IntegrationWebhookSourceOwnerScopes,
-  IntegrationWebhookSourceRoutingStrategies,
   IntegrationWebhookSourceStatuses,
   type InsertIntegrationWebhookSource,
   type IntegrationWebhookSource,
-  type IntegrationWebhookSourceOwnerScope,
-  type IntegrationWebhookSourceRoutingStrategy,
   type IntegrationWebhookSourceStatus,
 } from "./integration-webhook-sources.js";
 export {

@@ -18,6 +18,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Textarea,
 } from "@mistle/ui";
 import type { IChangeEvent } from "@rjsf/core";
 import type { RJSFSchema } from "@rjsf/utils";
@@ -140,7 +141,10 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
       open={dialog !== null}
     >
       {dialog ? (
-        <DialogContent showCloseButton={false}>
+        <DialogContent
+          className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-2xl"
+          showCloseButton={false}
+        >
           <DialogHeader variant="sectioned">
             <DialogTitle>
               {isUpdateMode ? "Edit Connection" : `Add ${dialog.targetDisplayName} Connection`}
@@ -235,21 +239,41 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
                     ) : null}
                   </FieldHeader>
                   <FieldContent>
-                    <Input
-                      autoComplete="off"
-                      data-1p-ignore="true"
-                      id={`connection-secret-${dialog.targetKey}-${secretField.name}`}
-                      onChange={(event) => {
-                        props.onSecretChange(secretField.name, event.currentTarget.value);
-                      }}
-                      placeholder={
-                        isUpdateMode
-                          ? `Leave blank to keep existing ${secretField.label.toLowerCase()}`
-                          : (secretField.placeholder ?? `Enter ${secretField.label.toLowerCase()}`)
-                      }
-                      type={secretField.inputType}
-                      value={props.secrets[secretField.name] ?? ""}
-                    />
+                    {secretField.inputType === "textarea" ? (
+                      <Textarea
+                        autoComplete="off"
+                        data-1p-ignore="true"
+                        id={`connection-secret-${dialog.targetKey}-${secretField.name}`}
+                        onChange={(event) => {
+                          props.onSecretChange(secretField.name, event.currentTarget.value);
+                        }}
+                        placeholder={
+                          isUpdateMode
+                            ? `Leave blank to keep existing ${secretField.label.toLowerCase()}`
+                            : (secretField.placeholder ??
+                              `Enter ${secretField.label.toLowerCase()}`)
+                        }
+                        rows={8}
+                        value={props.secrets[secretField.name] ?? ""}
+                      />
+                    ) : (
+                      <Input
+                        autoComplete="off"
+                        data-1p-ignore="true"
+                        id={`connection-secret-${dialog.targetKey}-${secretField.name}`}
+                        onChange={(event) => {
+                          props.onSecretChange(secretField.name, event.currentTarget.value);
+                        }}
+                        placeholder={
+                          isUpdateMode
+                            ? `Leave blank to keep existing ${secretField.label.toLowerCase()}`
+                            : (secretField.placeholder ??
+                              `Enter ${secretField.label.toLowerCase()}`)
+                        }
+                        type={secretField.inputType}
+                        value={props.secrets[secretField.name] ?? ""}
+                      />
+                    )}
                   </FieldContent>
                 </Field>
               ))}

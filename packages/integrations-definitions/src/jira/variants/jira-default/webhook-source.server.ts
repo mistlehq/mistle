@@ -1,10 +1,6 @@
 import { buildBasicAuthorizationHeader } from "@mistle/http";
 import type { IntegrationWebhookSourceCapability } from "@mistle/integrations-core";
-import {
-  IntegrationWebhookSourceLifecycles,
-  IntegrationWebhookSourceOwnerScopes,
-  IntegrationWebhookSourceRoutingStrategies,
-} from "@mistle/integrations-core";
+import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
 import { z } from "zod";
 
 import {
@@ -135,8 +131,6 @@ export const JiraWebhookSourceCapability: IntegrationWebhookSourceCapability<
   JiraTargetSecrets,
   JiraConnectionConfig
 > = {
-  ownerScope: IntegrationWebhookSourceOwnerScopes.CONNECTION,
-  routingStrategy: IntegrationWebhookSourceRoutingStrategies.PATH,
   lifecycle: IntegrationWebhookSourceLifecycles.MANAGED,
   async describeSource(input) {
     const endpointKey = input.source.endpointKey;

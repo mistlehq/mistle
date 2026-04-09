@@ -3,7 +3,6 @@ import {
   integrationConnections,
   integrationCredentials,
   integrationWebhookSources,
-  IntegrationWebhookSourceOwnerScopes,
   sandboxProfileVersionIntegrationBindings,
   type ControlPlaneDatabase,
   webhookAutomations,
@@ -111,11 +110,7 @@ export async function deleteIntegrationConnection(
     connectionId: input.connectionId,
   });
   const connectionOwnedWebhookSources = await ctx.db.query.integrationWebhookSources.findMany({
-    where: (table, { and: whereAnd, eq: whereEq }) =>
-      whereAnd(
-        whereEq(table.integrationConnectionId, connection.id),
-        whereEq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
-      ),
+    where: (table, { eq: whereEq }) => whereEq(table.integrationConnectionId, connection.id),
   });
 
   if (connectionOwnedWebhookSources.length > 0) {
@@ -124,7 +119,7 @@ export async function deleteIntegrationConnection(
       variantId: connection.target.variantId,
     });
 
-    if (definition?.webhookSource?.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION) {
+    if (definition?.webhookSource !== undefined) {
       const { webhookSourceCapability, parsedTargetConfig, parsedTargetSecrets } =
         resolveWebhookSourceCapabilityOrThrow({
           integrationRegistry: ctx.integrationRegistry,
@@ -167,16 +162,11 @@ export async function deleteIntegrationConnection(
               connectionSecrets,
               source: {
                 id: source.id,
-                targetKey: source.targetKey ?? connection.targetKey,
-                ownerScope: source.ownerScope,
-                ...(source.organizationId === null
-                  ? {}
-                  : { organizationId: source.organizationId }),
-                ...(source.integrationConnectionId === null
-                  ? {}
-                  : { integrationConnectionId: source.integrationConnectionId }),
+                targetKey: source.targetKey,
+                organizationId: source.organizationId,
+                integrationConnectionId: source.integrationConnectionId,
                 ...(source.displayName === null ? {} : { displayName: source.displayName }),
-                ...(source.endpointKey === null ? {} : { endpointKey: source.endpointKey }),
+                endpointKey: source.endpointKey,
                 ...(source.remoteRegistrationId === null
                   ? {}
                   : { remoteRegistrationId: source.remoteRegistrationId }),
@@ -201,25 +191,13 @@ export async function deleteIntegrationConnection(
         id: true,
         webhookSecretCredentialId: true,
       },
-      where: (table, { and: whereAnd, eq: whereEq }) =>
-        whereAnd(
-          whereEq(table.integrationConnectionId, input.connectionId),
-          whereEq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
-        ),
+      where: (table, { eq: whereEq }) => whereEq(table.integrationConnectionId, input.connectionId),
     });
 
     if (connectionOwnedWebhookSources.length > 0) {
       await tx
         .delete(integrationWebhookSources)
-        .where(
-          and(
-            eq(integrationWebhookSources.integrationConnectionId, input.connectionId),
-            eq(
-              integrationWebhookSources.ownerScope,
-              IntegrationWebhookSourceOwnerScopes.CONNECTION,
-            ),
-          ),
-        );
+        .where(eq(integrationWebhookSources.integrationConnectionId, input.connectionId));
     }
 
     const webhookSecretCredentialIds = connectionOwnedWebhookSources

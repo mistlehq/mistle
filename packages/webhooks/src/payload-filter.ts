@@ -1,6 +1,69 @@
 import { z } from "zod";
 
-import type { WebhookPayloadFilter } from "./types.js";
+export type WebhookPayloadFilterScalar = string | number | boolean | null;
+
+export type WebhookPayloadFilterPath = ReadonlyArray<string>;
+
+export type WebhookPayloadPathInput = string | ReadonlyArray<string>;
+
+export type WebhookPayloadFilter =
+  | {
+      op: "and";
+      filters: ReadonlyArray<WebhookPayloadFilter>;
+    }
+  | {
+      op: "or";
+      filters: ReadonlyArray<WebhookPayloadFilter>;
+    }
+  | {
+      op: "not";
+      filter: WebhookPayloadFilter;
+    }
+  | {
+      op: "eq";
+      path: WebhookPayloadFilterPath;
+      value: WebhookPayloadFilterScalar;
+    }
+  | {
+      op: "neq";
+      path: WebhookPayloadFilterPath;
+      value: WebhookPayloadFilterScalar;
+    }
+  | {
+      op: "in";
+      path: WebhookPayloadFilterPath;
+      values: ReadonlyArray<WebhookPayloadFilterScalar>;
+    }
+  | {
+      op: "contains";
+      path: WebhookPayloadFilterPath;
+      value: string;
+    }
+  | {
+      op: "contains_token";
+      path: WebhookPayloadFilterPath;
+      value: string;
+    }
+  | {
+      op: "starts_with";
+      path: WebhookPayloadFilterPath;
+      value: string;
+    }
+  | {
+      op: "ends_with";
+      path: WebhookPayloadFilterPath;
+      value: string;
+    }
+  | {
+      op: "exists";
+      path: WebhookPayloadFilterPath;
+    }
+  | {
+      op: "not_exists";
+      path: WebhookPayloadFilterPath;
+    };
+
+export type EventScopedWebhookPayloadFilter = Record<string, WebhookPayloadFilter>;
 
 const WebhookPayloadFilterScalarSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
@@ -36,7 +99,9 @@ export const WebhookPayloadFilterSchema: z.ZodType<WebhookPayloadFilter> = z.laz
       })
       .strict()
       .transform(
-        (value): Extract<WebhookPayloadFilter, { op: "and" }> => ({
+        (value: {
+          filters: WebhookPayloadFilter[];
+        }): Extract<WebhookPayloadFilter, { op: "and" }> => ({
           op: "and",
           filters: value.filters,
         }),
@@ -48,7 +113,9 @@ export const WebhookPayloadFilterSchema: z.ZodType<WebhookPayloadFilter> = z.laz
       })
       .strict()
       .transform(
-        (value): Extract<WebhookPayloadFilter, { op: "or" }> => ({
+        (value: {
+          filters: WebhookPayloadFilter[];
+        }): Extract<WebhookPayloadFilter, { op: "or" }> => ({
           op: "or",
           filters: value.filters,
         }),
@@ -123,12 +190,31 @@ export const WebhookPayloadFilterSchema: z.ZodType<WebhookPayloadFilter> = z.laz
   ]),
 );
 
+export const EventScopedWebhookPayloadFilterSchema = z.record(
+  z.string().min(1),
+  WebhookPayloadFilterSchema,
+);
+
 export function parseWebhookPayloadFilter(input: unknown): WebhookPayloadFilter {
   const parsed = WebhookPayloadFilterSchema.safeParse(input);
 
   if (!parsed.success) {
     throw new Error(
       `Webhook payload filter validation failed. ${formatIssues(parsed.error.issues)}`,
+    );
+  }
+
+  return parsed.data;
+}
+
+export function parseEventScopedWebhookPayloadFilter(
+  input: unknown,
+): EventScopedWebhookPayloadFilter {
+  const parsed = EventScopedWebhookPayloadFilterSchema.safeParse(input);
+
+  if (!parsed.success) {
+    throw new Error(
+      `Event-scoped webhook payload filter validation failed. ${formatIssues(parsed.error.issues)}`,
     );
   }
 

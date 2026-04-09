@@ -4,12 +4,11 @@ import {
   getValueAtPath,
   type SharedFilter,
 } from "@mistle/integrations-core/triggers";
-
 import type {
   WebhookPayloadFilter,
   WebhookPayloadFilterPath,
   WebhookPayloadFilterScalar,
-} from "./types.js";
+} from "@mistle/webhooks";
 
 function isWebhookPayloadFilterScalar(value: unknown): value is WebhookPayloadFilterScalar {
   return (

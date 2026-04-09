@@ -3,7 +3,6 @@ import { OpenApiValidationHook } from "@mistle/http/errors.js";
 
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import { INTEGRATION_WEBHOOKS_ROUTE_BASE_PATH } from "./constants.js";
-import * as ingestIntegrationWebhook from "./ingest-integration-webhook/index.js";
 import * as ingestSourceKeyedIntegrationWebhook from "./ingest-source-keyed-integration-webhook/index.js";
 
 export function createIntegrationWebhooksRoutes(): AppRoutes<
@@ -13,7 +12,6 @@ export function createIntegrationWebhooksRoutes(): AppRoutes<
     defaultHook: OpenApiValidationHook,
   });
 
-  routes.openapi(ingestIntegrationWebhook.route, ingestIntegrationWebhook.handler);
   routes.openapi(
     ingestSourceKeyedIntegrationWebhook.route,
     ingestSourceKeyedIntegrationWebhook.handler,

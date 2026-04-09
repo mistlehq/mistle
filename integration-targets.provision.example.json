@@ -63,14 +63,7 @@
       "enabled": true,
       "config": {
         "api_base_url": "https://api.github.com",
-        "web_base_url": "https://github.com",
-        "app_slug": "your-github-app-slug",
-        "app_id": "123456",
-        "client_id": "Iv1.yourclientid"
-      },
-      "secretEnv": {
-        "app_private_key_pem": "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM",
-        "webhook_secret": "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET"
+        "web_base_url": "https://github.com"
       }
     },
     {
@@ -78,14 +71,7 @@
       "enabled": false,
       "config": {
         "api_base_url": "https://ghe.example.com/api/v3",
-        "web_base_url": "https://ghe.example.com",
-        "app_slug": "your-ghe-app-slug",
-        "app_id": "7890",
-        "client_id": "Iv1.yourgheclientid"
-      },
-      "secretEnv": {
-        "app_private_key_pem": "MISTLE_INTEGRATION_TARGET_GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM",
-        "webhook_secret": "MISTLE_INTEGRATION_TARGET_GITHUB_ENTERPRISE_SERVER_WEBHOOK_SECRET"
+        "web_base_url": "https://ghe.example.com"
       }
     }
   ]

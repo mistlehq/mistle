@@ -1,9 +1,8 @@
-import { integrationTargets, IntegrationWebhookSourceOwnerScopes } from "@mistle/db/control-plane";
+import { integrationTargets } from "@mistle/db/control-plane";
 import {
   IntegrationKinds,
   IntegrationRegistry,
   IntegrationWebhookSourceLifecycles,
-  IntegrationWebhookSourceRoutingStrategies,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 import { describe, expect } from "vitest";
@@ -54,18 +53,11 @@ const ImplicitPathWebhookDefinition: IntegrationDefinition<
     },
   ],
   webhookSource: {
-    ownerScope: IntegrationWebhookSourceOwnerScopes.CONNECTION,
-    routingStrategy: IntegrationWebhookSourceRoutingStrategies.PATH,
     lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
     async describeSource(input) {
-      const endpointKey = input.source.endpointKey;
-      if (endpointKey === undefined) {
-        throw new Error("Expected endpoint key for implicit path-routed source.");
-      }
-
       return {
         displayName: input.source.displayName ?? "Implicit path webhook",
-        callbackUrl: `${input.controlPlaneBaseUrl}/v1/integration/webhooks/${input.targetKey}/${endpointKey}`,
+        callbackUrl: `${input.controlPlaneBaseUrl}/v1/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
         providerMetadata: input.source.providerMetadata,
       };
     },
@@ -123,7 +115,6 @@ describe("create form connection implicit webhook source integration", () => {
           eq(table.organizationId, authenticatedSession.organizationId),
           eq(table.integrationConnectionId, createdConnection.id),
           eq(table.targetKey, targetKey),
-          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
         ),
     });
 
@@ -132,8 +123,7 @@ describe("create form connection implicit webhook source integration", () => {
       throw new Error("Expected implicit webhook source to be created.");
     }
 
-    expect(persistedSource.routingStrategy).toBe("path");
     expect(typeof persistedSource.endpointKey).toBe("string");
-    expect(persistedSource.endpointKey?.length).toBeGreaterThan(0);
+    expect(persistedSource.endpointKey.length).toBeGreaterThan(0);
   });
 });

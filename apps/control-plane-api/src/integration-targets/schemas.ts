@@ -6,7 +6,7 @@ const IntegrationConnectionMethodSecretFieldSchema = z
     label: z.string().min(1),
     placeholder: z.string().min(1).optional(),
     description: z.string().min(1).optional(),
-    inputType: z.enum(["password", "text"]),
+    inputType: z.enum(["password", "text", "textarea"]),
     slotKey: z.string().min(1),
   })
   .strict();
@@ -127,7 +127,6 @@ export const IntegrationWebhookEventDefinitionSchema = z
 const IntegrationWebhookSourceMetadataSchema = z
   .object({
     lifecycle: z.enum(["implicit", "managed"]),
-    ownerScope: z.enum(["target", "connection"]),
     requiresSourceSelection: z.boolean(),
   })
   .strict();

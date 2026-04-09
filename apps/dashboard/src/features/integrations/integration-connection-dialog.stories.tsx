@@ -7,7 +7,7 @@ import {
   type IntegrationConnectionDialogState,
 } from "./integration-connection-dialog.js";
 
-const redirectCreateDialog: IntegrationConnectionDialogState = {
+const githubAppCreateDialog: IntegrationConnectionDialogState = {
   methods: [
     {
       id: IntegrationConnectionMethodIds.API_KEY,
@@ -25,13 +25,21 @@ const redirectCreateDialog: IntegrationConnectionDialogState = {
     {
       id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       label: "GitHub App installation",
-      kind: "redirect",
-      ui: {
-        create: {
-          submitLabel: "Install GitHub App",
-          helperText: "Continue to GitHub to install the app and finish connecting this account.",
+      kind: "form",
+      secretFields: [
+        {
+          name: "appPrivateKeyPem",
+          label: "App private key PEM",
+          placeholder: "-----BEGIN PRIVATE KEY-----",
+          inputType: "password",
         },
-      },
+        {
+          name: "webhookSecret",
+          label: "Webhook secret",
+          placeholder: "Enter webhook secret",
+          inputType: "password",
+        },
+      ],
     },
   ],
   mode: "create",
@@ -57,7 +65,7 @@ const meta = {
     connectionDisplayNamePlaceholder: "GitHub connection",
     connectionDisplayNameValue: "",
     connectError: null,
-    dialog: redirectCreateDialog,
+    dialog: githubAppCreateDialog,
     hasChanges: true,
     isConnectionDisplayNameChanged: false,
     isSecretChanged: false,
@@ -77,9 +85,9 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const RedirectCreate: Story = {};
+export const GitHubAppCreate: Story = {};
 
-export const RedirectCreatePending: Story = {
+export const GitHubAppCreatePending: Story = {
   args: {
     pending: true,
   },

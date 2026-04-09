@@ -124,9 +124,11 @@ describe("jira webhook handler", () => {
           },
         },
         connectionSecrets: {
+          apiKey: "jira-personal-token",
+        },
+        webhookSourceSecrets: {
           webhookSecret: "whsec_jira",
         },
-        webhookSourceSecrets: {},
         headers: {
           "x-hub-signature": signature,
         },

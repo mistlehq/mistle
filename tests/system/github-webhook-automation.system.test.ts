@@ -51,8 +51,8 @@ const IntegrationConnectionResponseSchema = z.looseObject({
 const IntegrationWebhookSourceResponseSchema = z.looseObject({
   id: z.string().min(1),
   targetKey: z.string().min(1),
-  ownerScope: z.enum(["target", "connection"]),
-  integrationConnectionId: z.string().min(1).optional(),
+  integrationConnectionId: z.string().min(1),
+  endpointKey: z.string().min(1),
 });
 
 const SandboxProfileResponseSchema = z.looseObject({
@@ -575,7 +575,6 @@ describeIf("system GitHub webhook automation", () => {
       const githubWebhookSource = githubWebhookSources.find(
         (source) =>
           source.targetKey === GitHubTargetKey &&
-          source.ownerScope === "connection" &&
           source.integrationConnectionId === githubConnection.id,
       );
       if (githubWebhookSource === undefined) {
@@ -647,9 +646,11 @@ describeIf("system GitHub webhook automation", () => {
             integrationWebhookSourceId: githubWebhookSource.id,
             eventTypes: ["github.issue_comment.created"],
             payloadFilter: {
-              op: "contains",
-              path: ["comment", "body"],
-              value: payloadMarker,
+              "github.issue_comment.created": {
+                op: "contains",
+                path: ["comment", "body"],
+                value: payloadMarker,
+              },
             },
             inputTemplate: "GitHub issue comment webhook: {{payload.comment.body}}",
             conversationKeyTemplate: "github-issue-{{payload.issue.number}}",

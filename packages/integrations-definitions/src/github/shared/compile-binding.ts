@@ -168,6 +168,13 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
   const apiPathPrefixes = resolveGitHubApiPathPrefixes(input.target.config.apiBaseUrl);
   const uploadRouteHost = resolveGitHubUploadRouteHost(input);
   const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(input.connection.config);
+  if (
+    parsedConnectionConfig.connection_method ===
+      IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION &&
+    parsedConnectionConfig.installation_id === undefined
+  ) {
+    throw new Error("Invalid input: GitHub App installation connections require installation_id.");
+  }
   const credentialSecretType = resolveGitHubCredentialSecretType(input.connection.config);
   const gitRepositoryPathPrefixes = repositories.map((repository) =>
     joinRoutePathPrefixes(gitPathPrefix, `/${repository}.git`),

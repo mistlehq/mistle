@@ -290,6 +290,8 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         status: "active",
         config: {
           connection_method: "github-app-installation",
+          app_id: "123",
+          app_slug: "mistle-github-app",
           installation_id: "12345",
         },
       },
@@ -343,6 +345,8 @@ describe("compileGitHubEnterpriseServerBinding", () => {
           status: "active",
           config: {
             connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle-github-app",
           },
         },
         binding: {

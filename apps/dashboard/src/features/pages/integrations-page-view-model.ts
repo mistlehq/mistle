@@ -6,6 +6,7 @@ import type { IntegrationCardViewModel } from "../integrations/directory-model.j
 import { formatConnectionCount } from "../integrations/format-connection-count.js";
 import type { IntegrationConnectionDetailItem } from "../integrations/integration-connection-detail-view.js";
 import {
+  IntegrationConnectionMethodIds,
   type IntegrationConnectionMethod,
   type IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-dialog.js";
@@ -15,6 +16,9 @@ import type {
 } from "../integrations/integrations-service.js";
 import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
 import type { OrganizationIntegrationsSettingsPageCard } from "./organization-integrations-settings-page-view.js";
+
+const GitHubAppInstallationCompletePath =
+  "/v1/integration/connections/github-app-installation/complete";
 
 function resolveTargetConfig(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -96,12 +100,26 @@ export function resolveEditableConnectionMethodId(
 
 export function buildIntegrationConnectionDetailItems(input: {
   connections: readonly IntegrationConnection[];
+  controlPlaneApiOrigin?: string;
+  githubAppInstallationStateByConnectionId?: ReadonlyMap<
+    string,
+    {
+      errorMessage?: string;
+      isPending: boolean;
+    }
+  >;
   refreshingResourceKeys: ReadonlySet<string>;
 }): readonly IntegrationConnectionDetailItem[] {
   return input.connections.map((connection) => {
     const connectionMethodId = resolveConnectionMethodId(connection.config ?? null);
     const bindingCount = connection.bindingCount ?? 0;
     const automationCount = connection.automationCount ?? 0;
+    const githubAppConnectionContext = resolveGitHubAppConnectionContext(
+      connection,
+      input.controlPlaneApiOrigin,
+    );
+    const githubAppInstallationState =
+      input.githubAppInstallationStateByConnectionId?.get(connection.id) ?? undefined;
 
     return {
       id: connection.id,
@@ -115,6 +133,35 @@ export function buildIntegrationConnectionDetailItems(input: {
       ...(connectionMethodId === null
         ? {}
         : { authMethodLabel: formatConnectionMethodLabel(connectionMethodId) }),
+      ...(githubAppConnectionContext === undefined
+        ? {}
+        : {
+            contextItems: githubAppConnectionContext.contextItems,
+            ...(githubAppConnectionContext.installActionLabel === undefined
+              ? {}
+              : {
+                  installActionLabel: githubAppConnectionContext.installActionLabel,
+                }),
+            ...(githubAppConnectionContext.setupDescription === undefined
+              ? {}
+              : {
+                  ...(githubAppConnectionContext.postInstallationSetupUrl === undefined
+                    ? {}
+                    : {
+                        postInstallationSetupUrl:
+                          githubAppConnectionContext.postInstallationSetupUrl,
+                      }),
+                  setupDescription: githubAppConnectionContext.setupDescription,
+                  ...(githubAppInstallationState?.errorMessage === undefined
+                    ? {}
+                    : { setupErrorMessage: githubAppInstallationState.errorMessage }),
+                  ...(githubAppInstallationState === undefined
+                    ? {}
+                    : { setupIsPending: githubAppInstallationState.isPending }),
+                  setupStatusLabel: githubAppConnectionContext.setupStatusLabel,
+                }),
+            webhookInstructions: githubAppConnectionContext.webhookInstructions,
+          }),
       resources: (connection.resources ?? []).map((resource) => ({
         kind: resource.kind,
         count: resource.count,
@@ -134,6 +181,88 @@ export function buildIntegrationConnectionDetailItems(input: {
       })),
     };
   });
+}
+
+function resolveGitHubAppConnectionContext(
+  connection: Pick<IntegrationConnection, "config" | "externalSubjectId">,
+  controlPlaneApiOrigin?: string,
+):
+  | {
+      contextItems: readonly {
+        label: string;
+        value: string;
+      }[];
+      installActionLabel?: string;
+      postInstallationSetupUrl?: string;
+      setupDescription?: string;
+      setupStatusLabel?: string;
+      webhookInstructions: string;
+    }
+  | undefined {
+  const config = connection.config;
+  if (
+    config === undefined ||
+    typeof config !== "object" ||
+    config === null ||
+    Array.isArray(config) ||
+    config.connection_method !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+  ) {
+    return undefined;
+  }
+
+  const appId = typeof config.app_id === "string" ? config.app_id : null;
+  const appSlug = typeof config.app_slug === "string" ? config.app_slug : null;
+  const installationId =
+    typeof config.installation_id === "string"
+      ? config.installation_id
+      : typeof connection.externalSubjectId === "string"
+        ? connection.externalSubjectId
+        : null;
+
+  return {
+    contextItems: [
+      ...(appId === null
+        ? []
+        : [
+            {
+              label: "App ID",
+              value: appId,
+            },
+          ]),
+      ...(appSlug === null
+        ? []
+        : [
+            {
+              label: "App slug",
+              value: appSlug,
+            },
+          ]),
+      {
+        label: "Installation",
+        value: installationId === null ? "Pending" : installationId,
+      },
+    ],
+    ...(installationId === null
+      ? { installActionLabel: "Install GitHub App" }
+      : { installActionLabel: "Manage installation" }),
+    ...(installationId === null
+      ? {
+          setupDescription:
+            "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
+          ...(controlPlaneApiOrigin === undefined
+            ? {}
+            : {
+                postInstallationSetupUrl: new URL(
+                  GitHubAppInstallationCompletePath,
+                  controlPlaneApiOrigin,
+                ).toString(),
+              }),
+          setupStatusLabel: "Setup incomplete",
+        }
+      : {}),
+    webhookInstructions:
+      "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
+  };
 }
 
 export function createIntegrationConnectionResourceKey(input: {

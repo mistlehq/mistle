@@ -40,7 +40,9 @@ describe("formatSandboxProfileBindingSummaryItems", () => {
       ],
       config: {
         connection_method: "github-app-installation",
-        installation_id: 12345,
+        app_id: "123",
+        app_slug: "mistle-github-app",
+        installation_id: "12345",
       },
     };
     const row: SandboxProfileBindingEditorRow = {

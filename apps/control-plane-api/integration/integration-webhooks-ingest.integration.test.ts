@@ -1,16 +1,19 @@
 import { createHmac } from "node:crypto";
+import { once } from "node:events";
+import { createServer } from "node:http";
 
 import {
+  integrationConnectionCredentials,
   integrationConnections,
   integrationCredentials,
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
   integrationTargets,
   integrationWebhookSources,
-  IntegrationWebhookSourceOwnerScopes,
-  IntegrationWebhookSourceRoutingStrategies,
   IntegrationWebhookSourceStatuses,
 } from "@mistle/db/control-plane";
+import { reserveAvailablePort } from "@mistle/test-harness";
+import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
@@ -18,11 +21,9 @@ import { IntegrationConnectionSchema } from "../src/integration-connections/sche
 import {
   IngestIntegrationWebhookResponseSchema,
   IntegrationWebhooksBadRequestResponseSchema,
-  IntegrationWebhooksNotFoundResponseSchema,
 } from "../src/integration-webhooks/index.js";
 import {
   encryptCredentialUtf8,
-  encryptIntegrationTargetSecrets,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../src/lib/crypto.js";
@@ -61,6 +62,90 @@ function createGitHubWebhookPayload(): Record<string, unknown> {
 function signGitHubWebhookPayload(input: { secret: string; payload: string }): string {
   const digest = createHmac("sha256", input.secret).update(input.payload, "utf8").digest("hex");
   return `sha256=${digest}`;
+}
+
+async function ensureGitHubTarget(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  targetKey: string;
+}): Promise<void> {
+  await input.fixture.db.insert(integrationTargets).values({
+    targetKey: input.targetKey,
+    familyId: "github",
+    variantId: "github-cloud",
+    enabled: true,
+    config: {
+      api_base_url: "https://api.github.com",
+      web_base_url: "https://github.com",
+    },
+  });
+}
+
+async function createGitHubWebhookConnection(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  targetKey: string;
+  email: string;
+  displayName: string;
+  installationId: string;
+  webhookSecret: string;
+}): Promise<{
+  connectionId: string;
+  endpointKey: string;
+  organizationId: string;
+}> {
+  const authenticatedSession = await input.fixture.authSession({
+    email: input.email,
+  });
+  const createConnectionResponse = await input.fixture.request(
+    `/v1/integration/connections/${input.targetKey}/form`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: input.displayName,
+        methodId: "github-app-installation",
+        config: {
+          connection_method: "github-app-installation",
+          app_id: "123",
+          app_slug: "mistle-github-app",
+          installation_id: input.installationId,
+        },
+        secrets: {
+          appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
+          webhookSecret: input.webhookSecret,
+        },
+      }),
+    },
+  );
+  expect(createConnectionResponse.status).toBe(201);
+  const connection = IntegrationConnectionSchema.parse(await createConnectionResponse.json());
+
+  await input.fixture.db
+    .update(integrationConnections)
+    .set({
+      externalSubjectId: input.installationId,
+    })
+    .where(eq(integrationConnections.id, connection.id));
+
+  const persistedWebhookSource = await input.fixture.db.query.integrationWebhookSources.findFirst({
+    where: (table, { and, eq }) =>
+      and(eq(table.targetKey, input.targetKey), eq(table.integrationConnectionId, connection.id)),
+  });
+
+  if (
+    persistedWebhookSource?.endpointKey === undefined ||
+    persistedWebhookSource.endpointKey === null
+  ) {
+    throw new Error("Expected persisted GitHub webhook source endpoint key.");
+  }
+
+  return {
+    connectionId: connection.id,
+    endpointKey: persistedWebhookSource.endpointKey,
+    organizationId: authenticatedSession.organizationId,
+  };
 }
 
 function createJiraWebhookPayload(input: { siteUrl: string }): Record<string, unknown> {
@@ -123,6 +208,28 @@ function createSlackMessageDeletedWebhookPayload(): Record<string, unknown> {
       },
     },
     event_id: "Ev124",
+  };
+}
+
+function createSlackReactionWebhookPayload(): Record<string, unknown> {
+  return {
+    ...createSlackMessageWebhookPayload(),
+    event: createSlackReactionEventPayload(),
+    event_id: "Ev125",
+  };
+}
+
+function createSlackReactionEventPayload(): Record<string, unknown> {
+  return {
+    type: "reaction_added",
+    user: "U123",
+    reaction: "thumbsup",
+    item: {
+      type: "message",
+      channel: "C123",
+      ts: "1710000000.000200",
+    },
+    event_ts: "1710000000.000300",
   };
 }
 
@@ -199,6 +306,66 @@ async function createWebhookSecretCredential(input: {
   }
 }
 
+async function createConnectionApiKeyCredential(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  organizationId: string;
+  familyId: string;
+  connectionId: string;
+  slotKey: string;
+  secret: string;
+}): Promise<void> {
+  const organizationCredentialKey =
+    await input.fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, input.organizationId),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+
+  if (organizationCredentialKey === undefined) {
+    throw new Error("Expected organization credential key.");
+  }
+
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+    masterEncryptionKeys: input.fixture.config.integrations.masterEncryptionKeys,
+  });
+  const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: organizationCredentialKey.ciphertext,
+    masterEncryptionKeyMaterial,
+  });
+
+  try {
+    const encryptedSecret = encryptCredentialUtf8({
+      plaintext: input.secret,
+      organizationCredentialKey: unwrappedOrganizationCredentialKey,
+    });
+    const [createdCredential] = await input.fixture.db
+      .insert(integrationCredentials)
+      .values({
+        organizationId: input.organizationId,
+        secretKind: IntegrationCredentialSecretKinds.API_KEY,
+        ciphertext: encryptedSecret.ciphertext,
+        nonce: encryptedSecret.nonce,
+        organizationCredentialKeyVersion: organizationCredentialKey.version,
+        intendedFamilyId: input.familyId,
+      })
+      .returning({
+        id: integrationCredentials.id,
+      });
+
+    if (createdCredential === undefined) {
+      throw new Error("Expected API key credential.");
+    }
+
+    await input.fixture.db.insert(integrationConnectionCredentials).values({
+      connectionId: input.connectionId,
+      credentialId: createdCredential.id,
+      slotKey: input.slotKey,
+    });
+  } finally {
+    unwrappedOrganizationCredentialKey.fill(0);
+  }
+}
+
 type PersistedWebhookWorkflowRun = {
   id: string;
   workflowName: string;
@@ -250,49 +417,24 @@ async function listWebhookWorkflowRuns(input: {
 describe("integration webhooks ingest integration", () => {
   it("accepts a valid GitHub webhook and stores the event", async ({ fixture }) => {
     const targetKey = "github-cloud-webhook-ingest-success";
-    const connectionId = "icn_webhook_ingest_success";
     const webhookSecret = "whsec_test_valid";
     const externalDeliveryId = "delivery_success_1";
-    const authenticatedSession = await fixture.authSession({
+    await ensureGitHubTarget({
+      fixture,
+      targetKey,
+    });
+    const { connectionId, endpointKey, organizationId } = await createGitHubWebhookConnection({
+      fixture,
+      targetKey,
       email: "integration-webhooks-ingest-success@example.com",
-    });
-
-    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const encryptedTargetSecrets = encryptIntegrationTargetSecrets({
-      secrets: {
-        webhook_secret: webhookSecret,
-      },
-      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-      masterEncryptionKeyMaterial,
-    });
-    await fixture.db.insert(integrationTargets).values({
-      targetKey,
-      familyId: "github",
-      variantId: "github-cloud",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.github.com",
-        web_base_url: "https://github.com",
-      },
-      secrets: encryptedTargetSecrets,
-    });
-
-    await fixture.db.insert(integrationConnections).values({
-      id: connectionId,
-      organizationId: authenticatedSession.organizationId,
-      targetKey,
       displayName: "Webhook ingest connection",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      externalSubjectId: InstallationId,
-      config: {},
+      installationId: InstallationId,
+      webhookSecret,
     });
 
     const payloadObject = createGitHubWebhookPayload();
     const payload = JSON.stringify(payloadObject);
-    const response = await fixture.request(`/v1/integration/webhooks/${targetKey}`, {
+    const response = await fixture.request(`/v1/integration/webhooks/${targetKey}/${endpointKey}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -325,7 +467,7 @@ describe("integration webhooks ingest integration", () => {
     expect(persistedEvent.providerEventType).toBe("issue_comment");
     expect(persistedEvent.eventType).toBe("github.issue_comment.created");
     expect(persistedEvent.status).toBe("received");
-    expect(persistedEvent.organizationId).toBe(authenticatedSession.organizationId);
+    expect(persistedEvent.organizationId).toBe(organizationId);
     expect(persistedEvent.integrationConnectionId).toBe(connectionId);
     expect(persistedEvent.integrationWebhookSourceId).toBeDefined();
     expect(persistedEvent.payload).toEqual(payloadObject);
@@ -336,11 +478,7 @@ describe("integration webhooks ingest integration", () => {
 
     const persistedSource = await fixture.db.query.integrationWebhookSources.findFirst({
       where: (table, { and, eq }) =>
-        and(
-          eq(table.targetKey, targetKey),
-          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
-          eq(table.integrationConnectionId, connectionId),
-        ),
+        and(eq(table.targetKey, targetKey), eq(table.integrationConnectionId, connectionId)),
     });
 
     expect(persistedSource).toBeDefined();
@@ -367,46 +505,22 @@ describe("integration webhooks ingest integration", () => {
     const targetKey = "github-cloud-webhook-ingest-invalid-signature";
     const webhookSecret = "whsec_expected_secret";
     const externalDeliveryId = "delivery_invalid_signature_1";
-    const authenticatedSession = await fixture.authSession({
+    await ensureGitHubTarget({
+      fixture,
+      targetKey,
+    });
+    const { endpointKey } = await createGitHubWebhookConnection({
+      fixture,
+      targetKey,
       email: "integration-webhooks-ingest-invalid-signature@example.com",
-    });
-
-    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const encryptedTargetSecrets = encryptIntegrationTargetSecrets({
-      secrets: {
-        webhook_secret: webhookSecret,
-      },
-      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-      masterEncryptionKeyMaterial,
-    });
-    await fixture.db.insert(integrationTargets).values({
-      targetKey,
-      familyId: "github",
-      variantId: "github-cloud",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.github.com",
-        web_base_url: "https://github.com",
-      },
-      secrets: encryptedTargetSecrets,
-    });
-
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_webhook_ingest_invalid_signature",
-      organizationId: authenticatedSession.organizationId,
-      targetKey,
       displayName: "Invalid signature connection",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      externalSubjectId: InstallationId,
-      config: {},
+      installationId: InstallationId,
+      webhookSecret,
     });
 
     const payloadObject = createGitHubWebhookPayload();
     const payload = JSON.stringify(payloadObject);
-    const response = await fixture.request(`/v1/integration/webhooks/${targetKey}`, {
+    const response = await fixture.request(`/v1/integration/webhooks/${targetKey}/${endpointKey}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -431,95 +545,68 @@ describe("integration webhooks ingest integration", () => {
     expect(persistedEvent).toBeUndefined();
   });
 
-  it("returns 404 when no active integration connection matches the webhook subject", async ({
+  it("returns 400 when the webhook installation does not match the path-routed connection", async ({
     fixture,
   }) => {
-    const targetKey = "github-cloud-webhook-ingest-missing-connection";
-    const externalDeliveryId = "delivery_missing_connection_1";
-
-    await fixture.db.insert(integrationTargets).values({
+    const targetKey = "github-cloud-webhook-ingest-installation-mismatch";
+    const externalDeliveryId = "delivery_installation_mismatch_1";
+    const webhookSecret = "whsec_mismatch_secret";
+    await ensureGitHubTarget({
+      fixture,
       targetKey,
-      familyId: "github",
-      variantId: "github-cloud",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.github.com",
-        web_base_url: "https://github.com",
-      },
-      secrets: encryptIntegrationTargetSecrets({
-        secrets: {
-          webhook_secret: "whsec_missing_connection",
-        },
-        masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-        masterEncryptionKeyMaterial: resolveMasterEncryptionKeyMaterial({
-          masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-          masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-        }),
-      }),
+    });
+    const { endpointKey } = await createGitHubWebhookConnection({
+      fixture,
+      targetKey,
+      email: "integration-webhooks-ingest-installation-mismatch@example.com",
+      displayName: "Mismatch webhook connection",
+      installationId: "999999",
+      webhookSecret,
     });
 
     const payload = JSON.stringify(createGitHubWebhookPayload());
-    const response = await fixture.request(`/v1/integration/webhooks/${targetKey}`, {
+    const response = await fixture.request(`/v1/integration/webhooks/${targetKey}/${endpointKey}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "x-github-event": GitHubEventTypeHeader,
         "x-github-delivery": externalDeliveryId,
         "x-hub-signature-256": signGitHubWebhookPayload({
-          secret: "whsec_missing_connection",
+          secret: webhookSecret,
           payload,
         }),
       },
       body: payload,
     });
 
-    expect(response.status).toBe(404);
-    const responseBody = IntegrationWebhooksNotFoundResponseSchema.parse(await response.json());
-    expect(responseBody.code).toBe("CONNECTION_NOT_FOUND");
+    expect(response.status).toBe(400);
+    const responseBody = IntegrationWebhooksBadRequestResponseSchema.parse(await response.json());
+    expect(responseBody.code).toBe("INVALID_WEBHOOK_REQUEST");
+
+    const persistedEvent = await fixture.db.query.integrationWebhookEvents.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.targetKey, targetKey), eq(table.externalEventId, externalDeliveryId)),
+    });
+    expect(persistedEvent).toBeUndefined();
   });
 
   it("returns duplicate for repeated external event ids and keeps one stored row", async ({
     fixture,
   }) => {
     const targetKey = "github-cloud-webhook-ingest-duplicate";
-    const connectionId = "icn_webhook_ingest_duplicate";
     const webhookSecret = "whsec_duplicate_secret";
     const externalDeliveryId = "delivery_duplicate_1";
-    const authenticatedSession = await fixture.authSession({
+    await ensureGitHubTarget({
+      fixture,
+      targetKey,
+    });
+    const { connectionId, endpointKey } = await createGitHubWebhookConnection({
+      fixture,
+      targetKey,
       email: "integration-webhooks-ingest-duplicate@example.com",
-    });
-
-    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const encryptedTargetSecrets = encryptIntegrationTargetSecrets({
-      secrets: {
-        webhook_secret: webhookSecret,
-      },
-      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-      masterEncryptionKeyMaterial,
-    });
-    await fixture.db.insert(integrationTargets).values({
-      targetKey,
-      familyId: "github",
-      variantId: "github-cloud",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.github.com",
-        web_base_url: "https://github.com",
-      },
-      secrets: encryptedTargetSecrets,
-    });
-
-    await fixture.db.insert(integrationConnections).values({
-      id: connectionId,
-      organizationId: authenticatedSession.organizationId,
-      targetKey,
       displayName: "Duplicate webhook connection",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      externalSubjectId: InstallationId,
-      config: {},
+      installationId: InstallationId,
+      webhookSecret,
     });
 
     const payload = JSON.stringify(createGitHubWebhookPayload());
@@ -533,22 +620,28 @@ describe("integration webhooks ingest integration", () => {
       }),
     };
 
-    const firstResponse = await fixture.request(`/v1/integration/webhooks/${targetKey}`, {
-      method: "POST",
-      headers,
-      body: payload,
-    });
+    const firstResponse = await fixture.request(
+      `/v1/integration/webhooks/${targetKey}/${endpointKey}`,
+      {
+        method: "POST",
+        headers,
+        body: payload,
+      },
+    );
     expect(firstResponse.status).toBe(202);
     const firstResponseBody = IngestIntegrationWebhookResponseSchema.parse(
       await firstResponse.json(),
     );
     expect(firstResponseBody.status).toBe("received");
 
-    const secondResponse = await fixture.request(`/v1/integration/webhooks/${targetKey}`, {
-      method: "POST",
-      headers,
-      body: payload,
-    });
+    const secondResponse = await fixture.request(
+      `/v1/integration/webhooks/${targetKey}/${endpointKey}`,
+      {
+        method: "POST",
+        headers,
+        body: payload,
+      },
+    );
     expect(secondResponse.status).toBe(202);
     const secondResponseBody = IngestIntegrationWebhookResponseSchema.parse(
       await secondResponse.json(),
@@ -567,11 +660,7 @@ describe("integration webhooks ingest integration", () => {
 
     const persistedSources = await fixture.db.query.integrationWebhookSources.findMany({
       where: (table, { and, eq }) =>
-        and(
-          eq(table.targetKey, targetKey),
-          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
-          eq(table.integrationConnectionId, connectionId),
-        ),
+        and(eq(table.targetKey, targetKey), eq(table.integrationConnectionId, connectionId)),
     });
     expect(persistedSources).toHaveLength(1);
     const [persistedSource] = persistedSources;
@@ -715,6 +804,175 @@ describe("integration webhooks ingest integration", () => {
       "2024-03-09T16:00:00.000Z",
     );
     expect(persistedEvent.sourceOrderKey).toBe("2024-03-09T16:00:00.000Z#1710000000.000100");
+  });
+
+  it("enriches Slack reaction webhooks with thread metadata before storing them", async ({
+    fixture,
+  }) => {
+    const targetKey = "slack-default";
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-webhooks-ingest-slack-reaction@example.com",
+    });
+    const requests: Array<{
+      authorization: string | undefined;
+      pathname: string;
+      search: string;
+    }> = [];
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const server = createServer((request, response) => {
+      const requestUrl = new URL(request.url ?? "/", `http://${host}:${String(port)}`);
+      requests.push({
+        authorization:
+          typeof request.headers.authorization === "string"
+            ? request.headers.authorization
+            : undefined,
+        pathname: requestUrl.pathname,
+        search: requestUrl.search,
+      });
+      response.statusCode = 200;
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          ok: true,
+          messages: [
+            {
+              type: "message",
+              user: "U234",
+              text: "Thread reply",
+              ts: "1710000000.000200",
+              thread_ts: "1710000000.000100",
+            },
+          ],
+        }),
+      );
+    });
+    server.listen(port, host);
+    await once(server, "listening");
+
+    try {
+      await fixture.db
+        .insert(integrationTargets)
+        .values({
+          targetKey,
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            api_base_url: `http://${host}:${String(port)}/api`,
+          },
+        })
+        .onConflictDoUpdate({
+          target: integrationTargets.targetKey,
+          set: {
+            familyId: "slack",
+            variantId: "slack-default",
+            enabled: true,
+            config: {
+              api_base_url: `http://${host}:${String(port)}/api`,
+            },
+          },
+        });
+
+      const createConnectionResponse = await fixture.request(
+        "/v1/integration/connections/slack-default/form",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            displayName: "Slack reactions",
+            methodId: "slack-bot-token",
+            config: {
+              connection_method: "slack-bot-token",
+            },
+            secrets: {
+              botToken: "xoxb-test-bot-token",
+              signingSecret: "slack-signing-secret",
+            },
+          }),
+        },
+      );
+
+      expect(createConnectionResponse.status).toBe(201);
+      const createdConnection = IntegrationConnectionSchema.parse(
+        await createConnectionResponse.json(),
+      );
+
+      const createdSource = await fixture.db.query.integrationWebhookSources.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, authenticatedSession.organizationId),
+            eq(table.integrationConnectionId, createdConnection.id),
+            eq(table.targetKey, targetKey),
+          ),
+      });
+      expect(createdSource).toBeDefined();
+
+      if (createdSource?.endpointKey === undefined) {
+        throw new Error("Expected Slack implicit path-routed webhook source.");
+      }
+
+      const payloadObject = createSlackReactionWebhookPayload();
+      const payload = JSON.stringify(payloadObject);
+      const response = await fixture.request(
+        `/v1/integration/webhooks/${targetKey}/${createdSource.endpointKey}`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-slack-request-timestamp": timestamp,
+            "x-slack-signature": signSlackWebhookPayload({
+              secret: "slack-signing-secret",
+              payload,
+              timestamp,
+            }),
+          },
+          body: payload,
+        },
+      );
+
+      expect(response.status).toBe(202);
+      expect(IngestIntegrationWebhookResponseSchema.parse(await response.json())).toEqual({
+        status: "received",
+      });
+      expect(requests).toEqual([
+        {
+          authorization: "Bearer xoxb-test-bot-token",
+          pathname: "/api/conversations.replies",
+          search: "?channel=C123&ts=1710000000.000200",
+        },
+      ]);
+
+      const persistedEvent = await fixture.db.query.integrationWebhookEvents.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.targetKey, targetKey), eq(table.externalEventId, "Ev125")),
+      });
+
+      expect(persistedEvent).toBeDefined();
+      if (persistedEvent === undefined) {
+        throw new Error("Expected Slack reaction webhook event to be stored.");
+      }
+
+      expect(persistedEvent.integrationConnectionId).toBe(createdConnection.id);
+      expect(persistedEvent.integrationWebhookSourceId).toBe(createdSource.id);
+      expect(persistedEvent.providerEventType).toBe("reaction_added");
+      expect(persistedEvent.eventType).toBe("slack:reaction_added");
+      expect(persistedEvent.payload).toEqual({
+        ...payloadObject,
+        event: {
+          ...createSlackReactionEventPayload(),
+          channel: "C123",
+          [SlackThreadRootTimestampField]: "1710000000.000100",
+        },
+      });
+    } finally {
+      server.close();
+      await once(server, "close");
+    }
   });
 
   it("stores Slack message subtypes outside the slack:message automation path", async ({
@@ -976,6 +1234,14 @@ describe("integration webhooks ingest integration", () => {
         email: "jira@example.com",
       },
     });
+    await createConnectionApiKeyCredential({
+      fixture,
+      organizationId: authenticatedSession.organizationId,
+      familyId: "jira",
+      connectionId,
+      slotKey: "jira.jira-default.jira-personal-api-token.api-key",
+      secret: "jira-personal-token",
+    });
 
     const webhookSecretCredentialId = await createWebhookSecretCredential({
       fixture,
@@ -987,12 +1253,10 @@ describe("integration webhooks ingest integration", () => {
     const [createdSource] = await fixture.db
       .insert(integrationWebhookSources)
       .values({
-        ownerScope: "connection",
         organizationId: authenticatedSession.organizationId,
         integrationConnectionId: connectionId,
         targetKey,
         displayName: "Jira admin webhook",
-        routingStrategy: IntegrationWebhookSourceRoutingStrategies.PATH,
         endpointKey,
         webhookSecretCredentialId,
         status: IntegrationWebhookSourceStatuses.ACTIVE,
@@ -1020,8 +1284,13 @@ describe("integration webhooks ingest integration", () => {
       body: payload,
     });
 
-    expect(response.status).toBe(202);
-    const responseBody = IngestIntegrationWebhookResponseSchema.parse(await response.json());
+    const responseBodyPayload = await response.json();
+    if (response.status !== 202) {
+      throw new Error(
+        `Unexpected status ${response.status}: ${JSON.stringify(responseBodyPayload)}`,
+      );
+    }
+    const responseBody = IngestIntegrationWebhookResponseSchema.parse(responseBodyPayload);
     expect(responseBody).toEqual({
       status: "received",
     });

@@ -2,8 +2,8 @@ import {
   integrationConnections,
   IntegrationConnectionStatuses,
   integrationTargets,
-  IntegrationWebhookSourceOwnerScopes,
 } from "@mistle/db/control-plane";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
   createIntegrationRegistry,
   JiraConnectionMethodIds,
@@ -21,7 +21,7 @@ import {
 import { it } from "./test-context.js";
 
 describe("integration connection webhook sources integration", () => {
-  it("materializes a connection-owned implicit webhook source for target-owned GitHub webhook ingress", async ({
+  it("lists the implicit webhook source created with a GitHub App form connection", async ({
     fixture,
   }) => {
     const targetKey = "github-cloud-implicit-webhook-source";
@@ -39,7 +39,6 @@ describe("integration connection webhook sources integration", () => {
         config: {
           api_base_url: "https://api.github.com",
           web_base_url: "https://github.com",
-          app_slug: "mistle-github-app",
         },
       })
       .onConflictDoUpdate({
@@ -51,31 +50,40 @@ describe("integration connection webhook sources integration", () => {
           config: {
             api_base_url: "https://api.github.com",
             web_base_url: "https://github.com",
-            app_slug: "mistle-github-app",
           },
         },
       });
 
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_github_implicit_webhook_source",
-      organizationId: authenticatedSession.organizationId,
-      targetKey,
-      displayName: "GitHub App Installation",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      externalSubjectId: "12345",
-      config: {
-        connection_method: "github-app-installation",
-        installation_id: "12345",
+    const createConnectionResponse = await fixture.request(
+      "/v1/integration/connections/github-cloud-implicit-webhook-source/form",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "GitHub App Installation",
+          methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          config: {
+            connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+            app_id: "123",
+            app_slug: "mistle-github-app",
+          },
+          secrets: {
+            appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
+            webhookSecret: "github-webhook-secret",
+          },
+        }),
       },
-      targetSnapshotConfig: {
-        apiBaseUrl: "https://api.github.com",
-        webBaseUrl: "https://github.com",
-        appSlug: "mistle-github-app",
-      },
-    });
+    );
+    expect(createConnectionResponse.status).toBe(201);
+    const createdConnection = (await createConnectionResponse.json()) as {
+      id: string;
+    };
 
     const response = await fixture.request(
-      "/v1/integration/connections/icn_github_implicit_webhook_source/webhook-sources",
+      `/v1/integration/connections/${createdConnection.id}/webhook-sources`,
       {
         method: "GET",
         headers: {
@@ -90,17 +98,17 @@ describe("integration connection webhook sources integration", () => {
     expect(body).toHaveLength(1);
     expect(body[0]).toMatchObject({
       targetKey,
-      ownerScope: "connection",
-      integrationConnectionId: "icn_github_implicit_webhook_source",
+      integrationConnectionId: createdConnection.id,
     });
+    expect(body[0]?.callbackUrl).toContain(`/v1/integration/webhooks/${targetKey}/`);
+    expect(body[0]?.endpointKey).toBeTruthy();
 
     const persistedSource = await fixture.db.query.integrationWebhookSources.findFirst({
       where: (table, { and, eq }) =>
         and(
           eq(table.organizationId, authenticatedSession.organizationId),
           eq(table.targetKey, targetKey),
-          eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
-          eq(table.integrationConnectionId, "icn_github_implicit_webhook_source"),
+          eq(table.integrationConnectionId, createdConnection.id),
         ),
     });
 
@@ -108,6 +116,73 @@ describe("integration connection webhook sources integration", () => {
     if (persistedSource === undefined) {
       throw new Error("Expected the connection-owned implicit GitHub webhook source to persist.");
     }
+
+    expect(persistedSource.endpointKey).toBeTruthy();
+  });
+
+  it("does not expose webhook sources for GitHub API key connections", async ({ fixture }) => {
+    const targetKey = "github-cloud-api-key-no-webhooks";
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connection-webhook-sources-github-api-key@example.com",
+    });
+
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey,
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
+          },
+        },
+      });
+
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_github_api_key_no_webhooks",
+      organizationId: authenticatedSession.organizationId,
+      targetKey,
+      displayName: "GitHub API key",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: IntegrationConnectionMethodIds.API_KEY,
+      },
+      targetSnapshotConfig: {
+        apiBaseUrl: "https://api.github.com",
+        webBaseUrl: "https://github.com",
+      },
+    });
+
+    const response = await fixture.request(
+      "/v1/integration/connections/icn_github_api_key_no_webhooks/webhook-sources",
+      {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([]);
+
+    const persistedSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { eq }) => eq(table.integrationConnectionId, "icn_github_api_key_no_webhooks"),
+    });
+    expect(persistedSource).toBeUndefined();
   });
 
   it("rejects Jira webhook source creation for service-account connections", async ({
