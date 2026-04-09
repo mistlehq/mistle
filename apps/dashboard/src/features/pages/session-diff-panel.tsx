@@ -1,7 +1,8 @@
 import { Notice } from "@mistle/ui";
-import { parsePatchFiles } from "@pierre/diffs";
 import { FileDiff, type FileDiffMetadata } from "@pierre/diffs/react";
 import { useMemo } from "react";
+
+import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
 
 const SessionDiffPanelOptions = {
   diffStyle: "unified",
@@ -16,45 +17,6 @@ type SessionDiffPanelProps = {
   summaryLabel: string;
   title?: string;
 };
-
-type ParsedSessionDiff =
-  | {
-      files: readonly FileDiffMetadata[];
-      kind: "parsed";
-    }
-  | {
-      kind: "raw";
-      patch: string;
-      reason: string;
-    };
-
-function buildPatchCacheKey(patch: string): string {
-  return `session-diff-panel:${patch.length}:${patch.slice(0, 64)}`;
-}
-
-function parseSessionDiffPatch(patch: string): ParsedSessionDiff {
-  const normalizedPatch = patch.trim();
-  if (normalizedPatch.length === 0) {
-    return {
-      files: [],
-      kind: "parsed",
-    };
-  }
-
-  try {
-    const parsedPatches = parsePatchFiles(normalizedPatch, buildPatchCacheKey(normalizedPatch));
-    return {
-      files: parsedPatches.flatMap((parsedPatch) => parsedPatch.files),
-      kind: "parsed",
-    };
-  } catch {
-    return {
-      kind: "raw",
-      patch: normalizedPatch,
-      reason: "Failed to parse patch. Showing raw diff output.",
-    };
-  }
-}
 
 function resolveFileDiffPath(fileDiff: FileDiffMetadata): string {
   return resolveRawDiffPath(fileDiff.name || fileDiff.prevName || "");

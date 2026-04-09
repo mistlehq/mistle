@@ -353,7 +353,12 @@ function SessionWorkbenchPageContent(input: {
           onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
           serverRequestPanelEntries: unmatchedServerRequests,
         },
-        cli: { ptyState: workbench.cliPtyState, refitKey: "cli:solo" },
+        cli: {
+          ptyState: workbench.cliPtyState,
+          refitKey: workbench.terminalPanelState.isVisible
+            ? "cli:terminal-open"
+            : "cli:terminal-closed",
+        },
         transitionState: workbench.primaryPanelState.transitionState,
       })}
       onBottomPanelResize={workbench.terminalPanelState.setPanelSize}
