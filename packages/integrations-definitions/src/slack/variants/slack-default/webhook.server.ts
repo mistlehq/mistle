@@ -8,6 +8,7 @@ import type {
   IntegrationWebhookVerifyResult,
 } from "@mistle/integrations-core";
 
+import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
 import type { SlackTargetConfig } from "./target-config-schema.js";
 import type { SlackTargetSecrets } from "./target-secret-schema.js";
 
@@ -51,8 +52,7 @@ function resolveSlackEnvelopeEvent(payload: Record<string, unknown>): Record<str
   return Object.fromEntries(Object.entries(event));
 }
 
-function resolveSlackProviderEventType(payload: Record<string, unknown>): string {
-  const event = resolveSlackEnvelopeEvent(payload);
+function resolveSlackProviderEventTypeFromEvent(event: Record<string, unknown>): string {
   const providerEventType = event.type;
   if (typeof providerEventType !== "string" || providerEventType.trim().length === 0) {
     throw new Error("Slack event payload is missing event.type.");
@@ -61,24 +61,97 @@ function resolveSlackProviderEventType(payload: Record<string, unknown>): string
   return providerEventType.trim();
 }
 
-function resolveSlackNormalizedEventType(providerEventType: string): string {
+function resolveOptionalSlackStringField(
+  input: Readonly<Record<string, unknown>>,
+  key: string,
+): string | undefined {
+  const value = input[key];
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmedValue = value.trim();
+  return trimmedValue.length === 0 ? undefined : trimmedValue;
+}
+
+function resolveSlackMessageSubtype(event: Record<string, unknown>): string | undefined {
+  return resolveOptionalSlackStringField(event, "subtype");
+}
+
+function resolveSlackEventClassification(input: {
+  rawProviderEventType: string;
+  event: Record<string, unknown>;
+}): {
+  providerEventType: string;
+  eventType: string;
+} {
+  const providerEventType = input.rawProviderEventType;
   if (providerEventType === "message") {
-    return "slack:message";
+    const messageSubtype = resolveSlackMessageSubtype(input.event);
+    if (messageSubtype !== undefined) {
+      return {
+        providerEventType: messageSubtype,
+        eventType: `slack:${messageSubtype}`,
+      };
+    }
+
+    return {
+      providerEventType: "message",
+      eventType: "slack:message",
+    };
   }
 
   if (providerEventType === "app_mention") {
-    return "slack:app_mention";
+    return {
+      providerEventType,
+      eventType: "slack:app_mention",
+    };
   }
 
   if (providerEventType === "reaction_added") {
-    return "slack:reaction_added";
+    return {
+      providerEventType,
+      eventType: "slack:reaction_added",
+    };
   }
 
   if (providerEventType === "reaction_removed") {
-    return "slack:reaction_removed";
+    return {
+      providerEventType,
+      eventType: "slack:reaction_removed",
+    };
   }
 
   throw new Error(`Slack event type '${providerEventType}' is not supported.`);
+}
+
+function enrichSlackEventForAutomation(
+  event: Readonly<Record<string, unknown>>,
+  eventType: string,
+): Record<string, unknown> {
+  if (eventType !== "slack:message" && eventType !== "slack:app_mention") {
+    return Object.fromEntries(Object.entries(event));
+  }
+
+  const threadRootTimestamp =
+    resolveOptionalSlackStringField(event, "thread_ts") ??
+    resolveOptionalSlackStringField(event, "ts");
+  if (threadRootTimestamp === undefined) {
+    return Object.fromEntries(Object.entries(event));
+  }
+
+  const existingThreadRootTimestamp = resolveOptionalSlackStringField(
+    event,
+    SlackThreadRootTimestampField,
+  );
+  if (existingThreadRootTimestamp === threadRootTimestamp) {
+    return Object.fromEntries(Object.entries(event));
+  }
+
+  return {
+    ...Object.fromEntries(Object.entries(event)),
+    [SlackThreadRootTimestampField]: threadRootTimestamp,
+  };
 }
 
 function resolveSlackExternalEventId(payload: Record<string, unknown>): string {
@@ -242,11 +315,11 @@ export const SlackWebhookHandler: IntegrationWebhookHandler<
   Record<string, string>
 > = {
   resolveWebhookRequest(input) {
-    const payload = parseSlackJsonPayload(input.rawBody);
-    const requestType = resolveSlackRequestType(payload);
+    const rawPayload = parseSlackJsonPayload(input.rawBody);
+    const requestType = resolveSlackRequestType(rawPayload);
 
     if (requestType === "url_verification") {
-      const challenge = payload.challenge;
+      const challenge = rawPayload.challenge;
       if (typeof challenge !== "string" || challenge.trim().length === 0) {
         throw new Error("Slack URL verification payload is missing challenge.");
       }
@@ -258,7 +331,7 @@ export const SlackWebhookHandler: IntegrationWebhookHandler<
           externalEventId: `url_verification:${challenge.trim()}`,
           providerEventType: "url_verification",
           eventType: "slack:url_verification",
-          payload,
+          payload: rawPayload,
         },
         response: {
           status: 200,
@@ -272,18 +345,31 @@ export const SlackWebhookHandler: IntegrationWebhookHandler<
       throw new Error(`Slack request type '${requestType}' is not supported.`);
     }
 
-    const providerEventType = resolveSlackProviderEventType(payload);
+    const rawEvent = resolveSlackEnvelopeEvent(rawPayload);
+    const rawProviderEventType = resolveSlackProviderEventTypeFromEvent(rawEvent);
+    const classification = resolveSlackEventClassification({
+      rawProviderEventType,
+      event: rawEvent,
+    });
+    const normalizedEventPayload = enrichSlackEventForAutomation(
+      rawEvent,
+      classification.eventType,
+    );
+    const payload = {
+      ...rawPayload,
+      event: normalizedEventPayload,
+    };
     const event: IntegrationWebhookEvent = {
-      externalEventId: resolveSlackExternalEventId(payload),
-      providerEventType,
-      eventType: resolveSlackNormalizedEventType(providerEventType),
+      externalEventId: resolveSlackExternalEventId(rawPayload),
+      providerEventType: classification.providerEventType,
+      eventType: classification.eventType,
       payload,
     };
-    const occurredAt = resolveSlackOccurredAt(payload);
+    const occurredAt = resolveSlackOccurredAt(rawPayload);
     if (occurredAt !== undefined) {
       event.occurredAt = occurredAt;
     }
-    const sourceOrderKey = resolveSlackSourceOrderKey(payload);
+    const sourceOrderKey = resolveSlackSourceOrderKey(rawPayload);
     if (sourceOrderKey !== undefined) {
       event.sourceOrderKey = sourceOrderKey;
     }

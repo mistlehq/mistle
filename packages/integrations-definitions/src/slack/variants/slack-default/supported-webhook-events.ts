@@ -3,6 +3,8 @@ import type {
   IntegrationWebhookPayloadReference,
 } from "@mistle/integrations-core";
 
+import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
+
 const SlackMessagePayloadReferences: readonly IntegrationWebhookPayloadReference[] = [
   {
     path: ["event", "channel"],
@@ -15,6 +17,11 @@ const SlackMessagePayloadReferences: readonly IntegrationWebhookPayloadReference
   {
     path: ["event", "thread_ts"],
     description: "Slack thread timestamp when the message belongs to a thread.",
+  },
+  {
+    path: ["event", SlackThreadRootTimestampField],
+    description:
+      "Normalized Slack thread root timestamp used to group top-level messages and thread replies together.",
   },
   {
     path: ["event", "user"],
@@ -56,7 +63,7 @@ const SlackThreadConversationKeyOption = {
   id: "thread",
   label: "Thread",
   description: "Events from the same Slack thread go to the same conversation.",
-  template: "slack:thread:{{payload.event.channel}}:{{payload.event.thread_ts}}",
+  template: `slack:thread:{{payload.event.channel}}:{{payload.event.${SlackThreadRootTimestampField}}}`,
 };
 
 const SlackReactedMessageConversationKeyOption = {

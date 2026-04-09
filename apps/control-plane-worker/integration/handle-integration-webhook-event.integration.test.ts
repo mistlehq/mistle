@@ -666,6 +666,142 @@ describe("handleIntegrationWebhookEvent integration", () => {
   );
 
   it(
+    "ignores Slack message subtypes when an automation only listens for slack:message",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const organizationId = "org_worker_slack_message_subtype_ignore";
+        const targetKey = "slack-default-worker-message-subtype-ignore";
+        const connectionId = "icn_worker_slack_message_subtype_ignore";
+        const webhookSourceId = "iws_worker_slack_message_subtype_ignore";
+        const webhookEventId = "iwe_worker_slack_message_subtype_ignore";
+        const sandboxProfileId = "sbp_worker_slack_message_subtype_ignore";
+        const automationId = "atm_worker_slack_message_subtype_ignore";
+        const automationTargetId = "atg_worker_slack_message_subtype_ignore";
+
+        await database.db.insert(organizations).values({
+          id: organizationId,
+          name: "Worker Slack Ignore Org",
+          slug: "worker-slack-ignore-org",
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey,
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://slack.com/api",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: connectionId,
+          organizationId,
+          targetKey,
+          displayName: "Worker Slack webhook connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "123456",
+          config: {
+            connection_method: "slack-bot-token",
+          },
+        });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
+        await database.db.insert(sandboxProfiles).values({
+          id: sandboxProfileId,
+          organizationId,
+          displayName: "Worker Slack Ignore Profile",
+          status: "active",
+        });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 3,
+          suffix: "worker_slack_message_subtype_ignore",
+        });
+        await database.db.insert(automations).values({
+          id: automationId,
+          organizationId,
+          kind: AutomationKinds.WEBHOOK,
+          name: "Worker Slack message automation",
+          enabled: true,
+        });
+        await database.db.insert(webhookAutomations).values({
+          automationId,
+          integrationWebhookSourceId: webhookSourceId,
+          eventTypes: ["slack:message"],
+          payloadFilter: null,
+          inputTemplate: "Respond to {{payload.event.text}}",
+          conversationKeyTemplate: "channel-{{payload.event.channel}}",
+          idempotencyKeyTemplate: "{{webhookEvent.externalEventId}}",
+        });
+        await database.db.insert(automationTargets).values({
+          id: automationTargetId,
+          automationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 3,
+        });
+        await database.db.insert(integrationWebhookEvents).values({
+          id: webhookEventId,
+          organizationId,
+          integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
+          targetKey,
+          externalEventId: "evt_slack_message_deleted",
+          providerEventType: "message_deleted",
+          eventType: "slack:message_deleted",
+          payload: {
+            event: {
+              channel: "C123",
+              text: "deleted",
+              subtype: "message_deleted",
+            },
+          },
+          status: IntegrationWebhookEventStatuses.RECEIVED,
+        });
+
+        const workflowOutput = await executeHandleIntegrationWebhookEvent({
+          db: database.db,
+          webhookEventId,
+          enqueueAutomationRuns: async () => {},
+          enqueueResourceSync: async () => {},
+        });
+
+        expect(workflowOutput).toEqual({
+          webhookEventId,
+        });
+
+        const persistedEvent = await database.db.query.integrationWebhookEvents.findFirst({
+          where: (table, { eq }) => eq(table.id, webhookEventId),
+        });
+        expect(persistedEvent).toBeDefined();
+        if (persistedEvent === undefined) {
+          throw new Error("Expected persisted webhook event.");
+        }
+
+        expect(persistedEvent.status).toBe(IntegrationWebhookEventStatuses.IGNORED);
+        expect(persistedEvent.finalizedAt).toBeDefined();
+
+        const queuedRuns = await database.db.query.automationRuns.findMany({
+          where: (table, { eq }) => eq(table.sourceWebhookEventId, webhookEventId),
+        });
+        expect(queuedRuns).toHaveLength(0);
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
     "marks webhook event processed when a resource sync trigger matches without automation targets",
     async ({ fixture }) => {
       const database = await createTestDatabase({

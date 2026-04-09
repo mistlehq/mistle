@@ -589,6 +589,159 @@ describe("handleAutomationRun integration", () => {
   );
 
   it(
+    "prepares Slack thread-grouped automations using the normalized thread root timestamp",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const organizationId = "org_worker_slack_thread_prepare";
+        const sandboxProfileId = "sbp_worker_slack_thread_prepare";
+        const automationId = "atm_worker_slack_thread_prepare";
+        const automationTargetId = "atg_worker_slack_thread_prepare";
+        const webhookEventId = "iwe_worker_slack_thread_prepare";
+        const automationRunId = "aru_worker_slack_thread_prepare";
+        const connectionId = "icn_worker_slack_thread_prepare";
+        const webhookSourceId = "iws_worker_slack_thread_prepare";
+        const targetKey = "slack-default-worker-automation-prepare";
+
+        await database.db.insert(organizations).values({
+          id: organizationId,
+          name: "Worker Slack Thread Prepare",
+          slug: "worker-slack-thread-prepare",
+        });
+        await database.db.insert(sandboxProfiles).values({
+          id: sandboxProfileId,
+          organizationId,
+          displayName: "Slack Thread Prepare Profile",
+          status: "active",
+        });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 7,
+          suffix: "worker_slack_thread_prepare",
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey,
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://slack.com/api",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: connectionId,
+          organizationId,
+          targetKey,
+          displayName: "Worker Slack automation connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "123456",
+          config: {
+            connection_method: "slack-bot-token",
+          },
+        });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
+        await database.db.insert(automations).values({
+          id: automationId,
+          organizationId,
+          kind: AutomationKinds.WEBHOOK,
+          name: "Slack Thread Prepare",
+          enabled: true,
+        });
+        await database.db.insert(webhookAutomations).values({
+          automationId,
+          integrationWebhookSourceId: webhookSourceId,
+          eventTypes: ["slack:message"],
+          payloadFilter: null,
+          inputTemplate: "Handle {{payload.event.text}}",
+          conversationKeyTemplate:
+            "slack:thread:{{payload.event.channel}}:{{payload.event.mistle_thread_root_ts}}",
+          idempotencyKeyTemplate: "{{webhookEvent.externalEventId}}",
+        });
+        await database.db.insert(automationTargets).values({
+          id: automationTargetId,
+          automationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 7,
+        });
+        await database.db.insert(integrationWebhookEvents).values({
+          id: webhookEventId,
+          organizationId,
+          integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
+          targetKey,
+          externalEventId: "evt_slack_thread_prepare",
+          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
+          sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+          providerEventType: "message",
+          eventType: "slack:message",
+          payload: {
+            event: {
+              channel: "C123",
+              ts: "1710000000.000100",
+              mistle_thread_root_ts: "1710000000.000100",
+              text: "@mistlebot prepare",
+            },
+          },
+          status: IntegrationWebhookEventStatuses.PROCESSED,
+        });
+        await database.db.insert(automationRuns).values({
+          id: automationRunId,
+          automationId,
+          automationTargetId,
+          sourceWebhookEventId: webhookEventId,
+          status: AutomationRunStatuses.QUEUED,
+        });
+
+        const preparedRun = await prepareAutomationRun(
+          {
+            db: database.db,
+          },
+          {
+            automationRunId,
+          },
+        );
+        const persistedRun = await database.db.query.automationRuns.findFirst({
+          where: (table, { eq }) => eq(table.id, automationRunId),
+        });
+
+        expect(preparedRun).toMatchObject({
+          automationRunId,
+          automationId,
+          conversationId: expect.stringMatching(/^cnv_/),
+          automationTargetId,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 7,
+          webhookEventId,
+          webhookEventType: "slack:message",
+          webhookProviderEventType: "message",
+          webhookExternalEventId: "evt_slack_thread_prepare",
+          webhookExternalDeliveryId: null,
+          webhookSourceOrderKey: "2026-03-09T00:00:00Z#0001",
+          renderedInput: "Handle @mistlebot prepare",
+          renderedConversationKey: "slack:thread:C123:1710000000.000100",
+          renderedIdempotencyKey: "evt_slack_thread_prepare",
+        });
+        expect(persistedRun?.renderedConversationKey).toBe("slack:thread:C123:1710000000.000100");
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
     "reuses the persisted rendered snapshot when replaying a running run",
     async ({ fixture }) => {
       const database = await createTestDatabase({
