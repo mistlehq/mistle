@@ -35,6 +35,8 @@ export type IntegrationConnectionDetailItem = {
   displayName: string;
   id: string;
   resources: readonly IntegrationConnectionDetailResourceSummary[];
+  setupDescription?: string;
+  setupStatusLabel?: string;
   status: "active" | "error" | "revoked";
   webhookInstructions?: string;
 };
@@ -168,6 +170,9 @@ function ConnectionCard(input: {
                 {formatConnectionStatusLabel(input.connection.status)}
               </Badge>
             )}
+            {input.connection.setupStatusLabel === undefined ? null : (
+              <Badge variant="outline">{input.connection.setupStatusLabel}</Badge>
+            )}
           </div>
           {input.onDeleteConnection && input.connection.canDelete ? (
             <Button
@@ -191,6 +196,9 @@ function ConnectionCard(input: {
           connectionId={input.connection.id}
           onEditApiKey={input.onEditApiKey}
         />
+        {input.connection.setupDescription === undefined ? null : (
+          <Notice title="Setup incomplete">{input.connection.setupDescription}</Notice>
+        )}
       </div>
 
       {input.connection.contextItems === undefined ||

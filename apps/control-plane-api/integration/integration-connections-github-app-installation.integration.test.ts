@@ -207,6 +207,20 @@ describe("integration connections GitHub App installation integration", () => {
       .from(integrationConnectionCredentials)
       .where(eq(integrationConnectionCredentials.connectionId, persistedConnection.id));
     expect(linkedCredentials).toHaveLength(0);
+
+    const persistedWebhookSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.integrationConnectionId, persistedConnection.id),
+        ),
+    });
+    expect(persistedWebhookSource).toBeDefined();
+    if (persistedWebhookSource === undefined) {
+      throw new Error("Expected GitHub App implicit webhook source.");
+    }
+    expect(persistedWebhookSource.endpointKey).toBeTruthy();
+    expect(persistedWebhookSource.routingStrategy).toBe("path");
   });
 
   it("preserves the requested display name when completing GitHub App installation connection creation", async ({

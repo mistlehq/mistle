@@ -121,6 +121,12 @@ export function buildIntegrationConnectionDetailItems(input: {
         ? {}
         : {
             contextItems: githubAppConnectionContext.contextItems,
+            ...(githubAppConnectionContext.setupDescription === undefined
+              ? {}
+              : {
+                  setupDescription: githubAppConnectionContext.setupDescription,
+                  setupStatusLabel: githubAppConnectionContext.setupStatusLabel,
+                }),
             webhookInstructions: githubAppConnectionContext.webhookInstructions,
           }),
       resources: (connection.resources ?? []).map((resource) => ({
@@ -152,6 +158,8 @@ function resolveGitHubAppConnectionContext(
         label: string;
         value: string;
       }[];
+      setupDescription?: string;
+      setupStatusLabel?: string;
       webhookInstructions: string;
     }
   | undefined {
@@ -198,8 +206,15 @@ function resolveGitHubAppConnectionContext(
         value: installationId === null ? "Pending" : installationId,
       },
     ],
+    ...(installationId === null
+      ? {
+          setupDescription:
+            "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
+          setupStatusLabel: "Setup incomplete",
+        }
+      : {}),
     webhookInstructions:
-      "Copy the callback URL into your GitHub App webhook settings before you install the app.",
+      "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
   };
 }
 

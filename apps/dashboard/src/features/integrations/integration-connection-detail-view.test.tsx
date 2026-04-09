@@ -392,8 +392,11 @@ describe("IntegrationConnectionDetailView", () => {
             authMethodLabel: "GitHub App installation",
             status: "active",
             resources: [],
+            setupDescription:
+              "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
+            setupStatusLabel: "Setup incomplete",
             webhookInstructions:
-              "Copy the callback URL into your GitHub App webhook settings before you install the app.",
+              "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
           },
         ]}
         showWebhookSources={true}
@@ -433,10 +436,11 @@ describe("IntegrationConnectionDetailView", () => {
     );
 
     expect(
-      screen.getByText(
-        "Copy the callback URL into your GitHub App webhook settings before you install the app.",
+      screen.getAllByText(
+        "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
       ),
-    ).toBeTruthy();
+    ).toHaveLength(2);
+    expect(screen.getAllByText("Setup incomplete")).toHaveLength(2);
     expect(
       screen.queryByRole("button", { name: "Delete webhook source GitHub App webhook" }),
     ).toBeNull();

@@ -202,11 +202,53 @@ describe("integrations page view model", () => {
         value: "mistle-labs",
       },
     ]);
+    expect(item?.setupStatusLabel).toBeUndefined();
+    expect(item?.setupDescription).toBeUndefined();
     expect(item?.webhookInstructions).toBe(
-      "Copy the callback URL into your GitHub App webhook settings before you install the app.",
+      "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
     );
     expect(item?.resources[0]?.isRefreshing).toBe(true);
     expect(item?.resources[0]?.lastErrorMessage).toBe("Resource sync failed.");
+  });
+
+  it("marks pre-install GitHub App connections as setup incomplete", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_preinstall",
+          targetKey: "github",
+          displayName: "Pre-install GitHub",
+          status: "active",
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle-github-app",
+          },
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.setupStatusLabel).toBe("Setup incomplete");
+    expect(item?.setupDescription).toBe(
+      "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
+    );
+    expect(item?.contextItems).toEqual([
+      {
+        label: "App ID",
+        value: "123",
+      },
+      {
+        label: "App slug",
+        value: "mistle-github-app",
+      },
+      {
+        label: "Installation",
+        value: "Pending",
+      },
+    ]);
   });
 
   it("marks syncing resources as refreshing even without a local pending refresh", () => {

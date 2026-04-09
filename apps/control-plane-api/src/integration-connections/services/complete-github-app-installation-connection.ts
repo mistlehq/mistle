@@ -9,6 +9,10 @@ import {
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
+import {
+  IntegrationWebhookSourceLifecycles,
+  IntegrationWebhookSourceOwnerScopes,
+} from "@mistle/integrations-core";
 import { and, eq, isNull } from "drizzle-orm";
 
 import {
@@ -19,6 +23,7 @@ import {
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import { createRedirectQueryParams, resolveRedirectDisplayName } from "./redirect-flow.js";
 import { resolveGitHubAppInstallationHandlerTargetOrThrow } from "./resolve-github-app-installation-handler.js";
+import { ensureImplicitConnectionWebhookSource } from "./webhook-sources.js";
 
 type CompleteGitHubAppInstallationConnectionInput = {
   targetKey: string;
@@ -232,6 +237,33 @@ export async function completeGitHubAppInstallationConnection(
       } finally {
         unwrappedOrganizationCredentialKey.fill(0);
       }
+    }
+
+    const definition = integrationRegistry.getDefinition({
+      familyId: resolved.target.familyId,
+      variantId: resolved.target.variantId,
+    });
+    const webhookSourceCapability = definition?.webhookSource;
+    if (
+      webhookSourceCapability !== undefined &&
+      webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT &&
+      webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION &&
+      ((await webhookSourceCapability.supportsConnection?.({
+        connection: {
+          id: createdConnection.id,
+          status: createdConnection.status,
+          config: createdConnection.config ?? {},
+        },
+      })) ??
+        true)
+    ) {
+      await ensureImplicitConnectionWebhookSource({
+        db: tx,
+        organizationId: redirectSession.organizationId,
+        connectionId: createdConnection.id,
+        targetKey: input.targetKey,
+        routingStrategy: webhookSourceCapability.routingStrategy,
+      });
     }
 
     return {
