@@ -50,22 +50,17 @@ export const APP_ROUTES = createRoutesFromElements(
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
         <Route element={<HomePage />} handle={ROUTE_HANDLES.dashboard} index />
         <Route
-          element={<RouteOutlet />}
+          element={<SandboxProfilesPage />}
           handle={ROUTE_HANDLES.sandboxProfiles}
           path="sandbox-profiles"
         >
-          <Route element={<SandboxProfilesPage />} index />
-          <Route
-            element={<SandboxProfileEditorPage mode="create" />}
-            handle={ROUTE_HANDLES.sandboxProfilesNew}
-            path="new"
-          />
-          <Route
-            element={<SandboxProfileEditorPage mode="edit" />}
-            handle={ROUTE_HANDLES.sandboxProfilesDetail}
-            path=":profileId"
-          />
+          <Route handle={ROUTE_HANDLES.sandboxProfilesNew} path="new" />
         </Route>
+        <Route
+          element={<SandboxProfileEditorPage mode="edit" />}
+          handle={ROUTE_HANDLES.sandboxProfilesDetail}
+          path="sandbox-profiles/:profileId"
+        />
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.automations} path="automations">
           <Route element={<AutomationsPage />} index />
           <Route

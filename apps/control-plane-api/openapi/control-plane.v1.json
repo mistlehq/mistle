@@ -1132,6 +1132,110 @@
         }
       }
     },
+    "/v1/home": {
+      "get": {
+        "tags": ["Home"],
+        "responses": {
+          "200": {
+            "description": "Get onboarding summary for the authenticated organization.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "onboarding": {
+                      "type": "object",
+                      "properties": {
+                        "hasIntegrations": {
+                          "type": "boolean"
+                        },
+                        "hasProfiles": {
+                          "type": "boolean"
+                        },
+                        "hasUsableProfiles": {
+                          "type": "boolean"
+                        },
+                        "hasStartedSession": {
+                          "type": "boolean"
+                        },
+                        "hasAutomations": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "hasIntegrations",
+                        "hasProfiles",
+                        "hasUsableProfiles",
+                        "hasStartedSession",
+                        "hasAutomations"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["onboarding"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/integration/connections": {
       "get": {
         "tags": ["Integrations"],
