@@ -20,6 +20,13 @@ function createWebhookHandler(input?: {
     | { ok: true; connectionId: string }
     | { ok: false; code: "connection-not-found" | "connection-ambiguous"; message: string };
   verifyResult?: { ok: true } | { ok: false; code: "invalid-signature"; message: string };
+  enrichEventResult?: {
+    externalEventId: string;
+    externalDeliveryId: string;
+    providerEventType: string;
+    eventType: string;
+    payload: Record<string, unknown>;
+  };
   eventType?: string;
   resolveWebhookRequestResult?:
     | {
@@ -78,6 +85,7 @@ function createWebhookHandler(input?: {
         connectionId: CandidateConnection.id,
       },
     verify: () => input?.verifyResult ?? { ok: true },
+    enrichEvent: (hookInput) => input?.enrichEventResult ?? hookInput.event,
   };
 }
 
@@ -357,6 +365,73 @@ describe("webhook helpers", () => {
     });
   });
 
+  it("enriches the verified event before returning it", async () => {
+    const resolvedWebhook = await verifyAndResolveWebhookRequestOrThrow({
+      definition: {
+        familyId: "slack",
+        variantId: "slack-default",
+        webhookHandler: createWebhookHandler({
+          eventType: "slack:reaction_added",
+          enrichEventResult: {
+            externalEventId: "evt_123",
+            externalDeliveryId: "delivery_123",
+            providerEventType: "reaction_added",
+            eventType: "slack:reaction_added",
+            payload: {
+              event: {
+                item: {
+                  channel: "C123",
+                  ts: "1710000000.000100",
+                },
+                channel: "C123",
+                mistle_thread_root_ts: "1710000000.000100",
+              },
+            },
+          },
+        }),
+      },
+      targetKey: "slack_default",
+      target: {
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      connections: [CandidateConnection],
+      resolveConnectionSecrets: () => ({
+        botToken: "xoxb-test-token",
+        signingSecret: "slack-signing-secret",
+      }),
+      webhookSourceSecrets: {
+        source_secret: "unused",
+      },
+      headers: {},
+      rawBody: new Uint8Array(),
+    });
+
+    expect(resolvedWebhook).toEqual({
+      kind: "event",
+      connectionId: CandidateConnection.id,
+      event: {
+        externalEventId: "evt_123",
+        externalDeliveryId: "delivery_123",
+        providerEventType: "reaction_added",
+        eventType: "slack:reaction_added",
+        payload: {
+          event: {
+            item: {
+              channel: "C123",
+              ts: "1710000000.000100",
+            },
+            channel: "C123",
+            mistle_thread_root_ts: "1710000000.000100",
+          },
+        },
+      },
+    });
+  });
+
   it("short-circuits with an immediate response", async () => {
     const resolvedWebhook = await verifyAndResolveWebhookRequestOrThrow({
       definition: {
@@ -373,6 +448,57 @@ describe("webhook helpers", () => {
             },
           },
         }),
+      },
+      targetKey: "slack_default",
+      target: {
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      connections: [CandidateConnection],
+      resolveConnectionSecrets: () => {
+        throw new Error("resolveConnectionSecrets should not be called for immediate responses");
+      },
+      headers: {},
+      rawBody: new Uint8Array(),
+    });
+
+    expect(resolvedWebhook).toEqual({
+      kind: "response",
+      response: {
+        status: 200,
+        contentType: "text/plain",
+        body: "challenge-value",
+      },
+    });
+  });
+
+  it("does not call event enrichment for immediate responses marked as skip", async () => {
+    const resolvedWebhook = await verifyAndResolveWebhookRequestOrThrow({
+      definition: {
+        familyId: "slack",
+        variantId: "slack-default",
+        webhookHandler: {
+          resolveWebhookRequest: () => ({
+            kind: "response",
+            verification: "skip",
+            response: {
+              status: 200,
+              contentType: "text/plain",
+              body: "challenge-value",
+            },
+          }),
+          resolveConnection: () => ({
+            ok: true,
+            connectionId: CandidateConnection.id,
+          }),
+          verify: () => ({ ok: true }),
+          enrichEvent: () => {
+            throw new Error("enrichEvent should not be called for immediate responses");
+          },
+        },
       },
       targetKey: "slack_default",
       target: {

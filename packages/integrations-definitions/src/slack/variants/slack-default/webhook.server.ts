@@ -16,6 +16,16 @@ const SlackSignatureHeaderName = "x-slack-signature";
 const SlackTimestampHeaderName = "x-slack-request-timestamp";
 const SlackSignatureVersion = "v0";
 const SlackTimestampToleranceSeconds = 300;
+const SlackConversationsRepliesPath = "conversations.replies";
+
+type SlackWebhookConnectionSecrets = {
+  botToken?: string;
+  signingSecret?: string;
+};
+
+function cloneSlackRecord(input: object): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(input));
+}
 
 function parseSlackJsonPayload(input: Uint8Array): Record<string, unknown> {
   const decodedBody = new TextDecoder().decode(input);
@@ -130,14 +140,14 @@ function enrichSlackEventForAutomation(
   eventType: string,
 ): Record<string, unknown> {
   if (eventType !== "slack:message" && eventType !== "slack:app_mention") {
-    return Object.fromEntries(Object.entries(event));
+    return cloneSlackRecord(event);
   }
 
   const threadRootTimestamp =
     resolveOptionalSlackStringField(event, "thread_ts") ??
     resolveOptionalSlackStringField(event, "ts");
   if (threadRootTimestamp === undefined) {
-    return Object.fromEntries(Object.entries(event));
+    return cloneSlackRecord(event);
   }
 
   const existingThreadRootTimestamp = resolveOptionalSlackStringField(
@@ -145,12 +155,155 @@ function enrichSlackEventForAutomation(
     SlackThreadRootTimestampField,
   );
   if (existingThreadRootTimestamp === threadRootTimestamp) {
-    return Object.fromEntries(Object.entries(event));
+    return cloneSlackRecord(event);
   }
 
   return {
-    ...Object.fromEntries(Object.entries(event)),
+    ...cloneSlackRecord(event),
     [SlackThreadRootTimestampField]: threadRootTimestamp,
+  };
+}
+
+function resolveSlackReactionItem(input: Readonly<Record<string, unknown>>): {
+  channel: string;
+  ts: string;
+} {
+  const item = input.item;
+  if (typeof item !== "object" || item === null || Array.isArray(item)) {
+    throw new Error("Slack reaction event is missing item.");
+  }
+
+  const normalizedItem = cloneSlackRecord(item);
+  const itemType = resolveOptionalSlackStringField(normalizedItem, "type");
+  if (itemType !== "message") {
+    throw new Error(`Slack reaction item type '${itemType ?? "unknown"}' is not supported.`);
+  }
+
+  const channel = resolveOptionalSlackStringField(normalizedItem, "channel");
+  if (channel === undefined) {
+    throw new Error("Slack reaction event is missing item.channel.");
+  }
+
+  const ts = resolveOptionalSlackStringField(normalizedItem, "ts");
+  if (ts === undefined) {
+    throw new Error("Slack reaction event is missing item.ts.");
+  }
+
+  return {
+    channel,
+    ts,
+  };
+}
+
+function buildSlackConversationsRepliesUrl(input: {
+  apiBaseUrl: string;
+  channel: string;
+  ts: string;
+}): URL {
+  const apiUrl = new URL(input.apiBaseUrl);
+  apiUrl.pathname = `${apiUrl.pathname === "/" ? "" : apiUrl.pathname}/${SlackConversationsRepliesPath}`;
+  apiUrl.searchParams.set("channel", input.channel);
+  apiUrl.searchParams.set("ts", input.ts);
+  return apiUrl;
+}
+
+async function fetchSlackConversationThreadRootTimestamp(input: {
+  apiBaseUrl: string;
+  botToken: string;
+  channel: string;
+  ts: string;
+}): Promise<string> {
+  const response = await fetch(buildSlackConversationsRepliesUrl(input), {
+    method: "GET",
+    headers: {
+      authorization: `Bearer ${input.botToken}`,
+      accept: "application/json",
+    },
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Slack conversations.replies request failed with status ${String(response.status)}.`,
+    );
+  }
+
+  const payload: unknown = await response.json();
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    throw new Error("Slack conversations.replies response must be a JSON object.");
+  }
+
+  const normalizedPayload = cloneSlackRecord(payload);
+  if (normalizedPayload.ok !== true) {
+    const slackError = resolveOptionalSlackStringField(normalizedPayload, "error");
+    throw new Error(
+      `Slack conversations.replies returned an error${slackError === undefined ? "." : `: ${slackError}.`}`,
+    );
+  }
+
+  const messages = normalizedPayload.messages;
+  if (!Array.isArray(messages)) {
+    throw new Error("Slack conversations.replies response is missing messages.");
+  }
+
+  const reactedMessage = messages.find((message): message is Record<string, unknown> => {
+    if (typeof message !== "object" || message === null || Array.isArray(message)) {
+      return false;
+    }
+
+    const normalizedMessage = cloneSlackRecord(message);
+    return resolveOptionalSlackStringField(normalizedMessage, "ts") === input.ts;
+  });
+  if (reactedMessage === undefined) {
+    throw new Error(
+      `Slack conversations.replies did not return message '${input.ts}' for channel '${input.channel}'.`,
+    );
+  }
+
+  const threadRootTimestamp =
+    resolveOptionalSlackStringField(reactedMessage, "thread_ts") ??
+    resolveOptionalSlackStringField(reactedMessage, "ts");
+  if (threadRootTimestamp === undefined) {
+    throw new Error("Slack replied message is missing ts.");
+  }
+
+  return threadRootTimestamp;
+}
+
+async function enrichSlackReactionEvent(input: {
+  event: IntegrationWebhookEvent;
+  target: {
+    config: SlackTargetConfig;
+  };
+  connectionSecrets: SlackWebhookConnectionSecrets;
+}): Promise<IntegrationWebhookEvent> {
+  const botToken = input.connectionSecrets.botToken;
+  if (typeof botToken !== "string" || botToken.length === 0) {
+    throw new Error("Slack bot token is missing for reaction event enrichment.");
+  }
+
+  const rawEvent = input.event.payload.event;
+  if (typeof rawEvent !== "object" || rawEvent === null || Array.isArray(rawEvent)) {
+    throw new Error("Slack reaction webhook payload is missing event.");
+  }
+
+  const normalizedEvent = cloneSlackRecord(rawEvent);
+  const reactionItem = resolveSlackReactionItem(normalizedEvent);
+  const threadRootTimestamp = await fetchSlackConversationThreadRootTimestamp({
+    apiBaseUrl: input.target.config.apiBaseUrl,
+    botToken,
+    channel: reactionItem.channel,
+    ts: reactionItem.ts,
+  });
+
+  return {
+    ...input.event,
+    payload: {
+      ...input.event.payload,
+      event: {
+        ...normalizedEvent,
+        channel: reactionItem.channel,
+        [SlackThreadRootTimestampField]: threadRootTimestamp,
+      },
+    },
   };
 }
 
@@ -312,7 +465,7 @@ export function verifySlackWebhookSignature(input: {
 export const SlackWebhookHandler: IntegrationWebhookHandler<
   SlackTargetConfig,
   SlackTargetSecrets,
-  Record<string, string>
+  SlackWebhookConnectionSecrets
 > = {
   resolveWebhookRequest(input) {
     const rawPayload = parseSlackJsonPayload(input.rawBody);
@@ -410,6 +563,20 @@ export const SlackWebhookHandler: IntegrationWebhookHandler<
       timestamp,
       signature,
       rawBody: input.rawBody,
+    });
+  },
+  async enrichEvent(input) {
+    if (
+      input.event.eventType !== "slack:reaction_added" &&
+      input.event.eventType !== "slack:reaction_removed"
+    ) {
+      return input.event;
+    }
+
+    return enrichSlackReactionEvent({
+      event: input.event,
+      target: input.target,
+      connectionSecrets: input.connectionSecrets,
     });
   },
 };
