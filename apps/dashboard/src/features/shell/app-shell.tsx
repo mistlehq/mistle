@@ -19,7 +19,7 @@ import {
 import { resolveAppShellFrame } from "./app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
 import { resolveAppShellRouteState } from "./app-shell-route-state.js";
-import { resolveSidebarModeToggleNavigationTarget } from "./app-shell-sessions-sidebar-mode.js";
+import { resolveSidebarModeEnableNavigationTarget } from "./app-shell-sessions-sidebar-mode.js";
 import { AppShellView } from "./app-shell-view.js";
 import { clearAuthenticatedSessionCache } from "./session-cache.js";
 import { useOrganizationSummary } from "./use-organization-summary.js";
@@ -79,10 +79,12 @@ export function AppShell(): React.JSX.Element {
 
   async function handleSessionsSidebarModeChange(nextChecked: boolean): Promise<void> {
     setShowSessionsSidebar(nextChecked);
-    const navigationTarget = resolveSidebarModeToggleNavigationTarget({
-      nextChecked,
-      pathname: location.pathname,
-    });
+
+    if (!nextChecked) {
+      return;
+    }
+
+    const navigationTarget = resolveSidebarModeEnableNavigationTarget(location.pathname);
 
     if (navigationTarget === null) {
       return;

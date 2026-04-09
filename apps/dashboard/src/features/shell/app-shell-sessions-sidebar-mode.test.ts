@@ -6,7 +6,6 @@ import {
   isSessionsPath,
   resolveSessionsNavHref,
   resolveSidebarModeEnableNavigationTarget,
-  resolveSidebarModeToggleNavigationTarget,
   SessionsRoutes,
 } from "./app-shell-sessions-sidebar-mode.js";
 
@@ -37,15 +36,6 @@ describe("app shell sessions sidebar mode routing", () => {
   it("routes non-session pages into the new-session page when enabling sidebar mode", () => {
     expect(isExistingSandboxSessionPath("/automations")).toBe(false);
     expect(resolveSidebarModeEnableNavigationTarget("/automations")).toBe(SessionsRoutes.NEW);
-  });
-
-  it("does not navigate when toggling sidebar mode off", () => {
-    expect(
-      resolveSidebarModeToggleNavigationTarget({
-        nextChecked: false,
-        pathname: SessionsRoutes.INDEX,
-      }),
-    ).toBeNull();
   });
 
   it("resolves the sessions nav href from the sidebar mode state", () => {

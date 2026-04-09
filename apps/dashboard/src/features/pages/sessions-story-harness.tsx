@@ -19,7 +19,7 @@ import { resolveAppShellFrame } from "../shell/app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
 import { resolveAppShellRouteState } from "../shell/app-shell-route-state.js";
 import {
-  resolveSidebarModeToggleNavigationTarget,
+  resolveSidebarModeEnableNavigationTarget,
   SessionsRoutes,
 } from "../shell/app-shell-sessions-sidebar-mode.js";
 import { AppShellView } from "../shell/app-shell-view.js";
@@ -115,10 +115,12 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     showSessionsSidebar,
     onShowSessionsSidebarChange: (checked) => {
       setShowSessionsSidebar(checked);
-      const navigationTarget = resolveSidebarModeToggleNavigationTarget({
-        nextChecked: checked,
-        pathname: location.pathname,
-      });
+
+      if (!checked) {
+        return;
+      }
+
+      const navigationTarget = resolveSidebarModeEnableNavigationTarget(location.pathname);
 
       if (navigationTarget !== null) {
         void navigate(navigationTarget);

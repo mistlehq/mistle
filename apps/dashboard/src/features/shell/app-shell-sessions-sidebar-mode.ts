@@ -25,14 +25,3 @@ export function resolveSessionsNavHref(showSessionsSidebar: boolean): string {
 export function resolveSidebarModeEnableNavigationTarget(pathname: string): string | null {
   return isExistingSandboxSessionPath(pathname) ? null : SessionsRoutes.NEW;
 }
-
-export function resolveSidebarModeToggleNavigationTarget(input: {
-  nextChecked: boolean;
-  pathname: string;
-}): string | null {
-  if (!input.nextChecked) {
-    return null;
-  }
-
-  return resolveSidebarModeEnableNavigationTarget(input.pathname);
-}
