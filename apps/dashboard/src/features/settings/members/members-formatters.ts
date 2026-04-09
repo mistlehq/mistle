@@ -55,7 +55,7 @@ export function invitationStatusLabel(
 ): string {
   const roleLabel = formatRoleLabel(role);
   if (displayStatus.kind === "pending") {
-    return `${roleLabel} (Invited)`;
+    return roleLabel;
   }
 
   if (displayStatus.kind === "expired") {

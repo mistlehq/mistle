@@ -51,6 +51,10 @@ export function canResendInvitation(displayStatus: InvitationDisplayStatus): boo
   return displayStatus.kind === "pending" || displayStatus.kind === "expired";
 }
 
+export function canRevokeInvitation(displayStatus: InvitationDisplayStatus): boolean {
+  return displayStatus.kind === "pending" || displayStatus.kind === "expired";
+}
+
 export type MembersDirectoryPendingMemberOperation =
   | { kind: "change_role"; memberId: string }
   | { kind: "remove_member"; memberId: string }
@@ -221,12 +225,16 @@ export function buildInvitationActionDescriptors(input: {
     });
   }
 
-  descriptors.push({
-    key: "revoke_invitation",
-    label: revokePending ? INVITATION_PENDING_ACTION_LABEL.revoke_invitation : "Revoke invitation",
-    disabled: invitationActionsDisabled,
-    destructive: true,
-  });
+  if (canRevokeInvitation(input.displayStatus)) {
+    descriptors.push({
+      key: "revoke_invitation",
+      label: revokePending
+        ? INVITATION_PENDING_ACTION_LABEL.revoke_invitation
+        : "Revoke invitation",
+      disabled: invitationActionsDisabled,
+      destructive: true,
+    });
+  }
 
   return descriptors;
 }

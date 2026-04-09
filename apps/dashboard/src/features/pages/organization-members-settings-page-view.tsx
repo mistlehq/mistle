@@ -112,8 +112,8 @@ export function OrganizationMembersSettingsPageView(
           value={props.activeFilter}
         >
           <TabsList variant="line">
-            <TabsTrigger value="members">Members</TabsTrigger>
-            <TabsTrigger value="invitations">Invitations</TabsTrigger>
+            <TabsTrigger value="members">Active</TabsTrigger>
+            <TabsTrigger value="invitations">Invited</TabsTrigger>
           </TabsList>
         </Tabs>
         <Button

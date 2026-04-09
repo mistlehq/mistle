@@ -18,7 +18,6 @@ import { parseRoleSelectValue } from "./members-formatters.js";
 import { clampMembersDirectoryOffset } from "./members-pagination.js";
 import { buildMembersQueryKeys } from "./members-query-keys.js";
 import { defaultMembersSettingsApi, type MembersSettingsApi } from "./members-settings-api.js";
-import { toMembersErrorMessage } from "./members-status-messages.js";
 import { useMembersMutations } from "./use-members-mutations.js";
 import { useMembersQueries } from "./use-members-queries.js";
 
@@ -202,8 +201,4 @@ export function useOrganizationMembersSettingsState(
       await mutations.onInviteCompleted();
     },
   };
-}
-
-export function toMembersLoadErrorMessage(input: { directoryError: unknown }): string {
-  return toMembersErrorMessage(input.directoryError, "Failed to load members.");
 }

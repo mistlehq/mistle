@@ -4,6 +4,7 @@ import {
   buildInvitationActionDescriptors,
   buildMemberActionDescriptors,
   buildMembersDirectoryRows,
+  canRevokeInvitation,
   canResendInvitation,
   formatMembersDirectoryRow,
   isInvitationActionDisabled,
@@ -32,6 +33,15 @@ describe("members directory model", () => {
     expect(canResendInvitation({ kind: "pending" })).toBe(true);
     expect(canResendInvitation({ kind: "expired" })).toBe(true);
     expect(canResendInvitation({ kind: "accepted" })).toBe(false);
+  });
+
+  it("allows revoke only for pending and expired invitations", () => {
+    expect(canRevokeInvitation({ kind: "pending" })).toBe(true);
+    expect(canRevokeInvitation({ kind: "expired" })).toBe(true);
+    expect(canRevokeInvitation({ kind: "accepted" })).toBe(false);
+    expect(canRevokeInvitation({ kind: "rejected" })).toBe(false);
+    expect(canRevokeInvitation({ kind: "revoked" })).toBe(false);
+    expect(canRevokeInvitation({ kind: "canceled" })).toBe(false);
   });
 
   it("disables invitation actions when invite is already processing", () => {
@@ -106,7 +116,7 @@ describe("members directory model", () => {
       kind: "invitation",
       name: "invitee@example.com",
       email: "invitee@example.com",
-      status: "Admin (Invited)",
+      status: "Admin",
       displayStatus: { kind: "pending" },
     });
     expect(rows[1]).toMatchObject({
@@ -195,7 +205,7 @@ describe("members directory model", () => {
     expect(formatMembersDirectoryRow(firstRow)).toMatchObject({
       name: "invitee@example.com",
       email: "invitee@example.com",
-      status: "Member (Invited)",
+      status: "Member",
     });
   });
 
@@ -277,6 +287,24 @@ describe("members directory model", () => {
         label: "Revoke invitation",
         disabled: true,
         destructive: true,
+      },
+    ]);
+  });
+
+  it("hides revoke action for terminal invitation states", () => {
+    const actions = buildInvitationActionDescriptors({
+      displayStatus: { kind: "rejected" },
+      canManageInvitations: true,
+      invitationId: "invite_1",
+      invitationActionState: null,
+    });
+
+    expect(actions).toEqual([
+      {
+        key: "view_details",
+        label: "View details",
+        disabled: false,
+        destructive: false,
       },
     ]);
   });

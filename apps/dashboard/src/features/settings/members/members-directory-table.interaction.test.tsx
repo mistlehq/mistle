@@ -38,10 +38,23 @@ describe("MembersDirectoryTable interaction", () => {
     return render(element);
   }
 
-  it("renders the shared search input", () => {
+  it("renders the shared search input on the active tab", () => {
     renderTable(<MembersDirectoryTable {...baseProps} invitations={[]} members={[]} />);
 
-    expect(screen.getByLabelText("Search members and invitations")).toBeTruthy();
+    expect(screen.getByLabelText("Search")).toBeTruthy();
+  });
+
+  it("renders an invitations-specific search input on the invited tab", () => {
+    renderTable(
+      <MembersDirectoryTable
+        {...baseProps}
+        activeFilter="invitations"
+        invitations={[]}
+        members={[]}
+      />,
+    );
+
+    expect(screen.getByLabelText("Search")).toBeTruthy();
   });
 
   it("opens member actions menu and shows row actions", async () => {

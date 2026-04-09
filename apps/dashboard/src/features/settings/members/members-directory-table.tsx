@@ -59,6 +59,7 @@ export function MembersDirectoryTable(input: {
   return (
     <>
       <MembersDirectoryToolbar
+        activeFilter={input.activeFilter}
         onSearchValueChange={input.onSearchValueChange}
         searchValue={input.searchValue}
       />

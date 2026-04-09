@@ -1,9 +1,7 @@
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { inviteMember } from "../settings/members/members-api.js";
-import {
-  toMembersLoadErrorMessage,
-  useOrganizationMembersSettingsState,
-} from "../settings/members/use-organization-members-settings-state.js";
+import { toMembersLoadErrorMessage } from "../settings/members/members-load-error-message.js";
+import { useOrganizationMembersSettingsState } from "../settings/members/use-organization-members-settings-state.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { OrganizationMembersSettingsPageView } from "./organization-members-settings-page-view.js";
@@ -40,6 +38,7 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
         loadErrorMessage={
           membersState.activeListQuery.isError
             ? toMembersLoadErrorMessage({
+                activeFilter: membersState.activeFilter,
                 directoryError: membersState.activeListQuery.error,
               })
             : null

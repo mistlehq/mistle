@@ -14,13 +14,13 @@ describe("OrganizationMembersSettingsPageView", () => {
     cleanup();
   });
 
-  it("renders members and invitations tabs with a shared invite action", () => {
+  it("renders active and invited tabs with a shared invite action", () => {
     render(
       <OrganizationMembersSettingsPageView {...createOrganizationMembersSettingsPageStoryArgs()} />,
     );
 
-    expect(screen.getByRole("tab", { name: "Members" })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Invitations" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Active" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Invited" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Invite members" })).toBeTruthy();
   });
 
@@ -36,7 +36,7 @@ describe("OrganizationMembersSettingsPageView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Invitations" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Invited" }));
 
     expect(filterChanges).toEqual(["invitations"]);
   });
