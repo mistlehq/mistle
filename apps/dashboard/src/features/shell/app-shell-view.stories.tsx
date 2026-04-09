@@ -1,9 +1,118 @@
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@mistle/ui";
 import { Badge } from "@mistle/ui";
+import { CpuIcon, HouseIcon, LightningIcon } from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useEffect, useState } from "react";
+import { MemoryRouter, NavLink } from "react-router";
 
 import { ErrorNotice } from "../auth/error-notice.js";
+import { SessionsNavToggleItem } from "../navigation/sessions-nav-toggle-item.js";
 import { AppShellView } from "./app-shell-view.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
+
+type AppShellViewStoryArgs = React.ComponentProps<typeof AppShellView> & {
+  locationPathname: string;
+  showSessionsSidebar: boolean;
+};
+
+function HomeNavIcon(props: { className?: string; "aria-hidden"?: boolean }): React.JSX.Element {
+  return <HouseIcon {...props} />;
+}
+
+function SandboxProfilesNavIcon(props: {
+  className?: string;
+  "aria-hidden"?: boolean;
+}): React.JSX.Element {
+  return <CpuIcon {...props} />;
+}
+
+function AutomationsNavIcon(props: {
+  className?: string;
+  "aria-hidden"?: boolean;
+}): React.JSX.Element {
+  return <LightningIcon {...props} />;
+}
+
+function StorySidebarContent(input: {
+  locationPathname: string;
+  showSessionsSidebar: boolean;
+  onShowSessionsSidebarChange: (checked: boolean) => void;
+}): React.JSX.Element {
+  return (
+    <SidebarGroup className="pt-0">
+      <SidebarGroupContent>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={input.locationPathname === "/"}
+              render={<NavLink to="/" />}
+            >
+              <HomeNavIcon aria-hidden className="size-4 shrink-0" />
+              <span>Home</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={
+                input.locationPathname === "/automations" ||
+                input.locationPathname.startsWith("/automations/")
+              }
+              render={<NavLink to="/automations" />}
+            >
+              <AutomationsNavIcon aria-hidden className="size-4 shrink-0" />
+              <span>Automations</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={
+                input.locationPathname === "/sandbox-profiles" ||
+                input.locationPathname.startsWith("/sandbox-profiles/")
+              }
+              render={<NavLink to="/sandbox-profiles" />}
+            >
+              <SandboxProfilesNavIcon aria-hidden className="size-4 shrink-0" />
+              <span>Sandbox Profiles</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SessionsNavToggleItem
+            checked={input.showSessionsSidebar}
+            onCheckedChange={input.onShowSessionsSidebarChange}
+          />
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
+
+function AppShellViewStory(input: AppShellViewStoryArgs): React.JSX.Element {
+  const [showSessionsSidebar, setShowSessionsSidebar] = useState(input.showSessionsSidebar);
+
+  useEffect(() => {
+    setShowSessionsSidebar(input.showSessionsSidebar);
+  }, [input.showSessionsSidebar]);
+
+  return (
+    <MemoryRouter initialEntries={[input.locationPathname]} key={input.locationPathname}>
+      <AppShellView
+        {...input}
+        sidebarContent={
+          <StorySidebarContent
+            locationPathname={input.locationPathname}
+            onShowSessionsSidebarChange={setShowSessionsSidebar}
+            showSessionsSidebar={showSessionsSidebar}
+          />
+        }
+      />
+    </MemoryRouter>
+  );
+}
 
 /**
  * AppShellView owns the outer dashboard shell contract.
@@ -21,7 +130,7 @@ import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
  */
 const meta = {
   title: "Dashboard/Shell/AppShellView",
-  component: AppShellView,
+  component: AppShellViewStory,
   tags: ["autodocs"],
   argTypes: {
     breadcrumbs: {
@@ -38,6 +147,10 @@ const meta = {
       control: false,
       description: "Optional header actions rendered on the right side of the sticky header.",
     },
+    locationPathname: {
+      control: "text",
+      description: "Current in-app pathname used to resolve active sidebar item state.",
+    },
     mainContent: {
       control: false,
       description: "Primary page content rendered inside the shell content region.",
@@ -46,9 +159,13 @@ const meta = {
       control: "boolean",
       description: "Toggles whether the breadcrumb region is shown in the sticky header.",
     },
+    showSessionsSidebar: {
+      control: "boolean",
+      description: "Toggles the real Sessions sidebar mode switch rendered in the sidebar menu.",
+    },
     sidebarContent: {
       control: false,
-      description: "Main sidebar navigation content.",
+      description: "Main sidebar navigation content. The story renders the real dashboard sidebar.",
     },
     sidebarFooterContent: {
       control: false,
@@ -80,6 +197,8 @@ const meta = {
         "contentInsetOwner",
         "viewportMode",
         "showBreadcrumbs",
+        "showSessionsSidebar",
+        "locationPathname",
         "breadcrumbs",
         "headerActions",
         "mainContent",
@@ -99,6 +218,7 @@ const meta = {
         Connected
       </Badge>
     ),
+    locationPathname: "/sessions",
     mainContent: (
       <div className="rounded-xl border bg-card p-6 shadow-xs">
         <h2 className="font-semibold text-lg">Storybook shell preview</h2>
@@ -108,14 +228,8 @@ const meta = {
       </div>
     ),
     showBreadcrumbs: true,
-    sidebarContent: (
-      <div className="space-y-1 px-2">
-        <div className="rounded-md bg-muted px-3 py-2 text-sm">Home</div>
-        <div className="rounded-md px-3 py-2 text-sm">Integrations</div>
-        <div className="rounded-md px-3 py-2 text-sm">Sandbox Profiles</div>
-        <div className="rounded-md px-3 py-2 text-sm">Sessions</div>
-      </div>
-    ),
+    showSessionsSidebar: false,
+    sidebarContent: null,
     sidebarFooterContent: <ErrorNotice message={null} />,
     sidebarHeaderContent: (
       <OrganizationMenuTrigger
@@ -130,7 +244,7 @@ const meta = {
     topLoadingBar: <div className="h-0" />,
     viewportMode: "document",
   },
-} satisfies Meta<typeof AppShellView>;
+} satisfies Meta<AppShellViewStoryArgs>;
 
 export default meta;
 
