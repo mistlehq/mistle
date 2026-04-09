@@ -81,7 +81,7 @@ export function SessionWorkbenchPageView({
         <ResizablePanelGroup
           className="min-h-0 flex-1"
           key={sandboxInstanceId}
-          orientation="vertical"
+          orientation="horizontal"
         >
           <ResizablePanel defaultSize={100 - secondaryPanelSize} minSize={25}>
             <div
