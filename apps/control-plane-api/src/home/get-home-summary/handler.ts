@@ -12,11 +12,13 @@ const routeHandler = async (
 ) => {
   const db = ctx.get("db");
   const dataPlaneClient = ctx.get("dataPlaneClient");
+  const integrationRegistry = ctx.get("integrationRegistry");
 
   const result = await getHomeSummary(
     {
       db,
       dataPlaneClient,
+      integrationRegistry,
     },
     {
       organizationId: session.activeOrganizationId,

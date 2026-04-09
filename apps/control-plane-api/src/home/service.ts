@@ -9,27 +9,11 @@ import {
   sandboxProfiles,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
-import { IntegrationKinds } from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
+import { IntegrationKinds, type IntegrationRegistry } from "@mistle/integrations-core";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { HomeSummaryResponse } from "./schema.js";
-
-const IntegrationRegistry = createIntegrationRegistry();
-const AgentCapableTargetLocators = IntegrationRegistry.listDefinitions()
-  .filter((definition) => definition.kind === IntegrationKinds.AGENT)
-  .map((definition) => ({
-    familyId: definition.familyId,
-    variantId: definition.variantId,
-  }));
-
-const WebhookCapableTargetLocators = IntegrationRegistry.listDefinitions()
-  .filter((definition) => (definition.supportedWebhookEvents?.length ?? 0) > 0)
-  .map((definition) => ({
-    familyId: definition.familyId,
-    variantId: definition.variantId,
-  }));
 
 const HomeSummaryRowSchema = z
   .object({
@@ -43,11 +27,26 @@ export async function getHomeSummary(
   input: {
     db: ControlPlaneDatabase;
     dataPlaneClient: DataPlaneSandboxInstancesClient;
+    integrationRegistry: IntegrationRegistry;
   },
   params: {
     organizationId: string;
   },
 ): Promise<HomeSummaryResponse> {
+  const agentCapableTargetLocators = input.integrationRegistry
+    .listDefinitions()
+    .filter((definition) => definition.kind === IntegrationKinds.AGENT)
+    .map((definition) => ({
+      familyId: definition.familyId,
+      variantId: definition.variantId,
+    }));
+  const webhookCapableTargetLocators = input.integrationRegistry
+    .listDefinitions()
+    .filter((definition) => (definition.supportedWebhookEvents?.length ?? 0) > 0)
+    .map((definition) => ({
+      familyId: definition.familyId,
+      variantId: definition.variantId,
+    }));
   const [agentCapableIntegrationResult, summaryResult, startedSessionResult] = await Promise.all([
     input.db
       .select({
@@ -139,13 +138,13 @@ export async function getHomeSummary(
     },
   );
   const hasAgentCapableIntegrations = agentCapableIntegrationResult.some((row) =>
-    AgentCapableTargetLocators.some(
+    agentCapableTargetLocators.some(
       (targetLocator) =>
         row.familyId === targetLocator.familyId && row.variantId === targetLocator.variantId,
     ),
   );
   const hasWebhookCapableIntegration = agentCapableIntegrationResult.some((row) =>
-    WebhookCapableTargetLocators.some(
+    webhookCapableTargetLocators.some(
       (targetLocator) =>
         row.familyId === targetLocator.familyId && row.variantId === targetLocator.variantId,
     ),
