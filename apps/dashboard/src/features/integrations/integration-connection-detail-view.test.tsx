@@ -477,6 +477,7 @@ describe("IntegrationConnectionDetailView", () => {
       postInstallationSetupLabel.compareDocumentPosition(webhookCallbackLabel) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
+
     fireEvent.click(screen.getByRole("button", { name: "Install GitHub App" }));
     expect(startedGitHubAppInstallationConnectionId).toBe("icn_github_primary");
   });
