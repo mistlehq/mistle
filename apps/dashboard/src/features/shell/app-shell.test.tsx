@@ -33,10 +33,13 @@ describe("resolveAppShellFrame", () => {
       onShowSessionsSidebarChange: () => {},
     });
 
-    expect(isValidElement<{ children: ReactNode[] }>(frame.sidebarContent)).toBe(true);
-    if (!isValidElement<{ children: ReactNode[] }>(frame.sidebarContent)) {
+    expect(isValidElement<{ children: ReactNode[]; className: string }>(frame.sidebarContent)).toBe(
+      true,
+    );
+    if (!isValidElement<{ children: ReactNode[]; className: string }>(frame.sidebarContent)) {
       throw new Error("Expected sidebar content to be a React element.");
     }
+    expect(frame.sidebarContent.props.className).toBe("animate-in fade-in-0 duration-200");
     const sidebarChildren = frame.sidebarContent.props.children;
     expect(Array.isArray(sidebarChildren)).toBe(true);
     const sessionsSidebarElement = sidebarChildren[1];

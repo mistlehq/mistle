@@ -31,6 +31,17 @@ type SessionsStoryHarnessProps = {
   initialEntries: readonly string[];
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
+  sessionsSidebarQueryState?:
+    | {
+        kind: "success";
+      }
+    | {
+        kind: "pending";
+      }
+    | {
+        errorMessage?: string;
+        kind: "error";
+      };
   showSessionsSidebar?: boolean;
 };
 
@@ -42,6 +53,9 @@ export function SessionsStoryHarness(input: SessionsStoryHarnessProps): React.JS
         : {}),
       ...(input.sandboxInstancesList !== undefined
         ? { sandboxInstancesList: input.sandboxInstancesList }
+        : {}),
+      ...(input.sessionsSidebarQueryState !== undefined
+        ? { sessionsSidebarQueryState: input.sessionsSidebarQueryState }
         : {}),
     }),
   );

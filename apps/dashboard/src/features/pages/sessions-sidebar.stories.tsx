@@ -13,6 +13,17 @@ type SessionsSidebarStoryArgs = {
   initialEntries: readonly string[];
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
+  sessionsSidebarQueryState?:
+    | {
+        kind: "success";
+      }
+    | {
+        kind: "pending";
+      }
+    | {
+        errorMessage?: string;
+        kind: "error";
+      };
   showSessionsSidebar?: boolean;
 };
 
@@ -22,6 +33,7 @@ function SessionsSidebarStory(input: SessionsSidebarStoryArgs): React.JSX.Elemen
       initialEntries={input.initialEntries}
       launchableProfiles={input.launchableProfiles}
       sandboxInstancesList={input.sandboxInstancesList}
+      sessionsSidebarQueryState={input.sessionsSidebarQueryState}
       showSessionsSidebar={input.showSessionsSidebar}
     />
   );
@@ -170,6 +182,26 @@ export const NoLaunchableProfiles: Story = {
 };
 
 export const ActivityIndicatorOnly: Story = {};
+
+export const LoadingState: Story = {
+  args: {
+    initialEntries: ["/sessions/new"],
+    sessionsSidebarQueryState: {
+      kind: "pending",
+    },
+    showSessionsSidebar: true,
+  },
+};
+
+export const LoadError: Story = {
+  args: {
+    initialEntries: ["/sessions/new"],
+    sessionsSidebarQueryState: {
+      kind: "error",
+    },
+    showSessionsSidebar: true,
+  },
+};
 
 export const SessionSelected: Story = {
   args: {

@@ -40,7 +40,7 @@ function installMatchMediaStub(): void {
 describe("SessionsNavToggleItem", () => {
   installMatchMediaStub();
 
-  it("routes to the legacy sessions index when sidebar mode is disabled", () => {
+  it("routes to the sessions list page when sidebar mode is disabled", () => {
     renderItem({
       checked: false,
     });
@@ -48,7 +48,7 @@ describe("SessionsNavToggleItem", () => {
     expect(screen.getByRole("link", { name: "Sessions" }).getAttribute("href")).toBe("/sessions");
   });
 
-  it("routes to the sidebar landing page when sidebar mode is enabled", () => {
+  it("routes to the dedicated sessions page when sidebar mode is enabled", () => {
     renderItem({
       checked: true,
     });

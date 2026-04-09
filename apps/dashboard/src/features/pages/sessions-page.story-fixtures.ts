@@ -16,6 +16,18 @@ import type {
   SandboxInstancesListResult,
 } from "../sessions/sessions-types.js";
 
+type SessionsSidebarQueryState =
+  | {
+      kind: "success";
+    }
+  | {
+      kind: "pending";
+    }
+  | {
+      errorMessage?: string;
+      kind: "error";
+    };
+
 function storyOrganizationSummaryQueryKey(
   organizationId: string | null,
 ): readonly ["shell", "organization-summary", string | null] {
@@ -69,6 +81,7 @@ export function buildSandboxInstanceListItemFixture(
 export function createSessionsPageStoryQueryClient(input?: {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
+  sessionsSidebarQueryState?: SessionsSidebarQueryState;
 }): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -102,19 +115,38 @@ export function createSessionsPageStoryQueryClient(input?: {
       totalResults: 0,
     },
   );
-  queryClient.setQueryData(
-    sandboxInstancesListQueryKey({
-      limit: 100,
-      after: null,
-      before: null,
-    }),
-    input?.sandboxInstancesList ?? {
-      items: [],
-      nextPage: null,
-      previousPage: null,
-      totalResults: 0,
-    },
-  );
+  const sessionsSidebarQueryKey = sandboxInstancesListQueryKey({
+    limit: 100,
+    after: null,
+    before: null,
+  });
+  const sessionsSidebarQueryState = input?.sessionsSidebarQueryState ?? {
+    kind: "success",
+  };
+
+  if (sessionsSidebarQueryState.kind === "success") {
+    queryClient.setQueryData(
+      sessionsSidebarQueryKey,
+      input?.sandboxInstancesList ?? {
+        items: [],
+        nextPage: null,
+        previousPage: null,
+        totalResults: 0,
+      },
+    );
+  } else if (sessionsSidebarQueryState.kind === "pending") {
+    queryClient.setQueryDefaults(sessionsSidebarQueryKey, {
+      queryFn: async () => await new Promise<SandboxInstancesListResult>(() => undefined),
+    });
+  } else {
+    queryClient.setQueryDefaults(sessionsSidebarQueryKey, {
+      queryFn: async () => {
+        throw new Error(
+          sessionsSidebarQueryState.errorMessage ?? "Could not load sandbox instances.",
+        );
+      },
+    });
+  }
 
   return queryClient;
 }

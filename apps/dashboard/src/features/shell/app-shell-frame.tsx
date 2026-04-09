@@ -99,13 +99,13 @@ export function resolveAppShellFrame(input: {
     contentInsetOwner: input.pageMeta.appShellInsetOwner,
     showBreadcrumbs,
     sidebarContent: showDedicatedSessionsSidebar ? (
-      <>
+      <div className="animate-in fade-in-0 duration-200">
         <SessionsSidebarHeader
           checked={input.showSessionsSidebar}
           onCheckedChange={input.onShowSessionsSidebarChange}
         />
         <SessionsShellSidebar />
-      </>
+      </div>
     ) : (
       <MainSidebarContent
         locationPathname={input.locationPathname}
