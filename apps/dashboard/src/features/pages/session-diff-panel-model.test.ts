@@ -26,6 +26,16 @@ describe("buildPatchCacheKey", () => {
 });
 
 describe("parseSessionDiffPatch", () => {
+  it("preserves exact patch text in the raw fallback path", () => {
+    const patch = " \ndiff --git this is not a valid patch   \n";
+
+    expect(parseSessionDiffPatch(patch)).toEqual({
+      kind: "raw",
+      patch,
+      reason: "Failed to parse patch. Showing raw diff output.",
+    });
+  });
+
   it("returns raw fallback data for malformed non-empty patches", () => {
     expect(parseSessionDiffPatch("diff --git this is not a valid patch")).toEqual({
       kind: "raw",

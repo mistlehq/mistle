@@ -17,8 +17,7 @@ function buildPatchCacheKey(patch: string): string {
 }
 
 function parseSessionDiffPatch(patch: string): ParsedSessionDiff {
-  const normalizedPatch = patch.trim();
-  if (normalizedPatch.length === 0) {
+  if (patch.length === 0) {
     return {
       files: [],
       kind: "parsed",
@@ -26,17 +25,13 @@ function parseSessionDiffPatch(patch: string): ParsedSessionDiff {
   }
 
   try {
-    const parsedPatches = parsePatchFiles(
-      normalizedPatch,
-      buildPatchCacheKey(normalizedPatch),
-      true,
-    );
+    const parsedPatches = parsePatchFiles(patch, buildPatchCacheKey(patch), true);
     const files = parsedPatches.flatMap((parsedPatch) => parsedPatch.files);
 
     if (files.length === 0) {
       return {
         kind: "raw",
-        patch: normalizedPatch,
+        patch,
         reason: "Failed to parse patch. Showing raw diff output.",
       };
     }
@@ -48,7 +43,7 @@ function parseSessionDiffPatch(patch: string): ParsedSessionDiff {
   } catch {
     return {
       kind: "raw",
-      patch: normalizedPatch,
+      patch,
       reason: "Failed to parse patch. Showing raw diff output.",
     };
   }
