@@ -1,10 +1,12 @@
 import { Button } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import type React from "react";
 import { expect, userEvent, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import type { RoleChangeDialogState } from "../settings/members/members-capability-policy.js";
 import type { MembersDirectoryInvitationActionState } from "../settings/members/members-directory-model.js";
 import { OrganizationMembersSettingsPageView } from "./organization-members-settings-page-view.js";
@@ -18,6 +20,19 @@ const meta = {
   component: OrganizationMembersSettingsPageView,
   decorators: [
     withDashboardPageStory,
+    function QueryClientDecorator(Story): React.JSX.Element {
+      const [queryClient] = useState(() =>
+        createTestQueryClient({
+          retry: false,
+        }),
+      );
+
+      return (
+        <QueryClientProvider client={queryClient}>
+          <Story />
+        </QueryClientProvider>
+      );
+    },
     function HeaderDecorator(Story, context): React.JSX.Element {
       const args = context.args;
 
