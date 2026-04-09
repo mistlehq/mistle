@@ -51,6 +51,14 @@
       "config": {}
     },
     {
+      "targetKey": "slack-default",
+      "enabled": true,
+      "config": {
+        "api_base_url": "https://slack.com/api"
+      },
+      "secrets": {}
+    },
+    {
       "targetKey": "github-cloud",
       "enabled": true,
       "config": {

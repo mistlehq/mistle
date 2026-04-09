@@ -7,7 +7,10 @@ import {
 } from "@mistle/db/control-plane";
 import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { JiraConnectionMethodIds } from "@mistle/integrations-definitions";
+import {
+  JiraConnectionMethodIds,
+  SlackConnectionMethodIds,
+} from "@mistle/integrations-definitions";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
@@ -406,6 +409,88 @@ describe("integration connections create form integration", () => {
     ).toBe("jira-client-secret");
   });
 
+  it("creates Slack bot token connections and the implicit webhook source", async ({ fixture }) => {
+    await upsertSlackTarget({ fixture, targetKey: "slack-default" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-create-slack-bot-token@example.com",
+    });
+
+    const response = await fixture.request("/v1/integration/connections/slack-default/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Slack bot token",
+        methodId: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+        config: {
+          connection_method: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+        },
+        secrets: {
+          botToken: "xoxb-test-bot-token",
+          signingSecret: "slack-signing-secret",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    expect(responseBody.config).toEqual({
+      connection_method: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+    });
+    expect(responseBody.targetSnapshotConfig).toEqual({
+      api_base_url: "https://slack.com/api",
+    });
+
+    const createdLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
+      where: (table, { eq }) => eq(table.connectionId, responseBody.id),
+      orderBy: (table, { asc }) => [asc(table.slotKey)],
+    });
+
+    expect(createdLinks.map((link) => link.slotKey)).toEqual([
+      "slack.slack-default.slack-bot-token.bot-token",
+      "slack.slack-default.slack-bot-token.signing-secret",
+    ]);
+
+    const createdCredentials = await fixture.db.query.integrationCredentials.findMany({
+      where: (table, { and, eq, inArray }) =>
+        and(
+          inArray(
+            table.id,
+            createdLinks.map((link) => link.credentialId),
+          ),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+      orderBy: (table, { asc }) => [asc(table.id)],
+    });
+
+    expect(createdCredentials).toHaveLength(2);
+    expect(createdCredentials.map((credential) => credential.secretKind)).toEqual([
+      IntegrationCredentialSecretKinds.API_KEY,
+      IntegrationCredentialSecretKinds.API_KEY,
+    ]);
+
+    const webhookSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.integrationConnectionId, responseBody.id),
+          eq(table.targetKey, "slack-default"),
+        ),
+    });
+
+    expect(webhookSource).toBeDefined();
+    if (webhookSource === undefined) {
+      throw new Error("Expected Slack implicit webhook source.");
+    }
+
+    expect(webhookSource.endpointKey).toBeDefined();
+    expect(webhookSource.endpointKey?.length).toBeGreaterThan(0);
+    expect(webhookSource.routingStrategy).toBe("path");
+  });
+
   it("returns 400 when Jira personal token config is missing site_url", async ({ fixture }) => {
     await upsertJiraTarget({ fixture, targetKey: "jira-default" });
 
@@ -665,6 +750,34 @@ async function upsertJiraTarget(input: {
         variantId: "jira-default",
         enabled: true,
         config: {},
+      },
+    });
+}
+
+async function upsertSlackTarget(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  targetKey: string;
+}) {
+  await input.fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "slack",
+      variantId: "slack-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://slack.com/api",
+      },
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://slack.com/api",
+        },
       },
     });
 }

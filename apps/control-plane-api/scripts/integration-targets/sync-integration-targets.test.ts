@@ -44,6 +44,13 @@ describe("sync-integration-targets", () => {
         enabled: false,
         config: {},
       },
+      {
+        targetKey: "slack-default",
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: false,
+        config: {},
+      },
     ]);
   });
 });

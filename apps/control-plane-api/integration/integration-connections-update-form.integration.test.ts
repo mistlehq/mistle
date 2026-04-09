@@ -4,7 +4,10 @@ import {
   integrationTargets,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { JiraConnectionMethodIds } from "@mistle/integrations-definitions";
+import {
+  JiraConnectionMethodIds,
+  SlackConnectionMethodIds,
+} from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import { CreateFormConnectionBodySchema } from "../src/integration-connections/create-form-connection/schema.js";
@@ -676,6 +679,101 @@ describe("integration connections update form integration", () => {
       message: `Connection config for method '${JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN}' is invalid.`,
     });
   });
+
+  it("updates Slack bot token connections", async ({ fixture }) => {
+    await upsertSlackTarget({ fixture, targetKey: "slack-default" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-update-slack-bot-token@example.com",
+    });
+
+    const createResponse = await fixture.request("/v1/integration/connections/slack-default/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Slack bot token",
+        methodId: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+        config: {
+          connection_method: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+        },
+        secrets: {
+          botToken: "xoxb-original-bot-token",
+          signingSecret: "original-signing-secret",
+        },
+      }),
+    });
+
+    expect(createResponse.status).toBe(201);
+    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+
+    const previousLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
+      where: (table, { eq }) => eq(table.connectionId, createdConnection.id),
+      orderBy: (table, { asc }) => [asc(table.slotKey)],
+    });
+    expect(previousLinks).toHaveLength(2);
+
+    const updateResponse = await fixture.request(
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/form`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Slack bot token rotated",
+          config: {
+            connection_method: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+          },
+          secrets: {
+            botToken: "xoxb-rotated-bot-token",
+            signingSecret: "rotated-signing-secret",
+          },
+        }),
+      },
+    );
+
+    expect(updateResponse.status).toBe(200);
+    const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
+    expect(updatedConnection.displayName).toBe("Slack bot token rotated");
+    expect(updatedConnection.config).toEqual({
+      connection_method: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+    });
+
+    const updatedLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
+      where: (table, { eq }) => eq(table.connectionId, createdConnection.id),
+      orderBy: (table, { asc }) => [asc(table.slotKey)],
+    });
+
+    expect(updatedLinks).toHaveLength(2);
+    expect(updatedLinks.map((link) => link.slotKey)).toEqual([
+      "slack.slack-default.slack-bot-token.bot-token",
+      "slack.slack-default.slack-bot-token.signing-secret",
+    ]);
+    expect(updatedLinks[0]?.credentialId).not.toBe(previousLinks[0]?.credentialId);
+    expect(updatedLinks[1]?.credentialId).not.toBe(previousLinks[1]?.credentialId);
+
+    const updatedCredentials = await fixture.db.query.integrationCredentials.findMany({
+      where: (table, { and, eq, inArray }) =>
+        and(
+          inArray(
+            table.id,
+            updatedLinks.map((link) => link.credentialId),
+          ),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+      orderBy: (table, { asc }) => [asc(table.id)],
+    });
+
+    expect(updatedCredentials).toHaveLength(2);
+    expect(updatedCredentials.map((credential) => credential.secretKind)).toEqual([
+      IntegrationCredentialSecretKinds.API_KEY,
+      IntegrationCredentialSecretKinds.API_KEY,
+    ]);
+  });
 });
 
 async function upsertOpenAiTarget(input: {
@@ -726,6 +824,34 @@ async function upsertJiraTarget(input: {
         variantId: "jira-default",
         enabled: true,
         config: {},
+      },
+    });
+}
+
+async function upsertSlackTarget(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  targetKey: string;
+}) {
+  await input.fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "slack",
+      variantId: "slack-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://slack.com/api",
+      },
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://slack.com/api",
+        },
       },
     });
 }

@@ -14,6 +14,7 @@ import {
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
+import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
 import {
   IngestIntegrationWebhookResponseSchema,
   IntegrationWebhooksBadRequestResponseSchema,
@@ -80,6 +81,46 @@ function createJiraWebhookPayload(input: { siteUrl: string }): Record<string, un
 function signJiraWebhookPayload(input: { secret: string; payload: string }): string {
   const digest = createHmac("sha256", input.secret).update(input.payload, "utf8").digest("hex");
   return `sha256=${digest}`;
+}
+
+function createSlackMessageWebhookPayload(): Record<string, unknown> {
+  return {
+    token: "verification-token",
+    team_id: "T123",
+    api_app_id: "A123",
+    event: {
+      type: "message",
+      channel: "C123",
+      user: "U123",
+      text: "Hello from Slack",
+      ts: "1710000000.000100",
+      event_ts: "1710000000.000100",
+      thread_ts: "1710000000.000100",
+    },
+    type: "event_callback",
+    event_id: "Ev123",
+    event_time: 1_710_000_000,
+    authed_users: ["U999"],
+  };
+}
+
+function createSlackUrlVerificationPayload(): Record<string, unknown> {
+  return {
+    token: "verification-token",
+    challenge: "challenge-value",
+    type: "url_verification",
+  };
+}
+
+function signSlackWebhookPayload(input: {
+  secret: string;
+  payload: string;
+  timestamp: string;
+}): string {
+  const digest = createHmac("sha256", input.secret)
+    .update(`v0:${input.timestamp}:${input.payload}`, "utf8")
+    .digest("hex");
+  return `v0=${digest}`;
 }
 
 async function createWebhookSecretCredential(input: {
@@ -527,6 +568,230 @@ describe("integration webhooks ingest integration", () => {
       throw new Error("Expected exactly one webhook workflow run.");
     }
     expect(workflowRun.idempotencyKey).toBe(persistedEvent.id);
+  });
+
+  it("accepts a valid Slack path-routed webhook and stores the normalized event", async ({
+    fixture,
+  }) => {
+    const targetKey = "slack-default";
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-webhooks-ingest-slack-message@example.com",
+    });
+
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey,
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://slack.com/api",
+        },
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://slack.com/api",
+          },
+        },
+      });
+
+    const createConnectionResponse = await fixture.request(
+      "/v1/integration/connections/slack-default/form",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Slack Events API",
+          methodId: "slack-bot-token",
+          config: {
+            connection_method: "slack-bot-token",
+          },
+          secrets: {
+            botToken: "xoxb-test-bot-token",
+            signingSecret: "slack-signing-secret",
+          },
+        }),
+      },
+    );
+
+    expect(createConnectionResponse.status).toBe(201);
+    const createdConnection = IntegrationConnectionSchema.parse(
+      await createConnectionResponse.json(),
+    );
+
+    const createdSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.integrationConnectionId, createdConnection.id),
+          eq(table.targetKey, targetKey),
+        ),
+    });
+    expect(createdSource).toBeDefined();
+
+    if (createdSource?.endpointKey === undefined) {
+      throw new Error("Expected Slack implicit path-routed webhook source.");
+    }
+
+    const payloadObject = createSlackMessageWebhookPayload();
+    const payload = JSON.stringify(payloadObject);
+    const response = await fixture.request(
+      `/v1/integration/webhooks/${targetKey}/${createdSource.endpointKey}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-slack-request-timestamp": timestamp,
+          "x-slack-signature": signSlackWebhookPayload({
+            secret: "slack-signing-secret",
+            payload,
+            timestamp,
+          }),
+        },
+        body: payload,
+      },
+    );
+
+    expect(response.status).toBe(202);
+    const responseBody = IngestIntegrationWebhookResponseSchema.parse(await response.json());
+    expect(responseBody).toEqual({
+      status: "received",
+    });
+
+    const persistedEvent = await fixture.db.query.integrationWebhookEvents.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.targetKey, targetKey), eq(table.externalEventId, "Ev123")),
+    });
+
+    expect(persistedEvent).toBeDefined();
+    if (persistedEvent === undefined) {
+      throw new Error("Expected Slack webhook event to be stored.");
+    }
+
+    expect(persistedEvent.integrationConnectionId).toBe(createdConnection.id);
+    expect(persistedEvent.integrationWebhookSourceId).toBe(createdSource.id);
+    expect(persistedEvent.providerEventType).toBe("message");
+    expect(persistedEvent.eventType).toBe("slack:message");
+    expect(persistedEvent.payload).toEqual(payloadObject);
+    expect(new Date(String(persistedEvent.sourceOccurredAt)).toISOString()).toBe(
+      "2024-03-09T16:00:00.000Z",
+    );
+    expect(persistedEvent.sourceOrderKey).toBe("2024-03-09T16:00:00.000Z#1710000000.000100");
+  });
+
+  it("responds to Slack URL verification after signature verification without storing an event", async ({
+    fixture,
+  }) => {
+    const targetKey = "slack-default";
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-webhooks-ingest-slack-url-verification@example.com",
+    });
+
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey,
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://slack.com/api",
+        },
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://slack.com/api",
+          },
+        },
+      });
+
+    const createConnectionResponse = await fixture.request(
+      "/v1/integration/connections/slack-default/form",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Slack URL verification",
+          methodId: "slack-bot-token",
+          config: {
+            connection_method: "slack-bot-token",
+          },
+          secrets: {
+            botToken: "xoxb-test-bot-token",
+            signingSecret: "slack-signing-secret",
+          },
+        }),
+      },
+    );
+
+    expect(createConnectionResponse.status).toBe(201);
+    const createdConnection = IntegrationConnectionSchema.parse(
+      await createConnectionResponse.json(),
+    );
+
+    const createdSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.integrationConnectionId, createdConnection.id),
+          eq(table.targetKey, targetKey),
+        ),
+    });
+    expect(createdSource).toBeDefined();
+
+    if (createdSource?.endpointKey === undefined) {
+      throw new Error("Expected Slack implicit path-routed webhook source.");
+    }
+
+    const payloadObject = createSlackUrlVerificationPayload();
+    const payload = JSON.stringify(payloadObject);
+    const response = await fixture.request(
+      `/v1/integration/webhooks/${targetKey}/${createdSource.endpointKey}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-slack-request-timestamp": timestamp,
+          "x-slack-signature": signSlackWebhookPayload({
+            secret: "slack-signing-secret",
+            payload,
+            timestamp,
+          }),
+        },
+        body: payload,
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("challenge-value");
+
+    const persistedEvents = await fixture.db.query.integrationWebhookEvents.findMany({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.targetKey, targetKey),
+          eq(table.integrationConnectionId, createdConnection.id),
+        ),
+    });
+    expect(persistedEvents).toEqual([]);
   });
 
   it("accepts a valid Jira path-routed webhook and stores the event against the source", async ({
