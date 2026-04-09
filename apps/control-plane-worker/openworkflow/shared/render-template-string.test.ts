@@ -57,6 +57,50 @@ describe("renderTemplateString", () => {
     ).toThrow("undefined variable: comment");
   });
 
+  it("renders the default filter fallback for missing values", () => {
+    const rendered = renderTemplateString({
+      template: "{{payload.event.thread_ts | default: payload.event.ts}}",
+      context: {
+        payload: {
+          event: {
+            ts: "1710000000.000100",
+          },
+        },
+      },
+    });
+
+    expect(rendered).toBe("1710000000.000100");
+  });
+
+  it("renders the default filter fallback for missing nested paths", () => {
+    const rendered = renderTemplateString({
+      template: '{{payload.event.thread_ts | default: "missing-thread"}}',
+      context: {
+        payload: {
+          event: {},
+        },
+      },
+    });
+
+    expect(rendered).toBe("missing-thread");
+  });
+
+  it("keeps existing values instead of the default fallback", () => {
+    const rendered = renderTemplateString({
+      template: "{{payload.event.thread_ts | default: payload.event.ts}}",
+      context: {
+        payload: {
+          event: {
+            thread_ts: "1710000000.000200",
+            ts: "1710000000.000100",
+          },
+        },
+      },
+    });
+
+    expect(rendered).toBe("1710000000.000200");
+  });
+
   it("throws when a placeholder expression is empty", () => {
     expect(() =>
       renderTemplateString({
