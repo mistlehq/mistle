@@ -2255,9 +2255,20 @@ mod tests {
                 .as_bytes(),
             )
             .expect("agent request frame should encode");
+            let request_payload_len = encoded_request.len() - 6;
             websocket
                 .send(Message::Binary(encoded_request.into()))
                 .expect("gateway should send agent request data");
+
+            let request_window = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                request_window,
+                json!({
+                    "type": "stream.window",
+                    "streamId": 7,
+                    "bytes": request_payload_len
+                })
+            );
 
             let agent_response = read_binary_frame(&mut websocket);
             assert_eq!(agent_response.stream_id, 7);
@@ -2670,9 +2681,20 @@ mod tests {
                 .as_bytes(),
             )
             .expect("agent request frame should encode");
+            let request_payload_len = encoded_request.len() - 6;
             websocket
                 .send(Message::Binary(encoded_request.into()))
                 .expect("gateway should send agent request data");
+
+            let request_window = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                request_window,
+                json!({
+                    "type": "stream.window",
+                    "streamId": 7,
+                    "bytes": request_payload_len
+                })
+            );
 
             let agent_response = read_binary_frame(&mut websocket);
             assert_eq!(agent_response.stream_id, 7);
