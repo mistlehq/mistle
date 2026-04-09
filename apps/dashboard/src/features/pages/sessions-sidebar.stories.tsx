@@ -31,10 +31,18 @@ function SessionsSidebarStory(input: SessionsSidebarStoryArgs): React.JSX.Elemen
   return (
     <SessionsStoryHarness
       initialEntries={input.initialEntries}
-      launchableProfiles={input.launchableProfiles}
-      sandboxInstancesList={input.sandboxInstancesList}
-      sessionsSidebarQueryState={input.sessionsSidebarQueryState}
-      showSessionsSidebar={input.showSessionsSidebar}
+      {...(input.launchableProfiles !== undefined
+        ? { launchableProfiles: input.launchableProfiles }
+        : {})}
+      {...(input.sandboxInstancesList !== undefined
+        ? { sandboxInstancesList: input.sandboxInstancesList }
+        : {})}
+      {...(input.sessionsSidebarQueryState !== undefined
+        ? { sessionsSidebarQueryState: input.sessionsSidebarQueryState }
+        : {})}
+      {...(input.showSessionsSidebar !== undefined
+        ? { showSessionsSidebar: input.showSessionsSidebar }
+        : {})}
     />
   );
 }

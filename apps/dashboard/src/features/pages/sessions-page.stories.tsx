@@ -18,8 +18,12 @@ function SessionsPageStory(input: SessionsPageStoryArgs): React.JSX.Element {
   return (
     <SessionsStoryHarness
       initialEntries={["/sessions"]}
-      launchableProfiles={input.launchableProfiles}
-      sandboxInstancesList={input.sandboxInstancesList}
+      {...(input.launchableProfiles !== undefined
+        ? { launchableProfiles: input.launchableProfiles }
+        : {})}
+      {...(input.sandboxInstancesList !== undefined
+        ? { sandboxInstancesList: input.sandboxInstancesList }
+        : {})}
     />
   );
 }
