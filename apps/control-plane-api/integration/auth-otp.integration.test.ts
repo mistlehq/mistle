@@ -224,6 +224,117 @@ describe("auth otp integration", () => {
     expect(capabilities.actorRole).toBe("owner");
   });
 
+  it("switches the active organization for a user who belongs to more than one organization", async ({
+    fixture,
+  }) => {
+    const recipient = `integration-auth-otp-switch-org-${randomUUID()}@example.com`;
+
+    const sendResponse = await sendOTPRequest({
+      fixture,
+      recipient,
+    });
+    expect(sendResponse.status).toBe(200);
+
+    const otp = await readIssuedOtp({
+      fixture,
+      recipient,
+    });
+
+    const signInResponse = await signInWithOTP({
+      fixture,
+      recipient,
+      otp,
+    });
+    expect(signInResponse.status).toBe(200);
+
+    const requestCookie = extractRequestCookie(signInResponse);
+
+    const firstOrganizationResponse = await fixture.request("/v1/auth/organization/create", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: requestCookie,
+      },
+      body: JSON.stringify({
+        name: "First Switch Organization",
+        slug: `integration-switch-first-${randomUUID()}`,
+      }),
+    });
+    expect(firstOrganizationResponse.status).toBe(200);
+
+    const firstOrganizationPayload: unknown = await firstOrganizationResponse
+      .json()
+      .catch(() => null);
+    const firstOrganizationId = readOrganizationIdFromPayload(firstOrganizationPayload);
+    expect(firstOrganizationId).not.toBeNull();
+    if (firstOrganizationId === null) {
+      throw new Error("Expected first organization id.");
+    }
+
+    const secondOrganizationResponse = await fixture.request("/v1/auth/organization/create", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: requestCookie,
+      },
+      body: JSON.stringify({
+        name: "Second Switch Organization",
+        slug: `integration-switch-second-${randomUUID()}`,
+      }),
+    });
+    expect(secondOrganizationResponse.status).toBe(200);
+
+    const secondOrganizationPayload: unknown = await secondOrganizationResponse
+      .json()
+      .catch(() => null);
+    const secondOrganizationId = readOrganizationIdFromPayload(secondOrganizationPayload);
+    expect(secondOrganizationId).not.toBeNull();
+    if (secondOrganizationId === null) {
+      throw new Error("Expected second organization id.");
+    }
+
+    const setActiveOrganizationResponse = await fixture.request(
+      "/v1/auth/organization/set-active",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: requestCookie,
+        },
+        body: JSON.stringify({
+          organizationId: firstOrganizationId,
+        }),
+      },
+    );
+    expect(setActiveOrganizationResponse.status).toBe(200);
+
+    const user = await fixture.db.query.users.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (users, { eq }) => eq(users.email, recipient),
+    });
+    expect(user).toBeDefined();
+    if (user === undefined) {
+      throw new Error("Expected user after organization switching sign-in.");
+    }
+
+    const session = await fixture.db.query.sessions.findFirst({
+      columns: {
+        activeOrganizationId: true,
+      },
+      where: (sessions, { eq }) => eq(sessions.userId, user.id),
+      orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
+    });
+    expect(session).toBeDefined();
+    if (session === undefined) {
+      throw new Error("Expected session after switching active organization.");
+    }
+
+    expect(session.activeOrganizationId).toBe(firstOrganizationId);
+    expect(session.activeOrganizationId).not.toBe(secondOrganizationId);
+  });
+
   it("does not bootstrap an organization for a newly invited user", async ({ fixture }) => {
     const inviterSession = await fixture.authSession({
       email: "integration-auth-otp-pending-invite-sender@example.com",

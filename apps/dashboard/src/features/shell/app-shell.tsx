@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 
@@ -25,7 +25,16 @@ import {
   resolveSidebarModeEnableNavigationTarget,
 } from "./app-shell-sessions-sidebar-mode.js";
 import { AppShellView } from "./app-shell-view.js";
-import { clearAuthenticatedSessionCache } from "./session-cache.js";
+import {
+  fetchOrganizationSwitcherOptions,
+  ORGANIZATION_SWITCHER_QUERY_KEY,
+  switchActiveOrganization,
+} from "./organization-switcher.js";
+import {
+  clearAuthenticatedSessionCache,
+  refreshAuthenticatedSessionAfterOrganizationSwitch,
+} from "./session-cache.js";
+import { fetchSession } from "./session-query.js";
 import { useOrganizationSummary } from "./use-organization-summary.js";
 
 const SESSIONS_SIDEBAR_MODE_STORAGE_KEY = "dashboard.sessions-sidebar.enabled";
@@ -40,7 +49,9 @@ export function AppShell(): React.JSX.Element {
   const previousNonSettingsPathRef = useRef<string>("/");
   const previousSessionsSidebarToggleUrlRef = useRef<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isSwitchingOrganization, setIsSwitchingOrganization] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [switchOrganizationError, setSwitchOrganizationError] = useState<string | null>(null);
   const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
   const [showSessionsSidebar, setShowSessionsSidebar] = useState(() =>
     readSessionsSidebarEnabledPreference(),
@@ -62,6 +73,27 @@ export function AppShell(): React.JSX.Element {
       previousSessionsSidebarToggleUrlRef.current = null;
     }
   }, [routeState.inSessions, showSessionsSidebar]);
+
+  const organizationOptionsQuery = useQuery({
+    queryKey: ORGANIZATION_SWITCHER_QUERY_KEY,
+    queryFn: fetchOrganizationSwitcherOptions,
+    staleTime: 30_000,
+    retry: false,
+    refetchOnWindowFocus: true,
+  });
+
+  const switchOrganizationMutation = useMutation({
+    mutationFn: async (organizationId: string) => {
+      await switchActiveOrganization({
+        organizationId,
+      });
+
+      return refreshAuthenticatedSessionAfterOrganizationSwitch({
+        queryClient,
+        fetchSessionData: fetchSession,
+      });
+    },
+  });
 
   async function handleSignOut(): Promise<void> {
     setSignOutError(null);
@@ -86,6 +118,26 @@ export function AppShell(): React.JSX.Element {
 
   async function handleNavigateToSettings(): Promise<void> {
     await navigate(SETTINGS_DEFAULT_PATH);
+  }
+
+  async function handleSwitchOrganization(organizationId: string): Promise<void> {
+    if (organizationId === organizationSummary.activeOrganizationId) {
+      return;
+    }
+
+    setSwitchOrganizationError(null);
+    setIsSwitchingOrganization(true);
+
+    try {
+      await switchOrganizationMutation.mutateAsync(organizationId);
+      await navigate("/", { replace: true });
+    } catch (error) {
+      setSwitchOrganizationError(
+        error instanceof Error ? error.message : "Unable to switch organization.",
+      );
+    } finally {
+      setIsSwitchingOrganization(false);
+    }
   }
 
   async function handleSessionsSidebarModeChange(nextChecked: boolean): Promise<void> {
@@ -134,6 +186,9 @@ export function AppShell(): React.JSX.Element {
     handleSignOut: () => {
       void handleSignOut();
     },
+    handleSwitchOrganization: (organizationId) => {
+      void handleSwitchOrganization(organizationId);
+    },
     inAutomations: routeState.inAutomations,
     inDashboardRoot: routeState.inDashboardRoot,
     inSandboxProfiles: routeState.inSandboxProfiles,
@@ -141,13 +196,17 @@ export function AppShell(): React.JSX.Element {
     inSessions: routeState.inSessions,
     inSettings: routeState.inSettings,
     isSigningOut,
+    isSwitchingOrganization,
     locationPathname: location.pathname,
-    organizationErrorMessage: organizationSummary.organizationErrorMessage,
+    organizationOptions: organizationOptionsQuery.data ?? [],
+    organizationErrorMessage:
+      switchOrganizationError ?? organizationSummary.organizationErrorMessage,
     organizationImageUrl: createSingletonImageContentUrl({
       resourceName: "Organization logo",
       path: createOrganizationLogoContentPath(organizationSummary.activeOrganizationId),
       image: organizationLogoQuery.data,
     }),
+    activeOrganizationId: organizationSummary.activeOrganizationId,
     organizationName: organizationSummary.organizationName ?? "",
     pageMeta,
     signOutError,
