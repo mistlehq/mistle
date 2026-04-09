@@ -9,12 +9,6 @@ import {
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
 
-export const CompleteGitHubAppInstallationConnectionParamsSchema = z
-  .object({
-    targetKey: z.string().min(1),
-  })
-  .strict();
-
 export const CompleteGitHubAppInstallationConnectionQuerySchema = z
   .object({
     state: z.string().min(1).optional(),
@@ -32,7 +26,6 @@ export const CompleteGitHubAppInstallationConnectionBadRequestResponseSchema = z
     z.enum([
       IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
       IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
-      IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED,
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
@@ -42,4 +35,4 @@ export const CompleteGitHubAppInstallationConnectionBadRequestResponseSchema = z
 ]);
 
 export const CompleteGitHubAppInstallationConnectionNotFoundResponseSchema =
-  createCodeMessageErrorSchema(z.literal(IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND));
+  createCodeMessageErrorSchema(z.literal(IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND));

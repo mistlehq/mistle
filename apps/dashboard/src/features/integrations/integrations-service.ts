@@ -11,6 +11,7 @@ export {
   createFormIntegrationConnection,
   createApiKeyIntegrationConnection,
   deleteIntegrationConnection,
+  startGitHubAppInstallation,
   startRedirectIntegrationConnection,
   updateFormIntegrationConnection,
   updateApiKeyIntegrationConnection,

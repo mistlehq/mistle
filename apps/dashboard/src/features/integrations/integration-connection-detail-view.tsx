@@ -34,8 +34,11 @@ export type IntegrationConnectionDetailItem = {
   }[];
   displayName: string;
   id: string;
+  installActionLabel?: string;
   resources: readonly IntegrationConnectionDetailResourceSummary[];
   setupDescription?: string;
+  setupErrorMessage?: string;
+  setupIsPending?: boolean;
   setupStatusLabel?: string;
   status: "active" | "error" | "revoked";
   webhookInstructions?: string;
@@ -48,6 +51,7 @@ export type IntegrationConnectionDetailViewProps = {
   onDeleteConnection?: (connectionId: string) => void;
   onDeleteWebhookSource?: (input: { connectionId: string; webhookSourceId: string }) => void;
   onEditApiKey?: (connectionId: string) => void;
+  onStartGitHubAppInstallation?: (connectionId: string) => Promise<void> | void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: ReadonlyMap<
     string,
@@ -113,6 +117,9 @@ function ConnectionCardWithOptionalProps(input: {
       {...(input.props.onEditApiKey === undefined
         ? {}
         : { onEditApiKey: input.props.onEditApiKey })}
+      {...(input.props.onStartGitHubAppInstallation === undefined
+        ? {}
+        : { onStartGitHubAppInstallation: input.props.onStartGitHubAppInstallation })}
       {...(input.props.onRefreshResource === undefined
         ? {}
         : { onRefreshResource: input.props.onRefreshResource })}
@@ -143,6 +150,7 @@ function ConnectionCard(input: {
   onDeleteConnection?: (connectionId: string) => void;
   onDeleteWebhookSource?: (input: { connectionId: string; webhookSourceId: string }) => void;
   onEditApiKey?: (connectionId: string) => void;
+  onStartGitHubAppInstallation?: (connectionId: string) => Promise<void> | void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
   showWebhookSources?: boolean;
@@ -195,9 +203,15 @@ function ConnectionCard(input: {
           authMethodLabel={input.connection.authMethodLabel}
           connectionId={input.connection.id}
           onEditApiKey={input.onEditApiKey}
+          onStartGitHubAppInstallation={input.onStartGitHubAppInstallation}
+          setupActionLabel={input.connection.installActionLabel}
+          setupIsPending={input.connection.setupIsPending ?? false}
         />
         {input.connection.setupDescription === undefined ? null : (
           <Notice title="Setup incomplete">{input.connection.setupDescription}</Notice>
+        )}
+        {input.connection.setupErrorMessage === undefined ? null : (
+          <Notice variant="alert">{input.connection.setupErrorMessage}</Notice>
         )}
       </div>
 
@@ -288,6 +302,9 @@ function ConnectionAuthSection(input: {
   authMethodLabel: string | null | undefined;
   connectionId: string;
   onEditApiKey: ((connectionId: string) => void) | undefined;
+  onStartGitHubAppInstallation: ((connectionId: string) => Promise<void> | void) | undefined;
+  setupActionLabel: string | undefined;
+  setupIsPending: boolean;
 }): React.JSX.Element | null {
   if (input.authMethodLabel === undefined || input.authMethodLabel === null) {
     return null;
@@ -325,7 +342,25 @@ function ConnectionAuthSection(input: {
     );
   }
 
-  return <InlineField label="Auth method" value={input.authMethodLabel} />;
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <InlineField label="Auth method" value={input.authMethodLabel} />
+      {input.onStartGitHubAppInstallation === undefined ||
+      input.setupActionLabel === undefined ? null : (
+        <Button
+          disabled={input.setupIsPending}
+          onClick={() => {
+            void input.onStartGitHubAppInstallation?.(input.connectionId);
+          }}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {input.setupIsPending ? "Starting install..." : input.setupActionLabel}
+        </Button>
+      )}
+    </div>
+  );
 }
 
 function InlineField(input: { label: string; value: string }): React.JSX.Element {

@@ -232,6 +232,7 @@ describe("integrations page view model", () => {
     });
 
     expect(item?.setupStatusLabel).toBe("Setup incomplete");
+    expect(item?.installActionLabel).toBe("Install GitHub App");
     expect(item?.setupDescription).toBe(
       "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
     );
@@ -249,6 +250,39 @@ describe("integrations page view model", () => {
         value: "Pending",
       },
     ]);
+  });
+
+  it("includes GitHub App installation mutation state in detail items", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_preinstall",
+          targetKey: "github",
+          displayName: "Pre-install GitHub",
+          status: "active",
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle-github-app",
+          },
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      githubAppInstallationStateByConnectionId: new Map([
+        [
+          "icn_preinstall",
+          {
+            errorMessage: "Could not start GitHub App installation.",
+            isPending: true,
+          },
+        ],
+      ]),
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.setupIsPending).toBe(true);
+    expect(item?.setupErrorMessage).toBe("Could not start GitHub App installation.");
   });
 
   it("marks syncing resources as refreshing even without a local pending refresh", () => {

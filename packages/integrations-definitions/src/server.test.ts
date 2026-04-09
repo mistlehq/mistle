@@ -32,7 +32,6 @@ describe("integrations-definitions server", () => {
       lifecycle: "managed",
     });
     expect(jiraDefinition?.webhookHandler).toBeDefined();
-    expect(githubCloudDefinition?.redirectHandler).toBeDefined();
     expect(githubCloudDefinition?.webhookHandler).toBeDefined();
     expect(githubCloudDefinition?.webhookSource).toMatchObject({
       ownerScope: "connection",
@@ -50,7 +49,6 @@ describe("integrations-definitions server", () => {
         }),
       ]),
     );
-    expect(githubEnterpriseServerDefinition?.redirectHandler).toBeDefined();
     expect(githubEnterpriseServerDefinition?.webhookHandler).toBeDefined();
     expect(githubEnterpriseServerDefinition?.webhookSource).toMatchObject({
       ownerScope: "connection",

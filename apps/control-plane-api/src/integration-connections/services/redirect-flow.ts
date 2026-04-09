@@ -37,6 +37,28 @@ export function resolveRedirectDisplayName(state: string): string | undefined {
   return displayName;
 }
 
+export function encodeGitHubAppInstallationStateMetadata(input: {
+  state: string;
+  connectionId: string;
+}): string {
+  return `${input.state}.${Buffer.from(input.connectionId, "utf8").toString("base64url")}`;
+}
+
+export function resolveGitHubAppInstallationConnectionId(state: string): string {
+  const separatorIndex = state.indexOf(".");
+  if (separatorIndex < 0 || separatorIndex === state.length - 1) {
+    throw new Error("GitHub App installation state is missing connection metadata.");
+  }
+
+  const encodedConnectionId = state.slice(separatorIndex + 1);
+  const connectionId = Buffer.from(encodedConnectionId, "base64url").toString("utf8").trim();
+  if (connectionId.length === 0) {
+    throw new Error("GitHub App installation state contains an empty connection id.");
+  }
+
+  return connectionId;
+}
+
 export function createRedirectQueryParams(query: Record<string, string>): URLSearchParams {
   const params = new URLSearchParams();
 

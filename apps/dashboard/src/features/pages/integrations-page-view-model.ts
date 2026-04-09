@@ -97,6 +97,13 @@ export function resolveEditableConnectionMethodId(
 
 export function buildIntegrationConnectionDetailItems(input: {
   connections: readonly IntegrationConnection[];
+  githubAppInstallationStateByConnectionId?: ReadonlyMap<
+    string,
+    {
+      errorMessage?: string;
+      isPending: boolean;
+    }
+  >;
   refreshingResourceKeys: ReadonlySet<string>;
 }): readonly IntegrationConnectionDetailItem[] {
   return input.connections.map((connection) => {
@@ -104,6 +111,8 @@ export function buildIntegrationConnectionDetailItems(input: {
     const bindingCount = connection.bindingCount ?? 0;
     const automationCount = connection.automationCount ?? 0;
     const githubAppConnectionContext = resolveGitHubAppConnectionContext(connection);
+    const githubAppInstallationState =
+      input.githubAppInstallationStateByConnectionId?.get(connection.id) ?? undefined;
 
     return {
       id: connection.id,
@@ -125,6 +134,13 @@ export function buildIntegrationConnectionDetailItems(input: {
               ? {}
               : {
                   setupDescription: githubAppConnectionContext.setupDescription,
+                  ...(githubAppInstallationState?.errorMessage === undefined
+                    ? {}
+                    : { setupErrorMessage: githubAppInstallationState.errorMessage }),
+                  installActionLabel: githubAppConnectionContext.installActionLabel,
+                  ...(githubAppInstallationState === undefined
+                    ? {}
+                    : { setupIsPending: githubAppInstallationState.isPending }),
                   setupStatusLabel: githubAppConnectionContext.setupStatusLabel,
                 }),
             webhookInstructions: githubAppConnectionContext.webhookInstructions,
@@ -158,6 +174,7 @@ function resolveGitHubAppConnectionContext(
         label: string;
         value: string;
       }[];
+      installActionLabel?: string;
       setupDescription?: string;
       setupStatusLabel?: string;
       webhookInstructions: string;
@@ -208,6 +225,7 @@ function resolveGitHubAppConnectionContext(
     ],
     ...(installationId === null
       ? {
+          installActionLabel: "Install GitHub App",
           setupDescription:
             "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
           setupStatusLabel: "Setup incomplete",

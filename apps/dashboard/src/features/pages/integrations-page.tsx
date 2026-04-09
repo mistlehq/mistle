@@ -37,6 +37,20 @@ export function IntegrationsPage() {
   const webhookSourceState = useIntegrationWebhookSourceState({
     detailConnections: directoryState.selectedDetailConnections,
   });
+  const githubAppInstallationStateByConnectionId = new Map(
+    directoryState.selectedDetailConnections.map((connection) => {
+      const errorMessage =
+        connectionEditors.githubAppInstallation.errorMessageByConnectionId[connection.id];
+
+      return [
+        connection.id,
+        {
+          ...(errorMessage === undefined ? {} : { errorMessage }),
+          isPending: connectionEditors.githubAppInstallation.pendingConnectionId === connection.id,
+        },
+      ] as const;
+    }),
+  );
 
   if (
     detailTargetKey !== null &&
@@ -52,10 +66,12 @@ export function IntegrationsPage() {
       <IntegrationConnectionDetailView
         connections={buildIntegrationConnectionDetailItems({
           connections: directoryState.selectedDetailConnections,
+          githubAppInstallationStateByConnectionId,
           refreshingResourceKeys: directoryState.refreshingResourceKeys,
         })}
         onDeleteConnection={connectionEditors.onDeleteConnection}
         onEditApiKey={connectionEditors.onEditApiKey}
+        onStartGitHubAppInstallation={connectionEditors.githubAppInstallation.onStartInstallation}
         onRefreshResource={directoryState.onRefreshResource}
         resourceItemsByKey={directoryState.resourceItemsByKey}
         webhookSourceStateByConnectionId={webhookSourceState.webhookSourceStateByConnectionId}
