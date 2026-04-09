@@ -8,6 +8,7 @@ import {
   encryptDeviceAuthorizationProviderStateUtf8,
   resolveMasterEncryptionKeyMaterial,
 } from "../../lib/crypto.js";
+import { createPollAfterTimestamp } from "./device-authorization-timing.js";
 import { resolveDeviceAuthorizationCapabilityTargetOrThrow } from "./resolve-device-authorization-capability-target.js";
 
 export type StartDeviceAuthorizationConnectionInput = {
@@ -25,14 +26,6 @@ type StartedDeviceAuthorizationConnection = {
   expiresAt?: string;
   pollAfterMs?: number;
 };
-
-function createPollAfterTimestamp(pollAfterMs: number | undefined): string | null {
-  if (pollAfterMs === undefined) {
-    return null;
-  }
-
-  return new Date(Date.now() + pollAfterMs).toISOString();
-}
 
 async function persistDeviceAuthorizationAttempt(input: {
   db: ControlPlaneDatabase;
@@ -111,7 +104,9 @@ export async function startDeviceAuthorizationConnection(
     masterKeyVersion: ctx.integrationsConfig.activeMasterEncryptionKeyVersion,
     masterEncryptionKeyMaterial,
   });
-  const pollAfterAt = createPollAfterTimestamp(startedAttempt.pollAfterMs);
+  const pollAfterAt = createPollAfterTimestamp({
+    pollAfterMs: startedAttempt.pollAfterMs,
+  });
 
   const attemptId = await persistDeviceAuthorizationAttempt({
     db: ctx.db,

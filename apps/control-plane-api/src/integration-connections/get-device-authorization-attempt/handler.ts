@@ -10,12 +10,16 @@ const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
   { session }: AppSession,
 ) => {
+  const config = ctx.get("config");
   const db = ctx.get("db");
+  const integrationRegistry = ctx.get("integrationRegistry");
   const { attemptId, targetKey } = ctx.req.valid("param");
 
   const attempt = await getDeviceAuthorizationAttempt(
     {
       db,
+      integrationRegistry,
+      integrationsConfig: config.integrations,
     },
     {
       organizationId: session.activeOrganizationId,

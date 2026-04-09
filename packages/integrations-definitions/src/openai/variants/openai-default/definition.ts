@@ -7,10 +7,11 @@ import {
 import { z } from "zod";
 
 import {
+  OpenAiApiKeyConnectionConfigSchema,
+  OpenAiCredentialSlotKeys,
+  resolveOpenAiCredentialSlotKey,
   resolveOpenAiCredentialSecretType,
   type OpenAiConnectionConfig,
-  OpenAiConnectionConfigSchema,
-  OpenAiCredentialSlotKeys,
 } from "./auth.js";
 import {
   OpenAiConnectionConfigForm,
@@ -20,6 +21,8 @@ import {
   OpenAiAllowedRuntimeIds,
   OpenAiApiKeyBindingConfigSchema,
 } from "./binding-config-schema.js";
+import { OpenAiDeviceAuthorizationCapability } from "./device-authorization.js";
+import { OpenAiConnectionMethodIds } from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 import { validateOpenAiBindingWriteContext } from "./validate-binding-write-context.js";
 
@@ -43,7 +46,7 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   variantId: "openai-default",
   kind: IntegrationKinds.AGENT,
   displayName: "OpenAI",
-  description: "Enable OpenAI model access with API key authentication.",
+  description: "Enable OpenAI model access with API key or ChatGPT subscription authentication.",
   logoKey: "openai",
   targetConfigSchema: OpenAiApiKeyTargetConfigSchema,
   targetSecretSchema: OpenAiApiKeyTargetSecretSchema,
@@ -65,11 +68,28 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
           slotKey: OpenAiCredentialSlotKeys.API_KEY,
         },
       ],
-      configSchema: OpenAiConnectionConfigSchema,
+      configSchema: OpenAiApiKeyConnectionConfigSchema,
       configForm: OpenAiConnectionConfigForm,
+    },
+    {
+      id: OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE,
+      label: "ChatGPT subscription",
+      kind: "device-authorization",
+      ui: {
+        create: {
+          submitLabel: "Connect",
+          helperText: "Connect with your ChatGPT subscription using a device code.",
+        },
+        pending: {
+          title: "Approve In ChatGPT",
+          description:
+            "Open the verification link, enter the device code, and approve access in ChatGPT.",
+        },
+      },
     },
   ],
   validateBindingWriteContext: validateOpenAiBindingWriteContext,
+  deviceAuthorization: OpenAiDeviceAuthorizationCapability,
   capabilities: {
     resolveCapabilities: (input) => {
       return {
@@ -81,7 +101,11 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
           credentialResolver: {
             connectionId: input.connection.id,
             secretType: resolveOpenAiCredentialSecretType(input.connection.config),
-            slotKey: OpenAiCredentialSlotKeys.API_KEY,
+            slotKey: resolveOpenAiCredentialSlotKey({
+              familyId: input.target.familyId,
+              variantId: input.target.variantId,
+              connectionConfig: input.connection.config,
+            }),
           },
           allowedMethods: ["GET", "POST"],
           allowedPathPrefixes: ["/"],

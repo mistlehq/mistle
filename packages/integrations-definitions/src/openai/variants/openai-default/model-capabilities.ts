@@ -34,6 +34,7 @@ export type OpenAiModelId = (typeof OpenAiModelIds)[number];
 
 export const OpenAiConnectionMethodIds = {
   API_KEY: "api-key",
+  CHATGPT_DEVICE_CODE: "chatgpt-device-code",
 } as const;
 
 export type OpenAiConnectionMethodId =
