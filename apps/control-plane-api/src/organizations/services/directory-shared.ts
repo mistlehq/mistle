@@ -31,7 +31,7 @@ export function normalizeOrganizationRole(role: string | null): OrganizationRole
     return role;
   }
 
-  return "member";
+  throw new Error(`Unexpected organization role: ${String(role)}`);
 }
 
 export function escapeLikePattern(value: string): string {

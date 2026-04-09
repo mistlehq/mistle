@@ -168,6 +168,25 @@ describe("organization invitations integration", () => {
       ],
       total: 1,
     });
+
+    const memberRoleResponse = await fixture.request(
+      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=member`,
+      {
+        headers: {
+          cookie: ownerSession.cookie,
+        },
+      },
+    );
+    expect(memberRoleResponse.status).toBe(200);
+    await expect(memberRoleResponse.json()).resolves.toMatchObject({
+      invitations: [
+        expect.objectContaining({
+          email: "future-member@example.com",
+          role: "member",
+        }),
+      ],
+      total: 1,
+    });
   });
 
   it("fails when invitations contain an unexpected status", async ({ fixture }) => {
@@ -187,6 +206,39 @@ describe("organization invitations integration", () => {
       role: "member",
       inviterId: ownerSession.userId,
       status: "queued",
+      expiresAt: new Date("3026-03-10T00:00:00.000Z"),
+      createdAt: new Date("2026-03-04T00:00:00.000Z"),
+    });
+
+    const response = await fixture.request(
+      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=`,
+      {
+        headers: {
+          cookie: ownerSession.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(500);
+  });
+
+  it("fails when invitations contain an unexpected role", async ({ fixture }) => {
+    const ownerSession = await fixture.authSession({
+      email: "integration-org-invitations-invalid-role@example.com",
+    });
+
+    await fixture.db
+      .update(users)
+      .set({
+        name: "Org Owner",
+      })
+      .where(eq(users.id, ownerSession.userId));
+    await fixture.db.insert(invitations).values({
+      organizationId: ownerSession.organizationId,
+      email: "broken-role-invite@example.com",
+      role: null,
+      inviterId: ownerSession.userId,
+      status: "pending",
       expiresAt: new Date("3026-03-10T00:00:00.000Z"),
       createdAt: new Date("2026-03-04T00:00:00.000Z"),
     });
