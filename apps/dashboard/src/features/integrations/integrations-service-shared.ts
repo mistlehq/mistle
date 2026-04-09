@@ -318,6 +318,55 @@ export const StartedRedirectConnectionSchema = z
   })
   .strict();
 
+export const StartedDeviceAuthorizationConnectionSchema = z
+  .object({
+    attemptId: z.string().min(1),
+    status: z.literal("pending"),
+    verificationUrl: z.url(),
+    userCode: z.string().min(1),
+    expiresAt: z.string().min(1).optional(),
+    pollAfterMs: z.number().int().min(0).optional(),
+  })
+  .strict();
+
+export const DeviceAuthorizationAttemptResponseSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      attemptId: z.string().min(1),
+      status: z.literal("pending"),
+      verificationUrl: z.url(),
+      userCode: z.string().min(1),
+      expiresAt: z.string().min(1).optional(),
+      pollAfterMs: z.number().int().min(0).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      attemptId: z.string().min(1),
+      status: z.literal("completed"),
+      connectionId: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      attemptId: z.string().min(1),
+      status: z.literal("failed"),
+      error: z
+        .object({
+          code: z.string().min(1),
+          message: z.string().min(1),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      attemptId: z.string().min(1),
+      status: z.literal("cancelled"),
+    })
+    .strict(),
+]);
+
 export const DeletedIntegrationConnectionSchema = z
   .object({
     connectionId: z.string().min(1),
@@ -338,6 +387,12 @@ export type CreatedIntegrationWebhookSource = z.infer<typeof CreatedIntegrationW
 export type CreatedIntegrationConnection = z.infer<typeof IntegrationConnectionSchema>;
 export type DeletedIntegrationConnection = z.infer<typeof DeletedIntegrationConnectionSchema>;
 export type StartedRedirectConnection = z.infer<typeof StartedRedirectConnectionSchema>;
+export type StartedDeviceAuthorizationConnection = z.infer<
+  typeof StartedDeviceAuthorizationConnectionSchema
+>;
+export type DeviceAuthorizationAttemptResponse = z.infer<
+  typeof DeviceAuthorizationAttemptResponseSchema
+>;
 export type IntegrationConnectionResources = Omit<
   z.infer<typeof IntegrationConnectionResourcesPageSchema>,
   "items" | "page"

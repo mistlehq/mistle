@@ -1,6 +1,12 @@
 export function resolveConnectionMethodId(
   config: Record<string, unknown> | null,
-): "api-key" | "oauth2-authorization-code" | "github-app-installation" | "slack-bot-token" | null {
+):
+  | "api-key"
+  | "oauth2-authorization-code"
+  | "github-app-installation"
+  | "slack-bot-token"
+  | "chatgpt-device-code"
+  | null {
   if (config === null) {
     return null;
   }
@@ -18,6 +24,9 @@ export function resolveConnectionMethodId(
   if (connectionMethod === "slack-bot-token") {
     return "slack-bot-token";
   }
+  if (connectionMethod === "chatgpt-device-code") {
+    return "chatgpt-device-code";
+  }
   return null;
 }
 
@@ -26,7 +35,8 @@ export function formatConnectionMethodLabel(
     | "api-key"
     | "oauth2-authorization-code"
     | "github-app-installation"
-    | "slack-bot-token",
+    | "slack-bot-token"
+    | "chatgpt-device-code",
 ): string {
   if (connectionMethod === "api-key") {
     return "API key";
@@ -36,6 +46,9 @@ export function formatConnectionMethodLabel(
   }
   if (connectionMethod === "slack-bot-token") {
     return "Bot token";
+  }
+  if (connectionMethod === "chatgpt-device-code") {
+    return "ChatGPT subscription";
   }
   return "GitHub App installation";
 }

@@ -2,12 +2,16 @@ import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 
 import { requestControlPlane } from "../api/request-control-plane.js";
 import {
+  type DeviceAuthorizationAttemptResponse,
   type CreatedIntegrationConnection,
   type DeletedIntegrationConnection,
   type IntegrationConnectionMethod,
   type StartedRedirectConnection,
+  type StartedDeviceAuthorizationConnection,
+  DeviceAuthorizationAttemptResponseSchema,
   DeletedIntegrationConnectionSchema,
   IntegrationConnectionSchema,
+  StartedDeviceAuthorizationConnectionSchema,
   StartedRedirectConnectionSchema,
   readJsonWithSchema,
   wrapIntegrationsApiError,
@@ -194,6 +198,87 @@ export async function startRedirectIntegrationConnection(input: {
       operation: "startRedirectIntegrationConnection",
       error,
       fallbackMessage: "Could not start integration connection.",
+    });
+  }
+}
+
+export async function startDeviceAuthorizationIntegrationConnection(input: {
+  targetKey: string;
+  methodId: IntegrationConnectionMethod["id"];
+  displayName?: string;
+}): Promise<StartedDeviceAuthorizationConnection> {
+  try {
+    const response = await requestControlPlane({
+      operation: "startDeviceAuthorizationIntegrationConnection",
+      method: "POST",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/device-authorization/start`,
+      body: {
+        methodId: input.methodId,
+        ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
+      },
+      fallbackMessage: "Could not start integration connection.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: StartedDeviceAuthorizationConnectionSchema,
+      operation: "startDeviceAuthorizationIntegrationConnection",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "startDeviceAuthorizationIntegrationConnection",
+      error,
+      fallbackMessage: "Could not start integration connection.",
+    });
+  }
+}
+
+export async function getDeviceAuthorizationAttempt(input: {
+  attemptId: string;
+}): Promise<DeviceAuthorizationAttemptResponse> {
+  try {
+    const response = await requestControlPlane({
+      operation: "getDeviceAuthorizationAttempt",
+      method: "GET",
+      pathname: `/v1/integration/connections/device-authorization/attempts/${encodeURIComponent(input.attemptId)}`,
+      fallbackMessage: "Could not read integration connection status.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: DeviceAuthorizationAttemptResponseSchema,
+      operation: "getDeviceAuthorizationAttempt",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "getDeviceAuthorizationAttempt",
+      error,
+      fallbackMessage: "Could not read integration connection status.",
+    });
+  }
+}
+
+export async function cancelDeviceAuthorizationAttempt(input: {
+  attemptId: string;
+}): Promise<DeviceAuthorizationAttemptResponse> {
+  try {
+    const response = await requestControlPlane({
+      operation: "cancelDeviceAuthorizationAttempt",
+      method: "POST",
+      pathname: `/v1/integration/connections/device-authorization/attempts/${encodeURIComponent(input.attemptId)}/cancel`,
+      fallbackMessage: "Could not cancel integration connection.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: DeviceAuthorizationAttemptResponseSchema,
+      operation: "cancelDeviceAuthorizationAttempt",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "cancelDeviceAuthorizationAttempt",
+      error,
+      fallbackMessage: "Could not cancel integration connection.",
     });
   }
 }

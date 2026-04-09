@@ -8,10 +8,13 @@ export {
   listIntegrationWebhookSources,
 } from "./integration-webhook-sources-service.js";
 export {
+  cancelDeviceAuthorizationAttempt,
   createFormIntegrationConnection,
   createApiKeyIntegrationConnection,
   deleteIntegrationConnection,
+  getDeviceAuthorizationAttempt,
   startGitHubAppInstallation,
+  startDeviceAuthorizationIntegrationConnection,
   startRedirectIntegrationConnection,
   updateFormIntegrationConnection,
   updateApiKeyIntegrationConnection,
@@ -22,6 +25,7 @@ export {
   IntegrationsApiError,
   type CreatedIntegrationConnection,
   type DeletedIntegrationConnection,
+  type DeviceAuthorizationAttemptResponse,
   type IntegrationConnection,
   type IntegrationConnectionResource,
   type IntegrationConnectionResources,
@@ -30,5 +34,6 @@ export {
   type IntegrationTarget,
   type RefreshedIntegrationConnectionResources,
   type StartedRedirectConnection,
+  type StartedDeviceAuthorizationConnection,
   type CreatedIntegrationWebhookSource,
 } from "./integrations-service-shared.js";
