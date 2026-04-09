@@ -22,6 +22,7 @@ import { ValkeySandboxRuntimeReadinessStore } from "../runtime-state/adapters/va
 import {
   BOOTSTRAP_DISCONNECT_GRACE_MS,
   IDLE_TIMEOUT_MS,
+  IDLE_REQUEST_RETRY_MS,
   OWNER_LEASE_RENEW_INTERVAL_MS,
 } from "../runtime-state/durations.js";
 import {
@@ -158,6 +159,7 @@ export function createDataPlaneGatewayRuntime(
         ownerLeaseId: input.ownerLeaseId,
         timeoutMs: IDLE_TIMEOUT_MS,
         disconnectGraceMs: BOOTSTRAP_DISCONNECT_GRACE_MS,
+        requestRetryMs: IDLE_REQUEST_RETRY_MS,
         clock: systemClock,
         scheduler: systemScheduler,
         ownerStore: sandboxOwnerStore,
