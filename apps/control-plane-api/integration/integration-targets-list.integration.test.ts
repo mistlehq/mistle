@@ -271,8 +271,7 @@ describe("integration targets discovery integration", () => {
       variantId: "jira-default",
       enabled: true,
       displayName: "Jira",
-      description:
-        "Access Jira REST APIs with personal tokens, service-account tokens, or service-account OAuth client credentials, with optional Jira CLI in sandbox.",
+      description: "Enable Jira issue access, automation, and optional Jira CLI in sandbox.",
       logoKey: "jira",
       connectionMethods: [
         {
