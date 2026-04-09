@@ -4029,6 +4029,9 @@ export interface paths {
                   name: string;
                 }[];
                 egressRoutes: {
+                  additionalHeaders?: {
+                    [key: string]: string;
+                  };
                   authInjection: {
                     target: string;
                     /** @enum {string} */
@@ -4457,6 +4460,9 @@ export interface paths {
                   name: string;
                 }[];
                 egressRoutes: {
+                  additionalHeaders?: {
+                    [key: string]: string;
+                  };
                   authInjection: {
                     target: string;
                     /** @enum {string} */

@@ -34,6 +34,47 @@ function toOptionalNonEmptyStringArray(
   return normalizedValues;
 }
 
+const HeaderNamePattern = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+
+function normalizeAdditionalHeaders(
+  value: Readonly<Record<string, string>> | undefined,
+): Readonly<Record<string, string>> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalizedHeaders: Record<string, string> = {};
+
+  for (const [rawHeaderName, rawHeaderValue] of Object.entries(value)) {
+    const normalizedHeaderName = toNonEmptyString(rawHeaderName)?.toLowerCase();
+    const normalizedHeaderValue = toNonEmptyString(rawHeaderValue);
+
+    if (
+      normalizedHeaderName === undefined ||
+      !HeaderNamePattern.test(normalizedHeaderName) ||
+      normalizedHeaderValue === undefined
+    ) {
+      return undefined;
+    }
+
+    if (normalizedHeaders[normalizedHeaderName] !== undefined) {
+      return undefined;
+    }
+
+    normalizedHeaders[normalizedHeaderName] = normalizedHeaderValue;
+  }
+
+  if (Object.keys(normalizedHeaders).length === 0) {
+    return undefined;
+  }
+
+  return Object.fromEntries(
+    Object.entries(normalizedHeaders).sort(([leftKey], [rightKey]) =>
+      leftKey.localeCompare(rightKey),
+    ),
+  );
+}
+
 export function parseAuthInjectionType(value: unknown): EgressGrantAuthInjectionType | undefined {
   if (value === "bearer" || value === "basic" || value === "header" || value === "query") {
     return value;
@@ -70,6 +111,15 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
     throw new EgressGrantError({
       code: EgressGrantErrorCode.AUTH_INJECTION_USERNAME_INVALID,
       message: "Egress grant authInjectionUsername is valid only for basic auth injection.",
+    });
+  }
+
+  const additionalHeaders = normalizeAdditionalHeaders(input.additionalHeaders);
+  if (input.additionalHeaders !== undefined && additionalHeaders === undefined) {
+    throw new EgressGrantError({
+      code: EgressGrantErrorCode.ADDITIONAL_HEADERS_INVALID,
+      message:
+        "Egress grant additionalHeaders must contain unique valid header names and non-empty values.",
     });
   }
 
@@ -118,6 +168,7 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
       "authInjectionTarget",
     ),
     ...(authInjectionUsername === undefined ? {} : { authInjectionUsername }),
+    ...(additionalHeaders === undefined ? {} : { additionalHeaders }),
     ...(slotKey === undefined ? {} : { slotKey }),
     ...(resolverKey === undefined ? {} : { resolverKey }),
     ...(allowedMethods === undefined ? {} : { allowedMethods }),

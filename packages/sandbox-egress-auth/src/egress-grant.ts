@@ -16,6 +16,15 @@ function toSecretKey(secret: string): ReturnType<typeof createSecretKey> {
   return createSecretKey(new TextEncoder().encode(secret));
 }
 
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every((entry) => typeof entry === "string")
+  );
+}
+
 function mapClaimValidationErrorCode(
   error: JoseErrors.JWTClaimValidationFailed,
 ): EgressGrantErrorCodeType {
@@ -56,6 +65,9 @@ export async function mintEgressGrant(input: {
       ...(claims.authInjectionUsername === undefined
         ? {}
         : { authInjectionUsername: claims.authInjectionUsername }),
+      ...(claims.additionalHeaders === undefined
+        ? {}
+        : { additionalHeaders: claims.additionalHeaders }),
       ...(claims.slotKey === undefined ? {} : { slotKey: claims.slotKey }),
       ...(claims.resolverKey === undefined ? {} : { resolverKey: claims.resolverKey }),
       ...(claims.allowedMethods === undefined ? {} : { allowedMethods: claims.allowedMethods }),
@@ -130,6 +142,9 @@ export async function verifyEgressGrant(input: {
           : "",
       ...(typeof verificationResult.payload.authInjectionUsername === "string"
         ? { authInjectionUsername: verificationResult.payload.authInjectionUsername }
+        : {}),
+      ...(isStringRecord(verificationResult.payload.additionalHeaders)
+        ? { additionalHeaders: verificationResult.payload.additionalHeaders }
         : {}),
       ...(typeof verificationResult.payload.slotKey === "string"
         ? { slotKey: verificationResult.payload.slotKey }

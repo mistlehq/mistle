@@ -46,6 +46,7 @@ const EgressCredentialRouteSchema = z
         username: z.string().min(1).optional(),
       })
       .strict(),
+    additionalHeaders: z.record(z.string(), z.string()).optional(),
     credentialResolver: z
       .object({
         connectionId: z.string().min(1),
@@ -255,6 +256,49 @@ function sortRecord(input: Record<string, string>): Record<string, string> {
   );
 }
 
+const HeaderNamePattern = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+
+function normalizeAdditionalHeaders(
+  input: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const normalizedHeaders: Record<string, string> = {};
+
+  for (const [rawHeaderName, rawHeaderValue] of Object.entries(input)) {
+    const normalizedHeaderName = rawHeaderName.trim().toLowerCase();
+    const normalizedHeaderValue = rawHeaderValue.trim();
+
+    if (normalizedHeaderName.length === 0 || !HeaderNamePattern.test(normalizedHeaderName)) {
+      throw new Error(
+        `Invalid additional header name '${rawHeaderName}' in compiled runtime plan.`,
+      );
+    }
+
+    if (normalizedHeaderValue.length === 0) {
+      throw new Error(
+        `Invalid additional header value for '${rawHeaderName}' in compiled runtime plan.`,
+      );
+    }
+
+    if (normalizedHeaders[normalizedHeaderName] !== undefined) {
+      throw new Error(
+        `Duplicate additional header '${normalizedHeaderName}' in compiled runtime plan.`,
+      );
+    }
+
+    normalizedHeaders[normalizedHeaderName] = normalizedHeaderValue;
+  }
+
+  if (Object.keys(normalizedHeaders).length === 0) {
+    return undefined;
+  }
+
+  return sortRecord(normalizedHeaders);
+}
+
 function normalizeRuntimeArtifactCommand(
   command: z.output<typeof RuntimeArtifactCommandSchema>,
 ): RuntimePlanArtifactCommand {
@@ -267,6 +311,8 @@ function normalizeRuntimeArtifactCommand(
 }
 
 function normalizeRoute(route: z.output<typeof EgressCredentialRouteSchema>): RuntimePlanRoute {
+  const additionalHeaders = normalizeAdditionalHeaders(route.additionalHeaders);
+
   return {
     egressRuleId: route.egressRuleId,
     bindingId: route.bindingId,
@@ -285,6 +331,7 @@ function normalizeRoute(route: z.output<typeof EgressCredentialRouteSchema>): Ru
         ? {}
         : { username: route.authInjection.username }),
     },
+    ...(additionalHeaders === undefined ? {} : { additionalHeaders }),
     credentialResolver: {
       connectionId: route.credentialResolver.connectionId,
       secretType: route.credentialResolver.secretType,

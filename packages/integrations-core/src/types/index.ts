@@ -981,6 +981,7 @@ export type EgressCredentialRoute = {
      */
     username?: string;
   };
+  additionalHeaders?: Readonly<Record<string, string>>;
   credentialResolver: EgressCredentialResolverRef;
 };
 

@@ -662,4 +662,89 @@ describe("assembleCompiledRuntimePlan", () => {
       code: CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
     });
   });
+
+  it("normalizes additional egress headers to lowercase sorted keys", () => {
+    const plan = CompiledRuntimePlanSchema.parse({
+      sandboxProfileId: "sbp_123",
+      version: 7,
+      image: {
+        source: "base",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      },
+      egressRoutes: [
+        {
+          egressRuleId: "egress_rule_openai",
+          bindingId: "bind_openai",
+          match: {
+            hosts: ["api.openai.com"],
+          },
+          upstream: {
+            baseUrl: "https://api.openai.com",
+          },
+          authInjection: {
+            type: "bearer",
+            target: "authorization",
+          },
+          additionalHeaders: {
+            "X-Trace-ID": " trace_123 ",
+            " ChatGPT-Account-ID ": " acct_123 ",
+          },
+          credentialResolver: {
+            connectionId: "conn_openai",
+            secretType: "oauth2_access_token",
+          },
+        },
+      ],
+      artifacts: [],
+      workspaceSources: [],
+      runtimeClients: [],
+      agentRuntimes: [],
+    });
+
+    expect(plan.egressRoutes[0]?.additionalHeaders).toEqual({
+      "chatgpt-account-id": "acct_123",
+      "x-trace-id": "trace_123",
+    });
+  });
+
+  it("rejects additional egress headers that collapse to the same normalized name", () => {
+    expect(() =>
+      CompiledRuntimePlanSchema.parse({
+        sandboxProfileId: "sbp_123",
+        version: 7,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        egressRoutes: [
+          {
+            egressRuleId: "egress_rule_openai",
+            bindingId: "bind_openai",
+            match: {
+              hosts: ["api.openai.com"],
+            },
+            upstream: {
+              baseUrl: "https://api.openai.com",
+            },
+            authInjection: {
+              type: "bearer",
+              target: "authorization",
+            },
+            additionalHeaders: {
+              "ChatGPT-Account-ID": "acct_123",
+              "chatgpt-account-id": "acct_456",
+            },
+            credentialResolver: {
+              connectionId: "conn_openai",
+              secretType: "oauth2_access_token",
+            },
+          },
+        ],
+        artifacts: [],
+        workspaceSources: [],
+        runtimeClients: [],
+        agentRuntimes: [],
+      }),
+    ).toThrow(/Duplicate additional header/);
+  });
 });

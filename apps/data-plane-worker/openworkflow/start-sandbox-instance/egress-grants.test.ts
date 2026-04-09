@@ -102,6 +102,9 @@ describe("createEgressGrantByRuleId", () => {
               type: "bearer",
               target: "authorization",
             },
+            additionalHeaders: {
+              "chatgpt-account-id": "acct_123",
+            },
             credentialResolver: {
               connectionId: "icn_github",
               secretType: "github_app_installation_token",
@@ -137,6 +140,9 @@ describe("createEgressGrantByRuleId", () => {
       upstreamBaseUrl: "https://api.github.com",
       authInjectionType: "bearer",
       authInjectionTarget: "authorization",
+      additionalHeaders: {
+        "chatgpt-account-id": "acct_123",
+      },
       slotKey: "github.github-cloud.github-app-installation.installation-token",
       resolverKey: "github_app_installation_token",
       allowedMethods: ["GET"],
@@ -146,6 +152,9 @@ describe("createEgressGrantByRuleId", () => {
     const decodedGrant = decodeJwtPayload(egressGrantByRuleId.egress_rule_github ?? "");
     expect(decodedGrant.exp).toBeTypeOf("number");
     expect(decodedGrant.iat).toBeTypeOf("number");
+    expect(decodedGrant.additionalHeaders).toEqual({
+      "chatgpt-account-id": "acct_123",
+    });
     expect(Number(decodedGrant.exp) - Number(decodedGrant.iat)).toBe(60 * 60 * 24);
   });
 });
