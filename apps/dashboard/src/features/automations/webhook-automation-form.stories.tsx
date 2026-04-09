@@ -453,7 +453,7 @@ function StoryHarness(input: {
   const [validationSummaryError, setValidationSummaryError] = useState<string | null>(
     input.validationSummaryError ?? null,
   );
-  const pageTitle = input.mode === "create" ? "Create automation" : "Edit automation";
+  const pageTitle = input.mode === "create" ? "Create automation" : "";
 
   useEffect(() => {
     if (input.validateOnMount !== true) {

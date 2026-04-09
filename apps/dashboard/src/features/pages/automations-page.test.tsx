@@ -78,7 +78,7 @@ describe("AutomationsPage", () => {
     );
 
     expect(markup).toContain("Automations");
-    expect(markup).toContain("Create automation");
+    expect(markup).toContain("Create");
     expect(markup).toContain("justify-between");
     expect(markup).toContain('data-slot="table-container" class="relative w-full overflow-x-auto"');
     expect(markup).toContain(

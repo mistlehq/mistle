@@ -157,7 +157,7 @@ function SelectField(input: {
 
 export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.JSX.Element {
   const inputTemplateLabelId = "automation-input-template-label";
-  const submitLabel = input.mode === "create" ? "Create automation" : "Save changes";
+  const submitLabel = input.mode === "create" ? "Create" : "Save";
   const selectedTriggerOptions = resolveSelectedWebhookAutomationEventOptions({
     eventOptions: input.webhookEventOptions,
     selectedTriggerIds: input.values.triggerIds,

@@ -82,7 +82,7 @@ export function AutomationsPage(): React.JSX.Element {
           }}
           type="button"
         >
-          Create automation
+          Create
         </Button>
       </div>
 
