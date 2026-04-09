@@ -17,7 +17,11 @@ import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbo
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import { resolveAppShellFrame } from "../shell/app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
-import { shouldNavigateToNewSessionOnSidebarModeEnable } from "../shell/app-shell-sessions-sidebar-mode.js";
+import { resolveAppShellRouteState } from "../shell/app-shell-route-state.js";
+import {
+  resolveSidebarModeToggleNavigationTarget,
+  SessionsRoutes,
+} from "../shell/app-shell-sessions-sidebar-mode.js";
 import { AppShellView } from "../shell/app-shell-view.js";
 import { NewSessionPage } from "./new-session-page.js";
 import { SessionsPage } from "./sessions-page.js";
@@ -84,26 +88,24 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
   const [showSessionsSidebar, setShowSessionsSidebar] = useState(
     input.initialShowSessionsSidebar === true,
   );
-  const inSessions =
-    location.pathname === "/sessions" || location.pathname.startsWith("/sessions/");
-  const inSessionDetail = location.pathname.startsWith("/sessions/");
+  const routeState = resolveAppShellRouteState(location.pathname);
   const appShellFrame = resolveAppShellFrame({
     handleBackToApp: () => {},
     handleNavigateToSettings: () => {},
     handleSignOut: () => {},
-    inAutomations: false,
-    inDashboardRoot: false,
-    inSandboxProfiles: false,
-    inSessionDetail,
-    inSessions,
-    inSettings: false,
+    inAutomations: routeState.inAutomations,
+    inDashboardRoot: routeState.inDashboardRoot,
+    inSandboxProfiles: routeState.inSandboxProfiles,
+    inSessionDetail: routeState.inSessionDetail,
+    inSessions: routeState.inSessions,
+    inSettings: routeState.inSettings,
     isSigningOut: false,
     locationPathname: location.pathname,
     organizationErrorMessage: null,
     organizationImageUrl: null,
     organizationName: "Mistle Labs",
     pageMeta: {
-      appShellInsetOwner: location.pathname === "/sessions/new" ? "child" : "app-shell",
+      appShellInsetOwner: location.pathname === SessionsRoutes.NEW ? "child" : "app-shell",
       appShellViewportMode: "document",
       title: null,
       headerIcon: null,
@@ -113,9 +115,13 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     showSessionsSidebar,
     onShowSessionsSidebarChange: (checked) => {
       setShowSessionsSidebar(checked);
+      const navigationTarget = resolveSidebarModeToggleNavigationTarget({
+        nextChecked: checked,
+        pathname: location.pathname,
+      });
 
-      if (checked && shouldNavigateToNewSessionOnSidebarModeEnable(location.pathname)) {
-        void navigate("/sessions/new");
+      if (navigationTarget !== null) {
+        void navigate(navigationTarget);
       }
     },
   });

@@ -6,11 +6,7 @@ import { authClient } from "../../lib/auth/client.js";
 import { resolveErrorMessage } from "../auth/messages.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { useOrganizationLogoQuery } from "../organizations/organization-logo-query.js";
-import {
-  isSettingsPath,
-  resolveSettingsBackDestination,
-  SETTINGS_DEFAULT_PATH,
-} from "../settings/model.js";
+import { resolveSettingsBackDestination, SETTINGS_DEFAULT_PATH } from "../settings/model.js";
 import {
   getBestEffortBrowserStorage,
   readBrowserStorageItem,
@@ -22,7 +18,8 @@ import {
 } from "../shared/singleton-image.js";
 import { resolveAppShellFrame } from "./app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
-import { shouldNavigateToNewSessionOnSidebarModeEnable } from "./app-shell-sessions-sidebar-mode.js";
+import { resolveAppShellRouteState } from "./app-shell-route-state.js";
+import { resolveSidebarModeToggleNavigationTarget } from "./app-shell-sessions-sidebar-mode.js";
 import { AppShellView } from "./app-shell-view.js";
 import { clearAuthenticatedSessionCache } from "./session-cache.js";
 import { useOrganizationSummary } from "./use-organization-summary.js";
@@ -43,21 +40,13 @@ export function AppShell(): React.JSX.Element {
   const [showSessionsSidebar, setShowSessionsSidebar] = useState(() =>
     readSessionsSidebarEnabledPreference(),
   );
-  const inSettings = isSettingsPath(location.pathname);
-  const inSandboxProfiles =
-    location.pathname === "/sandbox-profiles" || location.pathname.startsWith("/sandbox-profiles/");
-  const inAutomations =
-    location.pathname === "/automations" || location.pathname.startsWith("/automations/");
-  const inDashboardRoot = location.pathname === "/";
-  const inSessions =
-    location.pathname === "/sessions" || location.pathname.startsWith("/sessions/");
-  const inSessionDetail = location.pathname.startsWith("/sessions/");
+  const routeState = resolveAppShellRouteState(location.pathname);
 
   useEffect(() => {
-    if (!isSettingsPath(location.pathname)) {
+    if (!routeState.inSettings) {
       previousNonSettingsPathRef.current = location.pathname;
     }
-  }, [location.pathname]);
+  }, [location.pathname, routeState.inSettings]);
 
   useEffect(() => {
     persistSessionsSidebarEnabledPreference(showSessionsSidebar);
@@ -90,16 +79,16 @@ export function AppShell(): React.JSX.Element {
 
   async function handleSessionsSidebarModeChange(nextChecked: boolean): Promise<void> {
     setShowSessionsSidebar(nextChecked);
+    const navigationTarget = resolveSidebarModeToggleNavigationTarget({
+      nextChecked,
+      pathname: location.pathname,
+    });
 
-    if (!nextChecked) {
+    if (navigationTarget === null) {
       return;
     }
 
-    if (!shouldNavigateToNewSessionOnSidebarModeEnable(location.pathname)) {
-      return;
-    }
-
-    await navigate("/sessions/new");
+    await navigate(navigationTarget);
   }
 
   const appShellFrame = resolveAppShellFrame({
@@ -112,12 +101,12 @@ export function AppShell(): React.JSX.Element {
     handleSignOut: () => {
       void handleSignOut();
     },
-    inAutomations,
-    inDashboardRoot,
-    inSandboxProfiles,
-    inSessionDetail,
-    inSessions,
-    inSettings,
+    inAutomations: routeState.inAutomations,
+    inDashboardRoot: routeState.inDashboardRoot,
+    inSandboxProfiles: routeState.inSandboxProfiles,
+    inSessionDetail: routeState.inSessionDetail,
+    inSessions: routeState.inSessions,
+    inSettings: routeState.inSettings,
     isSigningOut,
     locationPathname: location.pathname,
     organizationErrorMessage: organizationSummary.organizationErrorMessage,

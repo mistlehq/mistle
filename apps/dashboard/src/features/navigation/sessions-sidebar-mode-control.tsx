@@ -1,4 +1,6 @@
-import { SidebarTrigger, Switch } from "@mistle/ui";
+import { SidebarTrigger } from "@mistle/ui";
+
+import { SessionsSidebarModeSwitch } from "./sessions-sidebar-mode-switch.js";
 
 export function SessionsSidebarModeControl(input: {
   checked: boolean;
@@ -12,12 +14,9 @@ export function SessionsSidebarModeControl(input: {
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <Switch
-          aria-label="Toggle sessions sidebar view"
+        <SessionsSidebarModeSwitch
           checked={input.checked}
           onCheckedChange={input.onCheckedChange}
-          className="cursor-default"
-          size="sm"
         />
         {input.checked ? <SidebarTrigger className="size-7 cursor-default" /> : null}
       </div>
