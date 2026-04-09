@@ -10,8 +10,12 @@ describe("SessionWorkbenchPageView", () => {
     const { container } = render(
       <SessionWorkbenchPageView
         alerts={[]}
+        bottomPanel={<div>Terminal</div>}
+        bottomPanelSize={32}
+        isBottomPanelVisible={false}
         isSecondaryPanelVisible={false}
         mainContent={<div>Conversation body</div>}
+        onBottomPanelResize={function onBottomPanelResize() {}}
         onSecondaryPanelResize={function onSecondaryPanelResize() {}}
         primaryBottomPanel={<div>Composer</div>}
         sandboxInstanceId="sbi_test"
@@ -35,9 +39,13 @@ describe("SessionWorkbenchPageView", () => {
     render(
       <SessionWorkbenchPageView
         alerts={[]}
+        bottomPanel={<div>Terminal</div>}
+        bottomPanelSize={32}
+        isBottomPanelVisible={false}
         isSecondaryPanelVisible={false}
         mainContent={<div>Conversation body</div>}
         mainContentLayout={{ scroll: "contained", width: "full" }}
+        onBottomPanelResize={function onBottomPanelResize() {}}
         onSecondaryPanelResize={function onSecondaryPanelResize() {}}
         primaryBottomPanel={<div>Composer</div>}
         sandboxInstanceId="sbi_test"

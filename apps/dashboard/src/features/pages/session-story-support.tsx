@@ -116,9 +116,13 @@ export function createStorySessionBottomPanel(
 
 export function renderSessionWorkbenchStory(input: {
   alerts?: readonly SessionWorkbenchAlert[];
+  bottomPanel?: React.ReactNode;
+  bottomPanelSize?: number;
   isSecondaryPanelVisible?: boolean;
+  isBottomPanelVisible?: boolean;
   mainContentLayout?: React.ComponentProps<typeof SessionWorkbenchPageView>["mainContentLayout"];
   mainContent: React.ReactNode;
+  onBottomPanelResize?: (size: number) => void;
   onSecondaryPanelResize?: (size: number) => void;
   primaryBottomPanel: React.ReactNode;
   secondaryPanel?: React.ReactNode;
@@ -131,8 +135,12 @@ export function renderSessionWorkbenchStory(input: {
   return (
     <SessionWorkbenchPageView
       alerts={input.alerts ?? []}
+      bottomPanel={input.bottomPanel ?? <></>}
+      bottomPanelSize={input.bottomPanelSize ?? 32}
+      isBottomPanelVisible={input.isBottomPanelVisible ?? false}
       isSecondaryPanelVisible={input.isSecondaryPanelVisible ?? false}
       mainContent={input.mainContent}
+      onBottomPanelResize={input.onBottomPanelResize ?? noop}
       onSecondaryPanelResize={input.onSecondaryPanelResize ?? noop}
       primaryBottomPanel={input.primaryBottomPanel}
       secondaryPanel={input.secondaryPanel ?? <></>}
@@ -174,10 +182,14 @@ export function SessionWorkbenchStoryChrome(input: {
 
 export function renderSessionWorkbenchContentStory(input: {
   alerts?: readonly SessionWorkbenchAlert[];
+  bottomPanel?: React.ReactNode;
+  bottomPanelSize?: number;
   headerStatusUi?: SandboxStatusBadgeUi;
+  isBottomPanelVisible?: boolean;
   isSecondaryPanelVisible?: boolean;
   mainContent: React.ReactNode;
   mainContentLayout?: React.ComponentProps<typeof SessionWorkbenchPageView>["mainContentLayout"];
+  onBottomPanelResize?: (size: number) => void;
   onSecondaryPanelResize?: (size: number) => void;
   primaryBottomPanel: React.ReactNode;
   secondaryPanel?: React.ReactNode;

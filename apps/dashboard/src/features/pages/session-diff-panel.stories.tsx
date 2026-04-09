@@ -67,17 +67,17 @@ const StoryBranchPatch = [
   " };",
 ].join("\n");
 
-function StoryDiffWorkbench(): React.JSX.Element {
+type StoryDiffWorkbenchProps = {
+  patch: string;
+};
+
+function StoryDiffWorkbench({ patch }: StoryDiffWorkbenchProps): React.JSX.Element {
   return renderSessionWorkbenchContentStory({
     isSecondaryPanelVisible: true,
     mainContent: createStorySessionMainContent(),
     primaryBottomPanel: createStorySessionBottomPanel(),
     secondaryPanel: (
-      <SessionDiffPanel
-        patch={StoryBranchPatch}
-        summaryLabel="Compared with main"
-        title="Changes"
-      />
+      <SessionDiffPanel patch={patch} summaryLabel="Compared with main" title="Changes" />
     ),
     secondaryPanelSize: 42,
   });
@@ -91,6 +91,9 @@ const meta = {
     layout: "fullscreen",
   },
   decorators: [withDashboardWorkspaceStory],
+  args: {
+    patch: StoryBranchPatch,
+  },
 } satisfies Meta<typeof StoryDiffWorkbench>;
 
 export default meta;
@@ -98,3 +101,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const AgainstMain: Story = {};
+
+export const EmptyState: Story = {
+  args: {
+    patch: "",
+  },
+};

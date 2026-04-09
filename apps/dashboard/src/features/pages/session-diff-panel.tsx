@@ -116,11 +116,7 @@ export function SessionDiffPanel({
           </pre>
         </div>
       ) : files.length === 0 ? (
-        <div className="p-4">
-          <Notice title="No changes detected" variant="default">
-            This diff is empty.
-          </Notice>
-        </div>
+        <div className="text-muted-foreground p-3 text-sm">No changes detected.</div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto p-2">
           <div className="flex flex-col gap-2">
