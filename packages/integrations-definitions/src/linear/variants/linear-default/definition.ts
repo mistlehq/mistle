@@ -30,7 +30,7 @@ export const LinearDefinition: LinearIntegrationDefinition = {
   variantId: "linear-default",
   kind: IntegrationKinds.CONNECTOR,
   displayName: "Linear",
-  description: "Expose Linear's remote MCP server to sandbox agents through Mistle egress.",
+  description: "Enable access to Linear issues, projects, and workflows from agents.",
   logoKey: "linear",
   targetConfigSchema: LinearTargetConfigSchema,
   targetSecretSchema: LinearTargetSecretSchema,
