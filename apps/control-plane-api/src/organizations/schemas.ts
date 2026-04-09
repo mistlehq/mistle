@@ -34,8 +34,6 @@ export const MemberAvatarSchema = z
   })
   .strict();
 
-export const MemberAvatarsResponseSchema = z.array(MemberAvatarSchema);
-
 export const DirectoryFilterSchema = z.enum(["all", "members", "invitations"]);
 
 export const DirectoryMemberEntrySchema = z

@@ -11,6 +11,6 @@ export type {
   SettingsMember,
 } from "./members-api-types.js";
 export { listMembersDirectoryPage } from "./members-directory-page-service.js";
-export { inviteMember, listInvitations, revokeInvitation } from "./members-invitations-service.js";
-export { listMembers, removeMember, updateMemberRole } from "./members-directory-service.js";
+export { inviteMember, revokeInvitation } from "./members-invitations-service.js";
+export { removeMember, updateMemberRole } from "./members-mutations-service.js";
 export { resolveActiveOrganizationId } from "./session-context.js";

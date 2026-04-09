@@ -32,7 +32,8 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
   );
 
   const isPageLoading =
-    membersState.directoryQuery.isPending || membersState.capabilitiesQuery.isPending;
+    (membersState.directoryQuery.data === undefined && membersState.directoryQuery.isPending) ||
+    (membersState.capabilitiesQuery.data === undefined && membersState.capabilitiesQuery.isPending);
 
   return (
     <PageFrame description={description} headerActions={headerActions} title={title}>

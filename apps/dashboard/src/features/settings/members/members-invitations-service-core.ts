@@ -1,13 +1,6 @@
 import { executeMembersOperation } from "./members-api-errors.js";
-import type {
-  InviteMemberResponse,
-  OrganizationRole,
-  SettingsInvitation,
-} from "./members-api-types.js";
-import {
-  parseInviteMemberResponse,
-  parseInvitationsResponse,
-} from "./members-invitations-parser.js";
+import type { InviteMemberResponse, OrganizationRole } from "./members-api-types.js";
+import { parseInviteMemberResponse } from "./members-invitations-parser.js";
 
 type MembersInvitationsQuery = Record<string, string>;
 type MembersInvitationsBody = Record<string, string | boolean>;
@@ -25,7 +18,6 @@ export type MembersInvitationsFetchClient = {
 };
 
 export function createMembersInvitationsService(client: MembersInvitationsFetchClient): {
-  listInvitations: (input: { organizationId: string }) => Promise<SettingsInvitation[]>;
   inviteMember: (input: {
     organizationId: string;
     email: string;
@@ -35,19 +27,6 @@ export function createMembersInvitationsService(client: MembersInvitationsFetchC
   revokeInvitation: (input: { invitationId: string }) => Promise<void>;
 } {
   return {
-    async listInvitations(input: { organizationId: string }): Promise<SettingsInvitation[]> {
-      return executeMembersOperation("listInvitations", async () => {
-        const result = await client.$fetch("/organization/list-invitations", {
-          method: "GET",
-          throw: true,
-          query: {
-            organizationId: input.organizationId,
-          },
-        });
-        const parsed = parseInvitationsResponse(result);
-        return parsed;
-      });
-    },
     async inviteMember(input: {
       organizationId: string;
       email: string;
